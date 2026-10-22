@@ -399,7 +399,8 @@ class UprImportContext:
     # workbook Applicable/DNA cell only maps to Not Applicable for these ids.
     not_applicable_item_ids: Set[int] = field(default_factory=set)
     warnings: List[str] = field(default_factory=list)
-    # PNS assignment AES ids with at least one Excel Funding row where PNS reported = Yes.
+    # PNS assignment AES ids that have a PNS Data row with a value. Status
+    # (approve vs clear/pending) uses these, not the ``PNS reported`` column.
     pns_t22_reported_aes: Set[int] = field(default_factory=set)
     pns_t23_reported_aes: Set[int] = field(default_factory=set)
     # (aes_id, item_id) / (aes_id, section_id, bank_id, repeat_instance_number) pairs that
@@ -542,8 +543,60 @@ def parse_upr_source(row: Dict[str, Any]) -> str:
 
 
 def is_pns_data_source(row: Dict[str, Any]) -> bool:
-    """True when ``Source`` is PNS Data — reporting PNS self-report (ValueNum)."""
+    """True when ``Source`` is PNS Data — the society's own rows, not Country Data."""
     return parse_upr_source(row) == "pns data"
+
+
+def _row_has_pns_figure(row: Dict[str, Any]) -> bool:
+    """True when a PNS Data row carries a number (funding, staff, or another value)."""
+    for key in ("ValueNum", "PNS Value", "Country Value"):
+        if parse_value_num(row.get(key)) is not None:
+            return True
+    return False
+
+
+def pns_aes_with_pns_data(
+    rows: List[Dict[str, Any]],
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    rounds: Optional[Set[str]] = None,
+) -> Dict[int, Set[int]]:
+    """Assignment ids to approve: the society has a ``Source = PNS Data`` row with a value.
+
+    Planning (template 22) uses ``P*`` rounds. Reporting (template 23) uses ``AR*``
+    rounds. The ``PNS reported`` column is not consulted.
+    """
+    out: Dict[int, Set[int]] = {22: set(), 23: set()}
+    if 22 not in template_ids and 23 not in template_ids:
+        return out
+
+    for row in rows:
+        if not is_pns_data_source(row) or not _row_has_pns_figure(row):
+            continue
+        rnd = str(row.get("Round") or "").strip().upper()
+        if not is_upr_master_importable_round(rnd):
+            continue
+        if rounds and rnd not in rounds:
+            continue
+        if str(row.get("Entity") or "").strip().upper() != "PNS":
+            continue
+        period = round_to_period(rnd)
+        ns_name = str(row.get("NS") or "").strip()
+        if not period or not ns_name or ns_name.lower() == "country":
+            continue
+        pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
+        if not pns_iso3:
+            continue
+        if rnd.startswith("P") and 22 in template_ids:
+            pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
+            if pns_aes:
+                out[22].add(int(pns_aes))
+        elif rnd.startswith("AR") and 23 in template_ids:
+            pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
+            if pns_aes:
+                out[23].add(int(pns_aes))
+    return out
 
 
 def _build_pns_reported_yes_sets(
@@ -657,7 +710,7 @@ def plan_non_reported_pns_aes_by_template(
     periods: Optional[Set[str]] = None,
     rounds: Optional[Set[str]] = None,
 ) -> Dict[int, Set[int]]:
-    """Map template id → AES ids with no ``PNS reported = Yes`` in the import scope.
+    """Map template id → AES ids with no PNS Data values in the import scope.
 
     Scope is always the allowlisted, template-appropriate periods (see
     ``pns_clear_periods_for_template``); ``periods`` can only narrow it further.
@@ -703,7 +756,7 @@ def reported_pns_aes_in_scope(
     *,
     rounds: Optional[Set[str]] = None,
 ) -> Set[int]:
-    """PNS assignments in this import that received workbook data and should be approved."""
+    """PNS assignments in this import that have PNS Data values and should be approved."""
     out: Set[int] = set()
     template_reported = (
         (22, ctx.pns_t22_reported_aes),
@@ -729,7 +782,7 @@ def apply_reported_pns_approvals(
     dry_run: bool = False,
     user_id: Optional[int] = None,
 ) -> Dict[str, int]:
-    """Mark PNS assignments that received imported data as approved."""
+    """Mark PNS assignments that have PNS Data values as approved."""
     from app.extensions import db
     from app.models.assignments import AssignmentEntityStatus
     from app.models.enums import AssignmentEntityStatusValue
@@ -788,7 +841,7 @@ def plan_pns_assignment_status_updates(
     periods: Optional[Set[str]] = None,
     rounds: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
-    """Plan ``pending`` status for PNS templates with no ``PNS reported = Yes`` in Excel."""
+    """Plan ``pending`` status for PNS assignments with no PNS Data values in Excel."""
     by_template = plan_non_reported_pns_aes_by_template(
         ctx, template_ids, periods=periods, rounds=rounds
     )
@@ -812,7 +865,7 @@ def clear_non_reported_pns_form_data(
     dry_run: bool = False,
 ) -> Tuple[Dict[str, int], Set[Tuple[int, int]]]:
     """
-    Delete UPR-imported form_data on PNS assignments with no ``PNS reported = Yes``.
+    Delete UPR-imported form_data on PNS assignments with no PNS Data values.
 
     Returns stats and ``(aes_id, form_item_id)`` source pairs for variable refresh.
     """
@@ -863,7 +916,12 @@ def clear_non_reported_pns_form_data(
 
 
 def _refresh_completion_for_aes_ids(aes_ids: Set[int]) -> int:
-    """Recompute stored ``completion_rate`` so the UI never shows a stale 100% after import."""
+    """Recompute stored ``completion_rate`` for each assignment after import.
+
+    The Excel upsert writes ``form_data`` directly, so country and PNS rates
+    stay stale unless this runs. Each assignment is committed on its own so one
+    failure does not discard the rates already saved.
+    """
     if not aes_ids:
         return 0
     from app.extensions import db
@@ -873,12 +931,11 @@ def _refresh_completion_for_aes_ids(aes_ids: Set[int]) -> int:
     for aes_id in sorted(aes_ids):
         try:
             AssignmentCompletionService.refresh_and_persist(int(aes_id))
+            db.session.commit()
             refreshed += 1
         except Exception as exc:
             db.session.rollback()
             logger.warning("Completion refresh failed (aes_id=%s): %s", aes_id, exc)
-    if refreshed:
-        db.session.commit()
     return refreshed
 
 
@@ -910,11 +967,6 @@ def sync_non_reported_pns_assignments(
         dry_run=dry_run,
         user_id=user_id,
     )
-    if not dry_run:
-        _refresh_completion_for_aes_ids(
-            {int(src[0]) for src in updated_sources}
-            | {int(r["assignment_entity_status_id"]) for r in status_plan}
-        )
 
     if not dry_run and updated_sources:
         from app.services.forms.variable_resolution_service import VariableResolutionService
@@ -4991,8 +5043,11 @@ def transform_to_import_rows(
             aes_meta=aes_meta,
         )
 
-    ctx.pns_t22_reported_aes = {int(aes) for aes, _ in pns_t22_reported_yes}
-    ctx.pns_t23_reported_aes = {int(aes) for aes, _ in pns_t23_reported_yes}
+    # Cell writes above still follow ``PNS reported`` for template 22. Status does not:
+    # approve when the society has a PNS Data value, and clear the rest.
+    with_pns_data = pns_aes_with_pns_data(rows, ctx, tids, rounds=rounds)
+    ctx.pns_t22_reported_aes = set(with_pns_data.get(22, set()))
+    ctx.pns_t23_reported_aes = set(with_pns_data.get(23, set()))
     _refresh_resolved_emergency_slots(ctx)
 
     return import_rows
@@ -5215,6 +5270,15 @@ def run_upr_import(
                 user_id=user_id,
             )
             upsert_stats.update(pns_sync_stats)
+        # Form-data upsert does not go through FormDataService, which is what
+        # normally stores completion_rate. Recompute every assignment on the
+        # selected (template, round) pairs: country (24, 33) and PNS (22, 23),
+        # including PNS rows whose imported data was just cleared.
+        if dry_run:
+            upsert_stats["completion_refreshed"] = 0
+        else:
+            _progress("completion", "Recalculating completion rates...", 96.0)
+            upsert_stats["completion_refreshed"] = _refresh_completion_for_aes_ids(valid_aes_ids)
         upsert_stats.update(summarize_warnings(ctx.warnings))
         upsert_stats["transformed"] = len(import_rows)
         upsert_stats["dynamic_transformed"] = len(ctx.dynamic_indicator_entries)

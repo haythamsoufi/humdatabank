@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (selectReadyBtn) selectReadyBtn.addEventListener('click', function () {
     bulkSelect(
       function (it) { return it.status === 'ok'; },
-      {{ _("No target is fully ready: every importable target carries a warning (existing progress, skipped entities, cleared PNS data…). Use “Select all applicable” and review the warnings.")|tojson|safe }}
+      {{ _("No target is fully ready: every importable target carries a warning (skipped entities, cleared PNS data…). Use “Select all applicable” and review the warnings.")|tojson|safe }}
     );
   });
   var selectImportableBtn = document.getElementById('upr-excel-select-importable');
@@ -494,6 +494,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var warningSectionTitle = {
+    emergency_appeals: {{ _("Emergency Appeals")|tojson|safe }},
     review: {{ _("Review on the form")|tojson|safe }},
     matched: {{ _("Matched to a GO appeal")|tojson|safe }},
     other: {{ _("Other")|tojson|safe }}
@@ -537,23 +538,23 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     groups.forEach(function (group, index) {
-      var block = el('div', index ? 'mt-3' : '');
+      var details = document.createElement('details');
+      details.className = index ? 'mt-2' : '';
       var title = warningSectionTitle[group.id] || group.id;
       var count = (group.items || []).length;
-      var headingClass = group.id === 'matched' ? 'font-medium text-gray-700 mb-1' : 'font-medium text-amber-900 mb-1';
-      block.appendChild(el('p', headingClass, title + ' (' + count + ')'));
+      var summary = document.createElement('summary');
+      summary.className = 'cursor-pointer font-medium text-amber-900';
+      summary.textContent = title + ' (' + count + ')';
+      details.appendChild(summary);
       if (group.note) {
-        block.appendChild(el('p', 'text-xs text-amber-800 mb-1', warningSectionNote[group.note] || group.note));
+        details.appendChild(el('p', 'text-xs text-amber-800 mt-1', warningSectionNote[group.note] || group.note));
       }
-      var listClass = group.id === 'matched'
-        ? 'list-disc ml-5 space-y-1 text-sm text-gray-700'
-        : 'list-disc ml-5 space-y-1 text-sm text-amber-900';
-      var list = el('ul', listClass);
+      var list = el('ul', 'list-disc ml-5 mt-1 space-y-1 text-sm text-amber-900');
       (group.items || []).forEach(function (item) {
         list.appendChild(renderWarningItem(item, ''));
       });
-      block.appendChild(list);
-      wrap.appendChild(block);
+      details.appendChild(list);
+      wrap.appendChild(details);
     });
   }
 

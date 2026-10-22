@@ -485,12 +485,17 @@ class TestUploadServingHeaders:
             ("/api/v1/uploads/ns/evil.svg", "ns/evil.svg"),
         ],
     )
-    def test_svg_is_never_rendered_inline(self, client, upload_root, url, rel):
+    def test_system_svg_logo_is_inline_with_script_blocking_csp(self, client, upload_root, url, rel):
+        """Sector, NS, SP/EF, and branding SVGs paint in ``<img>``. Scripts stay blocked."""
         self._put(upload_root, rel, self.SVG)
         resp = client.get(url)
         assert resp.status_code == 200
-        assert resp.headers["Content-Disposition"].startswith("attachment")
-        assert resp.headers["Content-Security-Policy"] == "default-src 'none'; sandbox"
+        assert resp.headers["Content-Disposition"].startswith("inline")
+        assert resp.headers["Content-Type"].startswith("image/svg+xml")
+        csp = resp.headers["Content-Security-Policy"]
+        assert csp == storage.INLINE_SVG_CSP
+        assert "script-src 'none'" in csp
+        assert "sandbox" not in csp
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
 
     def test_raster_logo_is_inline_and_hardened(self, client, upload_root):

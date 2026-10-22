@@ -12,9 +12,10 @@ links, so they do not require a key. The Angular client only puts the key on a
 CSV href when its parameter name is ``api_key``; keep the name ``apiKey``.
 Reads the published snapshot only (``plugins/fdrs/services/fdrs_public_adapter.py``).
 
-Content that Backoffice does not store (translations, embeds, offices, the
-mailing list) is always forwarded to ``https://data-api.ifrc.org`` (or
-``FDRS_DATA_API_BASE``) using ``FDRS_DATA_API_KEY``.
+``/api/embeddedcontent`` for unified planning and global initiatives is read
+from Admin → Embed Content. Translations, offices, the mailing list, and the
+other embed types (OCAC, BOCA, international overview) are forwarded to
+``https://data-api.ifrc.org`` (or ``FDRS_DATA_API_BASE``) using ``FDRS_DATA_API_KEY``.
 ``/csv/export`` and ``/csv/exportns`` are files built from the published snapshot.
 """
 
@@ -231,7 +232,12 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Forwarded to https://data-api.ifrc.org using FDRS_DATA_API_KEY.",
+        "description": (
+            "UNIFIED-PLANNING is active embeds whose page slot is Unified Planning, in sort order. "
+            "GLOBAL-INITIATIVES is active Global initiatives embeds. "
+            "EmbedCode is the same iframe as Admin → Embed Content → Copy iframe. "
+            "OCAC, BOCA, and OVERVIEW-INTERNATIONAL are forwarded to https://data-api.ifrc.org."
+        ),
         "consumers": "data.ifrc.org",
     },
     {
@@ -506,8 +512,22 @@ def _register_passthrough(rule: str, methods: list[str], *, exempt_csrf: bool = 
     bp.add_url_rule(rule, endpoint=name, view_func=view, methods=methods)
 
 
-for _path in ("/api/embeddedcontent", "/api/smarttran", "/api/tran", "/api/offices"):
+for _path in ("/api/smarttran", "/api/tran", "/api/offices"):
     _register_passthrough(_path, ["GET"])
+
+
+@bp.route("/api/embeddedcontent", methods=["GET"])
+@require_api_key(capability=CONTENT_READ)
+def fdrs_public_compat_embedded_content():
+    try:
+        from plugins.fdrs.services.fdrs_public_embeds import legacy_embeds, serves_embed_type
+
+        embed_type = request.args.get("type") or ""
+        if serves_embed_type(embed_type):
+            return _json(legacy_embeds(embed_type))
+        return _passthrough("/api/embeddedcontent")
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
 @bp.route("/api/documents", methods=["GET"])

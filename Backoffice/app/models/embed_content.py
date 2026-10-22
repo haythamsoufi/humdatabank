@@ -22,6 +22,7 @@ TABLEAU_EMBED_DOMAINS = (
 ALLOWED_EMBED_SCHEMES = ('https',)
 
 PAGE_SLOTS = {
+    'unified_planning': 'Unified Planning',
     'echo_partnership': 'ECHO Programmatic Partnership',
     'grbm': 'Global Route-based Migration',
     'phsm': 'Professional Health Services Mapping',

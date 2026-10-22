@@ -179,7 +179,7 @@ class TestPublicRoutesSubmittedDocuments:
             resp = client.get(f"/documents/thumbnail/{doc.id}")
             assert resp.status_code == 404
 
-    def test_public_document_display_404_for_non_image(self, client, db_session, app):
+    def test_public_document_display_404_when_file_missing(self, client, db_session, app):
         with app.app_context():
             user = create_test_user(db_session, role="admin")
             doc = SubmittedDocument(

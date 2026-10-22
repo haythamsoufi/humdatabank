@@ -3,6 +3,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify
+from werkzeug.exceptions import HTTPException
 from app.models import db, Resource, SubmittedDocument
 from app.services.documents import public_access
 from sqlalchemy import text
@@ -124,23 +125,54 @@ def _stream_public_thumbnail(document: SubmittedDocument):
     )
 
 
-_PUBLIC_DISPLAY_IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+def _materialize_public_fdrs_file(document: SubmittedDocument) -> None:
+    """Fetch a public FDRS file that admin download would materialize on demand."""
+    if not getattr(document, "fdrs_import_key", None) and not (document.source_url or "").strip():
+        return
+    try:
+        from plugins.fdrs.services.fdrs_document_fetch_service import (
+            try_materialize_public_fdrs_document,
+        )
+
+        try_materialize_public_fdrs_document(document)
+    except Exception as exc:
+        current_app.logger.warning(
+            "Public display could not fetch FDRS file for document %s: %s",
+            getattr(document, "id", None),
+            exc,
+        )
 
 
-def _stream_public_display_image(document: SubmittedDocument):
-    """Serve a public document file inline, images only (cover images)."""
-    lower = (document.filename or '').lower()
-    if not lower.endswith(_PUBLIC_DISPLAY_IMAGE_EXTENSIONS):
+def _stream_public_display(document: SubmittedDocument):
+    """Serve an approved public document inline.
+
+    Cover images and FDRS files (PDF and other safe types) share this URL.
+    HTML, SVG, and script types are forced to download by the storage layer.
+    The path resolver matches admin download, including a one-time FDRS fetch
+    when the row is public but the bytes are not stored yet.
+    """
+    storage_path = (document.storage_path or "").strip()
+    if not storage_path or not storage.submitted_source_exists(storage_path):
+        _materialize_public_fdrs_file(document)
+        storage_path = (document.storage_path or "").strip()
+    if not storage_path or not storage.submitted_source_exists(storage_path):
         abort(404)
-
-    main_cat = storage.submitted_document_rel_storage_category(document.storage_path)
-    if not storage.exists(main_cat, document.storage_path):
+    try:
+        return storage.stream_submitted_document_response(
+            storage_path,
+            filename=document.filename or "document",
+            as_attachment=False,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        current_app.logger.error(
+            "Error displaying public document %s: %s",
+            getattr(document, "public_id", None),
+            exc,
+            exc_info=True,
+        )
         abort(404)
-
-    return storage.stream_response(
-        main_cat, document.storage_path,
-        filename=document.filename, as_attachment=False,
-    )
 
 
 @bp.route("/documents/thumbnail/<uuid:public_id>", methods=["GET"])
@@ -155,18 +187,18 @@ def download_document_thumbnail_public(doc_id):
     return _stream_public_thumbnail(_public_document_or_404(doc_id))
 
 
-# =================== PUBLIC DOCUMENT DISPLAY (IMAGES ONLY) ===================
+# =================== PUBLIC DOCUMENT DISPLAY ===================
 
 @bp.route("/documents/display/<uuid:public_id>", methods=["GET"])
 def display_document_file_by_public_id(public_id):
-    """Serve an approved public document inline when it is an image (opaque id)."""
-    return _stream_public_display_image(_public_document_or_404(public_id))
+    """Serve an approved public document inline (opaque id)."""
+    return _stream_public_display(_public_document_or_404(public_id))
 
 
 @bp.route("/documents/display/<int:doc_id>", methods=["GET"])
 def display_document_file_public(doc_id):
-    """Serve an approved public image by legacy integer id (deprecated; same visibility policy)."""
-    return _stream_public_display_image(_public_document_or_404(doc_id))
+    """Serve an approved public document by legacy integer id (deprecated; same visibility policy)."""
+    return _stream_public_display(_public_document_or_404(doc_id))
 
 # =================== LEGACY URL REDIRECTS ===================
 

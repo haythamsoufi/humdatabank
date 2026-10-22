@@ -223,7 +223,8 @@ def serve_ns_logo(filename):
 def serve_branding_asset(filename):
     """Serve organization logo/favicon uploaded from System Configuration (branding tab).
 
-    Legacy uploads may still be SVG; storage_service delivers those as sandboxed attachments.
+    Legacy uploads may still be SVG. Those are served inline so an ``<img>`` can paint
+    them, with a script-blocking content security policy and no sandbox.
     """
     from app.utils.branding_visual_assets import SYSTEM_BRANDING_REL_PREFIX, safe_branding_download_filename
 

@@ -143,8 +143,6 @@ def _publication_entries(resource: Resource) -> list[dict[str, Any]]:
         title = translation.title if translation else resource.default_title
         filename = translation.document_display_name if translation else None
         year = dated_year or _year_from_labels(filename, title, resource.default_title)
-        if year is None:
-            continue
         has_file = bool(translation and translation.file_relative_path)
         external_url = _translation_public_url(translation) or ""
         description = (translation.description if translation else None) or resource.default_description
@@ -167,7 +165,7 @@ def _publication_entries(resource: Resource) -> list[dict[str, Any]]:
                 ),
                 "thumbnail": _resource_thumb_url(resource.id, thumb_language) if thumb else None,
                 "year": year,
-                "YearText": str(year),
+                "YearText": str(year) if year else None,
                 "document_type": legacy_type,
                 "language": _language_name(language),
                 "LangCode": language,

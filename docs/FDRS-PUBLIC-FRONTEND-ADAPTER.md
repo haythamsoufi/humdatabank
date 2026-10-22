@@ -218,7 +218,7 @@ The age/sex mapper does `response.data.filter(series => expectedIds.includes(ser
 
 `GET /api/kpivalue` rows are filtered in the browser with `row.doncode`. Include `doncode` and `value`.
 
-`GET /api/documents` is read as `response[0].documents`. The Everyone Counts page builds its year dropdown from `year` (`year.toString()`, so a null year leaves the list empty) and its language dropdown from `language` (the name, such as `English`) plus `LangCode`. `Description` is the card text. When a publication has no date, `year` is taken from the file name or title.
+`GET /api/documents` is read as `response[0].documents`. The Everyone Counts page groups cards by `year` and builds its language dropdown from `language` (the name, such as `English`) plus `LangCode`. `Description` is the card text. A publication with no date, and no year in the file name or title, is still returned; `year` and `YearText` are null.
 
 `GET /api/embeddedcontent` rows include `Id`, `TitleEn` / `TitleEs` / `TitleFr` / `TitleAr`, the matching `Text*` fields, and `EmbedCode`. `type=UNIFIED-PLANNING` is every active Embed Content row whose page slot is Unified Planning, in sort order. Category does not matter. `type=GLOBAL-INITIATIVES` is the Global initiatives category. `EmbedCode` is the iframe from Admin → Embed Content → Copy iframe. The same title and description are sent in every language. OCAC, BOCA, and `OVERVIEW-INTERNATIONAL` are still forwarded.
 

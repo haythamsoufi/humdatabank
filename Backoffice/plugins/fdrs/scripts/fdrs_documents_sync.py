@@ -9,6 +9,11 @@ HTTP 403/404 → retry once without a trailing ``_N`` filename suffix (API catal
 sometimes includes a duplicate suffix the file store does not); if still failing,
 keep ``file_pending=True``, set ``source_url_http_status``, retried on later syncs.
 When IFRC fixes the URL, a successful 200/206 clears ``source_url_http_status`` and saves the file.
+
+After a trustworthy catalog fetch, FDRS rows in the synced assignments whose
+import key is absent from that catalog are deleted, including their files.
+User uploads (no ``fdrs_import_key``) are left in place. An empty or unmapped
+catalog does not delete anything.
 """
 
 from __future__ import annotations
@@ -20,9 +25,10 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from datetime import datetime
 from io import BytesIO
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from werkzeug.datastructures import FileStorage
 
@@ -62,8 +68,9 @@ def _format_documents_done_message(doc_stats: Dict[str, Any]) -> str:
     status_approved = doc_stats.get("status_approved", 0)
     status_pending = doc_stats.get("status_pending", 0)
     status_rejected = doc_stats.get("status_rejected", 0)
+    removed = doc_stats.get("removed", 0)
     return (
-        f"FDRS documents complete: {inserted} inserted, {updated} updated; "
+        f"FDRS documents complete: {inserted} inserted, {updated} updated, {removed} removed; "
         f"status approved={status_approved} pending={status_pending} rejected={status_rejected} "
         f"changed={doc_stats.get('status_changed', 0)}; "
         f"files saved: {downloaded}, awaiting IFRC file download: {pending}, "
@@ -453,6 +460,10 @@ def build_document_import_plan(
         "status_pending": 0,
         "status_rejected": 0,
     }
+    # Every importable document that maps onto a synced assignment, including
+    # files that lose the one-per-type dedupe. Removal uses this set so a
+    # second real file is kept. Popped before the summary is stored on the job.
+    present_import_keys: Set[str] = set()
 
     # Best doc per (iso3, reporting_year, document_type)
     best: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
@@ -479,6 +490,7 @@ def build_document_import_plan(
             summary["skipped_sync_year"] += 1
             continue
 
+        present_import_keys.add(_fdrs_document_import_key(doc))
         key = (iso3, year_str, doc_type)
         prev = best.get(key)
         if prev is None or _doc_score(doc) > _doc_score(prev):
@@ -535,6 +547,7 @@ def build_document_import_plan(
         else:
             summary["status_pending"] += 1
     summary["planned"] = len(plan)
+    summary["present_import_keys"] = present_import_keys
     return plan, summary
 
 
@@ -642,6 +655,7 @@ def public_document_sync_summary(stats: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "inserted": int(stats.get("documents_inserted") or 0),
         "updated": int(stats.get("documents_updated") or 0),
+        "removed": int(stats.get("documents_removed") or 0),
         "errors": int(stats.get("documents_errors") or 0),
         "status_approved": int(stats.get("documents_status_approved") or 0),
         "status_pending": int(stats.get("documents_status_pending") or 0),
@@ -649,6 +663,230 @@ def public_document_sync_summary(stats: Dict[str, Any]) -> Dict[str, Any]:
         "status_changed": int(stats.get("documents_status_changed") or 0),
         "sync_error": (str(error)[:300] if error else None),
     }
+
+
+def fdrs_document_removal_allowed(summary: Dict[str, Any]) -> bool:
+    """True when the catalog fetch is safe to treat as the source of truth.
+
+    An empty payload or a failed country map must not wipe local FDRS documents.
+    A catalog that never resolves onto an assignment is the same kind of failure.
+    A year slice that resolved documents onto other years is a real empty slice
+    and may clear that year's FDRS rows.
+    """
+    total = int(summary.get("total_api_docs") or 0)
+    if total <= 0:
+        return False
+    if int(summary.get("skipped_no_iso3") or 0) >= total:
+        return False
+    if int(summary.get("planned") or 0) > 0:
+        return True
+    return int(summary.get("skipped_sync_year") or 0) > 0
+
+
+def scoped_fdrs_assignment_ids(
+    assignment_rows: Iterable[Dict[str, Any]],
+    sync_years: Optional[Iterable[int]] = None,
+) -> Set[int]:
+    """Assignment ids this sync may add, update, or remove documents for."""
+    year_set: Optional[Set[int]] = None
+    if sync_years:
+        parsed: Set[int] = set()
+        for year in sync_years:
+            try:
+                parsed.add(int(year))
+            except (TypeError, ValueError):
+                continue
+        year_set = parsed or None
+    ids: Set[int] = set()
+    for row in assignment_rows or []:
+        raw_id = row.get("assignment_entity_status_id")
+        if raw_id is None:
+            continue
+        if year_set is not None:
+            period = str(row.get("period_name") or "").strip()
+            try:
+                if int(period) not in year_set:
+                    continue
+            except (TypeError, ValueError):
+                continue
+        try:
+            ids.add(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
+def select_stale_fdrs_documents(rows: Iterable[Any], present_keys: Iterable[str]) -> List[Any]:
+    """FDRS rows whose import key is absent from the current catalog.
+
+    Rows without an import key are user uploads and are never selected.
+    """
+    keep = set(present_keys or [])
+    stale: List[Any] = []
+    for row in rows or []:
+        key = getattr(row, "fdrs_import_key", None)
+        if not key or key in keep:
+            continue
+        stale.append(row)
+    return stale
+
+
+def _purge_fdrs_document_files(
+    storage_path: Optional[str],
+    thumbnail_relative_path: Optional[str] = None,
+) -> None:
+    """Archive then delete the stored file and thumbnail. Failures are logged."""
+    from app.services.platform import storage_service as storage
+
+    archive_uuid = uuid.uuid4().hex
+    for rel, subdir in (
+        (storage_path, ""),
+        (thumbnail_relative_path, "thumbnails"),
+    ):
+        safe = (rel or "").replace("\\", "/").strip("/")
+        if not safe:
+            continue
+        try:
+            category = storage.submitted_document_rel_storage_category(safe)
+        except Exception as exc:
+            logger.warning("FDRS document storage category failed for %s: %s", safe, exc)
+            continue
+        if not storage.exists(category, safe):
+            continue
+        base = safe.rsplit("/", 1)[-1]
+        if subdir:
+            archive_rel = f"archive/deleted/{archive_uuid}/{subdir}/{base}"
+        else:
+            archive_rel = f"archive/deleted/{archive_uuid}/{base}"
+        try:
+            storage.archive(category, safe, archive_rel)
+        except Exception as exc:
+            logger.warning("FDRS document archive failed for %s: %s", safe, exc)
+        try:
+            storage.delete(category, safe)
+        except Exception as exc:
+            logger.warning("FDRS document file delete failed for %s: %s", safe, exc)
+
+
+def _delete_fdrs_document_row(document: Any) -> None:
+    """Delete linked AI rows, then the submitted document."""
+    from app.extensions import db
+    from app.models.embeddings import AIDocument
+
+    doc_id = getattr(document, "id", None)
+    if doc_id is not None:
+        linked = AIDocument.query.filter(AIDocument.submitted_document_id == doc_id).all()
+        for ai_doc in linked:
+            db.session.delete(ai_doc)
+        if linked:
+            db.session.flush()
+    db.session.delete(document)
+
+
+def remove_fdrs_documents_missing_from_catalog(
+    *,
+    present_keys: Iterable[str],
+    assignment_rows: List[Dict[str, Any]],
+    summary: Dict[str, Any],
+    sync_years: Optional[List[int]] = None,
+    dry_run: bool = False,
+    batch_size: int = 500,
+    change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> Tuple[int, int]:
+    """Delete FDRS documents in scope that the current catalog no longer lists.
+
+    Returns ``(removed, errors)``. ``removed`` is the dry-run count when
+    *dry_run* is set. Returns ``(0, 0)`` without querying when the catalog
+    fetch is not safe to treat as complete.
+    """
+    if not fdrs_document_removal_allowed(summary):
+        logger.warning(
+            "FDRS document removal skipped: catalog was empty or could not be mapped "
+            "(total=%s planned=%s skipped_no_iso3=%s skipped_sync_year=%s)",
+            summary.get("total_api_docs"),
+            summary.get("planned"),
+            summary.get("skipped_no_iso3"),
+            summary.get("skipped_sync_year"),
+        )
+        return 0, 0
+
+    scoped_ids = scoped_fdrs_assignment_ids(assignment_rows, sync_years)
+    if not scoped_ids:
+        logger.info("FDRS document removal skipped: no assignments in this sync")
+        return 0, 0
+
+    from app.extensions import db
+    from app.models.documents import SubmittedDocument
+
+    keep = set(present_keys or [])
+    candidates = SubmittedDocument.query.filter(
+        SubmittedDocument.assignment_entity_status_id.in_(list(scoped_ids)),
+        SubmittedDocument.fdrs_import_key.isnot(None),
+    ).all()
+    stale = select_stale_fdrs_documents(candidates, keep)
+    if not stale:
+        return 0, 0
+
+    by_assignment: Dict[int, Dict[str, Any]] = {}
+    for row in assignment_rows or []:
+        raw_id = row.get("assignment_entity_status_id")
+        if raw_id is None:
+            continue
+        try:
+            by_assignment[int(raw_id)] = row
+        except (TypeError, ValueError):
+            continue
+
+    removed = 0
+    errors = 0
+    for document in stale:
+        _check_cancel(cancel_check)
+        assignment = by_assignment.get(int(document.assignment_entity_status_id or 0), {})
+        filename = document.filename
+        storage_path = document.storage_path
+        thumbnail_path = document.thumbnail_relative_path
+        change = {
+            "op": "document_removed",
+            "aes_id": document.assignment_entity_status_id,
+            "item_id": document.form_item_id,
+            "iso3": assignment.get("iso3"),
+            "year": assignment.get("period_name"),
+            "label": filename,
+            "kpi": document.document_type,
+            "old_value": filename,
+            "new_value": None,
+        }
+        if dry_run:
+            removed += 1
+            continue
+        try:
+            with db.session.begin_nested():
+                _delete_fdrs_document_row(document)
+        except FdrsSyncCancelled:
+            raise
+        except Exception as exc:
+            errors += 1
+            logger.error(
+                "FDRS document removal failed for assignment=%s filename=%s: %s",
+                change["aes_id"],
+                change["label"],
+                exc,
+            )
+            continue
+        _purge_fdrs_document_files(storage_path, thumbnail_path)
+        removed += 1
+        if change_recorder is not None:
+            try:
+                change_recorder(change)
+            except Exception as exc:
+                logger.debug("FDRS document removal change log failed: %s", exc)
+        if batch_size and removed % batch_size == 0:
+            db.session.commit()
+    if not dry_run and removed:
+        db.session.commit()
+    logger.info("FDRS documents removed: %s (dry_run=%s, errors=%s)", removed, dry_run, errors)
+    return removed, errors
 
 
 def upsert_fdrs_document_metadata(
@@ -1031,6 +1269,7 @@ def run_fdrs_documents_sync(
     )
     documents = fetch_fdrs_documents_api(base_url, api_key, years=years)
     plan, summary = build_document_import_plan(documents, assignment_rows, sync_years=years)
+    present_keys = set(summary.pop("present_import_keys", ()) or ())
     planned = int(summary.get("planned") or 0)
     _progress(
         stage="documents_plan",
@@ -1051,6 +1290,25 @@ def run_fdrs_documents_sync(
         progress_start_pct=progress_start_pct,
         progress_end_pct=progress_end_pct,
     )
+    try:
+        removed, removal_errors = remove_fdrs_documents_missing_from_catalog(
+            present_keys=present_keys,
+            assignment_rows=assignment_rows,
+            summary=summary,
+            sync_years=years,
+            dry_run=dry_run,
+            batch_size=batch_size,
+            change_recorder=change_recorder,
+            cancel_check=cancel_check,
+        )
+        doc_stats["removed"] = removed
+        doc_stats["errors"] = int(doc_stats.get("errors") or 0) + removal_errors
+    except FdrsSyncCancelled:
+        raise
+    except Exception as exc:
+        logger.error("FDRS document removal failed: %s", exc, exc_info=True)
+        doc_stats["removed"] = 0
+        doc_stats["errors"] = int(doc_stats.get("errors") or 0) + 1
     _progress(
         stage="documents_done",
         message=_format_documents_done_message(doc_stats),

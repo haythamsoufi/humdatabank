@@ -508,6 +508,7 @@ class ImportChangeLogWriter:
                     "warning_unique_count",
                     "documents_inserted",
                     "documents_updated",
+                    "documents_removed",
                     "documents_errors",
                     "documents_ran",
                     "documents_status_approved",

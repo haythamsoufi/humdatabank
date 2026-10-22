@@ -441,7 +441,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             terminal_item_status = "completed"
             app.logger.info(
                 "Data sync %s: completed loaded=%s skipped=%s inserted=%s updated=%s unchanged=%s errors=%s "
-                "documents_inserted=%s documents_updated=%s documents_approved=%s documents_pending=%s "
+                "documents_inserted=%s documents_updated=%s documents_removed=%s documents_approved=%s documents_pending=%s "
                 "documents_rejected=%s documents_status_changed=%s documents_errors=%s",
                 job_id,
                 (stats or {}).get("loaded"),
@@ -452,6 +452,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 (stats or {}).get("errors"),
                 (stats or {}).get("documents_inserted"),
                 (stats or {}).get("documents_updated"),
+                (stats or {}).get("documents_removed"),
                 (stats or {}).get("documents_status_approved"),
                 (stats or {}).get("documents_status_pending"),
                 (stats or {}).get("documents_status_rejected"),

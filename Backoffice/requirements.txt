@@ -22,7 +22,7 @@ email_validator==2.2.0
 alembic==1.15.2
 psycopg2-binary==2.9.10
 PyMuPDF==1.25.5
-Pillow==12.3.0                  # was 12.2.0 — GHSA-9hw9-ch79-4vh6 and related Pillow CVEs
+Pillow==13.0.0                  # was 12.3.0 — Pillow 13 security release (CVE-2026-96639 and related)
 openpyxl==3.1.2
 pandas==2.2.3
 XlsxWriter==3.2.9                # was 3.2.3 — that version was yanked (PyPI metadata wrongly claimed Py3.6 support); no breaking changes in 3.2.4-3.2.9

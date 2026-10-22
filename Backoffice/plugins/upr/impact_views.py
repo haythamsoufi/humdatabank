@@ -291,52 +291,109 @@ def _reach(ctx: _Context) -> dict[str, Any]:
 
 def _partners(ctx: _Context) -> dict[str, Any]:
     labels = ctx.labels
-    points = (ctx.payload.get("partners") or {}).get("by_year") or []
-    rows = [
-        (
-            p.get("year"),
-            table_row(
-                [
-                    year_label(p.get("year"), ctx.in_progress_years),
-                    p.get("round"),
-                    value_or_none(p, "partners"),
-                    value_or_none(p, "funding"),
-                ],
-                country_rows(
-                    [c.get("country"), None, c.get("partners") or None, c.get("funding") or None]
-                    for c in p.get("countries") or []
-                ),
-            ),
-        )
-        for p in points
-    ]
-    return visual(
+    payload = ctx.payload.get("partners") or {}
+    by_source = payload.get("by_source") or {}
+    order = (
+        ("all", "source_all"),
+        ("pns", "source_pns"),
+        ("country", "source_country"),
+    )
+    sources = []
+    for source_id, label_key in order:
+        points = by_source.get(source_id)
+        if points is None:
+            points = payload.get("by_year") or []
+        chart, table = _partner_chart(ctx, points)
+        sources.append({"id": source_id, "label": labels[label_key], "chart": chart, "table": table})
+    shown = sources[0]
+    built = visual(
         "partners",
         labels["partners_title"],
         labels["partners_hint"],
-        chart=chart(
-            ctx.year_cats(years_of(points)),
-            [
-                series(labels["partners"], column(points, "partners"), color=COLORS["purple"], fmt="int"),
-                series(
-                    labels["partner_funding"],
-                    column(points, "funding"),
-                    kind="line",
-                    color=COLORS["amber"],
-                    axis_id="secondary",
-                    fmt="money",
-                ),
-            ],
-            axes={"primary": axis("int"), "secondary": axis("money", opposite=True)},
-            column_width="45%",
-        ),
-        table=table(
-            labels["partners_title"],
-            [labels["year"], labels["report_round"], labels["partners"], labels["partner_funding"]],
-            latest_first(rows),
-            note=labels["partners_source_note"],
-        ),
+        chart=shown["chart"],
+        table=shown["table"],
     )
+    built["sources"] = sources
+    built["sources_label"] = labels["source_group"]
+    return built
+
+
+def _partner_chart(ctx: _Context, points: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Funding as columns, partner counts as lines, for one data-source slice."""
+    labels = ctx.labels
+    rows = []
+    for p in points:
+        midyear = p.get("year") in ctx.midyear_years
+        countries = country_rows(
+            [
+                c.get("country"),
+                None,
+                c.get("plan_partners") or None,
+                c.get("plan_funding") or None,
+                None,
+                midyear_cell(c.get("report_partners") or None, midyear),
+                midyear_cell(c.get("report_funding") or None, midyear),
+            ]
+            for c in p.get("countries") or []
+        )
+        rows.append(
+            (
+                p.get("year"),
+                table_row(
+                    [
+                        year_label(p.get("year"), ctx.in_progress_years),
+                        p.get("plan_round"),
+                        value_or_none(p, "plan_partners"),
+                        value_or_none(p, "plan_funding"),
+                        p.get("report_round"),
+                        midyear_cell(value_or_none(p, "report_partners"), midyear),
+                        midyear_cell(value_or_none(p, "report_funding"), midyear),
+                    ],
+                    countries,
+                ),
+            )
+        )
+    chart_spec = chart(
+        ctx.year_cats(years_of(points)),
+        [
+            series(labels["partner_requirement"], column(points, "plan_funding"), color=COLORS["navy"], fmt="money"),
+            series(labels["partner_reported"], column(points, "report_funding"), color=COLORS["amber"], fmt="money"),
+            series(
+                labels["partners_planning"],
+                column(points, "plan_partners"),
+                kind="line",
+                color=COLORS["purple"],
+                axis_id="secondary",
+                fmt="int",
+            ),
+            series(
+                labels["partners_reporting"],
+                column(points, "report_partners"),
+                kind="line",
+                color=COLORS["teal"],
+                axis_id="secondary",
+                fmt="int",
+            ),
+        ],
+        axes={"primary": axis("money"), "secondary": axis("int", opposite=True)},
+        column_width="50%",
+    )
+    table_spec = table(
+        labels["partners_title"],
+        [
+            labels["year"],
+            labels["plan_round"],
+            labels["partners_planning"],
+            labels["partner_requirement"],
+            labels["report_round"],
+            labels["partners_reporting"],
+            labels["partner_reported"],
+        ],
+        latest_first(rows),
+        note=labels["partners_source_note"],
+        legend=labels["midyear_legend"],
+    )
+    return chart_spec, table_spec
 
 
 def _capacity(ctx: _Context) -> dict[str, Any]:

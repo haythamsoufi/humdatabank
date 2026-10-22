@@ -231,6 +231,20 @@
         }
         section.appendChild(head);
 
+        if (interactive && visual.sources && visual.sources.length) {
+            var seg = node('div', 'upri-seg upri-card__sources');
+            seg.setAttribute('role', 'group');
+            if (visual.sources_label) seg.setAttribute('aria-label', visual.sources_label);
+            visual.sources.forEach(function (source, index) {
+                var button = node('button', 'upri-seg__btn' + (index === 0 ? ' is-active' : ''), source.label);
+                button.type = 'button';
+                button.setAttribute('data-upri-source', source.id);
+                button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
+                seg.appendChild(button);
+            });
+            section.appendChild(seg);
+        }
+
         if (visual.kind === 'panels') {
             var grid = node('div', 'upri-chart upri-cap-grid');
             (visual.panels || []).forEach(function (panel) { grid.appendChild(panelBlock(panel, plots, size)); });

@@ -467,6 +467,22 @@
     background: var(--upri-navy);
     color: #fff;
 }
+.upri-card__sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.15rem 0 0.75rem;
+    border: 0;
+    background: transparent;
+    overflow: visible;
+}
+.upri-card__sources .upri-seg__btn {
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+}
+.upri-card__sources .upri-seg__btn:last-child {
+    border-right: 1px solid #d1d5db;
+}
 .upri-state--compact {
     min-height: 6rem;
 }

@@ -65,16 +65,16 @@ document.addEventListener('DOMContentLoaded', function () {
         container.replaceChildren();
         rows.forEach(function (row) {
             const wrap = document.createElement('div');
-            wrap.className = row.inline ? 'flex items-center gap-2' : 'flex items-start justify-between gap-4';
+            wrap.className = 'flex items-baseline gap-2';
             const label = document.createElement('span');
-            label.className = row.inline ? 'text-gray-500' : 'text-gray-500 shrink-0';
+            label.className = 'text-gray-500 shrink-0';
             label.textContent = row.label;
             wrap.appendChild(label);
             if (row.node) {
                 wrap.appendChild(row.node);
             } else {
                 const value = document.createElement('span');
-                value.className = 'font-medium text-gray-900 text-right';
+                value.className = 'font-medium text-gray-900';
                 value.textContent = row.value == null ? '' : String(row.value);
                 wrap.appendChild(value);
             }
@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const problemsBox = document.getElementById('sync-verify-problems-only');
         const viewingProblems = !!(problemsBox && problemsBox.checked);
         if (!viewingProblems && problemsOnlyFile && (data.sheet || '') === 'data_points' && Number(stats.total || 0) > filtered) {
-            return {{ _("This saved workbook only contains missing and mismatch rows. Run verification again to store the full comparison.")|tojson|safe }};
+            return {{ _("This saved workbook only contains missing and mismatch rows. Run sync again to store the full comparison.")|tojson|safe }};
         }
         return '';
     }
@@ -621,24 +621,15 @@ if (dataSyncYearsToggle && dataSyncYearsDropdown) {
 }
 
 const dataSyncFormError = document.getElementById('data-sync-form-error');
-const syncVerifyFormError = document.getElementById('sync-verify-form-error');
 const dataSyncConfigModal = makeConfigModal('#fdrs-sync-config-modal', setDataSyncYearsOpen);
-const syncVerifyConfigModal = makeConfigModal('#fdrs-verify-config-modal', setSyncVerifyYearsOpen);
+const syncVerifyConfigModal = { openModal: function () {}, closeModal: function () {}, isOpen: function () { return false; } };
 
 const openSyncConfigBtn = document.getElementById('fdrs-open-sync-config');
-const openVerifyConfigBtn = document.getElementById('fdrs-open-verify-config');
 if (openSyncConfigBtn) {
     openSyncConfigBtn.addEventListener('click', function () {
         activateSyncMainTab();
         showInlineFormError(dataSyncFormError, '');
         dataSyncConfigModal.openModal();
-    });
-}
-if (openVerifyConfigBtn) {
-    openVerifyConfigBtn.addEventListener('click', function () {
-        activateSyncMainTab();
-        showInlineFormError(syncVerifyFormError, '');
-        syncVerifyConfigModal.openModal();
     });
 }
 
@@ -954,6 +945,9 @@ function pollDataSyncStatus() {
                 } else {
                     appendMultilineText(dataSyncResultText, msg);
                 }
+                if (stats.verification) {
+                    msg += '\n' + formatSyncVerifyStats(stats.verification);
+                }
                 if (finishedJobId && /^[a-fA-F0-9]{32}$/.test(finishedJobId)) {
                     dataSyncResultText.appendChild(document.createTextNode(' '));
                     appendTextLink(
@@ -966,6 +960,9 @@ function pollDataSyncStatus() {
                 }
                 dataSyncResultText.className = 'text-sm text-green-700';
                 showDataSyncDone();
+                if (stats.verification && typeof restoreLatestVerifyIfNeeded === 'function') {
+                    restoreLatestVerifyIfNeeded(true);
+                }
                 return;
             }
             if (job.status === 'failed') {
@@ -1627,6 +1624,7 @@ if (syncVerifyRunBtn) {
 }
 
 function resumeSyncVerifyJobIfNeeded() {
+    return;
     let jobId = null;
     const serverJobs = readSyncVerifyActiveJobs().filter(function (j) { return j && j.job_id; });
     if (serverJobs.length) {
@@ -1666,7 +1664,7 @@ function restoreLatestVerifyIfNeeded(force) {
         .then(function (data) {
             if (!data || data.success === false || !data.exists) {
                 setVerifyGridLoading(false);
-                showVerifyGridNote({{ _("No verification results yet. Run verification to fill this table.")|tojson|safe }});
+                showVerifyGridNote({{ _("No comparison yet. Run sync to fill this table.")|tojson|safe }});
                 return;
             }
             renderSyncVerifyLastRun(data);

@@ -399,23 +399,30 @@ def _network_value(spec: SeriesSpec, row: Any, name_to_don: Mapping[str, str]) -
     """Counterpart DON codes (or their amounts), comma-separated, as the client splits them.
 
     Backoffice keeps one matrix cell per counterpart, so the legacy slot numbers are gone;
-    slot 1 carries every counterpart.
+    slot 1 carries every counterpart. A blank amount still keeps that counterpart on the list.
     """
     column = NETWORK_ITEMS[spec.network_prefix][1].lower()
+    payload = _payload(row.published_disagg_data) or {}
     codes: list[str] = []
     amounts: list[str] = []
     suffix = f"_{column}"
-    for key, amount in matrix_cells(row.published_disagg_data).items():
-        if not key.endswith(suffix):
+    for key, amount in payload.items():
+        lowered = str(key).strip().lower()
+        if lowered.startswith("_") or not lowered.endswith(suffix):
             continue
-        don = name_to_don.get(_norm(key[: -len(suffix)]))
+        don = name_to_don.get(_norm(lowered[: -len(suffix)]))
         if not don:
             continue
+        number = _number(amount)
         codes.append(don)
-        amounts.append(str(json_number(amount)))
+        amounts.append("" if number is None else str(json_number(number)))
     if not codes:
         return None
-    return ",".join(amounts if spec.network_amount else codes)
+    if spec.network_amount:
+        if not any(part.strip() for part in amounts):
+            return None
+        return ",".join(amounts)
+    return ",".join(codes)
 
 
 def _norm(text: str) -> str:

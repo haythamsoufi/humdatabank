@@ -91,6 +91,42 @@ def test_group_snapshot_picks_tot_not_sex_breakdown():
     assert point.skip_reason is None
 
 
+def test_ip_code_is_checked_against_the_stored_imputed_value():
+    points = group_snapshot_to_points([
+        _snapshot_row(
+            KPI_code="KPI_GB_Tot_IP",
+            BaseKPI="KPI_GB",
+            Value="11",
+            in_fdrs_data_stage="no",
+            fdrs_data_filter_reason="ends_with_IP",
+        )
+    ])
+    point = points[0]
+    assert point.skip_reason is None
+    assert point.kpi_code_used == "KPI_GB_Tot"
+    assert point.fdrs_value is None
+    assert point.fdrs_imputed_value == "11"
+    point.item_id = 914
+    point.databank = DatabankValue(imputed_value="11")
+    attach_classification(points)
+    assert point.status == STATUS_MATCHED
+    assert point.detail == "imputed_value"
+
+    missing = group_snapshot_to_points([
+        _snapshot_row(
+            ISO3="ARM",
+            KPI_code="KPI_GB_Tot_IP",
+            BaseKPI="KPI_GB",
+            Value="11",
+            in_fdrs_data_stage="no",
+            fdrs_data_filter_reason="ends_with_IP",
+        )
+    ])
+    attach_classification(missing)
+    assert missing[0].status == STATUS_MISSING
+    assert missing[0].detail == "imputed_value_not_in_databank"
+
+
 def test_zero_value_is_intentional_skip():
     points = group_snapshot_to_points([_snapshot_row(Value="0")])
     assert points[0].skip_reason == "main_value_empty_or_zero"
@@ -163,6 +199,41 @@ def test_received_support_matches_item_929_matrix_cells():
     assert by_kpi["received_support1_amount"].status == STATUS_MATCHED
     assert by_kpi["received_support1_amount"].network_db_value == "50000"
     assert by_kpi["received_support1_amount"].item_id == 929
+
+
+def test_supported_names_match_when_amounts_are_blank():
+    rows = build_fdrs_snapshot_rows([
+        {
+            "ISO3": "ARG",
+            "DonCode": "DARG001",
+            "year": 2025,
+            "KPI_code": code,
+            "Value": value,
+            "ImputedValue": None,
+            "State": 100,
+        }
+        for code, value in (
+            ("supported1", "DCR001,DPY001"),
+            ("supported1_amount", ","),
+        )
+    ])
+    points = group_snapshot_to_points(rows)
+    disagg = {
+        "Costa Rican Red Cross_Funding provided": None,
+        "Paraguayan Red Cross_Funding provided": None,
+    }
+    for point in points:
+        point.databank = DatabankValue(disagg_data=disagg)
+    apply_network_matrix_checks(
+        points,
+        {"DCR001": "Costa Rican Red Cross", "DPY001": "Paraguayan Red Cross"},
+    )
+    attach_classification(points)
+    by_kpi = {p.base_kpi: p for p in points}
+    assert by_kpi["supported1"].status == STATUS_MATCHED
+    assert by_kpi["supported1"].detail == "matrix_row"
+    assert by_kpi["supported1_amount"].status == STATUS_MATCHED
+    assert by_kpi["supported1_amount"].detail == "matrix_amount"
 
 
 def test_sex_age_rows_stay_one_point_per_base_kpi():

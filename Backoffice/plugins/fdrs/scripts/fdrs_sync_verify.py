@@ -196,6 +196,35 @@ def _majority_reason(rows: Sequence[Dict[str, Any]], key: str) -> str:
     return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
 
 
+def _imputed_parent_from_ip_rows(
+    rows: Sequence[Dict[str, Any]],
+    base_kpi: str,
+) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """Pick the ``*_IP`` row whose value was stored as the parent indicator's imputed value.
+
+    Preference matches the importer: the base code, then ``_Tot``, then ``_CPD``.
+    """
+    candidates: List[Tuple[str, Dict[str, Any]]] = []
+    for row in rows:
+        if (row.get("fdrs_data_filter_reason") or "").strip() != "ends_with_IP":
+            continue
+        code = (row.get("KPI_code") or "").strip()
+        if not code.endswith("_IP"):
+            continue
+        candidates.append((code[: -len("_IP")], row))
+    if not candidates:
+        return None, None
+    for target in (base_kpi, f"{base_kpi}_Tot", f"{base_kpi}_CPD"):
+        for parent, row in candidates:
+            if parent == target and not _blank(row.get("Value")):
+                return parent, row
+    for parent, row in candidates:
+        if not _blank(row.get("Value")):
+            return parent, row
+    parent, row = candidates[0]
+    return parent, row
+
+
 def _row_included(row: Dict[str, Any]) -> bool:
     flag = row.get("in_fdrs_data_stage")
     if flag is None:
@@ -290,7 +319,8 @@ def apply_network_matrix_checks(
             continue
         _item_id, column, _prefix = target
         sums: Dict[str, int] = defaultdict(int)
-        parsed_slots: Dict[int, List[Tuple[str, int]]] = {}
+        amount_reported: set = set()
+        parsed_slots: Dict[int, List[Tuple[str, Optional[int]]]] = {}
         for slot, roles in slots.items():
             code_point = roles.get("code")
             amount_point = roles.get("amount")
@@ -300,7 +330,10 @@ def apply_network_matrix_checks(
             )
             parsed_slots[slot] = pairs
             for don, amount in pairs:
+                if amount is None:
+                    continue
                 sums[don] += amount
+                amount_reported.add(don)
 
         payload = None
         for roles in slots.values():
@@ -321,13 +354,17 @@ def apply_network_matrix_checks(
                 label = labels.get(don, don)
                 key = f"{label}_{column}"
                 names.append(label)
-                cell = None if payload is None else payload.get(key)
-                if cell is None:
+                present = payload is not None and key in payload
+                cell = payload.get(key) if present else None
+                if not present:
                     missing.append(don)
                     found_amounts.append("")
                     continue
-                found_amounts.append(str(cell).strip())
-                if not values_equal(cell, sums[don]):
+                found_amounts.append("" if _blank(cell) else str(cell).strip())
+                if don in amount_reported:
+                    if not values_equal(cell, sums[don]):
+                        differed.append(don)
+                elif not _blank(cell):
                     differed.append(don)
             code_point = roles.get("code")
             amount_point = roles.get("amount")
@@ -413,6 +450,15 @@ def build_point_from_group(rows: Sequence[Dict[str, Any]]) -> FdrsDataPoint:
         statuses = {(r.get("ValueStatus") or "").strip() for r in rows}
         if "Unpublished Reported" in statuses and reason in ("", "null_or_empty_value"):
             reason = "unpublished_or_not_filled"
+        parent_code, ip_row = _imputed_parent_from_ip_rows(rows, base_kpi) if reason == "ends_with_IP" else (None, None)
+        if ip_row is not None and not _blank(ip_row.get("Value")):
+            # ``*_IP`` is the imputed figure for the parent indicator, not a dropped KPI.
+            point.kpi_code_used = parent_code or base_kpi
+            point.fdrs_value = None
+            point.fdrs_imputed_value = ip_row.get("Value")
+            point.fdrs_state = ip_row.get("State")
+            point.fdrs_value_status = (ip_row.get("ValueStatus") or "")
+            return point
         point.skip_reason = reason
         sample = rows[0]
         point.kpi_code_used = (sample.get("KPI_code") or base_kpi).strip()

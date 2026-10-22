@@ -255,8 +255,13 @@ def execute_verification(
     template_id: int = FDRS_TEMPLATE_ID,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
+    snapshot_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Compare FDRS API values to Backoffice form_data. Requires a Flask app context."""
+    """Compare FDRS values to Backoffice form_data. Requires a Flask app context.
+
+    Pass ``snapshot_rows`` to check the dataset a sync just imported, instead of
+    fetching the data API again.
+    """
     from flask import current_app, has_app_context
     from import_fdrs_form_data import write_rows_to_excel
 
@@ -321,24 +326,33 @@ def execute_verification(
     iso_filter = {s.strip().upper() for s in (iso3 or "").split(",") if s.strip()}
     kpi_filter = {s.strip() for s in (kpi or "").split(",") if s.strip()}
 
-    logger.info("Fetching FDRS data-api (%s, years %s–%s)...", base_url, min(year_list), max(year_list))
-    _emit(
-        f"Fetching FDRS data-api ({min(year_list)}–{max(year_list)})...",
-        2.0,
-        stage="fetch_fdrs",
-    )
-    _fdrs_data, _disagg, _excl, snapshot_rows, _disability = build_fdrs_table(
-        base_url=base_url,
-        api_key=resolved_key,
-        years=year_list,
-        imputed_url=None,
-        imputed_api_key=resolved_key,
-        use_imputed_cache=not fresh_imputed,
-        cache_dir=cache_dir,
-        reported_import_states=reported_states,
-        include_imputed=not skip_imputed,
-        progress_cb=_on_fetch,
-    )
+    if snapshot_rows is None:
+        logger.info("Fetching FDRS data-api (%s, years %s–%s)...", base_url, min(year_list), max(year_list))
+        _emit(
+            f"Fetching FDRS data-api ({min(year_list)}–{max(year_list)})...",
+            2.0,
+            stage="fetch_fdrs",
+        )
+        _fdrs_data, _disagg, _excl, snapshot_rows, _disability = build_fdrs_table(
+            base_url=base_url,
+            api_key=resolved_key,
+            years=year_list,
+            imputed_url=None,
+            imputed_api_key=resolved_key,
+            use_imputed_cache=not fresh_imputed,
+            cache_dir=cache_dir,
+            reported_import_states=reported_states,
+            include_imputed=not skip_imputed,
+            progress_cb=_on_fetch,
+        )
+    else:
+        snapshot_rows = list(snapshot_rows)
+        logger.info("Verifying the FDRS snapshot from this sync (%d rows)...", len(snapshot_rows))
+        _emit(
+            "Verifying the FDRS data this sync just imported...",
+            58.0,
+            stage="verify",
+        )
     logger.info("FDRS snapshot rows: %d", len(snapshot_rows))
     _raise_if_cancelled()
     time.sleep(0.02)

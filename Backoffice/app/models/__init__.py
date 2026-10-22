@@ -81,6 +81,7 @@ from .lookups import (
     LookupListRow
 )
 
+from .initiatives import Initiative
 from .organization import (
     NationalSociety,
     NSBranch,
@@ -293,6 +294,7 @@ __all__ = [
 
     # Organization models
     'NationalSociety',
+    'Initiative',
     'NSBranch',
     'NSSubBranch',
     'NSLocalUnit',

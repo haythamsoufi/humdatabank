@@ -130,6 +130,33 @@ def run_import():
     return json_ok(success=True, job_id=job_id)
 
 
+@bp.route('/retire-legacy', methods=['POST'])
+@admin_permission_required(NSD_ADMIN_PERMISSION)
+def retire_legacy():
+    """Delete the assignments of the old layout (one assignment per project report), in the background."""
+    if jobs.any_running():
+        return json_bad_request('Another NSD import is still running.')
+    app = current_app._get_current_object()
+    job_id = jobs.create(current_user.id)
+
+    def work():
+        with app.app_context():
+            try:
+                deleted = importer_apply.retire_legacy(
+                    progress=lambda done, total, cur: jobs.update(job_id, done=done, total=total, current=cur))
+                jobs.update(job_id, state='done', result={'stats': {'deleted_assignments': deleted}, 'messages': [],
+                                                          'failed': 0, 'cancelled': False}, finished=_now())
+            except Exception as exc:
+                db.session.rollback()
+                current_app.logger.exception('NSD legacy cleanup failed')
+                jobs.update(job_id, state='failed', error=f'{type(exc).__name__}: {str(exc)[:300]}', finished=_now())
+            finally:
+                db.session.remove()
+
+    threading.Thread(target=work, daemon=True, name=f'nsd-retire-{job_id[:8]}').start()
+    return json_ok(success=True, job_id=job_id)
+
+
 def _now():
     import time
     return time.time()

@@ -1,8 +1,8 @@
 """Read-only data layer for the NSD admin project overview.
 
-Every project is a hidden "project record" (an AssignedForm of the NSD Project profile template, period
-``<reference> Project``) plus report assignments (``<reference> Y1Q2``, ``<reference> Final``). Answers are
-FormData rows keyed by form item label. The list needs a handful of set-based queries (templates/items, project
+Every project is an Initiative (core entity type). Its hidden "project record" is its row in the assignment of the
+NSD Project profile template (period ``Project``); its reports are its rows in the quarterly assignments (``Y1Q2``)
+and the final report assignment (``Final``). Answers are FormData rows keyed by form item label. The list needs a handful of set-based queries (templates/items, project
 answers, report assignments, report answers, countries) and aggregates in Python, so there is no N+1.
 Nothing here writes.
 """
@@ -13,11 +13,14 @@ import re
 from collections import defaultdict
 from typing import Dict, Iterable, List, Optional
 
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func
 
 from app import db
 from app.models import (AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, FormTemplate,
                         FormTemplateVersion)
+from app.models.enums import EntityType
+from app.models.initiatives import Initiative
+from app.models.organization import NationalSociety
 from app.utils.datetime_helpers import utcnow
 
 from plugins.nsd_report_forms.importer import layout
@@ -120,6 +123,14 @@ def norm_email(v) -> str:
     return str(v or '').strip().lower()
 
 
+def _initiative_rows(query):
+    """Join the initiative (and its country, through the National Society) to an AssignmentEntityStatus query."""
+    return (query
+            .join(Initiative, and_(AssignmentEntityStatus.entity_type == EntityType.initiative.value,
+                                   Initiative.id == AssignmentEntityStatus.entity_id))
+            .outerjoin(NationalSociety, NationalSociety.id == Initiative.national_society_id))
+
+
 def _profiles(ctx: Ctx, reference: Optional[str] = None, with_logframe: bool = False,
               pm_email: Optional[str] = None) -> Dict[str, dict]:
     """reference -> project dict (simple answers, the expected-spending cell, optionally the planned logframe).
@@ -132,46 +143,43 @@ def _profiles(ctx: Ctx, reference: Optional[str] = None, with_logframe: bool = F
     spend_id = ctx.items[PROFILE].get('Expected spending')
     frame_id = ctx.items[PROFILE].get('Outcomes and outputs')
     wanted = list(by_item) + ([spend_id] if spend_id else []) + ([frame_id] if with_logframe and frame_id else [])
-    q = (db.session.query(AssignedForm.id, AssignedForm.period_name, AssignmentEntityStatus.id,
-                          AssignmentEntityStatus.entity_id, FormData.form_item_id, FormData.value,
-                          FormData.numeric_value, FormData.disagg_data)
-         .join(AssignmentEntityStatus, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
-         .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
-         .filter(AssignedForm.template_id == ctx.tpl[PROFILE], FormData.form_item_id.in_(wanted)))
+    q = _initiative_rows(
+        db.session.query(AssignmentEntityStatus.id, Initiative.reference, Initiative.id, NationalSociety.country_id,
+                         FormData.form_item_id, FormData.value, FormData.numeric_value, FormData.disagg_data)
+        .select_from(AssignmentEntityStatus)
+        .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
+        .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
+        .filter(AssignedForm.template_id == ctx.tpl[PROFILE], FormData.form_item_id.in_(wanted)))
     if reference:
-        q = q.filter(AssignedForm.period_name == layout.period_name(reference, layout.PROFILE_PERIOD))
+        q = q.filter(Initiative.reference == reference)
     if pm_email is not None:
         pm_item = ctx.items[PROFILE].get(PROFILE_LABELS['pm_email'])
         pm_email = norm_email(pm_email)
         if not pm_item or not pm_email:
             return {}
-        mine = (db.session.query(AssignmentEntityStatus.assigned_form_id)
-                .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
+        mine = (db.session.query(FormData.assignment_entity_status_id)
                 .filter(FormData.form_item_id == pm_item, func.lower(func.trim(FormData.value)) == pm_email))
-        q = q.filter(AssignedForm.id.in_(mine))
+        q = q.filter(AssignmentEntityStatus.id.in_(mine))
     projects: Dict[int, dict] = {}
-    for af_id, period, aes_id, country_id, item_id, value, numeric, disagg in q.all():
-        p = projects.setdefault(af_id, {'period_name': period, 'aes_id': aes_id, 'country_id': country_id,
-                                        'expected': None, 'logframe': None})
+    for aes_id, ref, initiative_id, country_id, item_id, value, numeric, disagg in q.all():
+        p = projects.setdefault(aes_id, {'aes_id': aes_id, 'reference': ref, 'initiative_id': initiative_id,
+                                         'country_id': country_id,
+                                         'expected': None, 'logframe': None})
         if item_id == spend_id:
             p['expected'] = parse_amount((disagg or {}).get(EXPECTED_CELL))
         elif item_id == frame_id:
             p['logframe'] = disagg if isinstance(disagg, list) else None
         else:
-            p[by_item[item_id]] = value if value not in (None, '') else (numeric if numeric is not None else '')
+            short = by_item[item_id]
+            if short != 'reference':   # the initiative's own reference is the one that counts
+                p[short] = value if value not in (None, '') else (numeric if numeric is not None else '')
     out: Dict[str, dict] = {}
     for p in projects.values():
-        ref = str(p.get('reference') or p['period_name'].rsplit(' ', 1)[0]).strip()
-        p['reference'] = ref
         p['status'] = p.get('status') or 'Open'
         p['granted'] = parse_amount(p.get('granted'))
         p['start'], p['end'] = parse_date(p.get('start')), parse_date(p.get('end'))
-        out[ref] = p
+        out[p['reference']] = p
     return out
-
-
-def _like_escape(text: str) -> str:
-    return text.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
 def _report_rows(ctx: Ctx, reference: Optional[str] = None, with_answers: bool = True,
@@ -181,27 +189,27 @@ def _report_rows(ctx: Ctx, reference: Optional[str] = None, with_answers: bool =
     tpl_ids.pop(None, None)
     if not tpl_ids:
         return {}
-    q = (db.session.query(AssignedForm.template_id, AssignedForm.period_name, AssignedForm.is_active,
-                          AssignmentEntityStatus.id, AssignmentEntityStatus.entity_id, AssignmentEntityStatus.status,
-                          AssignmentEntityStatus.due_date, AssignmentEntityStatus.completion_rate,
-                          AssignmentEntityStatus.submitted_at, AssignmentEntityStatus.status_timestamp)
-         .join(AssignmentEntityStatus, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
-         .filter(AssignedForm.template_id.in_(list(tpl_ids))))
+    q = _initiative_rows(
+        db.session.query(AssignedForm.template_id, AssignedForm.period_name, AssignedForm.is_active, Initiative.reference,
+                         Initiative.is_active, NationalSociety.country_id,
+                         AssignmentEntityStatus.id, AssignmentEntityStatus.status,
+                         AssignmentEntityStatus.due_date, AssignmentEntityStatus.completion_rate,
+                         AssignmentEntityStatus.submitted_at, AssignmentEntityStatus.status_timestamp)
+        .select_from(AssignmentEntityStatus)
+        .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
+        .filter(AssignedForm.template_id.in_(list(tpl_ids))))
     if reference:
-        escaped = reference.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-        q = q.filter(AssignedForm.period_name.like(escaped + ' %', escape='\\'))
-    wanted_refs = set(references) if references is not None else None
-    if wanted_refs is not None:
+        q = q.filter(Initiative.reference == reference)
+    if references is not None:
+        wanted_refs = list(references)
         if not wanted_refs:
             return {}
-        q = q.filter(or_(*[AssignedForm.period_name.like(_like_escape(r) + ' %', escape='\\') for r in wanted_refs]))
+        q = q.filter(Initiative.reference.in_(wanted_refs))
     reports: Dict[int, dict] = {}
-    for tpl_id, period_name, active, aes_id, country_id, status, due, comp, submitted_at, status_ts in q.all():
-        ref, _, period = period_name.rpartition(' ')
-        if not ref or (reference and ref != reference) or (wanted_refs is not None and ref not in wanted_refs):
-            continue
+    for (tpl_id, period, af_active, ref, init_active, country_id, aes_id, status, due, comp, submitted_at,
+         status_ts) in q.all():
         reports[aes_id] = {'aes_id': aes_id, 'reference': ref, 'period': period, 'kind': tpl_ids[tpl_id],
-                           'active': bool(active), 'status': status_value(status), 'due': due,
+                           'active': bool(af_active and init_active), 'status': status_value(status), 'due': due,
                            'completion': float(comp) if comp is not None else None,
                            'submitted_at': submitted_at or status_ts, 'country_id': country_id,
                            'overall': None, 'activities': None, 'actual': None, 'author': None, 'frame': None}

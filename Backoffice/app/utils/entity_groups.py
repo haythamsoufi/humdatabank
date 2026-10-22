@@ -27,6 +27,9 @@ ENTITY_GROUP_TYPE_MAP = {
         EntityType.regional_office.value,
         EntityType.cluster_office.value,
     ],
+    'funds': [
+        EntityType.initiative.value,
+    ],
 }
 
 

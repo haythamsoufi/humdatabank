@@ -204,7 +204,7 @@ def _load_sex_categories_from_settings(default_sex_categories):
     """
     return list(default_sex_categories)
 
-ALLOWED_ENTITY_GROUPS = ['countries', 'ns_structure', 'secretariat']
+ALLOWED_ENTITY_GROUPS = ['countries', 'ns_structure', 'secretariat', 'funds']
 
 def _load_enabled_entity_types_from_settings(default_entity_groups):
     """Return default enabled entity groups.

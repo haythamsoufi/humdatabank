@@ -12,7 +12,7 @@
   - csrf_token: CSRF token for form
 #}
 
-{% set entity_type_order = ['country', 'national_society', 'ns_branch', 'ns_subbranch', 'ns_localunit', 'division', 'department', 'regional_office', 'cluster_office'] %}
+{% set entity_type_order = ['country', 'national_society', 'ns_branch', 'ns_subbranch', 'ns_localunit', 'division', 'department', 'regional_office', 'cluster_office', 'initiative'] %}
 {% set all_entity_types = user_entities | map(attribute='entity_type') | unique | list %}
 {% set single_entity_type_mode = all_entity_types | length == 1 %}
 {% set sole_entity_type = all_entity_types[0] if single_entity_type_mode else '' %}

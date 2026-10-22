@@ -132,7 +132,3 @@ TEMPLATE_NAMES = {
 PROFILE_PERIOD = 'Project'
 FINAL_PERIOD = 'Final'
 
-
-def period_name(reference: str, suffix: str) -> str:
-    """Assignment period of one project report, e.g. 'CBF-XX-2401-001 Y1Q2'."""
-    return f'{reference} {suffix}'

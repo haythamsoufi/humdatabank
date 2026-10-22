@@ -10,9 +10,9 @@
         <a href="{{ back_url|default(url_for('nsd_projects.project_list')) }}" class="btn btn-outline-secondary">
           <i class="fas fa-arrow-left"></i> {{ back_label|default('Back to Welcome') }}
         </a>
-        {% if p.country_id %}
-        <a href="{{ url_for('main.dashboard', entity_select='country:%d' % p.country_id) }}" class="btn btn-outline-secondary">
-          <i class="fas fa-th-large"></i> {{ p.country or 'Country' }} dashboard
+        {% if p.initiative_id %}
+        <a href="{{ url_for('main.dashboard', entity_select='initiative:%d' % p.initiative_id) }}" class="btn btn-outline-secondary">
+          <i class="fas fa-th-large"></i> Project dashboard
         </a>
         {% endif %}
       </div>

@@ -308,6 +308,11 @@ def index():
     part_of_programs = collect_part_of_category_names(nss)
     part_of_category_definitions = collect_part_of_category_definitions(nss)
 
+    ns_plugin_columns, ns_plugin_values = [], {}
+    manager = getattr(current_app, "plugin_manager", None)
+    if manager is not None:
+        ns_plugin_columns, ns_plugin_values = manager.national_society_columns(nss)
+
     return render_template('admin/organization/index.html',
                          countries_count=countries_count,
                          nss_count=nss_count,
@@ -333,6 +338,8 @@ def index():
                          all_countries=all_countries,
                          part_of_programs=part_of_programs,
                          part_of_category_definitions=part_of_category_definitions,
+                         ns_plugin_columns=ns_plugin_columns,
+                         ns_plugin_values=ns_plugin_values,
                          # Filter parameters
                          selected_country_id=selected_country_id,
                          selected_division_id=selected_division_id,

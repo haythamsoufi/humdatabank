@@ -719,6 +719,9 @@ try {
             name_{{ code }}: {{ translation_lookup(_nt, code)|tojson|safe }},
             {% endfor %}
             country_name: {{ (ns.country.name if ns.country else '')|tojson|safe }},
+            {% for col in ns_plugin_columns or [] %}
+            {{ col.field }}: {{ ((ns_plugin_values or {}).get(ns.id, {}).get(col.field))|tojson|safe }},
+            {% endfor %}
             logo_url: {{ (ns_logo_url(ns) or '')|tojson|safe }},
             status: {{ (ns.status_label)|tojson|safe }},
             is_active: {{ ns.is_active|tojson|safe }},
@@ -732,9 +735,58 @@ try {
         {% endfor %}
     ];
 
+    // Plugin columns (FDRS DON code, zone, and the other society fields).
+    const nssPluginColumns = {{ (ns_plugin_columns or [])|tojson }};
+
     // Available categories (each becomes a column) — injected with the page so we
     // do not need GET /api/part-of-programs on load.
     let availableCategoryDefs = {{ (part_of_category_definitions or [])|tojson }};
+
+    function buildNssPluginColumns() {
+        return (nssPluginColumns || []).map(function(def) {
+            const kind = def.kind || 'text';
+            let filter = 'agTextColumnFilter';
+            if (kind === 'number') filter = 'agNumberColumnFilter';
+            else if (kind === 'set') filter = 'customSetFilter';
+            return {
+                field: def.field,
+                headerName: def.header,
+                width: def.width || 160,
+                minWidth: def.min_width || 110,
+                maxWidth: def.max_width || 320,
+                hide: !!def.hide,
+                filter: filter,
+                sortable: true,
+                cellRenderer: function(params) {
+                    const value = params.value;
+                    if (value === null || value === undefined || value === '') {
+                        return '<span class="text-gray-400">-</span>';
+                    }
+                    const label = escapeCategoryHtml(value);
+                    const raw = String(value).trim();
+                    // Only absolute http(s) links. A bare host like "www.example.org"
+                    // would otherwise be treated as a path on this site.
+                    if (kind !== 'url' || !window.SafeDom || !/^https?:\/\//i.test(raw)) {
+                        return label;
+                    }
+                    const href = SafeDom.safeHrefAttr(raw, { allowSameOrigin: false });
+                    if (!href || href === '#') return label;
+                    return '<a href="' + href + '" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">' + label + '</a>';
+                }
+            };
+        });
+    }
+
+    function withNssPluginColumns(baseColumns) {
+        const pluginColumns = buildNssPluginColumns();
+        const countryIndex = baseColumns.findIndex(function(col) { return col.field === 'country_name'; });
+        if (countryIndex === -1) {
+            return baseColumns.concat(pluginColumns);
+        }
+        return baseColumns.slice(0, countryIndex + 1)
+            .concat(pluginColumns)
+            .concat(baseColumns.slice(countryIndex + 1));
+    }
 
     function categoryFieldId(name) {
         return 'part_of_' + String(name).replace(/[^a-zA-Z0-9]/g, '_');
@@ -847,9 +899,12 @@ try {
     function nssDesiredColumnOrder() {
         const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
         const categoryColIds = availableCategoryDefs.map(def => categoryFieldId(def.name));
+        const pluginFields = (nssPluginColumns || []).map(function(def) { return def.field; });
         return ['id', 'logo_url', 'name']
             .concat(nameColumns)
-            .concat(['country_name', 'status', 'display_order'])
+            .concat(['country_name'])
+            .concat(pluginFields)
+            .concat(['status', 'display_order'])
             .concat(categoryColIds)
             .concat(['actions']);
     }
@@ -903,7 +958,9 @@ try {
         if (!window.nssGridApi || !nssGridHelper) return;
 
         // Get base column definitions (without part_of and actions columns - we'll add actions at the end)
-        const baseColumns = nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions');
+        const baseColumns = withNssPluginColumns(
+            nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions')
+        );
 
         const categoryColumns = buildCategoryColumns();
 
@@ -1118,7 +1175,9 @@ try {
 
         // Build complete column definitions including category columns
         // Filter out 'part_of' (old single column) and 'actions' (we'll add it at the end)
-        const baseColumns = nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions');
+        const baseColumns = withNssPluginColumns(
+            nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions')
+        );
         const categoryColumns = buildCategoryColumns();
         // Get actions column (only once)
         const actionsColumn = nssColumnDefs.find(col => col.field === 'actions');

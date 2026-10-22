@@ -9,7 +9,14 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from flask import Flask
-from .base import BasePlugin, BaseFieldType, CspOverride, DataExplorerTabConfig, PluginDocsSource
+from .base import (
+    BasePlugin,
+    BaseFieldType,
+    CspOverride,
+    DataExplorerTabConfig,
+    NationalSocietyGridColumn,
+    PluginDocsSource,
+)
 import shutil
 import json
 import hashlib
@@ -21,7 +28,41 @@ from jinja2 import ChoiceLoader
 from .jinja_plugin_loader import PluginTemplateLoader
 from .data_explorer import CORE_DATA_EXPLORER_PERMISSIONS
 
+def _national_society_column_value(society: Any, column: NationalSocietyGridColumn) -> Any:
+    """JSON-safe cell value for one plugin column. Blank cells are ``None``."""
+    raw = getattr(society, column.field, None)
+    if raw is None or raw == "":
+        return None
+    if column.kind == "date":
+        return raw.isoformat() if hasattr(raw, "isoformat") else str(raw)
+    if column.kind == "number":
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+    text = str(raw).strip()
+    return text or None
+
+
 _PLUGIN_ID_RE = re.compile(r'^[a-z0-9][a-z0-9_]{0,63}$')
+_NS_COLUMN_FIELD_RE = re.compile(r'^[a-z][a-z0-9_]{0,63}$')
+_NS_COLUMN_KINDS = frozenset({"text", "number", "date", "url", "set"})
+# Core grid fields. A plugin column with one of these names would overwrite the row.
+_RESERVED_NS_FIELDS = frozenset({
+    "id",
+    "name",
+    "country_name",
+    "logo_url",
+    "status",
+    "is_active",
+    "display_order",
+    "part_of",
+    "category_text",
+    "edit_url",
+    "delete_url",
+    "delete_confirm",
+    "actions",
+})
 
 
 class PluginLifecycleError(Exception):
@@ -1394,6 +1435,59 @@ class PluginManager:
                 seen.add(perm.code)
                 catalog.append((perm.code, perm.name, perm.description))
         return catalog
+
+    def national_society_columns(self, societies) -> tuple[list[dict], dict[int, dict]]:
+        """Column definitions and per-society values plugins add to the NSs table.
+
+        Returns ``(columns, values_by_id)``. A failing plugin contributes nothing.
+        Column headers are the strings the plugin returned (already translated).
+        """
+        specs: List[NationalSocietyGridColumn] = []
+        seen: Set[str] = set()
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                contributed = plugin.get_national_society_columns() or []
+            except Exception as exc:
+                self.logger.warning(
+                    "get_national_society_columns failed for plugin %s: %s",
+                    plugin_id,
+                    exc,
+                )
+                continue
+            for column in contributed:
+                field = getattr(column, "field", "") or ""
+                if (
+                    not isinstance(column, NationalSocietyGridColumn)
+                    or field in seen
+                    or field in _RESERVED_NS_FIELDS
+                    or field.startswith(("name_", "part_of_"))
+                    or not _NS_COLUMN_FIELD_RE.match(field)
+                ):
+                    continue
+                seen.add(field)
+                specs.append(column)
+
+        columns = [
+            {
+                "field": column.field,
+                "header": str(column.header),
+                "hide": bool(column.hide),
+                "width": int(column.width),
+                "min_width": int(column.min_width),
+                "max_width": int(column.max_width),
+                "kind": column.kind if column.kind in _NS_COLUMN_KINDS else "text",
+            }
+            for column in specs
+        ]
+        values: Dict[int, dict] = {}
+        for society in societies or []:
+            society_id = getattr(society, "id", None)
+            if society_id is None:
+                continue
+            values[int(society_id)] = {
+                column.field: _national_society_column_value(society, column) for column in specs
+            }
+        return columns, values
 
     def get_assignment_badges(self, assignment_entity_statuses) -> Dict[int, list]:
         """Badges plugins add to dashboard cards, keyed by AssignmentEntityStatus id. A failing plugin adds none."""

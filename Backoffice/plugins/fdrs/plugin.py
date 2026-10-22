@@ -162,6 +162,54 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     def is_admin_feature(self) -> bool:
         return True
 
+    def get_national_society_columns(self):
+        """DON code and the other FDRS society fields on the National Societies table."""
+        from flask_babel import gettext as _
+
+        from app.plugins.base import NationalSocietyGridColumn
+
+        return [
+            NationalSocietyGridColumn(
+                "fdrs_don_code", _("DON code"), hide=False, width=140, min_width=110, max_width=180
+            ),
+            NationalSocietyGridColumn(
+                "fdrs_zone_code", _("Zone code"), hide=False, width=120, min_width=100, max_width=160, kind="set"
+            ),
+            NationalSocietyGridColumn(
+                "fdrs_zone_name", _("Zone"), hide=False, width=220, min_width=160, max_width=320, kind="set"
+            ),
+            NationalSocietyGridColumn(
+                "currency_code", _("Currency"), hide=False, width=120, min_width=100, max_width=150, kind="set"
+            ),
+            NationalSocietyGridColumn(
+                "admission_date", _("Admission date"), hide=False, width=160, min_width=140, max_width=200, kind="date"
+            ),
+            NationalSocietyGridColumn(
+                "website", _("Website"), hide=False, width=220, min_width=160, max_width=360, kind="url"
+            ),
+            NationalSocietyGridColumn(
+                "latitude", _("Latitude"), hide=True, width=130, min_width=110, max_width=170, kind="number"
+            ),
+            NationalSocietyGridColumn(
+                "longitude", _("Longitude"), hide=True, width=130, min_width=110, max_width=170, kind="number"
+            ),
+            NationalSocietyGridColumn(
+                "admission_date_note", _("Admission date note"), hide=True, width=240, min_width=160, max_width=400
+            ),
+            NationalSocietyGridColumn(
+                "facebook", _("Facebook"), hide=True, width=200, min_width=140, max_width=320, kind="url"
+            ),
+            NationalSocietyGridColumn(
+                "twitter", _("Twitter"), hide=True, width=180, min_width=130, max_width=280, kind="url"
+            ),
+            NationalSocietyGridColumn(
+                "other_social", _("Other social"), hide=True, width=200, min_width=140, max_width=320
+            ),
+            NationalSocietyGridColumn(
+                "fdrs_search_string", _("Search string"), hide=True, width=240, min_width=160, max_width=400
+            ),
+        ]
+
     def get_entry_form_assets(self, template_id: int | None) -> list[dict[str, str]]:
         if template_id != 21:
             return []

@@ -16,7 +16,7 @@ UPR Master never writes later rounds (P27+, AR26+, MYR26+).
 
 Scope is always explicit: every import is a list of (template, round) targets and
 each target maps to exactly one assigned form (template + period). There is no
-"empty = everything" mode. Legal pairs: P* -> 24, 22; AR* -> 33, 23; MYR* -> 33.
+"empty = everything" mode. Legal pairs: P* -> 24, 22; AR* -> 33, 23; MYR* -> 33, 23.
 
 Usage (from Backoffice/):
     python plugins/upr/scripts/import_upr_excel_data.py --input f.xlsx --plan
@@ -112,8 +112,9 @@ UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     },
     23: {
         "name": "Reporting - PNS",
-        "round_prefixes": ("AR",),
-        # Only AR rounds have T23 assignments. Funding covers PNS-reported totals.
+        "round_prefixes": ("AR", "MYR"),
+        # Closed mid-year rounds (MYR23–MYR25) have T23 assignments. Live rounds
+        # such as MYR26 stay out via UPR_MASTER_ALLOWED_ROUNDS.
         "sections": frozenset({"Funding"}),
     },
 }
@@ -154,7 +155,7 @@ def assert_import_scope(template_ids: List[int], rounds: Optional[Set[str]]) -> 
 
     * ``rounds`` must be explicit — "empty = everything" is not a valid scope.
     * every round must be on the closed allowlist;
-    * every (template, round) pair must be legal (e.g. template 23 never takes MYR*);
+    * every (template, round) pair must be legal (e.g. template 22 never takes MYR*);
     * every round must be written by at least one selected template.
     """
     errors: List[str] = []
@@ -587,7 +588,7 @@ def pns_aes_with_pns_data(
     """Assignment ids to approve: the society has a ``Source = PNS Data`` row with a value.
 
     Planning (template 22) uses ``P*`` rounds. Reporting (template 23) uses ``AR*``
-    rounds. The ``PNS reported`` column is not consulted.
+    and closed ``MYR*`` rounds. The ``PNS reported`` column is not consulted.
     """
     out: Dict[int, Set[int]] = {22: set(), 23: set()}
     if 22 not in template_ids and 23 not in template_ids:
@@ -614,7 +615,7 @@ def pns_aes_with_pns_data(
             pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
             if pns_aes:
                 out[22].add(int(pns_aes))
-        elif rnd.startswith("AR") and 23 in template_ids:
+        elif template_accepts_round(23, rnd) and 23 in template_ids:
             pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
             if pns_aes:
                 out[23].add(int(pns_aes))
@@ -667,7 +668,7 @@ def _build_pns_reported_yes_sets(
             pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
             if pns_aes:
                 t22_yes.add((pns_aes, iso3))
-        elif rnd.startswith("AR") and 23 in template_ids:  # T23 has no mid-year assignments
+        elif template_accepts_round(23, rnd) and 23 in template_ids:
             if not is_pns_data_source(row):
                 continue
             pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
@@ -701,7 +702,7 @@ def pns_clear_periods_for_template(
     """Assignment periods the importer may treat as "not reported" for a PNS template.
 
     Limited to allowlisted rounds whose prefix the template actually imports
-    (T22 → ``P``; T23 → ``AR``). Live periods such as ``Jan-Jun 2026`` (MYR26),
+    (T22 → ``P``; T23 → ``AR`` and ``MYR``). Live periods such as ``Jan-Jun 2026`` (MYR26),
     ``2026`` for T23 (AR26) etc. are never in scope, so their form data and status
     are never cleared just because UPR Master has no row for them.
     """
@@ -4912,7 +4913,7 @@ def transform_to_import_rows(
             # AES is keyed by PNS home country ISO3; row is the host country's NS id.
             # Attribute=Total → the three total columns. Attribute=SP Breakdown and
             # indicator 734 → that Area's expenditure column (SP1–SP5, EFs).
-            if 23 in tids and rnd.startswith("AR") and ent_upper == "PNS" and is_pns_data_source(row):
+            if 23 in tids and template_accepts_round(23, rnd) and ent_upper == "PNS" and is_pns_data_source(row):
                 if not ctx.pns_funding_item_id:
                     skip_msg = (
                         "Skipping template 23 funding rows: published PNS funding matrix was not resolved"

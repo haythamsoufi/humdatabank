@@ -23,7 +23,7 @@
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 <div id="upr-excel-import-root">
   <p class="text-sm text-gray-600 mb-6">
-    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning and reporting forms. Importable rounds are a closed historical set: planning P23–P26 (templates 24 and 22), annual reports AR21–AR25 (templates 33 and 23), mid-year MYR23–MYR25 (template 33). Live or later rounds such as P27, AR26, and MYR26 are never imported.') }}
+    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning and reporting forms. Importable rounds are a closed historical set: planning P23–P26 (templates 24 and 22), annual reports AR21–AR25 and mid-year MYR23–MYR25 (templates 33 and 23). Live or later rounds such as P27, AR26, and MYR26 are never imported.') }}
   </p>
 
   {% set step_labels = [_('Upload'), _('Configure'), _('Import')] %}

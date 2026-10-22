@@ -20,7 +20,7 @@ Sync planning and reporting data from **UPR Master.xlsx** (sheet `UPR Data`) int
 | **24** | Unified Country Plan | `P*` | NS Data, Funding (country-reported), Reach, Support, Comments |
 | **22** | Annual Planning – International Bilateral Support | `P*` | Funding (PNS-reported), Staff |
 | **33** | Reporting – Country | `AR*`, `MYR*` | NS Data, Core indicators, Other indicators, Funding, Support |
-| **23** | Reporting – PNS | `AR*` | Funding (PNS-reported totals) |
+| **23** | Reporting – PNS | `AR*`, `MYR*` | Funding (PNS-reported totals) |
 
 **Emergency 1/2/3 sections** on T33 map to the repeat-group **Emergency Appeals Indicators** block and its dynamic child section — see §6.11.
 
@@ -107,7 +107,7 @@ UPR_TEMPLATE_PROFILES = {
          "round_prefixes": ("AR", "MYR"),
          "sections": frozenset({"NS Data", "Funding", "Core indicators", "Other indicators", "Support"})},
     23: {"name": "Reporting - PNS",
-         "round_prefixes": ("AR",),
+         "round_prefixes": ("AR", "MYR"),
          "sections": frozenset({"Funding"})},
 }
 ```
@@ -401,7 +401,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 - T23 has a **single published version**. The funding matrix often has an **empty label**; resolve it by columns `Total Funding` + `Total Expenditure`. There is **no item 952**.
 - Reporting is **PNS-only** (no country/PNS mix). Rows with **`Source = PNS Data`**, `Entity = PNS`; the amount is **`ValueNum`**
 - Do **not** use the planning `PNS reported` column or `PNS Value` / `Country Value` for T23
-- NS name → home country ISO3 → template 23 AES (`period_name` `2025` / `2025 Annual` / `AR25` all match AR25)
+- NS name → home country ISO3 → template 23 AES (`period_name` `2025` / `2025 Annual` / `AR25` all match AR25; `Jan-Jun 2025` / `MYR25` match the mid-year form)
 - Row key: `iso3_to_hns_id[host_ISO3]` (the host country's primary NS)
 - Columns: `Total Funding` (iid 733), `Total Expenditure` (iid 734), `Total Transferred to HNS` (iid 5, from `00005`)
 - `Attribute = Total` writes those three columns. `Attribute = SP Breakdown` with indicator 734 writes `Area` (`SP1`–`SP5`, `EFs`) to the expenditure-breakdown column of the same name. Breakdown rows share indicator 734 with the total and must not overwrite `Total Expenditure`.

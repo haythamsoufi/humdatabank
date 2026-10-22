@@ -411,9 +411,10 @@ class TestNonReportedPnsPlanning:
         for rounds in (None, set()):
             by_tpl = plan_non_reported_pns_aes_by_template(ctx, [22, 23], rounds=rounds)
             assert by_tpl[22] == {3208}
-            assert by_tpl[23] == {4001}
+            # 2025 annual and closed Jan-Jun 2025. Jan-Jun 2026 and AR26 stay out.
+            assert by_tpl[23] == {4001, 4003}
             plan = plan_pns_assignment_status_updates(ctx, [22, 23], rounds=rounds)
-            assert {r["assignment_entity_status_id"] for r in plan} == {3208, 4001}
+            assert {r["assignment_entity_status_id"] for r in plan} == {3208, 4001, 4003}
 
     def test_reported_assignments_are_approved_and_not_reset(self):
         ctx = UprImportContext(template_ids=[22, 23])
@@ -432,9 +433,11 @@ class TestNonReportedPnsPlanning:
         ctx.assignment_by_template = {23: {("Jan-Jun 2026", "AUT"): 4096}}
         assert plan_non_reported_pns_aes_by_template(ctx, [23], rounds={"MYR26"})[23] == set()
         assert plan_non_reported_pns_aes_by_template(ctx, [23], rounds={"AR26"})[23] == set()
-        assert pns_clear_periods_for_template(23, {"MYR25"}) == set()
+        assert pns_clear_periods_for_template(23, {"MYR25"}) == {"Jan-Jun 2025"}
+        assert pns_clear_periods_for_template(23, {"MYR26"}) == set()
         assert pns_clear_periods_for_template(23, None) == {
-            "2021", "2022", "2023", "2024", "2025"
+            "2021", "2022", "2023", "2024", "2025",
+            "Jan-Jun 2023", "Jan-Jun 2024", "Jan-Jun 2025",
         }
         assert pns_clear_periods_for_template(22, None) == {"2023", "2024", "2025", "2026"}
 
@@ -569,6 +572,26 @@ class TestT23ReportingPnsDataSource:
         assert len(item_rows) == 1
         cells = json.loads(item_rows[0]["disagg_data"])
         assert cells["77_Total Funding"] == 100000
+
+    def test_imports_midyear_onto_the_jan_jun_assignment(self):
+        ctx = self._ctx(period_key="Jan-Jun 2025")
+        import_rows = transform_to_import_rows(
+            [
+                _ar25_pns_funding_row(Round="MYR25", Indicator="Expenditure", indicatorId=734, ValueNum=53794),
+                _ar25_pns_funding_row(
+                    Round="MYR25", Indicator="Expenditure", indicatorId=734, ValueNum=107588,
+                    Attribute="SP Breakdown", Area="SP3",
+                ),
+            ],
+            ctx,
+            template_ids=[23],
+            rounds={"MYR25"},
+        )
+        item_rows = [r for r in import_rows if r["item_id"] == "1433"]
+        assert len(item_rows) == 1
+        cells = json.loads(item_rows[0]["disagg_data"])
+        assert cells["77_Total Expenditure"] == 53794
+        assert cells["77_SP3"] == 107588
 
     def test_sp_breakdown_expenditure_does_not_replace_the_total(self):
         ctx = self._ctx()

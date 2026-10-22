@@ -697,11 +697,15 @@ class TestDocuments:
         db_session.commit()
 
         documents = _get(client, key, "/api/documents", type="EveryoneCounts").get_json()[0]["documents"]
-        assert len(documents) == 1
-        assert documents[0]["year"] == 2023
-        assert documents[0]["YearText"] == "2023"
-        assert documents[0]["language"] == "Arabic"
-        assert documents[0]["LangCode"] == "ar"
+        by_name = {row["name"]: row for row in documents}
+        dated = by_name["EVERYONE COUNTS REPORT (COVID-19) 2023 AR.pdf"]
+        assert dated["year"] == 2023
+        assert dated["YearText"] == "2023"
+        assert dated["language"] == "Arabic"
+        assert dated["LangCode"] == "ar"
+        undated_row = by_name["overview.pdf"]
+        assert undated_row["year"] is None
+        assert undated_row["YearText"] is None
 
     def test_videos_and_document_guides_keep_their_urls(self, client, db_session, scenario, key):
         from datetime import date

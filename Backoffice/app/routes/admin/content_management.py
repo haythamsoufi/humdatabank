@@ -777,6 +777,10 @@ def _decode_b64_form_text_fields(form):
     for lang in _get_supported_language_codes():
         field_names.append(f'title_{lang}')
         field_names.append(f'description_{lang}')
+        # The edit page base64-encodes every text input, including video links.
+        # Decode those too, or an https YouTube URL fails validation and the
+        # whole save, including the publication date, is discarded.
+        field_names.append(f'external_url_{lang}')
 
     for name in field_names:
         field = getattr(form, name, None)

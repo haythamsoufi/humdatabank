@@ -1070,9 +1070,8 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
             if (frm) {
                 frm.addEventListener('submit', function () {
                     frm.querySelectorAll('input[type="text"], textarea').forEach(function (el) {
-                        if (!SKIP[el.name] && el.value) {
-                            el.value = toB64(el.value);
-                        }
+                        if (!el.value || SKIP[el.name] || el.name.indexOf('external_url_') === 0) return;
+                        el.value = toB64(el.value);
                     });
                 });
             }

@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models import FormData, FormItem, IndicatorBank, NationalSociety
+from app.models import EmbedContent, FormData, FormItem, IndicatorBank, NationalSociety
 from app.models.organization import NS_STATUS_INACTIVE
 from app.models.assignments import AssignmentEntityStatus
 from app.services.security.api_key_permissions import CONTENT_READ, build_permissions_document
@@ -489,6 +489,62 @@ class _FakeUpstream:
 
     def close(self):
         pass
+
+
+class TestEmbeddedContent:
+    def test_unified_planning_uses_the_admin_iframe(self, client, db_session, key):
+        db_session.add_all([
+            EmbedContent(
+                title="Network Bilateral Support and funding",
+                description="The support map.",
+                category="analysis",
+                embed_url="https://databank.ifrc.org/upr/support-overview",
+                embed_type="databank",
+                page_slot="unified_planning",
+                is_active=True,
+                sort_order=2,
+            ),
+            EmbedContent(
+                title="Analysis only",
+                category="analysis",
+                embed_url="https://databank.ifrc.org/upr/support-funding",
+                embed_type="databank",
+                is_active=True,
+                sort_order=1,
+            ),
+            EmbedContent(
+                title="Hidden",
+                category="other",
+                embed_url="https://databank.ifrc.org/upr/support-flow",
+                embed_type="databank",
+                page_slot="unified_planning",
+                is_active=False,
+                sort_order=1,
+            ),
+            EmbedContent(
+                title="ECHO",
+                category="global_initiative",
+                embed_url="https://app.powerbi.com/view?r=abc",
+                embed_type="powerbi",
+                is_active=True,
+                sort_order=1,
+            ),
+        ])
+        db_session.commit()
+
+        rows = _get(client, key, "/api/embeddedcontent", type="UNIFIED-PLANNING").get_json()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["TitleEn"] == row["TitleAr"] == "Network Bilateral Support and funding"
+        assert row["TextFr"] == "The support map."
+        assert row["Order"] == 2
+        assert row["EmbedCode"] == (
+            '<iframe title="Network Bilateral Support and funding" '
+            'src="https://databank.ifrc.org/upr/support-overview" '
+            'style="width:100%;height:640px;border:0;"></iframe>'
+        )
+        initiatives = _get(client, key, "/api/embeddedcontent", type="GLOBAL-INITIATIVES").get_json()
+        assert [item["TitleEn"] for item in initiatives] == ["ECHO"]
 
 
 class TestPassthrough:

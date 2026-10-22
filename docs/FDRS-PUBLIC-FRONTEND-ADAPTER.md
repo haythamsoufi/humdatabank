@@ -21,10 +21,10 @@ Implemented in the FDRS plugin:
 | `apiKey` query alias | `query_api_key_value()` in `app/services/security/api_authentication.py` |
 | `/csv/export` and `/csv/exportns` (`excel=1` for `.xlsx`) | Published snapshot, one row per society, year and KPI code |
 | `GET /api/documents` | Publications (`resource_type = publication`, subcategory → `EveryoneCounts` / `Analysis` / `FrontendVideo`) and, with `ns`, public approved submitted documents |
-| Forward to `https://data-api.ifrc.org` for `embeddedcontent`, `smarttran`, `tran`, `offices`, `documentSubscribe` | Always. Uses `FDRS_DATA_API_KEY`. `FDRS_DATA_API_BASE` overrides the host |
+| `GET /api/embeddedcontent` | `UNIFIED-PLANNING` = active embeds with page slot Unified Planning, in sort order. `GLOBAL-INITIATIVES` = active Global initiatives embeds. `EmbedCode` is the admin Copy iframe. OCAC, BOCA, and `OVERVIEW-INTERNATIONAL` still forward |
 | Tests | `Backoffice/tests/unit/test_plugins/test_fdrs_public_compat.py` |
 
-Not implemented: translations, embeds and offices (see [Content that is not the indicator bank](#content-that-is-not-the-indicator-bank)). `/api/documents` reads Manage Resources publications and public approved submitted documents. `/csv/export` and `/csv/exportns` are files of the published snapshot.
+Not implemented: translations and offices (see [Content that is not the indicator bank](#content-that-is-not-the-indicator-bank)). `/api/embeddedcontent` for unified planning and global initiatives reads Admin → Embed Content. `/api/documents` reads Manage Resources publications and public approved submitted documents. `/csv/export` and `/csv/exportns` are files of the published snapshot.
 
 ### Set up
 
@@ -220,7 +220,7 @@ The age/sex mapper does `response.data.filter(series => expectedIds.includes(ser
 
 `GET /api/documents` is read as `response[0].documents`. The Everyone Counts page builds its year dropdown from `year` (`year.toString()`, so a null year leaves the list empty) and its language dropdown from `language` (the name, such as `English`) plus `LangCode`. `Description` is the card text. When a publication has no date, `year` is taken from the file name or title.
 
-`GET /api/embeddedcontent` rows include `Id`, `TitleEn` / `TitleEs` / `TitleFr` / `TitleAr`, the matching `Text*` fields, and `EmbedCode`.
+`GET /api/embeddedcontent` rows include `Id`, `TitleEn` / `TitleEs` / `TitleFr` / `TitleAr`, the matching `Text*` fields, and `EmbedCode`. `type=UNIFIED-PLANNING` is every active Embed Content row whose page slot is Unified Planning, in sort order. Category does not matter. `type=GLOBAL-INITIATIVES` is the Global initiatives category. `EmbedCode` is the iframe from Admin → Embed Content → Copy iframe. The same title and description are sent in every language. OCAC, BOCA, and `OVERVIEW-INTERNATIONAL` are still forwarded.
 
 `GET /api/smarttran` rows include `LanguageCode`, `Page`, `Name`, `Value`.
 
@@ -292,9 +292,10 @@ Numbers can move first. The rest of the homepage is content the published-data f
 | `/api/kpivalue` | Published snapshot for the requested `kpicode`. Omitted `kpicode` returns `[]` | **Done** |
 | `/csv/export`, `/csv/exportns` | Published snapshot, long file (`KPI_DON_code`, year, `KPI_code`, `Value`, `source`). `excel=1` is the same rows as `.xlsx` | **Done** |
 | `/api/documents` | Manage Resources publications when `type` / `isglobal` is set. `ns` is that society's public approved submitted documents. Shape is `[{code, documents}]` | **Done** |
-| `/api/embeddedcontent`, `/api/smarttran`, `/api/tran`, `/api/offices`, `/api/documentSubscribe` | Not stored as FDRS CMS content | Phase 3. Same forward or `501` until an editor exists in Backoffice |
+| `/api/embeddedcontent` | Admin → Embed Content. `UNIFIED-PLANNING` is page slot `unified_planning`; `GLOBAL-INITIATIVES` is category `global_initiative` | **Done** for those two types. OCAC, BOCA, and `OVERVIEW-INTERNATIONAL` still forward |
+| `/api/smarttran`, `/api/tran`, `/api/offices`, `/api/documentSubscribe` | Not stored as FDRS CMS content | Forwarded |
 
-Translations, embeds, offices, and the mailing list are always relayed to `https://data-api.ifrc.org`. Backoffice replaces the caller’s key with `FDRS_DATA_API_KEY`. The upstream path is fixed in code and redirects are not followed. The relay adds a hop and the legacy API’s latency to those paths.
+Translations, offices, the mailing list, and the embed types that Embed Content does not cover are relayed to `https://data-api.ifrc.org`. Backoffice replaces the caller’s key with `FDRS_DATA_API_KEY`. The upstream path is fixed in code and redirects are not followed. The relay adds a hop and the legacy API’s latency to those paths.
 
 ## Implementation sketch
 

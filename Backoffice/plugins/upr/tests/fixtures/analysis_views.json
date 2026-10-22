@@ -40,7 +40,7 @@
    {
     "id": "partners",
     "label": "Partners engaged",
-    "value": 1,
+    "value": 2,
     "format": "int",
     "year": 2024,
     "delta": {
@@ -418,7 +418,7 @@
    {
     "id": "partners",
     "title": "Partners engaged",
-    "hint": "Participating National Societies providing bilateral support, and the funding they self-report (PNS data, CHF).",
+    "hint": "Participating National Societies providing bilateral support, split into planning and reporting. Bars are funding and lines are the number of societies. Planning uses that year's funding requirement; reporting uses funding reported. Switch between all data sources, PNS-reported data only, and country data only.",
     "wide": false,
     "kind": "chart",
     "chart": {
@@ -428,40 +428,64 @@
      ],
      "series": [
       {
-       "name": "Partners (PNS)",
+       "name": "Funding requirements (CHF)",
        "kind": "column",
        "data": [
-        1,
+        0,
         0
        ],
-       "color": "#8b5a9e",
+       "color": "#011e41",
        "axis": "primary",
-       "format": "int",
+       "format": "money",
        "dashed": false
       },
       {
-       "name": "Partner funding (CHF)",
-       "kind": "line",
+       "name": "Funding reported (CHF)",
+       "kind": "column",
        "data": [
         800,
         300
        ],
        "color": "#f39200",
-       "axis": "secondary",
+       "axis": "primary",
        "format": "money",
+       "dashed": false
+      },
+      {
+       "name": "Planning partners",
+       "kind": "line",
+       "data": [
+        0,
+        0
+       ],
+       "color": "#8b5a9e",
+       "axis": "secondary",
+       "format": "int",
+       "dashed": false
+      },
+      {
+       "name": "Reporting partners",
+       "kind": "line",
+       "data": [
+        2,
+        1
+       ],
+       "color": "#2a9d8f",
+       "axis": "secondary",
+       "format": "int",
        "dashed": false
       }
      ],
      "axes": {
       "primary": {
-       "format": "int",
+       "format": "money",
        "opposite": false,
        "min": null,
        "max": null,
        "tick_amount": null
       },
       "secondary": {
-       "format": "money",
+       "format": "int",
        "opposite": true,
        "min": null,
        "max": null,
@@ -470,7 +494,7 @@
      },
      "stacked": false,
      "height": 300,
-     "column_width": "45%",
+     "column_width": "50%",
      "border_radius": 3,
      "curve": "smooth",
      "stroke_width": 3,
@@ -483,21 +507,33 @@
     "gaps": null,
     "table": {
      "title": "Partners engaged",
-     "note": "Source: Participating National Society self-reports (PNS data). This is separate from the PNS amount a host National Society records in its own plan. Under a country, the partner count is the societies supporting that country; the year total counts each society once.",
-     "legend": "",
+     "note": "All data sources adds what the host National Society recorded and what Participating Societies self-report, counting each society once. PNS reported data is only the self-report. Country data is only the host's record. Planning funding is that year's PNS funding requirement (a stored total is used instead of its breakdown). Reporting funding is funding reported. Under a country, the partner count is the societies supporting that country.",
+     "legend": "Mid-year report, shown where the annual report is not yet available",
      "columns": [
       "Year",
+      "Plan round",
+      "Planning partners",
+      "Funding requirements (CHF)",
       "Report round",
-      "Partners (PNS)",
-      "Partner funding (CHF)"
+      "Reporting partners",
+      "Funding reported (CHF)"
      ],
      "rows": [
       {
        "cells": [
         "2025 *",
-        "MYR25",
+        "P25",
         0,
-        300.0
+        0.0,
+        "MYR25",
+        {
+         "value": 1,
+         "midyear": true
+        },
+        {
+         "value": 300.0,
+         "midyear": true
+        }
        ],
        "countries": [
         {
@@ -505,7 +541,16 @@
           "Aland",
           null,
           null,
-          300.0
+          null,
+          null,
+          {
+           "value": 1,
+           "midyear": true
+          },
+          {
+           "value": 300.0,
+           "midyear": true
+          }
          ]
         }
        ]
@@ -513,8 +558,11 @@
       {
        "cells": [
         "2024",
+        "P24",
+        0,
+        0.0,
         "AR24",
-        1,
+        2,
         800.0
        ],
        "countries": [
@@ -522,7 +570,10 @@
          "cells": [
           "Aland",
           null,
-          1,
+          null,
+          null,
+          null,
+          2,
           800.0
          ]
         }
@@ -531,7 +582,478 @@
      ]
     },
     "table_label": null,
-    "findings": []
+    "findings": [],
+    "sources": [
+     {
+      "id": "all",
+      "label": "All data sources",
+      "chart": {
+       "categories": [
+        "2024",
+        "2025 *"
+       ],
+       "series": [
+        {
+         "name": "Funding requirements (CHF)",
+         "kind": "column",
+         "data": [
+          0,
+          0
+         ],
+         "color": "#011e41",
+         "axis": "primary",
+         "format": "money",
+         "dashed": false
+        },
+        {
+         "name": "Funding reported (CHF)",
+         "kind": "column",
+         "data": [
+          800,
+          300
+         ],
+         "color": "#f39200",
+         "axis": "primary",
+         "format": "money",
+         "dashed": false
+        },
+        {
+         "name": "Planning partners",
+         "kind": "line",
+         "data": [
+          0,
+          0
+         ],
+         "color": "#8b5a9e",
+         "axis": "secondary",
+         "format": "int",
+         "dashed": false
+        },
+        {
+         "name": "Reporting partners",
+         "kind": "line",
+         "data": [
+          2,
+          1
+         ],
+         "color": "#2a9d8f",
+         "axis": "secondary",
+         "format": "int",
+         "dashed": false
+        }
+       ],
+       "axes": {
+        "primary": {
+         "format": "money",
+         "opposite": false,
+         "min": null,
+         "max": null,
+         "tick_amount": null
+        },
+        "secondary": {
+         "format": "int",
+         "opposite": true,
+         "min": null,
+         "max": null,
+         "tick_amount": null
+        }
+       },
+       "stacked": false,
+       "height": 300,
+       "column_width": "50%",
+       "border_radius": 3,
+       "curve": "smooth",
+       "stroke_width": 3,
+       "legend": true,
+       "data_labels": false,
+       "x_title": null,
+       "gradient": null
+      },
+      "table": {
+       "title": "Partners engaged",
+       "note": "All data sources adds what the host National Society recorded and what Participating Societies self-report, counting each society once. PNS reported data is only the self-report. Country data is only the host's record. Planning funding is that year's PNS funding requirement (a stored total is used instead of its breakdown). Reporting funding is funding reported. Under a country, the partner count is the societies supporting that country.",
+       "legend": "Mid-year report, shown where the annual report is not yet available",
+       "columns": [
+        "Year",
+        "Plan round",
+        "Planning partners",
+        "Funding requirements (CHF)",
+        "Report round",
+        "Reporting partners",
+        "Funding reported (CHF)"
+       ],
+       "rows": [
+        {
+         "cells": [
+          "2025 *",
+          "P25",
+          0,
+          0.0,
+          "MYR25",
+          {
+           "value": 1,
+           "midyear": true
+          },
+          {
+           "value": 300.0,
+           "midyear": true
+          }
+         ],
+         "countries": [
+          {
+           "cells": [
+            "Aland",
+            null,
+            null,
+            null,
+            null,
+            {
+             "value": 1,
+             "midyear": true
+            },
+            {
+             "value": 300.0,
+             "midyear": true
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "cells": [
+          "2024",
+          "P24",
+          0,
+          0.0,
+          "AR24",
+          2,
+          800.0
+         ],
+         "countries": [
+          {
+           "cells": [
+            "Aland",
+            null,
+            null,
+            null,
+            null,
+            2,
+            800.0
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "pns",
+      "label": "PNS reported data only",
+      "chart": {
+       "categories": [
+        "2024",
+        "2025 *"
+       ],
+       "series": [
+        {
+         "name": "Funding requirements (CHF)",
+         "kind": "column",
+         "data": [
+          0,
+          0
+         ],
+         "color": "#011e41",
+         "axis": "primary",
+         "format": "money",
+         "dashed": false
+        },
+        {
+         "name": "Funding reported (CHF)",
+         "kind": "column",
+         "data": [
+          800,
+          300
+         ],
+         "color": "#f39200",
+         "axis": "primary",
+         "format": "money",
+         "dashed": false
+        },
+        {
+         "name": "Planning partners",
+         "kind": "line",
+         "data": [
+          0,
+          0
+         ],
+         "color": "#8b5a9e",
+         "axis": "secondary",
+         "format": "int",
+         "dashed": false
+        },
+        {
+         "name": "Reporting partners",
+         "kind": "line",
+         "data": [
+          1,
+          1
+         ],
+         "color": "#2a9d8f",
+         "axis": "secondary",
+         "format": "int",
+         "dashed": false
+        }
+       ],
+       "axes": {
+        "primary": {
+         "format": "money",
+         "opposite": false,
+         "min": null,
+         "max": null,
+         "tick_amount": null
+        },
+        "secondary": {
+         "format": "int",
+         "opposite": true,
+         "min": null,
+         "max": null,
+         "tick_amount": null
+        }
+       },
+       "stacked": false,
+       "height": 300,
+       "column_width": "50%",
+       "border_radius": 3,
+       "curve": "smooth",
+       "stroke_width": 3,
+       "legend": true,
+       "data_labels": false,
+       "x_title": null,
+       "gradient": null
+      },
+      "table": {
+       "title": "Partners engaged",
+       "note": "All data sources adds what the host National Society recorded and what Participating Societies self-report, counting each society once. PNS reported data is only the self-report. Country data is only the host's record. Planning funding is that year's PNS funding requirement (a stored total is used instead of its breakdown). Reporting funding is funding reported. Under a country, the partner count is the societies supporting that country.",
+       "legend": "Mid-year report, shown where the annual report is not yet available",
+       "columns": [
+        "Year",
+        "Plan round",
+        "Planning partners",
+        "Funding requirements (CHF)",
+        "Report round",
+        "Reporting partners",
+        "Funding reported (CHF)"
+       ],
+       "rows": [
+        {
+         "cells": [
+          "2025 *",
+          "P25",
+          0,
+          0,
+          "MYR25",
+          {
+           "value": 1,
+           "midyear": true
+          },
+          {
+           "value": 300.0,
+           "midyear": true
+          }
+         ],
+         "countries": [
+          {
+           "cells": [
+            "Aland",
+            null,
+            null,
+            null,
+            null,
+            {
+             "value": 1,
+             "midyear": true
+            },
+            {
+             "value": 300.0,
+             "midyear": true
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "cells": [
+          "2024",
+          "P24",
+          0,
+          0,
+          "AR24",
+          1,
+          800.0
+         ],
+         "countries": [
+          {
+           "cells": [
+            "Aland",
+            null,
+            null,
+            null,
+            null,
+            1,
+            800.0
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "country",
+      "label": "Country data only",
+      "chart": {
+       "categories": [
+        "2024",
+        "2025 *"
+       ],
+       "series": [
+        {
+         "name": "Funding requirements (CHF)",
+         "kind": "column",
+         "data": [
+          0,
+          0
+         ],
+         "color": "#011e41",
+         "axis": "primary",
+         "format": "money",
+         "dashed": false
+        },
+        {
+         "name": "Funding reported (CHF)",
+         "kind": "column",
+         "data": [
+          0,
+          0
+         ],
+         "color": "#f39200",
+         "axis": "primary",
+         "format": "money",
+         "dashed": false
+        },
+        {
+         "name": "Planning partners",
+         "kind": "line",
+         "data": [
+          0,
+          0
+         ],
+         "color": "#8b5a9e",
+         "axis": "secondary",
+         "format": "int",
+         "dashed": false
+        },
+        {
+         "name": "Reporting partners",
+         "kind": "line",
+         "data": [
+          1,
+          0
+         ],
+         "color": "#2a9d8f",
+         "axis": "secondary",
+         "format": "int",
+         "dashed": false
+        }
+       ],
+       "axes": {
+        "primary": {
+         "format": "money",
+         "opposite": false,
+         "min": null,
+         "max": null,
+         "tick_amount": null
+        },
+        "secondary": {
+         "format": "int",
+         "opposite": true,
+         "min": null,
+         "max": null,
+         "tick_amount": null
+        }
+       },
+       "stacked": false,
+       "height": 300,
+       "column_width": "50%",
+       "border_radius": 3,
+       "curve": "smooth",
+       "stroke_width": 3,
+       "legend": true,
+       "data_labels": false,
+       "x_title": null,
+       "gradient": null
+      },
+      "table": {
+       "title": "Partners engaged",
+       "note": "All data sources adds what the host National Society recorded and what Participating Societies self-report, counting each society once. PNS reported data is only the self-report. Country data is only the host's record. Planning funding is that year's PNS funding requirement (a stored total is used instead of its breakdown). Reporting funding is funding reported. Under a country, the partner count is the societies supporting that country.",
+       "legend": "Mid-year report, shown where the annual report is not yet available",
+       "columns": [
+        "Year",
+        "Plan round",
+        "Planning partners",
+        "Funding requirements (CHF)",
+        "Report round",
+        "Reporting partners",
+        "Funding reported (CHF)"
+       ],
+       "rows": [
+        {
+         "cells": [
+          "2025 *",
+          "P25",
+          0,
+          0,
+          "MYR25",
+          {
+           "value": 0,
+           "midyear": true
+          },
+          {
+           "value": 0,
+           "midyear": true
+          }
+         ],
+         "countries": []
+        },
+        {
+         "cells": [
+          "2024",
+          "P24",
+          0,
+          0,
+          "AR24",
+          1,
+          0
+         ],
+         "countries": [
+          {
+           "cells": [
+            "Aland",
+            null,
+            null,
+            null,
+            null,
+            1,
+            null
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ],
+    "sources_label": "Data source"
    },
    {
     "id": "capacity",

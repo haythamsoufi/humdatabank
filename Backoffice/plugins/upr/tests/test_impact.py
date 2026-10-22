@@ -169,13 +169,73 @@ def test_partners_distinct_ns_and_pns_funding():
         _master(Round="AR25", Section="Support", Entity="PNS", NS="Danish RC", ValueNum=1),
         _master(Round="AR25", Section="Support", Entity="PNS", NS="Danish RC", ValueNum=1),
         _master(Round="AR25", Section="Support", Entity="PNS", NS="Spanish RC", ValueNum=1),
-        _master(Round="AR25", Section="Funding", Source="PNS Data", Indicator="Funding", Entity="PNS", ValueNum=5000),
-        _master(Round="AR25", Section="Funding", Source="PNS Data", Indicator="Funding", Entity="PNS", ValueNum=3000),
+        _master(Round="AR25", Section="Funding", Source="PNS Data", Indicator="Funding", Entity="PNS", NS="Danish RC", ValueNum=5000),
+        _master(Round="AR25", Section="Funding", Source="PNS Data", Indicator="Funding", Entity="PNS", NS="Spanish RC", ValueNum=3000),
     ]
     out = aggregate_impact(rows, [])
     partners = {r["year"]: r for r in out["partners"]["by_year"]}
+    assert partners[2025]["report_partners"] == 2
+    assert partners[2025]["report_funding"] == 8000
+    # Headline KPIs stay on the reporting side.
     assert partners[2025]["partners"] == 2
     assert partners[2025]["funding"] == 8000
+    assert partners[2025]["plan_partners"] is None
+    assert partners[2025]["plan_funding"] is None
+
+
+def test_partners_split_planning_requirements_from_reported_funding():
+    rows = [
+        _master(Round="P25", Section="Support", Entity="PNS", NS="Danish RC", ValueNum=1),
+        _master(Round="P25", Section="Support", Entity="PNS", NS="Spanish RC", ValueNum=1),
+        # Stored total wins over the area breakdown. The host's own requirement stays out.
+        _master(Round="P25", Section="Funding", Indicator="Funding Requirement", Entity="PNS", Area="Total", ValueNum=10000),
+        _master(Round="P25", Section="Funding", Indicator="Funding Requirement", Entity="PNS", Area="SP1", ValueNum=6000),
+        _master(Round="P25", Section="Funding", Indicator="Funding Requirement", Entity="HNS", Area="Total", ValueNum=50000),
+        # The same plan's later-year column is not this year's requirement.
+        _master(Round="P25", Section="Funding", Indicator="Funding Requirement", Entity="PNS", Area="Total", Year=2026, ValueNum=99999),
+        # No total for Bland: the area breakdown is the requirement.
+        _master(Round="P25", ISO3="BBB", Country="Bland", Section="Funding", Indicator="Funding Requirement", Entity="PNS", Area="SP1", ValueNum=200),
+        _master(Round="P25", ISO3="BBB", Country="Bland", Section="Funding", Indicator="Funding Requirement", Entity="PNS", Area="SP2", ValueNum=300),
+        # Annual report replaces the mid-year figure for the same year.
+        _master(Round="MYR25", Section="Support", Entity="PNS", NS="Danish RC", ValueNum=1),
+        _master(Round="MYR25", Section="Funding", Source="PNS Data", Indicator="Funding", Entity="PNS", ValueNum=1000),
+        _master(Round="AR25", Section="Support", Entity="PNS", NS="British RC", ValueNum=1),
+        _master(Round="AR25", Section="Funding", Source="PNS Data", Indicator="Funding", Entity="PNS", NS="British RC", ValueNum=4000),
+        # A later plan year with no report stays blank on the reporting side.
+        _master(Round="P26", Year=2026, Section="Support", Entity="PNS", NS="Danish RC", ValueNum=1),
+        _master(Round="P26", Year=2026, Section="Funding", Indicator="Funding Requirement", Entity="PNS", Area="Total", ValueNum=50),
+    ]
+    out = aggregate_impact(rows, [])
+    partners = {r["year"]: r for r in out["partners"]["by_year"]}
+    year = partners[2025]
+    assert year["plan_round"] == "P25"
+    assert year["report_round"] == "AR25"
+    assert year["plan_partners"] == 2
+    assert year["plan_funding"] == 10500
+    assert year["report_partners"] == 1
+    assert year["report_funding"] == 4000
+    countries = {c["iso3"]: c for c in year["countries"]}
+    assert countries["AAA"]["plan_partners"] == 2
+    assert countries["AAA"]["plan_funding"] == 10000
+    assert countries["AAA"]["report_funding"] == 4000
+    assert countries["BBB"]["plan_funding"] == 500
+    assert countries["BBB"]["plan_partners"] == 0
+    later = partners[2026]
+    assert later["plan_partners"] == 1
+    assert later["plan_funding"] == 50
+    assert later["report_partners"] is None
+    assert later["report_funding"] is None
+    assert later["report_round"] is None
+    country = {r["year"]: r for r in out["partners"]["by_source"]["country"]}
+    pns = {r["year"]: r for r in out["partners"]["by_source"]["pns"]}
+    assert country[2025]["plan_funding"] == 10500
+    assert country[2025]["plan_partners"] == 2
+    assert country[2025]["report_funding"] == 0
+    assert pns[2025]["plan_funding"] == 0
+    assert pns[2025]["report_funding"] == 4000
+    assert pns[2025]["report_partners"] == 1
+    # The same society on both sources is counted once in the combined total.
+    assert out["partners"]["by_year"] == out["partners"]["by_source"]["all"]
 
 
 def test_capacity_maps_indicators_to_keys():

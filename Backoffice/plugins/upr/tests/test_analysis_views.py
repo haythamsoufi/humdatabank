@@ -238,11 +238,38 @@ def test_capacity_panels_are_separate_charts_with_a_latest_figure(impact_payload
     assert panels["staff"]["chart"]["series"][0]["data"] == [None, None]  # zero is shown as a gap
 
 
-def test_partner_chart_uses_a_secondary_axis(impact_payload):
+def test_partner_chart_splits_planning_and_reporting(impact_payload):
     view = build_impact_view(impact_payload)
-    chart = next(v for v in view["visuals"] if v["id"] == "partners")["chart"]
-    assert [s["axis"] for s in chart["series"]] == ["primary", "secondary"]
+    visual = next(v for v in view["visuals"] if v["id"] == "partners")
+    assert [s["id"] for s in visual["sources"]] == ["all", "pns", "country"]
+    assert visual["chart"] is visual["sources"][0]["chart"]
+    chart = visual["chart"]
+    assert [s["name"] for s in chart["series"]] == [
+        LABELS["partner_requirement"],
+        LABELS["partner_reported"],
+        LABELS["partners_planning"],
+        LABELS["partners_reporting"],
+    ]
+    assert [s["kind"] for s in chart["series"]] == ["column", "column", "line", "line"]
+    assert [s["axis"] for s in chart["series"]] == ["primary", "primary", "secondary", "secondary"]
+    assert chart["axes"]["primary"]["format"] == "money"
+    assert chart["axes"]["secondary"]["format"] == "int"
     assert chart["axes"]["secondary"]["opposite"] is True
+    requirement, reported, planning, reporting = chart["series"]
+    # Fixture funding rows are PNS self-reports, so the combined view matches them.
+    assert requirement["data"] == [0, 0]
+    assert reported["data"] == [800, 300]
+    assert planning["data"] == [0, 0]
+    assert reporting["data"] == [2, 1]
+    assert reported["format"] == "money"
+    row_2025 = next(r for r in visual["table"]["rows"] if r["cells"][0] == "2025 *")
+    assert row_2025["cells"][4] == "MYR25"
+    assert row_2025["cells"][6] == {"value": 300.0, "midyear": True}
+    assert visual["table"]["legend"] == LABELS["midyear_legend"]
+    country = next(s for s in visual["sources"] if s["id"] == "country")["chart"]["series"]
+    assert country[1]["data"] == [0, 0]  # no country-recorded reported funding in the fixture
+    pns = next(s for s in visual["sources"] if s["id"] == "pns")["chart"]["series"]
+    assert pns[1]["data"] == [800, 300]
 
 
 def test_kpi_label_does_not_claim_participation():

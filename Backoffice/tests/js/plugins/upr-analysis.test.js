@@ -241,6 +241,19 @@ describe('server views (contract fixture)', () => {
         });
     });
 
+    it('offers a data-source toggle on partners and draws counts as lines', () => {
+        const visual = fixture.impact.visuals.find((v) => v.id === 'partners');
+        expect(visual.sources.map((s) => s.id)).toEqual(['all', 'pns', 'country']);
+        expect(visual.chart.series.map((s) => s.kind)).toEqual(['column', 'column', 'line', 'line']);
+        expect(visual.chart.axes.primary.format).toBe('money');
+        const shown = A.dom.renderCard(visual, { ui: {} });
+        const buttons = [...shown.element.querySelectorAll('[data-upri-source]')];
+        expect(buttons.map((b) => b.getAttribute('data-upri-source'))).toEqual(['all', 'pns', 'country']);
+        expect(buttons[0].classList.contains('is-active')).toBe(true);
+        const printed = A.dom.renderCard(visual, { interactive: false, ui: {} });
+        expect(printed.element.querySelector('[data-upri-source]')).toBeNull();
+    });
+
     it('shows each capacity panel with its latest figure', () => {
         const capacity = fixture.impact.visuals.find((v) => v.id === 'capacity');
         const { element } = A.dom.renderCard(capacity, { ui: {} });

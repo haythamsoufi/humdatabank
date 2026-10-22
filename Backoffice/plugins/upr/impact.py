@@ -13,7 +13,8 @@ how the Unified Planning and Reporting process is growing:
   added on top of that mix.
 * **Reach** — people to be reached through the plans.
 * **Partners** — participating National Societies providing bilateral support,
-  and the funding they report.
+  split by planning (funding requirement) and reporting (funding reported),
+  and by country records, PNS self-reports, or both.
 * **Capacity** — National Society volunteers, staff, branches and local units.
 
 The figures are *indicative network totals* summed from submitted Unified Plans
@@ -201,7 +202,8 @@ def aggregate_impact(
     coverage_rounds = _coverage_series(submissions, rounds_all)
     funding_rounds = _funding_series(master_rows, plan_rounds, report_rounds)
     reach_rounds = _reach_series(master_rows, plan_rounds)
-    partner_rounds = _partner_series(master_rows, report_rounds)
+    plan_partner_rounds = _partner_series(master_rows, plan_rounds, requirement=True)
+    report_partner_rounds = _partner_series(master_rows, report_rounds, requirement=False)
     capacity_rounds = _capacity_series(master_rows, report_rounds)
 
     in_progress = _in_progress_rounds(coverage_rounds)
@@ -227,11 +229,18 @@ def aggregate_impact(
         ),
     }
     reach = {"by_year": _collapse_to_years(reach_rounds["by_round"], plan_by_year, ("value",))}
-    partners = {
-        "by_year": _collapse_to_years(
-            partner_rounds["by_round"], report_by_year, ("partners", "funding")
+    partners_by_source = {
+        source: _partners_by_year(
+            plan_partner_rounds[source],
+            report_partner_rounds[source],
+            plan_by_year,
+            report_by_year,
+            years,
         )
+        for source in ("all", "pns", "country")
     }
+    # Headline KPIs stay on every source combined. The visual toggles the rest.
+    partners = {"by_year": partners_by_source["all"], "by_source": partners_by_source}
     capacity = {
         key: _collapse_to_years(capacity_rounds[key], report_by_year, ("value",))
         for key in _CAPACITY_KEYS
@@ -510,67 +519,280 @@ def _reach_series(master_rows: list[dict[str, Any]], plan_rounds: list[str]) -> 
     }
 
 
-def _partner_series(master_rows: list[dict[str, Any]], report_rounds: list[str]) -> dict[str, Any]:
-    support_rows = [
-        r
-        for r in master_rows
-        if norm(r.get("Section")) in {"support", "activities"}
-        and norm(r.get("Entity")) == "pns"
-    ]
-    pns_funding_rows = [
-        r
-        for r in master_rows
-        if norm(r.get("Source")) == "pns data" and norm(r.get("Indicator")) == "funding"
-    ]
+_TOTAL_AREAS = {"", "total", "row total", "row_total"}
 
-    partners: dict[str, set[str]] = {code: set() for code in report_rounds}
-    host_partners: dict[str, dict[str, set[str]]] = {code: {} for code in report_rounds}
-    host_funding: dict[str, dict[str, float]] = {code: {} for code in report_rounds}
-    names: dict[str, dict[str, str]] = {code: {} for code in report_rounds}
-    for row in support_rows:
-        code = row.get("Round")
-        if code not in partners:
+
+def _source_keys(row: dict[str, Any]) -> tuple[str, ...]:
+    """Which partner-source toggles a row belongs to.
+
+    ``all`` is the union of country records and Participating Society
+    self-reports. Other sources (for example IFRC Secretariat actuals) stay out.
+    """
+    source = norm(row.get("Source"))
+    if source == "pns data":
+        return ("pns",)
+    if source in {"", "country data"}:
+        return ("country",)
+    return ()
+
+
+def _partner_name(row: dict[str, Any]) -> str:
+    name = str(row.get("NS") or "").strip()
+    if not name or norm(name) == "country":
+        return ""
+    return name
+
+
+def _partner_series(
+    master_rows: list[dict[str, Any]],
+    rounds: list[str],
+    *,
+    requirement: bool,
+) -> dict[str, dict[str, Any]]:
+    """Partner counts and funding, split by country records and PNS self-reports.
+
+    ``requirement`` selects the planning figure (that year's PNS funding
+    requirement). Otherwise the figure is funding reported. A stored total wins
+    over its area breakdown. ``all`` counts each society once and adds the two
+    funding sources.
+    """
+    tracked = ("country", "pns")
+    partners: dict[str, dict[str, set[str]]] = {key: {code: set() for code in rounds} for key in tracked}
+    host_partners: dict[str, dict[str, dict[str, set[str]]]] = {
+        key: {code: {} for code in rounds} for key in tracked
+    }
+    funding_rows: dict[str, dict[str, dict[str, list[dict[str, Any]]]]] = {
+        key: {code: {} for code in rounds} for key in tracked
+    }
+    loose_rows: dict[str, dict[str, list[dict[str, Any]]]] = {
+        key: {code: [] for code in rounds} for key in tracked
+    }
+    names: dict[str, dict[str, dict[str, str]]] = {key: {code: {} for code in rounds} for key in tracked}
+
+    for row in master_rows:
+        keys = _source_keys(row)
+        if not keys:
             continue
-        ns = str(row.get("NS") or "").strip()
-        if ns:
-            partners[code].add(ns)
+        code = str(row.get("Round") or "")
+        if code not in partners["country"]:
+            continue
+        section = norm(row.get("Section"))
+        entity = norm(row.get("Entity"))
+        indicator = norm(row.get("Indicator"))
+        is_support = section in {"support", "activities"} and entity == "pns"
+        is_requirement = (
+            section == "funding"
+            and indicator == "funding requirement"
+            and entity == "pns"
+            and _requirement_on_round_year(row, code)
+        )
+        is_reported = section == "funding" and indicator == "funding" and entity == "pns"
+        is_money = is_requirement if requirement else is_reported
+        if not is_support and not is_money:
+            continue
         iso = str(row.get("ISO3") or "").strip().upper()
-        if iso and ns:
-            host_partners[code].setdefault(iso, set()).add(ns)
-            _remember_country(names[code], iso, row)
+        ns = _partner_name(row)
+        for key in keys:
+            # A country funding row names the host, not the supporting society.
+            names_a_partner = is_support or (is_money and key == "pns")
+            if names_a_partner and ns:
+                partners[key][code].add(ns)
+                if iso:
+                    host_partners[key][code].setdefault(iso, set()).add(ns)
+                    _remember_country(names[key][code], iso, row)
+            if not is_money:
+                continue
+            if iso:
+                funding_rows[key][code].setdefault(iso, []).append(row)
+                _remember_country(names[key][code], iso, row)
+            else:
+                loose_rows[key][code].append(row)
 
-    funding: dict[str, float] = {code: 0.0 for code in report_rounds}
-    for row in pns_funding_rows:
-        code = row.get("Round")
-        if code not in funding:
-            continue
-        value = num(row.get("ValueNum"))
-        if value is None:
-            continue
-        funding[code] += value
-        iso = str(row.get("ISO3") or "").strip().upper()
-        if not iso:
-            continue
-        host_funding[code][iso] = host_funding[code].get(iso, 0.0) + value
-        _remember_country(names[code], iso, row)
+    built = {
+        key: _partner_rounds(key, rounds, partners, host_partners, funding_rows, loose_rows, names)
+        for key in tracked
+    }
+    built["all"] = _all_partner_rounds(rounds, partners, host_partners, funding_rows, loose_rows, names)
+    return built
 
+
+def _partner_rounds(
+    key: str,
+    rounds: list[str],
+    partners: dict[str, dict[str, set[str]]],
+    host_partners: dict[str, dict[str, dict[str, set[str]]]],
+    funding_rows: dict[str, dict[str, dict[str, list[dict[str, Any]]]]],
+    loose_rows: dict[str, dict[str, list[dict[str, Any]]]],
+    names: dict[str, dict[str, dict[str, str]]],
+) -> dict[str, Any]:
     by_round = []
-    for code in report_rounds:
+    for code in rounds:
+        host_funding = {
+            iso: _prefer_total_area(rows) for iso, rows in funding_rows[key][code].items()
+        }
         amounts: dict[str, dict[str, Any]] = {}
-        for iso in set(host_partners[code]) | set(host_funding[code]):
+        for iso in set(host_partners[key][code]) | set(host_funding):
             amounts[iso] = {
-                "partners": len(host_partners[code].get(iso) or ()),
-                "funding": host_funding[code].get(iso, 0.0),
+                "partners": len(host_partners[key][code].get(iso) or ()),
+                "funding": host_funding.get(iso, 0.0),
             }
         by_round.append(
             {
                 "round": code,
-                "partners": len(partners[code]),
-                "funding": funding[code],
-                "countries": _country_rows(amounts, names[code]),
+                "partners": len(partners[key][code]),
+                "funding": sum(host_funding.values()) + _prefer_total_area(loose_rows[key][code]),
+                "countries": _country_rows(amounts, names[key][code]),
             }
         )
     return {"by_round": by_round}
+
+
+def _all_partner_rounds(
+    rounds: list[str],
+    partners: dict[str, dict[str, set[str]]],
+    host_partners: dict[str, dict[str, dict[str, set[str]]]],
+    funding_rows: dict[str, dict[str, dict[str, list[dict[str, Any]]]]],
+    loose_rows: dict[str, dict[str, list[dict[str, Any]]]],
+    names: dict[str, dict[str, dict[str, str]]],
+) -> dict[str, Any]:
+    """Each society once, and the sum of country-recorded and self-reported funding."""
+    by_round = []
+    for code in rounds:
+        host_funding: dict[str, float] = {}
+        host_names: dict[str, set[str]] = {}
+        labels: dict[str, str] = {}
+        loose = 0.0
+        for key in ("country", "pns"):
+            for iso, rows in funding_rows[key][code].items():
+                host_funding[iso] = host_funding.get(iso, 0.0) + _prefer_total_area(rows)
+            for iso, society_names in host_partners[key][code].items():
+                host_names.setdefault(iso, set()).update(society_names)
+            for iso, label in names[key][code].items():
+                labels.setdefault(iso, label)
+            loose += _prefer_total_area(loose_rows[key][code])
+        amounts = {
+            iso: {
+                "partners": len(host_names.get(iso) or ()),
+                "funding": host_funding.get(iso, 0.0),
+            }
+            for iso in set(host_names) | set(host_funding)
+        }
+        by_round.append(
+            {
+                "round": code,
+                "partners": len(partners["country"][code] | partners["pns"][code]),
+                "funding": sum(host_funding.values()) + loose,
+                "countries": _country_rows(amounts, labels),
+            }
+        )
+    return {"by_round": by_round}
+
+
+def _requirement_on_round_year(row: dict[str, Any], code: str) -> bool:
+    """True when a plan row is the requirement for that round's own calendar year.
+
+    A plan also stores the next two years. Those stay off this year so the
+    planning figure lines up with the report for the same year.
+    """
+    raw = row.get("Year")
+    if raw in (None, ""):
+        return True
+    year = num(raw)
+    if year is None:
+        return True
+    round_year = round_calendar_year(code)
+    return round_year is None or int(year) == round_year
+
+
+def _prefer_total_area(rows: list[dict[str, Any]]) -> float:
+    """Sum a stored total when one is present, otherwise the area breakdown."""
+    totals: list[float] = []
+    parts: list[float] = []
+    for row in rows:
+        value = num(row.get("ValueNum"))
+        if value is None:
+            continue
+        if norm(row.get("Area")) in _TOTAL_AREAS:
+            totals.append(value)
+        else:
+            parts.append(value)
+    chosen = totals if totals else parts
+    return sum(chosen)
+
+
+def _partners_by_year(
+    plan_rounds: dict[str, Any],
+    report_rounds: dict[str, Any],
+    plan_by_year: dict[int, str],
+    report_by_year: dict[int, str],
+    years: list[int],
+) -> list[dict[str, Any]]:
+    """One row per calendar year: planning requirement beside reported funding.
+
+    A side with no round for that year is left blank (``None``) so the chart
+    draws a gap rather than a zero. ``partners`` and ``funding`` keep the
+    reporting figures for the headline KPIs.
+    """
+    plan_index = _by_round_index(plan_rounds.get("by_round", []))
+    report_index = _by_round_index(report_rounds.get("by_round", []))
+    by_year = []
+    for year in years:
+        plan = plan_index.get(plan_by_year.get(year), {})
+        report = report_index.get(report_by_year.get(year), {})
+        by_year.append(
+            {
+                "year": year,
+                "plan_round": plan_by_year.get(year),
+                "report_round": report_by_year.get(year),
+                "plan_partners": plan.get("partners", 0) if plan else None,
+                "plan_funding": plan.get("funding", 0.0) if plan else None,
+                "report_partners": report.get("partners", 0) if report else None,
+                "report_funding": report.get("funding", 0.0) if report else None,
+                "partners": report.get("partners", 0) if report else 0,
+                "funding": report.get("funding", 0.0) if report else 0.0,
+                "countries": _merge_partner_countries(
+                    plan.get("countries") or [], report.get("countries") or []
+                ),
+            }
+        )
+    return by_year
+
+
+def _merge_partner_countries(
+    plan_rows: list[dict[str, Any]], report_rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """One country row carrying the planning and reporting partner figures."""
+    merged: dict[str, dict[str, Any]] = {}
+    for rows, partners_key, funding_key in (
+        (plan_rows, "plan_partners", "plan_funding"),
+        (report_rows, "report_partners", "report_funding"),
+    ):
+        for row in rows:
+            iso = str(row.get("iso3") or "")
+            if not iso:
+                continue
+            rec = merged.setdefault(
+                iso,
+                {
+                    "iso3": iso,
+                    "country": row.get("country") or iso,
+                    "plan_partners": 0,
+                    "report_partners": 0,
+                    "plan_funding": 0.0,
+                    "report_funding": 0.0,
+                },
+            )
+            if row.get("country"):
+                rec["country"] = row["country"]
+            rec[partners_key] = row.get("partners") or 0
+            rec[funding_key] = row.get("funding") or 0.0
+    rows = [
+        rec
+        for rec in merged.values()
+        if any(rec[key] for key in ("plan_partners", "report_partners", "plan_funding", "report_funding"))
+    ]
+    rows.sort(key=lambda row: (str(row["country"]).lower(), row["iso3"]))
+    return rows
 
 
 def _capacity_series(master_rows: list[dict[str, Any]], report_rounds: list[str]) -> dict[str, Any]:
@@ -687,6 +909,6 @@ def build_upr_impact(*, region: str | None = None) -> dict[str, Any]:
     # ``series`` is part of the cache key so a change in the mix or scoping
     # rules cannot reuse a payload built with an earlier rule.
     payload, _cache_hit = get_or_build_upr_payload(
-        "impact", {"region": region or None, "series": "network-mix-v3"}, _loader
+        "impact", {"region": region or None, "series": "network-mix-v5"}, _loader
     )
     return payload

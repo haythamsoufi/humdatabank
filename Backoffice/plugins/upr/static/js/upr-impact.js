@@ -111,7 +111,10 @@
             sec.grid.appendChild(card.element);
             card.plots.forEach(function (plot) {
                 var chart = A.charts.mount(plot.host, plot.chart);
-                if (chart) sec.charts.push(chart);
+                if (chart) {
+                    plot.host._upriChart = chart;
+                    sec.charts.push(chart);
+                }
             });
         });
     }
@@ -209,6 +212,34 @@
 
     function sectionOf(el) {
         return narr.root && narr.root.contains(el) ? narr : data;
+    }
+
+    function applySource(button) {
+        var card = button.closest('[data-upri-visual]');
+        var visual = card && findVisual(sectionOf(button), card.getAttribute('data-upri-visual'));
+        if (!visual) return;
+        var sourceId = button.getAttribute('data-upri-source');
+        var source = null;
+        (visual.sources || []).forEach(function (item) {
+            if (item.id === sourceId) source = item;
+        });
+        if (!source) return;
+        visual.chart = source.chart;
+        visual.table = source.table;
+        card.querySelectorAll('[data-upri-source]').forEach(function (item) {
+            var on = item === button;
+            item.classList.toggle('is-active', on);
+            item.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        var host = card.querySelector('.upri-chart');
+        var sec = sectionOf(button);
+        if (host && host._upriChart) {
+            try { host._upriChart.destroy(); } catch (e) { /* noop */ }
+            sec.charts = sec.charts.filter(function (chart) { return chart !== host._upriChart; });
+        }
+        var chart = host && A.charts.mount(host, source.chart);
+        if (host) host._upriChart = chart || null;
+        if (chart) sec.charts.push(chart);
     }
 
     function openVisualTable(btn) {
@@ -350,6 +381,8 @@
         if (paneBtn) showSubtab(paneBtn.getAttribute('data-upri-pane'));
         var trackBtn = target.closest('[data-upri-track]');
         if (trackBtn) setTrack(trackBtn.getAttribute('data-upri-track'));
+        var sourceBtn = target.closest('[data-upri-source]');
+        if (sourceBtn) applySource(sourceBtn);
         var gapBtn = target.closest('[data-upri-gap]');
         if (gapBtn) openGapTable(gapBtn);
         var tableBtn = target.closest('[data-upri-table]');

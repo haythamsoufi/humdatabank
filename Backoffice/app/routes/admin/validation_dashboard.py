@@ -67,6 +67,23 @@ def validation_dashboard_capacity_api():
     return json_ok(**load_capacity_comparison())
 
 
+@bp.route("/validation-dashboard/api/emergencies", methods=["GET"])
+@login_required
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
+def validation_dashboard_emergencies_api():
+    """Applicable emergencies for a UPR round, marked covered or not on each list."""
+    from plugins.upr.catalog import UPR_VALIDATION_TEMPLATE_IDS
+    from plugins.upr.validation.emergency_catalogue import load_round_emergencies
+
+    template_id = request.args.get("template_id", type=int)
+    period = request.args.get("period", type=str)
+    if not template_id or not period:
+        return json_bad_request("template_id and period are required")
+    if template_id not in UPR_VALIDATION_TEMPLATE_IDS:
+        return json_bad_request("Emergencies are available for Unified Planning and Reporting.")
+    return json_ok(**load_round_emergencies(template_id, period))
+
+
 @bp.route("/validation-dashboard/api/tracker", methods=["GET"])
 @login_required
 @permission_required(VALIDATION_DASHBOARD_PERMISSION)

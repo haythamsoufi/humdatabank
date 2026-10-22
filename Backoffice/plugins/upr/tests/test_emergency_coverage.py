@@ -101,6 +101,10 @@ def test_tracker_marks_a_country_that_has_both_gaps():
     assert status["label"].startswith("Missing 3")
     assert "Not applicable" in status["label"]
     assert "MDRS1001" in status["detail"]
+    added = next(group for group in status["groups"] if group["heading"] == "Not added")
+    assert added["sections"][0]["items"][0].startswith("MDRUG052")
+    other = next(group for group in status["groups"] if group["heading"] == "Not applicable")
+    assert other["sections"][0]["items"] == ["Sudan Crisis (MDRS1001)"]
 
 
 def test_rule_label_comes_from_the_upr_pack():
@@ -175,6 +179,30 @@ def test_planning_matrices_keep_emergency_rows_and_funding_headers():
     assert _ref_from_label(rows[1]).code == "MDRS1001"
 
 
+def test_emergency_appeals_rows_stored_as_appeal_codes_count_as_selected():
+    """The people-reached matrix saves the lookup id, which is the appeal code."""
+    rows = selected_matrix_row_labels(
+        {
+            "MDRAF018_Total People to be reached": 100,
+            "MDRAF019_Total People to be reached": 200,
+        },
+        ["Total People to be reached"],
+    )
+    selected = [_ref_from_label(label) for label in rows]
+    coverage = classify_emergency_coverage(
+        (
+            _ref("MDRAF019", "MDRAF019 Afghanistan - Earthquake"),
+            _ref("MDRAF018", "MDRAF018 Afghanistan - Population mvt from Pakistan"),
+        ),
+        selected,
+        {"MDRAF018", "MDRAF019"},
+    )
+
+    assert rows == ["MDRAF018", "MDRAF019"]
+    assert [op.code for op in selected] == ["MDRAF018", "MDRAF019"]
+    assert not coverage.has_issues
+
+
 def test_both_planning_lists_are_named_in_the_warning():
     appeals = FieldEmergencyCoverage(
         section_name="Emergency Appeals in 2027",
@@ -194,6 +222,24 @@ def test_both_planning_lists_are_named_in_the_warning():
 
     assert "Emergency Appeals in 2027" in missing
     assert "Funding Requirements for 2027" in missing
+
+    status = tracker_status([appeals, funding])
+    added = next(group for group in status["groups"] if group["heading"] == "Not added")
+    assert [section["name"] for section in added["sections"]] == [
+        "Emergency Appeals in 2027",
+        "Funding Requirements for 2027",
+    ]
+
+
+def test_section_names_fill_the_assignment_period():
+    from plugins.upr.validation.emergency_coverage import _fill_assignment_period
+
+    assert _fill_assignment_period(
+        "Funding Requirements for [assignment_period]", "2027"
+    ) == "Funding Requirements for 2027"
+    assert _fill_assignment_period(
+        "Funding Requirements for [[assignment_period]+1]", "2027"
+    ) == "Funding Requirements for 2028"
 
 
 def test_tracker_batch_answers_without_another_catalogue_lookup():

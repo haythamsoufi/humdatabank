@@ -93,7 +93,19 @@
         if (hidden) hidden.value = matched ? target : '';
         syncUprSubtabs(matched ? target : '');
         syncCapacityTab(matched ? target : '');
+        syncEmergenciesTab(matched ? target : '');
         return matched || !target;
+    }
+
+    function syncEmergenciesTab(templateId) {
+        var tab = document.querySelector('#vd-main-tabs [data-tab="emergencies"]');
+        if (!tab) return;
+        var show = templateId === '24' || templateId === '33';
+        tab.classList.toggle('hidden', !show);
+        if (!show && tab.getAttribute('aria-selected') === 'true') {
+            var tracker = document.getElementById('tab-vd-tracker');
+            if (tracker) tracker.click();
+        }
     }
 
     function syncCapacityTab(templateId) {

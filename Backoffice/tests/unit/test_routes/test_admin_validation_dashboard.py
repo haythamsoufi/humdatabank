@@ -91,6 +91,27 @@ class TestValidationDashboardCountriesApi:
 # ---------------------------------------------------------------------------
 
 
+class TestValidationDashboardEmergenciesApi:
+    def test_missing_params_returns_400(self, logged_in_client, db_session, app):
+        with _perm_patch():
+            resp = logged_in_client.get("/admin/validation-dashboard/api/emergencies")
+        assert resp.status_code == 400
+
+    def test_rejects_a_template_that_is_not_upr(self, logged_in_client, db_session, app):
+        with _perm_patch():
+            resp = logged_in_client.get("/admin/validation-dashboard/api/emergencies?template_id=1&period=2024")
+        assert resp.status_code == 400
+
+    def test_returns_the_round_catalogue(self, logged_in_client, db_session, app):
+        with _perm_patch(), patch(
+            "plugins.upr.validation.emergency_catalogue.load_round_emergencies",
+            return_value={"rows": [], "sections": [], "summary": {"applicable": 0}},
+        ):
+            resp = logged_in_client.get("/admin/validation-dashboard/api/emergencies?template_id=24&period=2027")
+        assert resp.status_code == 200
+        assert resp.get_json()["summary"]["applicable"] == 0
+
+
 class TestValidationDashboardTrackerApi:
     def test_missing_params_returns_400(self, logged_in_client, db_session, app):
         with _perm_patch():

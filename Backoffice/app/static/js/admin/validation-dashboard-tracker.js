@@ -662,6 +662,19 @@
         });
     }
 
+    function columnHasFilter(key) {
+        var raw = state.columnFilters && state.columnFilters[key];
+        if (Array.isArray(raw)) return true;
+        return raw != null && raw !== '';
+    }
+
+    function noticeValueAllowed(raw, value) {
+        if (raw == null || raw === '') return true;
+        var selected = Array.isArray(raw) ? raw : [raw];
+        if (!selected.length) return false;
+        return selected.indexOf(String(value)) !== -1;
+    }
+
     function rowMatchesColumnFilters(row) {
         var filters = state.columnFilters || {};
         var keys = Object.keys(filters);
@@ -680,7 +693,7 @@
                 if (raw === 'yes' && !uploaded) return false;
                 if (raw === 'no' && uploaded) return false;
             } else if (col.kind === 'notice') {
-                if (String(value) !== String(raw)) return false;
+                if (!noticeValueAllowed(raw, value)) return false;
             } else if (col.kind === 'number') {
                 var num = Number(value);
                 if (!Number.isFinite(num)) return false;
@@ -739,6 +752,45 @@
         return '<option value="' + esc(value) + '">' + esc(label) + '</option>';
     }
 
+    function checkRow(className, value, label, checked) {
+        return '<label class="vd-col-check">' +
+            '<input type="checkbox" class="' + className + '"' +
+            (value ? ' value="' + esc(value) + '"' : '') +
+            (checked ? ' checked' : '') + '>' +
+            '<span>' + esc(label) + '</span></label>';
+    }
+
+    function noticeFilterControl(col) {
+        var stored = state.columnFilters && state.columnFilters[col.key];
+        var selected = Array.isArray(stored) ? stored.map(String) : null;
+        var options = (col.filters || []).filter(function (item) { return item && item.value; });
+        var html = '<div class="vd-col-checks" data-filter-key="' + esc(col.key) +
+            '" role="group" aria-label="' + esc(col.label) + '">';
+        html += checkRow('vd-col-check-all', '', t.filterAll || 'All', !selected);
+        options.forEach(function (item) {
+            var on = !selected || selected.indexOf(String(item.value)) !== -1;
+            html += checkRow('vd-col-check-item', item.value, item.label || item.value, on);
+        });
+        return html + '</div>';
+    }
+
+    function syncChecklistAll(group) {
+        var items = group.querySelectorAll('.vd-col-check-item');
+        var allBox = group.querySelector('.vd-col-check-all');
+        if (!allBox) return;
+        var checkedCount = 0;
+        items.forEach(function (box) { if (box.checked) checkedCount += 1; });
+        allBox.checked = items.length > 0 && checkedCount === items.length;
+        allBox.indeterminate = checkedCount > 0 && checkedCount < items.length;
+    }
+
+    function checklistSelection(group) {
+        var items = Array.prototype.slice.call(group.querySelectorAll('.vd-col-check-item'));
+        var checked = items.filter(function (box) { return box.checked; }).map(function (box) { return box.value; });
+        if (!items.length || checked.length === items.length) return '';
+        return checked;
+    }
+
     function columnFilterControl(col, sourceRows) {
         var current = (state.columnFilters && state.columnFilters[col.key]) || '';
         var label = (t.filterAll || 'All');
@@ -747,6 +799,7 @@
                 '" value="' + esc(current) + '" placeholder="' + esc(label) + '" aria-label="' +
                 esc(col.label) + '">';
         }
+        if (col.kind === 'notice') return noticeFilterControl(col);
         var options = [filterOption('', label)];
         if (col.kind === 'status') {
             var seen = {};
@@ -780,7 +833,7 @@
 
     function columnHeaderHtml(col) {
         var sorted = state.sortKey === col.key;
-        var filtered = !!(state.columnFilters && state.columnFilters[col.key]);
+        var filtered = columnHasFilter(col.key);
         var sortMark = sorted
             ? '<i class="vd-sort-mark fas ' + (state.sortDir === 'desc' ? 'fa-sort-down' : 'fa-sort-up') + '" aria-hidden="true"></i>'
             : '';
@@ -800,7 +853,7 @@
         table.querySelectorAll('.vd-col-menu-btn').forEach(function (btn) {
             var key = btn.getAttribute('data-col-key');
             var sorted = key === state.sortKey;
-            var filtered = !!(state.columnFilters && state.columnFilters[key]);
+            var filtered = columnHasFilter(key);
             btn.classList.toggle('is-sorted', sorted);
             btn.classList.toggle('is-filtered', filtered);
             var headerCell = btn.closest('th');
@@ -828,6 +881,64 @@
         document.querySelectorAll('.vd-col-menu-btn[aria-expanded="true"]').forEach(function (btn) {
             btn.setAttribute('aria-expanded', 'false');
         });
+    }
+
+    function closeNoticePanels() {
+        document.querySelectorAll('.vd-notice-toggle[aria-expanded="true"]').forEach(function (button) {
+            setNoticeOpen(button, false);
+        });
+    }
+
+    function noticePanel(button) {
+        var id = button && button.getAttribute('aria-controls');
+        return id ? document.getElementById(id) : null;
+    }
+
+    function setNoticeOpen(button, open) {
+        var wrap = button.closest('.vd-notice');
+        var panel = noticePanel(button) || (wrap && wrap.querySelector('.vd-notice-detail'));
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        button.setAttribute('aria-label', open
+            ? (t.hideNoticeDetails || 'Hide details')
+            : (t.showNoticeDetails || 'Show details'));
+        if (wrap) wrap.classList.toggle('is-open', open);
+        if (!panel) return;
+        if (open) {
+            document.body.appendChild(panel);
+            panel.hidden = false;
+            positionNoticePanel(panel, button);
+        } else {
+            panel.hidden = true;
+            if (wrap) wrap.appendChild(panel);
+        }
+    }
+
+    function positionNoticePanel(panel, anchor) {
+        var rect = anchor.getBoundingClientRect();
+        var margin = 8;
+        var width = panel.offsetWidth || 288;
+        var left = rect.left;
+        if (left + width > window.innerWidth - margin) left = window.innerWidth - width - margin;
+        if (left < margin) left = margin;
+        var spaceBelow = window.innerHeight - rect.bottom - margin;
+        var spaceAbove = rect.top - margin;
+        var openUp = spaceBelow < 140 && spaceAbove > spaceBelow;
+        var available = Math.max(96, Math.min(256, openUp ? spaceAbove - 6 : spaceBelow - 6));
+        panel.style.maxHeight = available + 'px';
+        panel.style.left = left + 'px';
+        if (openUp) {
+            panel.style.top = 'auto';
+            panel.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+        } else {
+            panel.style.bottom = 'auto';
+            panel.style.top = (rect.bottom + 6) + 'px';
+        }
+    }
+
+    function repositionOpenNotice() {
+        var button = document.querySelector('.vd-notice-toggle[aria-expanded="true"]');
+        var panel = noticePanel(button);
+        if (button && panel && !panel.hidden) positionNoticePanel(panel, button);
     }
 
     function positionColumnPopover(pop, anchor) {
@@ -870,18 +981,27 @@
             '<button type="button" data-sort-dir="asc">' + esc(t.sortAscending || 'Ascending') + '</button>' +
             '<button type="button" data-sort-dir="desc">' + esc(t.sortDescending || 'Descending') + '</button>' +
             '</div>' +
-            '<label class="vd-col-popover-label" for="vd-col-popover-filter">' + esc(t.columnFilter || 'Filter') + '</label>' +
-            columnFilterControl(col, slicerFilteredRows()).replace(
-                'class="vd-col-filter"',
-                'class="vd-col-filter" id="vd-col-popover-filter"'
-            );
+            '<label class="vd-col-popover-label" id="vd-col-popover-filter-label">' + esc(t.columnFilter || 'Filter') + '</label>' +
+            columnFilterControl(col, slicerFilteredRows());
         document.body.appendChild(pop);
+        var control = pop.querySelector('.vd-col-filter, .vd-col-checks');
+        if (control) {
+            control.id = 'vd-col-popover-filter';
+            var filterLabel = pop.querySelector('.vd-col-popover-label');
+            if (control.classList.contains('vd-col-checks')) {
+                control.setAttribute('aria-labelledby', 'vd-col-popover-filter-label');
+                syncChecklistAll(control);
+                pop.classList.add('vd-col-popover--checks');
+            } else if (filterLabel) {
+                filterLabel.setAttribute('for', control.id);
+            }
+        }
         var select = pop.querySelector('select.vd-col-filter');
         if (select) select.value = (state.columnFilters && state.columnFilters[col.key]) || '';
         syncPopoverSortButtons(pop, key);
         positionColumnPopover(pop, button);
         button.setAttribute('aria-expanded', 'true');
-        var field = pop.querySelector('.vd-col-filter');
+        var field = pop.querySelector('.vd-col-checks input, .vd-col-filter');
         if (field) field.focus();
 
         pop.addEventListener('click', function (event) {
@@ -896,18 +1016,40 @@
             if (still) positionColumnPopover(pop, still);
         });
         pop.addEventListener('input', function (event) {
-            if (event.target.tagName !== 'INPUT') return;
+            if (event.target.tagName !== 'INPUT' || event.target.type === 'checkbox') return;
             onColumnFilter(event.target);
             var still = document.querySelector('.vd-col-menu-btn[data-col-key="' + key + '"]');
             if (still) positionColumnPopover(pop, still);
         });
         pop.addEventListener('change', function (event) {
-            if (!event.target.classList.contains('vd-col-filter')) return;
-            onColumnFilter(event.target);
+            var target = event.target;
+            if (!target.classList) return;
+            if (!target.classList.contains('vd-col-filter') &&
+                !target.classList.contains('vd-col-check-all') &&
+                !target.classList.contains('vd-col-check-item')) return;
+            onColumnFilter(target);
+            var still = document.querySelector('.vd-col-menu-btn[data-col-key="' + key + '"]');
+            if (still) positionColumnPopover(pop, still);
         });
     }
 
     function onColumnFilter(control) {
+        var group = control.closest && control.closest('.vd-col-checks');
+        if (group) {
+            var items = group.querySelectorAll('.vd-col-check-item');
+            if (control.classList.contains('vd-col-check-all')) {
+                items.forEach(function (box) { box.checked = control.checked; });
+            }
+            syncChecklistAll(group);
+            var checkKey = group.getAttribute('data-filter-key');
+            if (!checkKey) return;
+            var selected = checklistSelection(group);
+            if (selected) state.columnFilters[checkKey] = selected;
+            else delete state.columnFilters[checkKey];
+            refreshMenuButtons();
+            applyTrackerView();
+            return;
+        }
         var key = control.getAttribute('data-filter-key');
         if (!key) return;
         state.columnFilters[key] = control.value || '';
@@ -937,14 +1079,71 @@
         renderMapCountries(getFilteredMapCountries(filtered));
     }
 
+    var noticeSeq = 0;
+
+    function parseEmergencyLabel(label) {
+        var text = String(label || '').trim();
+        var parent = '';
+        var body = text;
+        var part = text.match(/^(.*?)\s+\(part of ([A-Za-z0-9]+)\)\s*$/i);
+        if (part) {
+            body = part[1].trim();
+            parent = part[2].toUpperCase();
+        }
+        var codeFirst = body.match(/^([A-Z][A-Z0-9]{4,})\s+(.+)$/);
+        if (codeFirst) return { name: codeFirst[2].trim(), code: codeFirst[1], parent: parent };
+        var nameFirst = body.match(/^(.+?)\s+\(([A-Z][A-Z0-9]{4,})\)\s*$/);
+        if (nameFirst) return { name: nameFirst[1].trim(), code: nameFirst[2], parent: parent };
+        var codeOnly = body.match(/^([A-Z][A-Z0-9]{4,})$/);
+        if (codeOnly) return { name: codeOnly[1], code: '', parent: parent };
+        return { name: text, code: '', parent: parent };
+    }
+
+    function noticeItemHtml(label) {
+        var item = parseEmergencyLabel(label);
+        var meta = [];
+        if (item.code) meta.push(item.code);
+        if (item.parent) meta.push((t.partOf || 'part of') + ' ' + item.parent);
+        return '<li><span class="vd-notice-name">' + esc(item.name) + '</span>' +
+            (meta.length ? '<span class="vd-notice-meta">' + esc(meta.join(' · ')) + '</span>' : '') +
+            '</li>';
+    }
+
+    function noticeDetailHtml(groups) {
+        return groups.map(function (group) {
+            var sections = group.sections || [];
+            var showNames = sections.length > 1;
+            var body = sections.map(function (section) {
+                var items = (section.items || []).map(noticeItemHtml).join('');
+                var name = showNames && section.name
+                    ? '<p class="vd-notice-section">' + esc(section.name) + '</p>'
+                    : '';
+                return '<div class="vd-notice-block">' + name + '<ul>' + items + '</ul></div>';
+            }).join('');
+            return '<div class="vd-notice-group"><p class="vd-notice-heading">' +
+                esc(group.heading || '') + '</p>' + body + '</div>';
+        }).join('');
+    }
+
     function noticeBadge(cell) {
         if (!cell || !cell.state || cell.state === 'unknown' || cell.state === 'not_used') {
             return '<span class="vd-muted">—</span>';
         }
         var variant = cell.state === 'ok' ? 'status-label--success' : 'status-label--warning';
-        var title = cell.detail || cell.label || '';
-        return '<span class="status-label ' + variant + '" title="' + esc(title) + '">' +
-            esc(cell.label || '') + '</span>';
+        var badge = '<span class="status-label ' + variant + '">' + esc(cell.label || '') + '</span>';
+        var groups = Array.isArray(cell.groups) ? cell.groups.filter(function (group) {
+            return group && (group.sections || []).some(function (section) {
+                return section && (section.items || []).length;
+            });
+        }) : [];
+        if (!groups.length) return badge;
+        var panelId = 'vd-notice-' + (++noticeSeq);
+        return '<div class="vd-notice">' +
+            '<span class="vd-notice-line">' + badge +
+            '<button type="button" class="vd-notice-toggle" aria-expanded="false" aria-controls="' + panelId +
+            '" aria-label="' + esc(t.showNoticeDetails || 'Show details') + '">' +
+            '<i class="fas fa-chevron-right" aria-hidden="true"></i></button></span>' +
+            '<div class="vd-notice-detail" id="' + panelId + '" hidden>' + noticeDetailHtml(groups) + '</div></div>';
     }
 
     function trackerColumnMeta() {
@@ -982,7 +1181,18 @@
                     : trackerHtmlCell('<span class="vd-muted">—</span>', 'vd-col-region');
             }
             if (col.key === 'country') {
-                return { text: row.country_name || '', className: 'vd-col-country' };
+                var countryName = row.country_name || '';
+                if (!countryName) {
+                    return trackerHtmlCell('<span class="vd-muted">—</span>', 'vd-col-country');
+                }
+                if (!row.aes_id) {
+                    return { text: countryName, className: 'vd-col-country' };
+                }
+                return trackerHtmlCell(
+                    '<a class="vd-country-link" href="/assignment/' + encodeURIComponent(row.aes_id) + '">' +
+                    esc(countryName) + '</a>',
+                    'vd-col-country'
+                );
             }
             if (col.key === 'status') {
                 return trackerHtmlCell(statusBadge(row.status, row.status_label));
@@ -997,7 +1207,10 @@
                 return trackerHtmlCell(boolIcon(!!col.value(row)), 'vd-center');
             }
             if (col.kind === 'notice') {
-                return trackerHtmlCell(noticeBadge(col.cell ? col.cell(row) : null));
+                var noticeCell = col.cell ? col.cell(row) : null;
+                var noticeHtml = noticeBadge(noticeCell);
+                var expandable = noticeHtml.indexOf('vd-notice-toggle') !== -1;
+                return trackerHtmlCell(noticeHtml, expandable ? 'vd-notice-cell' : '');
             }
             return { text: String(col.value(row) || '') };
         });
@@ -1037,6 +1250,7 @@
         } else {
             refreshMenuButtons();
         }
+        closeNoticePanels();
         if (body) {
             body.replaceChildren();
             list.forEach(function (row) {
@@ -1198,6 +1412,15 @@
         });
 
         el('vd-tracker-table')?.addEventListener('click', function (event) {
+            var noticeToggle = event.target.closest('.vd-notice-toggle');
+            if (noticeToggle && el('vd-tracker-table').contains(noticeToggle)) {
+                event.preventDefault();
+                event.stopPropagation();
+                var open = noticeToggle.getAttribute('aria-expanded') !== 'true';
+                closeNoticePanels();
+                if (open) setNoticeOpen(noticeToggle, true);
+                return;
+            }
             var button = event.target.closest('.vd-col-menu-btn');
             if (!button || !el('vd-tracker-table').contains(button)) return;
             event.stopPropagation();
@@ -1205,19 +1428,26 @@
         });
 
         document.addEventListener('click', function (event) {
+            if (!event.target.closest('.vd-notice-detail') && !event.target.closest('.vd-notice-toggle')) {
+                closeNoticePanels();
+            }
             var pop = document.getElementById('vd-col-popover');
             if (!pop || pop.contains(event.target)) return;
             closeColumnMenu();
         });
 
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') closeColumnMenu();
+            if (event.key === 'Escape') {
+                closeColumnMenu();
+                closeNoticePanels();
+            }
         });
 
         el('vd-tracker-table')?.closest('.vd-table-scroll')?.addEventListener('scroll', function () {
             var pop = document.getElementById('vd-col-popover');
             var button = document.querySelector('.vd-col-menu-btn[aria-expanded="true"]');
             if (pop && button) positionColumnPopover(pop, button);
+            repositionOpenNotice();
         });
 
         document.addEventListener('vd-main-tab-activated', function (e) {

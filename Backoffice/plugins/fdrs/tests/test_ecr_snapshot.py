@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import text
 
 from app.extensions import db
 from app.utils.datetime_helpers import naive_utc, utcnow
@@ -15,6 +16,11 @@ TEMPLATE_ID = 9021
 @pytest.fixture
 def snapshot_table(app):
     with app.app_context():
+        # create_all builds embedding tables. Those columns need pgvector first,
+        # the same step the shared test schema reset performs.
+        if db.engine.dialect.name == "postgresql":
+            with db.engine.begin() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         db.create_all()
         EveryoneCountsSnapshot.query.filter_by(template_id=TEMPLATE_ID).delete()
         db.session.commit()

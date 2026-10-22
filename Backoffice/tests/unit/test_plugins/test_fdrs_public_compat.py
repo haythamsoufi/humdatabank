@@ -363,6 +363,42 @@ class TestData:
         series = _series(_get(client, key, "/api/dataimputed", indicator="KPI_PeopleVol_Tot_IP", year=2024))
         assert "DCBB001" in series["KPI_PeopleVol_Tot_IP"]
 
+    def test_ns_line_chart_starts_five_years_before_the_latest_published_year(
+        self, client, db_session, scenario, key,
+    ):
+        from app.models import FormItem
+
+        assert adapter.ns_profile_min_year(2025) == 2020
+        item = FormItem.query.filter_by(label="Volunteers").one()
+        for period, value in (("2018", 11), ("2019", 22)):
+            aes = create_test_assignment_entity_status(
+                db_session, country=scenario.country_a, template=scenario.template, period_name=period,
+            )
+            _publish(db_session, aes, item, value=value)
+        db_session.commit()
+
+        world_years = [
+            point["year"]
+            for point in _series(_get(client, key, "/api/data", indicator="KPI_PeopleVol_Tot"))[
+                "KPI_PeopleVol_Tot"
+            ]["DCAA001"]
+        ]
+        assert world_years == [2018, 2019, 2023, 2024]
+
+        ns_years = [
+            point["year"]
+            for point in _series(
+                _get(client, key, "/api/data", indicator="KPI_PeopleVol_Tot", KPI_Don_Code="DCAA001")
+            )["KPI_PeopleVol_Tot"]["DCAA001"]
+        ]
+        # Latest published year in this fixture is 2024, so the window opens at 2019.
+        assert ns_years == [2019, 2023, 2024]
+
+        older = _series(
+            _get(client, key, "/api/data", indicator="KPI_PeopleVol_Tot", year=2018, KPI_Don_Code="DCAA001")
+        )
+        assert older["KPI_PeopleVol_Tot"]["DCAA001"] == [{"year": 2018, "value": 11}]
+
     def test_year_filter(self, client, scenario, key):
         series = _series(_get(client, key, "/api/data", indicator="KPI_PeopleVol_Tot", year=2023))
         assert series["KPI_PeopleVol_Tot"]["DCAA001"] == [{"year": 2023, "value": 1000}]

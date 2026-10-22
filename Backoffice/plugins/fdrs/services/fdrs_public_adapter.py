@@ -15,6 +15,8 @@ Legacy semantics this module reproduces:
   with ``source = "I"``.
 - ``globalvalidationdata`` is the volunteer headline: a 3-year rolling mean of
   reported values, not the single-year total.
+- A society series with no ``year`` (the NS page line chart) includes only the
+  latest published year and the five years before it. 2025 starts at 2020.
 - Sex and age series (``X_M``, ``X_F``, ``X_M_age_6_12`` ...) come from the
   disaggregation of the base indicator.
 """
@@ -550,12 +552,23 @@ def _fetch_cells(
     return query.order_by(FormData.published_at.asc().nullsfirst(), FormData.id.asc()).all()
 
 
+# NS profile line charts plot this many years before the latest published year,
+# and that year itself. Last published 2025 -> 2020 through 2025.
+NS_PROFILE_YEAR_LOOKBACK = 5
+
+
+def ns_profile_min_year(last_published: int) -> int:
+    """First year of an NS page series. Inclusive of ``last_published - 5``."""
+    return int(last_published) - NS_PROFILE_YEAR_LOOKBACK
+
+
 def compute_series(
     specs: list[SeriesSpec],
     *,
     year: Optional[int] = None,
     don_codes: Optional[list[str]] = None,
     zone_code: Optional[str] = None,
+    min_year: Optional[int] = None,
 ) -> dict[str, dict[str, dict[int, Observation]]]:
     """``{series code: {don code: {year: Observation}}}`` for the specs that have data."""
     if not specs:
@@ -576,6 +589,8 @@ def compute_series(
                 row_year = parse_period_year(row.period_name)
                 if row_year is None or (year is not None and row_year != year):
                     continue
+                if min_year is not None and row_year < min_year:
+                    continue
                 observation = observation_for(spec, row, name_to_don=name_to_don)
                 if observation is not None:
                     by_don.setdefault(row.don_code, {})[row_year] = observation
@@ -591,8 +606,17 @@ def build_data_tree(
     don_codes: Optional[list[str]] = None,
     zone_code: Optional[str] = None,
 ) -> dict[str, Any]:
-    """The ``/api/data`` response: indicator -> society -> ``{year, value}``."""
-    computed = compute_series(specs, year=year, don_codes=don_codes, zone_code=zone_code)
+    """The ``/api/data`` response: indicator -> society -> ``{year, value}``.
+
+    A society request with no ``year`` is the NS page line chart. Every society
+    gets the same window: the latest published year and the five years before it.
+    """
+    min_year = None
+    if year is None and don_codes:
+        min_year = ns_profile_min_year(last_published_year())
+    computed = compute_series(
+        specs, year=year, don_codes=don_codes, zone_code=zone_code, min_year=min_year,
+    )
     series = []
     for spec in specs:
         by_don = computed.get(spec.code)

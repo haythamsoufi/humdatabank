@@ -173,7 +173,8 @@ API_ENDPOINTS = [
         "description": (
             "Published FDRS KPI series as the legacy nested tree (indicator > society > year/value). "
             "Params: indicator (comma-separated legacy codes), year, KPI_Don_Code, zon_code. "
-            "X_IP = reported + imputed; X = reported only. Sex/age series are added when KPI_Don_Code is set."
+            "X_IP = reported + imputed; X = reported only. Sex/age series are added when KPI_Don_Code is set. "
+            "A society series with no year keeps the latest published year and the five years before it."
         ),
         "consumers": "data.ifrc.org",
     },

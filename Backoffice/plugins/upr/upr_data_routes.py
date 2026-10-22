@@ -205,7 +205,9 @@ API_ENDPOINTS = [
         "description": (
             "Volunteers, staff, branches, and local units: one figure per country and year. "
             "Templates 21 (FDRS), 24 (planning), and 33 (annual and mid-year reporting) collect the same four indicators. "
-            "The row uses the assignment approved most recently for that country and year. "
+            "The row uses the latest approved time period for that country and year: "
+            "FDRS, then annual reporting, then mid-year reporting, then planning. "
+            "A later approval of an earlier period does not replace it. "
             "A planning round is dated to the year it was reported: P27 belongs to 2026. "
             "Source names that round (FDRS, Planning, Annual reporting, or Mid-year reporting). "
             "All four figures come from that source; a blank there stays blank. "
@@ -496,7 +498,7 @@ def get_ns_key_data():
             return api_error(str(error), 400)
 
         payload, cache_hit = get_or_build_upr_payload(
-            "nskeydata",
+            "nskeydata-period",
             {},
             lambda: {"data": load_ns_key_rows()},
         )
@@ -514,8 +516,9 @@ def get_ns_key_data():
                     "total": len(rows),
                     "columns": list(NS_KEY_COLUMNS),
                     "priority": (
-                        "Most recently approved source among FDRS (template 21), "
-                        "planning (template 24), and reporting (template 33). "
+                        "Latest approved time period for that country and year: "
+                        "FDRS (template 21), then annual reporting, then mid-year reporting, "
+                        "then planning (template 24). "
                         "Planning P27 is the 2026 figure."
                     ),
                     "sources": [

@@ -2,9 +2,11 @@
 
 Templates 21 (FDRS), 24 (planning), and 33 (annual and mid-year reporting)
 all collect volunteers, staff, branches, and local units. For each country
-and year this keeps a single approved assignment: the one approved most
-recently. All four figures come from that assignment. A blank on the winning
-source stays blank.
+and year this keeps a single approved assignment: the one for the latest
+time period. FDRS comes first, then annual reporting, then mid-year
+reporting, then planning. A later approval of an earlier period
+does not replace it. All four figures come from that assignment. A blank on
+the winning source stays blank.
 
 A planning round is named for the year being planned. P27 is filled in 2026,
 so its key figures belong to 2026.
@@ -35,6 +37,15 @@ SOURCE_FDRS = "FDRS"
 SOURCE_PLANNING = "Planning"
 SOURCE_ANNUAL = "Annual reporting"
 SOURCE_MIDYEAR = "Mid-year reporting"
+
+# FDRS is the preferred full-year figure. Annual reporting is the next
+# full-year source, then mid-year (ends in June), then planning.
+_PERIOD_RANK = {
+    SOURCE_PLANNING: 0,
+    SOURCE_MIDYEAR: 1,
+    SOURCE_ANNUAL: 2,
+    SOURCE_FDRS: 3,
+}
 
 NS_KEY_COLUMNS: tuple[str, ...] = (
     "Country",
@@ -94,10 +105,11 @@ def _approved_at(value: Any) -> datetime | None:
     return None
 
 
-def _approval_rank(row: Mapping[str, Any]) -> tuple:
-    """Later approval wins. A missing timestamp loses to any real timestamp."""
+def _period_rank(row: Mapping[str, Any]) -> tuple:
+    """Latest time period wins. Approval time only breaks a tie on that period."""
     approved_at = _approved_at(row.get("approved_at"))
     return (
+        _PERIOD_RANK.get(str(row.get("source") or ""), -1),
         approved_at is not None,
         approved_at or datetime.min,
         int(row.get("aes_id") or 0),
@@ -133,7 +145,7 @@ def build_ns_key_rows(
     assignments: Iterable[Mapping[str, Any]],
     values: Iterable[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    """One row per country and year, from the most recently approved source."""
+    """One row per country and year, from the latest approved time period."""
     figures = _values_by_cell(values)
     grouped: dict[tuple[int, int], list[dict[str, Any]]] = {}
     for assignment in assignments:
@@ -160,7 +172,7 @@ def build_ns_key_rows(
 
     rows: list[dict[str, Any]] = []
     for candidates in grouped.values():
-        winner = max(candidates, key=_approval_rank)
+        winner = max(candidates, key=_period_rank)
         row = {
             "Country": winner["country_name"],
             "ISO2": winner["iso2"],

@@ -53,17 +53,17 @@ def _kenya(rows, year=2024):
     return [row for row in rows if row["ISO3"] == "KEN" and row["Year"] == year]
 
 
-def test_most_recent_approval_wins_across_the_three_templates():
+def test_the_latest_period_wins_even_when_an_earlier_period_was_approved_later():
     rows = build_ns_key_rows(
         [
             _assignment(aes_id=1, template_id=FDRS_TEMPLATE_ID, period_name="Annual 2024",
                         approved_at=datetime(2025, 3, 1)),
             _assignment(aes_id=2, template_id=PLAN_TEMPLATE_ID, period_name="2025 planning",
-                        approved_at=datetime(2023, 11, 1)),
+                        approved_at=datetime(2025, 12, 1)),
             _assignment(aes_id=3, template_id=REPORT_TEMPLATE_ID, period_name="2024 annual reporting",
-                        approved_at=datetime(2025, 6, 1)),
+                        approved_at=datetime(2025, 12, 15)),
             _assignment(aes_id=4, template_id=REPORT_TEMPLATE_ID, period_name="Jan-Jun 2024",
-                        approved_at=datetime(2024, 8, 1)),
+                        approved_at=datetime(2025, 11, 1)),
         ],
         [
             _value(1, VOLUNTEERS, 1000),
@@ -77,15 +77,15 @@ def test_most_recent_approval_wins_across_the_three_templates():
         ],
     )
     row = _kenya(rows)[0]
-    assert row["Source"] == "Annual reporting"
-    assert row["Volunteers"] == 1100
-    assert row["Staff"] == 45
-    assert row["Branches"] == 12
-    assert row["LocalUnits"] == 80
-    assert row["ApprovedAt"] == "2025-06-01 00:00:00"
+    assert row["Source"] == "FDRS"
+    assert row["Volunteers"] == 1000
+    assert row["Staff"] == 40
+    assert row["Branches"] is None
+    assert row["LocalUnits"] is None
+    assert row["ApprovedAt"] == "2025-03-01 00:00:00"
 
 
-def test_a_later_planning_approval_beats_an_earlier_annual_report():
+def test_annual_reporting_beats_a_later_planning_approval():
     rows = build_ns_key_rows(
         [
             _assignment(aes_id=1, template_id=REPORT_TEMPLATE_ID, period_name="2024 annual reporting",
@@ -99,9 +99,9 @@ def test_a_later_planning_approval_beats_an_earlier_annual_report():
         ],
     )
     row = _kenya(rows)[0]
-    assert row["Source"] == "Planning"
+    assert row["Source"] == "Annual reporting"
     assert row["Year"] == 2024
-    assert row["Volunteers"] == 900
+    assert row["Volunteers"] == 1100
 
 
 def test_unapproved_submissions_are_ignored():
@@ -143,9 +143,9 @@ def test_an_approved_blank_falls_through_to_the_previous_approved_source():
 def test_figures_are_not_mixed_across_sources():
     rows = build_ns_key_rows(
         [
-            _assignment(aes_id=1, approved_at=datetime(2025, 1, 1)),
+            _assignment(aes_id=1, approved_at=datetime(2024, 4, 1)),
             _assignment(aes_id=2, template_id=REPORT_TEMPLATE_ID, period_name="Jan-Jun 2024",
-                        approved_at=datetime(2024, 8, 1)),
+                        approved_at=datetime(2024, 9, 1)),
         ],
         [
             _value(1, VOLUNTEERS, 1000),
@@ -163,10 +163,36 @@ def test_figures_are_not_mixed_across_sources():
     assert row["LocalUnits"] is None
 
 
-def test_midyear_reporting_is_named_when_it_is_the_latest_approval():
+def test_annual_reporting_beats_a_later_approved_midyear():
     rows = build_ns_key_rows(
         [
-            _assignment(aes_id=1, approved_at=datetime(2024, 4, 1)),
+            _assignment(aes_id=1, country_name="Afghanistan", iso2="AF", iso3="AFG",
+                        template_id=REPORT_TEMPLATE_ID, period_name="2025 annual reporting",
+                        approved_at=datetime(2025, 8, 1)),
+            _assignment(aes_id=2, country_name="Afghanistan", iso2="AF", iso3="AFG",
+                        template_id=REPORT_TEMPLATE_ID, period_name="Jan-Jun 2025",
+                        approved_at=datetime(2025, 11, 15, 8, 30)),
+        ],
+        [
+            _value(1, VOLUNTEERS, 2000),
+            _value(1, STAFF, 80),
+            _value(2, VOLUNTEERS, 1500),
+            _value(2, LOCAL_UNITS, 40),
+        ],
+    )
+    row = [item for item in rows if item["ISO2"] == "AF" and item["Year"] == 2025][0]
+    assert row["Source"] == "Annual reporting"
+    assert row["Volunteers"] == 2000
+    assert row["Staff"] == 80
+    assert row["LocalUnits"] is None
+    assert row["ApprovedAt"] == "2025-08-01 00:00:00"
+
+
+def test_midyear_is_used_when_it_is_the_latest_approved_period():
+    rows = build_ns_key_rows(
+        [
+            _assignment(aes_id=1, template_id=PLAN_TEMPLATE_ID, period_name="P25",
+                        approved_at=datetime(2025, 12, 1)),
             _assignment(aes_id=2, template_id=REPORT_TEMPLATE_ID, period_name="Jan-Jun 2024",
                         approved_at=datetime(2024, 9, 15, 8, 30)),
         ],

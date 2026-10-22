@@ -549,6 +549,29 @@
     const canUploadDocuments = {{ can_upload_documents|default(false)|tojson|safe }};
     const isAdminOrSystemManager = {{ can_manage_documents|default(false)|tojson|safe }};
 
+    function documentStatusKey(raw) {
+        var text = String(raw || '').trim().toLowerCase();
+        var prefix = 'documentstatusvalue.';
+        if (text.indexOf(prefix) === 0) {
+            text = text.slice(prefix.length);
+        }
+        return text;
+    }
+
+    function documentStatusFilterLabel(raw) {
+        var key = documentStatusKey(raw);
+        if (key === 'approved') {
+            return {{ _('Approved')|tojson }};
+        }
+        if (key === 'rejected') {
+            return {{ _('Rejected')|tojson }};
+        }
+        if (!key || key === 'pending') {
+            return {{ _('Pending Review')|tojson }};
+        }
+        return String(raw || '');
+    }
+
     // AG Grid helper instance
     let gridHelper = null;
     let gridApi = null;
@@ -565,7 +588,10 @@
         {% set doc_country_id = (country.id if country else None) %}
         {% set is_owner = (current_user.is_authenticated and (doc.uploaded_by_user_id == current_user.id)) %}
         {% set has_entity_access = entity_access %}
-        {% set doc_review_status = ((status if status is not none else doc.status) or '')|trim|lower %}
+        {% set raw_status = status if status is not none else doc.status %}
+        {% set status_value = raw_status.value if (raw_status is not none and raw_status.value is defined) else (raw_status if raw_status is not none else '') %}
+        {% set doc_review_status = (status_value|string)|trim|lower %}
+        {% set doc_review_status = doc_review_status.replace('documentstatusvalue.', '') if doc_review_status.startswith('documentstatusvalue.') else doc_review_status %}
         {% set is_approved_doc = doc_review_status == 'approved' %}
         {% set team_pending_edit = documents_repo_team_pending_edit is defined and documents_repo_team_pending_edit %}
         {% set can_edit_doc = can_manage_documents or (can_upload_documents and has_entity_access and not is_approved_doc and (is_owner or team_pending_edit)) %}
@@ -591,7 +617,7 @@
             uploaded_by_active: {{ (user.active if user and not (user is string) else True)|tojson|safe }},
             uploaded_by_profile_color: {{ ((user.profile_color if user and not (user is string) and user.profile_color else '') or '')|tojson|safe }},
             uploaded_at: {{ uploaded_at|datetime_iso|tojson|safe }},
-            status: {{ (status or '')|tojson|safe }},
+            status: {{ (doc_review_status or '')|tojson|safe }},
             can_edit: {{ can_edit_doc|default(false)|tojson|safe }},
             can_delete: {{ can_delete_doc|default(false)|tojson|safe }},
             delete_url: "{{ (url_for('content_management.delete_document', doc_id=doc.id, next=next_url) if next_url is defined and next_url else url_for('content_management.delete_document', doc_id=doc.id)) if can_delete_doc else '' }}",
@@ -736,9 +762,11 @@
             minWidth: 240,
             filter: 'customSetFilter',
             sortable: true,
+            filterValueGetter: function(params) {
+                return documentStatusFilterLabel(params.data && params.data.status);
+            },
             cellRenderer: function(params) {
-                const statusRaw = (params.data && params.data.status) ? String(params.data.status) : '';
-                const status = statusRaw.trim().toLowerCase();
+                const status = documentStatusKey(params.data && params.data.status);
                 if (status === 'approved') {
                     return StatusLabels.renderGenericStatus('approved', {{ _('Approved')|tojson }});
                 } else if (status === 'rejected') {

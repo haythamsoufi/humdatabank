@@ -89,3 +89,34 @@ class TestSerializeDocumentGridRow:
         doc = _make_doc()
         payload = self._serialize(doc)
         assert payload["decline_url"].endswith(f"/documents/decline/{doc.id}")
+
+    def test_enum_status_serializes_as_value(self):
+        from app.models.enums import DocumentStatusValue
+
+        doc = _make_doc(status=DocumentStatusValue.approved)
+        payload = self._serialize(doc, status=DocumentStatusValue.approved)
+        assert payload["status"] == "approved"
+
+    def test_class_qualified_status_string_is_normalized(self):
+        doc = _make_doc()
+        payload = self._serialize(doc, status="DocumentStatusValue.rejected")
+        assert payload["status"] == "rejected"
+
+    def test_approved_enum_is_not_editable_by_uploader(self):
+        from app.models.enums import DocumentStatusValue
+
+        doc = _make_doc()
+        uploaded_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        row = (doc, DocumentStatusValue.approved, _make_country(), _make_user(), uploaded_at, None, True)
+
+        def _perm(_user, name):
+            return name == "assignment.documents.upload"
+
+        with patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_perm), patch(
+            "app.routes.admin.content_management.current_user"
+        ) as current:
+            current.is_authenticated = True
+            current.id = doc.uploaded_by_user_id
+            payload = _serialize_document_grid_row(row)
+        assert payload["status"] == "approved"
+        assert payload["can_edit"] is False

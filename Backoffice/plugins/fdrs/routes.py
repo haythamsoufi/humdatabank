@@ -452,13 +452,21 @@ def run_data_sync(template_id: int):
                 f"Inserted: {stats['inserted']}, Updated: {stats['updated']}, "
                 f"Unchanged: {stats.get('unchanged', 0)}, Errors: {stats['errors']}"
                 + (
-                    f"; Documents: +{stats.get('documents_inserted', 0)} "
-                    f"~{stats.get('documents_updated', 0)} "
-                    f"approved={stats.get('documents_status_approved', 0)} "
-                    f"pending={stats.get('documents_status_pending', 0)} "
-                    f"rejected={stats.get('documents_status_rejected', 0)} "
-                    f"err={stats.get('documents_errors', 0)}"
-                    if stats.get("documents_inserted") is not None or stats.get("documents_updated")
+                    (
+                        f"; Documents: +{stats.get('documents_inserted', 0)} "
+                        f"~{stats.get('documents_updated', 0)} "
+                        f"approved={stats.get('documents_status_approved', 0)} "
+                        f"pending={stats.get('documents_status_pending', 0)} "
+                        f"rejected={stats.get('documents_status_rejected', 0)} "
+                        f"status_changed={stats.get('documents_status_changed', 0)} "
+                        f"err={stats.get('documents_errors', 0)}"
+                        + (
+                            f" failed={stats.get('documents_sync_error')}"
+                            if stats.get("documents_sync_error")
+                            else ""
+                        )
+                    )
+                    if stats.get("documents_ran")
                     else ""
                 )
             ),
@@ -776,6 +784,7 @@ def sync_verify_latest(template_id: int):
         problems_only=meta.get("problems_only"),
         download_url=url_for("fdrs.sync_verify_latest_download", template_id=template_id),
         results_url=url_for("fdrs.sync_verify_latest_results", template_id=template_id),
+        documents=meta.get("documents"),
     )
 
 

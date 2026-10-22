@@ -2136,11 +2136,20 @@ def _verify_synced_snapshot(
         )
         from plugins.fdrs.services import fdrs_tools_artifacts as artifacts
 
+        documents_banner = None
+        if stats.get("documents_ran"):
+            from fdrs_documents_sync import public_document_sync_summary
+
+            documents_banner = public_document_sync_summary(stats)
         artifacts.persist_verify_latest(
             template_id=template_id,
             local_xlsx_path=path,
             stats=dict(result or {}),
-            extra={"source": "data_sync", "fdrs_years": years},
+            extra={
+                "source": "data_sync",
+                "fdrs_years": years,
+                "documents": documents_banner,
+            },
         )
         stats["verification"] = {
             "total": (result or {}).get("total", 0),
@@ -2544,10 +2553,12 @@ def run_import(
                     batch_size=batch_size,
                     progress_cb=_emit_progress,
                     cancel_check=cancel_check,
+                    change_recorder=change_recorder,
                     progress_start_pct=_PROGRESS_DOCUMENTS_START,
                     progress_end_pct=_PROGRESS_DOCUMENTS_END,
                 )
                 ds = doc_result.get("documents_stats") or {}
+                stats["documents_ran"] = True
                 stats["documents_inserted"] = ds.get("inserted", 0)
                 stats["documents_updated"] = ds.get("updated", 0)
                 stats["documents_errors"] = ds.get("errors", 0)
@@ -2558,11 +2569,12 @@ def run_import(
                 stats["documents_status_approved"] = ds.get("status_approved", 0)
                 stats["documents_status_pending"] = ds.get("status_pending", 0)
                 stats["documents_status_rejected"] = ds.get("status_rejected", 0)
+                stats["documents_status_changed"] = ds.get("status_changed", 0)
                 stats["documents_summary"] = doc_result.get("documents_summary")
                 logger.info(
                     "FDRS documents complete: inserted=%s updated=%s files_saved=%s "
                     "awaiting_file_download=%s download_errors=%s row_errors=%s planned=%s "
-                    "status_approved=%s status_pending=%s status_rejected=%s",
+                    "status_approved=%s status_pending=%s status_rejected=%s status_changed=%s",
                     stats["documents_inserted"],
                     stats["documents_updated"],
                     stats["documents_downloaded"],
@@ -2573,11 +2585,14 @@ def run_import(
                     stats["documents_status_approved"],
                     stats["documents_status_pending"],
                     stats["documents_status_rejected"],
+                    stats["documents_status_changed"],
                 )
             except FdrsSyncCancelled:
                 raise
             except Exception as e:
+                stats["documents_ran"] = True
                 stats["documents_errors"] = stats.get("documents_errors", 0) + 1
+                stats["documents_sync_error"] = str(e).strip()[:300] or type(e).__name__
                 logger.error("FDRS documents sync failed: %s", e, exc_info=True)
         elif fdrs_from_data_api and not sync_documents:
             _progress(

@@ -169,6 +169,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (statsEl && meta.stats) {
             statsEl.textContent = formatSyncVerifyStats(meta.stats);
         }
+        const docsEl = document.getElementById('sync-verify-last-run-documents');
+        if (docsEl) {
+            if (meta.documents) {
+                docsEl.textContent = formatDocumentSyncStats(meta.documents);
+                docsEl.classList.remove('hidden');
+            } else {
+                docsEl.textContent = '';
+                docsEl.classList.add('hidden');
+            }
+        }
         const dl = document.getElementById('sync-verify-last-run-download');
         if (dl && meta.download_url && isSafeHref(meta.download_url)) {
             dl.classList.remove('hidden');
@@ -932,6 +942,12 @@ function pollDataSyncStatus() {
                     + ', Updated: ' + formatCount(stats.updated || 0)
                     + ', Unchanged: ' + formatCount(stats.unchanged || 0)
                     + ', Errors: ' + formatCount(stats.errors || 0);
+                if (stats.documents_ran) {
+                    msg += '\n' + formatDocumentSyncStats(documentStatsFromJob(stats));
+                }
+                if (stats.verification) {
+                    msg += '\n' + formatSyncVerifyStats(stats.verification);
+                }
                 dataSyncResultText.replaceChildren();
                 if (job.download_ready && job.download_url) {
                     msg += `\n\n` + {{ _("Preview Excel ready:")|tojson|safe }} + ` `;
@@ -944,9 +960,6 @@ function pollDataSyncStatus() {
                     );
                 } else {
                     appendMultilineText(dataSyncResultText, msg);
-                }
-                if (stats.verification) {
-                    msg += '\n' + formatSyncVerifyStats(stats.verification);
                 }
                 if (finishedJobId && /^[a-fA-F0-9]{32}$/.test(finishedJobId)) {
                     dataSyncResultText.appendChild(document.createTextNode(' '));
@@ -1413,6 +1426,36 @@ function setSyncVerifyProgress(percent, stage, message, current, total, opts) {
             syncVerifyProgressCount.textContent = '';
         }
     }
+}
+
+function formatDocumentSyncStats(doc) {
+    doc = doc || {};
+    if (doc.sync_error) {
+        return {{ _("Documents:")|tojson|safe }} + ' ' + {{ _("sync failed")|tojson|safe }} + ' — ' + doc.sync_error;
+    }
+    return {{ _("Documents:")|tojson|safe }}
+        + ' ' + formatCount(doc.inserted || 0) + ' ' + {{ _("inserted")|tojson|safe }}
+        + ', ' + formatCount(doc.updated || 0) + ' ' + {{ _("updated")|tojson|safe }}
+        + ', ' + formatCount(doc.errors || 0) + ' ' + {{ _("errors")|tojson|safe }}
+        + ' — '
+        + formatCount(doc.status_approved || 0) + ' ' + {{ _("approved")|tojson|safe }}
+        + ', ' + formatCount(doc.status_pending || 0) + ' ' + {{ _("pending")|tojson|safe }}
+        + ', ' + formatCount(doc.status_rejected || 0) + ' ' + {{ _("rejected")|tojson|safe }}
+        + ', ' + formatCount(doc.status_changed || 0) + ' ' + {{ _("status changes")|tojson|safe }};
+}
+
+function documentStatsFromJob(stats) {
+    stats = stats || {};
+    return {
+        inserted: stats.documents_inserted || 0,
+        updated: stats.documents_updated || 0,
+        errors: stats.documents_errors || 0,
+        status_approved: stats.documents_status_approved || 0,
+        status_pending: stats.documents_status_pending || 0,
+        status_rejected: stats.documents_status_rejected || 0,
+        status_changed: stats.documents_status_changed || 0,
+        sync_error: stats.documents_sync_error || null
+    };
 }
 
 function formatSyncVerifyStats(stats) {

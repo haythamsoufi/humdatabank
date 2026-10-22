@@ -33,6 +33,22 @@
               {{ (verify_latest.stats.mismatch or 0) | format_number }} {{ _('mismatch') }}
             {% endif %}
           </p>
+          {% set docs_banner = verify_latest.documents if verify_latest and verify_latest.documents else none %}
+          <p id="sync-verify-last-run-documents" class="text-sm text-gray-600{% if not docs_banner %} hidden{% endif %}">
+            {% if docs_banner %}
+              {% if docs_banner.sync_error %}
+                {{ _('Documents:') }} {{ _('sync failed') }} — {{ docs_banner.sync_error }}
+              {% else %}
+                {{ _('Documents:') }} {{ (docs_banner.inserted or 0) | format_number }} {{ _('inserted') }},
+                {{ (docs_banner.updated or 0) | format_number }} {{ _('updated') }},
+                {{ (docs_banner.errors or 0) | format_number }} {{ _('errors') }} —
+                {{ (docs_banner.status_approved or 0) | format_number }} {{ _('approved') }},
+                {{ (docs_banner.status_pending or 0) | format_number }} {{ _('pending') }},
+                {{ (docs_banner.status_rejected or 0) | format_number }} {{ _('rejected') }},
+                {{ (docs_banner.status_changed or 0) | format_number }} {{ _('status changes') }}
+              {% endif %}
+            {% endif %}
+          </p>
         </div>
         <a id="sync-verify-last-run-download" href="{{ url_for('fdrs.sync_verify_latest_download', template_id=template.id) }}"
            class="text-sm text-blue-700 hover:underline shrink-0{% if not verify_latest %} hidden{% endif %}">

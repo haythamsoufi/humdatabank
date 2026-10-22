@@ -59,6 +59,23 @@
       <div><dt class="text-gray-500">{{ _('Dry run') }}</dt><dd class="text-amber-800 font-medium">{{ _('Yes') }}</dd></div>
       {% endif %}
     </dl>
+    {% if stats.documents_ran %}
+    <div class="mt-4 pt-4 border-t border-gray-100">
+      <h3 class="text-sm font-medium text-gray-900 mb-2">{{ _('Documents') }}</h3>
+      {% if stats.documents_sync_error %}
+      <p class="text-sm text-red-700 mb-2">{{ _('sync failed') }} — {{ stats.documents_sync_error }}</p>
+      {% endif %}
+      <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div><dt class="text-gray-500">{{ _('Inserted') }}</dt><dd class="text-gray-900">{{ stats.documents_inserted or 0 }}</dd></div>
+        <div><dt class="text-gray-500">{{ _('Updated') }}</dt><dd class="text-gray-900">{{ stats.documents_updated or 0 }}</dd></div>
+        <div><dt class="text-gray-500">{{ _('Errors') }}</dt><dd class="text-gray-900">{{ stats.documents_errors or 0 }}</dd></div>
+        <div><dt class="text-gray-500">{{ _('status changes') }}</dt><dd class="text-gray-900">{{ stats.documents_status_changed or 0 }}</dd></div>
+        <div><dt class="text-gray-500">{{ _('approved') }}</dt><dd class="text-gray-900">{{ stats.documents_status_approved or 0 }}</dd></div>
+        <div><dt class="text-gray-500">{{ _('pending') }}</dt><dd class="text-gray-900">{{ stats.documents_status_pending or 0 }}</dd></div>
+        <div><dt class="text-gray-500">{{ _('rejected') }}</dt><dd class="text-gray-900">{{ stats.documents_status_rejected or 0 }}</dd></div>
+      </dl>
+    </div>
+    {% endif %}
   </div>
 
   {% if summary.warnings %}

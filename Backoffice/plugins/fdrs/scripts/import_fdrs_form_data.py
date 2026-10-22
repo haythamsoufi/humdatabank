@@ -90,7 +90,9 @@ _PROGRESS_FORM_UPSERT_END = 82.0
 _PROGRESS_DOCUMENTS_START = 82.0
 _PROGRESS_DOCUMENTS_END = 94.0
 _PROGRESS_ASSIGNMENT_START = 94.0
-_PROGRESS_ASSIGNMENT_END = 99.0
+_PROGRESS_ASSIGNMENT_END = 97.0
+_PROGRESS_VERIFY_START = 97.0
+_PROGRESS_VERIFY_END = 100.0
 
 
 from datetime import datetime
@@ -1051,8 +1053,13 @@ def _split_fdrs_csv_field(raw: Any) -> List[str]:
     return [part.strip() for part in s.split(",")]
 
 
-def _parse_don_code_amount_pairs(codes_raw: Any, amounts_raw: Any) -> List[Tuple[str, int]]:
-    """Zip parallel CSV DonCode / amount lists from FDRS network-support KPIs."""
+def _parse_don_code_amount_pairs(codes_raw: Any, amounts_raw: Any) -> List[Tuple[str, Optional[int]]]:
+    """Zip parallel CSV DonCode / amount lists from FDRS network-support KPIs.
+
+    A DonCode with a blank amount is kept (amount ``None``) so the partner
+    still appears on the matrix. An explicit zero is omitted, same as other
+    FDRS amounts that are not stored.
+    """
     codes = _split_fdrs_csv_field(codes_raw)
     amounts = _split_fdrs_csv_field(amounts_raw)
     if not codes:
@@ -1062,17 +1069,19 @@ def _parse_don_code_amount_pairs(codes_raw: Any, amounts_raw: Any) -> List[Tuple
         codes.append("")
     while len(amounts) < n:
         amounts.append("")
-    pairs: List[Tuple[str, int]] = []
+    pairs: List[Tuple[str, Optional[int]]] = []
     for don, amt_raw in zip(codes, amounts):
         don = (don or "").strip()
         if not don:
             continue
         amt_s = (amt_raw or "").strip()
         if not amt_s:
+            pairs.append((don, None))
             continue
         try:
             amt = int(float(amt_s))
         except (ValueError, TypeError):
+            pairs.append((don, None))
             continue
         if amt == 0:
             continue
@@ -1180,21 +1189,30 @@ def _network_support_cells_from_slots(
     slot_count: int = FDRS_NETWORK_SUPPORT_SLOT_COUNT,
     kpi_states: Optional[Dict[str, Any]] = None,
     published_only: bool = False,
-) -> Dict[str, int]:
-    cells: Dict[str, int] = {}
+) -> Dict[str, Optional[int]]:
+    cells: Dict[str, Optional[int]] = {}
     for slot in range(1, slot_count + 1):
         codes_kpi = f"{code_prefix}{slot}"
         amounts_kpi = f"{code_prefix}{slot}_amount"
+        pairs = _parse_don_code_amount_pairs(kpi_values.get(codes_kpi), kpi_values.get(amounts_kpi))
         if published_only:
             from fdrs_data_fetcher import fdrs_state_is_published
 
-            if not fdrs_state_is_published((kpi_states or {}).get(amounts_kpi)):
+            states = kpi_states or {}
+            amount_published = fdrs_state_is_published(states.get(amounts_kpi))
+            code_published = fdrs_state_is_published(states.get(codes_kpi))
+            if not amount_published and not code_published:
                 continue
-        pairs = _parse_don_code_amount_pairs(kpi_values.get(codes_kpi), kpi_values.get(amounts_kpi))
+            if not amount_published:
+                pairs = [(don, None) for don, _amount in pairs]
         for don, amount in pairs:
             row_label = don_to_label.get(don, don)
             cell_key = f"{row_label}_{column}"
-            cells[cell_key] = cells.get(cell_key, 0) + amount
+            if amount is None:
+                cells.setdefault(cell_key, None)
+                continue
+            current = cells.get(cell_key)
+            cells[cell_key] = amount if current is None else int(current) + amount
     return cells
 
 
@@ -2077,6 +2095,75 @@ def _fdrs_table_to_ready_to_import(
 
 
 
+def _verify_synced_snapshot(
+    *,
+    snapshot_rows: List[Dict[str, Any]],
+    years: List[int],
+    template_id: int,
+    stats: Dict[str, Any],
+    progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> None:
+    """Check form_data against the FDRS snapshot this sync just imported."""
+    import tempfile
+
+    from verify_fdrs_sync import FdrsVerifyCancelled, execute_verification
+
+    def _mapped(payload: Dict[str, Any]) -> None:
+        if not progress_cb:
+            return
+        try:
+            raw = float(payload.get("percent") or 0.0)
+        except (TypeError, ValueError):
+            raw = 0.0
+        raw = max(0.0, min(raw, 100.0))
+        span = _PROGRESS_VERIFY_END - _PROGRESS_VERIFY_START
+        mapped = dict(payload)
+        mapped["percent"] = _PROGRESS_VERIFY_START + (span * (raw / 100.0))
+        mapped["stage"] = "verify"
+        progress_cb(mapped)
+
+    fd, path = tempfile.mkstemp(suffix=".xlsx", prefix="fdrs_sync_verify_")
+    os.close(fd)
+    try:
+        result = execute_verification(
+            years=years,
+            output_path=path,
+            template_id=template_id,
+            snapshot_rows=snapshot_rows,
+            progress_cb=_mapped if progress_cb else None,
+            cancel_check=cancel_check,
+        )
+        from plugins.fdrs.services import fdrs_tools_artifacts as artifacts
+
+        artifacts.persist_verify_latest(
+            template_id=template_id,
+            local_xlsx_path=path,
+            stats=dict(result or {}),
+            extra={"source": "data_sync", "fdrs_years": years},
+        )
+        stats["verification"] = {
+            "total": (result or {}).get("total", 0),
+            "matched": (result or {}).get("matched", 0),
+            "skipped_intentionally": (result or {}).get("skipped_intentionally", 0),
+            "missing": (result or {}).get("missing", 0),
+            "mismatch": (result or {}).get("mismatch", 0),
+        }
+        logger.info(
+            "FDRS verification after sync: matched=%s missing=%s mismatch=%s",
+            stats["verification"]["matched"],
+            stats["verification"]["missing"],
+            stats["verification"]["mismatch"],
+        )
+    except FdrsVerifyCancelled:
+        raise FdrsSyncCancelled()
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 def run_import(
     input_path: Optional[str] = None,
     fdrs_api_url: Optional[str] = None,
@@ -2190,6 +2277,7 @@ def run_import(
             logger.debug("progress_cb failed: %s", e)
 
     with app.app_context():
+        synced_snapshot_rows: Optional[List[Dict[str, Any]]] = None
         if fdrs_from_data_api:
             from flask import current_app
             from fdrs_data_fetcher import build_fdrs_table
@@ -2256,6 +2344,7 @@ def run_import(
                 progress_cb=_emit_progress,
                 reported_import_states=fdrs_reported_import_states,
             )
+            synced_snapshot_rows = fdrs_snapshot_rows
             logger.info("FDRS Data rows: %d, disagg keys: %d, disability keys: %d", len(fdrs_data), len(disagg_by_key), len(disability_by_key))
 
             _progress(stage="fetch_databank", message="Fetching databank lookups (assignments, form items, indicator bank)...", percent=8.0)
@@ -2533,6 +2622,33 @@ def run_import(
             except Exception as e:
                 stats["assignment_status_errors"] = stats.get("assignment_status_errors", 0) + 1
                 logger.error("FDRS assignment status sync failed: %s", e, exc_info=True)
+
+        if (
+            fdrs_from_data_api
+            and not dry_run
+            and not test_limit
+            and template_id is not None
+            and synced_snapshot_rows is not None
+        ):
+            _check_cancel()
+            try:
+                from app.extensions import db
+
+                db.session.commit()
+                db.session.expire_all()
+                _verify_synced_snapshot(
+                    snapshot_rows=synced_snapshot_rows,
+                    years=list(fdrs_years or []),
+                    template_id=int(template_id),
+                    stats=stats,
+                    progress_cb=progress_cb,
+                    cancel_check=cancel_check,
+                )
+            except FdrsSyncCancelled:
+                raise
+            except Exception as e:
+                stats["verification_error"] = str(e)
+                logger.error("FDRS verification after sync failed: %s", e, exc_info=True)
 
         _progress(stage="complete", message="Sync completed.", current=len(rows), total=len(rows), percent=100.0, extra={"stats": dict(stats)})
     return stats

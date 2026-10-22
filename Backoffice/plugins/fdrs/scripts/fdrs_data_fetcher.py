@@ -451,17 +451,25 @@ def get_valid_kpi_codes(
 
 
 def _extract_fdrs_row_value(row: Dict[str, Any]) -> Any:
-    """First non-null value field from a fdrsdata API row."""
-    int_v = row.get("IntValue")
-    bool_v = row.get("BoolValue")
-    str_v = row.get("StrValue")
-    date_v = row.get("DateValue")
-    generic_v = row.get("value")
-    if generic_v is None:
-        generic_v = row.get("Value")
-    for v in (generic_v, int_v, bool_v, str_v, date_v):
-        if v is not None:
-            return v
+    """Reported answer from an fdrsdata row.
+
+    When ``value`` / ``Value`` is present and null, the row has no answer.
+    ``IntValue``, ``BoolValue``, ``StrValue``, and ``DateValue`` are not
+    substitutes. Those typed fields are used only when the row has no
+    ``value`` key at all.
+    """
+    has_generic = "value" in row or "Value" in row
+    generic = row.get("value")
+    if generic is None:
+        generic = row.get("Value")
+    if generic is not None:
+        return generic
+    if has_generic:
+        return None
+    for key in ("IntValue", "BoolValue", "StrValue", "DateValue"):
+        typed = row.get(key)
+        if typed is not None:
+            return typed
     return None
 
 
@@ -541,7 +549,8 @@ def _fdrsdata_rows(
     """
     Convert fdrsdata API response to rows: DonCode, year, KPI_code, value, State.
     Inner-join filter by valid KPIs (3_FDRS Codebook List IDs). value = first of
-    value/Value, IntValue, BoolValue, StrValue, DateValue; year normalized to int calendar year when parseable.
+    value/Value when that key is present (null means no answer; IntValue is not a fallback).
+    Typed fields are used only when the row has no value key. Year is normalized to a calendar year when parseable.
     """
     valid_set = set(valid_kpi_codes) if valid_kpi_codes else None
     out = []
@@ -557,6 +566,14 @@ def _fdrsdata_rows(
             continue
         state = row.get("State")
         value = _extract_fdrs_row_value(row)
+        # Availability KPIs keep the answer in BoolValue. The generic value is
+        # null even when the flag is explicitly false, so a null value is not
+        # "the flag is set".
+        if value is None and fdrs_kpi_has_data_availability_suffix(kpi):
+            if "BoolValue" in row:
+                value = row.get("BoolValue")
+            elif "boolValue" in row:
+                value = row.get("boolValue")
         yk = _fdrs_reporting_year_key(year_raw)
         year_out = yk if isinstance(yk, int) else year_raw
         out.append({
@@ -579,8 +596,9 @@ def fetch_fdrsdata(
 ) -> List[Dict[str, Any]]:
     """
     FDRS - Data API: GET /api/fdrsdata with Query: year, apiKey, force, minstatus, showunpublished.
-    Expand DonCode, Year, KPICode->KPI_code, value/Value, IntValue, State, BoolValue, DateValue, StrValue;
-    inner-join with ValidKPIs (3_FDRS List IDs); value = first non-null field; year normalized to calendar int when parseable.
+    Expand DonCode, Year, KPICode->KPI_code, value/Value, State.
+    A null ``value`` is an empty answer (IntValue is not used). Inner-join with ValidKPIs
+    (3_FDRS List IDs); year normalized to calendar int when parseable.
     min_status: IFRC minstatus query param (default 100). Use min of selected import states when stricter fetch is desired.
     """
     raw = _fetch_fdrsdata_raw(

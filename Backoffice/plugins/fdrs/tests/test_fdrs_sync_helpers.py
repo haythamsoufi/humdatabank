@@ -39,11 +39,14 @@ from fdrs_data_fetcher import (  # noqa: E402
     build_fdrs_data,
     _classify_fdrs_combined_row,
     _disability_combined_from_raw,
+    _extract_fdrs_row_value,
+    _fdrsdata_rows,
 )
 from fdrs_sync_constants import fdrs_kpi_data_availability_kind  # noqa: E402
 from import_fdrs_form_data import (  # noqa: E402
     build_income_sources_matrix_rows,
     build_network_support_matrix_rows,
+    _network_support_cells_from_slots,
     build_ready_to_import_from_new_pipeline,
     _data_availability_from_group_rows,
     _merge_disability_into_disagg_data,
@@ -362,9 +365,9 @@ def test_parse_don_code_amount_pairs_zips_parallel_csv():
     assert pairs == [("DGB001", 100), ("DDE001", 200)]
 
 
-def test_parse_don_code_amount_pairs_skips_empty_amounts():
-    pairs = _parse_don_code_amount_pairs("DBB001,DBD001", ",500")
-    assert pairs == [("DBD001", 500)]
+def test_parse_don_code_amount_pairs_keeps_blank_amounts():
+    pairs = _parse_don_code_amount_pairs("DBB001,DBD001,DXX001", ",500,0")
+    assert pairs == [("DBB001", None), ("DBD001", 500)]
 
 
 def test_build_network_support_matrix_rows():
@@ -390,6 +393,49 @@ def test_build_network_support_matrix_rows():
     assert given["French Red Cross_Funding provided"] == 1000000
     assert given["German Red Cross_Funding provided"] == 200000
     assert received["Norwegian Red Cross_Funding Received"] == 50000
+
+
+def test_public_network_list_keeps_partners_with_blank_amounts():
+    from types import SimpleNamespace
+
+    from plugins.fdrs.services.fdrs_public_adapter import KIND_NETWORK, SeriesSpec, _network_value
+
+    row = SimpleNamespace(
+        published_disagg_data={
+            "Costa Rican Red Cross_Funding provided": None,
+            "Paraguayan Red Cross_Funding provided": 500,
+        }
+    )
+    names = {
+        "costa rican red cross": "DCR001",
+        "paraguayan red cross": "DPY001",
+    }
+    codes = SeriesSpec("supported1", KIND_NETWORK, network_prefix="supported", network_amount=False)
+    amounts = SeriesSpec("supported1_amount", KIND_NETWORK, network_prefix="supported", network_amount=True)
+    assert _network_value(codes, row, names) == "DCR001,DPY001"
+    assert _network_value(amounts, row, names) == ",500"
+
+
+def test_network_support_keeps_partner_names_when_amount_is_blank():
+    cells = _network_support_cells_from_slots(
+        {"supported1": "DCR001,DPY001", "supported1_amount": ","},
+        code_prefix="supported",
+        column="Funding provided",
+        don_to_label={"DCR001": "Costa Rican Red Cross", "DPY001": "Paraguayan Red Cross"},
+    )
+    assert cells == {
+        "Costa Rican Red Cross_Funding provided": None,
+        "Paraguayan Red Cross_Funding provided": None,
+    }
+    published = _network_support_cells_from_slots(
+        {"supported1": "DCR001", "supported1_amount": "100"},
+        code_prefix="supported",
+        column="Funding provided",
+        don_to_label={"DCR001": "Costa Rican Red Cross"},
+        kpi_states={"supported1": 500, "supported1_amount": 100},
+        published_only=True,
+    )
+    assert published == {"Costa Rican Red Cross_Funding provided": None}
 
 
 def test_derive_assignment_status_all_validated():
@@ -455,6 +501,59 @@ def test_build_assignment_status_plan_maps_workflow_kpis():
     assert submitted_at is not None
     assert status_ts is not None
     assert status_ts >= submitted_at
+
+
+def test_climate_not_available_uses_bool_value_not_the_not_collected_flag():
+    parsed = _fdrsdata_rows([
+        {
+            "DonCode": "DAF001",
+            "Year": 2025,
+            "KPICode": "KPI_Climate_D_IsDataNotAvailable",
+            "value": None,
+            "BoolValue": False,
+            "State": 200,
+        },
+        {
+            "DonCode": "DAF001",
+            "Year": 2025,
+            "KPICode": "KPI_Climate_D_isDataNotCollected",
+            "value": None,
+            "BoolValue": True,
+            "State": 200,
+        },
+    ], valid_kpi_codes=[
+        "KPI_Climate_D_IsDataNotAvailable",
+        "KPI_Climate_D_isDataNotCollected",
+    ])
+    by_code = {row["KPI_code"]: row["value"] for row in parsed}
+    assert by_code["KPI_Climate_D_IsDataNotAvailable"] == "False"
+    assert by_code["KPI_Climate_D_isDataNotCollected"] == "True"
+    combined = build_fdrs_combined(
+        parsed,
+        [],
+        {"DAF001": "AFG"},
+        import_state_allowlist=frozenset({100, 200, 300, 400, 500}),
+    )
+    data = build_fdrs_data(combined)
+    data_na, not_applic = _data_availability_from_group_rows(data)
+    assert data_na is False
+    assert not_applic is True
+
+
+def test_null_value_does_not_fall_back_to_int_value():
+    row = {"value": None, "IntValue": 6219, "KPICode": "KPI_ReachSI_D_Tot_UnknownSex", "State": 100}
+    assert _extract_fdrs_row_value(row) is None
+    parsed = _fdrsdata_rows([
+        {
+            "DonCode": "DDJ001",
+            "Year": 2025,
+            "KPICode": "KPI_ReachSI_D_Tot_UnknownSex",
+            "value": None,
+            "IntValue": 6219,
+            "State": 100,
+        }
+    ])
+    assert parsed[0]["value"] is None
 
 
 def test_disability_combined_from_raw_includes_excluded_codebook_kpis():

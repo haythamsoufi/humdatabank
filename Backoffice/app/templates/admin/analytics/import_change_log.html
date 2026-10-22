@@ -68,6 +68,7 @@
       <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
         <div><dt class="text-gray-500">{{ _('Inserted') }}</dt><dd class="text-gray-900">{{ stats.documents_inserted or 0 }}</dd></div>
         <div><dt class="text-gray-500">{{ _('Updated') }}</dt><dd class="text-gray-900">{{ stats.documents_updated or 0 }}</dd></div>
+        <div><dt class="text-gray-500">{{ _('Removed') }}</dt><dd class="text-gray-900">{{ stats.documents_removed or 0 }}</dd></div>
         <div><dt class="text-gray-500">{{ _('Errors') }}</dt><dd class="text-gray-900">{{ stats.documents_errors or 0 }}</dd></div>
         <div><dt class="text-gray-500">{{ _('status changes') }}</dt><dd class="text-gray-900">{{ stats.documents_status_changed or 0 }}</dd></div>
         <div><dt class="text-gray-500">{{ _('approved') }}</dt><dd class="text-gray-900">{{ stats.documents_status_approved or 0 }}</dd></div>

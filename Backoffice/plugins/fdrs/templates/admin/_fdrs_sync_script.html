@@ -1436,6 +1436,7 @@ function formatDocumentSyncStats(doc) {
     return {{ _("Documents:")|tojson|safe }}
         + ' ' + formatCount(doc.inserted || 0) + ' ' + {{ _("inserted")|tojson|safe }}
         + ', ' + formatCount(doc.updated || 0) + ' ' + {{ _("updated")|tojson|safe }}
+        + ', ' + formatCount(doc.removed || 0) + ' ' + {{ _("Removed")|tojson|safe }}
         + ', ' + formatCount(doc.errors || 0) + ' ' + {{ _("errors")|tojson|safe }}
         + ' — '
         + formatCount(doc.status_approved || 0) + ' ' + {{ _("approved")|tojson|safe }}
@@ -1449,6 +1450,7 @@ function documentStatsFromJob(stats) {
     return {
         inserted: stats.documents_inserted || 0,
         updated: stats.documents_updated || 0,
+        removed: stats.documents_removed || 0,
         errors: stats.documents_errors || 0,
         status_approved: stats.documents_status_approved || 0,
         status_pending: stats.documents_status_pending || 0,

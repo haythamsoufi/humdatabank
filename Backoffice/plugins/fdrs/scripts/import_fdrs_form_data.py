@@ -2227,6 +2227,7 @@ def run_import(
     stats = {"loaded": 0, "skipped": 0, "inserted": 0, "updated": 0, "errors": 0}
     stats.setdefault("documents_inserted", 0)
     stats.setdefault("documents_updated", 0)
+    stats.setdefault("documents_removed", 0)
     stats.setdefault("documents_errors", 0)
     stats.setdefault("assignment_status_updated", 0)
     stats.setdefault("assignment_status_skipped", 0)
@@ -2561,6 +2562,7 @@ def run_import(
                 stats["documents_ran"] = True
                 stats["documents_inserted"] = ds.get("inserted", 0)
                 stats["documents_updated"] = ds.get("updated", 0)
+                stats["documents_removed"] = ds.get("removed", 0)
                 stats["documents_errors"] = ds.get("errors", 0)
                 stats["documents_downloaded"] = ds.get("downloaded", 0)
                 stats["documents_pending"] = ds.get("pending", 0)
@@ -2572,11 +2574,12 @@ def run_import(
                 stats["documents_status_changed"] = ds.get("status_changed", 0)
                 stats["documents_summary"] = doc_result.get("documents_summary")
                 logger.info(
-                    "FDRS documents complete: inserted=%s updated=%s files_saved=%s "
+                    "FDRS documents complete: inserted=%s updated=%s removed=%s files_saved=%s "
                     "awaiting_file_download=%s download_errors=%s row_errors=%s planned=%s "
                     "status_approved=%s status_pending=%s status_rejected=%s status_changed=%s",
                     stats["documents_inserted"],
                     stats["documents_updated"],
+                    stats["documents_removed"],
                     stats["documents_downloaded"],
                     stats["documents_pending"],
                     stats["documents_download_errors"],

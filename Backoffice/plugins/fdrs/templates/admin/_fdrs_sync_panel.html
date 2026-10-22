@@ -41,6 +41,7 @@
               {% else %}
                 {{ _('Documents:') }} {{ (docs_banner.inserted or 0) | format_number }} {{ _('inserted') }},
                 {{ (docs_banner.updated or 0) | format_number }} {{ _('updated') }},
+                {{ (docs_banner.removed or 0) | format_number }} {{ _('Removed') }},
                 {{ (docs_banner.errors or 0) | format_number }} {{ _('errors') }} —
                 {{ (docs_banner.status_approved or 0) | format_number }} {{ _('approved') }},
                 {{ (docs_banner.status_pending or 0) | format_number }} {{ _('pending') }},

@@ -24,10 +24,14 @@ from fdrs_documents_sync import (  # noqa: E402
     clean_fdrs_document_period,
     encode_fdrs_document_url,
     fetch_fdrs_document_bytes,
+    fdrs_document_removal_allowed,
     fdrs_pending_slot_siblings,
     fdrs_url_without_duplicate_suffix,
     public_document_sync_summary,
+    scoped_fdrs_assignment_ids,
     select_fdrs_document_for_upsert,
+    select_stale_fdrs_documents,
+    _fdrs_document_import_key,
     _resolve_download_outcome,
     _should_attempt_download,
 )
@@ -258,9 +262,101 @@ def test_public_document_sync_summary_reads_job_stats():
         }
     )
     assert summary["inserted"] == 2
+    assert summary["removed"] == 0
     assert summary["status_approved"] == 4
     assert summary["status_changed"] == 3
     assert summary["sync_error"] is None
+
+
+def test_public_document_sync_summary_includes_removed():
+    summary = public_document_sync_summary({"documents_removed": 7, "documents_inserted": 1})
+    assert summary["removed"] == 7
+    assert summary["inserted"] == 1
+
+
+def test_catalog_keeps_every_importable_key_including_deduped_files():
+    documents = [
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "old-report.pdf",
+            "url": "https://example.org/old.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ModifiedAt": "2024-01-01T00:00:00",
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "new-report.pdf",
+            "url": "https://example.org/new.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ModifiedAt": "2025-06-01T00:00:00",
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2023,
+            "YearText": "2023",
+            "name": "report-2023.pdf",
+            "url": "https://example.org/2023.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ModifiedAt": "2023-06-01T00:00:00",
+        },
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
+        {"period_name": "2023", "iso3": "USA", "assignment_entity_status_id": 98},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows, sync_years=[2024])
+    present = summary["present_import_keys"]
+    assert summary["planned"] == 1
+    assert plan[0]["filename"] == "new-report.pdf"
+    assert plan[0]["fdrs_import_key"] in present
+    older = [doc for doc in documents if doc["name"] == "old-report.pdf"][0]
+    assert _fdrs_document_import_key(older) in present
+    assert len(present) == 2
+    assert summary["skipped_sync_year"] == 1
+
+
+def test_removal_requires_a_mapped_catalog():
+    assert fdrs_document_removal_allowed({"total_api_docs": 0, "planned": 0}) is False
+    assert fdrs_document_removal_allowed(
+        {"total_api_docs": 4, "planned": 0, "skipped_no_iso3": 4}
+    ) is False
+    assert fdrs_document_removal_allowed(
+        {"total_api_docs": 4, "planned": 0, "skipped_no_assignment": 4, "skipped_sync_year": 0}
+    ) is False
+    assert fdrs_document_removal_allowed({"total_api_docs": 4, "planned": 2}) is True
+    assert fdrs_document_removal_allowed(
+        {"total_api_docs": 4, "planned": 0, "skipped_sync_year": 4, "skipped_no_iso3": 0}
+    ) is True
+
+
+def test_removal_scope_follows_synced_years_and_spares_user_uploads():
+    rows = [
+        {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
+        {"period_name": "2023", "iso3": "USA", "assignment_entity_status_id": 98},
+    ]
+    assert scoped_fdrs_assignment_ids(rows, [2024]) == {99}
+    assert scoped_fdrs_assignment_ids(rows, None) == {99, 98}
+    kept = _Doc(key="keep", filename="current.pdf")
+    gone = _Doc(key="gone", filename="retired.pdf")
+    upload = _Doc(key=None, filename="manual.pdf")
+    stale = select_stale_fdrs_documents([kept, gone, upload], {"keep"})
+    assert stale == [gone]
 
 
 def test_build_document_import_plan_maps_under_validation_to_pending():

@@ -455,6 +455,7 @@ def run_data_sync(template_id: int):
                     (
                         f"; Documents: +{stats.get('documents_inserted', 0)} "
                         f"~{stats.get('documents_updated', 0)} "
+                        f"-{stats.get('documents_removed', 0)} "
                         f"approved={stats.get('documents_status_approved', 0)} "
                         f"pending={stats.get('documents_status_pending', 0)} "
                         f"rejected={stats.get('documents_status_rejected', 0)} "

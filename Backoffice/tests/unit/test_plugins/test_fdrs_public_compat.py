@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models import FormData, IndicatorBank, NationalSociety
+from app.models import FormData, FormItem, IndicatorBank, NationalSociety
 from app.models.organization import NS_STATUS_INACTIVE
 from app.models.assignments import AssignmentEntityStatus
 from app.services.security.api_key_permissions import CONTENT_READ, build_permissions_document
@@ -137,6 +137,17 @@ class TestValueExtraction:
     def test_json_number_drops_trailing_zero(self):
         assert adapter.json_number(1500.0) == 1500
         assert adapter.json_number(1.5) == 1.5
+
+    def test_rolling_mean_carries_forward_the_last_reported_value(self):
+        # 2023 is missing, so it reuses 900. 2025 reuses 1500.
+        assert adapter.three_year_rolling_mean({2022: 900, 2024: 1500}, 2024) == (900 + 900 + 1500) / 3
+        assert adapter.three_year_rolling_mean({2022: 900, 2023: 1000, 2024: 1500}, 2025) == (1000 + 1500 + 1500) / 3
+
+    def test_rolling_mean_needs_a_value_at_or_before_the_first_year(self):
+        assert adapter.three_year_rolling_mean({2023: 1000, 2024: 1500}, 2024) is None
+
+    def test_rolling_mean_ignores_zero(self):
+        assert adapter.three_year_rolling_mean({2022: 0, 2023: 100, 2024: 200}, 2024) is None
 
     def test_constants_match_the_sync_scripts(self):
         from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
@@ -437,13 +448,26 @@ class TestMapAndSummaries:
         rows = _get(client, key, "/api/KpiImputedValue", kpicode="KPI_PeopleVol_Tot_IP").get_json()
         assert {r["doncode"] for r in rows} == {"DCAA001", "DCBB001"}
 
-    def test_global_validation_sums_volunteers_by_zone(self, client, scenario, key):
+    def test_global_validation_is_the_three_year_rolling_mean(self, client, db_session, scenario, key):
+        item = (
+            db_session.query(FormItem)
+            .join(IndicatorBank, FormItem.indicator_bank_id == IndicatorBank.id)
+            .filter(IndicatorBank.fdrs_kpi_code == "KPI_PeopleVol")
+            .one()
+        )
+        aes_2022 = create_test_assignment_entity_status(
+            db_session, country=scenario.country_a, template=scenario.template, period_name="2022",
+        )
+        _publish(db_session, aes_2022, item, value=900)
+        db_session.commit()
+
         rows = _get(client, key, "/api/globalvalidationdata", year=2024).get_json()
         by_zone = {r["ZoneCode"]: r["IntValue"] for r in rows}
-        assert by_zone["S1"] == 1500
-        assert by_zone["S2"] == 700
+        # Society A reported 900, 1000, 1500. Society B's 700 is imputed and stays out.
+        assert by_zone["S1"] == 1133
+        assert by_zone["S2"] == 0
         assert by_zone["S3"] == 0
-        assert by_zone[""] == 2200
+        assert by_zone[""] == 1133
 
     def test_kpivalue_without_kpicode_is_empty(self, client, scenario, key):
         assert _get(client, key, "/api/kpivalue", year=2024, showunpublished="true").get_json() == []
@@ -576,9 +600,52 @@ class TestDocuments:
         assert documents[0]["document_type"] == "EveryoneCounts"
         assert documents[0]["year"] == 2024
         assert documents[0]["LangCode"] == "en"
+        assert documents[0]["language"] == "English"
+        assert documents[0]["Description"] == "The report"
         assert documents[0]["url"].endswith("/resources/download/%s/en" % report.id)
         assert "Toolkit" not in {row["name"] for row in documents}
         assert _get(client, key, "/api/documents", type="Analysis").get_json()[0]["documents"][0]["title"] == "Finance analysis"
+
+    def test_a_missing_publication_date_uses_the_year_in_the_file_name(self, client, db_session, scenario, key):
+        from app.models.documents import Resource, ResourceSubcategory, ResourceTranslation
+
+        counts = ResourceSubcategory(name="Everyone Counts", display_order=1)
+        dated = Resource(
+            resource_type="publication",
+            default_title="Everyone Counts covid",
+            resource_subcategory=counts,
+        )
+        undated = Resource(
+            resource_type="publication",
+            default_title="Overview",
+            resource_subcategory=counts,
+        )
+        db_session.add_all([counts, dated, undated])
+        db_session.flush()
+        db_session.add_all([
+            ResourceTranslation(
+                resource_id=dated.id,
+                language_code="ar",
+                title="تقرير",
+                filename="EVERYONE COUNTS REPORT (COVID-19) 2023 AR.pdf",
+                file_relative_path="resources/ec2023-ar.pdf",
+            ),
+            ResourceTranslation(
+                resource_id=undated.id,
+                language_code="en",
+                title="Overview",
+                filename="overview.pdf",
+                file_relative_path="resources/overview.pdf",
+            ),
+        ])
+        db_session.commit()
+
+        documents = _get(client, key, "/api/documents", type="EveryoneCounts").get_json()[0]["documents"]
+        assert len(documents) == 1
+        assert documents[0]["year"] == 2023
+        assert documents[0]["YearText"] == "2023"
+        assert documents[0]["language"] == "Arabic"
+        assert documents[0]["LangCode"] == "ar"
 
     def test_videos_and_document_guides_keep_their_urls(self, client, db_session, scenario, key):
         from datetime import date
@@ -730,6 +797,12 @@ class TestExport:
         assert {row["KPI_DON_code"] for row in rows} == {"DCAA001"}
         assert _get(client, key, "/csv/exportns").status_code == 400
         assert _get(client, key, "/csv/exportns", doncode="NOPE").status_code == 404
+
+    def test_csv_download_does_not_need_a_key(self, client, scenario):
+        assert client.get("/csv/export").status_code == 200
+        response = client.get("/csv/exportns", query_string={"doncode": "DCAA001"})
+        assert response.status_code == 200
+        assert "DCAA001" in response.get_data(as_text=True)
 
     def test_excel_is_a_workbook(self, client, scenario, key):
         response = _get(client, key, "/csv/export", excel="1")

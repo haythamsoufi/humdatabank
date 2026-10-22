@@ -42,9 +42,38 @@ _TYPE_BY_SUBCATEGORY = {
     "documentguide": "DocumentGuide",
 }
 
+# The Everyone Counts page labels its language dropdown with ``language``
+# (English, French, …) and builds the year dropdown with ``year.toString()``.
+# A missing year throws in the browser and the dropdown stays empty.
+_LANGUAGE_NAMES = {
+    "en": "English",
+    "fr": "French",
+    "es": "Spanish",
+    "ar": "Arabic",
+    "ru": "Russian",
+    "zh": "Chinese",
+    "hi": "Hindi",
+}
+_YEAR_IN_LABEL = re.compile(r"(?:19|20)\d{2}")
+
 
 def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").casefold())
+
+
+def _language_name(code: str) -> str:
+    key = (code or "").strip().lower()
+    return _LANGUAGE_NAMES.get(key, key)
+
+
+def _year_from_labels(*values: Optional[str]) -> Optional[int]:
+    for value in values:
+        if not value:
+            continue
+        match = _YEAR_IN_LABEL.search(value)
+        if match:
+            return int(match.group(0))
+    return None
 
 
 def publication_type_code(resource: Resource) -> Optional[str]:
@@ -91,7 +120,7 @@ def _translation_public_url(translation) -> str | None:
 
 
 def _publication_entries(resource: Resource) -> list[dict[str, Any]]:
-    year = resource.publication_date.year if resource.publication_date else None
+    dated_year = resource.publication_date.year if resource.publication_date else None
     subcategory = resource.resource_subcategory.name if resource.resource_subcategory else "Publication"
     legacy_type = publication_type_code(resource) or subcategory
     translations = list(resource.translations)
@@ -113,8 +142,12 @@ def _publication_entries(resource: Resource) -> list[dict[str, Any]]:
         language = (translation.language_code if translation else "en") or "en"
         title = translation.title if translation else resource.default_title
         filename = translation.document_display_name if translation else None
+        year = dated_year or _year_from_labels(filename, title, resource.default_title)
+        if year is None:
+            continue
         has_file = bool(translation and translation.file_relative_path)
         external_url = _translation_public_url(translation) or ""
+        description = (translation.description if translation else None) or resource.default_description
         thumb = translation if translation and translation.thumbnail_relative_path else None
         if thumb is None:
             english = resource.get_translation("en")
@@ -125,7 +158,8 @@ def _publication_entries(resource: Resource) -> list[dict[str, Any]]:
             {
                 "name": filename or title,
                 "title": title,
-                "description": (translation.description if translation else None) or resource.default_description,
+                "description": description,
+                "Description": description,
                 "url": (
                     _resource_file_url(resource.id, language)
                     if has_file
@@ -133,8 +167,9 @@ def _publication_entries(resource: Resource) -> list[dict[str, Any]]:
                 ),
                 "thumbnail": _resource_thumb_url(resource.id, thumb_language) if thumb else None,
                 "year": year,
-                "YearText": str(year) if year else None,
+                "YearText": str(year),
                 "document_type": legacy_type,
+                "language": _language_name(language),
                 "LangCode": language,
                 "ApprovalStatus": "Validated (Public)",
                 "Public": 1,
@@ -208,6 +243,7 @@ def _submitted_entry(document: SubmittedDocument) -> Optional[dict[str, Any]]:
         document.uploaded_at.year if document.uploaded_at else None
     )
     label = document.document_type or (document.form_item.label if document.form_item else None) or "Document"
+    language = (document.language or "en").strip().lower() or "en"
     return {
         "name": document.filename,
         "title": document.document_label,
@@ -216,7 +252,8 @@ def _submitted_entry(document: SubmittedDocument) -> Optional[dict[str, Any]]:
         "year": year,
         "YearText": document.period or (str(year) if year else None),
         "document_type": label,
-        "LangCode": (document.language or "en").strip().lower() or "en",
+        "language": _language_name(language),
+        "LangCode": language,
         "ApprovalStatus": "Validated (Public)",
         "Public": 1,
         "ModifiedAt": _iso(document.uploaded_at),

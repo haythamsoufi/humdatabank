@@ -8,7 +8,7 @@ Legal pairs follow ``UPR_TEMPLATE_PROFILES``::
 
     P*   -> 24 (Unified Country Plan), 22 (PNS planning)
     AR*  -> 33 (Country reporting),    23 (PNS reporting)
-    MYR* -> 33 (Country reporting)
+    MYR* -> 33 (Country reporting),    23 (PNS reporting)
 
 ``build_import_plan`` verifies every legal target against the live database and the
 uploaded workbook and flags anything that is unmapped or ambiguous; the wizard and

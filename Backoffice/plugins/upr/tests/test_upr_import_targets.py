@@ -62,11 +62,11 @@ class TestLegality:
     def test_legal_template_ids_follow_profiles(self):
         assert tg.legal_template_ids_for_round("P26") == (22, 24)
         assert tg.legal_template_ids_for_round("AR25") == (23, 33)
-        assert tg.legal_template_ids_for_round("MYR25") == (33,)
+        assert tg.legal_template_ids_for_round("MYR25") == (23, 33)
 
     @pytest.mark.parametrize(
         "template_id,round_code",
-        [(23, "MYR25"), (24, "AR25"), (33, "P26"), (24, "P27"), (33, "MYR26"), (99, "P26"), (24, "")],
+        [(23, "P26"), (24, "AR25"), (33, "P26"), (24, "P27"), (33, "MYR26"), (99, "P26"), (24, "")],
     )
     def test_illegal_pairs_rejected(self, template_id, round_code):
         assert tg.validate_target(template_id, round_code)
@@ -84,7 +84,7 @@ class TestLegality:
 
     def test_all_errors_reported_together(self):
         with pytest.raises(ImportTargetError) as exc:
-            normalize_targets(["23:MYR25", "24:P27"])
+            normalize_targets(["23:MYR26", "24:P27"])
         assert len(exc.value.errors) == 2
 
     def test_legacy_payload_requires_explicit_rounds(self):
@@ -126,9 +126,10 @@ class TestImportScope:
         with pytest.raises(ValueError, match="rounds are required"):
             imp.assert_import_scope([24], set())
 
-    def test_template_23_never_takes_midyear(self):
-        with pytest.raises(ValueError, match="Template 23 does not import round MYR25"):
-            imp.assert_import_scope([33, 23], {"MYR25"})
+    def test_template_23_takes_closed_midyear_not_live(self):
+        imp.assert_import_scope([33, 23], {"MYR25"})
+        with pytest.raises(ValueError, match="closed UPR Master set"):
+            imp.assert_import_scope([23], {"MYR26"})
 
     def test_live_round_rejected(self):
         with pytest.raises(ValueError, match="closed UPR Master set"):
@@ -161,15 +162,18 @@ class TestRowFiltering:
         out = imp._filter_rows(self._rows(), template_ids=[22])
         assert {(r["Round"], r["Section"]) for r in out} == {("P26", "Funding"), ("P26", "Staff")}
 
-    def test_template_23_alone_drops_midyear(self):
+    def test_template_23_alone_keeps_closed_midyear_funding(self):
         out = imp._filter_rows(self._rows(), template_ids=[23])
-        assert {(r["Round"], r["Section"]) for r in out} == {("AR25", "Funding")}
+        assert {(r["Round"], r["Section"]) for r in out} == {
+            ("AR25", "Funding"),
+            ("MYR25", "Funding"),
+        }
 
     def test_never_includes_live_rounds(self):
         out = imp._filter_rows(self._rows(), template_ids=[24, 22, 33, 23])
         assert "P27" not in {r["Round"] for r in out}
 
-    def test_t23_reported_set_ignores_midyear_rows(self):
+    def test_t23_reported_set_includes_closed_midyear_rows(self):
         ctx = imp.UprImportContext(template_ids=[23])
         ctx.ns_home_country_iso3 = {"austrian red cross": "AUT"}
         ctx.assignment_by_template = {23: {("2025", "AUT"): 1, ("Jan-Jun 2025", "AUT"): 2}}
@@ -177,9 +181,9 @@ class TestRowFiltering:
             "ISO3": "SYR", "Section": "Funding", "Entity": "PNS", "NS": "Austrian Red Cross",
             "Source": "PNS Data",
         }
-        rows = [{**base, "Round": "AR25"}, {**base, "Round": "MYR25"}]
+        rows = [{**base, "Round": "AR25"}, {**base, "Round": "MYR25"}, {**base, "Round": "MYR26"}]
         _t22, t23 = imp._build_pns_reported_yes_sets(rows, ctx, [23])
-        assert t23 == {(1, "SYR")}
+        assert t23 == {(1, "SYR"), (2, "SYR")}
 
 
 class TestWorkbookRoundStats:
@@ -350,15 +354,24 @@ class TestBuildImportPlan:
         assert {r["round"] for r in plan["not_importable_rounds"]} == {"P27", "MYR26", "AR26"}
         assert plan["unrecognised_rounds"] == ["XYZ1"]
 
-    def test_midyear_is_only_offered_for_template_33(self):
+    def test_midyear_is_offered_for_country_and_pns(self):
+        stats = _stats("MYR25", 33, rows=4, iso3={"JOR"})
+        stats["MYR25"][23] = {"rows": 2, "iso3": set(), "ns_names": {"french red cross"}}
         plan = self._plan(
-            round_stats=_stats("MYR25", 33, rows=4, iso3={"JOR"}),
-            af_index=[_af(5, 33, "Jan-Jun 2025", iso3s={"JOR"})],
+            round_stats=stats,
+            af_index=[
+                _af(5, 33, "Jan-Jun 2025", iso3s={"JOR"}),
+                _af(6, 23, "Jan-Jun 2025", iso3s={"FRA"}),
+            ],
+            ns_home_iso3={"french red cross": "FRA"},
             workbook_rounds=["MYR25"],
         )
-        assert [i["key"] for i in plan["targets"]] == ["33:MYR25"]
-        assert plan["targets"][0]["assigned_form_id"] == 5
-        assert plan["targets"][0]["period"] == "Jan-Jun 2025"
+        assert [i["key"] for i in plan["targets"]] == ["23:MYR25", "33:MYR25"]
+        assert _item(plan, "33:MYR25")["assigned_form_id"] == 5
+        pns = _item(plan, "23:MYR25")
+        assert pns["assigned_form_id"] == 6
+        assert pns["period"] == "Jan-Jun 2025"
+        assert pns["selectable"] is True
 
     def test_pns_target_matches_by_reporting_ns_home_country(self):
         plan = self._plan(

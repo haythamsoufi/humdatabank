@@ -94,6 +94,45 @@ class TestOrganizationIndex:
         assert resp.status_code == 200
         mock_rt.assert_called_once()
 
+    def test_index_passes_fdrs_ns_columns(self, logged_in_client, db_session):
+        from datetime import date
+
+        from app.models.organization import NationalSociety
+
+        country = create_test_country(db_session, name="Kenya NS Col", iso3="KNX", iso2="KX")
+        ns = NationalSociety(
+            name="Kenya Red Cross",
+            country_id=country.id,
+            fdrs_don_code="DKEN001",
+            fdrs_zone_code="S1",
+            fdrs_zone_name="Africa",
+            currency_code="KES",
+            admission_date=date(1965, 8, 26),
+            website="https://www.redcross.or.ke",
+            latitude=-1.29,
+            longitude=36.82,
+        )
+        db_session.add(ns)
+        db_session.commit()
+
+        with _mock_render() as mock_rt:
+            resp = logged_in_client.get("/admin/organization/?tab=nss")
+        assert resp.status_code == 200
+        columns = mock_rt.call_args.kwargs["ns_plugin_columns"]
+        fields = [column["field"] for column in columns]
+        assert fields[:3] == ["fdrs_don_code", "fdrs_zone_code", "fdrs_zone_name"]
+        assert "website" in fields
+        assert "latitude" in fields
+        don = next(column for column in columns if column["field"] == "fdrs_don_code")
+        assert don["hide"] is False
+        assert don["header"]
+        values = mock_rt.call_args.kwargs["ns_plugin_values"][ns.id]
+        assert values["fdrs_don_code"] == "DKEN001"
+        assert values["fdrs_zone_name"] == "Africa"
+        assert values["admission_date"] == "1965-08-26"
+        assert values["latitude"] == -1.29
+        assert values["website"] == "https://www.redcross.or.ke"
+
     def test_index_with_tab_param(self, logged_in_client, db_session):
         with _mock_render():
             resp = logged_in_client.get("/admin/organization/?tab=countries")

@@ -53,6 +53,25 @@ class AssignmentBadge:
 
 
 @dataclass(frozen=True)
+class NationalSocietyGridColumn:
+    """A column a plugin adds to the National Societies table.
+
+    ``field`` is an attribute of ``NationalSociety``. ``header`` is the label
+    shown on the grid (translate it with gettext when building the column).
+    ``kind`` is ``text``, ``number``, ``date``, ``url``, or ``set`` (a
+    distinct-value filter).
+    """
+
+    field: str
+    header: str
+    hide: bool = False
+    width: int = 160
+    min_width: int = 110
+    max_width: int = 320
+    kind: str = "text"
+
+
+@dataclass(frozen=True)
 class CspOverride:
     """Content-Security-Policy override for plugin-served HTML assets.
 
@@ -357,6 +376,10 @@ class BasePlugin(ABC):
         Called once per dashboard load with every assignment shown, so implementations should query in batches.
         """
         return {}
+
+    def get_national_society_columns(self) -> List[NationalSocietyGridColumn]:
+        """Columns this plugin adds to Admin → Organization → National Societies."""
+        return []
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
         """Extra template context when rendering a Data Explorer panel."""

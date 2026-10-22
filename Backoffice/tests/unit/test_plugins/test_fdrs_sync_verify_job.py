@@ -122,7 +122,12 @@ def test_execute_verification_reuses_app_context(app, tmp_path):
                  verify_mod,
                  "_load_databank_lookups",
                  return_value=({}, {}, set(), {}, {}, {}),
+             ), \
+             patch(
+                 "import_fdrs_form_data._load_don_code_to_matrix_row_label",
+                 return_value={},
              ):
+            # Label lookup calls entities/ns after the mocked table build.
             result = verify_mod.execute_verification(
                 years=[2024],
                 output_path=str(out),
@@ -156,7 +161,12 @@ def test_execute_verification_stretches_fetch_progress(app, tmp_path):
                  verify_mod,
                  "_load_databank_lookups",
                  return_value=({}, {}, set(), {}, {}, {}),
+             ), \
+             patch(
+                 "import_fdrs_form_data._load_don_code_to_matrix_row_label",
+                 return_value={},
              ):
+            # Label lookup calls entities/ns after the mocked table build.
             verify_mod.execute_verification(
                 years=[2024],
                 output_path=str(out),

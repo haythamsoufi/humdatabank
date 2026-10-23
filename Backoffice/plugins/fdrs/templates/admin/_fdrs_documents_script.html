@@ -100,6 +100,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const ok = stats.downloadable_count || 0;
         let msg = String(total) + ' ' + {{ _("documents")|tojson|safe }}
             + ' — ' + String(ok) + ' ' + {{ _("downloadable")|tojson|safe }};
+        if (stats.migration_lookup_available) {
+            msg += ' · ' + String(stats.file_migrated_count || 0) + ' '
+                + {{ _("migrated")|tojson|safe }}
+                + ' · ' + String(stats.not_migrated_count || 0) + ' '
+                + {{ _("not migrated")|tojson|safe }};
+        }
         if (stats.http_403_public_unexpected) {
             msg += ' · ' + String(stats.http_403_public_unexpected) + ' '
                 + {{ _("public 403s unexpected")|tojson|safe }};
@@ -228,6 +234,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const items = [
             { label: {{ _("Documents")|tojson|safe }}, value: stats.total_documents || 0, cls: 'border-gray-200 bg-gray-50 text-gray-800' },
             { label: {{ _("Downloadable")|tojson|safe }}, value: stats.downloadable_count || 0, cls: 'border-green-200 bg-green-50 text-green-800' },
+            { label: {{ _("Migrated")|tojson|safe }}, value: stats.file_migrated_count || 0, cls: 'border-green-200 bg-green-50 text-green-900' },
+            { label: {{ _("Not migrated")|tojson|safe }}, value: stats.not_migrated_count || 0, cls: 'border-red-200 bg-red-50 text-red-800' },
             { label: {{ _("Public 403s")|tojson|safe }}, value: stats.http_403_public_unexpected || 0, cls: 'border-amber-200 bg-amber-50 text-amber-800' },
             { label: {{ _("Private 403s")|tojson|safe }}, value: stats.http_403_private_expected || 0, cls: 'border-gray-200 bg-gray-50 text-gray-700' }
         ];
@@ -262,13 +270,29 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
                 def.filter = 'customSetFilter';
                 def.minWidth = 130;
-            } else if (key === 'downloadable') {
+            } else if (key === 'downloadable' || key === 'file_migrated' || key === 'in_backoffice' || key === 'file_pending') {
                 def.cellRenderer = function (params) {
+                    if (params.value === '' || params.value == null) {
+                        return '<span class="text-gray-400">—</span>';
+                    }
                     return isTruthyFlag(params.value)
                         ? '<span class="text-green-700">' + escapeHtmlAttr({{ _("Yes")|tojson|safe }}) + '</span>'
                         : '<span class="text-gray-500">' + escapeHtmlAttr({{ _("No")|tojson|safe }}) + '</span>';
                 };
                 def.filter = 'customSetFilter';
+            } else if (key === 'migration_status') {
+                def.cellRenderer = function (params) {
+                    const text = params.value == null ? '' : String(params.value);
+                    if (!text) return '<span class="text-gray-400">—</span>';
+                    let cls = 'bg-gray-100 text-gray-700';
+                    if (text === 'migrated') cls = 'bg-green-100 text-green-800';
+                    else if (text === 'pending_download') cls = 'bg-amber-100 text-amber-800';
+                    else if (text === 'not_in_backoffice') cls = 'bg-red-100 text-red-800';
+                    return '<span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium '
+                        + cls + '">' + escapeHtmlAttr(text) + '</span>';
+                };
+                def.filter = 'customSetFilter';
+                def.minWidth = 150;
             } else if (key === 'is_public') {
                 def.cellRenderer = function (params) {
                     return isTruthyFlag(params.value)
@@ -309,6 +333,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 options: {
                     getRowStyle: function (params) {
                         if (!params.data) return null;
+                        const mig = String(params.data.migration_status || '');
+                        if (mig === 'not_in_backoffice') return { backgroundColor: '#fff1f2' };
+                        if (mig === 'pending_download') return { backgroundColor: '#fffbeb' };
                         const n = Number(params.data.http_status);
                         if (n === 404) return { backgroundColor: '#fef2f2' };
                         if (n === 403) return { backgroundColor: '#fffbeb' };

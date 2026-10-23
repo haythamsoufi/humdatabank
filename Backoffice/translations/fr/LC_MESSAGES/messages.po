@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 16:55+0000\n"
+"POT-Creation-Date: 2026-10-23 21:18+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: fr <LL@li.org>\n"
@@ -9730,16 +9730,16 @@ msgstr "Document en attente d’examen"
 msgid "Document repository"
 msgstr "Dépôt de documents"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:420
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:447
 msgid "Document scan cancelled."
 msgstr "Analyse de documents annulée."
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:421
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:505
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:448
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:532
 msgid "Document scan failed"
 msgstr "Échec du scan du document"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:123
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:131
 msgid "Document sheets"
 msgstr "Feuilles de documents"
 
@@ -9795,8 +9795,8 @@ msgstr "Statut du document"
 #: app/templates/core/dashboard.html:1254
 #: app/templates/public_submission_export_pdf.html:61
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:101
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:124
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:229
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:132
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:235
 msgid "Documents"
 msgstr "Types de documents"
 
@@ -9996,7 +9996,7 @@ msgid "Download {dashboard}"
 msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:105
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:230
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:236
 msgid "Downloadable"
 msgstr "Téléchargeable"
 
@@ -12467,8 +12467,8 @@ msgstr "Échec de charger les données du tableau de bord"
 msgid "Failed to load data"
 msgstr "Échec du chargement des données"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:352
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:360
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:379
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:387
 msgid "Failed to load document table"
 msgstr "Échec du chargement de la table des documents"
 
@@ -12540,7 +12540,7 @@ msgstr "Échec du chargement de la table de vérification"
 msgid "Failed to process request."
 msgstr "Échec de traitement de la demande."
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:400
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:427
 msgid "Failed to read scan status"
 msgstr "Échec de lecture du statut de la balayage"
 
@@ -16689,7 +16689,7 @@ msgstr "Départements de chargement..."
 msgid "Loading divisions..."
 msgstr "Chargement des divisions..."
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:135
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:143
 msgid "Loading document status…"
 msgstr "Chargement du statut du document..."
 
@@ -17817,7 +17817,7 @@ msgstr "Message à montrer en cas d’échec de validation"
 msgid "Messages"
 msgstr "Messages"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:126
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:134
 msgid "Meta"
 msgstr "Meta"
 
@@ -17873,6 +17873,11 @@ msgstr "Rapports de mi-année : participation"
 #: app/utils/form_localization.py:152
 msgid "Migrants"
 msgstr "Migrants"
+
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:109
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:237
+msgid "Migrated"
+msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:245
 msgid "Min Score"
@@ -18754,7 +18759,7 @@ msgstr "L’année suivante"
 #: app/templates/forms/form_builder/partials/_template_details.html:56
 #: app/templates/forms/form_builder/partials/_template_details.html:70
 #: app/templates/forms/form_builder/partials/_template_details.html:88
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:269
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:280
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:745
 msgid "No"
 msgstr "Non"
@@ -19713,7 +19718,7 @@ msgstr ""
 msgid "No rows added"
 msgstr "Aucune ligne ajoutée"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:135
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:143
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:119
 msgid "No rows in this sheet."
 msgstr "Pas de rangées dans cette feuille."
@@ -20178,6 +20183,11 @@ msgstr "Pas dans le répertoire (depuis URL)"
 #: plugins/upr/analysis_labels.py:191
 msgid "Not loaded"
 msgstr "Non chargé"
+
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:113
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:238
+msgid "Not migrated"
+msgstr ""
 
 #: app/templates/admin/analytics/user_detail.html:41
 #: app/templates/core/layout.html:366
@@ -22825,12 +22835,12 @@ msgid "Privacy"
 msgstr "Privé"
 
 #: app/templates/components/ag_grid_i18n_js.html:40
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:276
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:300
 msgid "Private"
 msgstr "Privé"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:113
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:232
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:121
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:240
 msgid "Private 403s"
 msgstr "403 soldats"
 
@@ -22841,14 +22851,11 @@ msgstr "Sonde"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:41
 msgid ""
-"Probe every FDRS catalog document URL (the same scan as the Excel export) "
-"and keep a filterable log here. Results are stored in blob storage so they "
-"survive deploys and page reloads."
+"Probe every FDRS catalog document URL (the same scan as the Excel export), "
+"compare each against Backoffice submitted documents (migrated vs still "
+"pending / missing), and keep a filterable log here. Results are stored in "
+"blob storage so they survive deploys and page reloads."
 msgstr ""
-"Sondez chaque URL de document de catalogue FDRS (le même scan que l’export "
-"Excel) et gardez un journal filtrable ici. Les résultats sont stockés dans "
-"un stockage blob afin qu’ils survivent aux déploiements et aux rechargements"
-" de pages."
 
 #: app/templates/admin/ai/knowledge_base.html:762
 msgid "Process"
@@ -23010,7 +23017,7 @@ msgstr "Priorité des fournisseurs"
 #: app/templates/admin/ai/knowledge_base.html:774
 #: app/templates/admin/api_management.html:1861
 #: app/templates/components/ag_grid_i18n_js.html:39
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:275
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:299
 msgid "Public"
 msgstr "Public"
 
@@ -23019,8 +23026,8 @@ msgstr "Public"
 msgid "Public (external facing)"
 msgstr "Public (orienté vers l’extérieur)"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:109
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:231
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:117
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:239
 msgid "Public 403s"
 msgstr "403 publics"
 
@@ -24559,8 +24566,8 @@ msgstr "Modifications des demandes"
 msgid "Request changes?"
 msgstr "Demander des modifications ?"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:437
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:514
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:464
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:541
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:889
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1009
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1118
@@ -24829,7 +24836,7 @@ msgstr "Lignes de cache de résultats"
 msgid "Resume"
 msgstr "Reprendre"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:547
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:574
 msgid "Resuming scan..."
 msgstr "Reprise du scan..."
 
@@ -25623,7 +25630,7 @@ msgstr "Scanne à nouveau"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:19
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:73
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:144
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:150
 msgid "Scan document URLs"
 msgstr "Numériser les URL des documents"
 
@@ -25635,7 +25642,7 @@ msgstr "Scan for New Plugins"
 msgid "Scan plugin directories for new plugins"
 msgstr "Scan for New Plugins"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:491
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:518
 msgid "Scanning..."
 msgstr "En train de scanner..."
 
@@ -25728,7 +25735,7 @@ msgstr "Cherchez %(label)s..."
 msgid "Search Definition"
 msgstr "Définition de la recherche"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:129
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:137
 msgid "Search ISO3, name, type…"
 msgstr "Recherche ISO3, nom, type..."
 
@@ -25889,7 +25896,7 @@ msgstr "Divisions de recherche..."
 msgid "Search documentation..."
 msgstr "Recherchez la documentation..."
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:128
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:136
 msgid "Search documents"
 msgstr "Rechercher des documents"
 
@@ -28300,7 +28307,7 @@ msgid "Starting translation for"
 msgstr "Début de la traduction pour"
 
 #: app/templates/admin/ai/knowledge_base.html:810
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:489
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:516
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1081
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1632
 msgid "Starting..."
@@ -28475,7 +28482,7 @@ msgid "Stop Translation?"
 msgstr "Arrêter la traduction ?"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:80
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:151
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:157
 msgid "Stop scan"
 msgstr "Stop scan"
 
@@ -28502,8 +28509,8 @@ msgstr "Vérification d’arrêt"
 msgid "Stopped"
 msgstr "Arrêté"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:429
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:471
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:456
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:498
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:823
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1377
 msgid "Stopping..."
@@ -28868,7 +28875,7 @@ msgstr "Somme des valeurs"
 
 #: app/templates/forms/entry_form/entry_form.html:2782
 #: app/templates/forms/entry_form/validation_summary_pdf.html:175
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:125
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:133
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:105
 msgid "Summary"
 msgstr "Résumé"
@@ -34303,7 +34310,7 @@ msgstr "Jaune"
 #: app/templates/forms/form_builder/partials/_template_details.html:54
 #: app/templates/forms/form_builder/partials/_template_details.html:68
 #: app/templates/forms/form_builder/partials/_template_details.html:86
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:268
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:279
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:745
 msgid "Yes"
 msgstr "Oui"
@@ -35369,6 +35376,10 @@ msgstr "peuvent contenir des données associées."
 msgid "method, endpoint, description, activity type"
 msgstr "Méthode, point de terminaison, description, type d’activité"
 
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:105
+msgid "migrated"
+msgstr ""
+
 #: app/templates/admin/analytics/sessions.html:155
 #: app/templates/tours/tours.html:483
 msgid "min"
@@ -35454,6 +35465,10 @@ msgid "non-compliant countries have compliance documents pending validation."
 msgstr ""
 "Les pays non conformes disposent de documents de conformité en attente de "
 "validation."
+
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:107
+msgid "not migrated"
+msgstr ""
 
 #: app/templates/auth/login.html:767
 msgid "not registered"
@@ -35611,7 +35626,7 @@ msgstr "Nom propre ou terme technique, aucune traduction disponible"
 msgid "provisional"
 msgstr "provisoire"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:105
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:111
 msgid "public 403s unexpected"
 msgstr "403 publics inattendus"
 
@@ -36502,3 +36517,14 @@ msgstr "✓"
 #~ "Unified Planning sends this embed to the FDRS unified-planning page, in sort"
 #~ " order. The other slots mark a section on the Global Initiatives page."
 #~ msgstr ""
+
+# [Removed] was: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:41
+#~ msgid ""
+#~ "Probe every FDRS catalog document URL (the same scan as the Excel export) "
+#~ "and keep a filterable log here. Results are stored in blob storage so they "
+#~ "survive deploys and page reloads."
+#~ msgstr ""
+#~ "Sondez chaque URL de document de catalogue FDRS (le même scan que l’export "
+#~ "Excel) et gardez un journal filtrable ici. Les résultats sont stockés dans "
+#~ "un stockage blob afin qu’ils survivent aux déploiements et aux rechargements"
+#~ " de pages."

@@ -1233,12 +1233,6 @@ def handle_assignment_form(aes_id):
         assignment_data_history = get_assignment_data_change_history(
             assignment_entity_status.id
         )
-        current_app.logger.debug(
-            "Assignment %s change history: %s saves, %s fields",
-            assignment_entity_status.id,
-            assignment_data_history.get("total_count"),
-            len(assignment_data_history.get("by_field") or {}),
-        )
     except Exception as history_exc:
         current_app.logger.warning(
             "Could not load change history for assignment %s: %s",

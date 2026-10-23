@@ -18,6 +18,7 @@ const ENTRY_FORM_TOOLTIP_SELECTORS = [
   '.indicator-definition-tooltip',
   '.question-unit-tooltip',
   '.matrix-legend-tooltip',
+  '.entry-item-history',
 ];
 
 const MARGIN     = 8;  // px gap between trigger icon and tooltip box

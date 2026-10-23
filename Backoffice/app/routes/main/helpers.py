@@ -28,6 +28,12 @@ SELECTED_ENTITY_ID_SESSION_KEY = 'selected_entity_id'
 # contributor avatars and the recent-activity feed (not data-entry contributors).
 DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES = frozenset({'assignment_created'})
 
+# Field-level saves written by the entry form (and the older notifier name).
+ASSIGNMENT_DATA_CHANGE_ACTIVITY_TYPES = ('data_update', 'form_data_updated')
+# Enough recent saves to rebuild per-field history, not only the latest page of the feed.
+ASSIGNMENT_DATA_HISTORY_LIMIT = 200
+ASSIGNMENT_FIELD_HISTORY_LIMIT = 8
+
 
 def filter_dashboard_assignment_activities(activities):
     """Drop admin-only assignment lifecycle events from dashboard activity lists."""
@@ -144,6 +150,187 @@ def enrich_dashboard_recent_activities(activities):
                 e,
             )
     return activities
+
+
+def get_assignment_data_change_history(assignment_id, limit=ASSIGNMENT_DATA_HISTORY_LIMIT):
+    """Field-level save history for one assignment.
+
+    Returns who recorded the first save, who made the latest save, and the
+    most recent save events (newest first) with summary params safe to render.
+    Activity rows on the session are not mutated.
+    """
+    empty = {
+        'activities': [],
+        'entered_by': None,
+        'entered_at': None,
+        'last_changed_by': None,
+        'last_changed_at': None,
+        'total_count': 0,
+        'truncated': False,
+        'by_field': {},
+    }
+    if not assignment_id:
+        return empty
+
+    import copy
+    from types import SimpleNamespace
+
+    from sqlalchemy import asc, desc
+
+    from app.models import EntityActivityLog
+
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = ASSIGNMENT_DATA_HISTORY_LIMIT
+    if limit < 1:
+        limit = ASSIGNMENT_DATA_HISTORY_LIMIT
+
+    def _scoped():
+        # Fresh query each time so order_by on one statement cannot leak into another.
+        return (
+            EntityActivityLog.query.options(joinedload(EntityActivityLog.user))
+            .filter(
+                EntityActivityLog.assignment_id == assignment_id,
+                EntityActivityLog.activity_type.in_(ASSIGNMENT_DATA_CHANGE_ACTIVITY_TYPES),
+            )
+        )
+
+    total = _scoped().count()
+    if not total:
+        return empty
+
+    recent = (
+        _scoped()
+        .order_by(desc(EntityActivityLog.timestamp), desc(EntityActivityLog.id))
+        .limit(limit)
+        .all()
+    )
+    earliest = (
+        _scoped()
+        .order_by(asc(EntityActivityLog.timestamp), asc(EntityActivityLog.id))
+        .first()
+    )
+
+    display_rows = []
+    for activity in recent:
+        params = activity.summary_params if isinstance(activity.summary_params, dict) else {}
+        display_rows.append(SimpleNamespace(
+            id=activity.id,
+            user=activity.user,
+            timestamp=activity.timestamp,
+            summary_key=activity.summary_key,
+            summary_params=copy.deepcopy(params),
+            assignment_id=activity.assignment_id,
+            activity_type=activity.activity_type,
+            activity_description=activity.activity_description,
+        ))
+
+    try:
+        enrich_dashboard_recent_activities(display_rows)
+    except Exception as exc:
+        current_app.logger.debug(
+            "Could not enrich assignment %s change history: %s",
+            assignment_id,
+            exc,
+        )
+
+    latest = recent[0] if recent else earliest
+    show_last_changed = bool(
+        latest and earliest and getattr(latest, 'id', None) != getattr(earliest, 'id', None)
+    )
+    return {
+        'activities': display_rows,
+        'entered_by': getattr(earliest, 'user', None) if earliest else None,
+        'entered_at': getattr(earliest, 'timestamp', None) if earliest else None,
+        'last_changed_by': getattr(latest, 'user', None) if show_last_changed else None,
+        'last_changed_at': getattr(latest, 'timestamp', None) if show_last_changed else None,
+        'total_count': total,
+        'truncated': total > len(display_rows),
+        'by_field': _index_field_change_history(display_rows),
+    }
+
+
+def _field_history_key(field_id, field_id_kind):
+    """Stable lookup key for one form item or dynamic indicator."""
+    if field_id is None or field_id == '':
+        return None
+    try:
+        numeric_id = int(field_id)
+    except (TypeError, ValueError):
+        return None
+    kind = str(field_id_kind or 'form_item').lower().strip()
+    if kind in ('indicator_bank', 'indicatorbank', 'indicator'):
+        kind = 'indicator_bank'
+    else:
+        kind = 'form_item'
+    return f'{kind}:{numeric_id}'
+
+
+def _field_change_events(activity):
+    """One activity row may record a single field or many fields."""
+    params = activity.summary_params if isinstance(activity.summary_params, dict) else {}
+    if params.get('_suppress_matrix_display'):
+        return []
+    summary_key = getattr(activity, 'summary_key', None)
+    user = getattr(activity, 'user', None)
+    timestamp = getattr(activity, 'timestamp', None)
+    if summary_key == 'activity.form_data_updated.single':
+        sources = [params]
+    elif summary_key == 'activity.form_data_updated.multiple':
+        changes = params.get('changes')
+        sources = changes if isinstance(changes, list) else []
+    else:
+        return []
+
+    events = []
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        key = _field_history_key(source.get('field_id'), source.get('field_id_kind'))
+        if not key:
+            continue
+        events.append({
+            'key': key,
+            'user': user,
+            'timestamp': timestamp,
+            'change_type': source.get('change_type') or source.get('type') or 'updated',
+            'old': source.get('old'),
+            'new': source.get('new'),
+            'field_id': source.get('field_id'),
+        })
+    return events
+
+
+def _index_field_change_history(activities):
+    """Group save events by field. Activities must be newest first."""
+    buckets = {}
+    for activity in activities or []:
+        for event in _field_change_events(activity):
+            bucket = buckets.get(event['key'])
+            if bucket is None:
+                bucket = {
+                    'events': [],
+                    'more': 0,
+                    'entered_by': None,
+                    'entered_at': None,
+                    'last_changed_by': event['user'],
+                    'last_changed_at': event['timestamp'],
+                }
+                buckets[event['key']] = bucket
+            if len(bucket['events']) < ASSIGNMENT_FIELD_HISTORY_LIMIT:
+                bucket['events'].append(event)
+            else:
+                bucket['more'] += 1
+            # Newest-first scan: the last event seen is the oldest in this window.
+            bucket['entered_by'] = event['user']
+            bucket['entered_at'] = event['timestamp']
+
+    for bucket in buckets.values():
+        if bucket['entered_at'] == bucket['last_changed_at']:
+            bucket['last_changed_by'] = None
+            bucket['last_changed_at'] = None
+    return buckets
 
 
 def _parse_int(value, field_name, *, minimum=None) -> int:

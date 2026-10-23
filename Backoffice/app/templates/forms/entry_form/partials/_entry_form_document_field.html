@@ -4,6 +4,7 @@
      entry_form_document_section_order — int for section.display_order or sub_section.display_order
 #}
 {% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
+{% from "forms/entry_form/partials/_data_change_history.html" import entry_item_change_history with context %}
 {% macro entry_form_document_card(doc, field, field_label_with_period, can_edit, entity_repo_document_ids, documents_library_url) %}
     {% set is_repo = doc.id in entity_repo_document_ids %}
     {% set doc_lang_base = (doc.language or '').split('_')[0].split('-')[0] %}
@@ -161,6 +162,7 @@
             {% endif %}
         {% endif %}
         <div class="flex items-center gap-2 flex-shrink-0">
+            {{ entry_item_change_history(field) }}
             {% if _desc_text %}
                 <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
                     <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>

@@ -1790,3 +1790,189 @@ class TestSplitFlatMatrixEntries:
         with app.app_context():
             result_old, result_new = _extract_changed_matrix_values("", "")
         assert result_old is None
+
+
+class TestAssignmentDataChangeHistory:
+    def test_missing_assignment_returns_empty(self):
+        from app.routes.main.helpers import get_assignment_data_change_history
+
+        result = get_assignment_data_change_history(None)
+        assert result["activities"] == []
+        assert result["total_count"] == 0
+        assert result["entered_by"] is None
+        assert result["last_changed_by"] is None
+
+    def test_no_saves_returns_empty(self, app):
+        from app.routes.main.helpers import get_assignment_data_change_history
+
+        count_q = MagicMock()
+        count_q.count.return_value = 0
+        with app.app_context():
+            with patch("app.models.EntityActivityLog") as model, \
+                 patch("app.routes.main.helpers.joinedload", return_value=MagicMock()), \
+                 patch("sqlalchemy.asc", side_effect=lambda *a, **k: MagicMock()), \
+                 patch("sqlalchemy.desc", side_effect=lambda *a, **k: MagicMock()):
+                model.query.options.return_value.filter.return_value = count_q
+                result = get_assignment_data_change_history(9)
+        assert result["total_count"] == 0
+        assert result["activities"] == []
+        count_q.order_by.assert_not_called()
+
+    def test_first_and_latest_save_identify_who_entered_and_changed(self, app):
+        from datetime import datetime
+
+        from app.routes.main.helpers import get_assignment_data_change_history
+
+        entered = MagicMock()
+        entered.name = "Ada"
+        changer = MagicMock()
+        changer.name = "Grace"
+
+        first = MagicMock()
+        first.id = 1
+        first.user = entered
+        first.timestamp = datetime(2024, 1, 1)
+        first.summary_params = {"field": "Volunteers", "old": "", "new": "10"}
+        first.summary_key = "activity.form_data_updated.single"
+        first.assignment_id = 9
+        first.activity_type = "data_update"
+        first.activity_description = "Field updated"
+
+        latest = MagicMock()
+        latest.id = 2
+        latest.user = changer
+        latest.timestamp = datetime(2024, 6, 1)
+        latest.summary_params = {"field": "Volunteers", "old": "10", "new": "12"}
+        latest.summary_key = "activity.form_data_updated.single"
+        latest.assignment_id = 9
+        latest.activity_type = "data_update"
+        latest.activity_description = "Field updated"
+
+        count_q = MagicMock()
+        count_q.count.return_value = 2
+        recent_q = MagicMock()
+        recent_q.order_by.return_value.limit.return_value.all.return_value = [latest]
+        early_q = MagicMock()
+        early_q.order_by.return_value.first.return_value = first
+
+        def _rewrite(rows):
+            rows[0].summary_params["field"] = "Rewritten"
+
+        with app.app_context():
+            with patch("app.models.EntityActivityLog") as model, \
+                 patch("app.routes.main.helpers.joinedload", return_value=MagicMock()), \
+                 patch("app.routes.main.helpers.enrich_dashboard_recent_activities", side_effect=_rewrite), \
+                 patch("sqlalchemy.asc", side_effect=lambda *a, **k: MagicMock()), \
+                 patch("sqlalchemy.desc", side_effect=lambda *a, **k: MagicMock()):
+                model.query.options.return_value.filter.side_effect = [count_q, recent_q, early_q]
+                result = get_assignment_data_change_history(9)
+
+        assert result["entered_by"] is entered
+        assert result["entered_at"] == first.timestamp
+        assert result["last_changed_by"] is changer
+        assert result["last_changed_at"] == latest.timestamp
+        assert result["total_count"] == 2
+        assert result["truncated"] is True
+        assert result["activities"][0].user is changer
+        assert result["activities"][0].summary_params["field"] == "Rewritten"
+        assert latest.summary_params["field"] == "Volunteers"
+
+    def test_single_save_has_no_separate_last_change(self, app):
+        from datetime import datetime
+
+        from app.routes.main.helpers import get_assignment_data_change_history
+
+        entered = MagicMock()
+        entered.name = "Ada"
+        only = MagicMock()
+        only.id = 5
+        only.user = entered
+        only.timestamp = datetime(2024, 3, 1)
+        only.summary_params = {}
+        only.summary_key = "activity.form_data_updated.single"
+        only.assignment_id = 9
+        only.activity_type = "data_update"
+        only.activity_description = "Field updated"
+
+        count_q = MagicMock()
+        count_q.count.return_value = 1
+        recent_q = MagicMock()
+        recent_q.order_by.return_value.limit.return_value.all.return_value = [only]
+        early_q = MagicMock()
+        early_q.order_by.return_value.first.return_value = only
+
+        with app.app_context():
+            with patch("app.models.EntityActivityLog") as model, \
+                 patch("app.routes.main.helpers.joinedload", return_value=MagicMock()), \
+                 patch("app.routes.main.helpers.enrich_dashboard_recent_activities"), \
+                 patch("sqlalchemy.asc", side_effect=lambda *a, **k: MagicMock()), \
+                 patch("sqlalchemy.desc", side_effect=lambda *a, **k: MagicMock()):
+                model.query.options.return_value.filter.side_effect = [count_q, recent_q, early_q]
+                result = get_assignment_data_change_history(9)
+
+        assert result["entered_by"] is entered
+        assert result["last_changed_by"] is None
+        assert result["truncated"] is False
+        assert result["by_field"] == {}
+
+    def test_indexes_changes_onto_each_field(self):
+        from datetime import datetime
+        from types import SimpleNamespace
+
+        from app.routes.main.helpers import _index_field_change_history
+
+        ada = MagicMock()
+        ada.name = "Ada"
+        grace = MagicMock()
+        grace.name = "Grace"
+        newer = SimpleNamespace(
+            summary_key="activity.form_data_updated.single",
+            summary_params={
+                "field_id": 15,
+                "old": "10",
+                "new": "12",
+                "change_type": "updated",
+            },
+            user=grace,
+            timestamp=datetime(2024, 6, 1),
+        )
+        bank = SimpleNamespace(
+            summary_key="activity.form_data_updated.single",
+            summary_params={
+                "field_id": "9",
+                "field_id_kind": "indicator_bank",
+                "old": "",
+                "new": "4",
+                "change_type": "added",
+            },
+            user=ada,
+            timestamp=datetime(2024, 2, 1),
+        )
+        older = SimpleNamespace(
+            summary_key="activity.form_data_updated.multiple",
+            summary_params={
+                "changes": [
+                    {
+                        "field_id": 15,
+                        "old": "",
+                        "new": "10",
+                        "change_type": "added",
+                    }
+                ]
+            },
+            user=ada,
+            timestamp=datetime(2024, 1, 1),
+        )
+
+        indexed = _index_field_change_history([newer, bank, older])
+
+        volunteers = indexed["form_item:15"]
+        assert volunteers["entered_by"] is ada
+        assert volunteers["entered_at"] == older.timestamp
+        assert volunteers["last_changed_by"] is grace
+        assert [event["new"] for event in volunteers["events"]] == ["12", "10"]
+
+        branches = indexed["indicator_bank:9"]
+        assert branches["entered_by"] is ada
+        assert branches["last_changed_by"] is None
+        assert len(branches["events"]) == 1

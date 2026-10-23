@@ -11,6 +11,7 @@
 {% set scoped_reopenable_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled', 'requires_revision'] %}
 {% set scoped_revision_statuses = ['submitted', 'sent_for_review', 'approved'] %}
 {% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
+{% from "forms/entry_form/partials/_data_change_history.html" import entry_item_change_history with context %}
 {% from "components/_svg_icons.html" import svg_icon %}
 {% set can_use_upr = (not is_public_submission|default(false)) and (not is_preview_mode|default(false)) and has_permission('admin.data_explore.upr_visuals') %}
 {% set enable_page_submission = enable_page_submission|default(false) %}
@@ -1040,8 +1041,9 @@
                                                                     {% endif %}
                                                                 </label>
                                                             </div>
-                                                            {% if field.description %}
-                                                                <div class="flex items-center gap-2 flex-shrink-0">
+                                                            <div class="flex items-center gap-2 flex-shrink-0">
+                                                                {{ entry_item_change_history(field) }}
+                                                                {% if field.description %}
                                                                     <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
                                                                         <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
                                                                         <span class="tooltip-text">
@@ -1051,8 +1053,8 @@
                                                                             </div>
                                                                         </span>
                                                                     </span>
-                                                                </div>
-                                                            {% endif %}
+                                                                {% endif %}
+                                                            </div>
                                                         </div>
 
                                                         {% include 'forms/entry_form/partials/_entry_form_item_hint.html' %}
@@ -1183,6 +1185,7 @@
                                                             </div>
 
                                                             <div class="flex items-center gap-2 flex-shrink-0">
+                                                                {{ entry_item_change_history(field) }}
                                                                 {% if field.is_indicator %}
                                                                     {# Determine which label and definition to use #}
                                                                     {% set _ind_label_text = None %}
@@ -2006,8 +2009,9 @@
                                                                                     {% endif %}
                                                                                 </label>
                                                                             </div>
-                                                                            {% if field.description %}
-                                                                                <div class="flex items-center gap-2 flex-shrink-0">
+                                                                            <div class="flex items-center gap-2 flex-shrink-0">
+                                                                                {{ entry_item_change_history(field) }}
+                                                                                {% if field.description %}
                                                                                     <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
                                                                                         <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
                                                                                         <span class="tooltip-text">
@@ -2017,8 +2021,8 @@
                                                                             </div>
                                                                         </span>
                                                                     </span>
-                                                                </div>
-                                                            {% endif %}
+                                                                                {% endif %}
+                                                                            </div>
                                                         </div>
 
                                                         {% include 'forms/entry_form/partials/_entry_form_item_hint.html' %}
@@ -2134,6 +2138,7 @@
                                                                     </div>
 
                                                                     <div class="flex items-center gap-2 flex-shrink-0">
+                                                                        {{ entry_item_change_history(field) }}
                                                                         {% if field.is_indicator %}
                                                                             {# Determine which label and definition to use #}
                                                                             {% set _ind_label_text = None %}

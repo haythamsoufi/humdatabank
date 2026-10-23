@@ -1,0 +1,90 @@
+{% from "components/_status_label.html" import status_label, status_label_for_change_type %}
+
+{% macro data_history_person(user) -%}
+{%- if user and user.name -%}
+{{ user.name }}
+{%- elif user and user.email -%}
+{{ user.email.split('@')[0] }}
+{%- else -%}
+{{ _('Unknown user') }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro history_field_change(change_type, old_val, new_val, field_id) %}
+{% set ict = (change_type or 'updated')|lower %}
+{% set is_matrix = (old_val is mapping and old_val.get('_matrix_change')) or (new_val is mapping and new_val.get('_matrix_change')) %}
+{% if is_matrix and not matrix_activity_has_visible_changes(old_val if old_val is mapping else {}, new_val if new_val is mapping else {}) %}
+{% else %}
+<div class="history-change">
+    <span class="history-change-kind">
+        {% if ict == 'added' %}
+            {{ status_label_for_change_type('added') }}
+        {% elif ict == 'removed' %}
+            {{ status_label_for_change_type('removed') }}
+        {% else %}
+            {{ status_label(_('Updated'), 'info') }}
+        {% endif %}
+    </span>
+    <span class="history-change-text">
+        {% if is_matrix %}
+            {{ render_matrix_change('', old_val if old_val is mapping else {}, new_val if new_val is mapping else {}, field_id)|safe }}
+        {% elif ict == 'added' %}
+            <span class="history-new">{{ format_activity_value(new_val, field_id, compare_value=old_val)|safe }}</span>
+        {% elif ict == 'removed' %}
+            <span class="history-old">{{ format_activity_value(old_val, field_id)|safe }}</span>
+        {% else %}
+            <span class="history-old">{{ format_activity_value(old_val, field_id)|safe }}</span>
+            <span class="history-arrow">→</span>
+            <span class="history-new">{{ format_activity_value(new_val, field_id)|safe }}</span>
+        {% endif %}
+    </span>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro entry_item_change_history(field) %}
+{% if assignment_data_history is defined and not is_public_submission|default(false) and not is_preview_mode|default(false) %}
+{% set bank_id = field.indicator_bank_id if field.indicator_bank_id is defined else none %}
+{% set is_dynamic = (field.dynamic_assignment_id is defined) and field.dynamic_assignment_id %}
+{# Set must stay outside {% if %} — Jinja drops assignments made inside a branch. #}
+{% set history_key = ('indicator_bank:' ~ bank_id) if (is_dynamic and bank_id) else ('form_item:' ~ field.id) %}
+{% set field_history = assignment_data_history.by_field if assignment_data_history and assignment_data_history.by_field is mapping else {} %}
+{% set item_history = field_history.get(history_key) %}
+<span class="entry-item-history cursor-help w-5 h-5" tabindex="0" aria-label="{{ _('Change history')|forceescape }}">
+    <i class="fas fa-history" aria-hidden="true"></i>
+    <span class="tooltip-text" role="tooltip">
+        <p class="history-title">{{ _('Change history') }}</p>
+        {% if item_history and item_history.events %}
+        <p class="history-meta">
+            <span class="history-label">{{ _('Entered by') }}</span>
+            {{ data_history_person(item_history.entered_by) }}
+            {% if item_history.entered_at %}· {{ item_history.entered_at|format_datetime_localized('short', 'short') }}{% endif %}
+        </p>
+        {% if item_history.last_changed_by %}
+        <p class="history-meta">
+            <span class="history-label">{{ _('Last changed by') }}</span>
+            {{ data_history_person(item_history.last_changed_by) }}
+            {% if item_history.last_changed_at %}· {{ item_history.last_changed_at|format_datetime_localized('short', 'short') }}{% endif %}
+        </p>
+        {% endif %}
+        {% for event in item_history.events %}
+        <div class="history-event">
+            <div class="history-event-head">
+                <span>{{ data_history_person(event.user) }}</span>
+                {% if event.timestamp %}
+                <span>{{ event.timestamp|format_datetime_localized('short', 'short') }}</span>
+                {% endif %}
+            </div>
+            {{ history_field_change(event.change_type, event.old, event.new, event.field_id) }}
+        </div>
+        {% endfor %}
+        {% if item_history.more %}
+        <p class="history-more">{{ _('And %(count)s earlier changes.', count=item_history.more) }}</p>
+        {% endif %}
+        {% else %}
+        <p class="history-meta">{{ _('No changes have been recorded for this item yet.') }}</p>
+        {% endif %}
+    </span>
+</span>
+{% endif %}
+{% endmacro %}

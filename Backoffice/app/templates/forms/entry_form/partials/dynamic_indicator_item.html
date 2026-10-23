@@ -1,4 +1,5 @@
 {# Render a single dynamic indicator form item #}
+{% from "forms/entry_form/partials/_data_change_history.html" import entry_item_change_history with context %}
 {% set is_sub_item = field.is_sub_item if hasattr(field, 'is_sub_item') else false %}
 {% set is_dynamic_indicator = true %}
 
@@ -46,6 +47,7 @@
         </div>
 
         <div class="flex items-center gap-2 flex-shrink-0">
+            {{ entry_item_change_history(field) }}
             {% if field.is_indicator %}
                 {# Determine which label and definition to use #}
                 {% set _ind_label_text = None %}

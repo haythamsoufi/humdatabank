@@ -1226,6 +1226,26 @@ def handle_assignment_form(aes_id):
         )
         discussion_comments = comment_query.order_by(order_clause).all()
 
+    assignment_data_history = None
+    try:
+        from app.routes.main.helpers import get_assignment_data_change_history
+
+        assignment_data_history = get_assignment_data_change_history(
+            assignment_entity_status.id
+        )
+        current_app.logger.debug(
+            "Assignment %s change history: %s saves, %s fields",
+            assignment_entity_status.id,
+            assignment_data_history.get("total_count"),
+            len(assignment_data_history.get("by_field") or {}),
+        )
+    except Exception as history_exc:
+        current_app.logger.warning(
+            "Could not load change history for assignment %s: %s",
+            assignment_entity_status.id,
+            history_exc,
+        )
+
     _entry_lap("pre_render")
     # stream_template returns a Response with a Jinja2 generator body.
     # Flask sends the <head> and first blocks to the browser immediately, so CSS/JS
@@ -1293,6 +1313,7 @@ def handle_assignment_form(aes_id):
         template_variables=variable_configs if 'variable_configs' in locals() else {},
         form_features=form_features,
         discussion_comments=discussion_comments,
+        assignment_data_history=assignment_data_history,
         # Defer heavy chatbot modules (12 ES modules, ~567 KB) on entry form pages.
         # The chatbot is initialised lazily by entry_form.html after formInitialized instead.
         skip_layout_chatbot=True,

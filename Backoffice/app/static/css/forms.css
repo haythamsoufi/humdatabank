@@ -1089,6 +1089,150 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   margin-top: 2px;
 }
 
+/* Per-item change history. Positioning is finished by forms/modules/tooltips.js. */
+.entry-item-history {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.entry-item-history i {
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.entry-item-history:hover i,
+.entry-item-history:focus-visible i {
+  color: #374151;
+}
+
+.entry-item-history:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.entry-item-history .tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  display: block;
+  width: min(22rem, 90vw);
+  max-height: 16rem;
+  overflow: auto;
+  background-color: #1f2937;
+  color: #f9fafb;
+  text-align: start;
+  border-radius: 6px;
+  padding: 12px;
+  position: absolute;
+  z-index: 1000;
+  top: 125%;
+  right: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.4;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+
+.entry-item-history .tooltip-text::after {
+  content: "";
+  position: absolute;
+  bottom: var(--tooltip-arrow-bottom, 100%);
+  top: var(--tooltip-arrow-top, auto);
+  left: var(--tooltip-arrow-left, auto);
+  right: var(--tooltip-arrow-right, 12px);
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--tooltip-arrow-color, transparent transparent #1f2937 transparent);
+}
+
+.entry-item-history:hover .tooltip-text,
+.entry-item-history:focus-within .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.entry-item-history .history-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.entry-item-history .history-meta,
+.entry-item-history .history-more {
+  margin: 0;
+  color: #e5e7eb;
+}
+
+.entry-item-history .history-meta + .history-meta {
+  margin-top: 0.15rem;
+}
+
+.entry-item-history .history-label {
+  font-weight: 600;
+  color: #fff;
+  margin-inline-end: 0.2rem;
+}
+
+.entry-item-history .history-event {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.entry-item-history .history-event-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  color: #e5e7eb;
+}
+
+.entry-item-history .history-change {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.entry-item-history .history-change-kind {
+  flex-shrink: 0;
+}
+
+.entry-item-history .history-change-kind .status-label {
+  font-size: 0.6875rem;
+  padding: 0.05rem 0.4rem;
+}
+
+.entry-item-history .history-change-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entry-item-history .history-old {
+  color: #fca5a5;
+}
+
+.entry-item-history .history-new {
+  color: #86efac;
+}
+
+.entry-item-history .history-arrow {
+  color: #9ca3af;
+  margin: 0 0.15rem;
+}
+
+.entry-item-history .history-more {
+  margin-top: 0.35rem;
+}
+
+
 .completion-gap-btn.completion-gap-active {
   background-color: #fde68a;
   border-color: #f59e0b;

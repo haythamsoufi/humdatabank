@@ -1014,6 +1014,78 @@ class TestExport:
         assert data_codes == {"KPI_PeopleVol"}
 
 
+class TestExportSnapshot:
+    def test_archive_retention_keeps_today_and_drops_the_oldest_day(self):
+        from plugins.fdrs.services.fdrs_public_export_cache import select_archives
+
+        existing = [f"2020-01-{day:02d}" for day in range(1, 15)]
+        kept, dropped = select_archives(existing, "2026-10-23", keep=14)
+        assert kept[0] == "2020-01-02"
+        assert kept[-1] == "2026-10-23"
+        assert dropped == ["2020-01-01"]
+        assert len(kept) == 14
+
+    def test_download_serves_the_saved_snapshot(self, app, client, scenario, tmp_path, monkeypatch):
+        import json
+
+        from app.services.platform import storage_service
+        from plugins.fdrs.services import fdrs_public_export_cache as export_cache
+
+        previous = {
+            key: app.config.get(key)
+            for key in ("UPLOAD_FOLDER", "UPLOAD_STORAGE_PROVIDER", "FDRS_PUBLIC_EXPORT_CACHE_ENABLED")
+        }
+        app.config["UPLOAD_FOLDER"] = str(tmp_path)
+        app.config["UPLOAD_STORAGE_PROVIDER"] = "filesystem"
+        app.config["FDRS_PUBLIC_EXPORT_CACHE_ENABLED"] = True
+        try:
+            storage_service.upload(
+                export_cache.STORAGE_CATEGORY,
+                "archive/2020-01-01/fdrs.csv",
+                b"old",
+            )
+            storage_service.upload(
+                export_cache.STORAGE_CATEGORY,
+                "latest/ns/DGONE001.csv",
+                b"retired",
+            )
+            storage_service.upload(
+                export_cache.STORAGE_CATEGORY,
+                export_cache.MANIFEST_REL,
+                json.dumps({
+                    "archives": [f"2020-01-{day:02d}" for day in range(1, 15)],
+                    "societies": ["DGONE001"],
+                }).encode("utf-8"),
+            )
+            with app.app_context():
+                summary = export_cache.build_public_export_snapshot()
+            assert summary["snapshot_date"]
+            assert "DCAA001" in summary["societies"]
+            assert not storage_service.exists(export_cache.STORAGE_CATEGORY, "archive/2020-01-01/fdrs.csv")
+            assert not storage_service.exists(export_cache.STORAGE_CATEGORY, "latest/ns/DGONE001.csv")
+            assert storage_service.exists(export_cache.STORAGE_CATEGORY, f"archive/{summary['snapshot_date']}/fdrs.xlsx")
+
+            def _boom(*_args, **_kwargs):
+                raise AssertionError("download rebuilt the export")
+
+            monkeypatch.setattr("plugins.fdrs.public_compat_routes.adapter.export_rows", _boom)
+            csv_response = client.get("/csv/export")
+            assert csv_response.status_code == 200
+            assert b"KPI_DON_code" in csv_response.data
+            assert b"DCAA001" in csv_response.data
+            excel_response = client.get("/csv/export", query_string={"excel": "1"})
+            assert excel_response.status_code == 200
+            assert excel_response.data[:2] == b"PK"
+            one = client.get("/csv/exportns", query_string={"doncode": "DCAA001"})
+            stored = storage_service.download(export_cache.STORAGE_CATEGORY, "latest/ns/DCAA001.csv")
+            assert one.status_code == 200
+            assert one.data == stored
+            assert b"DCAA001" in stored
+            assert client.get("/csv/exportns", query_string={"doncode": "NOPE"}).status_code == 404
+        finally:
+            app.config.update(previous)
+
+
 class TestRegistry:
     def test_plugin_lists_the_compat_endpoints(self):
         from plugins.fdrs.plugin import FdrsPlugin

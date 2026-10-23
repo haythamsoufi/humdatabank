@@ -228,7 +228,7 @@ The age/sex mapper does `response.data.filter(series => expectedIds.includes(ser
 
 `POST /api/documentSubscribe` body is `{ "email", "name", "organization" }`.
 
-`/csv/export` and `/csv/exportns` return a file, not JSON.
+`/csv/export` and `/csv/exportns` return a file, not JSON. A scheduler job rewrites those files at 04:15 UTC, and the download serves the saved file. `flask fdrs-public-export` rebuilds it immediately. The previous file stays in place until the new build finishes. The full CSV and Excel are also kept for 14 UTC days. A one-society file is saved for each society in that build. When the file is missing, the request builds it live.
 
 ## How a legacy code becomes a Backoffice cell
 
@@ -290,7 +290,7 @@ Numbers can move first. The rest of the homepage is content the published-data f
 | `/api/data`, `/api/dataimputed`, `/api/KpiImputedValue`, `/api/globalvalidationdata`, `/api/lastpublishedyear` | Published FDRS snapshot | **Done** (phase 1) |
 | `/api/entities/ns` | `national_societies` rows that have `fdrs_don_code` | **Done** (phase 1) |
 | `/api/kpivalue` | Published snapshot for the requested `kpicode`. Omitted `kpicode` returns `[]` | **Done** |
-| `/csv/export`, `/csv/exportns` | Published snapshot, long file (`KPI_DON_code`, year, `KPI_code`, `Value`, `source`). `excel=1` is an `.xlsx` with that data plus an Indicators sheet (name, definition, type, unit, and the sex, age, income, question, or network slice). CSV stays the data table | **Done** |
+| `/csv/export`, `/csv/exportns` | Daily snapshot of the published figures (`KPI_DON_code`, year, `KPI_code`, `Value`, `source`). `excel=1` is that day's `.xlsx` with a Data sheet and an Indicators sheet. Rebuilt at 04:15 UTC, or with `flask fdrs-public-export` | **Done** |
 | `/api/documents` | Manage Resources publications when `type` / `isglobal` is set. `ns` is that society's public approved submitted documents. Shape is `[{code, documents}]` | **Done** |
 | `/api/embeddedcontent` | Admin → Embed Content. `UNIFIED-PLANNING` is page slot `unified_planning`; `OVERVIEW-INTERNATIONAL` is page slot `overview_international`; `GLOBAL-INITIATIVES` is page slot `global_initiatives` | **Done** for those three types. OCAC and BOCA still forward |
 | `/api/smarttran`, `/api/tran`, `/api/offices`, `/api/documentSubscribe` | Not stored as FDRS CMS content | Forwarded |

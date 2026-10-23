@@ -1248,17 +1248,25 @@ def _fill_sheet(sheet: Any, columns: tuple[str, ...], records: Iterable[Mapping[
         sheet.column_dimensions[get_column_letter(index)].width = widths.get(column, 18)
 
 
-def export_xlsx(rows: Iterable[Mapping[str, Any]]) -> bytes:
-    """Workbook with a Data sheet and an Indicators sheet for the codes in that data."""
+def export_xlsx(
+    rows: Iterable[Mapping[str, Any]],
+    mapping: Optional[Iterable[Mapping[str, Any]]] = None,
+) -> bytes:
+    """Workbook with a Data sheet and an Indicators sheet for the codes in that data.
+
+    Pass ``mapping`` when the caller already built the indicator dictionary, so a
+    batch of society files does not look the definitions up again.
+    """
     from openpyxl import Workbook
 
     materialised = list(rows)
+    indicator_rows = list(mapping) if mapping is not None else export_mapping(materialised)
     workbook = Workbook()
     data = workbook.active
     data.title = "Data"
     _fill_sheet(data, EXPORT_COLUMNS, materialised, _DATA_COLUMN_WIDTHS)
     indicators = workbook.create_sheet("Indicators")
-    _fill_sheet(indicators, MAPPING_COLUMNS, export_mapping(materialised), _MAPPING_COLUMN_WIDTHS)
+    _fill_sheet(indicators, MAPPING_COLUMNS, indicator_rows, _MAPPING_COLUMN_WIDTHS)
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()

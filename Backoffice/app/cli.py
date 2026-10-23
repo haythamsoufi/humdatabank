@@ -40,6 +40,18 @@ def register_commands(app):
     from app.cli_commands.fdrs_societies import register_fdrs_society_commands
     register_fdrs_society_commands(app)
 
+    @app.cli.command("fdrs-public-export")
+    @with_appcontext
+    def fdrs_public_export():
+        """Rebuild the daily public FDRS CSV and Excel snapshot now."""
+        from plugins.fdrs.services.fdrs_public_export_cache import build_public_export_snapshot
+
+        summary = build_public_export_snapshot()
+        click.echo(
+            f"Snapshot {summary['snapshot_date']}: {summary['row_count']} rows, "
+            f"{len(summary['societies'])} societies."
+        )
+
     # AI regression testing
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)

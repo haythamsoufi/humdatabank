@@ -16,7 +16,8 @@ Reads the published snapshot only (``plugins/fdrs/services/fdrs_public_adapter.p
 global initiatives is read from Admin → Embed Content. Translations, offices,
 the mailing list, and the other embed types (OCAC, BOCA) are forwarded to
 ``https://data-api.ifrc.org`` (or ``FDRS_DATA_API_BASE``) using ``FDRS_DATA_API_KEY``.
-``/csv/export`` and ``/csv/exportns`` are files built from the published snapshot.
+``/csv/export`` and ``/csv/exportns`` serve the daily snapshot when it is present,
+and build the file on the request when it is not.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from app.utils.auth import require_api_key
 from app.utils.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
 from plugins.fdrs.services import fdrs_public_adapter as adapter
+from plugins.fdrs.services import fdrs_public_export_cache as export_cache
 
 CACHE_SECONDS = 300
 PASSTHROUGH_TIMEOUT_SECONDS = 25
@@ -112,7 +114,7 @@ _QUERY_PARAMS = {
         "name": "excel",
         "type": "select",
         "options": ["1"],
-        "description": "1 returns an Excel workbook with a Data sheet and an Indicators sheet (name, definition, type, unit).",
+        "description": "1 returns the daily Excel snapshot (Data sheet and Indicators sheet). The CSV link returns the daily CSV.",
     },
     "doncode": {
         "name": "doncode",
@@ -284,7 +286,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "public",
         "rate_limited": True,
-        "description": "Published public FDRS figures as CSV. No API key: the link is a browser download. excel=1 returns an .xlsx workbook with those rows on a Data sheet and an Indicators sheet of names, definitions, types, and units.",
+        "description": "Published public FDRS figures as CSV. No API key: the link is a browser download of the daily snapshot. excel=1 returns that day's .xlsx workbook (Data sheet and Indicators sheet). A missing snapshot is built for that request.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -293,7 +295,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "public",
         "rate_limited": True,
-        "description": "Published public FDRS figures for one society (doncode). No API key. excel=1 returns an .xlsx workbook with a Data sheet and an Indicators sheet.",
+        "description": "Published public FDRS figures for one society (doncode). No API key. Serves that society's file from the daily snapshot. excel=1 returns the .xlsx workbook.",
         "consumers": "data.ifrc.org",
     },
 ]
@@ -558,6 +560,16 @@ def _download(body: bytes, *, filename: str, mimetype: str):
 
 def _export_file(don_code: str | None):
     excel = (request.args.get("excel") or "").strip().lower() in {"1", "true", "yes"}
+    cached = export_cache.cached_download(excel=excel, don_code=don_code)
+    if cached is not None:
+        cached.headers["Cache-Control"] = f"public, max-age={CACHE_SECONDS}"
+        return cached
+    if export_cache.cache_enabled():
+        current_app.logger.warning(
+            "FDRS public export snapshot missing (excel=%s don=%s); building this download live",
+            excel,
+            don_code or "",
+        )
     rows = adapter.export_rows(don_code=don_code)
     stem = f"fdrs-{don_code}" if don_code else "fdrs"
     if excel:

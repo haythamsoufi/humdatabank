@@ -797,6 +797,9 @@ class Config:
     # Legacy FDRS data API. Passthrough for translations, embeds, offices, and the mailing
     # list uses this host. It must stay data-api.ifrc.org, not the host that serves this app.
     FDRS_DATA_API_BASE = _fdrs_data_api_base_raw or "https://data-api.ifrc.org"
+    # /csv/export serves the last daily file instead of rebuilding it on the request.
+    # Tests turn this off so they keep reading the fixture rows.
+    FDRS_PUBLIC_EXPORT_CACHE_ENABLED = True
     # IFRC CHF exchange rates: GetCHFExchangeRate/{currency}/{year}-01-01
     _ifrc_exchange_rate_key = (os.environ.get("IFRC_EXCHANGE_RATE_API_KEY") or "").strip()
     IFRC_EXCHANGE_RATE_API_KEY = _ifrc_exchange_rate_key or None
@@ -1516,6 +1519,7 @@ class TestingConfig(Config):
     # Avoid RotatingFileHandler on instance/logs/application.log during pytest — on Windows
     # the file is often locked by a running dev server, causing PermissionError on rollover.
     APPLICATION_LOG_FILE_ENABLED = False
+    FDRS_PUBLIC_EXPORT_CACHE_ENABLED = False
     # Smaller pool + statement timeout so stuck DDL/locks fail fast instead of hanging.
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,

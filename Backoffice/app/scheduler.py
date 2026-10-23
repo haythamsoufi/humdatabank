@@ -206,6 +206,7 @@ def init_scheduler(app, is_reloader):
                         return
 
                     from apscheduler.schedulers.background import BackgroundScheduler
+                    from apscheduler.triggers.cron import CronTrigger
                     try:
                         misfire_grace_seconds = int(app.config.get('SCHEDULER_MISFIRE_GRACE_SECONDS', 30))
                     except (TypeError, ValueError):
@@ -252,6 +253,17 @@ def init_scheduler(app, is_reloader):
                         if processed > 0:
                             app.logger.info("Processed %d scheduled notification(s)", processed)
 
+                    def _refresh_fdrs_public_export():
+                        from plugins.fdrs.services.fdrs_public_export_cache import build_public_export_snapshot
+
+                        summary = build_public_export_snapshot()
+                        app.logger.info(
+                            "FDRS public export snapshot %s rows=%s societies=%s",
+                            summary.get("snapshot_date"),
+                            summary.get("row_count"),
+                            len(summary.get("societies") or []),
+                        )
+
                     def _cleanup_stale_websockets():
                         # Purely in-memory — no DB connection needed.
                         # Own try/except so APScheduler never loses the job on error.
@@ -272,6 +284,16 @@ def init_scheduler(app, is_reloader):
                         trigger="cron", hour=2, minute=0,
                         id='cleanup_notifications', name='Cleanup old notifications',
                         replace_existing=True
+                    )
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(
+                            app, 'fdrs_public_export_snapshot', _refresh_fdrs_public_export
+                        ),
+                        trigger=CronTrigger(hour=4, minute=15, timezone="UTC"),
+                        id='fdrs_public_export_snapshot',
+                        name='Rebuild the public FDRS CSV and Excel snapshot',
+                        replace_existing=True,
                     )
 
                     scheduler.add_job(

@@ -12,9 +12,9 @@ links, so they do not require a key. The Angular client only puts the key on a
 CSV href when its parameter name is ``api_key``; keep the name ``apiKey``.
 Reads the published snapshot only (``plugins/fdrs/services/fdrs_public_adapter.py``).
 
-``/api/embeddedcontent`` for unified planning and global initiatives is read
-from Admin → Embed Content. Translations, offices, the mailing list, and the
-other embed types (OCAC, BOCA, international overview) are forwarded to
+``/api/embeddedcontent`` for unified planning, the international overview, and
+global initiatives is read from Admin → Embed Content. Translations, offices,
+the mailing list, and the other embed types (OCAC, BOCA) are forwarded to
 ``https://data-api.ifrc.org`` (or ``FDRS_DATA_API_BASE``) using ``FDRS_DATA_API_KEY``.
 ``/csv/export`` and ``/csv/exportns`` are files built from the published snapshot.
 """
@@ -112,7 +112,7 @@ _QUERY_PARAMS = {
         "name": "excel",
         "type": "select",
         "options": ["1"],
-        "description": "1 returns the Excel workbook instead of CSV.",
+        "description": "1 returns an Excel workbook with a Data sheet and an Indicators sheet (name, definition, type, unit).",
     },
     "doncode": {
         "name": "doncode",
@@ -235,9 +235,10 @@ API_ENDPOINTS = [
         "rate_limited": True,
         "description": (
             "UNIFIED-PLANNING is active embeds whose page slot is Unified Planning, in sort order. "
-            "GLOBAL-INITIATIVES is active Global initiatives embeds. "
+            "OVERVIEW-INTERNATIONAL is active embeds whose page slot is International Overview, in sort order. "
+            "GLOBAL-INITIATIVES is active embeds whose page slot is Global Initiatives, in sort order. "
             "EmbedCode is the same iframe as Admin → Embed Content → Copy iframe. "
-            "OCAC, BOCA, and OVERVIEW-INTERNATIONAL are forwarded to https://data-api.ifrc.org."
+            "OCAC and BOCA are forwarded to https://data-api.ifrc.org."
         ),
         "consumers": "data.ifrc.org",
     },
@@ -283,7 +284,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "public",
         "rate_limited": True,
-        "description": "Published public FDRS figures as CSV. No API key: the link is a browser download. excel=1 returns the same rows as an .xlsx workbook.",
+        "description": "Published public FDRS figures as CSV. No API key: the link is a browser download. excel=1 returns an .xlsx workbook with those rows on a Data sheet and an Indicators sheet of names, definitions, types, and units.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -292,7 +293,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "public",
         "rate_limited": True,
-        "description": "Published public FDRS figures for one society (doncode). No API key. excel=1 returns an .xlsx workbook.",
+        "description": "Published public FDRS figures for one society (doncode). No API key. excel=1 returns an .xlsx workbook with a Data sheet and an Indicators sheet.",
         "consumers": "data.ifrc.org",
     },
 ]

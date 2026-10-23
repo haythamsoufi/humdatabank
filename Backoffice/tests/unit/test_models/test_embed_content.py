@@ -505,6 +505,8 @@ class TestEmbedContent:
     def test_page_slots_constant(self):
         """Test PAGE_SLOTS contains expected keys."""
         assert 'unified_planning' in PAGE_SLOTS
+        assert 'overview_international' in PAGE_SLOTS
+        assert 'global_initiatives' in PAGE_SLOTS
         assert 'echo_partnership' in PAGE_SLOTS
         assert 'grbm' in PAGE_SLOTS
         assert 'phsm' in PAGE_SLOTS

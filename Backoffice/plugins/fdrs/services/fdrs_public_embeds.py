@@ -4,10 +4,11 @@ The data.ifrc.org client injects ``EmbedCode`` as HTML. That string is the same
 iframe the admin Copy button builds. One title and one description are copied
 into every language field, because Embed Content is not translated.
 
-``type=UNIFIED-PLANNING`` is every active row whose page slot is Unified Planning,
-in sort order. Category is ignored, so an Analysis embed stays off that page
-until the slot is set. ``type=GLOBAL-INITIATIVES`` is the Global initiatives
-category. OCAC, BOCA, and OVERVIEW-INTERNATIONAL are not in this table.
+``type=UNIFIED-PLANNING``, ``type=OVERVIEW-INTERNATIONAL``, and
+``type=GLOBAL-INITIATIVES`` are the active rows whose page slot is Unified
+Planning, International Overview, or Global Initiatives, in sort order.
+Category is ignored, so an Analysis embed stays off those pages until the slot
+is set. OCAC and BOCA are not in this table.
 """
 
 from __future__ import annotations
@@ -21,12 +22,11 @@ from flask import has_request_context, request
 
 from app.models import EmbedContent
 
-# Legacy ``type`` values the unified-planning and global-initiatives pages send.
+# Legacy ``type`` values the FDRS dashboard pages send.
 EMBED_TYPE_TO_PAGE_SLOT = {
     "UNIFIED-PLANNING": "unified_planning",
-}
-EMBED_TYPE_TO_CATEGORY = {
-    "GLOBAL-INITIATIVES": "global_initiative",
+    "OVERVIEW-INTERNATIONAL": "overview_international",
+    "GLOBAL-INITIATIVES": "global_initiatives",
 }
 
 _TABLEAU_EMBEDDED = re.compile(r"[:?&]embed\s*=\s*y", re.IGNORECASE)
@@ -34,18 +34,17 @@ _TABLEAU_EMBEDDED = re.compile(r"[:?&]embed\s*=\s*y", re.IGNORECASE)
 
 def serves_embed_type(embed_type: str) -> bool:
     key = (embed_type or "").strip().upper()
-    return key in EMBED_TYPE_TO_PAGE_SLOT or key in EMBED_TYPE_TO_CATEGORY
+    return key in EMBED_TYPE_TO_PAGE_SLOT
 
 
 def legacy_embeds(embed_type: str) -> list[dict[str, Any]]:
     """Rows for one FDRS page, in the shape ``embeddedcontent`` already parses."""
     key = (embed_type or "").strip().upper()
-    query = EmbedContent.query.filter_by(is_active=True)
-    if key in EMBED_TYPE_TO_PAGE_SLOT:
-        query = query.filter_by(page_slot=EMBED_TYPE_TO_PAGE_SLOT[key])
-    else:
-        query = query.filter_by(category=EMBED_TYPE_TO_CATEGORY[key])
-    rows = query.order_by(EmbedContent.sort_order, EmbedContent.id).all()
+    rows = (
+        EmbedContent.query.filter_by(is_active=True, page_slot=EMBED_TYPE_TO_PAGE_SLOT[key])
+        .order_by(EmbedContent.sort_order, EmbedContent.id)
+        .all()
+    )
     return [_legacy_row(row) for row in rows]
 
 

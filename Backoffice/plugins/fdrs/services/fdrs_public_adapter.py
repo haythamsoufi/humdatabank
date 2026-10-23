@@ -34,7 +34,16 @@ from typing import Any, Iterable, Mapping, Optional
 from sqlalchemy import and_, func
 
 from app.extensions import db
-from app.models import AssignedForm, Country, FormData, FormItem, IndicatorBank, NationalSociety
+from app.models import (
+    AssignedForm,
+    Country,
+    FormData,
+    FormItem,
+    IndicatorBank,
+    IndicatorBankType,
+    IndicatorBankUnit,
+    NationalSociety,
+)
 from app.models.assignments import AssignmentEntityStatus
 from app.models.organization import FDRS_ZONES
 from app.services.data_quality.helpers import parse_period_year
@@ -825,7 +834,54 @@ EXPORT_COLUMNS = (
     "Value",
     "source",
 )
+# One row per KPI code that appears on the Data sheet. ``KPI_code`` matches that sheet.
+MAPPING_COLUMNS = (
+    "KPI_code",
+    "name",
+    "definition",
+    "type",
+    "unit",
+    "breakdown",
+    "base_code",
+    "area",
+    "disaggregation_guidance",
+    "data_source",
+)
 _SEX_LETTER = {"male": "M", "female": "F"}
+_AGE_BAND_LABELS = {
+    "6_12": "6-12",
+    "13_17": "13-17",
+    "18_29": "18-29",
+    "30_39": "30-39",
+    "40_49": "40-49",
+    "50_59": "50-59",
+    "60_69": "60-69",
+    "70_79": "70-79",
+    "80": "80 and over",
+}
+_DATA_COLUMN_WIDTHS = {
+    "KPI_DON_code": 16,
+    "NSO_DON_name": 28,
+    "iso_3": 10,
+    "ZON_Code": 12,
+    "NSO_ZON_name": 18,
+    "year": 10,
+    "KPI_code": 32,
+    "Value": 16,
+    "source": 12,
+}
+_MAPPING_COLUMN_WIDTHS = {
+    "KPI_code": 32,
+    "name": 36,
+    "definition": 64,
+    "type": 18,
+    "unit": 16,
+    "breakdown": 24,
+    "base_code": 24,
+    "area": 28,
+    "disaggregation_guidance": 40,
+    "data_source": 28,
+}
 
 
 def _source_label(row: Any) -> str:
@@ -960,7 +1016,214 @@ def export_rows(*, don_code: Optional[str] = None) -> list[dict[str, Any]]:
     return [chosen[key] for key in sorted(chosen)]
 
 
+def _blank(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _area_text(area: Any, area_label: Any) -> Optional[str]:
+    code = _blank(area)
+    label = _blank(area_label)
+    if code and label:
+        return f"{code} — {label}"
+    return code or label
+
+
+def _base_code(spec: SeriesSpec) -> str:
+    if spec.candidates:
+        return spec.candidates[-1]
+    return spec.code
+
+
+def _breakdown_label(spec: SeriesSpec) -> str:
+    if spec.kind == KIND_TOTAL:
+        return "Total"
+    if spec.kind == KIND_INCOME:
+        return "Income source"
+    if spec.kind == KIND_QUESTION:
+        return "Question"
+    if spec.kind == KIND_NETWORK:
+        return "Amount" if spec.network_amount else "Counterpart societies"
+    sex = "Male" if spec.sex == "male" else "Female" if spec.sex == "female" else ""
+    if spec.kind == KIND_SEX:
+        return sex
+    band = _AGE_BAND_LABELS.get(spec.age or "", spec.age or "")
+    return f"{sex}, age {band}".strip(", ")
+
+
+def _mapping_sort_key(code: str) -> tuple:
+    spec = parse_code(code)
+    if spec is None:
+        return (9, code.lower())
+    if spec.kind == KIND_INCOME:
+        order = list(INCOME_KPI_TO_ROW).index(code) if code in INCOME_KPI_TO_ROW else 99
+        return (1, order, code.lower())
+    if spec.kind == KIND_QUESTION:
+        return (2, code.lower())
+    if spec.kind == KIND_NETWORK:
+        return (
+            3,
+            0 if spec.network_prefix == "supported" else 1,
+            1 if spec.network_amount else 0,
+            code.lower(),
+        )
+    age_index = AGE_BANDS.index(spec.age) if spec.age in AGE_BANDS else 99
+    sex_index = {"male": 0, "female": 1}.get(spec.sex or "", 0)
+    kind_index = {KIND_TOTAL: 0, KIND_SEX: 1, KIND_AGE: 2}.get(spec.kind, 9)
+    return (0, _base_code(spec).lower(), kind_index, sex_index, age_index, code.lower())
+
+
+def _bank_catalog(codes: set[str]) -> dict[str, dict[str, Any]]:
+    """Public FDRS indicator-bank rows keyed by lower-case ``fdrs_kpi_code``."""
+    wanted = {code.strip().lower() for code in codes if code and code.strip()}
+    if not wanted:
+        return {}
+    fetched = (
+        db.session.query(
+            IndicatorBank.fdrs_kpi_code,
+            IndicatorBank.name,
+            IndicatorBank.definition,
+            func.coalesce(IndicatorBankType.name, IndicatorBank.type).label("type_name"),
+            func.coalesce(IndicatorBankUnit.name, IndicatorBank.unit).label("unit_name"),
+            IndicatorBank.area,
+            IndicatorBank.area_label,
+            IndicatorBank.disaggregation_guidance,
+            IndicatorBank.data_source,
+        )
+        .select_from(IndicatorBank)
+        .outerjoin(IndicatorBankType, IndicatorBankType.id == IndicatorBank.indicator_type_id)
+        .outerjoin(IndicatorBankUnit, IndicatorBankUnit.id == IndicatorBank.indicator_unit_id)
+        .join(FormItem, FormItem.indicator_bank_id == IndicatorBank.id)
+        .filter(FormItem.template_id == FDRS_TEMPLATE_ID)
+        .filter(form_item_privacy_is_public_expr())
+        .filter(func.lower(IndicatorBank.fdrs_kpi_code).in_(wanted))
+        .all()
+    )
+    catalog: dict[str, dict[str, Any]] = {}
+    for row in fetched:
+        key = (row.fdrs_kpi_code or "").strip().lower()
+        entry = {
+            "name": _blank(row.name),
+            "definition": _blank(row.definition),
+            "type": _blank(row.type_name),
+            "unit": _blank(row.unit_name),
+            "area": _area_text(row.area, row.area_label),
+            "disaggregation_guidance": _blank(row.disaggregation_guidance),
+            "data_source": _blank(row.data_source),
+        }
+        current = catalog.get(key)
+        if current is None or (not current.get("definition") and entry.get("definition")):
+            catalog[key] = entry
+    return catalog
+
+
+def _question_catalog(codes: set[str]) -> dict[str, dict[str, Any]]:
+    wanted = {code for code in codes if code in QUESTION_KPI_TO_ITEM}
+    if not wanted:
+        return {}
+    items = {
+        item.id: item
+        for item in FormItem.query.filter(FormItem.id.in_([QUESTION_KPI_TO_ITEM[code] for code in wanted])).all()
+    }
+    catalog: dict[str, dict[str, Any]] = {}
+    for code in wanted:
+        item = items.get(QUESTION_KPI_TO_ITEM[code])
+        if item is None:
+            continue
+        catalog[code] = {
+            "name": _blank(item.label),
+            "definition": _blank(item.definition),
+            "type": _blank(item.type) or _blank(item.item_type),
+        }
+    return catalog
+
+
+def _describe_code(
+    code: str,
+    banks: Mapping[str, Mapping[str, Any]],
+    questions: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    row: dict[str, Any] = {column: None for column in MAPPING_COLUMNS}
+    row["KPI_code"] = code
+    row["base_code"] = code
+    spec = parse_code(code)
+    if spec is None:
+        return row
+    row["breakdown"] = _breakdown_label(spec)
+    row["base_code"] = _base_code(spec)
+    if spec.kind == KIND_INCOME:
+        label = spec.income_row or code
+        row["name"] = label
+        row["definition"] = f"Funding from {label}, in Swiss francs."
+        row["type"] = "number"
+        row["unit"] = "CHF"
+        row["base_code"] = code
+        return row
+    if spec.kind == KIND_QUESTION:
+        meta = questions.get(code) or {}
+        row["name"] = meta.get("name")
+        row["definition"] = meta.get("definition")
+        row["type"] = meta.get("type")
+        row["base_code"] = code
+        return row
+    if spec.kind == KIND_NETWORK:
+        given = spec.network_prefix == "supported"
+        if spec.network_amount:
+            row["name"] = "Support provided (CHF)" if given else "Support received (CHF)"
+            row["definition"] = "Amounts in Swiss francs, in the same order as the counterpart DON codes."
+            row["type"] = "number"
+            row["unit"] = "CHF"
+        else:
+            row["name"] = "National Societies supported" if given else "National Societies support was received from"
+            row["definition"] = (
+                "DON codes of the National Societies this society supported, separated by commas."
+                if given
+                else "DON codes of the National Societies this society received support from, separated by commas."
+            )
+            row["type"] = "text"
+        row["base_code"] = code
+        return row
+    meta = None
+    for candidate in spec.candidates:
+        meta = banks.get(candidate.lower())
+        if meta:
+            row["base_code"] = candidate
+            break
+    if meta:
+        for field in ("name", "definition", "type", "unit", "area", "disaggregation_guidance", "data_source"):
+            row[field] = meta.get(field)
+    return row
+
+
+def export_mapping(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Indicator dictionary for the KPI codes present in ``rows``.
+
+    Sex and age codes inherit the parent indicator's name, definition, type, and unit.
+    Income sources, questions, and network-support codes are described from the FDRS
+    form, because they are not indicator-bank rows.
+    """
+    codes = {str(row.get("KPI_code") or "").strip() for row in rows}
+    codes.discard("")
+    if not codes:
+        return []
+    bank_codes: set[str] = set()
+    question_codes: set[str] = set()
+    for code in codes:
+        spec = parse_code(code)
+        if spec is None:
+            continue
+        if spec.kind == KIND_QUESTION:
+            question_codes.add(code)
+        bank_codes.update(spec.candidates)
+    banks = _bank_catalog(bank_codes)
+    questions = _question_catalog(question_codes)
+    return [_describe_code(code, banks, questions) for code in sorted(codes, key=_mapping_sort_key)]
+
+
 def export_csv(rows: Iterable[Mapping[str, Any]]) -> bytes:
+    """Data table only. A CSV has one table; the indicator dictionary is the workbook's second sheet."""
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=EXPORT_COLUMNS, extrasaction="ignore", lineterminator="\r\n")
     writer.writeheader()
@@ -969,15 +1232,33 @@ def export_csv(rows: Iterable[Mapping[str, Any]]) -> bytes:
     return buffer.getvalue().encode("utf-8-sig")
 
 
+def _fill_sheet(sheet: Any, columns: tuple[str, ...], records: Iterable[Mapping[str, Any]], widths: Mapping[str, int]) -> None:
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    sheet.append(list(columns))
+    for record in records:
+        sheet.append([record.get(column) for column in columns])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+    sheet.freeze_panes = "A2"
+    if sheet.dimensions:
+        sheet.auto_filter.ref = sheet.dimensions
+    for index, column in enumerate(columns, start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = widths.get(column, 18)
+
+
 def export_xlsx(rows: Iterable[Mapping[str, Any]]) -> bytes:
+    """Workbook with a Data sheet and an Indicators sheet for the codes in that data."""
     from openpyxl import Workbook
 
+    materialised = list(rows)
     workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "FDRS"
-    sheet.append(list(EXPORT_COLUMNS))
-    for row in rows:
-        sheet.append([row.get(column) for column in EXPORT_COLUMNS])
+    data = workbook.active
+    data.title = "Data"
+    _fill_sheet(data, EXPORT_COLUMNS, materialised, _DATA_COLUMN_WIDTHS)
+    indicators = workbook.create_sheet("Indicators")
+    _fill_sheet(indicators, MAPPING_COLUMNS, export_mapping(materialised), _MAPPING_COLUMN_WIDTHS)
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()

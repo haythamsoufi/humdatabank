@@ -201,7 +201,12 @@ def scenario(db_session, monkeypatch):
     section = create_test_section(db_session, template)
 
     volunteers = IndicatorBank(
-        name="Compat volunteers", type="number", unit="people", archived=False, fdrs_kpi_code="KPI_PeopleVol",
+        name="Compat volunteers",
+        type="number",
+        unit="people",
+        definition="People who volunteer for the National Society.",
+        archived=False,
+        fdrs_kpi_code="KPI_PeopleVol",
     )
     secret = IndicatorBank(
         name="Compat secret", type="number", unit="people", archived=False, fdrs_kpi_code="KPI_CompatSecret",
@@ -559,11 +564,20 @@ class TestEmbeddedContent:
             ),
             EmbedContent(
                 title="ECHO",
-                category="global_initiative",
+                category="analysis",
                 embed_url="https://app.powerbi.com/view?r=abc",
                 embed_type="powerbi",
+                page_slot="global_initiatives",
                 is_active=True,
                 sort_order=1,
+            ),
+            EmbedContent(
+                title="Category only",
+                category="global_initiative",
+                embed_url="https://app.powerbi.com/view?r=other",
+                embed_type="powerbi",
+                is_active=True,
+                sort_order=0,
             ),
         ])
         db_session.commit()
@@ -581,6 +595,49 @@ class TestEmbeddedContent:
         )
         initiatives = _get(client, key, "/api/embeddedcontent", type="GLOBAL-INITIATIVES").get_json()
         assert [item["TitleEn"] for item in initiatives] == ["ECHO"]
+
+    def test_international_overview_uses_the_page_slot(self, client, db_session, key):
+        db_session.add_all([
+            EmbedContent(
+                title="World overview",
+                description="The international dashboard.",
+                category="other",
+                embed_url="https://app.powerbi.com/view?r=world",
+                embed_type="powerbi",
+                page_slot="overview_international",
+                is_active=True,
+                sort_order=2,
+            ),
+            EmbedContent(
+                title="Draft",
+                category="other",
+                embed_url="https://app.powerbi.com/view?r=draft",
+                embed_type="powerbi",
+                page_slot="overview_international",
+                is_active=False,
+                sort_order=0,
+            ),
+            EmbedContent(
+                title="Unified",
+                category="analysis",
+                embed_url="https://databank.ifrc.org/upr/support-overview",
+                embed_type="databank",
+                page_slot="unified_planning",
+                is_active=True,
+                sort_order=1,
+            ),
+        ])
+        db_session.commit()
+
+        rows = _get(client, key, "/api/embeddedcontent", type="OVERVIEW-INTERNATIONAL").get_json()
+        assert [item["TitleEn"] for item in rows] == ["World overview"]
+        assert rows[0]["TextEn"] == rows[0]["TextAr"] == "The international dashboard."
+        assert rows[0]["Order"] == 2
+        assert rows[0]["EmbedCode"] == (
+            '<iframe title="World overview" '
+            'src="https://app.powerbi.com/view?r=world" '
+            'style="width:100%;height:640px;border:0;"></iframe>'
+        )
 
 
 class TestPassthrough:
@@ -901,11 +958,60 @@ class TestExport:
         assert "DCAA001" in response.get_data(as_text=True)
 
     def test_excel_is_a_workbook(self, client, scenario, key):
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+
         response = _get(client, key, "/csv/export", excel="1")
         assert response.status_code == 200
         assert response.data[:2] == b"PK"
         assert response.headers["Content-Disposition"].endswith('filename="fdrs.xlsx"')
         assert "spreadsheetml" in response.headers["Content-Type"]
+
+        workbook = load_workbook(BytesIO(response.data), read_only=True, data_only=True)
+        try:
+            assert workbook.sheetnames == ["Data", "Indicators"]
+            data_header = [cell.value for cell in next(workbook["Data"].iter_rows(max_row=1))]
+            assert data_header == list(adapter.EXPORT_COLUMNS)
+            indicator_rows = list(workbook["Indicators"].iter_rows(values_only=True))
+        finally:
+            workbook.close()
+
+        columns = indicator_rows[0]
+        assert columns == adapter.MAPPING_COLUMNS
+        by_code = {row[0]: dict(zip(columns, row)) for row in indicator_rows[1:]}
+        volunteers = by_code["KPI_PeopleVol"]
+        assert volunteers["name"] == "Compat volunteers"
+        assert volunteers["definition"] == "People who volunteer for the National Society."
+        assert (volunteers["type"], volunteers["unit"], volunteers["breakdown"]) == ("number", "people", "Total")
+        age = by_code["KPI_PeopleVol_M_age_6_12"]
+        assert age["base_code"] == "KPI_PeopleVol"
+        assert age["breakdown"] == "Male, age 6-12"
+        assert age["unit"] == "people"
+        assert by_code["KPI_PeopleVol_M"]["breakdown"] == "Male"
+        assert by_code["h_gov_CHF"]["name"] == "Home Government"
+        assert by_code["h_gov_CHF"]["unit"] == "CHF"
+        assert by_code["h_gov_CHF"]["breakdown"] == "Income source"
+        assert by_code["KPI_pr_sex"]["name"] == "President sex"
+        assert by_code["supported1"]["breakdown"] == "Counterpart societies"
+        assert "KPI_CompatSecret" not in by_code
+
+    def test_one_society_workbook_maps_only_that_societys_codes(self, client, scenario, key):
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+
+        response = _get(client, key, "/csv/exportns", doncode="DCBB001", excel="1")
+        assert response.status_code == 200
+        assert response.headers["Content-Disposition"].endswith('filename="fdrs-DCBB001.xlsx"')
+        workbook = load_workbook(BytesIO(response.data), read_only=True, data_only=True)
+        try:
+            codes = {row[0] for row in workbook["Indicators"].iter_rows(min_row=2, values_only=True)}
+            data_codes = {row[6] for row in workbook["Data"].iter_rows(min_row=2, values_only=True)}
+        finally:
+            workbook.close()
+        assert codes == {"KPI_PeopleVol"}
+        assert data_codes == {"KPI_PeopleVol"}
 
 
 class TestRegistry:

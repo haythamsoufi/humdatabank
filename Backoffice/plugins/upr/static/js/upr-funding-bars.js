@@ -14,6 +14,7 @@
         } catch (e) { /* keep the page catalogue */ }
     }
     var BAR_LIMIT = 15;
+    var DEFAULT_YEAR = 2026;
     var funding = [];
     var loaded = false;
     var ready = false;
@@ -139,6 +140,7 @@
         var years = Object.keys(seen).map(Number).sort(function (a, b) { return b - a; });
         var preset = parseInt(root.getAttribute('data-year') || '', 10);
         var previous = parseInt(select.value, 10);
+        var shared = window.UprYearSync ? parseInt(UprYearSync.read(), 10) : NaN;
         select.replaceChildren();
         years.forEach(function (year) {
             var option = document.createElement('option');
@@ -146,7 +148,10 @@
             option.textContent = String(year);
             select.appendChild(option);
         });
-        var pick = years.indexOf(previous) !== -1 ? previous : (years.indexOf(preset) !== -1 ? preset : years[0]);
+        var pick = years.indexOf(shared) !== -1 ? shared
+            : (years.indexOf(previous) !== -1 ? previous
+            : (years.indexOf(preset) !== -1 ? preset
+            : (years.indexOf(DEFAULT_YEAR) !== -1 ? DEFAULT_YEAR : years[0])));
         if (pick) select.value = String(pick);
     }
 
@@ -246,7 +251,19 @@
     var yearSelect = byId('upri-funding-year');
     if (yearSelect) {
         yearSelect.addEventListener('change', function () {
+            if (window.UprYearSync) UprYearSync.publish(yearSelect.value);
             syncFollowedYear(yearSelect.value);
+            draw();
+        });
+    }
+    if (window.UprYearSync && yearSelect && !followedSelect()) {
+        UprYearSync.subscribe(function (year) {
+            if (String(yearSelect.value) === String(year)) return;
+            var has = Array.prototype.some.call(yearSelect.options, function (option) {
+                return option.value === String(year);
+            });
+            if (!has) return;
+            yearSelect.value = String(year);
             draw();
         });
     }

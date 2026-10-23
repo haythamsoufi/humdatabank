@@ -15,6 +15,7 @@
         } catch (e) { /* keep the page catalogue */ }
     }
 
+    var DEFAULT_YEAR = 2026;
     var CLASSES = [
         { id: 'low', label: 'flow_coverage_low', color: '#e7a0a6' },
         { id: 'medium', label: 'flow_coverage_medium', color: '#c44955' },
@@ -85,7 +86,8 @@
         rows.forEach(function (row) { if (row.year) seen[row.year] = true; });
         var years = Object.keys(seen).map(Number).sort(function (a, b) { return a - b; });
         var preset = parseInt(root.getAttribute('data-year') || '', 10);
-        var current = selectedYear();
+        var shared = window.UprYearSync ? parseInt(UprYearSync.read(), 10) : NaN;
+        var current = shared || selectedYear();
         host.replaceChildren();
         years.forEach(function (year) {
             var button = document.createElement('button');
@@ -97,13 +99,16 @@
                 host.querySelectorAll('.upri-coverage__year').forEach(function (item) {
                     item.classList.toggle('is-active', item === button);
                 });
+                if (window.UprYearSync) UprYearSync.publish(button.getAttribute('data-year'));
                 draw();
             });
             host.appendChild(button);
         });
         var funded = years.filter(yearHasFunding);
         var fallback = funded.length ? funded[funded.length - 1] : years[years.length - 1];
-        var pick = years.indexOf(current) !== -1 ? current : (years.indexOf(preset) !== -1 ? preset : fallback);
+        var pick = years.indexOf(current) !== -1 ? current
+            : (years.indexOf(preset) !== -1 ? preset
+            : (years.indexOf(DEFAULT_YEAR) !== -1 ? DEFAULT_YEAR : fallback));
         host.querySelectorAll('.upri-coverage__year').forEach(function (button) {
             button.classList.toggle('is-active', Number(button.getAttribute('data-year')) === pick);
         });
@@ -532,6 +537,18 @@
             });
     }
 
+    if (window.UprYearSync && !followedSelect()) {
+        UprYearSync.subscribe(function (year) {
+            var host = byId('upri-coverage-years');
+            if (!host) return;
+            var match = host.querySelector('.upri-coverage__year[data-year="' + year + '"]');
+            if (!match || match.classList.contains('is-active')) return;
+            host.querySelectorAll('.upri-coverage__year').forEach(function (item) {
+                item.classList.toggle('is-active', item === match);
+            });
+            draw();
+        });
+    }
     var followed = followedSelect();
     if (followed) {
         followed.addEventListener('change', function () {

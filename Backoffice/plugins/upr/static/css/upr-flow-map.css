@@ -644,7 +644,19 @@
 }
 
 .upri-funding__toolbar {
+    display: flex;
+    justify-content: flex-start;
     margin-bottom: 0.85rem;
+}
+
+.upri-funding__toolbar .upri-field {
+    width: auto;
+    align-items: flex-start;
+}
+
+.upri-funding__toolbar .upri-select {
+    width: 6.5rem;
+    min-width: 0;
 }
 
 .upri-funding-embed-body {

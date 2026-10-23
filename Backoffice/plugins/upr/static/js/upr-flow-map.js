@@ -208,9 +208,12 @@
         state.filtersReady = true;
     }
 
+    var DEFAULT_YEAR = 2026;
+
     function defaultYear() {
         var fromLink = preset.year ? parseInt(preset.year, 10) : null;
         if (fromLink && state.years.indexOf(fromLink) !== -1) return fromLink;
+        if (state.years.indexOf(DEFAULT_YEAR) !== -1) return DEFAULT_YEAR;
         return state.years[0] || null;
     }
 
@@ -253,7 +256,10 @@
             option.textContent = String(year);
             els.year.appendChild(option);
         });
-        var pick = list.indexOf(previous) !== -1 ? previous : list[0];
+        var shared = window.UprYearSync ? parseInt(UprYearSync.read(), 10) : NaN;
+        var pick = list.indexOf(shared) !== -1 ? shared
+            : (list.indexOf(previous) !== -1 ? previous
+            : (list.indexOf(DEFAULT_YEAR) !== -1 ? DEFAULT_YEAR : list[0]));
         state.year = pick == null ? null : pick;
         if (pick != null) els.year.value = String(pick);
         if (document.querySelector('[data-follow-year="upri-flow-year"]')) {
@@ -1104,9 +1110,21 @@
     [els.year, els.pns, els.recipient].forEach(function (select) {
         if (!select) return;
         select.addEventListener('change', function () {
+            if (select === els.year && window.UprYearSync) UprYearSync.publish(els.year.value);
             if (state.loaded && state.allEdges.length) applyYear();
         });
     });
+    if (window.UprYearSync && els.year) {
+        UprYearSync.subscribe(function (year) {
+            if (String(els.year.value) === String(year)) return;
+            var has = Array.prototype.some.call(els.year.options, function (option) {
+                return option.value === String(year);
+            });
+            if (!has) return;
+            els.year.value = String(year);
+            els.year.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
     if (els.region) els.region.addEventListener('change', function () { if (state.loaded) load(); });
     if (els.refresh) els.refresh.addEventListener('click', function () { if (state.loaded) load(); });
 

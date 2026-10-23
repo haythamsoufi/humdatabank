@@ -7,8 +7,8 @@ import logging
 
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, TextAreaField, SubmitField, SelectField, DateField
-from wtforms.validators import DataRequired, Optional, Length, ValidationError
+from wtforms import IntegerField, StringField, TextAreaField, SubmitField, SelectField
+from wtforms.validators import DataRequired, NumberRange, Optional, Length, ValidationError
 from ..base import BaseForm, MultilingualForm, FileUploadForm, _get_language_display_name
 
 
@@ -112,7 +112,11 @@ class ResourceForm(MultilingualForm, FileUploadForm):
         default=0,
     )
 
-    publication_date = DateField("Publication Date (Optional)", format='%Y-%m-%d', validators=[Optional()])
+    document_year = IntegerField(
+        "Document year",
+        validators=[Optional(), NumberRange(min=1900, max=2100)],
+        render_kw={"min": 1900, "max": 2100, "inputmode": "numeric", "placeholder": "2024"},
+    )
 
     # Default language (English) fields
     default_title = StringField("Default Title (English)", validators=[DataRequired(), Length(max=255)])

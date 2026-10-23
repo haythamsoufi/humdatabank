@@ -6,6 +6,7 @@ from plugins.fdrs.services.fdrs_resource_sync import (
     dedupe_documents,
     group_documents,
     normalize_filename,
+    publication_date_for_catalog_year,
 )
 
 
@@ -19,6 +20,13 @@ def _doc(document_type, name, url, language="en", year=None):
         url=url,
         thumbnail="",
     )
+
+
+def test_catalog_year_zero_is_not_a_publication_date():
+    assert publication_date_for_catalog_year(2024).isoformat() == "2024-01-01"
+    assert publication_date_for_catalog_year(0) is None
+    assert publication_date_for_catalog_year(None) is None
+    assert publication_date_for_catalog_year("2022").isoformat() == "2022-01-01"
 
 
 def test_filename_match_ignores_case_and_underscores():

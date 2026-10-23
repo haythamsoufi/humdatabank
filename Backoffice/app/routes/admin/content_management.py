@@ -6,6 +6,7 @@ from contextlib import suppress
 import io
 import os
 import uuid
+from datetime import date
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
 from flask_login import current_user
@@ -839,6 +840,16 @@ def _thumbnail_language(rows):
     return chosen
 
 
+def _publication_date_for_year(year, current=None):
+    """Store a document year as 1 January, keeping an existing day when the year is unchanged."""
+    if year in (None, ""):
+        return None
+    year = int(year)
+    if current is not None and current.year == year:
+        return current
+    return date(year, 1, 1)
+
+
 def _format_resource_date(value):
     if not value:
         return ""
@@ -910,6 +921,7 @@ def _resource_grid_rows(resources):
             "publication_date": (
                 f"{resource.publication_date.isoformat()}T00:00:00" if resource.publication_date else None
             ),
+            "document_year": resource.publication_date.year if resource.publication_date else None,
             "publication_date_display": _format_resource_date(resource.publication_date),
             "description": resource.default_description or "",
             "thumbnail_url": (
@@ -988,7 +1000,7 @@ def new_resource():
                 resource_type=form.resource_type.data,
                 default_title=form.default_title.data,
                 default_description=form.default_description.data,
-                publication_date=form.publication_date.data,
+                publication_date=_publication_date_for_year(form.document_year.data),
                 resource_subcategory_id=sub_id if sub_id and sub_id > 0 else None,
             )
 
@@ -1022,6 +1034,8 @@ def new_resource():
 def edit_resource(resource_id):
     resource = Resource.query.get_or_404(resource_id)
     form = ResourceForm(obj=resource)
+    if request.method == "GET" and resource.publication_date:
+        form.document_year.data = resource.publication_date.year
 
     if request.method == 'POST':
         _decode_b64_form_text_fields(form)
@@ -1035,7 +1049,9 @@ def edit_resource(resource_id):
             resource.resource_type = form.resource_type.data
             resource.default_title = form.default_title.data
             resource.default_description = form.default_description.data
-            resource.publication_date = form.publication_date.data
+            resource.publication_date = _publication_date_for_year(
+                form.document_year.data, resource.publication_date
+            )
             sub_id = form.resource_subcategory_id.data
             resource.resource_subcategory_id = sub_id if sub_id and sub_id > 0 else None
 

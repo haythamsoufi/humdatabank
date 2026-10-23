@@ -94,6 +94,21 @@ class TestResourceFormValidation:
                 })
                 assert form.validate() is True
 
+    def test_document_year_must_be_a_plausible_year(self, app):
+        with app.app_context():
+            with patch('app.models.documents.ResourceSubcategory') as mock_rsc:
+                mock_rsc.query.order_by.return_value.all.return_value = []
+                from app.forms.content.resource_forms import ResourceForm
+                from werkzeug.datastructures import ImmutableMultiDict
+                form = ResourceForm(formdata=ImmutableMultiDict([
+                    ('default_title', 'My Resource'),
+                    ('resource_type', 'publication'),
+                    ('resource_subcategory_id', '0'),
+                    ('document_year', '1899'),
+                ]))
+                assert form.validate() is False
+                assert 'document_year' in form.errors
+
     def test_missing_default_title(self, app):
         with app.app_context():
             with patch('app.models.documents.ResourceSubcategory') as mock_rsc:

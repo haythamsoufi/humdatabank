@@ -171,15 +171,14 @@
             cellRenderer: languagesCell
         },
         {
-            field: 'publication_date',
-            headerName: {{ _('Publication Date')|tojson }},
-            minWidth: 160,
-            filter: 'agDateColumnFilter',
-            filterParams: AgGridRenderers.dateFilterParams,
+            field: 'document_year',
+            headerName: {{ _('Year')|tojson }},
+            minWidth: 110,
+            filter: 'agNumberColumnFilter',
             cellRenderer: function(params) {
-                var display = params.data && params.data.publication_date_display;
-                if (!display) return '<span class="text-gray-400">-</span>';
-                return esc(display);
+                var year = params.data && params.data.document_year;
+                if (!year) return '<span class="text-gray-400">-</span>';
+                return esc(String(year));
             }
         },
         {
@@ -309,7 +308,7 @@
                 if (api && typeof AgGridHelper.pinActionsColumn === 'function') {
                     AgGridHelper.pinActionsColumn(api, [
                         'thumbnail_url', 'title', 'resource_type', 'subcategory',
-                        'languages', 'publication_date', 'description', 'actions'
+                        'languages', 'document_year', 'description', 'actions'
                     ], helper && helper.columnVisibilityManager);
                 }
             }

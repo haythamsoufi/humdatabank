@@ -375,6 +375,21 @@ def build_plan(
     }
 
 
+def publication_date_for_catalog_year(year: Any) -> Optional[date]:
+    """1 January of a catalog year.
+
+    The legacy list uses ``0`` when a file has no reporting year. That is not a
+    date, and neither is a value outside 1900–2100.
+    """
+    try:
+        number = int(year)
+    except (TypeError, ValueError):
+        return None
+    if number < 1900 or number > 2100:
+        return None
+    return date(number, 1, 1)
+
+
 def fetch_global_catalog(base_url: str, api_key: str, *, timeout: int = 180) -> Any:
     """Download the global FDRS document list. The key is not logged."""
     import json
@@ -539,7 +554,7 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
             existed = resource is not None
             extended = False
             if resource is None:
-                published = date(action["year"], 1, 1) if action.get("year") else None
+                published = publication_date_for_catalog_year(action.get("year"))
                 resource = Resource(
                     resource_type="publication",
                     default_title=(action.get("title") or "Untitled")[:255],
@@ -555,6 +570,12 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
                     resource.resource_type = "publication"
                 if resource.resource_subcategory_id is None:
                     resource.resource_subcategory = subcategory_for(action["subcategory"])
+                # A row matched by filename can still be invisible on data.ifrc.org:
+                # no subcategory means it is left out of /api/documents?type=, and no
+                # publication date makes the page read a year out of the file name
+                # (Strategy 2030) or throw when the year is null.
+                if resource.publication_date is None:
+                    resource.publication_date = publication_date_for_catalog_year(action.get("year"))
             print(f"syncing {action.get('title')}", flush=True)
             for item in action.get("files") or []:
                 language = normalize_language(item.get("language"))

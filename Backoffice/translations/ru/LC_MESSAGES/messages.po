@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 16:55+0000\n"
+"POT-Creation-Date: 2026-10-23 21:18+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: ru <LL@li.org>\n"
@@ -9553,16 +9553,16 @@ msgstr "Документ находится на рассмотрении"
 msgid "Document repository"
 msgstr "Хранилище документов"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:420
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:447
 msgid "Document scan cancelled."
 msgstr "Сканирование документов отменено."
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:421
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:505
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:448
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:532
 msgid "Document scan failed"
 msgstr "Сканирование документов не прошло"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:123
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:131
 msgid "Document sheets"
 msgstr "Документальные листы"
 
@@ -9617,8 +9617,8 @@ msgstr "Статус документа"
 #: app/templates/core/dashboard.html:1254
 #: app/templates/public_submission_export_pdf.html:61
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:101
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:124
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:229
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:132
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:235
 msgid "Documents"
 msgstr "Типы документов"
 
@@ -9815,7 +9815,7 @@ msgid "Download {dashboard}"
 msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:105
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:230
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:236
 msgid "Downloadable"
 msgstr "Доступно для скачивания"
 
@@ -12243,8 +12243,8 @@ msgstr "Не удалось загрузить данные панели упр�
 msgid "Failed to load data"
 msgstr "Не удалось загрузить данные"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:352
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:360
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:379
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:387
 msgid "Failed to load document table"
 msgstr "Не удалось загрузить таблицу документов"
 
@@ -12316,7 +12316,7 @@ msgstr "Не удалось загрузить таблицу верификац
 msgid "Failed to process request."
 msgstr "Не удалось обработать запрос."
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:400
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:427
 msgid "Failed to read scan status"
 msgstr "Не удалось прочитать статус сканирования"
 
@@ -16412,7 +16412,7 @@ msgstr ""
 msgid "Loading divisions..."
 msgstr ""
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:135
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:143
 msgid "Loading document status…"
 msgstr "Загрузка статуса документа..."
 
@@ -17530,7 +17530,7 @@ msgstr "Сообщение, показывающее, если валидаци�
 msgid "Messages"
 msgstr "Сообщения"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:126
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:134
 msgid "Meta"
 msgstr "Мета"
 
@@ -17585,6 +17585,11 @@ msgstr "Отчёты за середину года: участие"
 #: app/utils/form_localization.py:152
 msgid "Migrants"
 msgstr "Мигранты"
+
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:109
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:237
+msgid "Migrated"
+msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:245
 msgid "Min Score"
@@ -18463,7 +18468,7 @@ msgstr "В следующем году"
 #: app/templates/forms/form_builder/partials/_template_details.html:56
 #: app/templates/forms/form_builder/partials/_template_details.html:70
 #: app/templates/forms/form_builder/partials/_template_details.html:88
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:269
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:280
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:745
 msgid "No"
 msgstr "Нет"
@@ -19415,7 +19420,7 @@ msgstr ""
 msgid "No rows added"
 msgstr "Строк не добавлено"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:135
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:143
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:119
 msgid "No rows in this sheet."
 msgstr "В этом листе нет строк."
@@ -19868,6 +19873,11 @@ msgstr "Нет в каталоге (по URL)"
 #: plugins/upr/analysis_labels.py:191
 msgid "Not loaded"
 msgstr "Не заряжен"
+
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:113
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:238
+msgid "Not migrated"
+msgstr ""
 
 #: app/templates/admin/analytics/user_detail.html:41
 #: app/templates/core/layout.html:366
@@ -22479,12 +22489,12 @@ msgid "Privacy"
 msgstr "Приватный"
 
 #: app/templates/components/ag_grid_i18n_js.html:40
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:276
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:300
 msgid "Private"
 msgstr "Приватный"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:113
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:232
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:121
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:240
 msgid "Private 403s"
 msgstr "Частные 403"
 
@@ -22495,13 +22505,11 @@ msgstr "Зонд"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:41
 msgid ""
-"Probe every FDRS catalog document URL (the same scan as the Excel export) "
-"and keep a filterable log here. Results are stored in blob storage so they "
-"survive deploys and page reloads."
+"Probe every FDRS catalog document URL (the same scan as the Excel export), "
+"compare each against Backoffice submitted documents (migrated vs still "
+"pending / missing), and keep a filterable log here. Results are stored in "
+"blob storage so they survive deploys and page reloads."
 msgstr ""
-"Проверьте URL каждого документа каталога FDRS (тот же скан, что и экспорт в "
-"Excel) и ведите фильтруемый журнал здесь. Результаты хранятся в хранилище "
-"blob, чтобы выдержать развертывание и перезагрузку страниц."
 
 #: app/templates/admin/ai/knowledge_base.html:762
 msgid "Process"
@@ -22662,7 +22670,7 @@ msgstr "Приоритет поставщика"
 #: app/templates/admin/ai/knowledge_base.html:774
 #: app/templates/admin/api_management.html:1861
 #: app/templates/components/ag_grid_i18n_js.html:39
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:275
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:299
 msgid "Public"
 msgstr "Публичный"
 
@@ -22671,8 +22679,8 @@ msgstr "Публичный"
 msgid "Public (external facing)"
 msgstr "Публичный (внешний интерфейс)"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:109
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:231
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:117
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:239
 msgid "Public 403s"
 msgstr "Публичные 403"
 
@@ -24191,8 +24199,8 @@ msgstr "Изменения запросов"
 msgid "Request changes?"
 msgstr ""
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:437
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:514
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:464
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:541
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:889
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1009
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1118
@@ -24460,7 +24468,7 @@ msgstr ""
 msgid "Resume"
 msgstr "Возобновить"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:547
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:574
 msgid "Resuming scan..."
 msgstr "Возобновляем сканирование..."
 
@@ -25248,7 +25256,7 @@ msgstr "Сканируйте ещё раз"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:19
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:73
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:144
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:150
 msgid "Scan document URLs"
 msgstr "URL-адреса сканирования документов"
 
@@ -25260,7 +25268,7 @@ msgstr "Scan for New Plugins"
 msgid "Scan plugin directories for new plugins"
 msgstr "Scan for New Plugins"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:491
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:518
 msgid "Scanning..."
 msgstr "Сканирование..."
 
@@ -25352,7 +25360,7 @@ msgstr "Поиск %(label)s..."
 msgid "Search Definition"
 msgstr "Определение поиска"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:129
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:137
 msgid "Search ISO3, name, type…"
 msgstr "Поиск по ISO3, имя, тип..."
 
@@ -25513,7 +25521,7 @@ msgstr "Поисковые подразделения..."
 msgid "Search documentation..."
 msgstr "Документация по поиску..."
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:128
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:136
 msgid "Search documents"
 msgstr "Поисковые документы"
 
@@ -27885,7 +27893,7 @@ msgid "Starting translation for"
 msgstr "Начало перевода для"
 
 #: app/templates/admin/ai/knowledge_base.html:810
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:489
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:516
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1081
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1632
 msgid "Starting..."
@@ -28060,7 +28068,7 @@ msgid "Stop Translation?"
 msgstr "Прекратить перевод?"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:80
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:151
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:157
 msgid "Stop scan"
 msgstr "Остановите сканирование"
 
@@ -28087,8 +28095,8 @@ msgstr "Остановить проверку"
 msgid "Stopped"
 msgstr "Остановка"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:429
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:471
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:456
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:498
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:823
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1377
 msgid "Stopping..."
@@ -28449,7 +28457,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:2782
 #: app/templates/forms/entry_form/validation_summary_pdf.html:175
-#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:125
+#: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:133
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:105
 msgid "Summary"
 msgstr "Краткое содержание"
@@ -33780,7 +33788,7 @@ msgstr "Жёлтый"
 #: app/templates/forms/form_builder/partials/_template_details.html:54
 #: app/templates/forms/form_builder/partials/_template_details.html:68
 #: app/templates/forms/form_builder/partials/_template_details.html:86
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:268
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:279
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:745
 msgid "Yes"
 msgstr "Да"
@@ -34826,6 +34834,10 @@ msgstr "могут иметь связанные данные."
 msgid "method, endpoint, description, activity type"
 msgstr "Метод, конечная точка, описание, тип деятельности"
 
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:105
+msgid "migrated"
+msgstr ""
+
 #: app/templates/admin/analytics/sessions.html:155
 #: app/templates/tours/tours.html:483
 msgid "min"
@@ -34911,6 +34923,10 @@ msgid "non-compliant countries have compliance documents pending validation."
 msgstr ""
 "Страны, не соответствующие требованиям, имеют документы по соблюдению "
 "требований, ожидающие проверки."
+
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:107
+msgid "not migrated"
+msgstr ""
 
 #: app/templates/auth/login.html:767
 msgid "not registered"
@@ -35068,7 +35084,7 @@ msgstr "собственное имя или технический термин
 msgid "provisional"
 msgstr "Предварительный"
 
-#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:105
+#: plugins/fdrs/templates/admin/_fdrs_documents_script.html:111
 msgid "public 403s unexpected"
 msgstr "Публичные 403 неожиданно"
 
@@ -35939,3 +35955,13 @@ msgstr "✓"
 #~ "Unified Planning sends this embed to the FDRS unified-planning page, in sort"
 #~ " order. The other slots mark a section on the Global Initiatives page."
 #~ msgstr ""
+
+# [Removed] was: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:41
+#~ msgid ""
+#~ "Probe every FDRS catalog document URL (the same scan as the Excel export) "
+#~ "and keep a filterable log here. Results are stored in blob storage so they "
+#~ "survive deploys and page reloads."
+#~ msgstr ""
+#~ "Проверьте URL каждого документа каталога FDRS (тот же скан, что и экспорт в "
+#~ "Excel) и ведите фильтруемый журнал здесь. Результаты хранятся в хранилище "
+#~ "blob, чтобы выдержать развертывание и перезагрузку страниц."

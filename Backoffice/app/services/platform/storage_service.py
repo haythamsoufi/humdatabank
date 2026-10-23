@@ -19,6 +19,7 @@ import os
 import re
 import tempfile
 from typing import Optional, Tuple, Union
+from urllib.parse import quote
 
 from flask import current_app, send_file
 
@@ -261,6 +262,20 @@ def harden_upload_response(response, *, mimetype: Optional[str], as_attachment: 
     return response
 
 
+def _content_disposition_header(filename: str, *, as_attachment: bool) -> str:
+    """One Content-Disposition value Chrome will accept.
+
+    Names with spaces must stay a single header. ``dump_header`` walks a
+    string as separate tokens and joins them with commas, which Chrome
+    treats as multiple Content-Disposition headers
+    (``ERR_RESPONSE_HEADERS_MULTIPLE_CONTENT_DISPOSITION``).
+    """
+    disposition = "attachment" if as_attachment else "inline"
+    name = (filename or "download").replace("\\", "/").rsplit("/", 1)[-1]
+    name = name.replace("\r", "").replace("\n", "").strip() or "download"
+    return f"{disposition}; filename*=UTF-8''{quote(name, safe='')}"
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -357,7 +372,6 @@ def stream_response(
 
         if blob_size > _AZURE_STREAM_THRESHOLD:
             from flask import Response as FlaskResponse
-            from werkzeug.http import dump_header
 
             def _generate():
                 stream = blob.download_blob()
@@ -367,11 +381,10 @@ def stream_response(
             headers = {
                 "Content-Type": effective_mime,
                 "Content-Length": str(blob_size),
+                "Content-Disposition": _content_disposition_header(
+                    filename, as_attachment=as_attachment
+                ),
             }
-            if as_attachment:
-                headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{dump_header(filename)}"
-            else:
-                headers["Content-Disposition"] = f"inline; filename*=UTF-8''{dump_header(filename)}"
             return harden_upload_response(
                 FlaskResponse(_generate(), headers=headers),
                 mimetype=effective_mime,

@@ -533,10 +533,16 @@ class TestStreamResponse:
             with patch.object(svc, "_get_container_client", return_value=mock_container):
                 with app.test_request_context():
                     resp = svc.stream_response(
-                        "admin_documents", "large.bin", "large.bin",
+                        "admin_documents", "large.bin",
+                        "audited Financial Statement_Afghanistan_2024.pdf",
                         as_attachment=False,
                     )
-            assert resp is not None
+            disposition = resp.headers["Content-Disposition"]
+            assert disposition == (
+                "inline; filename*=UTF-8''"
+                "audited%20Financial%20Statement_Afghanistan_2024.pdf"
+            )
+            assert "," not in disposition
             app.config.pop("UPLOAD_STORAGE_PROVIDER", None)
 
     def test_azure_large_file_as_attachment(self, app):
@@ -558,8 +564,9 @@ class TestStreamResponse:
                         "admin_documents", "large.pdf", "large.pdf",
                         as_attachment=True,
                     )
-            headers = dict(resp.headers)
-            assert "attachment" in headers.get("Content-Disposition", "")
+            disposition = resp.headers["Content-Disposition"]
+            assert disposition == "attachment; filename*=UTF-8''large.pdf"
+            assert "," not in disposition
             app.config.pop("UPLOAD_STORAGE_PROVIDER", None)
 
     def test_stream_response_explicit_mimetype(self, app, tmp_path):

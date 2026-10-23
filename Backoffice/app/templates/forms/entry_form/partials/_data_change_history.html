@@ -53,20 +53,7 @@
 <span class="entry-item-history cursor-help w-5 h-5" tabindex="0" aria-label="{{ _('Change history')|forceescape }}">
     <i class="fas fa-history" aria-hidden="true"></i>
     <span class="tooltip-text" role="tooltip">
-        <p class="history-title">{{ _('Change history') }}</p>
         {% if item_history and item_history.events %}
-        <p class="history-meta">
-            <span class="history-label">{{ _('Entered by') }}</span>
-            {{ data_history_person(item_history.entered_by) }}
-            {% if item_history.entered_at %}· {{ item_history.entered_at|format_datetime_localized('short', 'short') }}{% endif %}
-        </p>
-        {% if item_history.last_changed_by %}
-        <p class="history-meta">
-            <span class="history-label">{{ _('Last changed by') }}</span>
-            {{ data_history_person(item_history.last_changed_by) }}
-            {% if item_history.last_changed_at %}· {{ item_history.last_changed_at|format_datetime_localized('short', 'short') }}{% endif %}
-        </p>
-        {% endif %}
         {% for event in item_history.events %}
         <div class="history-event">
             <div class="history-event-head">

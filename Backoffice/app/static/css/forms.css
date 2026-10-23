@@ -1108,7 +1108,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .form-item-block:hover > .flex .entry-item-history,
 .form-item-block:focus-within > .flex .entry-item-history,
 .form-group:hover > .flex .entry-item-history,
-.form-group:focus-within > .flex .entry-item-history {
+.form-group:focus-within > .flex .entry-item-history,
+/* Stay interactive while the fixed tooltip is open (cursor may leave the card). */
+.entry-item-history.entry-tooltip-open {
   opacity: 1;
   width: 1.25rem;
   height: 1.25rem;

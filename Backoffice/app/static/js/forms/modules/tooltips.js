@@ -24,11 +24,21 @@ const ENTRY_FORM_TOOLTIP_SELECTORS = [
 const MARGIN     = 8;  // px gap between trigger icon and tooltip box
 const ARROW_HALF = 5;  // matches border-width: 5px in the ::after rule
 const ARROW_MIN  = 10; // minimum distance from tooltip edge to arrow centre
+const HIDE_DELAY_MS = 150;
+// History panels are taller and often need the scrollbar; give more time to reach them.
+const HISTORY_HIDE_DELAY_MS = 350;
+const OPEN_CLASS = 'entry-tooltip-open';
 
 // Module-level reference so the scroll handler can always reach the active tooltip.
 let _activeContainer  = null;
 let _activeHideTimer  = null;
 let _scrollRafPending = false;
+
+function hideDelayFor(container) {
+  return container.classList.contains('entry-item-history')
+    ? HISTORY_HIDE_DELAY_MS
+    : HIDE_DELAY_MS;
+}
 
 /** Returns the viewport x coordinate the tooltip must not cross on the left.
  *  Reads the admin sidebar's live right edge so it works for both expanded
@@ -110,6 +120,10 @@ function positionTooltip(tooltipContainer) {
 
   tooltip.style.visibility = 'visible';
   tooltip.style.opacity    = '1';
+  // Keep hover-hidden history icons expanded while the fixed tooltip is open;
+  // otherwise leaving the field card collapses the icon (pointer-events:none)
+  // and the cursor can never reach the panel.
+  tooltipContainer.classList.add(OPEN_CLASS);
 }
 
 function hideTooltip(tooltipContainer) {
@@ -118,6 +132,7 @@ function hideTooltip(tooltipContainer) {
   if (!tooltip) return;
   tooltip.style.visibility = 'hidden';
   tooltip.style.opacity    = '0';
+  tooltipContainer.classList.remove(OPEN_CLASS);
   // Do NOT touch position/left/top/right or CSS variables here.
   // The CSS rule has `transition: opacity .3s` so the fade takes 300 ms.
   // Resetting position fixed→absolute mid-transition reflows the element to
@@ -142,7 +157,10 @@ export function bindTooltipEvents(container) {
 
   const scheduleHide = () => {
     clearTimeout(_activeHideTimer);
-    _activeHideTimer = setTimeout(() => hideTooltip(container), 150);
+    _activeHideTimer = setTimeout(
+      () => hideTooltip(container),
+      hideDelayFor(container),
+    );
   };
 
   container.addEventListener('mouseenter', show);

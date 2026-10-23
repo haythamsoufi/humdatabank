@@ -1216,8 +1216,10 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
         if not rows:
             return ""
 
-        # Resolve entity names where possible (e.g. national society id -> NS name)
-        html_parts = [f"{escape(field_label)}:<br>"]
+        # Resolve entity names where possible (e.g. national society id -> NS name).
+        # Field history already sits on the item, so an empty label must not render a lone colon.
+        label_text = str(field_label or "").strip()
+        html_parts = [f"{escape(label_text)}:<br>"] if label_text else []
         has_content = False
 
         def _row_sort_key(rc):

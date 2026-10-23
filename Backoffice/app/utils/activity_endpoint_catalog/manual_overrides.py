@@ -197,4 +197,8 @@ MANUAL_ACTIVITY_OVERRIDES: dict[tuple[str, str], ActivityEndpointSpec] = {
         description="Resolved a security event",
         activity_type="admin_monitoring",
     ),
+    ("POST", "admin.validation_dashboard_emergencies_export"): ActivityEndpointSpec(
+        description="Exported the UPR emergencies list",
+        activity_type="admin_other",
+    ),
 }

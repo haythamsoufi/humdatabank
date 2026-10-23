@@ -301,7 +301,7 @@
         {# ——— UPR emergencies: applicable list for the round, marked covered or not ——— #}
         <div id="panel-emergencies" class="vd-panel hidden p-6">
             <p class="vd-cap-intro">
-                {{ _('Every emergency that applies to a country in this round. Covered means it was added on each list that includes it. Not covered means at least one of those lists is still missing it.') }}
+                {{ _('Every emergency that applies to a country in this round. A tick means it was added on every list, a cross means it was added on none, and a yellow mark means only some lists include it. For a planning round, those lists show the people and funding figures, or Not reported when nothing was entered. Total Multiyear Requested is the appeal total. A multi-year appeal is flagged when that year holds the whole request.') }}
             </p>
             <div class="vd-cap-stats" aria-live="polite">
                 <div class="vd-cap-stat">
@@ -336,11 +336,16 @@
                             <option value="missing">{{ _('Not covered') }}</option>
                             <option value="covered">{{ _('Covered') }}</option>
                             <option value="all">{{ _('All, including ones outside the list') }}</option>
+                            <option value="funding_gap">{{ _('Annualised funding gap') }}</option>
                         </select>
                     </div>
                     <div class="vd-field vd-field-country">
                         <label for="vd-em-search" class="vd-field-label">{{ _('Country or emergency') }}</label>
                         <input type="search" id="vd-em-search" class="vd-select" placeholder="{{ _('Search')|forceescape }}">
+                    </div>
+                    <div class="vd-field vd-em-export-field">
+                        <span class="vd-field-label">&nbsp;</span>
+                        <button type="button" id="vd-em-export" class="vd-em-export">{{ _('Export Excel') }}</button>
                     </div>
                 </div>
             </div>
@@ -363,6 +368,7 @@
     'runChecksUrl': url_for('admin.validation_dashboard_run_checks'),
     'trackerUrl': url_for('admin.validation_dashboard_tracker_api'),
     'emergenciesUrl': url_for('admin.validation_dashboard_emergencies_api'),
+    'emergenciesExportUrl': url_for('admin.validation_dashboard_emergencies_export'),
     'capacityUrl': url_for('admin.validation_dashboard_capacity_api'),
     'mapboxAccessToken': mapbox_access_token,
     'mapboxStyleId': mapbox_style_id,
@@ -469,15 +475,35 @@
         'emergenciesEmpty': _('No emergencies apply to this round.'),
         'emergenciesEmptyFilter': _('No emergencies match this filter.'),
         'emergenciesLoadFailed': _('Failed to load emergencies'),
+        'emergenciesExportFailed': _('Failed to export emergencies'),
         'emergenciesUnavailable': _('The emergency list is not available yet.'),
         'emergencyCovered': _('Covered'),
         'emergencyMissing': _('Not covered'),
+        'emergencyPartial': _('Partial'),
         'emergencyNotApplicable': _('Not applicable'),
         'emergencyNoLonger': _('No longer applicable'),
         'emergencyCountry': _('Country'),
         'emergencyName': _('Emergency'),
         'emergencyCode': _('Code'),
         'emergencyStatus': _('Coverage'),
+        'emergencySingles': _('Single appeals'),
+        'emergencyGrouped': _('Grouped appeals'),
+        'emergencyOne': _('appeal'),
+        'emergencyMany': _('appeals'),
+        'emergencyGroup': _('group'),
+        'emergencyGroups': _('groups'),
+        'groupTotal': _('Group total'),
+        'sourceErp': _('ERP'),
+        'sourceGo': _('GO'),
+        'sourceDatabank': _('Databank'),
+        'emergencyDuration': _('Duration'),
+        'emergencyOneYear': _('1 year'),
+        'emergencyYears': _('years'),
+        'emergencyRequested': _('Total Multiyear Requested'),
+        'emergencyFundingCheck': _('Annualised funding'),
+        'fundingNotAnnualised': _('Not annualised'),
+        'fundingNotEntered': _('Not reported'),
+        'fundingEntered': _('Entered'),
     }
 } %}
 {{ ag_grid_page_config('validationDashboardConfig', 'VD_GRID_TRANSLATIONS', vd_grid_bootstrap) }}

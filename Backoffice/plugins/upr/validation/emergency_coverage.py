@@ -567,11 +567,8 @@ def _display_names(aes):
 
     def names(item_label: str, section_name: str) -> str:
         nonlocal resolved
-        raw = str(item_label or "").strip()
-        if raw in {"", "-", "—"}:
-            raw = str(section_name or "").strip()
-        if not raw:
-            return "Emergency appeals"
+        period = getattr(getattr(aes, "assigned_form", None), "period_name", None)
+        raw = coverage_source_title(item_label, section_name, period)
         if "[" not in raw:
             return raw
         if resolved is None:
@@ -687,11 +684,35 @@ def _fill_assignment_period(text: str, period: str | None) -> str:
     return filled.replace("[assignment_period]", period_text)
 
 
+_ENTITY_SUFFIX_RE = re.compile(r"\s+by\s+\[entity_name\]", re.IGNORECASE)
+_IN_YEAR_RE = re.compile(r"\bin\s+(20\d{2})\s*$")
+
+
+def coverage_source_title(item_label: str, section_name: str, period: str | None = None) -> str:
+    """Name an emergency list from its section, keeping the round year.
+
+    The Emergency Appeals matrix lives in People to be reached, so the list is
+    "People to be reached in 2027" rather than the field label
+    "Emergency Appeals in 2027". A section that already names the period, such
+    as Funding Requirements, is left as it is.
+    """
+    section = _ENTITY_SUFFIX_RE.sub("", str(section_name or "")).strip()
+    item = _fill_assignment_period(str(item_label or "").strip(), period)
+    if item in {"", "-", "—"}:
+        item = ""
+    section_filled = _fill_assignment_period(section, period).strip()
+    if section_filled and "[" not in section_filled:
+        year = _IN_YEAR_RE.search(item)
+        if year and not _PERIOD_YEAR_RE.search(section_filled):
+            return f"{section_filled} in {year.group(1)}"
+        return section_filled
+    if item and "[" not in item:
+        return item
+    return section_filled or item or "Emergency appeals"
+
+
 def _plain_section_name(item_label: str, section_name: str) -> str:
-    raw = str(item_label or "").strip()
-    if raw in {"", "-", "—"}:
-        raw = str(section_name or "").strip()
-    return raw or "Emergency appeals"
+    return coverage_source_title(item_label, section_name, None)
 
 
 class _CoverageBatch:
@@ -757,7 +778,7 @@ class _CoverageBatch:
         period = self._period(aes)
 
         def names(item_label, section_name):
-            return _fill_assignment_period(_plain_section_name(item_label, section_name), period)
+            return coverage_source_title(item_label, section_name, period)
 
         sources = []
         for item, section_name, plugin_config in self.repeat_defs.get(template_id, []):

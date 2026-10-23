@@ -231,6 +231,21 @@ def test_both_planning_lists_are_named_in_the_warning():
     ]
 
 
+def test_emergency_appeals_list_is_named_from_the_people_reached_section():
+    from plugins.upr.validation.emergency_coverage import coverage_source_title
+
+    assert coverage_source_title(
+        "Emergency Appeals in [assignment_period]",
+        "People to be reached by [entity_name]",
+        "2027",
+    ) == "People to be reached in 2027"
+    assert coverage_source_title(
+        "",
+        "Funding Requirements for [assignment_period]",
+        "2027",
+    ) == "Funding Requirements for 2027"
+
+
 def test_section_names_fill_the_assignment_period():
     from plugins.upr.validation.emergency_coverage import _fill_assignment_period
 

@@ -155,8 +155,8 @@ def normalize_appeal_group_row(row: dict) -> dict:
         "group_appeal_name": (row.get("Group_Appeal_Name") or "").strip(),
         "group_geographical_code": (row.get("Group_Geographical_Code") or "").strip().upper(),
         "disaster_type": (row.get("Disaster_Type") or "").strip(),
-        "amount_requested": None,
-        "amount_funded": None,
+        "amount_requested": _money(row.get("Amount_Requested")),
+        "amount_funded": _money(row.get("Amount_Funded")),
         "num_beneficiaries": None,
         "event": None,
     }

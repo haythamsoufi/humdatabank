@@ -1,6 +1,8 @@
 """Validation dashboard — preview flags by country and generate questions."""
 
-from flask import current_app, render_template, request
+from io import BytesIO
+
+from flask import current_app, render_template, request, send_file
 from flask_login import login_required, current_user
 
 from app import db
@@ -82,6 +84,39 @@ def validation_dashboard_emergencies_api():
     if template_id not in UPR_VALIDATION_TEMPLATE_IDS:
         return json_bad_request("Emergencies are available for Unified Planning and Reporting.")
     return json_ok(**load_round_emergencies(template_id, period))
+
+
+@bp.route("/validation-dashboard/api/emergencies/export", methods=["POST"])
+@login_required
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
+def validation_dashboard_emergencies_export():
+    """Download the emergencies catalogue as a formatted workbook."""
+    from plugins.upr.validation.emergency_excel import build_emergencies_workbook, export_filename
+
+    csrf_error = enforce_csrf_json()
+    if csrf_error:
+        return csrf_error
+    data = get_json_safe() or {}
+    rows = data.get("rows")
+    if not isinstance(rows, list):
+        return json_bad_request("rows are required")
+    if len(rows) > 20000:
+        return json_bad_request("Too many rows to export")
+    round_label = str(data.get("round_label") or data.get("period") or "").strip()
+    content = build_emergencies_workbook(
+        {
+            "sections": data.get("sections") or [],
+            "plan_columns": bool(data.get("plan_columns")),
+            "rows": rows,
+        },
+        round_label=round_label,
+    )
+    return send_file(
+        BytesIO(content),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=export_filename(round_label),
+    )
 
 
 @bp.route("/validation-dashboard/api/tracker", methods=["GET"])

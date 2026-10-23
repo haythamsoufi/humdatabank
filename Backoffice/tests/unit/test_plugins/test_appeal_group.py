@@ -50,6 +50,8 @@ def test_child_row_keeps_country_code_and_parent():
         "Subtype": "Emergency",
         "Original_Subtype": "Minor Emergency",
         "Group_Appeal_Name": "Sudan Crisis Regional Population Movement",
+        "Amount_Requested": 27000000,
+        "Amount_Funded": "9763020.15",
     })
     assert row["code"] == "MDRUG051"
     assert row["part_of"] == "MDRS1001"

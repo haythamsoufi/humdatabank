@@ -9,6 +9,8 @@
     var csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     var feedbackEl = document.getElementById('vd-feedback');
     var SCOPE_STORAGE_KEY = 'humdb_validation_dashboard_scope_v2';
+    var VIEWS = ['tracker', 'country-validation', 'capacity', 'emergencies'];
+    var urlWriteSuspended = false;
 
     var state = {
         templateId: null,
@@ -94,8 +96,57 @@
         syncUprSubtabs(matched ? target : '');
         syncCapacityTab(matched ? target : '');
         syncEmergenciesTab(matched ? target : '');
+        writeUrlState();
         return matched || !target;
     }
+
+    function readUrlState() {
+        var params = new URLSearchParams(window.location.search);
+        var templateId = params.get('template') || '';
+        var view = params.get('tab') || '';
+        if (!/^\d+$/.test(templateId)) templateId = '';
+        if (VIEWS.indexOf(view) === -1) view = '';
+        return { templateId: templateId, view: view };
+    }
+
+    function currentView() {
+        var active = document.querySelector('#vd-main-tabs .settings-tab[aria-selected="true"]');
+        if (!active || active.classList.contains('hidden')) return 'tracker';
+        return active.getAttribute('data-tab') || 'tracker';
+    }
+
+    function writeUrlState() {
+        if (urlWriteSuspended) return;
+        var url = new URL(window.location.href);
+        var templateId = getTemplateId();
+        var view = currentView();
+        if (templateId) url.searchParams.set('template', templateId);
+        else url.searchParams.delete('template');
+        if (view) url.searchParams.set('tab', view);
+        else url.searchParams.delete('tab');
+        var next = url.pathname + url.search + url.hash;
+        if (next !== window.location.pathname + window.location.search + window.location.hash) {
+            window.history.replaceState(null, '', next);
+        }
+    }
+
+    function activateView(view) {
+        if (VIEWS.indexOf(view) === -1) return false;
+        var btn = document.querySelector('#vd-main-tabs [data-tab="' + view + '"]');
+        if (!btn || btn.classList.contains('hidden')) return false;
+        if (btn.getAttribute('aria-selected') === 'true') return true;
+        btn.click();
+        return true;
+    }
+
+    function syncTemplateChrome() {
+        var id = getTemplateId();
+        syncUprSubtabs(id);
+        syncCapacityTab(id);
+        syncEmergenciesTab(id);
+        writeUrlState();
+    }
+    window.validationDashboardSyncTemplate = syncTemplateChrome;
 
     function syncEmergenciesTab(templateId) {
         var tab = document.querySelector('#vd-main-tabs [data-tab="emergencies"]');
@@ -716,6 +767,7 @@
                 var tabId = btn.getAttribute('data-tab');
                 if (!tabId) return;
                 A.activateStripTab('#vd-main-tabs', tabId, { panelSelector: '.vd-panel', panelIdPrefix: 'panel-' });
+                writeUrlState();
                 document.dispatchEvent(new CustomEvent('vd-main-tab-activated', { detail: { tab: tabId } }));
                 if (tabId === 'country-validation') {
                     var period = periodValue('vd-period');
@@ -735,6 +787,7 @@
     el('vd-period')?.addEventListener('change', function () {
         if (scopeLoader.isRoundScope && scopeLoader.isRoundScope()) {
             scopeLoader.commitRoundSelection(this);
+            syncTemplateChrome();
             if (window.validationDashboardTracker && window.validationDashboardTracker.markStale) {
                 window.validationDashboardTracker.markStale();
             }
@@ -779,31 +832,43 @@
     setActionButtonsEnabled(false);
 
     async function restoreSavedScope() {
-        syncCapacityTab(getTemplateId());
-        var saved = readSavedScope();
-        if (saved) {
-            if (LAYOUTS.indexOf(saved.layout) !== -1) state.layout = saved.layout;
-            state.flaggedOnly = !!saved.flaggedOnly;
-            state.search = typeof saved.search === 'string' ? saved.search : '';
-            if (el('vd-flagged-only')) el('vd-flagged-only').checked = state.flaggedOnly;
-            if (el('vd-indicator-search')) el('vd-indicator-search').value = state.search;
-            syncLayoutControls();
-        }
+        var urlState = readUrlState();
+        urlWriteSuspended = true;
+        try {
+            syncCapacityTab(getTemplateId());
+            var saved = readSavedScope();
+            if (urlState.templateId) {
+                saved = saved || {};
+                saved.templateId = urlState.templateId;
+            }
+            if (saved) {
+                if (LAYOUTS.indexOf(saved.layout) !== -1) state.layout = saved.layout;
+                state.flaggedOnly = !!saved.flaggedOnly;
+                state.search = typeof saved.search === 'string' ? saved.search : '';
+                if (el('vd-flagged-only')) el('vd-flagged-only').checked = state.flaggedOnly;
+                if (el('vd-indicator-search')) el('vd-indicator-search').value = state.search;
+                syncLayoutControls();
+            }
 
-        if (!saved || !saved.templateId) {
-            if (getTemplateId()) await applyScope(null, null);
-            await notifyTracker(null);
-            return;
-        }
+            if (!saved || !saved.templateId) {
+                if (getTemplateId()) await applyScope(null, null);
+                await notifyTracker(null);
+                return;
+            }
 
-        if (!setTemplateId(saved.templateId)) {
-            if (getTemplateId()) await applyScope(null, null);
-            await notifyTracker(null);
-            return;
-        }
+            if (!setTemplateId(saved.templateId)) {
+                if (getTemplateId()) await applyScope(null, null);
+                await notifyTracker(null);
+                return;
+            }
 
-        await applyScope(saved.period, saved.countryId);
-        await notifyTracker(saved.period);
+            await applyScope(saved.period, saved.countryId);
+            await notifyTracker(saved.period);
+        } finally {
+            urlWriteSuspended = false;
+            if (urlState.view) activateView(urlState.view);
+            writeUrlState();
+        }
     }
 
     function notifyTracker(preferredPeriod) {

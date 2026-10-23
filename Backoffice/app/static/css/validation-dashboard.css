@@ -945,10 +945,202 @@
     justify-content: center !important;
 }
 
+#vd-em-table th,
+#vd-em-table td {
+    border-right: 1px solid rgb(229 231 235);
+}
+
+#vd-em-table th:last-child,
+#vd-em-table td:last-child {
+    border-right: 0;
+}
+
+#vd-em-table th {
+    vertical-align: bottom;
+}
+
+#vd-em-table th.vd-em-request {
+    white-space: normal;
+    min-width: 8.75rem;
+    max-width: 9rem;
+    line-height: 1.25;
+}
+
+#vd-em-table td.vd-num,
+#vd-em-table th.vd-num,
+#vd-em-table td.vd-em-figure,
+#vd-em-table th.vd-em-figure,
+#vd-em-table td.vd-em-flag,
+#vd-em-table th.vd-em-flag {
+    text-align: center;
+}
+
+.vd-em-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    font-size: 0.85rem;
+}
+
+.vd-em-mark.is-covered {
+    color: rgb(22 163 74);
+}
+
+.vd-em-mark.is-missing {
+    color: rgb(220 38 38);
+}
+
+.vd-em-mark.is-partial {
+    color: rgb(202 138 4);
+}
+
+.vd-em-head-label {
+    display: block;
+}
+
+.vd-em-sources {
+    display: inline-flex;
+    gap: 0.2rem;
+    margin-top: 0.25rem;
+}
+
+.vd-em-source {
+    display: inline-block;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.vd-em-source.is-go {
+    color: rgb(30 64 175);
+    background: rgb(239 246 255);
+}
+
+.vd-em-source.is-erp {
+    color: rgb(154 52 18);
+    background: rgb(255 247 237);
+}
+
+.vd-em-source.is-databank {
+    color: rgb(22 101 52);
+    background: rgb(240 253 244);
+}
+
+.vd-em-export-field {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.vd-em-export {
+    height: 2.35rem;
+    padding: 0 0.9rem;
+    border: 1px solid rgb(1 30 65);
+    border-radius: 0.4rem;
+    background: rgb(1 30 65);
+    color: white;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vd-em-export:hover,
+.vd-em-export:focus-visible {
+    background: rgb(15 45 90);
+}
+
+.vd-em-export:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
 .vd-em-code {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     color: rgb(75 85 99);
+}
+
+.vd-em-band td {
+    padding-top: 0.55rem;
+    padding-bottom: 0.4rem;
+    background: rgb(243 244 246);
+    color: rgb(55 65 81);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.vd-em-band-count {
+    margin-left: 0.65rem;
+    color: rgb(75 85 99);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.vd-em-fold {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0.1rem 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.vd-em-fold i {
+    font-size: 0.65rem;
+    transition: transform 0.15s ease;
+}
+
+.vd-em-fold[aria-expanded="true"] i {
+    transform: rotate(90deg);
+}
+
+tr.vd-em-collapsed {
+    display: none;
+}
+
+.vd-em-group td {
+    padding-top: 0.55rem;
+    padding-bottom: 0.45rem;
+    background: rgb(255 247 237);
+    border-top: 1px solid rgb(253 186 116);
+}
+
+.vd-em-group-amount {
+    font-weight: 700;
+    color: rgb(124 45 18);
+}
+
+.vd-em-group-name {
+    margin-right: 0.55rem;
+    color: rgb(124 45 18);
+    font-weight: 700;
+}
+
+.vd-em-group-meta {
+    margin-left: 0.75rem;
+    color: rgb(146 64 14);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.vd-em-child {
+    padding-left: 1.35rem;
 }
 
 .vd-cap-intro {

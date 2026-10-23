@@ -1397,6 +1397,7 @@
         el('vd-tracker-period')?.addEventListener('change', function () {
             if (scopeLoader.isRoundScope && scopeLoader.isRoundScope()) {
                 scopeLoader.commitRoundSelection(el('vd-tracker-period'));
+                if (window.validationDashboardSyncTemplate) window.validationDashboardSyncTemplate();
             }
             loadTrackerData().catch(function (err) { console.error(err); });
         });

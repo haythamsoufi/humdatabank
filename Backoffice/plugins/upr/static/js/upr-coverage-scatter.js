@@ -26,12 +26,15 @@
     var DOMAIN_MAX = 1e8;
     var X_TICKS = [1e4, 1e5, 1e6, 1e7, 1e8];
     var points = [];
+    var fundingLinks = [];
     var edition = '';
     var activeUrl = '';
     var xLo = DOMAIN_MIN;
     var xHi = DOMAIN_MAX;
     var drag = null;
     var layout = { left: 64, plotW: 800, width: 920 };
+    var focus = { from: '', to: '', fromName: '', toName: '' };
+    var applyingParty = false;
 
     function byId(id) { return document.getElementById(id); }
     function show(el, visible) { if (el) el.hidden = !visible; }
@@ -114,6 +117,30 @@
         });
     }
 
+    function focusIsos(year) {
+        var wanted = {};
+        if (focus.to) {
+            wanted[focus.to] = true;
+            return wanted;
+        }
+        if (!focus.from && !focus.fromName) return null;
+        fundingLinks.forEach(function (link) {
+            if (Number(link.year) !== Number(year) || !link.value) return;
+            var fromMatch = focus.from
+                ? String(link.from || '').toUpperCase() === focus.from
+                : String(link.from_name || '') === focus.fromName;
+            if (!fromMatch) return;
+            var iso = String(link.to || '').toUpperCase();
+            if (iso) wanted[iso] = true;
+        });
+        return wanted;
+    }
+
+    function publishFocus(party) {
+        if (applyingParty || !window.UprPartySync) return;
+        UprPartySync.publish(party);
+    }
+
     function draw() {
         var year = selectedYear();
         var rows = points.filter(function (row) { return Number(row.year) === Number(year) && row.requirement > 0; });
@@ -135,7 +162,7 @@
         }
         renderLegend();
         plot.replaceChildren();
-        plot.appendChild(chart(rows));
+        plot.appendChild(chart(rows, year));
     }
 
     function renderLegend() {
@@ -163,17 +190,21 @@
         show(host, true);
     }
 
-    function chart(rows) {
+    function chart(rows, year) {
+        // Keep the plot near the support-map height so the three international
+        // iframes (all 640px tall) look the same size. A 560 viewBox already
+        // filled that frame before the title and legend.
         var width = 920;
-        var height = 560;
+        var height = 420;
         var left = 64;
         var right = 56;
-        var top = 18;
-        var bottom = 96;
+        var top = 14;
+        var bottom = 88;
         var plotW = width - left - right;
         var plotH = height - top - bottom;
         var xMin = xLo;
         var xMax = xHi;
+        var highlighted = focusIsos(year);
         layout = { left: left, plotW: plotW, width: width };
         var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
@@ -222,8 +253,16 @@
             var x = xOf(row.requirement);
             var y = yOf(row.met);
             var color = (CLASSES.filter(function (item) { return item.id === row.inform_class; })[0] || {}).color || '#9ca3af';
+            var iso = String(row.iso3 || '').toUpperCase();
             var point = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            point.setAttribute('class', 'upri-coverage__point');
+            var classes = 'upri-coverage__point';
+            if (highlighted) {
+                classes += highlighted[iso] ? ' is-focus' : ' is-dimmed';
+            }
+            point.setAttribute('class', classes);
+            point.setAttribute('data-iso3', iso);
+            point.setAttribute('role', 'button');
+            point.setAttribute('tabindex', '0');
             var tip = fill(text('flow_coverage_tooltip'), {
                 name: row.name,
                 requirement: money(row.requirement),
@@ -234,6 +273,17 @@
             var title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
             title.textContent = tip;
             point.appendChild(title);
+            point.addEventListener('click', function (event) {
+                event.stopPropagation();
+                if (!iso) return;
+                if (focus.to === iso) {
+                    focus = { from: '', to: '', fromName: '', toName: '' };
+                } else {
+                    focus = { from: '', to: iso, fromName: '', toName: row.name || iso };
+                }
+                publishFocus(focus);
+                draw();
+            });
             svg.appendChild(point);
         });
         svg.appendChild(scale(left, top + plotH + 40, handleMinX, handleMaxX));
@@ -498,9 +548,19 @@
     function applyPayload(payload) {
         var flows = (payload && payload.flows) || payload || {};
         points = flows.coverage || [];
+        fundingLinks = flows.funding || [];
         edition = (flows.inform && flows.inform.edition) || '';
         show(byId('upri-coverage-loading'), false);
         show(byId('upri-coverage-error'), false);
+        if (window.UprPartySync) {
+            var party = UprPartySync.read();
+            focus = {
+                from: String(party.from || '').toUpperCase(),
+                to: String(party.to || '').toUpperCase(),
+                fromName: String(party.fromName || ''),
+                toName: String(party.toName || '')
+            };
+        }
         renderYears(points);
         draw();
         try {
@@ -547,6 +607,19 @@
                 item.classList.toggle('is-active', item === match);
             });
             draw();
+        });
+    }
+    if (window.UprPartySync) {
+        UprPartySync.subscribe(function (party) {
+            applyingParty = true;
+            focus = {
+                from: String(party.from || '').toUpperCase(),
+                to: String(party.to || '').toUpperCase(),
+                fromName: String(party.fromName || ''),
+                toName: String(party.toName || '')
+            };
+            applyingParty = false;
+            if (points.length) draw();
         });
     }
     var followed = followedSelect();

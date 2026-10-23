@@ -53,6 +53,9 @@
         empty: byId('upri-flow-empty'),
         note: byId('upri-flow-note'),
         reset: byId('upri-flow-reset'),
+        fullscreen: byId('upri-flow-fullscreen'),
+        mapTools: byId('upri-flow-map-tools'),
+        mapWrap: document.querySelector('.upri-flow__map-wrap'),
         year: byId('upri-flow-year'),
         pns: byId('upri-flow-pns'),
         recipient: byId('upri-flow-recipient'),
@@ -87,7 +90,7 @@
         show(els.error, name === 'error');
         show(els.empty, name === 'empty');
         show(els.host, name === 'content');
-        show(els.reset, name === 'content');
+        show(els.mapTools, name === 'content');
         show(els.filters, name === 'content' || name === 'empty');
     }
 
@@ -239,6 +242,9 @@
         }
         if (els.pns) els.pns.value = '';
         if (els.recipient) els.recipient.value = '';
+        if (window.UprPartySync) {
+            UprPartySync.publish({ from: '', to: '', fromName: '', toName: '' });
+        }
         if (yearChanged && els.year) els.year.dispatchEvent(new Event('change', { bubbles: true }));
         else if (state.loaded && state.allEdges.length) applyYear();
         else updateClearFilters();
@@ -349,6 +355,14 @@
         }
     }
 
+    // Destinations east of the source must not share a tree with destinations
+    // west of it. One mixed tree (for example the US supporting both Europe and
+    // the Pacific) pulls the trunk across the date line, so Atlantic links go
+    // left around the world instead of right across the ocean.
+    function shortArcEast(srcLng, destLng) {
+        return nearLng(destLng, srcLng) - srcLng >= 0;
+    }
+
     function buildSegments() {
         var bySource = {};
         state.edges.forEach(function (e) {
@@ -360,9 +374,18 @@
         var segs = [];
         Object.keys(bySource).forEach(function (k) {
             var grp = bySource[k], S = grp.source, start = [S.lat, S.lng];
-            var root = clusterTree(grp.leaves);
-            assignMerge(root, start, true);
-            emit(root, start, start, S, segs);
+            var east = [];
+            var west = [];
+            grp.leaves.forEach(function (leaf) {
+                if (shortArcEast(S.lng, leaf.lng)) east.push(leaf);
+                else west.push(leaf);
+            });
+            [east, west].forEach(function (leaves) {
+                if (!leaves.length) return;
+                var root = clusterTree(leaves);
+                assignMerge(root, start, true);
+                emit(root, start, start, S, segs);
+            });
         });
         return segs;
     }
@@ -1035,6 +1058,7 @@
         populateYears(years);
         renderNote(flows);
         applyYear();
+        if (window.UprPartySync) applyPartyToMap(UprPartySync.read());
     }
 
     function renderNote(flows) {
@@ -1098,6 +1122,50 @@
     // --- Wiring ----------------------------------------------------------
 
     if (els.reset) els.reset.addEventListener('click', fitToNodes);
+
+    function syncFullscreen() {
+        if (!els.fullscreen || !els.mapWrap) return;
+        var on = document.fullscreenElement === els.mapWrap;
+        var icon = els.fullscreen.querySelector('i');
+        var label = els.fullscreen.getAttribute(on ? 'data-label-exit' : 'data-label-enter') || '';
+        if (icon) icon.className = 'fas ' + (on ? 'fa-compress' : 'fa-expand');
+        els.fullscreen.setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (label) {
+            els.fullscreen.setAttribute('title', label);
+            els.fullscreen.setAttribute('aria-label', label);
+        }
+        function resizeMap() {
+            if (!map) return;
+            map.invalidateSize();
+            if (on) fitToNodes();
+        }
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(function () {
+                resizeMap();
+                requestAnimationFrame(resizeMap);
+            });
+        } else {
+            resizeMap();
+            setTimeout(resizeMap, 50);
+        }
+    }
+
+    function toggleFullscreen() {
+        if (!els.mapWrap) return;
+        if (document.fullscreenElement === els.mapWrap) {
+            if (typeof document.exitFullscreen === 'function') document.exitFullscreen();
+        } else if (typeof els.mapWrap.requestFullscreen === 'function') {
+            els.mapWrap.requestFullscreen().catch(function () { /* browser refused */ });
+        }
+    }
+
+    if (els.fullscreen && els.mapWrap && typeof els.mapWrap.requestFullscreen === 'function') {
+        els.fullscreen.addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', syncFullscreen);
+    } else if (els.fullscreen) {
+        show(els.fullscreen, false);
+    }
+
     if (els.clearFilters) els.clearFilters.addEventListener('click', clearFilters);
     var filtersToggle = byId('upri-flow-filters-toggle');
     if (filtersToggle && els.filters) {
@@ -1107,10 +1175,53 @@
             filtersToggle.setAttribute('aria-label', filtersToggle.getAttribute(collapsed ? 'data-label-show' : 'data-label-hide') || '');
         });
     }
+    var applyingParty = false;
+
+    function publishPartyFromMap() {
+        if (applyingParty || !window.UprPartySync) return;
+        var from = els.pns ? els.pns.value : '';
+        var to = els.recipient ? els.recipient.value : '';
+        var fromName = '';
+        var toName = '';
+        if (els.pns && els.pns.selectedIndex >= 0) {
+            fromName = els.pns.options[els.pns.selectedIndex].textContent || '';
+            if (!from) fromName = '';
+        }
+        if (els.recipient && els.recipient.selectedIndex >= 0) {
+            toName = els.recipient.options[els.recipient.selectedIndex].textContent || '';
+            if (!to) toName = '';
+        }
+        UprPartySync.publish({ from: from, to: to, fromName: fromName, toName: toName });
+    }
+
+    function applyPartyToMap(party) {
+        if (!party) return;
+        applyingParty = true;
+        var from = String(party.from || '').toUpperCase();
+        var to = String(party.to || '').toUpperCase();
+        if (els.pns) {
+            var hasFrom = !from || Array.prototype.some.call(els.pns.options, function (option) {
+                return option.value === from;
+            });
+            if (hasFrom && els.pns.value !== from) els.pns.value = from;
+        }
+        if (els.recipient) {
+            var hasTo = !to || Array.prototype.some.call(els.recipient.options, function (option) {
+                return option.value === to;
+            });
+            if (hasTo && els.recipient.value !== to) els.recipient.value = to;
+        }
+        applyingParty = false;
+        if (state.loaded && state.allEdges.length) applyYear();
+    }
+
     [els.year, els.pns, els.recipient].forEach(function (select) {
         if (!select) return;
         select.addEventListener('change', function () {
             if (select === els.year && window.UprYearSync) UprYearSync.publish(els.year.value);
+            if ((select === els.pns || select === els.recipient) && !applyingParty) {
+                publishPartyFromMap();
+            }
             if (state.loaded && state.allEdges.length) applyYear();
         });
     });
@@ -1124,6 +1235,9 @@
             els.year.value = String(year);
             els.year.dispatchEvent(new Event('change', { bubbles: true }));
         });
+    }
+    if (window.UprPartySync) {
+        UprPartySync.subscribe(applyPartyToMap);
     }
     if (els.region) els.region.addEventListener('change', function () { if (state.loaded) load(); });
     if (els.refresh) els.refresh.addEventListener('click', function () { if (state.loaded) load(); });

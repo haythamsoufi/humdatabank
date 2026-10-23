@@ -1,9 +1,13 @@
 <section id="upri-funding" class="upri-funding" data-flow-url="{{ flow_url }}" data-year="{{ year|default('') }}"{% if follow_year %} data-follow-year="{{ follow_year }}"{% endif %} data-ui="{{ (ui if ui is defined else upr_analysis_ui())|tojson|forceescape }}">
-    <div class="upri-funding__toolbar"{% if follow_year %} hidden{% endif %}>
-        <label class="upri-field" for="upri-funding-year">
+    <div class="upri-funding__toolbar" id="upri-funding-toolbar"{% if follow_year %} data-year-follows="1"{% endif %}>
+        <label class="upri-field upri-funding__year"{% if follow_year %} hidden{% endif %} for="upri-funding-year">
             <span class="upri-field__label">{{ L.flow_year }}</span>
             <select id="upri-funding-year" class="upri-select upri-flow__year"></select>
         </label>
+        <div id="upri-funding-filter" class="upri-flow-bars__filter" hidden>
+            <span class="upri-flow-bars__filter-label"></span>
+            <button type="button" class="upri-flow-bars__filter-clear">{{ L.flow_filters_clear }}</button>
+        </div>
     </div>
     <div id="upri-funding-loading" class="upri-state upri-state--compact" hidden>
         <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>

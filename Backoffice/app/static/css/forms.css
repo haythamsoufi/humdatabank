@@ -1089,13 +1089,31 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   margin-top: 2px;
 }
 
-/* Per-item change history. Positioning is finished by forms/modules/tooltips.js. */
+/* Per-item change history. Positioning is finished by forms/modules/tooltips.js.
+   The clock stays hidden until the pointer (or keyboard focus) is on the field. */
 .entry-item-history {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.form-item-block:hover > .flex .entry-item-history,
+.form-item-block:focus-within > .flex .entry-item-history,
+.form-group:hover > .flex .entry-item-history,
+.form-group:focus-within > .flex .entry-item-history {
+  opacity: 1;
+  width: 1.25rem;
+  height: 1.25rem;
+  overflow: visible;
+  pointer-events: auto;
 }
 
 .entry-item-history i {
@@ -1125,7 +1143,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   color: #f9fafb;
   text-align: start;
   border-radius: 6px;
-  padding: 12px;
+  padding: 12px 10px 12px 12px;
   position: absolute;
   z-index: 1000;
   top: 125%;
@@ -1136,6 +1154,30 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   pointer-events: none;
   transition: opacity 0.3s, visibility 0.3s;
+  scrollbar-width: thin;
+  scrollbar-color: #6b7280 transparent;
+}
+
+.entry-item-history .tooltip-text::-webkit-scrollbar {
+  width: 8px;
+}
+
+.entry-item-history .tooltip-text::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.entry-item-history .tooltip-text::-webkit-scrollbar-thumb {
+  background-color: #6b7280;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.entry-item-history .tooltip-text::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .entry-item-history .tooltip-text::after {
@@ -1184,6 +1226,12 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   margin-top: 0.45rem;
   padding-top: 0.45rem;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.entry-item-history .history-event:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .entry-item-history .history-event-head {

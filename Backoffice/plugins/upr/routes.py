@@ -1110,7 +1110,7 @@ def support_flow_tile(z, x, y):
         status=200,
         mimetype=mimetype,
         headers={
-            "Cache-Control": "public, max-age=86400",
+            "Cache-Control": "public, max-age=604800",
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'; sandbox",
         },

@@ -38,8 +38,6 @@ SECRET_PATHS = (
 
 MAP_PROVIDERS = ('openstreetmap', 'google_maps', 'mapbox', 'leaflet', 'custom_tiles')
 
-MAPBOX_STYLE_ID = 'go-ifrc/ckrfe16ru4c8718phmckdfjh0'
-
 # Per-user and global per-minute budgets for paid or policy-limited upstream services.
 TILE_REQUESTS_PER_USER_PER_MINUTE = 600
 GEOCODE_REQUESTS_PER_USER_PER_MINUTE = 10
@@ -98,14 +96,11 @@ def create_blueprint():
     @plugin_route_wrapper('Interactive Map Plugin')
     @measure_performance('Interactive Map Plugin', 'proxy_mapbox_tile')
     def proxy_mapbox_tile(z, x, y):
-        """Proxy Mapbox raster tiles so the access token stays server-side."""
-        if requests is None:
-            return json_server_error(
-                'Server missing HTTP client support (requests).',
-                success=False,
-                error='Server missing HTTP client support (requests).',
-            )
+        """Proxy Mapbox raster tiles so the access token stays server-side.
 
+        Uses the shared UPR ``mapbox_tile`` helper (in-process LRU) so admin and
+        public embeds warm the same cache.
+        """
         if z < 0 or z > 22:
             return json_bad_request('Invalid zoom level', error='Invalid zoom level')
         if x >= 2 ** z or y >= 2 ** z:
@@ -114,42 +109,25 @@ def create_blueprint():
         if hit_rate_limit(_viewer_key('interactive_map:tiles'), TILE_REQUESTS_PER_USER_PER_MINUTE):
             return json_error('Too many tile requests', 429, success=False, error='Too many tile requests')
 
-        mapbox_token = (plugin_config.get_api_key('mapbox') or '').strip()
-        if not mapbox_token:
-            # The validation dashboard and other maps use this env token. The
-            # plugin setting is optional when it is already set.
-            mapbox_token = (current_app.config.get('MAPBOX_ACCESS_TOKEN') or '').strip()
-        if not mapbox_token:
+        from plugins.upr.flow import mapbox_tile
+
+        body, mimetype, error = mapbox_tile(z, x, y)
+        if error == 'invalid':
+            return json_bad_request('Invalid tile coordinates', error='Invalid tile coordinates')
+        if error == 'unconfigured':
             return json_bad_request('Mapbox is not configured', error='Mapbox is not configured')
-
-        tile_url = f'https://api.mapbox.com/styles/v1/{MAPBOX_STYLE_ID}/tiles/{z}/{x}/{y}'
-
-        try:
-            upstream = requests.get(tile_url, params={'access_token': mapbox_token}, timeout=10)
-            if upstream.status_code != 200:
-                current_app.logger.warning(
-                    'Mapbox tile proxy upstream status %s for z=%s x=%s y=%s',
-                    upstream.status_code,
-                    z,
-                    x,
-                    y,
-                )
-                return Response(status=upstream.status_code)
-
-            upstream_type = (upstream.headers.get('Content-Type') or '').split(';')[0].strip().lower()
-            headers = {
-                'Cache-Control': 'private, max-age=86400',
+        if body is None:
+            return Response(status=502)
+        return Response(
+            body,
+            status=200,
+            mimetype=mimetype,
+            headers={
+                'Cache-Control': 'private, max-age=604800',
                 'X-Content-Type-Options': 'nosniff',
                 'Content-Security-Policy': "default-src 'none'; sandbox",
-            }
-            if upstream_type in ('image/png', 'image/jpeg', 'image/webp'):
-                return Response(upstream.content, status=200, headers=headers, mimetype=upstream_type)
-            current_app.logger.warning('Mapbox tile proxy rejected upstream content type %r', upstream_type)
-            return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
-        except requests.exceptions.RequestException as exc:
-            # The exception text can embed the request URL, which carries the access token.
-            current_app.logger.error('Mapbox tile proxy request failed: %s', type(exc).__name__)
-            return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
+            },
+        )
 
     @bp.route('/api/config/field', methods=['GET'])
     @plugin_route_wrapper('Interactive Map Plugin')

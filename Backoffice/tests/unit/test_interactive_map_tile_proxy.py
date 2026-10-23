@@ -20,10 +20,18 @@ def tile_client(app, logged_in_admin_client):
     view = app.view_functions.get("interactive_map_plugin.proxy_mapbox_tile")
     if view is None:
         pytest.skip("interactive_map plugin is not registered in the test app")
-    routes_globals = inspect.unwrap(view).__globals__
+    from plugins.upr.flow import clear_mapbox_tile_cache
+
+    clear_mapbox_tile_cache()
     fake_config = MagicMock(get_api_key=lambda provider: "token")
-    with patch.dict(routes_globals, {"plugin_config": fake_config}):
+    # mapbox_tile resolves the key from interactive_map.config; keep routes in sync.
+    routes_globals = inspect.unwrap(view).__globals__
+    with (
+        patch.dict(routes_globals, {"plugin_config": fake_config}),
+        patch("plugins.interactive_map.config.plugin_config", fake_config),
+    ):
         yield logged_in_admin_client
+    clear_mapbox_tile_cache()
 
 
 def _get(client, upstream):
@@ -49,12 +57,28 @@ def test_non_image_upstream_content_is_not_relayed(tile_client):
     assert b"<script>" not in resp.data
 
 
-
 def test_tile_responses_are_private_cache(tile_client):
     resp = _get(tile_client, _upstream("image/png"))
     if resp.status_code == 404:
         pytest.skip("interactive_map plugin is not registered in the test app")
-    assert resp.headers["Cache-Control"].startswith("private")
+    assert resp.headers["Cache-Control"] == "private, max-age=604800"
+
+
+def test_second_tile_request_skips_upstream(tile_client):
+    """In-process LRU: identical z/x/y must not re-hit Mapbox on a warm worker."""
+    from plugins.upr.flow import clear_mapbox_tile_cache
+
+    clear_mapbox_tile_cache()
+    upstream = _upstream("image/png", b"\x89PNG-cached")
+    with patch("requests.get", return_value=upstream) as get:
+        first = tile_client.get(TILE_URL)
+        second = tile_client.get(TILE_URL)
+    if first.status_code == 404:
+        pytest.skip("interactive_map plugin is not registered in the test app")
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.data == second.data == b"\x89PNG-cached"
+    assert get.call_count == 1
 
 
 @pytest.mark.parametrize("path", ["3/8/0.png", "3/0/8.png", "23/0/0.png"])

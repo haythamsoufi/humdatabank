@@ -20,7 +20,10 @@ currently in the database, like the rest of the Analysis feature.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import threading
+from collections import OrderedDict
 from functools import lru_cache
 from typing import Any
 
@@ -39,7 +42,12 @@ from plugins.upr.analysis_common import (
 )
 from plugins.upr.api_cache import get_or_build_upr_payload
 
-__all__ = ["build_support_flows"]
+__all__ = ["build_support_flows", "mapbox_tile", "clear_mapbox_tile_cache"]
+
+# Successful Mapbox raster tiles only. Caps memory on a long-lived worker.
+_TILE_CACHE_MAX = 1024
+_tile_cache: OrderedDict[tuple[str, str, int, int, int], tuple[bytes, str]] = OrderedDict()
+_tile_cache_lock = threading.Lock()
 
 # Master rows that describe one PNS supporting one host country.
 _SUPPORT_SECTIONS = {"support", "activities"}
@@ -670,11 +678,35 @@ def build_support_flows(*, region: str | None = None, public_tiles: bool = False
     return payload
 
 
+def clear_mapbox_tile_cache() -> None:
+    """Drop in-process Mapbox tile bytes (tests / token rotation)."""
+    with _tile_cache_lock:
+        _tile_cache.clear()
+
+
+def _tile_cache_get(key: tuple[str, str, int, int, int]) -> tuple[bytes, str] | None:
+    with _tile_cache_lock:
+        hit = _tile_cache.get(key)
+        if hit is None:
+            return None
+        _tile_cache.move_to_end(key)
+        return hit
+
+
+def _tile_cache_put(key: tuple[str, str, int, int, int], body: bytes, mimetype: str) -> None:
+    with _tile_cache_lock:
+        _tile_cache[key] = (body, mimetype)
+        _tile_cache.move_to_end(key)
+        while len(_tile_cache) > _TILE_CACHE_MAX:
+            _tile_cache.popitem(last=False)
+
+
 def mapbox_tile(z: int, x: int, y: int):
     """Fetch one IFRC Mapbox raster tile. Returns ``(body, mimetype)`` or an error code.
 
-    The access token stays on the server. ``error`` is ``"unconfigured"``,
-    ``"upstream"`` or ``"invalid"``.
+    Successful tiles are kept in an in-process LRU so warm workers avoid
+    re-hitting Mapbox. The access token stays on the server. ``error`` is
+    ``"unconfigured"``, ``"upstream"`` or ``"invalid"``.
     """
     import requests
     from flask import current_app
@@ -693,6 +725,11 @@ def mapbox_tile(z: int, x: int, y: int):
     if not token:
         return None, None, "unconfigured"
     style = (current_app.config.get("MAPBOX_STYLE_ID") or "go-ifrc/ckrfe16ru4c8718phmckdfjh0").strip()
+    token_fp = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+    cache_key = (token_fp, style, z, x, y)
+    cached = _tile_cache_get(cache_key)
+    if cached is not None:
+        return cached[0], cached[1], None
     try:
         upstream = requests.get(
             f"https://api.mapbox.com/styles/v1/{style}/tiles/{z}/{x}/{y}",
@@ -706,4 +743,6 @@ def mapbox_tile(z: int, x: int, y: int):
     mimetype = (upstream.headers.get("Content-Type") or "").split(";")[0].strip().lower()
     if mimetype not in ("image/png", "image/jpeg", "image/webp"):
         return None, None, "upstream"
-    return upstream.content, mimetype, None
+    body = upstream.content
+    _tile_cache_put(cache_key, body, mimetype)
+    return body, mimetype, None

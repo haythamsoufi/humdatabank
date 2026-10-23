@@ -247,7 +247,15 @@ def _process_fdrs_document_status_item(app, *, job_id: str, item_id: int) -> Non
             last_logged = log_state.get("last_logged_pct")
             stage = progress_payload.get("stage") or ""
             should_log = (
-                stage in ("complete", "failed", "cancelled", "fetch_catalog", "write_excel")
+                stage
+                in (
+                    "complete",
+                    "failed",
+                    "cancelled",
+                    "fetch_catalog",
+                    "migration_lookup",
+                    "write_excel",
+                )
                 or (pct_f is not None and (last_logged is None or abs(pct_f - float(last_logged)) >= 5.0))
             )
             if should_log and pct_f is not None:
@@ -334,10 +342,12 @@ def _process_fdrs_document_status_item(app, *, job_id: str, item_id: int) -> Non
             item.error = None
             terminal_item_status = "completed"
             app.logger.info(
-                "FDRS document status %s: completed total=%s downloadable=%s",
+                "FDRS document status %s: completed total=%s downloadable=%s migrated=%s not_migrated=%s",
                 job_id,
                 (stats or {}).get("total_documents"),
                 (stats or {}).get("downloadable_count"),
+                (stats or {}).get("file_migrated_count"),
+                (stats or {}).get("not_migrated_count"),
             )
         except FdrsDocumentScanCancelled:
             update_import_job(

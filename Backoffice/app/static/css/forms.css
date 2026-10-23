@@ -1182,6 +1182,16 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   background-clip: padding-box;
 }
 
+/* Invisible bridge so the pointer can travel from the clock to the panel. */
+.entry-item-history .tooltip-text::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 14px;
+  bottom: 100%;
+}
+
 .entry-item-history .tooltip-text::after {
   content: "";
   position: absolute;
@@ -1195,7 +1205,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 
 .entry-item-history:hover .tooltip-text,
-.entry-item-history:focus-within .tooltip-text {
+.entry-item-history:focus-within .tooltip-text,
+/* Fixed tooltip stays interactive after the pointer leaves the clock. */
+.entry-item-history.entry-tooltip-open .tooltip-text {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;

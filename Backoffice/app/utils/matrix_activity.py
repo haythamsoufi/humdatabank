@@ -87,6 +87,25 @@ def _is_binary_like_matrix_value(value: Any) -> bool:
     return value in (0, 1, "0", "1", True, False)
 
 
+def _format_matrix_activity_number(value: Any) -> str:
+    """Format matrix cell values with thousands separators when numeric."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    text = str(value).strip()
+    if not text:
+        return ""
+    cleaned = text.replace(",", "").replace(" ", "").replace("\u00A0", "").replace("\u202F", "")
+    try:
+        number = float(cleaned)
+    except (TypeError, ValueError):
+        return text
+    if number.is_integer():
+        return f"{int(number):,}"
+    return f"{number:,}"
+
+
 def matrix_cell_activity_render_displays(old_v: Any, new_v: Any) -> tuple[str, str]:
     """
     Human-readable old/new strings for matrix activity rows.
@@ -96,12 +115,12 @@ def matrix_cell_activity_render_displays(old_v: Any, new_v: Any) -> tuple[str, s
     if (old_v is None or old_v == "") and _is_binary_like_matrix_value(new_v):
         old_disp = "0"
     else:
-        old_disp = "" if old_v is None else str(old_v)
+        old_disp = "" if old_v is None else _format_matrix_activity_number(old_v)
 
     if (new_v is None or new_v == "") and _is_binary_like_matrix_value(old_v):
         new_disp = "0"
     else:
-        new_disp = "" if new_v is None else str(new_v)
+        new_disp = "" if new_v is None else _format_matrix_activity_number(new_v)
 
     return old_disp, new_disp
 

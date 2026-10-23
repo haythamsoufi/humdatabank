@@ -761,18 +761,18 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
             if mode == 'total' and values:
                 # For total mode, extract the direct value
                 if 'direct' in values:
-                    return str(values['direct'])
+                    return _fmt_number(values['direct'])
                 elif 'total' in values:
-                    return str(values['total'])
+                    return _fmt_number(values['total'])
                 else:
                     # Return first available value
                     for k, v in values.items():
                         if v is not None:
-                            return str(v)
+                            return _fmt_number(v)
             elif mode == 'disaggregated' and values:
                 # Show first few disaggregated values
                 items = list(values.items())[:3]  # Show first 3
-                result = ", ".join([f"{k}: {v}" for k, v in items])
+                result = ", ".join([f"{k}: {_fmt_number(v)}" for k, v in items])
                 if len(values) > 3:
                     result += f" (+{len(values) - 3} more)"
                 return result
@@ -788,14 +788,14 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
                 if isinstance(direct_value, dict):
                     return _format_age_group_breakdown(direct_value, _fmt_number)
                 if direct_value is not None:
-                    return str(direct_value)
+                    return _fmt_number(direct_value)
                 return ""
             elif 'total' in value:
                 total_value = value['total']
                 if isinstance(total_value, dict):
                     return _format_age_group_breakdown(total_value, _fmt_number)
                 if total_value is not None:
-                    return str(total_value)
+                    return _fmt_number(total_value)
                 return ""
             # Handle flat maps where all values are scalars, e.g. {'female': 234, 'male': 645}
             elif _is_metadata_only_dict(value):
@@ -857,9 +857,9 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
     elif isinstance(value, str):
         if value.strip() == '[object Object]':
             return "N/A"
-        return value
+        return _fmt_number(value)
     else:
-        return str(value)
+        return _fmt_number(value) if _is_numeric_scalar(value) else str(value)
 
 from app.utils.matrix_activity import (  # noqa: E402
     MATRIX_HEADER_ACTIVITY_ROW,

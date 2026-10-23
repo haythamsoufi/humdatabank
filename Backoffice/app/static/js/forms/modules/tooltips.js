@@ -26,7 +26,7 @@ const ARROW_HALF = 5;  // matches border-width: 5px in the ::after rule
 const ARROW_MIN  = 10; // minimum distance from tooltip edge to arrow centre
 const HIDE_DELAY_MS = 150;
 // History panels are taller and often need the scrollbar; give more time to reach them.
-const HISTORY_HIDE_DELAY_MS = 350;
+const HISTORY_HIDE_DELAY_MS = 500;
 const OPEN_CLASS = 'entry-tooltip-open';
 
 // Module-level reference so the scroll handler can always reach the active tooltip.
@@ -120,6 +120,9 @@ function positionTooltip(tooltipContainer) {
 
   tooltip.style.visibility = 'visible';
   tooltip.style.opacity    = '1';
+  // Must be set inline: the base CSS uses pointer-events:none, and :hover falls
+  // away as soon as the cursor leaves the icon toward the fixed panel.
+  tooltip.style.pointerEvents = 'auto';
   // Keep hover-hidden history icons expanded while the fixed tooltip is open;
   // otherwise leaving the field card collapses the icon (pointer-events:none)
   // and the cursor can never reach the panel.
@@ -132,6 +135,7 @@ function hideTooltip(tooltipContainer) {
   if (!tooltip) return;
   tooltip.style.visibility = 'hidden';
   tooltip.style.opacity    = '0';
+  tooltip.style.pointerEvents = '';
   tooltipContainer.classList.remove(OPEN_CLASS);
   // Do NOT touch position/left/top/right or CSS variables here.
   // The CSS rule has `transition: opacity .3s` so the fade takes 300 ms.

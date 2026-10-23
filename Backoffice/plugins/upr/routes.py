@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 from html import escape
+from pathlib import Path
 
 from flask import Response, current_app, g, has_request_context, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_babel import force_locale, gettext as _
@@ -120,6 +121,35 @@ def _apply_plugin_static_cache(response: Response) -> Response:
         response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
     response._skip_cache_override = True
     return response
+
+
+# CSS/JS/icons used by public FDRS iframes (International Overview embeds). Excel
+# form templates under static/templates/ stay login-gated.
+_PUBLIC_STATIC_SUFFIXES = frozenset(
+    {
+        ".css",
+        ".js",
+        ".map",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".ico",
+        ".woff",
+        ".woff2",
+        ".ttf",
+    }
+)
+
+
+def _is_public_upr_static(filename: str) -> bool:
+    """True when an anonymous visitor may fetch this plugin static path."""
+    name = (filename or "").replace("\\", "/").lstrip("/")
+    if not name or name.startswith("/") or ".." in name.split("/"):
+        return False
+    return Path(name).suffix.lower() in _PUBLIC_STATIC_SUFFIXES
 
 
 def _requested_bundle() -> str:
@@ -297,8 +327,15 @@ def upr_sync_imputation():
 
 
 @bp.route("/upr/static/<path:filename>", methods=["GET"])
-@login_required
 def static_file(filename: str):
+    """Serve UPR plugin assets.
+
+    Web assets are public so framed embeds on data.ifrc.org work without a
+    Backoffice session (phones rarely have one; desktop often does from an
+    earlier login). Excel templates remain authenticated.
+    """
+    if not _is_public_upr_static(filename) and not current_user.is_authenticated:
+        return current_app.login_manager.unauthorized()
     response = send_from_directory(str(_PLUGIN_DIR / "static"), filename)
     return _apply_plugin_static_cache(response)
 

@@ -2,7 +2,7 @@
 
 Track what the FDRS import pipeline (`Backoffice/plugins/fdrs/scripts/import_fdrs_form_data.py`) fills from [data-api.ifrc.org](https://data-api.ifrc.org), and what remains manual or blocked.
 
-**Last updated:** 2026-10-20
+**Last updated:** 2026-10-24
 
 ## Summary
 
@@ -14,6 +14,7 @@ Track what the FDRS import pipeline (`Backoffice/plugins/fdrs/scripts/import_fdr
 | Document fields | 4 | **Metadata synced**; file download **blocked** (IFRC URL fix pending) |
 | Network Support matrices | 2 (919, 929) | **Synced** (CSV DonCode + amount KPIs → matrix `disagg_data`) |
 | Assignment workflow | per `(country, year)` | **Synced** to `assignment_entity_status` only. Page-level status is **not** imported yet — every FDRS assignment must have per-page submit on first. See [FDRS page-level submission](fdrs-page-submission.md). |
+| Missing assignment years | per sync year × ISO3 | **Created** before KPI/document import when local databank lookups are used (`fdrs_assignment_ensure.py`). |
 | **Total published items** | **40** | **40 covered** |
 
 ## Done
@@ -68,9 +69,19 @@ Constants: `Backoffice/plugins/fdrs/scripts/fdrs_sync_constants.py` → `FDRS_QU
 - FDRS workflow KPIs **always** overwrite databank assignment status during sync (no downgrade protection).
 - CLI opt-out: `--no-sync-assignment-status`.
 
+### Missing assignment years (auto-create)
+
+KPI and document import join FDRS rows to `assignment_entity_status` by `(period_name, iso3)`. Years (or country AES rows) that were never opened in the Backoffice would otherwise be skipped.
+
+- Module: `Backoffice/plugins/fdrs/scripts/fdrs_assignment_ensure.py` (runs after local databank lookups, before row build).
+- For each sync year: create `AssignedForm` (`period_name=YYYY`) if missing, with `enable_page_submission=True`, and one country AES per ISO3 country not already on that period.
+- Seeds page-status rows via `apply_page_submission_mode_change` (same path as the assignment editor).
+- Default **on** for admin/CLI sync with in-process lookups; skipped when `--databank-base-url` points at a remote API.
+- CLI opt-out: `--no-create-assignments`. Dry-run reports planned creates without writing.
+
 ### Page-level submission (required before per-page workflow import)
 
-Every FDRS assignment, including inactive years, needs **Allow save and submit per page** (`enable_page_submission`). Procedure: [FDRS page-level submission](fdrs-page-submission.md).
+Every FDRS assignment, including inactive years, needs **Allow save and submit per page** (`enable_page_submission`). New years created by sync get this flag automatically; for older assignments see [FDRS page-level submission](fdrs-page-submission.md).
 
 Once that flag is on, the same workflow KPIs should be imported as `assignment_page_status` for the matching published page:
 
@@ -112,6 +123,8 @@ CLI:
 ```bash
 cd Backoffice
 python plugins/fdrs/scripts/import_fdrs_form_data.py --fdrs-from-data-api --fdrs-years 2024
+# Opt out of creating missing AssignedForm / AES rows:
+# python plugins/fdrs/scripts/import_fdrs_form_data.py --fdrs-from-data-api --fdrs-years 2018,2019 --no-create-assignments
 ```
 
 ### Verify API vs database

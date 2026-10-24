@@ -2203,6 +2203,7 @@ def run_import(
     sync_user_id: Optional[int] = None,
     sync_documents: bool = True,
     sync_assignment_status: bool = True,
+    create_missing_assignments: bool = True,
     change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, int]:
     """Load from file, FDRS API (ready-to-import), or data-api.ifrc.org pipeline; upsert into form_data.
@@ -2364,11 +2365,56 @@ def run_import(
                     "HTTP /api/v1/* is not used for lookups."
                 )
                 assignment_rows, form_item_rows, indicator_bank_rows = _fetch_databank_tables_local(template_id or 21)
+                if create_missing_assignments:
+                    from fdrs_assignment_ensure import (
+                        ensure_fdrs_assignments_for_sync,
+                        years_from_fdrs_data,
+                    )
+
+                    years_for_ensure = list(fdrs_years or []) or years_from_fdrs_data(fdrs_data)
+                    _progress(
+                        stage="ensure_assignments",
+                        message="Ensuring FDRS assignments exist for sync years...",
+                        percent=9.0,
+                    )
+                    ensure_stats = ensure_fdrs_assignments_for_sync(
+                        template_id=template_id or 21,
+                        years=years_for_ensure,
+                        dry_run=dry_run,
+                    )
+                    stats["assignments_ensure"] = ensure_stats
+                    stats["assignments_periods_created"] = ensure_stats.get("periods_created", 0)
+                    stats["assignments_aes_created"] = ensure_stats.get("aes_created", 0)
+                    if (
+                        ensure_stats.get("periods_created")
+                        or ensure_stats.get("aes_created")
+                        or ensure_stats.get("dry_run")
+                    ):
+                        logger.info(
+                            "FDRS assignment ensure: periods_created=%s aes_created=%s "
+                            "to_create_periods=%s to_create_aes=%s dry_run=%s years=%s",
+                            ensure_stats.get("periods_created"),
+                            ensure_stats.get("aes_created"),
+                            ensure_stats.get("periods_to_create"),
+                            ensure_stats.get("aes_to_create"),
+                            ensure_stats.get("dry_run"),
+                            ensure_stats.get("years_requested"),
+                        )
+                    # Reload so KPI/document builders see newly created AES rows.
+                    if not dry_run and (
+                        ensure_stats.get("periods_created") or ensure_stats.get("aes_created")
+                    ):
+                        assignment_rows, _, _ = _fetch_databank_tables_local(template_id or 21)
             else:
                 logger.info("Fetching databank APIs (assigned-forms, form-items, indicator-bank)...")
                 assignment_rows = fetch_assignment_id_table(databank_base, databank_key, template_id=template_id or 21)
                 form_item_rows = fetch_form_item_table(databank_base, databank_key, template_id=template_id or 21)
                 indicator_bank_rows = fetch_indicator_bank_table(databank_base, databank_key)
+                if create_missing_assignments:
+                    logger.info(
+                        "FDRS assignment ensure skipped (remote databank lookups); "
+                        "create missing years in the target Backoffice or run sync in-process."
+                    )
             logger.info(
                 "Databank: assignments=%d, form_items=%d, indicators=%d",
                 len(assignment_rows), len(form_item_rows), len(indicator_bank_rows)
@@ -2777,6 +2823,11 @@ def main() -> int:
         help="Skip syncing FDRS section workflow KPIs to assignment_entity_status (data-api mode only).",
     )
     parser.add_argument(
+        "--no-create-assignments",
+        action="store_true",
+        help="Do not create missing FDRS AssignedForm / country AES rows for sync years",
+    )
+    parser.add_argument(
         "--no-sync-documents",
         action="store_true",
         help="Skip syncing FDRS submission documents (data-api mode only; indicator data still imports).",
@@ -2966,6 +3017,7 @@ def main() -> int:
             template_id=template_id,
             sync_assignment_status=not getattr(args, "no_sync_assignment_status", False),
             sync_documents=not getattr(args, "no_sync_documents", False),
+            create_missing_assignments=not getattr(args, "no_create_assignments", False),
         )
     except (ValueError, RuntimeError) as e:
         logger.error("Error: %s", e)

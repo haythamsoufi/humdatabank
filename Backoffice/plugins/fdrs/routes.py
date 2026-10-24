@@ -305,6 +305,7 @@ def run_data_sync(template_id: int):
         async_mode = bool(data.get("async", False))
         imputed_use_cache = bool(data.get("imputed_use_cache", True))
         sync_documents = bool(data.get("sync_documents", True))
+        create_missing_assignments = bool(data.get("create_missing_assignments", True))
         try:
             fdrs_reported_import_states = parse_reported_import_states(data)
         except ValueError as e:
@@ -345,6 +346,7 @@ def run_data_sync(template_id: int):
                 test_limit=test_limit,
                 imputed_use_cache=imputed_use_cache,
                 sync_documents=sync_documents,
+                create_missing_assignments=create_missing_assignments,
                 fdrs_reported_import_states=fdrs_reported_import_states,
                 preview_path=preview_path,
                 sync_user_id=sync_user_id,
@@ -406,6 +408,7 @@ def run_data_sync(template_id: int):
                 template_id=template_id,
                 sync_user_id=int(getattr(current_user, "id", 0) or 0) or None,
                 sync_documents=sync_documents,
+                create_missing_assignments=create_missing_assignments,
                 change_recorder=writer.record,
             )
             writer.finalize(dict(stats or {}))

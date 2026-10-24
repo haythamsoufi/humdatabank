@@ -44,6 +44,7 @@ class TestCreateFdrsDataSyncJob:
         assert item.entity_id == 1
         assert item.status == "queued"
         assert item.payload["batch_size"] == 1000
+        assert item.payload["create_missing_assignments"] is True
 
 
 class TestGetActiveFdrsDataSyncJobs:

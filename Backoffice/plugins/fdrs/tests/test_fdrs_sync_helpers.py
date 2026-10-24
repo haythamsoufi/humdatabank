@@ -13,6 +13,10 @@ for p in (backoffice_dir, fdrs_scripts, imports_dir):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from fdrs_assignment_ensure import (  # noqa: E402
+    plan_missing_fdrs_assignments,
+    years_from_fdrs_data,
+)
 from fdrs_assignment_status_sync import (  # noqa: E402
     build_assignment_status_plan,
     derive_assignment_status_from_sections,
@@ -1474,3 +1478,46 @@ def test_check_cancel_raises_fdrs_sync_cancelled():
     assert raised
     _check_cancel(lambda: False)
     _check_cancel(None)
+
+
+def test_years_from_fdrs_data_dedupes_and_sorts():
+    years = years_from_fdrs_data(
+        [
+            {"year": "2024"},
+            {"year": 2018},
+            {"year": "2024-01-01"},
+            {"year": ""},
+            {"year": None},
+            {"year": "nope"},
+        ]
+    )
+    assert years == [2018, 2024]
+
+
+def test_plan_missing_fdrs_assignments_creates_period_and_aes():
+    plan = plan_missing_fdrs_assignments(
+        years=[2018, 2024],
+        country_iso3_to_id={"KEN": 10, "FRA": 20},
+        existing_period_names={"2024"},
+        existing_period_iso3={("2024", "KEN")},
+    )
+    assert plan["periods_to_create"] == ["2018"]
+    assert plan["target_pairs"] == 4
+    aes = {(row["period_name"], row["iso3"], row["country_id"]) for row in plan["aes_to_create"]}
+    assert aes == {
+        ("2018", "FRA", 20),
+        ("2018", "KEN", 10),
+        ("2024", "FRA", 20),
+    }
+
+
+def test_plan_missing_fdrs_assignments_noop_when_complete():
+    plan = plan_missing_fdrs_assignments(
+        years=[2024],
+        country_iso3_to_id={"KEN": 10},
+        existing_period_names={"2024"},
+        existing_period_iso3={("2024", "KEN")},
+    )
+    assert plan["periods_to_create"] == []
+    assert plan["aes_to_create"] == []
+    assert plan["target_pairs"] == 1

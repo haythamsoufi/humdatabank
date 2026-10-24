@@ -102,6 +102,7 @@ FDRS_INCOME_KPI_TO_MATRIX_ROW = {
 assert set(FDRS_INCOME_KPI_TO_MATRIX_ROW) == set(INCOME_SOURCE_KPI_CODES)
 
 # FDRS documents API document_type → template document_field item_id
+# (only the four FDRS questionnaire document slots).
 FDRS_DOCUMENT_TYPE_TO_ITEM = {
     "Our Annual Report": 923,
     "Our Audited Financial Statements": 933,
@@ -109,13 +110,51 @@ FDRS_DOCUMENT_TYPE_TO_ITEM = {
     "Our Unaudited Financial Statement": 1310,
 }
 
-# Map to form item config document_type string
+# Global publication types from ``isglobal=true`` / Manage Resources sync — not NS library rows.
+FDRS_DOCUMENT_GLOBAL_TYPES = frozenset(
+    {
+        "EveryoneCounts",
+        "Analysis",
+        "FrontendVideo",
+        "VideoGuide",
+        "DocumentGuide",
+        "Thumbnail",
+    }
+)
+
+# Map to SubmittedDocument.document_type / form item config label.
+# Types without an entry in FDRS_DOCUMENT_TYPE_TO_ITEM are still imported onto the
+# country assignment as library documents (form_item_id=None).
 FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL = {
     "Our Annual Report": "Annual Report",
     "Our Audited Financial Statements": "Audited Financial Statement",
     "Our Strategic Plan": "Strategic Plan",
     "Our Unaudited Financial Statement": "Unaudited Financial Statement",
+    "Other": "Other",
+    "Our Statutes in Force": "Statutes in Force",
+    "Our Red Cross Law": "Red Cross Law",
+    "Our Emblem Law": "Emblem Law",
+    "Picture of the Year": "Picture of the Year",
 }
+
+
+def fdrs_document_config_label(document_type: str) -> str:
+    """Human label for a FDRS API ``document_type`` string."""
+    raw = (document_type or "").strip()
+    if not raw:
+        return "Document"
+    return FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL.get(raw, raw)
+
+
+def fdrs_document_type_is_global(document_type: str) -> bool:
+    return (document_type or "").strip() in FDRS_DOCUMENT_GLOBAL_TYPES
+
+
+def fdrs_document_form_item_id(document_type: str) -> Optional[int]:
+    """Template form_item_id for questionnaire slots, else None (library import)."""
+    raw = (document_type or "").strip()
+    item_id = FDRS_DOCUMENT_TYPE_TO_ITEM.get(raw)
+    return int(item_id) if item_id is not None else None
 
 # ApprovalStatus / Public values treated as importable.
 # FDRS ``Public`` codes (observed on GET /api/documents):

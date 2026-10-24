@@ -86,7 +86,9 @@ Per page: validated/published → `approved`, submitted → `submitted`, started
 
 - API: `GET /api/documents?apiKey=…&showunpublished=true&force=true[&year=YYYY]`
 - Module: `Backoffice/plugins/fdrs/scripts/fdrs_documents_sync.py`
-- Maps FDRS `document_type` → form items 923, 933, 1309, 1310.
+- Questionnaire slots map FDRS `document_type` → form items 923, 933, 1309, 1310 (one winner per country/year/type).
+- Other National Society types (`Other`, statutes/laws, Picture of the Year, …) import as library `SubmittedDocument` rows on the same assignment (`form_item_id=NULL`), one row per catalog file.
+- Global publication types (`EveryoneCounts`, `Analysis`, videos, guides) are skipped here — resource sync owns those.
 - Creates/updates `SubmittedDocument` with `source_url`, `file_pending=true`, `storage_path=NULL`.
 - Idempotency: `fdrs_import_key` (unique).
 - **File URLs return HTTP 403** from `https://data-api.ifrc.org/documents/…` — awaiting IFRC fix; then re-run sync to download bytes into storage. A small subset of 403s are stale `_N` duplicate-filename suffixes from the API catalog; download retries once without that suffix.

@@ -3,6 +3,11 @@ FDRS documents API → SubmittedDocument import (metadata + file bytes when URL 
 
 GET https://data-api.ifrc.org/api/documents?apiKey=...&showunpublished=true&force=true[&year=YYYY]
 
+Questionnaire document types map onto FDRS template document fields. All other
+National Society catalog types (Other, statutes/laws, Picture of the Year, …)
+are imported as library rows on the same country assignment
+(``form_item_id=None``). Global publication types are left to resource sync.
+
 Public document URLs must be percent-encoded (spaces in paths). Use GET (HEAD is unreliable).
 HTTP 200/206 → save to submission storage and clear ``file_pending``.
 HTTP 403/404 → retry once without a trailing ``_N`` filename suffix (API catalog
@@ -33,14 +38,15 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 from werkzeug.datastructures import FileStorage
 
 from fdrs_sync_constants import (
-    FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL,
-    FDRS_DOCUMENT_TYPE_TO_ITEM,
     FdrsSyncCancelled,
     fdrs_approval_is_importable,
     fdrs_clean_approval_text,
     fdrs_document_approval_rank,
+    fdrs_document_config_label,
+    fdrs_document_form_item_id,
     fdrs_document_is_public_visibility,
     fdrs_document_status_from_approval,
+    fdrs_document_type_is_global,
     fdrs_public_code,
 )
 
@@ -430,6 +436,43 @@ def _fdrs_document_import_key(doc: Dict[str, Any]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:64]
 
 
+def _plan_row_from_doc(
+    doc: Dict[str, Any],
+    *,
+    iso3: str,
+    year_str: str,
+    aes_id: int,
+    doc_type: str,
+) -> Dict[str, Any]:
+    approval_raw = _doc_approval_raw(doc)
+    public_raw = _doc_public_raw(doc)
+    return {
+        "fdrs_import_key": _fdrs_document_import_key(doc),
+        "assignment_entity_status_id": aes_id,
+        "form_item_id": fdrs_document_form_item_id(doc_type),
+        "filename": (doc.get("name") or "document.pdf").strip(),
+        "source_url": (doc.get("url") or "").strip(),
+        "thumbnail_url": (doc.get("thumbnail") or "").strip() or None,
+        "language": (doc.get("LangCode") or "en").strip().lower() or "en",
+        "document_type": fdrs_document_config_label(doc_type),
+        "period": clean_fdrs_document_period(doc.get("YearText") or year_str),
+        "is_public": fdrs_document_is_public_visibility(
+            approval_raw,
+            public_code=public_raw,
+        ),
+        "iso3": iso3,
+        "year": year_str,
+        "fdrs_document_type": doc_type,
+        "approval_status": fdrs_clean_approval_text(approval_raw),
+        "public_code": fdrs_public_code(public_raw),
+        "status": fdrs_document_status_from_approval(
+            approval_raw,
+            public_code=public_raw,
+        ),
+        "modified_at": doc.get("ModifiedAt"),
+    }
+
+
 def build_document_import_plan(
     documents: List[Dict[str, Any]],
     assignment_rows: List[Dict[str, Any]],
@@ -438,7 +481,13 @@ def build_document_import_plan(
     sync_years: Optional[List[int]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Select importable FDRS documents and map to assignment + form_item_id.
+    Select importable FDRS documents and map to assignment (+ form_item_id when known).
+
+    Questionnaire slot types (Annual Report, financials, Strategic Plan) keep one
+    winner per (iso3, year, type). All other National Society document types are
+    imported as library rows on the assignment (``form_item_id=None``), one row per
+    catalog file. Global publication types are skipped (resource sync owns those).
+
     Returns (plan_rows, summary).
     """
     del template_id  # reserved for future template-specific rules
@@ -451,11 +500,14 @@ def build_document_import_plan(
         "total_api_docs": len(documents),
         "skipped_no_iso3": 0,
         "skipped_no_assignment": 0,
-        "skipped_unmapped_type": 0,
+        "skipped_unmapped_type": 0,  # retained for older job UIs; now unused (0)
+        "skipped_global_type": 0,
         "skipped_approval": 0,
         "skipped_duplicate": 0,
         "skipped_sync_year": 0,
         "planned": 0,
+        "planned_template_slots": 0,
+        "planned_library": 0,
         "status_approved": 0,
         "status_pending": 0,
         "status_rejected": 0,
@@ -465,12 +517,15 @@ def build_document_import_plan(
     # second real file is kept. Popped before the summary is stored on the job.
     present_import_keys: Set[str] = set()
 
-    # Best doc per (iso3, reporting_year, document_type)
-    best: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    # Questionnaire slots: best doc per (iso3, reporting_year, document_type)
+    best_slots: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    # Library types: every catalog file (countries often upload several "Other" docs)
+    library_candidates: List[Tuple[str, str, str, Dict[str, Any]]] = []
+
     for doc in documents:
         doc_type = (doc.get("document_type") or "").strip()
-        if doc_type not in FDRS_DOCUMENT_TYPE_TO_ITEM:
-            summary["skipped_unmapped_type"] += 1
+        if not doc_type or fdrs_document_type_is_global(doc_type):
+            summary["skipped_global_type"] += 1
             continue
         approval_raw = _doc_approval_raw(doc)
         public_raw = _doc_public_raw(doc)
@@ -491,61 +546,49 @@ def build_document_import_plan(
             continue
 
         present_import_keys.add(_fdrs_document_import_key(doc))
-        key = (iso3, year_str, doc_type)
-        prev = best.get(key)
-        if prev is None or _doc_score(doc) > _doc_score(prev):
-            best[key] = doc
+        form_item_id = fdrs_document_form_item_id(doc_type)
+        if form_item_id is not None:
+            key = (iso3, year_str, doc_type)
+            prev = best_slots.get(key)
+            if prev is None or _doc_score(doc) > _doc_score(prev):
+                best_slots[key] = doc
+        else:
+            library_candidates.append((iso3, year_str, doc_type, doc))
 
     plan: List[Dict[str, Any]] = []
     seen_keys: set = set()
-    for (iso3, year_str, doc_type), doc in sorted(best.items()):
+
+    def _append_plan_doc(iso3: str, year_str: str, doc_type: str, doc: Dict[str, Any]) -> None:
         import_key = _fdrs_document_import_key(doc)
         if import_key in seen_keys:
             summary["skipped_duplicate"] += 1
-            continue
+            return
         seen_keys.add(import_key)
         aes_id = assignment_by_key[(year_str, iso3)]
-        form_item_id = FDRS_DOCUMENT_TYPE_TO_ITEM[doc_type]
-        period = clean_fdrs_document_period(doc.get("YearText") or year_str)
-        lang = (doc.get("LangCode") or "en").strip().lower() or "en"
-        approval_raw = _doc_approval_raw(doc)
-        public_raw = _doc_public_raw(doc)
-        approval_status = fdrs_clean_approval_text(approval_raw)
-        is_public = fdrs_document_is_public_visibility(
-            approval_raw,
-            public_code=public_raw,
+        row = _plan_row_from_doc(
+            doc,
+            iso3=iso3,
+            year_str=year_str,
+            aes_id=aes_id,
+            doc_type=doc_type,
         )
-        doc_status = fdrs_document_status_from_approval(
-            approval_raw,
-            public_code=public_raw,
-        )
-        plan.append(
-            {
-                "fdrs_import_key": import_key,
-                "assignment_entity_status_id": aes_id,
-                "form_item_id": form_item_id,
-                "filename": (doc.get("name") or "document.pdf").strip(),
-                "source_url": (doc.get("url") or "").strip(),
-                "thumbnail_url": (doc.get("thumbnail") or "").strip() or None,
-                "language": lang,
-                "document_type": FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL.get(doc_type, doc_type),
-                "period": period,
-                "is_public": is_public,
-                "iso3": iso3,
-                "year": year_str,
-                "fdrs_document_type": doc_type,
-                "approval_status": approval_status,
-                "public_code": fdrs_public_code(public_raw),
-                "status": doc_status,
-                "modified_at": doc.get("ModifiedAt"),
-            }
-        )
-        if doc_status == "approved":
+        plan.append(row)
+        if row["form_item_id"] is not None:
+            summary["planned_template_slots"] += 1
+        else:
+            summary["planned_library"] += 1
+        if row["status"] == "approved":
             summary["status_approved"] += 1
-        elif doc_status == "rejected":
+        elif row["status"] == "rejected":
             summary["status_rejected"] += 1
         else:
             summary["status_pending"] += 1
+
+    for (iso3, year_str, doc_type), doc in sorted(best_slots.items()):
+        _append_plan_doc(iso3, year_str, doc_type, doc)
+    for iso3, year_str, doc_type, doc in library_candidates:
+        _append_plan_doc(iso3, year_str, doc_type, doc)
+
     summary["planned"] = len(plan)
     summary["present_import_keys"] = present_import_keys
     return plan, summary
@@ -985,6 +1028,8 @@ def upsert_fdrs_document_metadata(
         for r in plan_rows
         if r.get("form_item_id") is not None
     }
+    # Questionnaire slots only — library imports (form_item_id=None) are keyed solely
+    # by fdrs_import_key and never adopt a sibling slot row.
     slots: Dict[Tuple[int, int], List[SubmittedDocument]] = defaultdict(list)
     if aes_ids and item_ids:
         for doc in SubmittedDocument.query.filter(
@@ -1021,11 +1066,17 @@ def upsert_fdrs_document_metadata(
             stats["skipped"] += 1
             continue
         try:
-            slot_key = (
-                int(row["assignment_entity_status_id"]),
-                int(row["form_item_id"]),
-            )
-            slot_rows = slots.get(slot_key, [])
+            form_item_raw = row.get("form_item_id")
+            form_item_id = int(form_item_raw) if form_item_raw is not None else None
+            if form_item_id is not None:
+                slot_key: Optional[Tuple[int, int]] = (
+                    int(row["assignment_entity_status_id"]),
+                    form_item_id,
+                )
+                slot_rows = slots.get(slot_key, [])
+            else:
+                slot_key = None
+                slot_rows = []
             existing, adopted = select_fdrs_document_for_upsert(
                 existing_by_key.get(import_key),
                 slot_rows,
@@ -1179,7 +1230,7 @@ def upsert_fdrs_document_metadata(
             else:
                 entry = SubmittedDocument(
                     assignment_entity_status_id=int(row["assignment_entity_status_id"]),
-                    form_item_id=int(row["form_item_id"]),
+                    form_item_id=form_item_id,
                     filename=row["filename"],
                     storage_path=storage_path,
                     source_url=row.get("source_url"),
@@ -1197,7 +1248,8 @@ def upsert_fdrs_document_metadata(
                 )
                 db.session.add(entry)
                 existing_by_key[import_key] = entry
-                slots.setdefault(slot_key, []).append(entry)
+                if slot_key is not None:
+                    slots.setdefault(slot_key, []).append(entry)
                 stats["inserted"] += 1
 
             for sibling in siblings:

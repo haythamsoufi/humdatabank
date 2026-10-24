@@ -583,7 +583,7 @@ def test_same_year_period_range_is_stored_as_the_year():
     assert plan[0]["year"] == "2024"
 
 
-def test_build_document_import_plan_skips_unmapped_type():
+def test_build_document_import_plan_imports_library_types_without_form_item():
     documents = [
         {
             "don_code": "DUS001",
@@ -593,14 +593,65 @@ def test_build_document_import_plan_skips_unmapped_type():
             "name": "x.pdf",
             "Public": 1,
             "ApprovalStatus": "Validated (Public)",
-        }
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Statutes in Force",
+            "year": 2024,
+            "name": "statutes.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "EveryoneCounts",
+            "year": 2024,
+            "name": "ec.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
     ]
     assignment_rows = [
         {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
     ]
     plan, summary = build_document_import_plan(documents, assignment_rows)
-    assert plan == []
-    assert summary["skipped_unmapped_type"] == 1
+    assert summary["skipped_global_type"] == 1
+    assert summary["planned_library"] == 2
+    assert summary["planned_template_slots"] == 0
+    assert {row["document_type"] for row in plan} == {"Other", "Statutes in Force"}
+    assert all(row["form_item_id"] is None for row in plan)
+    assert all(row["assignment_entity_status_id"] == 99 for row in plan)
+
+
+def test_build_document_import_plan_keeps_all_other_docs_same_year():
+    documents = [
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Other",
+            "year": 2024,
+            "name": "plan-a.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Other",
+            "year": 2024,
+            "name": "plan-b.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 2
+    assert {row["filename"] for row in plan} == {"plan-a.pdf", "plan-b.pdf"}
 
 
 def test_parse_don_code_amount_pairs_zips_parallel_csv():

@@ -120,6 +120,32 @@ class TestPluginManagerInit:
         assert "plugin_a" in pm._raw_active_tokens
         assert "plugin_b" in pm._raw_active_tokens
 
+    def test_load_plugin_states_uses_app_context_outside_request(self, tmp_path):
+        """Boot has no request context; lifecycle reads must still hit the DB."""
+        app = _make_flask_app(tmp_path)
+        calls = {"n": 0}
+
+        def load_ids():
+            from flask import has_app_context
+
+            assert has_app_context()
+            calls["n"] += 1
+            return ["upr"]
+
+        with patch("app.plugins.manager.utcnow") as m, patch(
+            "app.plugins.lifecycle_store.load_active_plugin_ids",
+            side_effect=load_ids,
+        ), patch(
+            "app.plugins.lifecycle_store.get_updated_at",
+            return_value=None,
+        ):
+            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+            from app.plugins.manager import PluginManager
+            pm = PluginManager(app)
+
+        assert calls["n"] == 1
+        assert pm._raw_active_tokens == ["upr"]
+
     def test_defaults_to_empty_tokens_when_store_empty(self, tmp_path):
         app = _make_flask_app(tmp_path)
         with patch("app.plugins.manager.utcnow") as m, patch(

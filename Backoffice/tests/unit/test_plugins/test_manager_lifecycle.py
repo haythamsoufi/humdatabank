@@ -2,7 +2,7 @@
 multi-worker state sync, the activation guard and safe reload."""
 import shutil
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Blueprint
@@ -173,10 +173,37 @@ class TestStateSync:
         with patch("app.plugins.lifecycle_store.get_updated_at", return_value=t1), patch(
             "app.plugins.lifecycle_store.load_active_plugin_ids",
             return_value=["a_plugin"],
-        ):
+        ), patch.object(pm, "_apply_activation_side_effects") as side_effects:
             assert pm.sync_activation_state() is True
             assert "a_plugin" in pm.active_plugins
+            side_effects.assert_called_once()
             assert pm.sync_activation_state() is False
+
+    def test_sync_reregisters_validation_packs_when_plugin_becomes_active(self, manager):
+        """Workers that miss activate() still get packs when they adopt DB state."""
+        from datetime import datetime, timezone
+
+        pm, d = manager
+        _write_plugin(d, "a_plugin")
+        _load(pm)
+        plugin = pm.plugins["a_plugin"]
+        plugin.register_validation_packs = MagicMock()
+        plugin.unregister_validation_packs = MagicMock()
+        pm.active_plugins.discard("a_plugin")
+        t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        t1 = datetime(2026, 1, 2, tzinfo=timezone.utc)
+        pm._state_updated_at = t0
+
+        with patch("app.plugins.lifecycle_store.get_updated_at", return_value=t1), patch(
+            "app.plugins.lifecycle_store.load_active_plugin_ids",
+            return_value=["a_plugin"],
+        ), patch("app.services.validation.core_checks.register_core_validation_pack"), patch(
+            "app.services.validation.pack_registry.mark_synced_from_plugins"
+        ):
+            assert pm.sync_activation_state() is True
+
+        plugin.register_validation_packs.assert_called()
+        plugin.unregister_validation_packs.assert_not_called()
 
     def test_own_writes_do_not_trigger_resync(self, manager):
         from datetime import datetime, timezone

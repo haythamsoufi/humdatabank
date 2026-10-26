@@ -205,6 +205,12 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         register_upr_validation_pack()
 
+    def unregister_validation_packs(self) -> None:
+        from app.services.validation.pack_registry import unregister_pack
+        from plugins.upr.validation.register import RULE_PACK_UPR
+
+        unregister_pack(RULE_PACK_UPR)
+
     def get_entry_form_assets(self, template_id: int | None) -> list[dict[str, str]]:
         from plugins.upr.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
         from plugins.upr.routes import upr_static_url

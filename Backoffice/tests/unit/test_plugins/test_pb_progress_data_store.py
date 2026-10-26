@@ -8,11 +8,11 @@ import pytest
 
 from app.extensions import db
 from app.models.plugin_data import PluginData
-from plugins.pb_progress.plugin_data_store import (
+from plugins.ifrc.pb_progress.plugin_data_store import (
     BUILD_HEARTBEAT_STALE_SECONDS,
     PBProgressDataStore,
 )
-from plugins.pb_progress.versions import DEFAULT_VERSION, VERSION_ORDER
+from plugins.ifrc.pb_progress.versions import DEFAULT_VERSION, VERSION_ORDER
 
 OTHER_VERSION = next(v for v in VERSION_ORDER if v != DEFAULT_VERSION)
 

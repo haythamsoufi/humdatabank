@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 import pytest
 
-from plugins.pb_progress.db_source import validate_uploaded_workbook
-from plugins.pb_progress.service import PBProgressService
+from plugins.ifrc.pb_progress.db_source import validate_uploaded_workbook
+from plugins.ifrc.pb_progress.service import PBProgressService
 from workbook_fixtures import (
     apply_section_order_env,
     cumulative_docx_item,

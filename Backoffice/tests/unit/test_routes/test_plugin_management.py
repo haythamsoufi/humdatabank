@@ -977,10 +977,10 @@ class TestPluginStaticAuthentication:
 class TestLifecycleRefusals:
     def test_blocked_action_returns_readable_400_without_running(self, logged_in_client, db_session, app):
         pm = _make_plugin_manager(
-            block_reason="pb_progress is required by active plugin(s): fdrs."
+            block_reason="ifrc is required by active plugin(s): example_dep."
         )
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/pb_progress/deactivate")
+            resp = logged_in_client.post("/admin/api/plugins/ifrc/deactivate")
         assert resp.status_code == 400
         assert "required by active" in resp.get_data(as_text=True)
         pm.deactivate_plugin.assert_not_called()
@@ -1054,7 +1054,7 @@ class TestReloadScanAndInfoRoutes:
         pm = _make_plugin_manager(first_party=True, dependents=["fdrs"])
         pm.get_plugin_cleanup_info.return_value = {"data_to_cleanup": []}
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.get("/admin/api/plugins/pb_progress/cleanup-info")
+            resp = logged_in_client.get("/admin/api/plugins/ifrc/cleanup-info")
         data = _get_json(resp)
         assert resp.status_code == 200
         assert data["first_party"] is True

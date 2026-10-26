@@ -16,7 +16,7 @@ for path in (VISUALS_SCRIPTS, TESTS_ROOT):
 
 
 def pytest_collection_modifyitems(items) -> None:
-    """Tag every test under plugins/pb_progress for selective runs."""
+    """Tag every test under plugins/ifrc/pb_progress for selective runs."""
     plugin_root = PLUGIN_ROOT.as_posix().lower()
     for item in items:
         if plugin_root in item.path.as_posix().lower():

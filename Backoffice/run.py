@@ -259,9 +259,9 @@ if __name__ == '__main__':
         "**/.coverage",
         "**/*.log",
         # P&B report build writes heavily here; exclude to avoid dev-server reload mid-build.
-        "**/plugins/pb_progress/visuals/report/**",
-        "**/plugins/pb_progress/visuals/Figures/**",
-        "**/plugins/pb_progress/visuals/**",
+        "**/plugins/ifrc/pb_progress/visuals/report/**",
+        "**/plugins/ifrc/pb_progress/visuals/Figures/**",
+        "**/plugins/ifrc/pb_progress/visuals/**",
     ]
 
     # Werkzeug's _stat_ignore_scan only covers sys.prefix / sys.base_prefix.

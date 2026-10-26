@@ -9,8 +9,8 @@ from werkzeug.exceptions import NotFound
 
 from flask_login import current_user
 
-from plugins.pb_progress import bp, settings_bp, _PLUGIN_DIR
-from plugins.pb_progress.db_source import (
+from plugins.ifrc.pb_progress import bp, settings_bp, _PLUGIN_DIR
+from plugins.ifrc.pb_progress.db_source import (
     DbSourceError,
     get_editable_translations_config,
     import_config_from_excel,
@@ -19,9 +19,9 @@ from plugins.pb_progress.db_source import (
     sync_mapping_from_indicator_bank,
     validate_mapping_config,
 )
-from plugins.pb_progress.plugin_data_store import PBProgressDataStore
-from plugins.pb_progress.service import PBProgressService
-from plugins.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER, validate_version
+from plugins.ifrc.pb_progress.plugin_data_store import PBProgressDataStore
+from plugins.ifrc.pb_progress.service import PBProgressService
+from plugins.ifrc.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER, validate_version
 from app.routes.admin.shared import permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
 from app.utils.error_handling import handle_json_view_exception
@@ -39,12 +39,12 @@ def settings_page():
     from app.plugins.plugin_utils import settings_plugin_info
 
     return render_template(
-        "plugins/pb_progress/settings.html",
+        "plugins/ifrc/pb_progress/settings.html",
         settings={
             "default_version": DEFAULT_VERSION,
             "versions": list(VERSION_ORDER),
         },
-        plugin_info=settings_plugin_info("pb_progress"),
+        plugin_info=settings_plugin_info("ifrc"),
     )
 
 
@@ -67,7 +67,7 @@ def manage_page():
         initial_subtab = "build"
     explore_report_url = url_for("data_exploration.explore_data", tab="pb-progress")
     return render_template(
-        "plugins/pb_progress/pb_progress/manage.html",
+        "plugins/ifrc/pb_progress/manage.html",
         pb_report_versions=REPORT_VERSIONS,
         pb_report_version_order=VERSION_ORDER,
         pb_default_version=DEFAULT_VERSION,
@@ -311,7 +311,7 @@ def config_import_from_excel(version: str):
 @permission_required("admin.data_explore.pb_progress")
 @system_manager_required
 def report_years(version: str):
-    from plugins.pb_progress.db_source import list_available_years
+    from plugins.ifrc.pb_progress.db_source import list_available_years
 
     try:
         version_key = validate_version(version)

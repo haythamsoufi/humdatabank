@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from werkzeug.datastructures import FileStorage
 
-from plugins.pb_progress.service import PBProgressService
-from plugins.pb_progress.versions import DEFAULT_VERSION
+from plugins.ifrc.pb_progress.service import PBProgressService
+from plugins.ifrc.pb_progress.versions import DEFAULT_VERSION
 
 
 def _reset_service_state() -> None:
@@ -92,10 +92,10 @@ class TestPBProgressWorkbookUpload:
     def test_store_excel_replaces_workbook_without_archiving(self, app) -> None:
         with app.app_context():
             with patch.object(PBProgressService, "workbook_exists", return_value=True), patch(
-                "plugins.pb_progress.db_source.validate_uploaded_workbook",
+                "plugins.ifrc.pb_progress.db_source.validate_uploaded_workbook",
                 return_value={"valid": True, "warnings": []},
             ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch(
-                "plugins.pb_progress.service.storage_service.upload"
+                "plugins.ifrc.pb_progress.service.storage_service.upload"
             ) as upload_mock, patch.object(PBProgressService, "_persist_status"):
                 result = PBProgressService.store_excel(
                     DEFAULT_VERSION,
@@ -108,10 +108,10 @@ class TestPBProgressWorkbookUpload:
     def test_store_excel_first_upload(self, app) -> None:
         with app.app_context():
             with patch.object(PBProgressService, "workbook_exists", return_value=False), patch(
-                "plugins.pb_progress.db_source.validate_uploaded_workbook",
+                "plugins.ifrc.pb_progress.db_source.validate_uploaded_workbook",
                 return_value={"valid": True, "warnings": []},
             ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch(
-                "plugins.pb_progress.service.storage_service.upload"
+                "plugins.ifrc.pb_progress.service.storage_service.upload"
             ), patch.object(PBProgressService, "_persist_status"):
                 result = PBProgressService.store_excel(
                     DEFAULT_VERSION,
@@ -197,13 +197,13 @@ class TestPBProgressCopyOutputsToStorage:
 
         with app.app_context():
             with patch.object(PBProgressService, "_report_output_dir", return_value=output_dir), patch(
-                "plugins.pb_progress.service.storage_service.upload",
+                "plugins.ifrc.pb_progress.service.storage_service.upload",
                 side_effect=fake_upload,
             ), patch(
-                "plugins.pb_progress.service.storage_service.exists",
+                "plugins.ifrc.pb_progress.service.storage_service.exists",
                 return_value=True,
             ), patch(
-                "plugins.pb_progress.service.storage_service.get_size",
+                "plugins.ifrc.pb_progress.service.storage_service.get_size",
                 return_value=123,
             ):
                 copied = PBProgressService._copy_outputs_to_storage(DEFAULT_VERSION)
@@ -224,10 +224,10 @@ class TestPBProgressCopyOutputsToStorage:
 
         with app.app_context():
             with patch.object(PBProgressService, "_report_output_dir", return_value=output_dir), patch(
-                "plugins.pb_progress.service.storage_service.upload",
+                "plugins.ifrc.pb_progress.service.storage_service.upload",
                 return_value="versions/2025-2026/output/pb-report.html",
             ), patch(
-                "plugins.pb_progress.service.storage_service.exists",
+                "plugins.ifrc.pb_progress.service.storage_service.exists",
                 return_value=False,
             ):
                 with pytest.raises(RuntimeError, match="not persisted"):
@@ -289,8 +289,8 @@ class TestPBProgressOutputRetention:
         with app.app_context():
             with patch.object(PBProgressService, "_ensure_status_loaded"), patch.object(
                 PBProgressService, "_sync_status_from_storage"
-            ), patch("plugins.pb_progress.service.storage_service.exists", return_value=True), patch(
-                "plugins.pb_progress.service.storage_service.get_size", return_value=1024
+            ), patch("plugins.ifrc.pb_progress.service.storage_service.exists", return_value=True), patch(
+                "plugins.ifrc.pb_progress.service.storage_service.get_size", return_value=1024
             ), patch.object(
                 PBProgressService, "_output_url", return_value="/admin/data-exploration/pb-progress/2025-2026/output/pb-report.html"
             ):
@@ -312,15 +312,15 @@ class TestPBProgressOutputRetention:
             ), patch.object(PBProgressService, "_reload_status_from_storage", return_value=dict(state)), patch.object(
                 PBProgressService, "_clear_orphaned_run"
             ), patch(
-                "plugins.pb_progress.service.PBProgressDataStore.get_data_source", return_value="excel"
+                "plugins.ifrc.pb_progress.service.PBProgressDataStore.get_data_source", return_value="excel"
             ), patch(
-                "plugins.pb_progress.service.storage_service.exists", return_value=True
+                "plugins.ifrc.pb_progress.service.storage_service.exists", return_value=True
             ), patch(
-                "plugins.pb_progress.service.PBProgressDataStore.get_version_status", return_value=dict(state)
+                "plugins.ifrc.pb_progress.service.PBProgressDataStore.get_version_status", return_value=dict(state)
             ), patch(
-                "plugins.pb_progress.service.PBProgressDataStore.try_set_version_status_if_not_running",
+                "plugins.ifrc.pb_progress.service.PBProgressDataStore.try_set_version_status_if_not_running",
                 return_value=True,
-            ) as claim_mock, patch("plugins.pb_progress.service.threading.Thread") as thread_cls:
+            ) as claim_mock, patch("plugins.ifrc.pb_progress.service.threading.Thread") as thread_cls:
                 thread_cls.return_value.start = MagicMock()
                 PBProgressService.start_generation(DEFAULT_VERSION)
         running_status = claim_mock.call_args[0][1]

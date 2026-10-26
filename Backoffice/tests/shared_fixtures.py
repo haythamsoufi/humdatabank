@@ -462,6 +462,12 @@ def app():
             plugin_manager.load_plugins()
             plugin_manager.register_template_loader()
             plugin_manager.register_blueprints()
+        # Suite expects plugin routes/templates available; production defaults
+        # plugins off until listed in plugin_data.
+        if plugin_manager.plugins and not plugin_manager.active_plugins:
+            plugin_manager.active_plugins = set(plugin_manager.plugins.keys())
+            plugin_manager._extract_field_types()
+            plugin_manager._save_plugin_states()
         if not getattr(app, 'form_integration', None):
             from app.plugins.form_integration import FormIntegration
             app.form_integration = FormIntegration(plugin_manager)

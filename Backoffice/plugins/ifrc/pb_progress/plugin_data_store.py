@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from app.plugins.db_config import DbPluginConfig
 from app.services.platform import storage_service
-from plugins.pb_progress.versions import (
+from plugins.ifrc.pb_progress.versions import (
     DEFAULT_VERSION,
     LEGACY_EXCEL_REL_PATH,
     LEGACY_OUTPUT_PREFIX,

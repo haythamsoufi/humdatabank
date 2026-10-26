@@ -21,11 +21,11 @@ from flask import Response, current_app, url_for
 from werkzeug.datastructures import FileStorage
 from werkzeug.exceptions import NotFound
 
-from plugins.pb_progress.plugin_data_store import (
+from plugins.ifrc.pb_progress.plugin_data_store import (
     PBProgressDataStore,
     SYSTEM_GENERATED_NAME,
 )
-from plugins.pb_progress.versions import (
+from plugins.ifrc.pb_progress.versions import (
     DEFAULT_VERSION,
     LEGACY_EXCEL_REL_PATH,
     LEGACY_OUTPUT_PREFIX,
@@ -996,7 +996,7 @@ class PBProgressService:
                 temp_path = tmp.name
 
             from app.utils.safe_workbook import inspect_xlsx
-            from plugins.pb_progress.db_source import WorkbookValidationError, validate_uploaded_workbook
+            from plugins.ifrc.pb_progress.db_source import WorkbookValidationError, validate_uploaded_workbook
 
             inspect_xlsx(file_bytes)
 
@@ -1040,7 +1040,7 @@ class PBProgressService:
         """Load mapping and translations from the uploaded workbook; derive section order from SPEF."""
         result: dict[str, Any] = {"excel": excel_info}
         try:
-            from plugins.pb_progress.db_source import DbSourceError, get_editable_translations_config, import_config_from_excel
+            from plugins.ifrc.pb_progress.db_source import DbSourceError, get_editable_translations_config, import_config_from_excel
 
             summary = import_config_from_excel(version)
             result["config_import"] = summary
@@ -1111,7 +1111,7 @@ class PBProgressService:
 
         source = PBProgressDataStore.get_data_source(version)
         if source == "system":
-            from plugins.pb_progress.db_source import DbSourceError, generate_system_dataset as _generate_system_dataset
+            from plugins.ifrc.pb_progress.db_source import DbSourceError, generate_system_dataset as _generate_system_dataset
 
             try:
                 _generate_system_dataset(version)
@@ -1352,7 +1352,7 @@ class PBProgressService:
         if quarto_exe:
             env["PB_QUARTO_EXE"] = quarto_exe
 
-        from plugins.pb_progress.db_source import resolve_section_order_config
+        from plugins.ifrc.pb_progress.db_source import resolve_section_order_config
 
         section_order_config = resolve_section_order_config(version, excel_path)
         if section_order_config:
@@ -1363,7 +1363,7 @@ class PBProgressService:
                 if str(row.get("section") or "").strip()
             ]
             if section_codes:
-                from plugins.pb_progress.db_source import resolve_section_title_translations
+                from plugins.ifrc.pb_progress.db_source import resolve_section_title_translations
 
                 title_translations = resolve_section_title_translations(section_codes)
                 if title_translations:
@@ -1624,14 +1624,14 @@ class PBProgressService:
 
     @classmethod
     def generate_system_dataset(cls, version: str) -> dict[str, Any]:
-        from plugins.pb_progress.db_source import generate_system_dataset as _generate
+        from plugins.ifrc.pb_progress.db_source import generate_system_dataset as _generate
 
         version = validate_version(version)
         return _generate(version)
 
     @classmethod
     def compare_system_dataset(cls, version: str) -> dict[str, Any]:
-        from plugins.pb_progress.db_source import compare_final_with_uploaded
+        from plugins.ifrc.pb_progress.db_source import compare_final_with_uploaded
 
         version = validate_version(version)
         return compare_final_with_uploaded(version)

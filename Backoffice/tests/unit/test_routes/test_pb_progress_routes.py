@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from plugins.pb_progress.versions import DEFAULT_VERSION
+from plugins.ifrc.pb_progress.versions import DEFAULT_VERSION
 
 pytestmark = [pytest.mark.unit, pytest.mark.api]
 
@@ -26,7 +26,7 @@ class TestPBProgressRouteAuth:
 
     def test_status_ok_for_admin_with_permission(self, logged_in_admin_client):
         with patch(
-            "plugins.pb_progress.routes.PBProgressService.get_public_status",
+            "plugins.ifrc.pb_progress.routes.PBProgressService.get_public_status",
             return_value={"version": DEFAULT_VERSION, "status": "idle", "outputs": []},
         ):
             resp = logged_in_admin_client.get(_version_url("/status"), headers=JSON_HEADERS)
@@ -63,20 +63,10 @@ class TestPBProgressConfigValidation:
         assert resp.status_code == 400
         assert "non-empty id" in resp.get_json()["error"].lower()
 
-    def test_section_order_put_rejects_invalid_part(self, logged_in_sm_client):
-        resp = logged_in_sm_client.put(
-            _version_url("/section-order"),
-            data=json.dumps({"section_order": [{"part": "invalid", "section": "SP1", "order": 1}]}),
-            headers=JSON_HEADERS,
-        )
-        assert resp.status_code == 400
-        assert "invalid section part" in resp.get_json()["error"].lower()
-
-
 class TestPBProgressServeOutput:
     def test_serve_output_rejects_path_traversal(self, logged_in_admin_client):
         with patch(
-            "plugins.pb_progress.routes.PBProgressService.serve_output",
+            "plugins.ifrc.pb_progress.routes.PBProgressService.serve_output",
             side_effect=ValueError("Invalid filename."),
         ):
             resp = logged_in_admin_client.get(
@@ -100,7 +90,7 @@ class TestPBProgressCancelRoute:
 
     def test_cancel_ok_for_system_manager(self, logged_in_sm_client):
         with patch(
-            "plugins.pb_progress.routes.PBProgressService.cancel_generation",
+            "plugins.ifrc.pb_progress.routes.PBProgressService.cancel_generation",
             return_value={"version": DEFAULT_VERSION, "status": "cancelled", "outputs": []},
         ):
             resp = logged_in_sm_client.post(_version_url("/cancel"), headers=JSON_HEADERS)
@@ -111,7 +101,7 @@ class TestPBProgressCancelRoute:
 
     def test_cancel_returns_400_when_not_running(self, logged_in_sm_client):
         with patch(
-            "plugins.pb_progress.routes.PBProgressService.cancel_generation",
+            "plugins.ifrc.pb_progress.routes.PBProgressService.cancel_generation",
             side_effect=RuntimeError("No report generation is in progress."),
         ):
             resp = logged_in_sm_client.post(_version_url("/cancel"), headers=JSON_HEADERS)

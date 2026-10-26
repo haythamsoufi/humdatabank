@@ -206,10 +206,10 @@ _TRUSTED_WORKBOOK_READERS = {
     "plugins/fdrs/scripts/import_fdrs_form_data.py",
     "plugins/upr/scripts/upr_country_reporting_excel_template.py",
     "plugins/upr/scripts/unified_country_plan_excel_template.py",
-    "plugins/pb_progress/db_source.py",
-    "plugins/pb_progress/visuals/scripts/pb_figures/data.py",
-    "plugins/pb_progress/visuals/scripts/pb_figures/translations.py",
-    "plugins/pb_progress/visuals/scripts/patch_footnote_placeholders.py",
+    "plugins/ifrc/pb_progress/db_source.py",
+    "plugins/ifrc/pb_progress/visuals/scripts/pb_figures/data.py",
+    "plugins/ifrc/pb_progress/visuals/scripts/pb_figures/translations.py",
+    "plugins/ifrc/pb_progress/visuals/scripts/patch_footnote_placeholders.py",
 }
 
 

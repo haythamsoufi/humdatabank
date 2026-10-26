@@ -1,8 +1,6 @@
-"""FDRS plugin — data sync, documents, compliance, disaggregation, P&B visuals, validation, and quality methodology."""
+"""FDRS plugin — data sync, documents, compliance, disaggregation, validation, and quality methodology."""
 
 from __future__ import annotations
-
-from typing import Any
 
 from app.plugins.base import BasePlugin, DataExplorerTabConfig, SeedPermission, SeedRole
 from plugins.metadata import FirstPartyPluginMetadata
@@ -56,7 +54,7 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
             "Federation-wide Databank & Reporting System: data-api sync, "
             "document fetch, disaggregation analysis, service-income estimate, "
             "Everyone Counts report, "
-            "document compliance, P&B visuals, matrix validation, and quality methodology."
+            "document compliance, matrix validation, and quality methodology."
         )
 
     def get_settings(self):
@@ -107,16 +105,6 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
                 icon="fas fa-clipboard-check",
                 manage_requires_system_manager=False,
             ),
-            DataExplorerTabConfig(
-                tab_id="pb-progress",
-                label="P&B visuals",
-                permission="admin.data_explore.pb_progress",
-                priority=40,
-                panel_template="plugins/pb_progress/pb_progress/tab_panel.html",
-                plugin_id=self.plugin_id,
-                icon="fas fa-chart-line",
-                manage_requires_system_manager=True,
-            ),
         ]
 
     @staticmethod
@@ -147,17 +135,6 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
             )
             for _tab_id, label, permission, role_code, _priority, _icon in _SPLIT_ANALYSIS_TABS
         ]
-
-    def get_required_plugins(self) -> list[str]:
-        return ["pb_progress"]
-
-    def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
-        from flask import current_app
-
-        pb_progress = current_app.plugin_manager.get_plugin("pb_progress")
-        if pb_progress is None:
-            return {"explore_first_tab": first_tab}
-        return pb_progress.get_panel_render_context(flags, first_tab)
 
     def is_admin_feature(self) -> bool:
         return True

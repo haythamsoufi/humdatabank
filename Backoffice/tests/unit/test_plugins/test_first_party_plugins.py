@@ -1,41 +1,32 @@
-"""First-party plugin contracts touched by the plugin review."""
+"""Plugin contracts touched by the plugin review."""
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 
 @pytest.mark.unit
-def test_fdrs_declares_pb_progress_dependency():
+def test_fdrs_has_no_pb_progress_dependency():
     from plugins.fdrs.plugin import FdrsPlugin
 
-    assert FdrsPlugin().get_required_plugins() == ["pb_progress"]
+    assert FdrsPlugin().get_required_plugins() == []
 
 
 @pytest.mark.unit
-def test_fdrs_panel_context_comes_from_loaded_pb_progress(app):
-    from plugins.fdrs.plugin import FdrsPlugin
+def test_ifrc_owns_pb_progress_panel_context(app):
+    from plugins.ifrc.plugin import IfrcPlugin
 
-    pb = MagicMock()
-    pb.get_panel_render_context.return_value = {"explore_first_tab": "x"}
-    manager = MagicMock()
-    manager.get_plugin.return_value = pb
-    with app.app_context(), patch.object(app, "plugin_manager", manager):
-        assert FdrsPlugin().get_panel_render_context({}, "x") == {"explore_first_tab": "x"}
-    manager.get_plugin.assert_called_once_with("pb_progress")
-
-
-@pytest.mark.unit
-def test_fdrs_panel_context_without_pb_progress_degrades(app):
-    from plugins.fdrs.plugin import FdrsPlugin
-
-    manager = MagicMock()
-    manager.get_plugin.return_value = None
-    with app.app_context(), patch.object(app, "plugin_manager", manager):
-        assert FdrsPlugin().get_panel_render_context({}, "t") == {"explore_first_tab": "t"}
+    with app.test_request_context("/admin/data-exploration/explore-data?tab=pb-progress"):
+        ctx = IfrcPlugin().get_panel_render_context(
+            {"can_manage_pb_progress": True},
+            "pb-progress",
+        )
+    assert ctx["explore_first_tab"] == "pb-progress"
+    assert ctx["can_manage_pb_progress"] is True
+    assert "pb_report_versions" in ctx
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("module", ["interactive_map", "emergency_operations"])
+@pytest.mark.parametrize("module", ["interactive_map", "emergency_operations", "ifrc"])
 def test_blueprints_load_through_package_import(module):
     import importlib
 
@@ -48,7 +39,7 @@ def test_blueprints_load_through_package_import(module):
 
 
 @pytest.mark.unit
-def test_first_party_plugins_do_not_expose_editable_settings_by_accident():
-    from plugins.pb_progress.plugin import PBProgressPlugin
+def test_ifrc_does_not_expose_editable_settings_by_accident():
+    from plugins.ifrc.plugin import IfrcPlugin
 
-    assert PBProgressPlugin().update_settings({"a": 1}) is False
+    assert IfrcPlugin().update_settings({"a": 1}) is False

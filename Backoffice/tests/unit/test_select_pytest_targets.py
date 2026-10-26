@@ -81,13 +81,13 @@ class TestPlanPytestRun:
 
     def test_plugin_py_does_not_select_visuals_or_excel_suites(self):
         plan = plan_pytest_run(
-            ["Backoffice/plugins/pb_progress/plugin.py"],
+            ["Backoffice/plugins/ifrc/plugin.py"],
             BACKOFFICE_ROOT,
         )
         assert plan.mode == "selected"
         assert "tests/unit/test_plugins/test_plugin_metadata.py" in plan.targets
-        assert "plugins/pb_progress/visuals/tests" not in plan.targets
-        assert "plugins/pb_progress/tests" not in plan.targets
+        assert "plugins/ifrc/pb_progress/visuals/tests" not in plan.targets
+        assert "plugins/ifrc/pb_progress/tests" not in plan.targets
         assert plan.needs_render_libs is False
 
     def test_upr_plugin_py_maps_to_plugin_unit_tests_not_excel_suite(self):
@@ -103,7 +103,7 @@ class TestPlanPytestRun:
 
     def test_routes_py_maps_to_metadata_tests_not_visuals(self):
         plan = plan_pytest_run(
-            ["Backoffice/plugins/pb_progress/routes.py"],
+            ["Backoffice/plugins/ifrc/pb_progress/routes.py"],
             BACKOFFICE_ROOT,
         )
         assert plan.targets == ("tests/unit/test_plugins/test_plugin_metadata.py",)

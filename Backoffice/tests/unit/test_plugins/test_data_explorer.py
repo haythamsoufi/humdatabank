@@ -20,8 +20,8 @@ def _plugin_manager_with_pb_progress():
             label="P&B visuals",
             permission="admin.data_explore.pb_progress",
             priority=40,
-            panel_template="plugins/pb_progress/pb_progress/tab_panel.html",
-            plugin_id="pb_progress",
+            panel_template="plugins/ifrc/pb_progress/tab_panel.html",
+            plugin_id="ifrc",
             icon="fas fa-chart-line",
         )
     ]
@@ -30,20 +30,24 @@ def _plugin_manager_with_pb_progress():
 
 def test_fdrs_plugin_owns_fdrs_explorer_tabs():
     from plugins.fdrs.plugin import FdrsPlugin
-    from plugins.pb_progress.plugin import PBProgressPlugin
+    from plugins.ifrc.plugin import IfrcPlugin
     from plugins.upr.plugin import UprPlugin
 
     tabs = {tab.tab_id: tab for tab in FdrsPlugin().get_data_explorer_tabs()}
-    assert list(tabs) == ["disaggregation", "service-income", "everyone-counts", "compliance", "pb-progress"]
+    assert list(tabs) == ["disaggregation", "service-income", "everyone-counts", "compliance"]
     assert tabs["disaggregation"].permission == "admin.data_explore.disaggregation"
     assert tabs["service-income"].permission == "admin.data_explore.service_income"
     assert tabs["everyone-counts"].permission == "admin.data_explore.everyone_counts"
     assert tabs["everyone-counts"].panel_template == "plugins/fdrs/ecr/tab_panel.html"
     assert tabs["service-income"].panel_template == "plugins/fdrs/service_income/tab_panel.html"
     assert tabs["compliance"].permission == "admin.data_explore.compliance"
-    assert tabs["pb-progress"].permission == "admin.data_explore.pb_progress"
-    assert tabs["pb-progress"].plugin_id == "fdrs"
-    assert PBProgressPlugin().get_data_explorer_tab() is None
+
+    ifrc_tabs = {tab.tab_id: tab for tab in IfrcPlugin().get_data_explorer_tabs()}
+    assert list(ifrc_tabs) == ["pb-progress"]
+    assert ifrc_tabs["pb-progress"].permission == "admin.data_explore.pb_progress"
+    assert ifrc_tabs["pb-progress"].plugin_id == "ifrc"
+    assert ifrc_tabs["pb-progress"].panel_template == "plugins/ifrc/pb_progress/tab_panel.html"
+
     upr_tabs = {tab.tab_id: tab for tab in UprPlugin().get_data_explorer_tabs()}
     assert list(upr_tabs) == ["upr", "upr-impact"]
     assert upr_tabs["upr"].plugin_id == "upr"
@@ -102,17 +106,17 @@ def test_each_explore_tab_has_its_own_permission_and_user_form_role():
         _permission_catalog,
     )
     from plugins.fdrs.plugin import FdrsPlugin
-    from plugins.pb_progress.plugin import PBProgressPlugin
+    from plugins.ifrc.plugin import IfrcPlugin
     from plugins.upr.plugin import UprPlugin
 
     tab_permissions = [tab["permission"] for tab in CORE_DATA_EXPLORER_TABS]
-    for plugin in (FdrsPlugin(), UprPlugin(), PBProgressPlugin()):
+    for plugin in (FdrsPlugin(), UprPlugin(), IfrcPlugin()):
         tab_permissions.extend(tab.permission for tab in plugin.get_data_explorer_tabs())
 
     assert len(tab_permissions) == len(set(tab_permissions))
 
     roles = list(_baseline_roles(_permission_catalog()))
-    for plugin in (FdrsPlugin(), UprPlugin(), PBProgressPlugin()):
+    for plugin in (FdrsPlugin(), UprPlugin(), IfrcPlugin()):
         for role in plugin.get_seed_roles():
             roles.append(
                 {

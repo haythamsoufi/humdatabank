@@ -630,7 +630,7 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 |-------|----------|
 | Plugin contract | [`Backoffice/app/plugins/base.py`](Backoffice/app/plugins/base.py) (`BasePlugin`, optional admin hooks) |
 | Discovery & lifecycle | [`Backoffice/app/plugins/manager.py`](Backoffice/app/plugins/manager.py) (`PluginManager`) |
-| Example plugin | [`Backoffice/plugins/pb_progress/`](Backoffice/plugins/pb_progress/) |
+| Example plugin | [`Backoffice/plugins/ifrc/`](Backoffice/plugins/ifrc/) (P&B visuals in `pb_progress/`) |
 | FDRS plugin | [`Backoffice/plugins/fdrs/`](Backoffice/plugins/fdrs/) — backend-only Federation-wide Databank & Reporting System: data-api sync, document fetch, matrix validation, quality methodology, and publication to the public FDRS website (see [FDRS publication](#fdrs-publication-published_value) below). No Data Explorer tab. |
 | UPR plugin | [`Backoffice/plugins/upr/`](Backoffice/plugins/upr/) — Unified Plan (template 24) / Report (template 33): live dashboards, Excel import/export, GO-API document import, and AI/RAG document intelligence. PNG/PDF/InDesign download; optional Word-narrative PDF or InDesign package; bulk PNG export on the Data Explorer **UPR** tab (replaces Tableau `UPR.twb`). Public landscape gallery of the same plans and reports as the mobile app, for a Power BI HTML visual: `GET /api/v1/upr/documents` (`?format=powerbi` returns the iframe snippet). National Society key figures (volunteers, staff, branches, local units), one value per country and year from the latest approved time period among FDRS (template 21), planning (24), and reporting (33) — FDRS, then annual reporting, then mid-year, then planning: `GET /api/v1/nskeydata`. A planning round is dated to the year it was reported (P27 is 2026). Temporary People reached remapping: [`people-reached.md`](../Backoffice/plugins/upr/docs/people-reached.md). **UPR Analysis** tab (data + participation trends): server-built, renderer-independent views shared by the tab, the in-browser presentation and the A4 report (print to PDF) — [`analysis-visuals.md`](../Backoffice/plugins/upr/docs/analysis-visuals.md) |
 | Standalone tool scripts | `Backoffice/plugins/<id>/visuals/` (or similar subfolder) |
@@ -645,7 +645,7 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 
 **To unplug:** delete the plugin folder. Core Data Explorer tabs remain.
 
-**Lifecycle semantics** (details in [`Backoffice/plugins/README.md`](../Backoffice/plugins/README.md)): plugins are inactive until listed in the `plugin_data` lifecycle row (`plugin_id=__plugin_lifecycle__`, `active_plugin_ids`); blueprints register at start and 404 while inactive (state is shared across workers via that DB row); admin-feature plugins (FDRS, UPR, …) are activation-gated the same way; a plugin declares prerequisites with `get_required_plugins()` (FDRS requires `pb_progress`); only first-party plugins (`interactive_map`) cannot be uninstalled from the UI; ZIP upload is System Manager only and off unless `PLUGIN_UPLOAD_ENABLED` is set; stored API keys in plugin settings are redacted in responses (`BasePluginRoutes(secret_paths=...)`).
+**Lifecycle semantics** (details in [`Backoffice/plugins/README.md`](../Backoffice/plugins/README.md)): plugins are inactive until listed in the `plugin_data` lifecycle row (`plugin_id=__plugin_lifecycle__`, `active_plugin_ids`); blueprints register at start and 404 while inactive (state is shared across workers via that DB row); admin-feature plugins (FDRS, UPR, IFRC, …) are activation-gated the same way; P&B visuals live under the IFRC plugin (legacy `pb_progress` activation tokens map to `ifrc`); only first-party plugins (`interactive_map`) cannot be uninstalled from the UI; ZIP upload is System Manager only and off unless `PLUGIN_UPLOAD_ENABLED` is set; stored API keys in plugin settings are redacted in responses (`BasePluginRoutes(secret_paths=...)`).
 
 #### Plugin Data Explorer panel contract
 
@@ -657,7 +657,7 @@ A plugin contributes a Data Explorer tab by returning a `DataExplorerTabConfig` 
 - Failures render an empty panel and are logged; a panel must not depend on exceptions for control flow.
 - Field-type entry templates receive `config_json` as `Markup` from `htmlsafe_json_dumps` (safe inside `<script type="application/json">` with plain `{{ config_json }}`); `existing_data_json` is a plain string for attribute use (`{{ existing_data_json | e }}`).
 
-**Config override:** `PB_VISUALS_TOOL_DIR` in Flask config overrides the default `plugins/pb_progress/visuals/` path for the P&B build pipeline.
+**Config override:** `PB_VISUALS_TOOL_DIR` in Flask config overrides the default `plugins/ifrc/pb_progress/visuals/` path for the P&B build pipeline.
 
 ### Native Report Builder (core platform)
 
@@ -678,7 +678,7 @@ Admins compose metadata-driven reports from Indicator Bank, templates, and assig
 
 **Relationship to `/api/v1/data`:** reports use the same underlying FormData/assignment joins via `aggregation.py` and `query_form_data` filters; the public data API remains the integration surface for external BI tools.
 
-**Relationship to pb_progress:** P&B remains a specialized offline publish pipeline; it may later consume `aggregation.py` for system dataset generation, but is unchanged by the report builder v1.
+**Relationship to IFRC P&B visuals:** P&B remains a specialized offline publish pipeline under `plugins/ifrc/pb_progress/`; it may later consume `aggregation.py` for system dataset generation, but is unchanged by the report builder v1.
 
 **Not to be confused with the public country one-pager report** (`Backoffice/app/services/public/report_service.py`) — a separate, unauthenticated feature behind the Custom GPT `getCountryReport`/`getReportTemplate` Actions and the MCP connector's `databank_build_country_report`/`databank_get_report_template` tools. It has no `report_definition` row, no admin UI, and no widget model; it assembles a curated FDRS/UPR JSON spec plus an HTML/CSS design-template skeleton for an LLM to render (optionally as a PDF the LLM generates itself). Its style/layout assets live in `Backoffice/app/services/public/report_styles/<style>.html` (+ `<style>.tokens.json`), colocated with the one module that reads them — see [`humanitarian-databank-mcp/README.md`](../humanitarian-databank-mcp/README.md#report-design-templates) and [`Backoffice/docs/public/custom-gpt/README.md`](../Backoffice/docs/public/custom-gpt/README.md).
 

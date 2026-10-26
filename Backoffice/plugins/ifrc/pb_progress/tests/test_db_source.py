@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from plugins.pb_progress.db_source import (
+from plugins.ifrc.pb_progress.db_source import (
     _chart_type_from_measurement,
     _default_source,
     _indicator_labels,
@@ -194,7 +194,7 @@ def test_sync_mapping_derives_chart_type_from_bank(monkeypatch):
         saved.append(rows)
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.list_tagged_indicators",
+        "plugins.ifrc.pb_progress.db_source.list_tagged_indicators",
         lambda _tag: [
             {
                 "id": "101",
@@ -207,10 +207,10 @@ def test_sync_mapping_derives_chart_type_from_bank(monkeypatch):
             }
         ],
     )
-    monkeypatch.setattr("plugins.pb_progress.db_source.PBProgressDataStore.get_mapping_config", lambda _v: [])
-    monkeypatch.setattr("plugins.pb_progress.db_source.PBProgressDataStore.save_mapping_config", fake_save)
+    monkeypatch.setattr("plugins.ifrc.pb_progress.db_source.PBProgressDataStore.get_mapping_config", lambda _v: [])
+    monkeypatch.setattr("plugins.ifrc.pb_progress.db_source.PBProgressDataStore.save_mapping_config", fake_save)
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.validate_mapping_config",
+        "plugins.ifrc.pb_progress.db_source.validate_mapping_config",
         lambda rows: rows,
     )
 
@@ -231,7 +231,7 @@ def test_sync_mapping_removes_untagged_rows(monkeypatch):
         saved.append(rows)
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.list_tagged_indicators",
+        "plugins.ifrc.pb_progress.db_source.list_tagged_indicators",
         lambda _tag: [
             {
                 "id": "101",
@@ -245,15 +245,15 @@ def test_sync_mapping_removes_untagged_rows(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.PBProgressDataStore.get_mapping_config",
+        "plugins.ifrc.pb_progress.db_source.PBProgressDataStore.get_mapping_config",
         lambda _v: [
             {"id": "101", "section": "SP1", "source": "FDRS", "tag_missing": True},
             {"id": "999", "section": "SP2", "source": "Manual", "tag_missing": True},
         ],
     )
-    monkeypatch.setattr("plugins.pb_progress.db_source.PBProgressDataStore.save_mapping_config", fake_save)
+    monkeypatch.setattr("plugins.ifrc.pb_progress.db_source.PBProgressDataStore.save_mapping_config", fake_save)
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.validate_mapping_config",
+        "plugins.ifrc.pb_progress.db_source.validate_mapping_config",
         lambda rows: rows,
     )
 
@@ -267,10 +267,10 @@ def test_sync_mapping_removes_untagged_rows(monkeypatch):
 
 @pytest.mark.unit
 def test_prune_untagged_mapping_rows(monkeypatch):
-    from plugins.pb_progress.db_source import prune_untagged_mapping_rows
+    from plugins.ifrc.pb_progress.db_source import prune_untagged_mapping_rows
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.list_tagged_indicators",
+        "plugins.ifrc.pb_progress.db_source.list_tagged_indicators",
         lambda _tag: [{"id": "101"}, {"id": "102"}],
     )
 
@@ -295,7 +295,7 @@ def test_sync_mapping_refreshes_bank_metadata_for_existing_rows(monkeypatch):
         saved.append(rows)
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.list_tagged_indicators",
+        "plugins.ifrc.pb_progress.db_source.list_tagged_indicators",
         lambda _tag: [
             {
                 "id": "101",
@@ -309,7 +309,7 @@ def test_sync_mapping_refreshes_bank_metadata_for_existing_rows(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.PBProgressDataStore.get_mapping_config",
+        "plugins.ifrc.pb_progress.db_source.PBProgressDataStore.get_mapping_config",
         lambda _v: [
             {
                 "id": "101",
@@ -321,9 +321,9 @@ def test_sync_mapping_refreshes_bank_metadata_for_existing_rows(monkeypatch):
             }
         ],
     )
-    monkeypatch.setattr("plugins.pb_progress.db_source.PBProgressDataStore.save_mapping_config", fake_save)
+    monkeypatch.setattr("plugins.ifrc.pb_progress.db_source.PBProgressDataStore.save_mapping_config", fake_save)
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.validate_mapping_config",
+        "plugins.ifrc.pb_progress.db_source.validate_mapping_config",
         lambda rows: rows,
     )
 
@@ -339,7 +339,7 @@ def test_sync_mapping_refreshes_bank_metadata_for_existing_rows(monkeypatch):
 
 @pytest.mark.unit
 def test_indicator_section_code_prefers_spef_link():
-    from plugins.pb_progress.db_source import _indicator_section_code
+    from plugins.ifrc.pb_progress.db_source import _indicator_section_code
 
     class Spef:
         code = "SP3"
@@ -355,7 +355,7 @@ def test_indicator_section_code_prefers_spef_link():
 
 @pytest.mark.unit
 def test_spef_section_titles_falls_back_to_catalog_by_area(monkeypatch):
-    from plugins.pb_progress.db_source import _spef_section_titles
+    from plugins.ifrc.pb_progress.db_source import _spef_section_titles
 
     class Spef:
         code = "EF3"
@@ -370,7 +370,7 @@ def test_spef_section_titles_falls_back_to_catalog_by_area(monkeypatch):
         spef_area = None
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._spef_rows_by_code",
+        "plugins.ifrc.pb_progress.db_source._spef_rows_by_code",
         lambda _codes: {"EF3": Spef()},
     )
 
@@ -380,7 +380,7 @@ def test_spef_section_titles_falls_back_to_catalog_by_area(monkeypatch):
 
 @pytest.mark.unit
 def test_resolve_section_title_translations(monkeypatch):
-    from plugins.pb_progress.db_source import resolve_section_title_translations
+    from plugins.ifrc.pb_progress.db_source import resolve_section_title_translations
 
     class Spef:
         code = "SP2"
@@ -390,7 +390,7 @@ def test_resolve_section_title_translations(monkeypatch):
             return {"fr": "Santé et soins", "es": "Salud y cuidado"}.get(lang, "")
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._spef_rows_by_code",
+        "plugins.ifrc.pb_progress.db_source._spef_rows_by_code",
         lambda _codes: {"SP2": Spef()},
     )
 
@@ -402,7 +402,7 @@ def test_resolve_section_title_translations(monkeypatch):
 
 @pytest.mark.unit
 def test_build_section_order_from_bank(monkeypatch):
-    from plugins.pb_progress.db_source import build_section_order_from_bank
+    from plugins.ifrc.pb_progress.db_source import build_section_order_from_bank
 
     class SpefRow:
         def __init__(self, code: str, sort_order: int):
@@ -420,7 +420,7 @@ def test_build_section_order_from_bank(monkeypatch):
             self.spef_area = SpefRow(section_code, {"SP1": 1, "SP2": 2, "EF2": 3, "CC1": 0}[section_code])
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._query_tagged_indicator_rows",
+        "plugins.ifrc.pb_progress.db_source._query_tagged_indicator_rows",
         lambda _tag: [
             Indicator("SP2"),
             Indicator("SP1"),
@@ -429,7 +429,7 @@ def test_build_section_order_from_bank(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._spef_rows_by_code",
+        "plugins.ifrc.pb_progress.db_source._spef_rows_by_code",
         lambda codes: {
             code: SpefRow(code, {"SP1": 1, "SP2": 2, "EF2": 3, "CC1": 0}[code])
             for code in codes
@@ -451,7 +451,7 @@ def test_build_section_order_from_bank(monkeypatch):
 def test_build_mapping_dataframe_includes_type_of_measurement(monkeypatch):
     from unittest.mock import MagicMock
 
-    from plugins.pb_progress.db_source import _build_mapping_dataframe
+    from plugins.ifrc.pb_progress.db_source import _build_mapping_dataframe
 
     class BankRow:
         id = 42
@@ -471,7 +471,7 @@ def test_build_mapping_dataframe_includes_type_of_measurement(monkeypatch):
         spef_area = _Spef()
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._load_indicators_by_id",
+        "plugins.ifrc.pb_progress.db_source._load_indicators_by_id",
         lambda _ids: {"42": BankRow()},
     )
 
@@ -496,11 +496,11 @@ def test_build_mapping_dataframe_includes_type_of_measurement(monkeypatch):
 @pytest.mark.unit
 def test_resolve_build_years_uses_all_when_none_selected(monkeypatch):
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.list_available_years",
+        "plugins.ifrc.pb_progress.db_source.list_available_years",
         lambda _version: ["2023", "2024", "2025"],
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.PBProgressDataStore.get_selected_years",
+        "plugins.ifrc.pb_progress.db_source.PBProgressDataStore.get_selected_years",
         lambda _version: [],
     )
     assert resolve_build_years("2025-2026") == {"2023", "2024", "2025"}
@@ -509,11 +509,11 @@ def test_resolve_build_years_uses_all_when_none_selected(monkeypatch):
 @pytest.mark.unit
 def test_resolve_build_years_filters_to_selection(monkeypatch):
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.list_available_years",
+        "plugins.ifrc.pb_progress.db_source.list_available_years",
         lambda _version: ["2023", "2024", "2025"],
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.PBProgressDataStore.get_selected_years",
+        "plugins.ifrc.pb_progress.db_source.PBProgressDataStore.get_selected_years",
         lambda _version: ["2024", "2025"],
     )
     assert resolve_build_years("2025-2026") == {"2024", "2025"}
@@ -522,7 +522,7 @@ def test_resolve_build_years_filters_to_selection(monkeypatch):
 @pytest.mark.unit
 def test_export_dataset_to_excel_always_writes_metadata_sheets(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.build_dataset",
+        "plugins.ifrc.pb_progress.db_source.build_dataset",
         lambda _version: {
             "mapping": pd.DataFrame({"ID": ["1"]}),
             "final": pd.DataFrame({"ID": ["1"], "Year": ["2027"], "Value": [1]}),
@@ -591,7 +591,7 @@ def test_validate_uploaded_workbook_accepts_minimal_valid_file(tmp_path):
 
 @pytest.mark.unit
 def test_build_section_order_from_mapping_rows_uses_spef_sort_order(monkeypatch):
-    from plugins.pb_progress.db_source import build_section_order_from_mapping_rows
+    from plugins.ifrc.pb_progress.db_source import build_section_order_from_mapping_rows
 
     class SpefRow:
         def __init__(self, code: str, sort_order: int):
@@ -610,11 +610,11 @@ def test_build_section_order_from_mapping_rows_uses_spef_sort_order(monkeypatch)
             self.spef_area = SpefRow(section_code, {"SP2": 2, "SP1": 1}[section_code])
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._load_indicators_by_id",
+        "plugins.ifrc.pb_progress.db_source._load_indicators_by_id",
         lambda _ids: {"2": Indicator(2, "SP2"), "1": Indicator(1, "SP1")},
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._spef_rows_by_code",
+        "plugins.ifrc.pb_progress.db_source._spef_rows_by_code",
         lambda codes: {
             code: SpefRow(code, {"SP1": 1, "SP2": 2}[code])
             for code in codes
@@ -673,7 +673,7 @@ def test_validate_uploaded_workbook_rejects_empty_mapping(tmp_path):
 
 @pytest.mark.unit
 def test_validate_translations_config_normalizes_rows():
-    from plugins.pb_progress.db_source import validate_translations_config
+    from plugins.ifrc.pb_progress.db_source import validate_translations_config
 
     rows = validate_translations_config([{"id": "report.title", "EN": " Title ", "FR": "Titre"}])
     assert rows == [{"id": "report.title", "EN": "Title", "FR": "Titre", "SP": "", "AR": ""}]
@@ -681,7 +681,7 @@ def test_validate_translations_config_normalizes_rows():
 
 @pytest.mark.unit
 def test_validate_translations_config_rejects_duplicate_ids():
-    from plugins.pb_progress.db_source import validate_translations_config
+    from plugins.ifrc.pb_progress.db_source import validate_translations_config
 
     with pytest.raises(ValueError, match="Duplicate translation id"):
         validate_translations_config(
@@ -694,7 +694,7 @@ def test_validate_translations_config_rejects_duplicate_ids():
 
 @pytest.mark.unit
 def test_filter_editable_translations_drops_section_rows():
-    from plugins.pb_progress.db_source import filter_editable_translations
+    from plugins.ifrc.pb_progress.db_source import filter_editable_translations
 
     rows = filter_editable_translations(
         [
@@ -709,7 +709,7 @@ def test_filter_editable_translations_drops_section_rows():
 
 @pytest.mark.unit
 def test_get_editable_translations_config_prunes_section_rows(monkeypatch):
-    from plugins.pb_progress.db_source import get_editable_translations_config
+    from plugins.ifrc.pb_progress.db_source import get_editable_translations_config
 
     stored = [
         {"id": "report.title", "EN": "Title"},
@@ -718,11 +718,11 @@ def test_get_editable_translations_config_prunes_section_rows(monkeypatch):
     saved: list[list[dict]] = []
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.PBProgressDataStore.get_translations_config",
+        "plugins.ifrc.pb_progress.db_source.PBProgressDataStore.get_translations_config",
         lambda _version: stored,
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.PBProgressDataStore.save_translations_config",
+        "plugins.ifrc.pb_progress.db_source.PBProgressDataStore.save_translations_config",
         lambda _version, rows: saved.append(rows) or True,
     )
 
@@ -733,7 +733,7 @@ def test_get_editable_translations_config_prunes_section_rows(monkeypatch):
 
 @pytest.mark.unit
 def test_validate_section_order_config_normalizes_part():
-    from plugins.pb_progress.db_source import validate_section_order_config
+    from plugins.ifrc.pb_progress.db_source import validate_section_order_config
 
     rows = validate_section_order_config([{"part": "SP", "section": "SP1", "order": "2"}])
     assert rows == [{"part": "sp", "section": "SP1", "order": 2}]
@@ -741,7 +741,7 @@ def test_validate_section_order_config_normalizes_part():
 
 @pytest.mark.unit
 def test_validate_section_order_config_rejects_invalid_part():
-    from plugins.pb_progress.db_source import validate_section_order_config
+    from plugins.ifrc.pb_progress.db_source import validate_section_order_config
 
     with pytest.raises(ValueError, match="Invalid section part"):
         validate_section_order_config([{"part": "bad", "section": "SP1", "order": 1}])
@@ -756,21 +756,21 @@ def test_generate_system_dataset_uploads_without_downloading_blob(monkeypatch):
         uploaded["rel"] = rel
         uploaded["size"] = len(data)
 
-    monkeypatch.setattr("plugins.pb_progress.db_source.storage_service.upload", fake_upload)
+    monkeypatch.setattr("plugins.ifrc.pb_progress.db_source.storage_service.upload", fake_upload)
 
     def fail_get_absolute_path(*_args, **_kwargs):
         raise AssertionError("get_absolute_path must not be used when creating a new system dataset")
 
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.storage_service.get_absolute_path",
+        "plugins.ifrc.pb_progress.db_source.storage_service.get_absolute_path",
         fail_get_absolute_path,
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.export_dataset_to_excel",
+        "plugins.ifrc.pb_progress.db_source.export_dataset_to_excel",
         lambda _version, path: Path(path).write_bytes(b"PK fake xlsx"),
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.build_dataset",
+        "plugins.ifrc.pb_progress.db_source.build_dataset",
         lambda _version: {
             "mapping": [{"id": "1"}],
             "final": [{"id": "1", "Year": "2027"}],
@@ -829,11 +829,11 @@ def test_import_config_from_excel_validates_translations(tmp_path, monkeypatch):
     with pd.ExcelWriter(path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
         translations.to_excel(writer, sheet_name="Translations", index=False)
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source._excel_path_for_version",
+        "plugins.ifrc.pb_progress.db_source._excel_path_for_version",
         lambda _version: path,
     )
     monkeypatch.setattr(
-        "plugins.pb_progress.db_source.validate_mapping_config",
+        "plugins.ifrc.pb_progress.db_source.validate_mapping_config",
         lambda rows: rows,
     )
 

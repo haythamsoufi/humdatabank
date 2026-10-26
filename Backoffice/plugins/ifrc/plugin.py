@@ -1,9 +1,24 @@
-"""IFRC programmes: public dashboards that the FDRS website can embed."""
+"""IFRC programmes: PPP embeds and Plan & Budget visuals."""
 
 from __future__ import annotations
 
-from app.plugins.base import BasePlugin, CspOverride, EmbedVisual
+from typing import Any
+
+from app.plugins.base import (
+    BasePlugin,
+    CspOverride,
+    DataExplorerTabConfig,
+    EmbedVisual,
+    SeedPermission,
+    SeedRole,
+)
 from plugins.metadata import FirstPartyPluginMetadata
+from plugins.ifrc.pb_progress.versions import (
+    DEFAULT_VERSION,
+    REPORT_VERSIONS,
+    VERSION_ORDER,
+    resolve_requested_version,
+)
 
 _IFRC_EMBED_CSP = (
     "default-src 'self'; "
@@ -14,6 +29,19 @@ _IFRC_EMBED_CSP = (
     "connect-src 'self'; "
     "object-src 'none'; "
     "base-uri 'none'; "
+    "form-action 'none'"
+)
+
+_PB_REPORT_CSP = (
+    "default-src 'self' data:; "
+    "script-src 'self' 'unsafe-inline' data:; "
+    "style-src 'self' 'unsafe-inline' data: https://fonts.googleapis.com; "
+    "img-src 'self' data: blob:; "
+    "font-src 'self' data: https://fonts.gstatic.com; "
+    "connect-src 'self'; "
+    "frame-src 'none'; "
+    "frame-ancestors 'self'; "
+    "base-uri 'self'; "
     "form-action 'none'"
 )
 
@@ -64,9 +92,8 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def description(self) -> str:
         return (
-            "IFRC programme dashboards for the FDRS website. "
-            "The Pilot Programmatic Partnership dashboard is the first embed; "
-            "later IFRC programmes can be added here."
+            "IFRC programme tools: Pilot Programmatic Partnership embeds, "
+            "and Plan & Budget visuals (Quarto/Playwright report pipeline)."
         )
 
     def is_admin_feature(self) -> bool:
@@ -77,10 +104,23 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         return bp
 
+    def get_additional_blueprints(self):
+        from plugins.ifrc.pb_progress import bp as pb_bp
+        from plugins.ifrc.pb_progress import settings_bp
+
+        return [pb_bp, settings_bp]
+
     def get_settings(self):
         from plugins.ifrc.routes import ifrc_settings_status
 
-        return ifrc_settings_status()
+        status = ifrc_settings_status()
+        status.update(
+            {
+                "pb_default_version": DEFAULT_VERSION,
+                "pb_versions": list(VERSION_ORDER),
+            }
+        )
+        return status
 
     def get_embed_visuals(self) -> list[EmbedVisual]:
         from flask_babel import gettext as _
@@ -99,9 +139,42 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
             ),
         ]
 
+    def get_data_explorer_tabs(self) -> list[DataExplorerTabConfig]:
+        return [
+            DataExplorerTabConfig(
+                tab_id="pb-progress",
+                label="P&B visuals",
+                permission="admin.data_explore.pb_progress",
+                priority=40,
+                panel_template="plugins/ifrc/pb_progress/tab_panel.html",
+                plugin_id=self.plugin_id,
+                icon="fas fa-chart-line",
+                manage_requires_system_manager=True,
+            ),
+        ]
+
+    def get_seed_permissions(self) -> list[SeedPermission]:
+        return [
+            SeedPermission(
+                code="admin.data_explore.pb_progress",
+                name="Data Explorer: P&B visuals",
+                description="Access the Plan and Budget visuals tab in Data Explorer",
+            ),
+        ]
+
+    def get_seed_roles(self) -> list[SeedRole]:
+        return [
+            SeedRole(
+                code="admin_data_explorer_pb_progress",
+                name="Admin: Data Explorer (P&B visuals)",
+                description="Access the Plan and Budget visuals tab in Data Explorer.",
+                permission_codes=["admin.data_explore.pb_progress"],
+            ),
+        ]
+
     def get_csp_overrides(self) -> list[CspOverride]:
         policy = _embed_csp()
-        return [
+        overrides = [
             CspOverride(
                 endpoint=endpoint,
                 path_predicate=lambda path: True,
@@ -111,3 +184,27 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
             )
             for endpoint in ("ifrc.ppp_dashboard", "ifrc.ppp_data", "ifrc.static_file")
         ]
+        overrides.append(
+            CspOverride(
+                endpoint="pb_progress.serve_output",
+                path_predicate=lambda path: path.endswith(".html"),
+                policy=_PB_REPORT_CSP,
+            )
+        )
+        return overrides
+
+    def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
+        from flask import request
+
+        pb_active_version = resolve_requested_version(
+            request.args.get("pb_version"),
+            active_tab=first_tab,
+        )
+        return {
+            "explore_first_tab": first_tab,
+            "can_manage_pb_progress": flags.get("can_manage_pb_progress", False),
+            "pb_report_versions": REPORT_VERSIONS,
+            "pb_report_version_order": VERSION_ORDER,
+            "pb_default_version": DEFAULT_VERSION,
+            "pb_active_version": pb_active_version,
+        }

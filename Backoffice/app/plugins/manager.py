@@ -74,6 +74,8 @@ class PluginManager:
 
     _PLUGIN_ID_ALIASES = {
         "upr_visuals": "upr",
+        # Standalone P&B plugin folded into IFRC
+        "pb_progress": "ifrc",
     }
 
     def __init__(self, app: Flask):
@@ -120,14 +122,31 @@ class PluginManager:
         if root_str not in sys.path:
             sys.path.insert(0, root_str)
 
+    def _with_app_context(self, fn):
+        """Run ``fn`` inside an app context when the caller is outside one.
+
+        ``create_app`` builds the plugin manager before any request context
+        exists; lifecycle reads/writes still need ``current_app`` / the DB.
+        """
+        from flask import has_app_context
+
+        if has_app_context():
+            return fn()
+        with self.app.app_context():
+            return fn()
+
     def _load_plugin_states(self):
         """Load plugin activation tokens from ``plugin_data`` (default: none active)."""
         from app.plugins.lifecycle_store import get_updated_at, load_active_plugin_ids
 
         try:
-            self._raw_active_tokens = list(load_active_plugin_ids())
+            def _read():
+                return list(load_active_plugin_ids()), get_updated_at()
+
+            tokens, updated_at = self._with_app_context(_read)
+            self._raw_active_tokens = tokens
             self.active_plugins = set()  # resolved after plugins are loaded
-            self._state_updated_at = get_updated_at()
+            self._state_updated_at = updated_at
             self.logger.info(
                 "Loaded plugin states from DB: %s token(s)",
                 len(self._raw_active_tokens),
@@ -198,14 +217,40 @@ class PluginManager:
             from app.plugins.lifecycle_store import get_updated_at, save_active_plugin_ids
 
             try:
-                if save_active_plugin_ids(self.active_plugins):
-                    self._state_updated_at = get_updated_at()
+                def _write():
+                    if not save_active_plugin_ids(self.active_plugins):
+                        return None
+                    return get_updated_at()
+
+                updated_at = self._with_app_context(_write)
+                if updated_at is not None:
+                    self._state_updated_at = updated_at
                     self.logger.info(
                         "Saved plugin states: %s active plugins",
                         len(self.active_plugins),
                     )
             except Exception as e:
                 self.logger.error(f"Error saving plugin states: {e}", exc_info=True)
+
+    def _apply_activation_side_effects(self, previous: Set[str]) -> None:
+        """Refresh field types, form caches, and validation packs after the active set changes."""
+        removed = previous - self.active_plugins
+        for plugin_id in sorted(removed):
+            plugin = self.plugins.get(plugin_id)
+            unregister = getattr(plugin, "unregister_validation_packs", None)
+            if callable(unregister):
+                try:
+                    unregister()
+                except Exception as exc:
+                    self.logger.error(
+                        "Plugin %s failed to unregister validation packs: %s",
+                        plugin_id,
+                        exc,
+                    )
+        self._extract_field_types()
+        self._invalidate_form_integration_cache()
+        self._sync_validation_packs()
+        self._register_section_binding_providers()
 
     def sync_activation_state(self) -> bool:
         """Adopt activation changes written by another worker process.
@@ -216,7 +261,7 @@ class PluginManager:
         """
         from app.plugins.lifecycle_store import get_updated_at
 
-        current = get_updated_at()
+        current = self._with_app_context(get_updated_at)
         if current is None or current == self._state_updated_at:
             return False
         with self._state_update_lock:
@@ -226,8 +271,7 @@ class PluginManager:
             self._load_plugin_states()
             self._resolve_active_plugins()
             if self.active_plugins != previous:
-                self._extract_field_types()
-                self._invalidate_form_integration_cache()
+                self._apply_activation_side_effects(previous)
                 return True
         return False
 
@@ -360,8 +404,8 @@ class PluginManager:
         self._sync_validation_packs()
         self._register_section_binding_providers()
 
-        # Save the current state after loading
-        self._save_plugin_states()
+        # Do not rewrite plugin_data on every boot: that bumps updated_at and
+        # makes every other worker re-sync. Legacy migrate already persists.
 
         if loaded_plugins:
             self.logger.info(f"Plugin system: Loaded {len(loaded_plugins)} plugins [{', '.join(loaded_plugins)}]")
@@ -372,18 +416,27 @@ class PluginManager:
         """Import instance/plugin_states.json into plugin_data when lifecycle row is absent."""
         from app.plugins.lifecycle_store import get_updated_at, migrate_from_legacy_state_file
 
-        migrated = migrate_from_legacy_state_file(self.state_file_path)
+        def _migrate():
+            return migrate_from_legacy_state_file(self.state_file_path), get_updated_at()
+
+        migrated, updated_at = self._with_app_context(_migrate)
         if migrated is None:
             return
         self._raw_active_tokens = list(migrated)
-        self._state_updated_at = get_updated_at()
+        self._state_updated_at = updated_at
 
     def _import_legacy_plugin_configs(self) -> None:
         """Copy plugins/*/plugin_config.json into plugin_data when no row exists yet."""
         from app.plugins.legacy_config_import import import_missing_plugin_configs
 
         id_by_dir = {path: plugin_id for plugin_id, path in self.plugin_dirs.items()}
-        imported = import_missing_plugin_configs(self.plugin_dirs.values(), plugin_id_by_dir=id_by_dir)
+
+        def _import():
+            return import_missing_plugin_configs(
+                self.plugin_dirs.values(), plugin_id_by_dir=id_by_dir
+            )
+
+        imported = self._with_app_context(_import)
         if imported:
             self.logger.info("Imported legacy plugin configs for: %s", ", ".join(imported))
 
@@ -950,6 +1003,10 @@ class PluginManager:
             self.active_plugins.discard(plugin_name)
             self._extract_field_types()
             self._invalidate_form_integration_cache()
+            # activate()/deactivate() already (un)register this plugin's packs;
+            # re-sync so core + remaining active plugins stay consistent.
+            self._sync_validation_packs()
+            self._register_section_binding_providers()
             self._track_plugin_installation(plugin, 'deactivated')
             self._save_plugin_states()
 
@@ -985,6 +1042,8 @@ class PluginManager:
             self.active_plugins.add(plugin_name)
             self._extract_field_types()
             self._invalidate_form_integration_cache()
+            self._sync_validation_packs()
+            self._register_section_binding_providers()
             self._track_plugin_installation(plugin, 'activated')
             self._save_plugin_states()
 

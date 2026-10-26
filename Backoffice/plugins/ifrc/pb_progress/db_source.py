@@ -25,13 +25,13 @@ from app.services.platform import storage_service
 from app.utils.country_utils import exclude_sandbox_countries
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.upr.catalog import UPR_REPORTING_TEMPLATE_ID
-from plugins.pb_progress.plugin_data_store import (
+from plugins.ifrc.pb_progress.plugin_data_store import (
     EXCEL_NAME,
     PBProgressDataStore,
     STORAGE_CATEGORY,
     SYSTEM_GENERATED_NAME,
 )
-from plugins.pb_progress.versions import REPORT_VERSIONS, validate_version, version_storage_prefix
+from plugins.ifrc.pb_progress.versions import REPORT_VERSIONS, validate_version, version_storage_prefix
 
 UPR_TEMPLATE_ID = UPR_REPORTING_TEMPLATE_ID
 
@@ -802,7 +802,7 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
     mapping_rows = validate_mapping_config(mapping_rows)
     PBProgressDataStore.save_mapping_config(version, mapping_rows)
     if not translations_rows:
-        from plugins.pb_progress.report_defaults import default_translations_config_rows
+        from plugins.ifrc.pb_progress.report_defaults import default_translations_config_rows
 
         translations_rows = default_translations_config_rows()
     else:
@@ -1164,7 +1164,7 @@ def build_dataset(version: str) -> dict[str, pd.DataFrame]:
 
 
 def export_dataset_to_excel(version: str, output_path: Path | str) -> Path:
-    from plugins.pb_progress.report_defaults import default_translations_config_rows
+    from plugins.ifrc.pb_progress.report_defaults import default_translations_config_rows
 
     sheets = build_dataset(version)
     output_path = Path(output_path)

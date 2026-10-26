@@ -87,6 +87,24 @@ def get_data_explorer_nav_permissions() -> tuple[str, ...]:
     return CORE_DATA_EXPLORER_PERMISSIONS
 
 
+def user_can_access_data_explorer_nav(user) -> bool:
+    """True when the user may see Explore Data in the admin sidebar / land on it.
+
+    Includes plugin extension tabs (e.g. UPR Visuals) and the legacy Analysis
+    grant so older roles keep nav access until migrated to split tab roles.
+    """
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if AuthorizationService.is_system_manager(user):
+        return True
+    for code in (*get_data_explorer_nav_permissions(), LEGACY_ANALYSIS_PERMISSION):
+        if AuthorizationService.has_rbac_permission(user, code):
+            return True
+    return False
+
+
 def explore_tab_access_flags(user, plugin_manager: "PluginManager") -> dict[str, bool]:
     from app.services.organization.authorization_service import AuthorizationService
 

@@ -91,11 +91,10 @@
 {% endif %}
 
 {# Form & Data Management Category - Only show if user has any form/data management permissions #}
-{% set can_access_data_explorer = is_system_manager or has_permission('admin.data_explore.data_table') or has_permission('admin.data_explore.analysis') or has_permission('admin.data_explore.compliance') %}
+{# Extension-tab grants (UPR Visuals, Disaggregation, …) must be evaluated in Python:
+   Jinja {% set %} inside {% for %} does not update the outer variable. #}
+{% set can_access_data_explorer = can_access_data_explorer_nav() %}
 {% set can_access_reports_builder = is_system_manager or has_permission('admin.reports.view') or has_permission('admin.reports.edit') %}
-{% for ext_tab in data_explorer_extension_tabs|default([]) %}
-{% set can_access_data_explorer = can_access_data_explorer or has_permission(ext_tab.permission) %}
-{% endfor %}
 {% set can_access_validation_dashboard = is_system_manager or has_permission('admin.validation.dashboard') %}
 {% set can_access_validation_questions = is_system_manager or has_permission('admin.validation.questions') %}
 {% set can_access_validation = can_access_validation_dashboard or can_access_validation_questions %}

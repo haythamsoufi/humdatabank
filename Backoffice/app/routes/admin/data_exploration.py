@@ -77,12 +77,9 @@ def _ai_beta_denied_response():
 
 def has_any_data_explorer_permission(user) -> bool:
     """Check if user has any Data Explorer permission."""
-    if AuthorizationService.is_system_manager(user):
-        return True
-    for perm in _data_explorer_permissions():
-        if AuthorizationService.has_rbac_permission(user, perm):
-            return True
-    return False
+    from app.plugins.data_explorer import user_can_access_data_explorer_nav
+
+    return user_can_access_data_explorer_nav(user)
 
 
 def _explore_tab_access_flags(user) -> dict[str, bool]:

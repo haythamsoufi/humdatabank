@@ -6,6 +6,7 @@ from app.plugins.base import DataExplorerTabConfig
 from app.plugins.data_explorer import (
     explore_first_tab,
     resolve_explore_tab,
+    user_can_access_data_explorer_nav,
     user_can_read_disaggregation_template,
 )
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
@@ -139,6 +140,44 @@ def test_each_explore_tab_has_its_own_permission_and_user_form_role():
         assert action.endswith(")")
         actions.append(action[:-1])
     assert len(actions) == len(set(actions))
+
+
+def test_upr_visuals_only_grants_data_explorer_nav():
+    """Extension-tab-only roles must unlock Explore Data (sidebar used to miss these)."""
+    from unittest.mock import patch
+
+    user = MagicMock(is_authenticated=True)
+
+    def _has_perm(_user, code, scope=None):
+        return code == "admin.data_explore.upr_visuals"
+
+    with patch(
+        "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
+        return_value=False,
+    ), patch(
+        "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
+        side_effect=_has_perm,
+    ), patch(
+        "app.plugins.data_explorer.get_data_explorer_nav_permissions",
+        return_value=(
+            "admin.data_explore.data_table",
+            "admin.data_explore.upr_visuals",
+            "admin.data_explore.upr_impact",
+        ),
+    ):
+        assert user_can_access_data_explorer_nav(user) is True
+
+    with patch(
+        "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
+        return_value=False,
+    ), patch(
+        "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
+        return_value=False,
+    ), patch(
+        "app.plugins.data_explorer.get_data_explorer_nav_permissions",
+        return_value=("admin.data_explore.data_table", "admin.data_explore.upr_visuals"),
+    ):
+        assert user_can_access_data_explorer_nav(user) is False
 
 
 def test_analysis_permission_reads_fdrs_without_a_template_share():

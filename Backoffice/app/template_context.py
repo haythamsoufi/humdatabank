@@ -332,6 +332,15 @@ def register_template_context(app, config_class):
                 current_app.logger.debug("is_admin_user check failed: %s", e)
                 return False
 
+        def can_access_data_explorer_nav() -> bool:
+            try:
+                from app.plugins.data_explorer import user_can_access_data_explorer_nav
+
+                return user_can_access_data_explorer_nav(current_user)
+            except Exception as e:
+                current_app.logger.debug("can_access_data_explorer_nav check failed: %s", e)
+                return False
+
         def user_access_level(user) -> str:
             try:
                 if AuthorizationService is None or not user:
@@ -354,6 +363,7 @@ def register_template_context(app, config_class):
             "user_access_level": user_access_level,
             "get_admin_gate_permissions": get_admin_gate_permissions,
             "is_admin_user": is_admin_user,
+            "can_access_data_explorer_nav": can_access_data_explorer_nav,
         }
 
     @app.context_processor

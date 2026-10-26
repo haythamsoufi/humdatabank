@@ -23,6 +23,7 @@ from app.utils.api_helpers import (
 from app.utils.auth import require_api_key_or_session
 from app.services.security.api_key_permissions import DATA_READ
 from app.utils.error_handling import handle_json_view_exception
+from app.utils.rate_limiting import api_rate_limit
 from plugins.upr import bp
 from plugins.upr.api_cache import get_or_build_upr_payload
 from plugins.upr.ns_key_data import NS_KEY_COLUMNS, load_ns_key_rows
@@ -199,11 +200,12 @@ API_ENDPOINTS = [
         "group": "UPR",
         "path": "/api/v1/nskeydata",
         "methods": ["GET"],
-        "auth": "api_key_or_session",
+        "auth": "public",
         "rate_limited": True,
         "featured": True,
         "description": (
             "Volunteers, staff, branches, and local units: one figure per country and year. "
+            "Public — no API key. "
             "Templates 21 (FDRS), 24 (planning), and 33 (annual and mid-year reporting) collect the same four indicators. "
             "The row uses the latest approved time period for that country and year: "
             "FDRS, then annual reporting, then mid-year reporting, then planning. "
@@ -214,7 +216,7 @@ API_ENDPOINTS = [
             "Only approved country assignments are included. "
             "Filters: iso2, iso3, year."
         ),
-        "consumers": "Power BI, Backoffice session",
+        "consumers": "Power BI, browser, Custom GPT, MCP",
         "paginated": False,
         "query_params": [
             {
@@ -268,7 +270,7 @@ def upr_api_documentation() -> dict:
         "auth": (
             "Bearer token, X-API-Key header, api_key query parameter, "
             "or a Backoffice session. "
-            "GET /api/v1/upr/documents is public and does not use this."
+            "GET /api/v1/upr/documents and GET /api/v1/nskeydata are public and do not use this."
         ),
         "round_codes": {
             "report_midyear": "MYRyy, for example MYR26",
@@ -488,9 +490,12 @@ def _ns_key_filters() -> tuple[str | None, str | None, int | None]:
 
 
 @bp.route("/api/v1/nskeydata", methods=["GET"])
-@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+@api_rate_limit()
 def get_ns_key_data():
-    """One approved figure per country and year for the four National Society key indicators."""
+    """One approved figure per country and year for the four National Society key indicators.
+
+    Public read — no API key or session required.
+    """
     try:
         try:
             iso2, iso3, year = _ns_key_filters()

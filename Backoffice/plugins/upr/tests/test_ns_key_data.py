@@ -249,6 +249,13 @@ def test_years_stay_separate_and_zero_is_kept():
     assert albania["Source"] == "FDRS"
 
 
+def test_nskeydata_is_listed_as_public():
+    by_path = {item["path"]: item for item in upr_data_routes.API_ENDPOINTS}
+    assert by_path["/api/v1/nskeydata"]["auth"] == "public"
+    docs = {item["path"]: item for item in upr_data_routes.upr_api_documentation()["endpoints"]}
+    assert docs["/api/v1/nskeydata"]["auth"] == "public"
+
+
 def test_nskeydata_route_filters_iso3_and_year(monkeypatch):
     api_cache.reset_upr_api_cache_for_tests()
     monkeypatch.setattr(api_cache, "get_upr_cache_revision", lambda: None)

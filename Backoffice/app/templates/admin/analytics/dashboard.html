@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_status_label.html" import status_label %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes %}
 {% block title %}{{ _('User Analytics Dashboard') }}{% endblock %}
 
 {% block head %}
@@ -54,7 +55,7 @@
     ) }}
 
     {# Time Range Filter #}
-    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 mb-8">
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 mb-6">
         <form method="GET" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center gap-2">
                 <label for="days" class="text-sm font-medium text-gray-700">{{ _('Time Range:') }}</label>
@@ -73,9 +74,164 @@
         </form>
     </div>
 
-    {# Key Metrics Overview — same stat-card pattern as admin/api_management.html #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden mb-8">
+        {% call scroll_tab_bar(inner_id='analytics-dash-tabs', aria_label=_('Analytics sections'), wrapper_class='px-2 sm:px-4') %}
+            <button type="button" role="tab" id="analytics-tab-operations" data-tab="operations"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(true) }}"
+                    aria-controls="panel-operations" aria-selected="true">
+                <i class="fas fa-tachometer-alt mr-1.5" aria-hidden="true"></i>
+                {{ _('Operations') }}
+            </button>
+            <button type="button" role="tab" id="analytics-tab-product" data-tab="product"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-product" aria-selected="false">
+                <i class="fas fa-chart-pie mr-1.5" aria-hidden="true"></i>
+                {{ _('Product usage') }}
+                {% if product_analytics %}
+                <span class="{{ admin_underline_tab_badge_classes(false) }}">{{ product_analytics.mau.unique_users }}</span>
+                {% endif %}
+            </button>
+            <button type="button" role="tab" id="analytics-tab-security" data-tab="security"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-security" aria-selected="false">
+                <i class="fas fa-shield-alt mr-1.5" aria-hidden="true"></i>
+                {{ _('Security') }}
+                {% if security_summary.unresolved_events %}
+                <span class="{{ admin_underline_tab_badge_classes(false) }}">{{ security_summary.unresolved_events }}</span>
+                {% endif %}
+            </button>
+        {% endcall %}
+
+        {# ——— Product usage (panel after Operations in DOM; default tab is Operations) ——— #}
+        <div id="panel-product" class="settings-panel p-4 md:p-6 hidden" role="tabpanel" aria-labelledby="analytics-tab-product">
+    {% if product_analytics %}
+    <p class="text-xs text-gray-500 mb-4">{{ _('First-party authenticated usage · not a third-party tracking tool') }}</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Monthly Active Users') }}</h3>
+                <i class="fas fa-user-check text-blue-500"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums text-blue-600">{{ product_analytics.mau.unique_users }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+                {{ product_analytics.accounts.active_flag_true }} {{ _('active accounts') }}
+                · {{ selected_days }}{{ _('d window') }}
+            </p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Geographic reach') }}</h3>
+                <i class="fas fa-globe text-teal-500"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums text-teal-600">{{ product_analytics.geographic.countries_ns_scoped }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+                {{ _('NS-scoped countries') }}
+                · {{ product_analytics.geographic.countries_submitted }} {{ _('submitted') }}
+            </p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Reports submitted') }}</h3>
+                <i class="fas fa-file-upload text-indigo-500"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums text-indigo-600">{{ product_analytics.geographic.reports_submitted }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+                {{ product_analytics.geographic.documents_uploaded }} {{ _('documents uploaded') }}
+            </p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Sessions') }}</h3>
+                <i class="fas fa-laptop text-purple-500"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums text-purple-600">{{ product_analytics.sessions.count }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+                {{ product_analytics.sessions.page_views }} {{ _('page views') }}
+                {% if product_analytics.sessions.avg_duration_minutes is not none %}
+                · {{ product_analytics.sessions.avg_duration_minutes }}{{ _('m avg') }}
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <h5 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
+                <i class="fas fa-chart-bar mr-2 text-blue-500"></i> {{ _('Frequency of use') }}
+            </h5>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Among MAU, by distinct active days in the selected window') }}</p>
+            <div class="chart-container">
+                <canvas id="productFrequencyChart" aria-label="{{ _('Frequency of use chart')|forceescape }}"></canvas>
+            </div>
+        </div>
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <h5 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
+                <i class="fas fa-users mr-2 text-teal-500"></i> {{ _('Primary user types') }}
+            </h5>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Secretariat staff, National Societies, volunteers, and similar business categories') }}</p>
+            <div class="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-gray-200 bg-gray-50">
+                <i class="fas fa-hourglass-half text-3xl text-gray-300 mb-3" aria-hidden="true"></i>
+                <p class="text-sm font-medium text-gray-600">{{ _('Pending') }}</p>
+                <p class="text-xs text-gray-500 mt-1 max-w-sm">{{ _('User-type classification is not available yet. Technical RBAC roles are not used here.') }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <h5 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
+                <i class="fas fa-chart-line mr-2 text-indigo-500"></i> {{ _('Monthly trend') }}
+            </h5>
+            <p class="text-xs text-gray-500 mb-4">{{ _('MAU and country reports submitted by calendar month') }}</p>
+            <div class="chart-container">
+                <canvas id="productMonthlyChart" aria-label="{{ _('Monthly product trend chart')|forceescape }}"></canvas>
+            </div>
+        </div>
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <h5 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
+                <i class="fas fa-bolt mr-2 text-amber-500"></i> {{ _('Key activities') }}
+            </h5>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Meaningful form and data actions in the selected window') }}</p>
+            {% if product_analytics.key_activities.rows %}
+            <div class="chart-container">
+                <canvas id="productKeyActivitiesChart" aria-label="{{ _('Key activities chart')|forceescape }}"></canvas>
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-gray-200 bg-gray-50">
+                <i class="fas fa-bolt text-3xl text-gray-300 mb-3"></i>
+                <p class="text-sm font-medium text-gray-600">{{ _('No key activities yet') }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if product_analytics.segmentation.available and product_analytics.segmentation.rows %}
+    <div class="bg-gray-50 p-4 md:p-6 rounded-lg border border-gray-200">
+        <h5 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+            <i class="fas fa-sitemap mr-2 text-gray-500"></i> {{ _('User segmentation (Access Groups)') }}
+        </h5>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {% for row in product_analytics.segmentation.rows[:12] %}
+            <div class="flex items-center justify-between gap-2 px-3 py-2 bg-white border border-gray-200 text-sm">
+                <span class="truncate text-gray-700">{{ row.name }}</span>
+                <span class="tabular-nums font-semibold text-gray-800 shrink-0">{{ row.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-gray-200 bg-gray-50">
+        <i class="fas fa-chart-pie text-4xl text-gray-300 mb-3"></i>
+        <p class="text-sm font-medium text-gray-600">{{ _('Product usage data is unavailable.') }}</p>
+    </div>
+    {% endif %}
+        </div>{# /panel-product #}
+
+        {# ——— Operations ——— #}
+        <div id="panel-operations" class="settings-panel p-4 md:p-6" role="tabpanel" aria-labelledby="analytics-tab-operations">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Total Logins') }}</h3>
                 <i class="fas fa-sign-in-alt text-blue-500"></i>
@@ -84,7 +240,7 @@
             <p class="text-xs text-gray-500 mt-1">{{ login_analytics.failed_attempts }} {{ _('failed') }}</p>
         </div>
 
-        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('User Activities') }}</h3>
                 <i class="fas fa-history text-green-500"></i>
@@ -93,7 +249,7 @@
             <p class="text-xs text-gray-500 mt-1">{{ session_stats.total_page_views }} {{ _('page views') }}</p>
         </div>
 
-        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Active Sessions') }}</h3>
                 <i class="fas fa-users-cog text-indigo-500"></i>
@@ -101,53 +257,7 @@
             <p class="text-2xl font-bold tabular-nums text-indigo-600">{{ session_stats.active_sessions }}</p>
             <p class="text-xs text-gray-500 mt-1">{{ session_stats.average_duration }}{{ _('m avg duration') }}</p>
         </div>
-
-        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-sm font-semibold text-gray-700">{{ _('Security Events') }}</h3>
-                <i class="fas fa-shield-alt {% if security_summary.unresolved_events > 0 %}text-red-500{% else %}text-green-500{% endif %}"></i>
-            </div>
-            <p class="text-2xl font-bold tabular-nums {% if security_summary.unresolved_events > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ security_summary.unresolved_events }}</p>
-            <p class="text-xs text-gray-500 mt-1">{{ login_analytics.suspicious_attempts }} {{ _('suspicious') }}</p>
-        </div>
     </div>
-
-    {# Security Alerts Section #}
-    {% if security_summary.high_priority_events %}
-    <div class="mb-8">
-        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 border-l-4 border-l-red-500">
-            <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
-                {{ _('High Priority Security Events') }}
-                <span class="ml-2">{{ status_label(_('Requires Attention'), 'danger') }}</span>
-            </h5>
-            <div class="space-y-3">
-                {% for event in security_summary.high_priority_events %}
-                <div class="p-4 rounded-md flex justify-between items-center
-                            {% if event.severity == 'critical' %}bg-red-50 border border-red-200
-                            {% else %}bg-yellow-50 border border-yellow-200{% endif %}">
-                    <div class="flex-grow">
-                        <div class="flex items-center gap-2 mb-1">
-                            <strong class="font-semibold text-gray-800">{{ event.type|title }}</strong>
-                            {% if event.severity == 'critical' %}
-                                {{ status_label(event.severity|upper, 'danger') }}
-                            {% else %}
-                                {{ status_label(event.severity|upper, 'warning') }}
-                            {% endif %}
-                        </div>
-                        <p class="text-sm text-gray-600 mb-1">{{ event.description }}</p>
-                        <small class="text-xs text-gray-500">{{ event.timestamp|datetime_local('datetime') }}</small>
-                    </div>
-                    <a href="{{ url_for('analytics.security_events', unresolved_only=True) }}"
-                       class="btn btn-danger ml-4">
-                        {{ _('View Details') }}
-                    </a>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
 
     {# Charts Section #}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -327,27 +437,27 @@
             </div>
 
             {# System Statistics #}
-            <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="bg-gray-50 p-4 md:p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200">
                 <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-server mr-2 text-orange-500"></i> System Statistics
+                    <i class="fas fa-server mr-2 text-orange-500"></i> {{ _('System Statistics') }}
                 </h5>
                 <div class="space-y-4">
                     <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span class="text-sm text-gray-600">Total Sessions</span>
+                        <span class="text-sm text-gray-600">{{ _('Total Sessions') }}</span>
                         <span class="font-semibold text-gray-800">{{ session_stats.total_sessions }}</span>
                     </div>
                     <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span class="text-sm text-gray-600">Unique IP Addresses</span>
+                        <span class="text-sm text-gray-600">{{ _('Unique IP Addresses') }}</span>
                         <span class="font-semibold text-gray-800">{{ login_analytics.unique_ips }}</span>
                     </div>
                     <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                        <span class="text-sm text-gray-600">Failed Login Attempts</span>
+                        <span class="text-sm text-gray-600">{{ _('Failed Login Attempts') }}</span>
                         <span class="font-semibold {% if login_analytics.failed_attempts > 0 %}text-yellow-600{% else %}text-gray-800{% endif %}">
                             {{ login_analytics.failed_attempts }}
                         </span>
                     </div>
                     <div class="flex justify-between items-center py-2">
-                        <span class="text-sm text-gray-600">Suspicious Activities</span>
+                        <span class="text-sm text-gray-600">{{ _('Suspicious Activities') }}</span>
                         <span class="font-semibold {% if login_analytics.suspicious_attempts > 0 %}text-red-600{% else %}text-gray-800{% endif %}">
                             {{ login_analytics.suspicious_attempts }}
                         </span>
@@ -356,27 +466,84 @@
             </div>
         </div>
     </div>
+        </div>{# /panel-operations #}
 
-    {# Recent Security Events Table - Only show if there are events #}
+        {# ——— Security ——— #}
+        <div id="panel-security" class="settings-panel p-4 md:p-6 hidden" role="tabpanel" aria-labelledby="analytics-tab-security">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Unresolved security events') }}</h3>
+                <i class="fas fa-shield-alt {% if security_summary.unresolved_events > 0 %}text-red-500{% else %}text-green-500{% endif %}"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums {% if security_summary.unresolved_events > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ security_summary.unresolved_events }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Open events needing review') }}</p>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Suspicious login attempts') }}</h3>
+                <i class="fas fa-user-secret {% if login_analytics.suspicious_attempts > 0 %}text-red-500{% else %}text-gray-400{% endif %}"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums {% if login_analytics.suspicious_attempts > 0 %}text-red-600{% else %}text-gray-800{% endif %}">{{ login_analytics.suspicious_attempts }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ login_analytics.failed_attempts }} {{ _('failed logins in window') }}</p>
+        </div>
+    </div>
+
+    {% if security_summary.high_priority_events %}
+    <div class="mb-8">
+        <div class="bg-white p-4 md:p-6 rounded-lg border border-gray-200 border-l-4 border-l-red-500">
+            <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
+                {{ _('High Priority Security Events') }}
+                <span class="ml-2">{{ status_label(_('Requires Attention'), 'danger') }}</span>
+            </h5>
+            <div class="space-y-3">
+                {% for event in security_summary.high_priority_events %}
+                <div class="p-4 rounded-md flex justify-between items-center
+                            {% if event.severity == 'critical' %}bg-red-50 border border-red-200
+                            {% else %}bg-yellow-50 border border-yellow-200{% endif %}">
+                    <div class="flex-grow">
+                        <div class="flex items-center gap-2 mb-1">
+                            <strong class="font-semibold text-gray-800">{{ event.type|title }}</strong>
+                            {% if event.severity == 'critical' %}
+                                {{ status_label(event.severity|upper, 'danger') }}
+                            {% else %}
+                                {{ status_label(event.severity|upper, 'warning') }}
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-gray-600 mb-1">{{ event.description }}</p>
+                        <small class="text-xs text-gray-500">{{ event.timestamp|datetime_local('datetime') }}</small>
+                    </div>
+                    <a href="{{ url_for('analytics.security_events', unresolved_only=True) }}"
+                       class="btn btn-danger ml-4">
+                        {{ _('View Details') }}
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% if recent_security_events %}
-    <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+    <div class="bg-gray-50 p-4 md:p-6 rounded-lg border border-gray-200">
         <div class="flex items-center justify-between mb-4">
             <h5 class="text-xl font-semibold text-gray-800 flex items-center">
-                <i class="fas fa-clock mr-2 text-gray-500"></i> Recent Security Events
+                <i class="fas fa-clock mr-2 text-gray-500"></i> {{ _('Recent Security Events') }}
             </h5>
             <a href="{{ url_for('analytics.security_events') }}" class="text-sm text-blue-600 hover:text-blue-800">
-                View All Events
+                {{ _('View All Events') }}
             </a>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto bg-white border border-gray-200">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Time') }}</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Event') }}</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Severity') }}</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Description') }}</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -413,7 +580,14 @@
             </table>
         </div>
     </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-gray-200 bg-gray-50">
+        <i class="fas fa-shield-alt text-4xl text-gray-300 mb-3"></i>
+        <p class="text-sm font-medium text-gray-600">{{ _('No recent security events.') }}</p>
+    </div>
     {% endif %}
+        </div>{# /panel-security #}
+    </div>{# /tab card #}
 
 <!-- Chart.js Library -->
 <script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
@@ -425,7 +599,8 @@
         deviceData: JSON.parse('{{ login_analytics.device_breakdown|tojson|safe }}'),
         deviceChartLabels: {{ device_dist_rows|map(attribute='device')|list|tojson|safe }},
         deviceChartValues: {{ device_dist_rows|map(attribute='count')|list|tojson|safe }},
-        deviceChartColors: {{ device_dist_series_rgba|tojson|safe }}
+        deviceChartColors: {{ device_dist_series_rgba|tojson|safe }},
+        product: {{ (product_analytics or {})|tojson|safe }}
     };
 </script>
 
@@ -437,6 +612,61 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    const chartRegistry = [];
+    function registerChart(chart) {
+        if (chart) chartRegistry.push(chart);
+        return chart;
+    }
+    function resizeChartsInPanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        chartRegistry.forEach(function (chart) {
+            try {
+                if (chart.canvas && panel.contains(chart.canvas)) {
+                    chart.resize();
+                }
+            } catch (e) { /* ignore */ }
+        });
+    }
+
+    // Tab strip (Product / Operations / Security)
+    (function initAnalyticsTabs() {
+        const tabs = document.getElementById('analytics-dash-tabs');
+        if (!tabs || !window.AdminUnderlineTabs) return;
+        const known = { product: true, operations: true, security: true };
+        const panelCharts = {
+            product: 'panel-product',
+            operations: 'panel-operations',
+            security: 'panel-security'
+        };
+
+        function show(tabId) {
+            if (!known[tabId]) tabId = 'operations';
+            AdminUnderlineTabs.activateStripTab('#analytics-dash-tabs', tabId, {
+                panelSelector: '.settings-panel'
+            });
+            tabs.querySelectorAll('.settings-tab').forEach(function (btn) {
+                AdminUnderlineTabs.setOrgMainTabButton(btn, btn.getAttribute('data-tab') === tabId);
+            });
+            if (history.replaceState) {
+                history.replaceState(null, '', '#' + tabId);
+            }
+            // Charts in newly shown panels need a resize after layout
+            window.requestAnimationFrame(function () {
+                resizeChartsInPanel(panelCharts[tabId]);
+            });
+        }
+
+        tabs.addEventListener('click', function (event) {
+            const btn = event.target.closest('.settings-tab');
+            if (!btn) return;
+            show(btn.getAttribute('data-tab'));
+        });
+
+        const initial = (location.hash || '').replace('#', '');
+        show(known[initial] ? initial : 'operations');
+    })();
+
     const loginDataRaw = window.analyticsData.loginData;
     const deviceChartLabels = window.analyticsData.deviceChartLabels || [];
     const deviceChartValues = window.analyticsData.deviceChartValues || [];
@@ -447,7 +677,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const loginData = (typeof loginDataRaw === 'object' && loginDataRaw !== null && !Array.isArray(loginDataRaw)) ? loginDataRaw : {};
         const sortedDates = Object.keys(loginData).sort();
 
-        new Chart(loginCtx.getContext('2d'), {
+        registerChart(new Chart(loginCtx.getContext('2d'), {
             type: 'line',
             data: {
                 labels: sortedDates,
@@ -499,7 +729,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             }
-        });
+        }));
     }
 
     // Device Types Chart (labels/order aligned with server-side infographic)
@@ -521,7 +751,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return devicePalette[i % devicePalette.length];
         });
 
-        new Chart(deviceCtx.getContext('2d'), {
+        registerChart(new Chart(deviceCtx.getContext('2d'), {
             type: 'doughnut',
             data: {
                 labels: deviceChartLabels,
@@ -557,16 +787,182 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             }
-        });
+        }));
     }
 
-    // Days filter auto-submit
+    // Product usage charts
+    const product = window.analyticsData.product || {};
+
+    const freqCtx = document.getElementById('productFrequencyChart');
+    if (freqCtx && product.frequency && product.frequency.labels && product.frequency.labels.length) {
+        registerChart(new Chart(freqCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: product.frequency.labels,
+                datasets: [{
+                    label: 'Users',
+                    data: product.frequency.counts || [],
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.85)',
+                        'rgba(16, 185, 129, 0.85)',
+                        'rgba(148, 163, 184, 0.85)'
+                    ],
+                    borderWidth: 0,
+                    borderRadius: 0,
+                    maxBarThickness: 56
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#6b7280', precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    x: {
+                        ticks: { color: '#6b7280', maxRotation: 0, autoSkip: false },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db'
+                    }
+                }
+            }
+        }));
+    }
+
+    const monthlyCtx = document.getElementById('productMonthlyChart');
+    if (monthlyCtx && product.monthly && product.monthly.labels && product.monthly.labels.length) {
+        registerChart(new Chart(monthlyCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: product.monthly.labels,
+                datasets: [{
+                    label: 'MAU',
+                    data: product.monthly.mau || [],
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                    fill: true,
+                    yAxisID: 'y'
+                }, {
+                    label: 'Reports submitted',
+                    data: product.monthly.reports_submitted || [],
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(99, 102, 241, 1)',
+                    fill: false,
+                    yAxisID: 'y'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#6b7280', precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    x: {
+                        ticks: { color: '#6b7280' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#374151', usePointStyle: true }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db'
+                    }
+                }
+            }
+        }));
+    }
+
+    const keyActCtx = document.getElementById('productKeyActivitiesChart');
+    if (keyActCtx && product.key_activities && product.key_activities.labels && product.key_activities.labels.length) {
+        registerChart(new Chart(keyActCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: product.key_activities.labels,
+                datasets: [{
+                    label: 'Events',
+                    data: product.key_activities.counts || [],
+                    backgroundColor: 'rgba(245, 158, 11, 0.85)',
+                    borderWidth: 0,
+                    borderRadius: 0,
+                    maxBarThickness: 40
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { color: '#6b7280', precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    y: {
+                        ticks: { color: '#6b7280' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db'
+                    }
+                }
+            }
+        }));
+    }
+
+    // Days filter auto-submit (preserve active tab hash)
     const daysSelect = document.getElementById('days');
     if (daysSelect) {
         daysSelect.addEventListener('change', function() {
-            this.form.submit();
+            const form = this.form;
+            const hash = (location.hash || '').replace('#', '');
+            if (hash && form) {
+                // Keep the selected tab after reload
+                form.action = form.action.split('#')[0] + '#' + hash;
+            }
+            form.submit();
         });
     }
+
+    // Resize charts for the initially visible panel (after registration)
+    window.requestAnimationFrame(function () {
+        const hash = (location.hash || '').replace('#', '');
+        const panelId = (
+            hash === 'product' ? 'panel-product' :
+            hash === 'security' ? 'panel-security' :
+            'panel-operations'
+        );
+        resizeChartsInPanel(panelId);
+    });
 });
 </script>
 {% endblock %}

@@ -31,6 +31,7 @@ from app.services.platform.user_analytics_service import (
     format_page_path_histogram_csv,
     effective_session_active_duration_minutes,
 )
+from app.services.platform.product_analytics_service import get_product_analytics
 from app.middleware.activity_middleware import track_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_pagination import validate_pagination_params
@@ -87,6 +88,11 @@ def analytics_dashboard():
     login_analytics = get_user_login_analytics(days=days)
     activity_analytics = get_user_activity_analytics(days=days)
     security_summary = get_security_events_summary(days=days)
+    try:
+        product_analytics = get_product_analytics(days=days)
+    except Exception:
+        logger.exception("product analytics aggregation failed")
+        product_analytics = None
 
     # Get top active users
     top_users = get_top_active_users(days)
@@ -119,6 +125,7 @@ def analytics_dashboard():
         login_analytics=login_analytics,
         activity_analytics=activity_analytics,
         security_summary=security_summary,
+        product_analytics=product_analytics,
         top_users=top_users,
         recent_security_events=recent_security_events,
         session_stats=session_stats,

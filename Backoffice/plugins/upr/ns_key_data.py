@@ -9,7 +9,8 @@ does not replace it. All four figures come from that assignment. A blank on
 the winning source stays blank.
 
 A planning round is named for the year being planned. P27 is filled in 2026,
-so its key figures belong to 2026.
+so its key figures belong to 2026. Source labels name that round
+(``Planning 2027``, ``Annual reporting 2024``, ``Mid-year reporting 2024``).
 """
 
 from __future__ import annotations
@@ -72,29 +73,35 @@ def classify_source(template_id: int, period_name: str | None) -> dict[str, Any]
         return {
             "year": year,
             "source": SOURCE_FDRS,
+            "period_kind": SOURCE_FDRS,
         }
     round_code = round_for_assignment(template_id, period)
     if not round_code:
         return None
     if template_id == PLAN_TEMPLATE_ID and round_code.startswith("P") and round_code[1:].isdigit():
         # P27 is the plan for 2027, filled during 2026. The key figures are the
-        # current year's numbers, so they belong to 2026.
+        # current year's numbers, so they belong to 2026. Source keeps the plan year.
         plan_year = 2000 + int(round_code[1:])
         return {
             "year": plan_year - 1,
-            "source": SOURCE_PLANNING,
+            "source": f"{SOURCE_PLANNING} {plan_year}",
+            "period_kind": SOURCE_PLANNING,
         }
     if template_id != REPORT_TEMPLATE_ID:
         return None
     if round_code.startswith("MYR") and round_code[3:].isdigit():
+        year = 2000 + int(round_code[3:])
         return {
-            "year": 2000 + int(round_code[3:]),
-            "source": SOURCE_MIDYEAR,
+            "year": year,
+            "source": f"{SOURCE_MIDYEAR} {year}",
+            "period_kind": SOURCE_MIDYEAR,
         }
     if round_code.startswith("AR") and round_code[2:].isdigit():
+        year = 2000 + int(round_code[2:])
         return {
-            "year": 2000 + int(round_code[2:]),
-            "source": SOURCE_ANNUAL,
+            "year": year,
+            "source": f"{SOURCE_ANNUAL} {year}",
+            "period_kind": SOURCE_ANNUAL,
         }
     return None
 
@@ -109,7 +116,7 @@ def _period_rank(row: Mapping[str, Any]) -> tuple:
     """Latest time period wins. Approval time only breaks a tie on that period."""
     approved_at = _approved_at(row.get("approved_at"))
     return (
-        _PERIOD_RANK.get(str(row.get("source") or ""), -1),
+        _PERIOD_RANK.get(str(row.get("period_kind") or ""), -1),
         approved_at is not None,
         approved_at or datetime.min,
         int(row.get("aes_id") or 0),

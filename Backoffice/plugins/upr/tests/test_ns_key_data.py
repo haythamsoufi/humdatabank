@@ -99,7 +99,7 @@ def test_annual_reporting_beats_a_later_planning_approval():
         ],
     )
     row = _kenya(rows)[0]
-    assert row["Source"] == "Annual reporting"
+    assert row["Source"] == "Annual reporting 2024"
     assert row["Year"] == 2024
     assert row["Volunteers"] == 1100
 
@@ -117,7 +117,8 @@ def test_unapproved_submissions_are_ignored():
         ],
     )
     row = _kenya(rows)[0]
-    assert row["Source"] == "Planning"
+    assert row["Source"] == "Planning 2025"
+    assert row["Year"] == 2024
     assert row["Volunteers"] == 800
 
 
@@ -181,7 +182,7 @@ def test_annual_reporting_beats_a_later_approved_midyear():
         ],
     )
     row = [item for item in rows if item["ISO2"] == "AF" and item["Year"] == 2025][0]
-    assert row["Source"] == "Annual reporting"
+    assert row["Source"] == "Annual reporting 2025"
     assert row["Volunteers"] == 2000
     assert row["Staff"] == 80
     assert row["LocalUnits"] is None
@@ -203,7 +204,7 @@ def test_midyear_is_used_when_it_is_the_latest_approved_period():
         ],
     )
     row = _kenya(rows)[0]
-    assert row["Source"] == "Mid-year reporting"
+    assert row["Source"] == "Mid-year reporting 2024"
     assert row["Volunteers"] == 700
     assert row["LocalUnits"] == 50
     assert row["Staff"] is None
@@ -219,7 +220,7 @@ def test_planning_round_belongs_to_the_year_it_was_reported():
     )
     row = _kenya(rows, year=2026)[0]
     assert row["Year"] == 2026
-    assert row["Source"] == "Planning"
+    assert row["Source"] == "Planning 2027"
     assert row["Volunteers"] == 1400
     assert row["Staff"] == 60
     assert _kenya(rows, year=2027) == []
@@ -264,8 +265,8 @@ def test_nskeydata_route_filters_iso3_and_year(monkeypatch):
         "load_ns_key_rows",
         lambda: [
             {"ISO2": "KE", "ISO3": "KEN", "Year": 2024, "Source": "FDRS", "Volunteers": 1},
-            {"ISO2": "KE", "ISO3": "KEN", "Year": 2023, "Source": "Planning", "Volunteers": 2},
-            {"ISO2": "AL", "ISO3": "ALB", "Year": 2024, "Source": "Annual reporting", "Volunteers": 3},
+            {"ISO2": "KE", "ISO3": "KEN", "Year": 2023, "Source": "Planning 2024", "Volunteers": 2},
+            {"ISO2": "AL", "ISO3": "ALB", "Year": 2024, "Source": "Annual reporting 2024", "Volunteers": 3},
         ],
     )
     app = Flask(__name__)
@@ -276,6 +277,12 @@ def test_nskeydata_route_filters_iso3_and_year(monkeypatch):
     assert body["data"] == [{"ISO2": "KE", "ISO3": "KEN", "Year": 2024, "Source": "FDRS", "Volunteers": 1}]
     assert body["meta"]["total"] == 1
     assert "Source" in body["meta"]["columns"]
+    assert body["meta"]["sources"] == [
+        "FDRS",
+        "Planning YYYY",
+        "Annual reporting YYYY",
+        "Mid-year reporting YYYY",
+    ]
     assert response.headers["Cache-Control"] == "no-store"
     api_cache.reset_upr_api_cache_for_tests()
 

@@ -211,7 +211,8 @@ API_ENDPOINTS = [
             "FDRS, then annual reporting, then mid-year reporting, then planning. "
             "A later approval of an earlier period does not replace it. "
             "A planning round is dated to the year it was reported: P27 belongs to 2026. "
-            "Source names that round (FDRS, Planning, Annual reporting, or Mid-year reporting). "
+            "Source names that round (FDRS, Planning 2027, Annual reporting 2024, or Mid-year reporting 2024). "
+            "For planning, the year in Source is the plan year while Year is the year the figures belong to. "
             "All four figures come from that source; a blank there stays blank. "
             "Only approved country assignments are included. "
             "Filters: iso2, iso3, year."
@@ -524,13 +525,13 @@ def get_ns_key_data():
                         "Latest approved time period for that country and year: "
                         "FDRS (template 21), then annual reporting, then mid-year reporting, "
                         "then planning (template 24). "
-                        "Planning P27 is the 2026 figure."
+                        "Planning 2027 (P27) is the 2026 figure."
                     ),
                     "sources": [
                         "FDRS",
-                        "Planning",
-                        "Annual reporting",
-                        "Mid-year reporting",
+                        "Planning YYYY",
+                        "Annual reporting YYYY",
+                        "Mid-year reporting YYYY",
                     ],
                 },
             },

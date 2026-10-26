@@ -130,6 +130,25 @@ def _basic_auth():
     return HTTPBasicAuth(user, password)
 
 
+def _money(value) -> Optional[float]:
+    """Coerce Amount_Requested / Amount_Funded from the GO feed to float."""
+    if value is None or value is False:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        if value != value:  # NaN
+            return None
+        return float(value)
+    text = str(value).strip().replace(",", "")
+    if not text or text.lower() in {"none", "null", "n/a"}:
+        return None
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
 def normalize_appeal_group_row(row: dict) -> dict:
     """Shape one appealgroupchild row like the legacy GO appeal objects the UI reads."""
     subtype = (row.get("Subtype") or "").strip()

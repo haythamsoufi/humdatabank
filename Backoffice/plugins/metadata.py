@@ -10,14 +10,11 @@ PLUGIN_AUTHOR = "Haytham Alsoufi"
 PLUGIN_HOMEPAGE = "https://github.com/haythamsoufi"
 PLUGIN_LICENSE = "MIT"
 
-# Folder names under Backoffice/plugins/ that ship with the app.
+# Plugins that cannot be uninstalled from the UI (tracked product code).
+# Other folders under Backoffice/plugins/ may still ship in the image but are
+# activation-gated and uninstallable like uploaded plugins.
 FIRST_PARTY_PLUGIN_IDS = (
-    "emergency_operations",
-    "fdrs",
-    "ifrc",
     "interactive_map",
-    "pb_progress",
-    "upr",
 )
 
 

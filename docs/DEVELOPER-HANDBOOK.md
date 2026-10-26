@@ -645,7 +645,7 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 
 **To unplug:** delete the plugin folder. Core Data Explorer tabs remain.
 
-**Lifecycle semantics** (details in [`Backoffice/plugins/README.md`](../Backoffice/plugins/README.md)): admin-feature plugins are always on and cannot be deactivated; every other plugin's blueprint is registered at start and 404s while the plugin is inactive (state is shared across workers through `plugin_states.json`); a plugin declares prerequisites with `get_required_plugins()` (FDRS requires `pb_progress`); bundled plugins cannot be uninstalled from the UI; ZIP upload is System Manager only and off unless `PLUGIN_UPLOAD_ENABLED` is set; stored API keys in plugin settings are redacted in responses (`BasePluginRoutes(secret_paths=...)`).
+**Lifecycle semantics** (details in [`Backoffice/plugins/README.md`](../Backoffice/plugins/README.md)): plugins are inactive until listed in the `plugin_data` lifecycle row (`plugin_id=__plugin_lifecycle__`, `active_plugin_ids`); blueprints register at start and 404 while inactive (state is shared across workers via that DB row); admin-feature plugins (FDRS, UPR, …) are activation-gated the same way; a plugin declares prerequisites with `get_required_plugins()` (FDRS requires `pb_progress`); only first-party plugins (`interactive_map`) cannot be uninstalled from the UI; ZIP upload is System Manager only and off unless `PLUGIN_UPLOAD_ENABLED` is set; stored API keys in plugin settings are redacted in responses (`BasePluginRoutes(secret_paths=...)`).
 
 #### Plugin Data Explorer panel contract
 

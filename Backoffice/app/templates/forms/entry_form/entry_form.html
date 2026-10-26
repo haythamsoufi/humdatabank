@@ -13,7 +13,8 @@
 {% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
 {% from "forms/entry_form/partials/_data_change_history.html" import entry_item_change_history with context %}
 {% from "components/_svg_icons.html" import svg_icon %}
-{% set can_use_upr = (not is_public_submission|default(false)) and (not is_preview_mode|default(false)) and has_permission('admin.data_explore.upr_visuals') %}
+{% set upr_plugin_active = (is_plugin_active is defined) and is_plugin_active('upr') %}
+{% set can_use_upr = upr_plugin_active and (not is_public_submission|default(false)) and (not is_preview_mode|default(false)) and has_permission('admin.data_explore.upr_visuals') %}
 {% set enable_page_submission = enable_page_submission|default(false) %}
 {% set enable_scoped_submission = enable_page_submission %}
 {% set section_workflow_statuses = section_workflow_statuses if section_workflow_statuses is defined else {} %}

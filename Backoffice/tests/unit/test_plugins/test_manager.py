@@ -103,45 +103,49 @@ class TestPluginManagerInit:
         assert pm.active_plugins == set()
         assert pm.field_types == {}
 
-    def test_loads_existing_state_file(self, tmp_path):
-        """Active plugin ids are read from the state file on init."""
-        (tmp_path / "instance").mkdir(exist_ok=True)
-        state_file = tmp_path / "instance" / "plugin_states.json"
-        state_file.write_text(json.dumps({"active_plugin_ids": ["plugin_a", "plugin_b"]}))
-
+    def test_loads_active_ids_from_db_store(self, tmp_path):
+        """Active plugin ids are read from the lifecycle store on init."""
         app = _make_flask_app(tmp_path)
-        with patch("app.plugins.manager.utcnow") as m:
+        with patch("app.plugins.manager.utcnow") as m, patch(
+            "app.plugins.lifecycle_store.load_active_plugin_ids",
+            return_value=["plugin_a", "plugin_b"],
+        ), patch(
+            "app.plugins.lifecycle_store.get_updated_at",
+            return_value=None,
+        ):
             m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
             from app.plugins.manager import PluginManager
             pm = PluginManager(app)
 
         assert "plugin_a" in pm._raw_active_tokens
+        assert "plugin_b" in pm._raw_active_tokens
 
-    def test_loads_legacy_active_plugins_key(self, tmp_path):
-        (tmp_path / "instance").mkdir(exist_ok=True)
-        state_file = tmp_path / "instance" / "plugin_states.json"
-        state_file.write_text(json.dumps({"active_plugins": ["Legacy Plugin"]}))
-
+    def test_defaults_to_empty_tokens_when_store_empty(self, tmp_path):
         app = _make_flask_app(tmp_path)
-        with patch("app.plugins.manager.utcnow") as m:
+        with patch("app.plugins.manager.utcnow") as m, patch(
+            "app.plugins.lifecycle_store.load_active_plugin_ids",
+            return_value=[],
+        ), patch(
+            "app.plugins.lifecycle_store.get_updated_at",
+            return_value=None,
+        ):
             m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
             from app.plugins.manager import PluginManager
             pm = PluginManager(app)
 
-        assert "Legacy Plugin" in pm._raw_active_tokens
+        assert pm._raw_active_tokens == []
 
-    def test_handles_corrupt_state_file(self, tmp_path):
-        (tmp_path / "instance").mkdir(exist_ok=True)
-        (tmp_path / "instance" / "plugin_states.json").write_text("{NOT JSON}")
-
+    def test_handles_store_load_error(self, tmp_path):
         app = _make_flask_app(tmp_path)
-        with patch("app.plugins.manager.utcnow") as m:
+        with patch("app.plugins.manager.utcnow") as m, patch(
+            "app.plugins.lifecycle_store.load_active_plugin_ids",
+            side_effect=RuntimeError("db down"),
+        ):
             m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
             from app.plugins.manager import PluginManager
             pm = PluginManager(app)
 
-        # Should not crash; falls back to empty
-        assert pm._raw_active_tokens is None
+        assert pm._raw_active_tokens == []
 
     def test_loads_discovery_cache(self, tmp_path):
         (tmp_path / "instance").mkdir(exist_ok=True)
@@ -173,7 +177,7 @@ class TestPluginManagerInit:
 
 @pytest.mark.unit
 class TestIntegratingPlugins:
-    def test_admin_feature_contributes_when_not_activated(self, tmp_path):
+    def test_inactive_admin_feature_does_not_contribute_assets(self, tmp_path):
         pm, _ = _make_manager(tmp_path)
         admin = MagicMock()
         admin.is_admin_feature.return_value = True
@@ -189,14 +193,26 @@ class TestIntegratingPlugins:
         pm.plugins = {"upr": admin, "off": gated}
         pm.active_plugins = set()
 
+        assert pm.entry_form_assets(33) == []
+        admin.get_entry_form_assets.assert_not_called()
+        gated.get_entry_form_assets.assert_not_called()
+
+    def test_active_admin_feature_contributes_assets(self, tmp_path):
+        pm, _ = _make_manager(tmp_path)
+        admin = MagicMock()
+        admin.is_admin_feature.return_value = True
+        admin.get_entry_form_assets.return_value = [
+            {"kind": "script", "url": "/upr/static/js/upr-emergency-coverage.js"},
+        ]
+        pm.plugins = {"upr": admin}
+        pm.active_plugins = {"upr"}
+
         assert pm.entry_form_assets(33) == [
-            {"kind": "stylesheet", "url": "/upr/static/css/upr-emergency-coverage.css"},
             {"kind": "script", "url": "/upr/static/js/upr-emergency-coverage.js"},
         ]
         admin.get_entry_form_assets.assert_called_once_with(33)
-        gated.get_entry_form_assets.assert_not_called()
 
-    def test_validation_sync_includes_admin_features(self, tmp_path):
+    def test_validation_sync_only_includes_active_plugins(self, tmp_path):
         pm, _ = _make_manager(tmp_path)
         admin = MagicMock()
         admin.plugin_id = "upr"
@@ -212,7 +228,7 @@ class TestIntegratingPlugins:
         ):
             pm._sync_validation_packs()
 
-        admin.register_validation_packs.assert_called_once_with()
+        admin.register_validation_packs.assert_not_called()
         gated.register_validation_packs.assert_not_called()
 
 
@@ -222,23 +238,27 @@ class TestIntegratingPlugins:
 
 @pytest.mark.unit
 class TestSavePluginStates:
-    def test_writes_state_file(self, tmp_path):
+    def test_writes_to_lifecycle_store(self, tmp_path):
         pm, _ = _make_manager(tmp_path)
         pm.active_plugins = {"plugin_a", "plugin_b"}
 
-        with patch("app.plugins.manager.utcnow") as m:
-            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+        with patch("app.plugins.lifecycle_store.save_active_plugin_ids", return_value=True) as save, patch(
+            "app.plugins.lifecycle_store.get_updated_at",
+            return_value=None,
+        ):
             pm._save_plugin_states()
 
-        data = json.loads((tmp_path / "instance" / "plugin_states.json").read_text())
-        assert set(data["active_plugin_ids"]) == {"plugin_a", "plugin_b"}
+        save.assert_called_once()
+        saved = set(save.call_args.args[0])
+        assert saved == {"plugin_a", "plugin_b"}
 
     def test_handles_write_error_gracefully(self, tmp_path):
         pm, _ = _make_manager(tmp_path)
-        with patch("builtins.open", side_effect=OSError("no perm")):
-            with patch("app.plugins.manager.utcnow") as m:
-                m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
-                pm._save_plugin_states()  # Should not raise
+        with patch(
+            "app.plugins.lifecycle_store.save_active_plugin_ids",
+            side_effect=RuntimeError("db down"),
+        ):
+            pm._save_plugin_states()  # Should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -609,7 +629,7 @@ class TestLoadPlugins:
 
 @pytest.mark.unit
 class TestResolveActivePlugins:
-    def test_all_active_when_no_persisted_tokens(self, tmp_path):
+    def test_all_inactive_when_no_persisted_tokens(self, tmp_path):
         pm, plugins_dir = _make_manager(tmp_path)
         _create_plugin_dir(plugins_dir, "plugin_a")
 
@@ -619,7 +639,7 @@ class TestResolveActivePlugins:
 
         pm._raw_active_tokens = None
         pm._resolve_active_plugins()
-        assert "plugin_a" in pm.active_plugins
+        assert "plugin_a" not in pm.active_plugins
 
     def test_resolves_by_plugin_id(self, tmp_path):
         pm, plugins_dir = _make_manager(tmp_path)
@@ -722,6 +742,7 @@ class TestPluginLifecycle:
 
     def test_get_active_plugins(self, tmp_path):
         pm = self._loaded_pm(tmp_path)
+        pm.active_plugins.add("plugin_a")
         active = pm.get_active_plugins()
         assert "plugin_a" in active
 
@@ -941,6 +962,7 @@ class TestReloadPlugin:
     def test_failed_reload_keeps_running_plugin_and_field_types(self, tmp_path):
         pm, plugins_dir = self._loaded_pm(tmp_path)
         pm.active_plugins.add("plugin_a")
+        pm._extract_field_types()
         original = pm.plugins["plugin_a"]
         (plugins_dir / "plugin_a" / "plugin.py").write_text("raise RuntimeError('broken')\n")
 

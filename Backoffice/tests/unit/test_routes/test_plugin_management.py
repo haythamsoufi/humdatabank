@@ -976,11 +976,13 @@ class TestPluginStaticAuthentication:
 
 class TestLifecycleRefusals:
     def test_blocked_action_returns_readable_400_without_running(self, logged_in_client, db_session, app):
-        pm = _make_plugin_manager(block_reason="fdrs is an admin feature and is always on; it cannot be deactivated.")
+        pm = _make_plugin_manager(
+            block_reason="pb_progress is required by active plugin(s): fdrs."
+        )
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/fdrs/deactivate")
+            resp = logged_in_client.post("/admin/api/plugins/pb_progress/deactivate")
         assert resp.status_code == 400
-        assert "always on" in resp.get_data(as_text=True)
+        assert "required by active" in resp.get_data(as_text=True)
         pm.deactivate_plugin.assert_not_called()
 
     def test_first_party_uninstall_refusal_is_400(self, logged_in_sm_client, db_session, app):

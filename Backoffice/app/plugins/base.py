@@ -339,10 +339,12 @@ class BasePlugin(ABC):
         return None
 
     def is_admin_feature(self) -> bool:
-        """True when plugin routes register regardless of activate/deactivate.
+        """True when this plugin is an org admin tool (Data Explorer / sync / etc.).
 
-        Default: plugins that contribute a Data Explorer tab. Backend-only admin
-        tools (for example FDRS data sync) can override this without adding a tab.
+        Admin-feature blueprints register via ``register_admin_feature_blueprints``
+        and are still activation-gated (404 while inactive). Default: plugins that
+        contribute a Data Explorer tab. Backend-only admin tools (for example FDRS
+        data sync) can override this without adding a tab.
         """
         return bool(self.get_data_explorer_tabs())
 

@@ -1,7 +1,5 @@
-"""Lifecycle semantics of PluginManager: always-on plugins, dependencies, uninstall guards,
+"""Lifecycle semantics of PluginManager: dependencies, uninstall guards,
 multi-worker state sync, the activation guard and safe reload."""
-import json
-import os
 import shutil
 from pathlib import Path
 from unittest.mock import patch
@@ -120,7 +118,7 @@ class TestLifecycleBlockReason:
         _load(pm)
         pm.active_plugins.update({"base_p", "child_p"})
         assert "required by active" in pm.lifecycle_block_reason("deactivate", "base_p")
-        assert "always on" in pm.lifecycle_block_reason("deactivate", "admin_tool")
+        assert pm.lifecycle_block_reason("deactivate", "admin_tool") is None
         assert "required by" in pm.lifecycle_block_reason("uninstall", "base_p")
         pm.active_plugins.discard("base_p")
         assert "not active" in pm.lifecycle_block_reason("activate", "child_p")
@@ -130,15 +128,14 @@ class TestLifecycleBlockReason:
 
 @pytest.mark.unit
 class TestAlwaysOnAndFirstParty:
-    def test_admin_feature_plugin_cannot_be_deactivated(self, manager):
-        from app.plugins.manager import PluginLifecycleError
-
+    def test_admin_feature_plugin_can_be_deactivated(self, manager):
         pm, d = manager
         _write_plugin(d, "admin_tool", admin=True)
         _load(pm)
-        assert pm.is_always_on("admin_tool")
-        with pytest.raises(PluginLifecycleError, match="always on"):
-            pm.deactivate_plugin("admin_tool")
+        pm.active_plugins.add("admin_tool")
+        assert pm.is_always_on("admin_tool") is False
+        assert pm.deactivate_plugin("admin_tool") is True
+        assert "admin_tool" not in pm.active_plugins
 
     def test_first_party_plugin_cannot_be_uninstalled(self, manager):
         from app.plugins.manager import PluginLifecycleError
@@ -163,28 +160,37 @@ class TestAlwaysOnAndFirstParty:
 @pytest.mark.unit
 class TestStateSync:
     def test_sync_adopts_state_written_by_another_worker(self, manager):
+        from datetime import datetime, timezone
+
         pm, d = manager
         _write_plugin(d, "a_plugin")
         _load(pm)
         pm.active_plugins.discard("a_plugin")
-        pm._save_plugin_states()
-        assert pm.sync_state_from_disk() is False
+        t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        t1 = datetime(2026, 1, 2, tzinfo=timezone.utc)
+        pm._state_updated_at = t0
 
-        other_state = {"active_plugin_ids": ["a_plugin"]}
-        pm.state_file_path.write_text(json.dumps(other_state))
-        stat = pm.state_file_path.stat()
-        os.utime(pm.state_file_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 5_000_000_000))
-
-        assert pm.sync_state_from_disk() is True
-        assert "a_plugin" in pm.active_plugins
-        assert pm.sync_state_from_disk() is False
+        with patch("app.plugins.lifecycle_store.get_updated_at", return_value=t1), patch(
+            "app.plugins.lifecycle_store.load_active_plugin_ids",
+            return_value=["a_plugin"],
+        ):
+            assert pm.sync_activation_state() is True
+            assert "a_plugin" in pm.active_plugins
+            assert pm.sync_activation_state() is False
 
     def test_own_writes_do_not_trigger_resync(self, manager):
+        from datetime import datetime, timezone
+
         pm, d = manager
         _write_plugin(d, "a_plugin")
         _load(pm)
-        pm.activate_plugin("a_plugin")
-        assert pm.sync_state_from_disk() is False
+        stamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        with patch("app.plugins.lifecycle_store.save_active_plugin_ids", return_value=True), patch(
+            "app.plugins.lifecycle_store.get_updated_at",
+            return_value=stamp,
+        ):
+            pm.activate_plugin("a_plugin")
+            assert pm.sync_activation_state() is False
 
 
 @pytest.mark.unit
@@ -215,6 +221,19 @@ class TestActivationGuard:
         pm.register_blueprints()
         assert "gated_bp" in pm.app.blueprints
         assert pm.blueprint_plugin_ids["gated_bp"] == "gated"
+
+    def test_admin_feature_routes_are_activation_gated(self, manager):
+        pm, d = manager
+        _write_plugin(d, "admin_tool", admin=True, with_bp=True)
+        _load(pm)
+        pm.register_admin_feature_blueprints()
+        pm.register_activation_guard()
+        client = pm.app.test_client()
+
+        assert "admin_tool_bp" in pm.blueprint_plugin_ids
+        assert client.get("/admin_tool/ping").status_code == 404
+        pm.activate_plugin("admin_tool")
+        assert client.get("/admin_tool/ping").status_code == 200
 
     def test_guard_registered_once(self, manager):
         pm, d = manager

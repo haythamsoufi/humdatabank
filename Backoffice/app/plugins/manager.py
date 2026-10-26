@@ -101,17 +101,17 @@ class PluginManager:
             Path(app.root_path).parent / 'plugins',
         ]
 
-        # Plugin state file path
+        # Legacy activation file (one-shot migrate into plugin_data only)
         self.state_file_path = Path(app.instance_path) / 'plugin_states.json'
 
         # Caching and optimization
         self._discovery_cache = {}
         self._discovery_cache_file = Path(app.instance_path) / 'plugin_discovery_cache.json'
         self._state_update_lock = threading.RLock()
-        self._state_mtime_ns: Optional[int] = None
+        self._state_updated_at = None
         self._loaded_plugin_modules = {}  # Cache for loaded modules
 
-        # Load plugin states on initialization
+        # Load plugin states on initialization (DB; default inactive)
         self._load_plugin_states()
         self._load_discovery_cache()
 
@@ -121,26 +121,22 @@ class PluginManager:
             sys.path.insert(0, root_str)
 
     def _load_plugin_states(self):
-        """Load plugin activation states from persistent storage."""
+        """Load plugin activation tokens from ``plugin_data`` (default: none active)."""
+        from app.plugins.lifecycle_store import get_updated_at, load_active_plugin_ids
+
         try:
-            if self.state_file_path.exists():
-                with open(self.state_file_path, 'r') as f:
-                    state_data = json.load(f)
-                    # Support new and legacy keys.
-                    # - New: active_plugin_ids
-                    # - Legacy: active_plugins (could be plugin_id or display_name)
-                    self._raw_active_tokens = list(state_data.get('active_plugin_ids') or state_data.get('active_plugins') or [])
-                    self.active_plugins = set()  # resolved after plugins are loaded
-                    self._state_mtime_ns = self._state_file_mtime_ns()
-                    self.logger.info(f"Loaded plugin states: {len(self._raw_active_tokens)} tokens")
-            else:
-                self.logger.info("No plugin state file found, all plugins will be active by default")
-                self._raw_active_tokens = None
+            self._raw_active_tokens = list(load_active_plugin_ids())
+            self.active_plugins = set()  # resolved after plugins are loaded
+            self._state_updated_at = get_updated_at()
+            self.logger.info(
+                "Loaded plugin states from DB: %s token(s)",
+                len(self._raw_active_tokens),
+            )
         except Exception as e:
             self.logger.error(f"Error loading plugin states: {e}")
-            # Fallback: all plugins active by default
             self.active_plugins = set()
-            self._raw_active_tokens = None
+            self._raw_active_tokens = []
+            self._state_updated_at = None
 
     def _load_discovery_cache(self):
         """Load plugin discovery cache from persistent storage."""
@@ -196,42 +192,35 @@ class PluginManager:
             self.logger.warning(f"Error generating directory hash for {directory}: {e}")
             return str(time.time())  # Fallback to timestamp
 
-    def _state_file_mtime_ns(self) -> Optional[int]:
-        try:
-            return self.state_file_path.stat().st_mtime_ns
-        except OSError:
-            return None
-
     def _save_plugin_states(self):
-        """Persist plugin activation states."""
+        """Persist plugin activation states to ``plugin_data``."""
         with self._state_update_lock:
+            from app.plugins.lifecycle_store import get_updated_at, save_active_plugin_ids
+
             try:
-                from app.utils.file_lock import atomic_json_write
-
-                state_data = {
-                    'active_plugin_ids': sorted(list(self.active_plugins)),
-                    'last_updated': utcnow().isoformat()
-                }
-                atomic_json_write(self.state_file_path, state_data)
-                self._state_mtime_ns = self._state_file_mtime_ns()
-
-                self.logger.info(f"Saved plugin states: {len(self.active_plugins)} active plugins")
+                if save_active_plugin_ids(self.active_plugins):
+                    self._state_updated_at = get_updated_at()
+                    self.logger.info(
+                        "Saved plugin states: %s active plugins",
+                        len(self.active_plugins),
+                    )
             except Exception as e:
                 self.logger.error(f"Error saving plugin states: {e}", exc_info=True)
 
-    def sync_state_from_disk(self) -> bool:
+    def sync_activation_state(self) -> bool:
         """Adopt activation changes written by another worker process.
 
-        Activation state is persisted to ``plugin_states.json`` but each worker
-        keeps its own in-memory copy. This is a cheap ``stat`` per call; the file
-        is re-read only when its modification time changed. Returns True when the
-        active set was refreshed.
+        Activation state lives in ``plugin_data``; each worker keeps an in-memory
+        copy. Compares the lifecycle row ``updated_at`` and reloads when it
+        changed. Returns True when the active set was refreshed.
         """
-        current = self._state_file_mtime_ns()
-        if current is None or current == self._state_mtime_ns:
+        from app.plugins.lifecycle_store import get_updated_at
+
+        current = get_updated_at()
+        if current is None or current == self._state_updated_at:
             return False
         with self._state_update_lock:
-            if current == self._state_mtime_ns:
+            if current == self._state_updated_at:
                 return False
             previous = set(self.active_plugins)
             self._load_plugin_states()
@@ -241,6 +230,10 @@ class PluginManager:
                 self._invalidate_form_integration_cache()
                 return True
         return False
+
+    def sync_state_from_disk(self) -> bool:
+        """Backward-compatible alias for :meth:`sync_activation_state`."""
+        return self.sync_activation_state()
 
     def _invalidate_form_integration_cache(self) -> None:
         form_integration = getattr(self.app, 'form_integration', None)
@@ -354,6 +347,9 @@ class PluginManager:
             if plugin_id:
                 loaded_plugins.append(plugin_id)
 
+        self._migrate_legacy_activation_state()
+        self._import_legacy_plugin_configs()
+
         # Resolve which plugins are active using stored tokens (plugin_id or legacy display_name)
         self._resolve_active_plugins()
 
@@ -371,6 +367,25 @@ class PluginManager:
             self.logger.info(f"Plugin system: Loaded {len(loaded_plugins)} plugins [{', '.join(loaded_plugins)}]")
 
         return self.plugins
+
+    def _migrate_legacy_activation_state(self) -> None:
+        """Import instance/plugin_states.json into plugin_data when lifecycle row is absent."""
+        from app.plugins.lifecycle_store import get_updated_at, migrate_from_legacy_state_file
+
+        migrated = migrate_from_legacy_state_file(self.state_file_path)
+        if migrated is None:
+            return
+        self._raw_active_tokens = list(migrated)
+        self._state_updated_at = get_updated_at()
+
+    def _import_legacy_plugin_configs(self) -> None:
+        """Copy plugins/*/plugin_config.json into plugin_data when no row exists yet."""
+        from app.plugins.legacy_config_import import import_missing_plugin_configs
+
+        id_by_dir = {path: plugin_id for plugin_id, path in self.plugin_dirs.items()}
+        imported = import_missing_plugin_configs(self.plugin_dirs.values(), plugin_id_by_dir=id_by_dir)
+        if imported:
+            self.logger.info("Imported legacy plugin configs for: %s", ", ".join(imported))
 
     def _load_and_register(self, plugin_path: str) -> Optional[str]:
         """Load one plugin directory and add it to the registry. Returns its id when newly registered."""
@@ -490,12 +505,8 @@ class PluginManager:
         """
         Resolve active plugins from persisted state tokens.
         Tokens may be plugin_id (new) or display_name/name (legacy).
+        Missing / empty tokens => all plugins inactive.
         """
-        if getattr(self, "_raw_active_tokens", None) is None:
-            # No persisted state => default: all loaded plugins active
-            self.active_plugins = set(self.plugins.keys())
-            return
-
         tokens = set(str(t) for t in (self._raw_active_tokens or []) if str(t).strip())
         tokens = {self._PLUGIN_ID_ALIASES.get(token, token) for token in tokens}
         resolved: Set[str] = set()
@@ -511,23 +522,11 @@ class PluginManager:
                 resolved.add(plugin_id)
                 continue
 
-        # If nothing matched but there were tokens, keep resolved empty (all inactive),
-        # except admin features, which are always on.
-        resolved.update(self._always_on_plugin_ids())
         self.active_plugins = resolved
 
-    def _always_on_plugin_ids(self) -> Set[str]:
-        return {pid for pid in self.plugins if self.is_always_on(pid)}
-
     def is_always_on(self, plugin_id: str) -> bool:
-        """Admin-feature plugins register routes and RBAC regardless of activation."""
-        plugin = self.plugins.get(plugin_id)
-        if plugin is None:
-            return False
-        try:
-            return bool(plugin.is_admin_feature())
-        except Exception:
-            return False
+        """Activation is always DB-gated; retained for API compatibility (always False)."""
+        return False
 
     def is_first_party(self, plugin_id: str) -> bool:
         from plugins.metadata import FIRST_PARTY_PLUGIN_IDS
@@ -793,7 +792,7 @@ class PluginManager:
         def _reject_inactive_plugin_routes():
             from flask import abort, request
 
-            self.sync_state_from_disk()
+            self.sync_activation_state()
             blueprint = request.blueprint
             if not blueprint or blueprint not in self.blueprint_plugin_ids:
                 return None
@@ -808,24 +807,12 @@ class PluginManager:
         return self.plugins.get(plugin_name)
 
     def _integrating_plugins(self) -> Dict[str, BasePlugin]:
-        """Plugins that plug into core behavior.
-
-        User-activated plugins are included. Admin features are included too:
-        their routes stay registered when they are not in the activation list,
-        and the same plugins own validation packs and assignment-form assets.
-        """
-        chosen: Dict[str, BasePlugin] = {}
-        for plugin_id, plugin in self.plugins.items():
-            if plugin_id in self.active_plugins:
-                chosen[plugin_id] = plugin
-                continue
-            try:
-                always_on = bool(plugin.is_admin_feature())
-            except Exception:
-                always_on = False
-            if always_on:
-                chosen[plugin_id] = plugin
-        return chosen
+        """Active plugins that plug into core behavior (validation packs, form assets)."""
+        return {
+            plugin_id: plugin
+            for plugin_id, plugin in self.plugins.items()
+            if plugin_id in self.active_plugins
+        }
 
     def get_active_plugins(self) -> Dict[str, BasePlugin]:
         """Get all active plugin instances."""
@@ -917,8 +904,6 @@ class PluginManager:
             return None
 
         if action == 'deactivate':
-            if self.is_always_on(plugin_name):
-                return f"{plugin_name} is an admin feature and is always on; it cannot be deactivated."
             active_dependents = [d for d in self.get_dependents(plugin_name) if d in self.active_plugins]
             if active_dependents:
                 return f"{plugin_name} is required by active plugin(s): {', '.join(active_dependents)}."
@@ -943,8 +928,7 @@ class PluginManager:
     def deactivate_plugin(self, plugin_name: str) -> bool:
         """Deactivate a specific plugin (safe, reversible).
 
-        Raises PluginLifecycleError for admin-feature plugins, which are always on, and for
-        plugins that other active plugins depend on.
+        Raises PluginLifecycleError for plugins that other active plugins depend on.
         """
         if plugin_name not in self.plugins:
             self.logger.error(f"Plugin {plugin_name} not found")
@@ -1233,12 +1217,13 @@ class PluginManager:
         return self.plugin_installations.copy()
 
     def register_admin_feature_blueprints(self) -> None:
-        """Register blueprints for admin-feature plugins (always on, not activation-gated).
+        """Register blueprints for admin-feature plugins (activation-gated like form plugins).
 
         Each plugin may contribute a primary blueprint (``get_blueprint()``) plus any
         number of additional blueprints (``get_additional_blueprints()``) — e.g. a
         plugin that owns a dedicated import-wizard blueprint or a legacy-redirect
-        blueprint alongside its main one.
+        blueprint alongside its main one. Inactive plugins still register routes so
+        activation takes effect without a restart; the activation guard returns 404.
         """
         registered: list[str] = []
         for plugin_id, plugin in self.plugins.items():
@@ -1255,7 +1240,10 @@ class PluginManager:
 
             plugin_registered = False
             for blueprint in blueprints:
-                if blueprint is None or blueprint.name in self.app.blueprints:
+                if blueprint is None:
+                    continue
+                self.blueprint_plugin_ids[blueprint.name] = plugin_id
+                if blueprint.name in self.app.blueprints:
                     continue
                 try:
                     self.app.register_blueprint(blueprint)
@@ -1340,6 +1328,11 @@ class PluginManager:
         @self.app.template_global('plugin_entry_form_assets')
         def plugin_entry_form_assets(template_id=None):
             return self.entry_form_assets(template_id)
+
+        @self.app.template_global('is_plugin_active')
+        def is_plugin_active(plugin_id: str) -> bool:
+            self.sync_activation_state()
+            return self.is_plugin_active(plugin_id)
 
     def list_embed_visuals(self) -> list[dict[str, str]]:
         """Visuals plugins offer when an admin creates embed content.

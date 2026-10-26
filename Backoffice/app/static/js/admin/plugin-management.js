@@ -230,7 +230,6 @@
                         </div>
                         <div class="ml-4 min-w-0 whitespace-normal break-words">
                             <div class="text-sm font-medium text-gray-900">${escapeHtml(displayName)}</div>
-                            <div class="text-xs text-gray-500">${escapeHtml(pluginId)}</div>
                             <div class="text-sm text-gray-500">${escapeHtml(plugin.description || '')}</div>
                         </div>
                     </div>
@@ -601,6 +600,17 @@
             showError(i18n.error_failed_install);
         } finally {
             showLoading(false);
+        }
+    }
+
+    function deactivatePlugin(pluginId) {
+        const plugin = findPluginById(pluginId);
+        const displayName = plugin ? getPluginDisplayName(plugin) : pluginId;
+        const msg = i18n.confirm_deactivate_plugin.replace('%(plugin)s', displayName);
+        if (window.showConfirmation) {
+            window.showConfirmation(msg, () => { void _deactivatePlugin(pluginId); }, null, _t('Deactivate'), _t('Cancel'), _t('Deactivate Plugin?'));
+        } else {
+            void _deactivatePlugin(pluginId);
         }
     }
 

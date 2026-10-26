@@ -101,21 +101,23 @@ Required file: `plugin.py` with a concrete `BasePlugin` subclass. Set `get_field
 
 First-party plugins share author metadata from `plugins/metadata.py` (`Haytham Alsoufi`, `https://github.com/haythamsoufi`). Settings pages should render that via `settings_plugin_info()` rather than hardcoding.
 
-Admin-feature plugins (`is_admin_feature()`) are always on: they cannot be deactivated. Templates are referenced as `plugins/<plugin_id>/...`.
+Admin-feature plugins (`is_admin_feature()`) register via the admin-feature blueprint path but are still activation-gated (404 while inactive). Templates are referenced as `plugins/<plugin_id>/...`.
 
 ## Lifecycle
 
 | State | Meaning |
 |---|---|
 | Discovered | Folder under `plugins/` with a loadable `plugin.py`. |
-| Installed | `install_plugin` ran; recorded in `plugin_states.json`. |
-| Active | Field types, templates and routes are served. |
+| Installed | `install_plugin` ran; tracked in memory / installation history. |
+| Active | Listed in `plugin_data` (`plugin_id=__plugin_lifecycle__`, `active_plugin_ids`); field types, templates and routes are served. |
 
+- Plugins are **inactive by default**. Only IDs in the lifecycle `plugin_data` row are active.
 - Every plugin blueprint is registered at application start, whatever its state. A guard returns 404 for plugins that are not active, so activating or deactivating takes effect without a restart.
 - A plugin installed after start (upload or **Scan for plugins**) is loaded at once, but its blueprint and any changed view code only appear after a restart. **Reload** re-imports `plugin.py` and keeps the old version if the new one fails to load.
-- State is shared between workers through `plugin_states.json`; each request checks its modification time and re-reads it when it changed.
+- State is shared between workers through the lifecycle `plugin_data` row; each request compares `updated_at` and reloads when it changed.
+- On first boot, if that row is missing and `instance/plugin_states.json` exists, its `active_plugin_ids` are imported once. Each `plugins/*/plugin_config.json` is imported into that plugin’s `plugin_data` row when no row exists yet (existing DB rows are never overwritten).
 - Declare plugins that must be active first with `get_required_plugins()`. Activation is refused while a requirement is missing or inactive, and a plugin that others require cannot be deactivated or uninstalled.
-- First-party plugins (`plugins/metadata.py::FIRST_PARTY_PLUGIN_IDS`) cannot be uninstalled from the UI because that would delete tracked code.
+- First-party plugins (`plugins/metadata.py::FIRST_PARTY_PLUGIN_IDS`, currently only `interactive_map`) cannot be uninstalled from the UI because that would delete tracked code. Other bundled plugins can be deactivated or uninstalled like uploads.
 - `update_settings()` returns `False` by default. Override it together with `supports_settings_update()` to expose a settings form.
 
 ### Secrets in plugin settings

@@ -105,6 +105,10 @@ def main():
                             "Unified Network Annual Report",
                             "Unified Network Midyear Report",
                             "Legal Document",
+                            "Statutes in Force",
+                            "Red Cross Law",
+                            "Emblem Law",
+                            "Picture of the Year",
                             "Cover Image",
                             "Agreement",
                             "Other"

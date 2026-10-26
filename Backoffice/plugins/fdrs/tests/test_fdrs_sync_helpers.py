@@ -13,6 +13,10 @@ for p in (backoffice_dir, fdrs_scripts, imports_dir):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from fdrs_assignment_ensure import (  # noqa: E402
+    plan_missing_fdrs_assignments,
+    years_from_fdrs_data,
+)
 from fdrs_assignment_status_sync import (  # noqa: E402
     build_assignment_status_plan,
     derive_assignment_status_from_sections,
@@ -583,7 +587,7 @@ def test_same_year_period_range_is_stored_as_the_year():
     assert plan[0]["year"] == "2024"
 
 
-def test_build_document_import_plan_skips_unmapped_type():
+def test_build_document_import_plan_imports_library_types_without_form_item():
     documents = [
         {
             "don_code": "DUS001",
@@ -593,14 +597,65 @@ def test_build_document_import_plan_skips_unmapped_type():
             "name": "x.pdf",
             "Public": 1,
             "ApprovalStatus": "Validated (Public)",
-        }
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Statutes in Force",
+            "year": 2024,
+            "name": "statutes.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "EveryoneCounts",
+            "year": 2024,
+            "name": "ec.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
     ]
     assignment_rows = [
         {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
     ]
     plan, summary = build_document_import_plan(documents, assignment_rows)
-    assert plan == []
-    assert summary["skipped_unmapped_type"] == 1
+    assert summary["skipped_global_type"] == 1
+    assert summary["planned_library"] == 2
+    assert summary["planned_template_slots"] == 0
+    assert {row["document_type"] for row in plan} == {"Other", "Statutes in Force"}
+    assert all(row["form_item_id"] is None for row in plan)
+    assert all(row["assignment_entity_status_id"] == 99 for row in plan)
+
+
+def test_build_document_import_plan_keeps_all_other_docs_same_year():
+    documents = [
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Other",
+            "year": 2024,
+            "name": "plan-a.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Other",
+            "year": 2024,
+            "name": "plan-b.pdf",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 2
+    assert {row["filename"] for row in plan} == {"plan-a.pdf", "plan-b.pdf"}
 
 
 def test_parse_don_code_amount_pairs_zips_parallel_csv():
@@ -1423,3 +1478,46 @@ def test_check_cancel_raises_fdrs_sync_cancelled():
     assert raised
     _check_cancel(lambda: False)
     _check_cancel(None)
+
+
+def test_years_from_fdrs_data_dedupes_and_sorts():
+    years = years_from_fdrs_data(
+        [
+            {"year": "2024"},
+            {"year": 2018},
+            {"year": "2024-01-01"},
+            {"year": ""},
+            {"year": None},
+            {"year": "nope"},
+        ]
+    )
+    assert years == [2018, 2024]
+
+
+def test_plan_missing_fdrs_assignments_creates_period_and_aes():
+    plan = plan_missing_fdrs_assignments(
+        years=[2018, 2024],
+        country_iso3_to_id={"KEN": 10, "FRA": 20},
+        existing_period_names={"2024"},
+        existing_period_iso3={("2024", "KEN")},
+    )
+    assert plan["periods_to_create"] == ["2018"]
+    assert plan["target_pairs"] == 4
+    aes = {(row["period_name"], row["iso3"], row["country_id"]) for row in plan["aes_to_create"]}
+    assert aes == {
+        ("2018", "FRA", 20),
+        ("2018", "KEN", 10),
+        ("2024", "FRA", 20),
+    }
+
+
+def test_plan_missing_fdrs_assignments_noop_when_complete():
+    plan = plan_missing_fdrs_assignments(
+        years=[2024],
+        country_iso3_to_id={"KEN": 10},
+        existing_period_names={"2024"},
+        existing_period_iso3={("2024", "KEN")},
+    )
+    assert plan["periods_to_create"] == []
+    assert plan["aes_to_create"] == []
+    assert plan["target_pairs"] == 1

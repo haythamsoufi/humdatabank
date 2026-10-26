@@ -95,6 +95,7 @@ def create_fdrs_data_sync_job(
     fdrs_reported_import_states: Optional[List[int]],
     preview_path: Optional[str],
     sync_user_id: Optional[int],
+    create_missing_assignments: bool = True,
 ) -> str:
     """Create AIJob + single AIJobItem for an async FDRS data sync."""
     job_id = uuid.uuid4().hex
@@ -122,6 +123,7 @@ def create_fdrs_data_sync_job(
         "test_limit": test_limit,
         "imputed_use_cache": bool(imputed_use_cache),
         "sync_documents": bool(sync_documents),
+        "create_missing_assignments": bool(create_missing_assignments),
         "fdrs_reported_import_states": fdrs_reported_import_states,
         "preview_path": preview_path,
         "sync_user_id": sync_user_id,
@@ -412,6 +414,9 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 cancel_check=_cancel_check,
                 sync_user_id=sync_user_id,
                 sync_documents=bool(payload.get("sync_documents", True)),
+                create_missing_assignments=bool(
+                    payload.get("create_missing_assignments", True)
+                ),
                 change_recorder=writer.record,
             )
             writer.finalize(dict(stats or {}))

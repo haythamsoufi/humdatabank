@@ -421,6 +421,24 @@ def test_plugin_static_cache_disabled_in_debug():
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("css/upr-flow-map.css", True),
+        ("js/upr-flow-map.js", True),
+        ("icons/eo-emergency.png", True),
+        ("templates/unified_country_plan.xlsx", False),
+        ("../secrets.txt", False),
+        ("", False),
+    ],
+)
+def test_public_upr_static_allowlist(filename, expected):
+    from plugins.upr.routes import _is_public_upr_static
+
+    assert _is_public_upr_static(filename) is expected
+
+
+@pytest.mark.unit
 def test_pdf_viewer_csp_allows_same_origin_frame():
     from plugins.upr.plugin import (
         UprPlugin,

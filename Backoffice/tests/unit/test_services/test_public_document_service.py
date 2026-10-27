@@ -1652,3 +1652,91 @@ class TestRequirePhraseLiteralSafetyNet:
         slim = slim_public_document_chunk(row, max_content_chars=60, require_phrase="Post Office")
         assert "Post Office" in slim["content"]
 
+
+@pytest.mark.unit
+class TestStreamPublicAiDocumentDownload:
+    """Regression: download must use storage_service module functions, not a StorageService class."""
+
+    def test_streams_ai_document_via_storage_module(self, app):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+
+        doc = SimpleNamespace(
+            id=583,
+            title="Public plan",
+            filename="plan.pdf",
+            source_url=None,
+            storage_path="plans/583.pdf",
+            submitted_document_id=None,
+        )
+        fake_response = object()
+
+        with app.app_context():
+            with patch.object(svc, "_load_public_ai_document", return_value=doc), patch(
+                "app.routes.ai_documents.helpers._ai_doc_source_ready", return_value=True
+            ), patch(
+                "app.services.platform.storage_service.stream_response",
+                return_value=fake_response,
+            ) as mock_stream:
+                # ImportError on StorageService used to 500 every local-file download.
+                result = svc.stream_public_ai_document_download(583)
+
+        assert result is fake_response
+        mock_stream.assert_called_once_with(
+            "ai_documents",
+            "plans/583.pdf",
+            filename="plan.pdf",
+            mimetype="application/octet-stream",
+            as_attachment=True,
+        )
+
+    def test_redirects_to_trusted_source_url(self, app):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+
+        doc = SimpleNamespace(
+            id=10,
+            title="External plan",
+            filename="plan.pdf",
+            source_url="https://www.ifrc.org/docs/plan.pdf",
+            storage_path=None,
+            submitted_document_id=None,
+        )
+
+        with app.app_context():
+            with patch.object(svc, "_load_public_ai_document", return_value=doc), patch(
+                "app.routes.ai_documents.helpers._validate_ifrc_fetch_url",
+                return_value=(True, None),
+            ):
+                result = svc.stream_public_ai_document_download(10)
+
+        assert result.status_code == 302
+        assert result.headers["Location"] == "https://www.ifrc.org/docs/plan.pdf"
+
+    def test_missing_file_raises_client_input_error(self, app):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+        from app.utils.api_errors import ClientInputError
+
+        doc = SimpleNamespace(
+            id=11,
+            title="Missing file",
+            filename="missing.pdf",
+            source_url=None,
+            storage_path=None,
+            submitted_document_id=None,
+        )
+
+        with app.app_context():
+            with patch.object(svc, "_load_public_ai_document", return_value=doc), patch(
+                "app.routes.ai_documents.helpers._ai_doc_source_ready", return_value=False
+            ):
+                with pytest.raises(ClientInputError, match="not available"):
+                    svc.stream_public_ai_document_download(11)
+

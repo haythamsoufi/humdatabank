@@ -1503,7 +1503,7 @@ def stream_public_ai_document_download(document_id: int):
     from flask import redirect, send_file
 
     from app.routes.ai_documents.helpers import _ai_doc_source_ready, _validate_ifrc_fetch_url
-    from app.services.platform.storage_service import StorageService
+    from app.services.platform import storage_service as _storage
 
     doc = _load_public_ai_document(document_id)
     source_url = _document_source_url(doc)
@@ -1515,10 +1515,9 @@ def stream_public_ai_document_download(document_id: int):
     if not doc.storage_path or not _ai_doc_source_ready(doc):
         raise ClientInputError("Document file not available")
 
-    storage = StorageService()
     if getattr(doc, "submitted_document_id", None):
         storage_path = doc.storage_path.strip()
-        category_rel = storage.category_rel_for_submitted_storage_path(storage_path)
+        category_rel = _storage.category_rel_for_submitted_storage_path(storage_path)
         if category_rel is None:
             if storage_path and os.path.exists(storage_path):
                 return send_file(
@@ -1529,7 +1528,7 @@ def stream_public_ai_document_download(document_id: int):
                 )
             raise ClientInputError("Document file not available")
         category, rel = category_rel
-        return storage.stream_response(
+        return _storage.stream_response(
             category,
             rel,
             filename=doc.filename,
@@ -1544,8 +1543,8 @@ def stream_public_ai_document_download(document_id: int):
             download_name=doc.filename,
             mimetype="application/octet-stream",
         )
-    return storage.stream_response(
-        storage.AI_DOCUMENTS,
+    return _storage.stream_response(
+        _storage.AI_DOCUMENTS,
         doc.storage_path,
         filename=doc.filename,
         mimetype="application/octet-stream",

@@ -14,6 +14,8 @@
 // called again via requestAnimationFrame so the tooltip follows the icon
 // smoothly — getBoundingClientRect() always returns live viewport coordinates.
 
+import { bindFieldHistoryScroll } from './field-history.js';
+
 const ENTRY_FORM_TOOLTIP_SELECTORS = [
   '.indicator-definition-tooltip',
   '.question-unit-tooltip',
@@ -157,6 +159,9 @@ export function bindTooltipEvents(container) {
     }
     _activeContainer = container;
     positionTooltip(container);
+    if (container.classList.contains('entry-item-history')) {
+      bindFieldHistoryScroll(container);
+    }
   };
 
   const scheduleHide = () => {
@@ -181,9 +186,13 @@ export function bindTooltipEvents(container) {
 /** When any scrollable ancestor scrolls, reposition the active tooltip so it
  *  follows the icon. Throttled with requestAnimationFrame to avoid jank.
  *  getBoundingClientRect() always returns live viewport coordinates, so calling
- *  positionTooltip() on scroll makes the tooltip track the icon exactly. */
-function onScroll() {
+ *  positionTooltip() on scroll makes the tooltip track the icon exactly.
+ *  Scroll inside the history panel itself must not reposition (that would
+ *  interrupt infinite-scroll loading). */
+function onScroll(event) {
   if (!_activeContainer || _scrollRafPending) return;
+  const panel = _activeContainer.querySelector('.tooltip-text');
+  if (panel && event && panel.contains(event.target)) return;
   _scrollRafPending = true;
   requestAnimationFrame(() => {
     _scrollRafPending = false;

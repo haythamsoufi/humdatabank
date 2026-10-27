@@ -30,9 +30,19 @@ DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES = frozenset({'assignment_created'})
 
 # Field-level saves written by the entry form (and the older notifier name).
 ASSIGNMENT_DATA_CHANGE_ACTIVITY_TYPES = ('data_update', 'form_data_updated')
+# Assignment workflow / status transitions (header status tooltip history).
+ASSIGNMENT_STATUS_HISTORY_ACTIVITY_TYPES = (
+    'assignment_created',
+    'assignment_submitted',
+    'assignment_sent_for_review',
+    'assignment_returned_for_revision',
+    'assignment_approved',
+    'assignment_reopened',
+)
 # Enough recent saves to rebuild per-field history, not only the latest page of the feed.
 ASSIGNMENT_DATA_HISTORY_LIMIT = 200
 ASSIGNMENT_FIELD_HISTORY_LIMIT = 8
+ASSIGNMENT_STATUS_HISTORY_LIMIT = 8
 
 
 def filter_dashboard_assignment_activities(activities):
@@ -312,6 +322,7 @@ def _index_field_change_history(activities):
                 bucket = {
                     'events': [],
                     'more': 0,
+                    'has_more': False,
                     'entered_by': None,
                     'entered_at': None,
                     'last_changed_by': event['user'],
@@ -322,6 +333,7 @@ def _index_field_change_history(activities):
                 bucket['events'].append(event)
             else:
                 bucket['more'] += 1
+                bucket['has_more'] = True
             # Newest-first scan: the last event seen is the oldest in this window.
             bucket['entered_by'] = event['user']
             bucket['entered_at'] = event['timestamp']
@@ -331,6 +343,159 @@ def _index_field_change_history(activities):
             bucket['last_changed_by'] = None
             bucket['last_changed_at'] = None
     return buckets
+
+
+def _enriched_field_events_for_activity(activity):
+    """Copy + matrix-trim summary params, then expand into per-field events."""
+    import copy
+    from types import SimpleNamespace
+
+    raw = getattr(activity, 'summary_params', None)
+    params = copy.deepcopy(raw) if isinstance(raw, dict) else {}
+    try:
+        postprocess_activity_summary_params(params, getattr(activity, 'summary_key', None))
+    except Exception as exc:
+        current_app.logger.debug(
+            "Could not postprocess activity %s for field history: %s",
+            getattr(activity, 'id', None),
+            exc,
+        )
+    return _field_change_events(SimpleNamespace(
+        summary_key=getattr(activity, 'summary_key', None),
+        summary_params=params,
+        user=getattr(activity, 'user', None),
+        timestamp=getattr(activity, 'timestamp', None),
+    ))
+
+
+def get_field_change_history_page(
+    assignment_id,
+    field_id,
+    field_id_kind=None,
+    *,
+    offset=0,
+    limit=ASSIGNMENT_FIELD_HISTORY_LIMIT,
+):
+    """Paginate change events for one field (newest first).
+
+    Walks assignment activity rows in chunks until enough matching field events
+    are collected for ``offset`` + ``limit`` (+1 to detect ``has_more``).
+    """
+    empty = {'events': [], 'has_more': False, 'next_offset': max(0, int(offset or 0))}
+    field_key = _field_history_key(field_id, field_id_kind)
+    if not assignment_id or not field_key:
+        return empty
+
+    from sqlalchemy import desc
+
+    from app.models import EntityActivityLog
+
+    try:
+        offset = max(0, int(offset))
+    except (TypeError, ValueError):
+        offset = 0
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = ASSIGNMENT_FIELD_HISTORY_LIMIT
+    if limit < 1:
+        limit = ASSIGNMENT_FIELD_HISTORY_LIMIT
+    limit = min(limit, 50)
+
+    needed = offset + limit + 1
+    matched = []
+    batch_size = 50
+    batch_offset = 0
+
+    while len(matched) < needed:
+        batch = (
+            EntityActivityLog.query.options(joinedload(EntityActivityLog.user))
+            .filter(
+                EntityActivityLog.assignment_id == assignment_id,
+                EntityActivityLog.activity_type.in_(ASSIGNMENT_DATA_CHANGE_ACTIVITY_TYPES),
+            )
+            .order_by(desc(EntityActivityLog.timestamp), desc(EntityActivityLog.id))
+            .offset(batch_offset)
+            .limit(batch_size)
+            .all()
+        )
+        if not batch:
+            break
+        for activity in batch:
+            for event in _enriched_field_events_for_activity(activity):
+                if event.get('key') == field_key:
+                    matched.append(event)
+                    if len(matched) >= needed:
+                        break
+            if len(matched) >= needed:
+                break
+        batch_offset += batch_size
+        if len(batch) < batch_size:
+            break
+
+    page = matched[offset:offset + limit]
+    return {
+        'events': page,
+        'has_more': len(matched) > offset + limit,
+        'next_offset': offset + len(page),
+    }
+
+
+def get_assignment_status_change_history(
+    assignment_id,
+    *,
+    offset=0,
+    limit=ASSIGNMENT_STATUS_HISTORY_LIMIT,
+):
+    """Paginate workflow/status transition events for one assignment (newest first)."""
+    empty = {'events': [], 'has_more': False, 'next_offset': max(0, int(offset or 0))}
+    if not assignment_id:
+        return empty
+
+    from sqlalchemy import desc
+
+    from app.models import EntityActivityLog
+
+    try:
+        offset = max(0, int(offset))
+    except (TypeError, ValueError):
+        offset = 0
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = ASSIGNMENT_STATUS_HISTORY_LIMIT
+    if limit < 1:
+        limit = ASSIGNMENT_STATUS_HISTORY_LIMIT
+    limit = min(limit, 50)
+
+    needed = offset + limit + 1
+    rows = (
+        EntityActivityLog.query.options(joinedload(EntityActivityLog.user))
+        .filter(
+            EntityActivityLog.assignment_id == assignment_id,
+            EntityActivityLog.activity_type.in_(ASSIGNMENT_STATUS_HISTORY_ACTIVITY_TYPES),
+        )
+        .order_by(desc(EntityActivityLog.timestamp), desc(EntityActivityLog.id))
+        .offset(offset)
+        .limit(needed)
+        .all()
+    )
+    has_more = len(rows) > limit
+    page_rows = rows[:limit]
+    events = [
+        {
+            'user': getattr(row, 'user', None),
+            'timestamp': getattr(row, 'timestamp', None),
+            'activity_type': getattr(row, 'activity_type', None),
+            'summary_key': getattr(row, 'summary_key', None),
+        }
+        for row in page_rows
+    ]
+    return {
+        'events': events,
+        'has_more': has_more,
+        'next_offset': offset + len(events),
+    }
 
 
 def _parse_int(value, field_name, *, minimum=None) -> int:

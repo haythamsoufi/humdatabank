@@ -23,6 +23,7 @@ import { initSessionKeepalive } from './modules/session-keepalive.js';
 import { initPublicDrafts } from './modules/public-drafts.js';
 import { initAuthDrafts, prepareAuthDraftsStore } from './modules/auth-drafts.js';
 import { initTooltips } from './modules/tooltips.js';
+import { initFieldHistory } from './modules/field-history.js';
 import { initFormEvents } from './modules/form-events.js';
 import { cleanupInputValues, setupNumericInputJsonSupport } from './modules/form-item-utils.js';
 import { initAiOpinions } from './modules/ai-opinions.js';
@@ -189,6 +190,7 @@ async function initializeEntryForm() {
         safeInit('initUniqueSectionOptions', () => initUniqueSectionOptions());
         safeInit('initDisaggregationCalculator', () => initDisaggregationCalculator());
         safeInit('initTooltips', () => initTooltips());
+        safeInit('initFieldHistory', () => initFieldHistory());
         if (initDiscussion) safeInit('initDiscussion', () => initDiscussion());
 
         // Initialize matrix handling (await restore + auto-load + variable lookups so loading gate waits)

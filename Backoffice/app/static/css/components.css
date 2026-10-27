@@ -1281,6 +1281,93 @@ button.entity-status-chip.status-label,
     opacity: 0.85;
 }
 
+.assignment-status-history {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e8edf2;
+}
+
+.assignment-status-history-title {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+    line-height: 1.2;
+}
+
+.assignment-status-history-list {
+    max-height: 9.5rem;
+    overflow: auto;
+    margin: 0 -0.125rem;
+    padding: 0 0.125rem;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.assignment-status-history-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.assignment-status-history-list::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 999px;
+}
+
+.assignment-status-history-empty {
+    margin: 0;
+    font-size: 0.6875rem;
+    color: #94a3b8;
+    line-height: 1.35;
+}
+
+.assignment-status-history-event {
+    margin-top: 0.375rem;
+    padding-top: 0.375rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.assignment-status-history-event:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.assignment-status-history-event-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.2rem 0.75rem;
+    font-size: 0.6875rem;
+    color: #64748b;
+    line-height: 1.3;
+}
+
+.assignment-status-history-event-body {
+    margin-top: 0.2rem;
+}
+
+.assignment-status-history-event-body .status-label {
+    font-size: 0.625rem;
+    padding: 0.05rem 0.35rem;
+}
+
+.assignment-status-history-load-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1rem;
+    margin-top: 0.25rem;
+    color: #94a3b8;
+    font-size: 0.625rem;
+}
+
+.assignment-status-history-load-more-spinner[hidden] {
+    display: none;
+}
+
 /* Let workflow tooltips escape clipped headers (entry form, dashboard cards, etc.) */
 .executive-page-header .title-text-group:has(.assignment-status-pipeline-container:hover),
 .executive-page-header .title-text-group:has(.assignment-status-pipeline-container:focus-within) {

@@ -1971,8 +1971,138 @@ class TestAssignmentDataChangeHistory:
         assert volunteers["entered_at"] == older.timestamp
         assert volunteers["last_changed_by"] is grace
         assert [event["new"] for event in volunteers["events"]] == ["12", "10"]
+        assert volunteers["has_more"] is False
 
         branches = indexed["indicator_bank:9"]
         assert branches["entered_by"] is ada
         assert branches["last_changed_by"] is None
         assert len(branches["events"]) == 1
+
+
+class TestAssignmentStatusChangeHistory:
+    def test_missing_assignment_returns_empty(self):
+        from app.routes.main.helpers import get_assignment_status_change_history
+
+        result = get_assignment_status_change_history(None)
+        assert result == {"events": [], "has_more": False, "next_offset": 0}
+
+    def test_paginates_status_events(self, app):
+        from datetime import datetime
+        from types import SimpleNamespace
+
+        from app.routes.main.helpers import get_assignment_status_change_history
+
+        user = MagicMock()
+        user.name = "Ada"
+        rows = [
+            SimpleNamespace(
+                id=3,
+                user=user,
+                timestamp=datetime(2024, 6, 1),
+                activity_type="assignment_approved",
+                summary_key="activity.assignment_approved",
+            ),
+            SimpleNamespace(
+                id=2,
+                user=user,
+                timestamp=datetime(2024, 5, 1),
+                activity_type="assignment_submitted",
+                summary_key="activity.assignment_submitted",
+            ),
+            SimpleNamespace(
+                id=1,
+                user=user,
+                timestamp=datetime(2024, 1, 1),
+                activity_type="assignment_created",
+                summary_key="activity.assignment_created",
+            ),
+        ]
+        query = MagicMock()
+        query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = rows
+
+        with app.app_context():
+            with patch("app.models.EntityActivityLog") as model, \
+                 patch("app.routes.main.helpers.joinedload", return_value=MagicMock()), \
+                 patch("sqlalchemy.desc", side_effect=lambda *a, **k: MagicMock()):
+                model.query = query
+                first = get_assignment_status_change_history(9, offset=0, limit=2)
+                second_rows = rows[2:]
+                query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = second_rows
+                second = get_assignment_status_change_history(9, offset=2, limit=2)
+
+        assert len(first["events"]) == 2
+        assert first["has_more"] is True
+        assert first["next_offset"] == 2
+        assert [e["activity_type"] for e in first["events"]] == [
+            "assignment_approved",
+            "assignment_submitted",
+        ]
+        assert len(second["events"]) == 1
+        assert second["has_more"] is False
+        assert second["events"][0]["activity_type"] == "assignment_created"
+
+
+class TestFieldChangeHistoryPage:
+    def test_missing_field_returns_empty(self):
+        from app.routes.main.helpers import get_field_change_history_page
+
+        result = get_field_change_history_page(9, None)
+        assert result == {"events": [], "has_more": False, "next_offset": 0}
+
+    def test_paginates_matching_field_events(self, app):
+        from datetime import datetime
+        from types import SimpleNamespace
+
+        from app.routes.main.helpers import get_field_change_history_page
+
+        user = MagicMock()
+        user.name = "Ada"
+        rows = []
+        for i in range(12):
+            rows.append(SimpleNamespace(
+                id=100 - i,
+                summary_key="activity.form_data_updated.single",
+                summary_params={
+                    "field_id": 15,
+                    "old": str(i),
+                    "new": str(i + 1),
+                    "change_type": "updated",
+                },
+                user=user,
+                timestamp=datetime(2024, 1, 12 - i),
+            ))
+        # Unrelated field should be skipped.
+        rows.append(SimpleNamespace(
+            id=1,
+            summary_key="activity.form_data_updated.single",
+            summary_params={
+                "field_id": 99,
+                "old": "a",
+                "new": "b",
+                "change_type": "updated",
+            },
+            user=user,
+            timestamp=datetime(2024, 1, 1),
+        ))
+
+        query = MagicMock()
+        query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = rows
+
+        with app.app_context():
+            with patch("app.models.EntityActivityLog") as model, \
+                 patch("app.routes.main.helpers.joinedload", return_value=MagicMock()), \
+                 patch("app.routes.main.helpers.postprocess_activity_summary_params"), \
+                 patch("sqlalchemy.desc", side_effect=lambda *a, **k: MagicMock()):
+                model.query = query
+                first = get_field_change_history_page(9, 15, offset=0, limit=8)
+                second = get_field_change_history_page(9, 15, offset=8, limit=8)
+
+        assert len(first["events"]) == 8
+        assert first["has_more"] is True
+        assert first["next_offset"] == 8
+        assert [event["new"] for event in first["events"]] == [str(i) for i in range(1, 9)]
+
+        assert len(second["events"]) == 4
+        assert second["has_more"] is False
+        assert second["next_offset"] == 12
+        assert [event["new"] for event in second["events"]] == [str(i) for i in range(9, 13)]

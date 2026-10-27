@@ -1,0 +1,44 @@
+{% from "components/_status_label.html" import status_label, status_label_for_assignment %}
+
+{% macro status_history_person(user) -%}
+{%- if user and user.name -%}
+{{ user.name }}
+{%- elif user and user.email -%}
+{{ user.email.split('@')[0] }}
+{%- else -%}
+{{ _('Unknown user') }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro status_history_action_label(activity_type) -%}
+{%- set t = (activity_type or '')|string|lower -%}
+{%- if t == 'assignment_created' -%}
+{{ status_label(_('Created'), 'neutral') }}
+{%- elif t == 'assignment_submitted' -%}
+{{ status_label_for_assignment('submitted') }}
+{%- elif t == 'assignment_sent_for_review' -%}
+{{ status_label_for_assignment('sent_for_review') }}
+{%- elif t == 'assignment_returned_for_revision' -%}
+{{ status_label_for_assignment('requires_revision') }}
+{%- elif t == 'assignment_approved' -%}
+{{ status_label_for_assignment('approved') }}
+{%- elif t == 'assignment_reopened' -%}
+{{ status_label(_('Reopened'), 'warning') }}
+{%- else -%}
+{{ status_label(t|replace('assignment_', '')|replace('_', ' ')|title, 'neutral') }}
+{%- endif -%}
+{%- endmacro %}
+
+{% for event in events %}
+<div class="assignment-status-history-event">
+    <div class="assignment-status-history-event-head">
+        <span>{{ status_history_person(event.user) }}</span>
+        {% if event.timestamp %}
+        <span>{{ event.timestamp|format_datetime_localized('short', 'short') }}</span>
+        {% endif %}
+    </div>
+    <div class="assignment-status-history-event-body">
+        {{ status_history_action_label(event.activity_type) }}
+    </div>
+</div>
+{% endfor %}

@@ -1,11 +1,14 @@
 {# Assignment workflow pipeline tooltip (hover on status badge). #}
 {% from "components/_status_label.html" import status_label, assignment_status_variant, assignment_status_key %}
-{% macro assignment_status_pipeline_badge(status, is_closed=false, lang='en', assignment_entity_status=none) %}
+{% macro assignment_status_pipeline_badge(status, is_closed=false, lang='en', assignment_entity_status=none, status_history=none) %}
     {% set status_key %}{{ assignment_status_key(status) }}{% endset %}
     {% set status_key = status_key|trim %}
     {% set status_variant %}{{ assignment_status_variant(status) }}{% endset %}
     {% set status_variant = status_variant|trim %}
     {% set status_text = localize_status(status) ~ (' - ' ~ _('Closed') if is_closed else '') %}
+    {% set aes_id = assignment_entity_status.id if assignment_entity_status is not none and assignment_entity_status.id is defined else none %}
+    {% set history_events = status_history.events if status_history and status_history.events is defined else none %}
+    {% set history_has_more = status_history.has_more if status_history and status_history.has_more is defined else false %}
 
     {% if status_key == 'cancelled' %}
         <span class="inline-block align-middle shrink-0" title="{{ assignment_status_step_description(status_key) }}">
@@ -71,6 +74,29 @@
                     <i class="fas fa-lock" aria-hidden="true"></i>
                     {{ _('Assignment is closed') }}
                 </span>
+            {% endif %}
+
+            {% if status_history is not none and aes_id %}
+            <div class="assignment-status-history">
+                <span class="assignment-status-history-title">{{ _('Change history') }}</span>
+                <div class="assignment-status-history-list"
+                     data-status-history-aes-id="{{ aes_id }}"
+                     data-status-history-offset="{{ history_events|length if history_events else 0 }}"
+                     data-status-history-has-more="{{ '1' if history_has_more else '0' }}">
+                    {% if history_events %}
+                    {% with events=history_events %}
+                    {% include "forms/entry_form/partials/_status_change_history_events.html" %}
+                    {% endwith %}
+                    {% if history_has_more %}
+                    <div class="assignment-status-history-load-more" aria-hidden="true">
+                        <span class="assignment-status-history-load-more-spinner" hidden><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <p class="assignment-status-history-empty">{{ _('No status changes have been recorded yet.') }}</p>
+                    {% endif %}
+                </div>
+            </div>
             {% endif %}
         </span>
     </span>

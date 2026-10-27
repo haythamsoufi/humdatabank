@@ -129,6 +129,24 @@ def register_template_context(app, config_class):
 
     app.jinja_env.globals['sort_matrix_display_rows'] = sort_matrix_display_rows
 
+    # Activity / field-history formatters (entry form tooltips + dashboard feed).
+    # Lazy wrappers avoid importing routes during early app init.
+    def format_activity_value(*args, **kwargs):
+        from app.routes.main.helpers import format_activity_value as _fn
+        return _fn(*args, **kwargs)
+
+    def render_matrix_change(*args, **kwargs):
+        from app.routes.main.helpers import render_matrix_change as _fn
+        return _fn(*args, **kwargs)
+
+    def matrix_activity_has_visible_changes(*args, **kwargs):
+        from app.routes.main.helpers import matrix_activity_has_visible_changes as _fn
+        return _fn(*args, **kwargs)
+
+    app.jinja_env.globals['format_activity_value'] = format_activity_value
+    app.jinja_env.globals['render_matrix_change'] = render_matrix_change
+    app.jinja_env.globals['matrix_activity_has_visible_changes'] = matrix_activity_has_visible_changes
+
     @app.context_processor
     def inject_staging_environment_banner():
         """Expose whether to show the staging-environment warning banner."""

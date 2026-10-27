@@ -1214,7 +1214,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 
 .entry-item-history .history-title {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 0.8125rem;
   font-weight: 600;
   color: #fff;
@@ -1242,6 +1244,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+.entry-item-history .history-title + .history-event,
 .entry-item-history .history-event:first-child {
   margin-top: 0;
   padding-top: 0;
@@ -1292,6 +1295,20 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 .entry-item-history .history-more {
   margin-top: 0.35rem;
+}
+
+.entry-item-history .history-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.25rem;
+  margin-top: 0.35rem;
+  color: #9ca3af;
+  font-size: 0.7rem;
+}
+
+.entry-item-history .history-load-more-spinner[hidden] {
+  display: none;
 }
 
 

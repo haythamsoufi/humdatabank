@@ -1226,10 +1226,17 @@ def handle_assignment_form(aes_id):
         )
         discussion_comments = comment_query.order_by(order_clause).all()
 
-    assignment_data_history = None
-    try:
-        from app.routes.main.helpers import get_assignment_data_change_history
+    from app.routes.main.helpers import (
+        format_activity_value,
+        get_assignment_data_change_history,
+        get_assignment_status_change_history,
+        matrix_activity_has_visible_changes,
+        render_matrix_change,
+    )
 
+    assignment_data_history = None
+    assignment_status_history = None
+    try:
         assignment_data_history = get_assignment_data_change_history(
             assignment_entity_status.id
         )
@@ -1238,6 +1245,16 @@ def handle_assignment_form(aes_id):
             "Could not load change history for assignment %s: %s",
             assignment_entity_status.id,
             history_exc,
+        )
+    try:
+        assignment_status_history = get_assignment_status_change_history(
+            assignment_entity_status.id
+        )
+    except Exception as status_history_exc:
+        current_app.logger.warning(
+            "Could not load status history for assignment %s: %s",
+            assignment_entity_status.id,
+            status_history_exc,
         )
 
     _entry_lap("pre_render")
@@ -1308,6 +1325,10 @@ def handle_assignment_form(aes_id):
         form_features=form_features,
         discussion_comments=discussion_comments,
         assignment_data_history=assignment_data_history,
+        assignment_status_history=assignment_status_history,
+        format_activity_value=format_activity_value,
+        render_matrix_change=render_matrix_change,
+        matrix_activity_has_visible_changes=matrix_activity_has_visible_changes,
         # Defer heavy chatbot modules (12 ES modules, ~567 KB) on entry form pages.
         # The chatbot is initialised lazily by entry_form.html after formInitialized instead.
         skip_layout_chatbot=True,

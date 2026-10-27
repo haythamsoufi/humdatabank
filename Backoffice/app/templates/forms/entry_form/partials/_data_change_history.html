@@ -47,12 +47,23 @@
 {% set bank_id = field.indicator_bank_id if field.indicator_bank_id is defined else none %}
 {% set is_dynamic = (field.dynamic_assignment_id is defined) and field.dynamic_assignment_id %}
 {# Set must stay outside {% if %} — Jinja drops assignments made inside a branch. #}
-{% set history_key = ('indicator_bank:' ~ bank_id) if (is_dynamic and bank_id) else ('form_item:' ~ field.id) %}
+{% set history_kind = 'indicator_bank' if (is_dynamic and bank_id) else 'form_item' %}
+{% set history_field_id = bank_id if history_kind == 'indicator_bank' else field.id %}
+{% set history_key = history_kind ~ ':' ~ history_field_id %}
 {% set field_history = assignment_data_history.by_field if assignment_data_history and assignment_data_history.by_field is mapping else {} %}
 {% set item_history = field_history.get(history_key) %}
+{% set aes_id = assignment_status.id if assignment_status is defined and assignment_status else none %}
 <span class="entry-item-history cursor-help w-5 h-5" tabindex="0" aria-label="{{ _('Change history')|forceescape }}">
     <i class="fas fa-history" aria-hidden="true"></i>
-    <span class="tooltip-text" role="tooltip">
+    <span class="tooltip-text" role="tooltip"
+          {% if aes_id %}
+          data-history-aes-id="{{ aes_id }}"
+          data-history-field-id="{{ history_field_id }}"
+          data-history-field-kind="{{ history_kind }}"
+          data-history-offset="{{ item_history.events|length if item_history and item_history.events else 0 }}"
+          data-history-has-more="{{ '1' if item_history and item_history.has_more else '0' }}"
+          {% endif %}>
+        <p class="history-title">{{ _('Change history') }}</p>
         {% if item_history and item_history.events %}
         {% for event in item_history.events %}
         <div class="history-event">
@@ -65,8 +76,10 @@
             {{ history_field_change(event.change_type, event.old, event.new, event.field_id) }}
         </div>
         {% endfor %}
-        {% if item_history.more %}
-        <p class="history-more">{{ _('And %(count)s earlier changes.', count=item_history.more) }}</p>
+        {% if item_history.has_more %}
+        <div class="history-load-more" aria-hidden="true">
+            <span class="history-load-more-spinner" hidden><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></span>
+        </div>
         {% endif %}
         {% else %}
         <p class="history-meta">{{ _('No changes have been recorded for this item yet.') }}</p>

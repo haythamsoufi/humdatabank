@@ -1,0 +1,12 @@
+{% from "forms/entry_form/partials/_data_change_history.html" import history_field_change, data_history_person with context %}
+{% for event in events %}
+<div class="history-event">
+    <div class="history-event-head">
+        <span>{{ data_history_person(event.user) }}</span>
+        {% if event.timestamp %}
+        <span>{{ event.timestamp|format_datetime_localized('short', 'short') }}</span>
+        {% endif %}
+    </div>
+    {{ history_field_change(event.change_type, event.old, event.new, event.field_id) }}
+</div>
+{% endfor %}

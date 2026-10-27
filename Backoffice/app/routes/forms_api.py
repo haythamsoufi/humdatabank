@@ -1068,6 +1068,100 @@ def evaluate_filter_condition(field_value, operator, filter_value):
 
 # ===================== Assignment Completion Rate API =====================
 
+@bp.route('/assignment/<int:aes_id>/field-history', methods=['GET'])
+@login_required
+def api_assignment_field_history(aes_id):
+    """Return the next page of change-history HTML for one entry-form field."""
+    try:
+        if load_aes_for_user(aes_id, current_user, AES_ACTION_VIEW) is None:
+            return json_forbidden('Assignment not found or access denied')
+
+        from app.routes.main.helpers import (
+            ASSIGNMENT_FIELD_HISTORY_LIMIT,
+            format_activity_value,
+            get_field_change_history_page,
+            matrix_activity_has_visible_changes,
+            render_matrix_change,
+        )
+
+        field_id = request.args.get('field_id')
+        field_kind = request.args.get('field_kind') or 'form_item'
+        try:
+            offset = int(request.args.get('offset') or 0)
+        except (TypeError, ValueError):
+            offset = 0
+        try:
+            limit = int(request.args.get('limit') or ASSIGNMENT_FIELD_HISTORY_LIMIT)
+        except (TypeError, ValueError):
+            limit = ASSIGNMENT_FIELD_HISTORY_LIMIT
+
+        page = get_field_change_history_page(
+            aes_id,
+            field_id,
+            field_kind,
+            offset=offset,
+            limit=limit,
+        )
+        html = render_template(
+            'forms/entry_form/partials/_data_change_history_events.html',
+            events=page.get('events') or [],
+            format_activity_value=format_activity_value,
+            render_matrix_change=render_matrix_change,
+            matrix_activity_has_visible_changes=matrix_activity_has_visible_changes,
+        )
+        response = json_ok(
+            html=html,
+            next_offset=page.get('next_offset', offset),
+            has_more=bool(page.get('has_more')),
+        )
+        response.headers['Cache-Control'] = 'private, no-store'
+        return response
+    except Exception as e:
+        return handle_json_view_exception(e, 'Failed to load field history', status_code=500)
+
+
+@bp.route('/assignment/<int:aes_id>/status-history', methods=['GET'])
+@login_required
+def api_assignment_status_history(aes_id):
+    """Return the next page of workflow/status change-history HTML."""
+    try:
+        if load_aes_for_user(aes_id, current_user, AES_ACTION_VIEW) is None:
+            return json_forbidden('Assignment not found or access denied')
+
+        from app.routes.main.helpers import (
+            ASSIGNMENT_STATUS_HISTORY_LIMIT,
+            get_assignment_status_change_history,
+        )
+
+        try:
+            offset = int(request.args.get('offset') or 0)
+        except (TypeError, ValueError):
+            offset = 0
+        try:
+            limit = int(request.args.get('limit') or ASSIGNMENT_STATUS_HISTORY_LIMIT)
+        except (TypeError, ValueError):
+            limit = ASSIGNMENT_STATUS_HISTORY_LIMIT
+
+        page = get_assignment_status_change_history(
+            aes_id,
+            offset=offset,
+            limit=limit,
+        )
+        html = render_template(
+            'forms/entry_form/partials/_status_change_history_events.html',
+            events=page.get('events') or [],
+        )
+        response = json_ok(
+            html=html,
+            next_offset=page.get('next_offset', offset),
+            has_more=bool(page.get('has_more')),
+        )
+        response.headers['Cache-Control'] = 'private, no-store'
+        return response
+    except Exception as e:
+        return handle_json_view_exception(e, 'Failed to load status history', status_code=500)
+
+
 @bp.route('/assignment/<int:aes_id>/completion-rate', methods=['GET'])
 @login_required
 def api_assignment_completion_rate(aes_id):

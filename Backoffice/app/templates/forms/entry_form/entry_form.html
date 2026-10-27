@@ -135,7 +135,7 @@
                                 <span class="mx-2">•</span>
                                 <span class="font-medium mr-1">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
-                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_is_round_closed_for_entity(assignment_status), translation_key if translation_key is defined else 'en', assignment_status) }}
+                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_is_round_closed_for_entity(assignment_status), translation_key if translation_key is defined else 'en', assignment_status, status_history=assignment_status_history if assignment_status_history is defined else none) }}
                                 {% if enable_page_submission and pages_total_count %}
                                 <span class="mx-2">•</span>
                                 <span id="pages-submitted-chip" class="inline-flex items-center gap-1 text-sm text-gray-700" data-submitted="{{ pages_submitted_count }}" data-total="{{ pages_total_count }}">

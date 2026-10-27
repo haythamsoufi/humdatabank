@@ -26,6 +26,13 @@ from typing import Optional
 
 from .appeal_group import CACHE_SOURCE, format_operation_label
 from .data_store import get_data_store, trigger_background_refresh
+from .end_date_overrides import (
+    apply_end_date_overrides,
+    delete_override,
+    list_overrides_with_source,
+    source_end_dates_from_cache,
+    upsert_override,
+)
 
 plugin_config = load_plugin_config(Path(__file__).parent, "emergency_operations")
 
@@ -402,6 +409,9 @@ def create_blueprint():
                     trigger_background_refresh(_appeals_feed_url(), fetch_params, timeout=timeout_sec)
             current_app.logger.debug(f"[EmOps List] appeals results total: {len(results)}")
 
+            # Tentative end-date overrides (before filters so extended appeals stay visible).
+            results = apply_end_date_overrides(results)
+
             # Apply country + date filters on raw GO rows (required when serving from file
             # cache — cache is stored with admin default dates, not per-request query_b64).
             start_date_gte = _emops_query_arg('start_date__gte', default=None)
@@ -456,6 +466,11 @@ def create_blueprint():
                     'part_of': (item.get('part_of') or ''),
                     'country': country_str,
                     'end_date': str(item.get('end_date') or '')[:10] or None,
+                    'end_date_overridden': bool(item.get('end_date_overridden')),
+                    'source_end_date': (
+                        str(item.get('source_end_date') or '')[:10] or None
+                        if item.get('end_date_overridden') else None
+                    ),
                     'requested_amount': item.get('amount_requested', 0),
                     'funded_amount': item.get('amount_funded', 0)
                 })
@@ -613,6 +628,8 @@ def create_blueprint():
                 current_app.logger.info('[EmOps] Scheduled refresh is overdue; starting background refresh')
                 _bg_refresh(cfg, store, limit_default, end_date_default, timeout_sec)
 
+        results = apply_end_date_overrides(results)
+
         # ── Apply all filters from request params ──────────────────────────────
         results = _apply_filters(results, iso=iso, end_date_gt=end_date_gt, start_date_gte=start_date_gte)
         current_app.logger.debug(f'[EmOps] After filters: {len(results)} results (iso={iso})')
@@ -732,9 +749,10 @@ def create_blueprint():
         per_page = min(100, max(10, per_page))
 
         country_lookup = _snapshot_country_lookup()
+        preview_results = apply_end_date_overrides(cached.get('results') or [])
         rows = [
             _snapshot_preview_row(item, country_lookup=country_lookup)
-            for item in (cached.get('results') or [])
+            for item in preview_results
         ]
         if status_filter:
             rows = [r for r in rows if (r.get('status') or '').lower() == status_filter]
@@ -779,6 +797,57 @@ def create_blueprint():
             source=cached.get('source'),
             record_count=cached.get('record_count') or len(cached.get('results') or []),
         )
+
+    # ── Manual end-date overrides (tentative ERP extensions) ─────────────────
+
+    @bp.route('/api/end-date-overrides', methods=['GET'])
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
+    def get_end_date_overrides():
+        """List manual end-date overrides with source-sync status."""
+        store = get_data_store()
+        cached = store.load_cached() or {}
+        source_map = source_end_dates_from_cache(cached.get('results') or [])
+        rows = list_overrides_with_source(source_map)
+        return json_ok(
+            success=True,
+            overrides=rows,
+            count=len(rows),
+            cache_fetched_at=cached.get('fetched_at'),
+        )
+
+    @bp.route('/api/end-date-overrides', methods=['POST'])
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
+    def create_or_update_end_date_override():
+        """Upsert a tentative end date for an appeal code."""
+        payload = get_json_safe() or {}
+        entry, err = upsert_override(
+            payload.get('code'),
+            payload.get('end_date'),
+            note=payload.get('note') or '',
+        )
+        if err:
+            return json_bad_request(err, success=False, error=err)
+        cleared = clear_plugin_cache('emergency_operations')
+        store = get_data_store()
+        cached = store.load_cached() or {}
+        source_map = source_end_dates_from_cache(cached.get('results') or [])
+        enriched = next(
+            (r for r in list_overrides_with_source(source_map) if r.get('code') == entry.get('code')),
+            {**entry, 'source_end_date': source_map.get(entry.get('code')), 'source_matches': False,
+             'source_covers': False, 'sync_status': 'pending', 'can_remove': False},
+        )
+        return json_ok(success=True, override=enriched, cache_cleared=cleared)
+
+    @bp.route('/api/end-date-overrides/<code>', methods=['DELETE'])
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
+    def remove_end_date_override(code):
+        """Delete a manual end-date override once the source system has caught up."""
+        ok, err = delete_override(code)
+        if not ok:
+            status = 404 if err == 'Override not found' else 400
+            return json_error(err or 'Failed to delete', status, success=False, error=err)
+        cleared = clear_plugin_cache('emergency_operations')
+        return json_ok(success=True, deleted=code.strip().upper(), cache_cleared=cleared)
 
     return bp
 
@@ -860,6 +929,8 @@ def _snapshot_preview_row(item: dict, country_lookup: Optional[dict] = None) -> 
     region = meta.get('region') or ''
     start_date = str(item.get('start_date') or '')[:10] or None
     end_date = str(item.get('end_date') or '')[:10] or None
+    source_end = str(item.get('source_end_date') or '')[:10] or None
+    overridden = bool(item.get('end_date_overridden'))
     return {
         'code': code,
         'name': name,
@@ -873,6 +944,8 @@ def _snapshot_preview_row(item: dict, country_lookup: Optional[dict] = None) -> 
         'part_of': item.get('part_of') or '',
         'start_date': start_date,
         'end_date': end_date,
+        'source_end_date': source_end if overridden else None,
+        'end_date_overridden': overridden,
         'start_year': _year_from_date(start_date),
         'end_year': _year_from_date(end_date),
         'amount_requested': item.get('amount_requested'),
@@ -1432,7 +1505,7 @@ def get_emergency_operations_data(country_iso=None, config=None):
                 "cache" if from_cache else "live",
             )
         raw_results, end_date_default = catalogue
-        results = list(raw_results)
+        results = apply_end_date_overrides(list(raw_results))
 
         # Use end_date_gt from config if provided, otherwise use plugin default
         end_date_gt = config.get('end_date_gt', end_date_default)

@@ -257,14 +257,15 @@ paths:
     get:
       operationId: getChunkContext
       summary: Neighboring chunks around one search result
-      description: Fetches up to before+1+after chunks in reading order from the same document. Use when a searchPublicDocuments chunk is truncated or its match is unclear — avoids re-searching the whole document.
+      description: Fetches up to before+1+after chunks in reading order from the same document. Use when a searchPublicDocuments chunk is truncated or its match is unclear — avoids re-searching the whole document. Path uses the opaque UUID chunk_id from search (never a sequential integer).
       parameters:
         - name: chunk_id
           in: path
           required: true
           schema:
-            type: integer
-          description: chunk_id from a searchPublicDocuments result
+            type: string
+            format: uuid
+          description: Opaque UUID chunk_id from a searchPublicDocuments result
         - name: before
           in: query
           required: false
@@ -285,7 +286,7 @@ paths:
           description: Chunks to include after the requested chunk
       responses:
         "200":
-          description: document_id, document_title, chunks[] with content/page_number/is_requested_chunk, in reading order
+          description: document_id (UUID), document_title, chunks[] with content/page_number/is_requested_chunk, in reading order
         "404":
           description: Chunk not found or its document is not public
 
@@ -293,16 +294,17 @@ paths:
     get:
       operationId: getPublicDocument
       summary: Public document metadata
-      description: Title, countries, source_url, download_url, document_url for one public AI document.
+      description: Title, countries, source_url, download_url, document_url for one public AI document. document_id is an opaque UUID from search/catalog (never a sequential integer).
       parameters:
         - name: document_id
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
       responses:
         "200":
-          description: document_id, document_title, document_url, source_url, download_url
+          description: document_id (UUID), document_title, document_url, source_url, download_url
         "404":
           description: Document not found or not public
 
@@ -310,13 +312,14 @@ paths:
     get:
       operationId: downloadPublicDocument
       summary: Download public AI document
-      description: Streams a Databank-hosted file or redirects to external source_url. Use document_url from search when sharing links.
+      description: Streams a Databank-hosted file or redirects to external source_url. Use document_url from search when sharing links. Path uses the opaque UUID document_id only.
       parameters:
         - name: document_id
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            format: uuid
       responses:
         "200":
           description: File stream

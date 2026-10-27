@@ -70,7 +70,7 @@ databank_build_country_report(country="Syria", period_hint="2026 midyear", templ
 Example — expand a truncated or ambiguous chunk:
 
 ```text
-databank_get_chunk_context(chunk_id=17842, before=1, after=1)
+databank_get_chunk_context(chunk_id="<uuid-from-search>", before=1, after=1)
 ```
 
 Do **not** sum raw `databank_get_public_data*` rows for worldwide totals.  

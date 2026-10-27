@@ -90,7 +90,7 @@ Not verified: `docker build`, Azure Portal SSH or `az webapp ssh`. If the Kudu t
 | `/resources/download/...`, sector/NS/indicator logo routes | Public by design; get the new upload headers |
 | `/admin/documents/serve/<int>` | Not changed: does not check approved status (follow-up) |
 | `/forms/public-submission/<int>/success` | Not changed: unauthenticated with sequential IDs (follow-up) |
-| `/api/v1/public/documents/<int>[/download]` | Not changed: fallback download path imports a `StorageService` that does not exist (follow-up) |
+| `/api/v1/public/documents/<uuid>[/download]` | Fixed: UUID-only paths + `storage_service` module API (no integer enumeration; no nonexistent `StorageService` class) |
 | `/download_submission_pdf/<int>`, public submission view/edit, AI document routes | Already guarded |
 
 ## 3. Authentication, sessions and perimeter
@@ -246,7 +246,7 @@ Not done in this PR:
 - **History purge and rotation** for the committed production logs and HAR: runbook at `docs/runbooks/security/committed-artifacts-history-purge.md`; requires a force-push by the repository owner. Rotate publish and deploy credentials as a precaution; rotate `SECRET_KEY`, JWT secrets or the DB password only if those files held live values.
 - Website uses a public API key and `?api_key=`; needs a server-side key.
 - `EntityService.check_user_entity_access` still lets any admin through for content management and country data retrieval.
-- `public_submission_success/<id>` is unauthenticated with sequential IDs; `/admin/documents/serve/<int>` does not check approved status; `services/public/document_service.py` imports a nonexistent `StorageService`.
+- `public_submission_success/<id>` is unauthenticated with sequential IDs; `/admin/documents/serve/<int>` does not check approved status.
 - `forms_api` child-write endpoints check status but take no lock; `update_public_submission_status` is unlocked; the FDRS and UPR importers hold row locks until the run commits.
 - CSRF enforcement inside exempt blueprints is not verified per route.
 - Rate limits stay per worker unless Redis is configured; countries and periods routes have no `per_page` clamp.

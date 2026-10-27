@@ -235,7 +235,11 @@ class AIVectorStore:
 
         out: Dict[str, Any] = {
             "chunk_id": chunk.id,
+            "chunk_public_id": str(chunk.public_id) if getattr(chunk, "public_id", None) else None,
             "document_id": document.id,
+            "document_public_id": (
+                str(document.public_id) if getattr(document, "public_id", None) else None
+            ),
             "document_title": document.title,
             "document_filename": document.filename,
             "document_type": document.file_type,

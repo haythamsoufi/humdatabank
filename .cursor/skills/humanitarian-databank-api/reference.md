@@ -212,11 +212,13 @@ returned.
 | `file_type` | string | e.g. `pdf` |
 | `search_mode` | string | `hybrid` (default) or `vector` |
 
-Chunk shape: `chunk_id`, `document_id`, `document_title`, `document_date`,
-`countries[]`, `page_number`, `section_title`, `content`, `score`,
-`source_url`, `download_url`, `document_url`. With `full_coverage=true`, the
-response also includes a `coverage{}` block (`documents_in_scope`,
-`without_hits[]`, `has_more_pages`, `latest_per_country{}`).
+Chunk shape: `chunk_id` (opaque UUID), `document_id` (opaque UUID),
+`document_title`, `document_date`, `countries[]`, `page_number`,
+`section_title`, `content`, `score`, `source_url`, `download_url`,
+`document_url`. With `full_coverage=true`, the response also includes a
+`coverage{}` block (`documents_in_scope`, `without_hits[]`, `has_more_pages`,
+`latest_per_country{}`). Integer primary keys are never returned on this
+public surface (anti-enumeration).
 
 ### `GET /public/documents/catalog`
 
@@ -246,11 +248,12 @@ visibility scope as document search.
 }
 ```
 
-### `GET /public/documents/<id>` and `GET /public/documents/<id>/download`
+### `GET /public/documents/<uuid>` and `GET /public/documents/<uuid>/download`
 
-Single public document's metadata (`document_id`, `document_title`,
-`countries[]`, `source_url`, `download_url`, `document_url`) or a file
-stream/redirect (`200`/`302`/`404`). 404 if the document is not public.
+Single public document's metadata (`document_id` = opaque UUID,
+`document_title`, `countries[]`, `source_url`, `download_url`, `document_url`)
+or a file stream/redirect (`200`/`302`/`404`). Path and JSON use UUIDs only —
+integer ids do not match these routes (404). 404 if the document is not public.
 
 ---
 

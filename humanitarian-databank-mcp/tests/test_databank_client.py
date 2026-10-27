@@ -289,17 +289,18 @@ class TestGetChunkContext:
     def test_calls_chunk_context_endpoint(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"requested_chunk_id": 17842, "chunks": []}
+        chunk_uuid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        mock_resp.json.return_value = {"requested_chunk_id": chunk_uuid, "chunks": []}
 
         with patch("databank_client.httpx.Client") as client_cls:
             mock_get = client_cls.return_value.__enter__.return_value.get
             mock_get.return_value = mock_resp
-            out = get_chunk_context(17842, before=1, after=2)
-            assert "/public/documents/chunks/17842/context" in mock_get.call_args[0][0]
+            out = get_chunk_context(chunk_uuid, before=1, after=2)
+            assert f"/public/documents/chunks/{chunk_uuid}/context" in mock_get.call_args[0][0]
             params = mock_get.call_args[1]["params"]
             assert params["before"] == 1
             assert params["after"] == 2
-            assert out["requested_chunk_id"] == 17842
+            assert out["requested_chunk_id"] == chunk_uuid
 
     def test_clamps_before_after_to_5(self):
         mock_resp = MagicMock()
@@ -309,7 +310,7 @@ class TestGetChunkContext:
         with patch("databank_client.httpx.Client") as client_cls:
             mock_get = client_cls.return_value.__enter__.return_value.get
             mock_get.return_value = mock_resp
-            get_chunk_context(1, before=999, after=-3)
+            get_chunk_context("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", before=999, after=-3)
             params = mock_get.call_args[1]["params"]
             assert params["before"] == 5
             assert params["after"] == 0
@@ -322,21 +323,22 @@ class TestGetChunkContext:
         with patch("databank_client.httpx.Client") as client_cls:
             client_cls.return_value.__enter__.return_value.get.return_value = mock_resp
             with pytest.raises(DatabankAPIError, match="HTTP 404"):
-                get_chunk_context(999999999)
+                get_chunk_context("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
 
 
 class TestGetPublicDocument:
     def test_calls_public_endpoint_with_id(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"id": 42, "title": "Kenya Annual Report 2024"}
+        doc_uuid = "11111111-1111-4111-8111-111111111111"
+        mock_resp.json.return_value = {"document_id": doc_uuid, "document_title": "Kenya Annual Report 2024"}
 
         with patch("databank_client.httpx.Client") as client_cls:
             mock_get = client_cls.return_value.__enter__.return_value.get
             mock_get.return_value = mock_resp
-            out = get_public_document(42)
-            assert "/public/documents/42" in mock_get.call_args[0][0]
-            assert out["id"] == 42
+            out = get_public_document(doc_uuid)
+            assert f"/public/documents/{doc_uuid}" in mock_get.call_args[0][0]
+            assert out["document_id"] == doc_uuid
 
     def test_raises_on_404(self):
         mock_resp = MagicMock()
@@ -346,7 +348,7 @@ class TestGetPublicDocument:
         with patch("databank_client.httpx.Client") as client_cls:
             client_cls.return_value.__enter__.return_value.get.return_value = mock_resp
             with pytest.raises(DatabankAPIError, match="HTTP 404"):
-                get_public_document(999999)
+                get_public_document("99999999-9999-4999-8999-999999999999")
 
 
 class TestGetPublicDocumentsCatalog:

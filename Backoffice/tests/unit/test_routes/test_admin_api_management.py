@@ -372,7 +372,7 @@ class TestApiManagementHelpers:
         for path in (
             "/api/v1/public/global-trend",
             "/api/v1/public/documents/search",
-            "/api/v1/public/documents/<document_id>/download",
+            "/api/v1/public/documents/<uuid:document_id>/download",
             "/api/v1/uploads/spef/<filename>",
             "/api/v1/uploads/ns/<filename>",
             "/api/v1/dashboard/data-quality",

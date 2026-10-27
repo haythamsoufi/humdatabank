@@ -84,6 +84,14 @@ class TestPublicReportTemplateRoute:
         mock_template.assert_called_once_with("x")
 
 
+class TestPublicDocumentUuidRoutes:
+    def test_integer_document_paths_do_not_match(self, client):
+        """Anti-enumeration: sequential int paths must not resolve (UUID routes only)."""
+        assert client.get("/api/v1/public/documents/583").status_code == 404
+        assert client.get("/api/v1/public/documents/583/download").status_code == 404
+        assert client.get("/api/v1/public/documents/chunks/17842/context").status_code == 404
+
+
 class TestPublicErrorExposure:
     LEAK = "psycopg2.errors.SyntaxError at /srv/app/services/public/secret.py line 42"
 
@@ -91,9 +99,21 @@ class TestPublicErrorExposure:
         "url,target,status",
         [
             ("/api/v1/public/global-trend", "aggregate_global_trend", 400),
-            ("/api/v1/public/documents/1", "get_public_document_metadata", 404),
-            ("/api/v1/public/documents/1/download", "stream_public_ai_document_download", 404),
-            ("/api/v1/public/documents/chunks/1/context", "get_public_document_chunk_context", 404),
+            (
+                "/api/v1/public/documents/11111111-1111-4111-8111-111111111111",
+                "get_public_document_metadata",
+                404,
+            ),
+            (
+                "/api/v1/public/documents/11111111-1111-4111-8111-111111111111/download",
+                "stream_public_ai_document_download",
+                404,
+            ),
+            (
+                "/api/v1/public/documents/chunks/22222222-2222-4222-8222-222222222222/context",
+                "get_public_document_chunk_context",
+                404,
+            ),
             ("/api/v1/public/reports/country?country=Kenya", "build_country_report", 400),
         ],
     )

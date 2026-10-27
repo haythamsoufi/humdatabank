@@ -43,6 +43,8 @@ class AIDocument(db.Model):
     __tablename__ = 'ai_documents'
 
     id = Column(Integer, primary_key=True)
+    # Opaque identifier for unauthenticated public API URLs; never embed the integer id.
+    public_id = Column(UUID(as_uuid=True), nullable=False, default=uuid.uuid4, unique=True)
 
     # Link to existing document system (optional)
     submitted_document_id = Column(Integer, ForeignKey('submitted_document.id', ondelete='CASCADE'), nullable=True, index=True)
@@ -150,6 +152,7 @@ class AIDocument(db.Model):
 
         return {
             'id': self.id,
+            'public_id': str(self.public_id) if self.public_id else None,
             'title': self.title,
             'filename': self.filename,
             'file_type': self.file_type,
@@ -196,6 +199,8 @@ class AIDocumentChunk(db.Model):
     __tablename__ = 'ai_document_chunks'
 
     id = Column(Integer, primary_key=True)
+    # Opaque identifier for unauthenticated public API URLs; never embed the integer id.
+    public_id = Column(UUID(as_uuid=True), nullable=False, default=uuid.uuid4, unique=True)
 
     # Parent document
     document_id = Column(Integer, ForeignKey('ai_documents.id', ondelete='CASCADE'), nullable=False, index=True)
@@ -236,6 +241,7 @@ class AIDocumentChunk(db.Model):
         """Convert to dictionary for API responses."""
         result = {
             'id': self.id,
+            'public_id': str(self.public_id) if self.public_id else None,
             'document_id': self.document_id,
             'chunk_index': self.chunk_index,
             'page_number': self.page_number,

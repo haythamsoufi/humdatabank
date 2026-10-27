@@ -460,6 +460,12 @@ def reject_access_request(request_id):
         db.session.flush()
         flash("Request rejected.", "info")
     except Exception as e:
+        current_app.logger.error(
+            "reject_access_request failed for request_id=%s: %s",
+            request_id,
+            e,
+            exc_info=True,
+        )
         request_transaction_rollback()
         flash("An error occurred. Please try again.", "danger")
     return redirect(url_for("user_management.access_requests"))

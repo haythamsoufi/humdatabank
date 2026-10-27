@@ -402,6 +402,24 @@ class TestRejectAccessRequest:
         )
         assert resp.status_code == 302
 
+    def test_reject_after_prior_rejection_for_same_country(
+        self, logged_in_client, db_session, admin_user
+    ):
+        """Re-request after reject must be rejectable (no unique-on-status clash)."""
+        country = create_test_country(db_session)
+        user = create_test_user(db_session, email="rereject@example.com")
+        _make_access_request(db_session, user, country, status="rejected")
+        pending = _make_access_request(db_session, user, country, status="pending")
+
+        resp = logged_in_client.post(
+            f"/admin/access-requests/{pending.id}/reject",
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert b"An error occurred. Please try again." not in resp.data
+        db_session.refresh(pending)
+        assert pending.status == "rejected"
+
     def test_reject_handles_exception(self, logged_in_client, db_session, admin_user):
         country = create_test_country(db_session)
         user = create_test_user(db_session, email="exc_reject@example.com")

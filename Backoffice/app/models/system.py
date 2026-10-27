@@ -43,7 +43,16 @@ class CountryAccessRequest(db.Model):
     __table_args__ = (
         db.Index('ix_car_status_time', 'status', 'created_at'),
         db.Index('ix_car_user', 'user_id'),
-        db.UniqueConstraint('user_id', 'country_id', 'status', name='uq_user_country_status_active'),
+        # Only one pending request per user+country. Rejected/approved history
+        # may accumulate (e.g. reject → re-request → reject again).
+        db.Index(
+            'uq_car_user_country_pending',
+            'user_id',
+            'country_id',
+            unique=True,
+            postgresql_where=db.text("status = 'pending'"),
+            sqlite_where=db.text("status = 'pending'"),
+        ),
     )
 
     def __repr__(self):

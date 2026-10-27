@@ -1243,20 +1243,22 @@ class TestPublicDocumentSearchFixes:
 
     def test_api_route_chunk_context_returns_payload(self, client, app):
         from unittest.mock import patch
+        from uuid import UUID
 
+        chunk_uuid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        neighbor_uuid = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        doc_uuid = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
         payload = {
-            "document_id": 244,
-            "document_public_id": "767989a1-8121-5d0a-b6c4-fe78f7076c9b",
-            "chunk_public_id": "20d3c3f1-19c9-52fc-844a-67e89109f4d2",
+            "document_id": doc_uuid,
             "document_title": "Lithuania Annual Report 2025",
-            "requested_chunk_id": 17842,
+            "requested_chunk_id": chunk_uuid,
             "requested_chunk_index": 40,
             "before": 1,
             "after": 1,
             "count": 2,
             "chunks": [
-                {"chunk_id": 17841, "chunk_index": 39, "is_requested_chunk": False},
-                {"chunk_id": 17842, "chunk_index": 40, "is_requested_chunk": True},
+                {"chunk_id": neighbor_uuid, "chunk_index": 39, "is_requested_chunk": False},
+                {"chunk_id": chunk_uuid, "chunk_index": 40, "is_requested_chunk": True},
             ],
             "notes": [],
         }
@@ -1266,22 +1268,23 @@ class TestPublicDocumentSearchFixes:
                 return_value=payload,
             ) as mock_context:
                 resp = client.get(
-                    "/api/v1/public/documents/chunks/17842/context?before=1&after=1"
+                    f"/api/v1/public/documents/chunks/{chunk_uuid}/context?before=1&after=1"
                 )
 
         assert resp.status_code == 200
-        assert resp.get_json()["requested_chunk_id"] == 17842
-        mock_context.assert_called_once_with(17842, before=1, after=1)
+        assert resp.get_json()["requested_chunk_id"] == chunk_uuid
+        mock_context.assert_called_once_with(UUID(chunk_uuid), before=1, after=1)
 
     def test_api_route_chunk_context_returns_404_for_unknown_chunk(self, client, app):
         from unittest.mock import patch
 
+        unknown = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
         with app.app_context():
             with patch(
                 "app.routes.api.public_integrations.get_public_document_chunk_context",
                 side_effect=ValueError("Chunk not found, or its document is not public"),
             ):
-                resp = client.get("/api/v1/public/documents/chunks/999999999/context")
+                resp = client.get(f"/api/v1/public/documents/chunks/{unknown}/context")
 
         assert resp.status_code == 404
 
@@ -1533,13 +1536,17 @@ class TestAutoBatchingForLargeScope:
 
         docs = [FakeDoc(i) for i in range(1, 5)]  # 4 docs, batch size patched to 2 => 2 batches
 
+        opaque_chunk = "99999999-9999-4999-8999-999999999999"
+
         class FakeStore:
             def hybrid_search_per_document(self, raw_query, doc_ids, **kwargs):
                 # Simulate chunk_id=999 leaking into both batches with different scores.
                 return [
                     {
                         "chunk_id": 999,
+                        "chunk_public_id": opaque_chunk,
                         "document_id": doc_ids[0],
+                        "document_public_id": f"00000000-0000-4000-8000-{doc_ids[0]:012d}",
                         "document_title": "Duplicate-prone doc",
                         "content": "Post Office partnership content with enough relevance.",
                         "combined_score": 0.3 + 0.1 * doc_ids[0],
@@ -1563,7 +1570,7 @@ class TestAutoBatchingForLargeScope:
             svc.AIVectorStore = original
 
         chunk_ids = [c["chunk_id"] for c in out["chunks"]]
-        assert chunk_ids.count(999) == 1
+        assert chunk_ids.count(opaque_chunk) == 1
         assert out["count"] == 1
 
 

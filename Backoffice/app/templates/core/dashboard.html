@@ -566,6 +566,9 @@
             flex-direction: column;
             gap: 0.625rem;
         }
+        .dashboard-no-access-form-section--full {
+            grid-column: 1 / -1;
+        }
         .dashboard-no-access-form-section-header {
             display: flex;
             align-items: center;
@@ -581,6 +584,10 @@
             flex-shrink: 0;
             font-size: 0.8125rem;
         }
+        .dashboard-no-access-form-section-icon--title {
+            background: #ecfdf5;
+            color: #059669;
+        }
         .dashboard-no-access-form-section-icon--country {
             background: #eff6ff;
             color: #2563eb;
@@ -588,6 +595,23 @@
         .dashboard-no-access-form-section-icon--message {
             background: #f5f3ff;
             color: #7c3aed;
+        }
+        .dashboard-no-access-title-input {
+            display: block;
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            min-height: 2.25rem;
+            padding: 0.5rem 0.75rem;
+            background: #fff;
+            font-size: 0.875rem;
+            color: #0f172a;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .dashboard-no-access-title-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
         .dashboard-no-access-form-section-title {
             margin: 0;

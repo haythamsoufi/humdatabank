@@ -204,8 +204,27 @@ class TestRequestCountryAccessForm:
 
     def test_requires_at_least_one_country(self, app, db_session):
         with app.app_context():
-            form = RequestCountryAccessForm(data={'requested_country_id': []})
+            form = RequestCountryAccessForm(data={
+                'title': 'Focal Point',
+                'requested_country_id': [],
+            })
             assert form.validate() is False
+
+    def test_requires_job_title(self, app, db_session):
+        from tests.factories import create_test_country
+        with app.app_context():
+            country = create_test_country(db_session)
+            form = RequestCountryAccessForm(data={
+                'title': '',
+                'requested_country_id': [country.id],
+            })
+            assert form.validate() is False
+            assert 'title' in form.errors
+
+    def test_prefills_default_title_when_not_submitted(self, app, db_session):
+        with app.app_context():
+            form = RequestCountryAccessForm(default_title='Data Manager')
+            assert form.title.data == 'Data Manager'
 
     def test_db_failure_empty_choices(self, app):
         with app.app_context():
@@ -227,7 +246,10 @@ class TestRequestCountryAccessForm:
         from tests.factories import create_test_country
         with app.app_context():
             country = create_test_country(db_session)
-            form = RequestCountryAccessForm(data={'requested_country_id': [country.id]})
+            form = RequestCountryAccessForm(data={
+                'title': 'Focal Point',
+                'requested_country_id': [country.id],
+            })
             assert form.validate() is True
 
 

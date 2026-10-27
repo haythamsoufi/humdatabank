@@ -204,6 +204,25 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="request_access_csrf_token">
 
                             <div class="dashboard-no-access-form-grid">
+                                <section class="dashboard-no-access-form-section dashboard-no-access-form-section--full">
+                                    <div class="dashboard-no-access-form-section-header">
+                                        <span class="dashboard-no-access-form-section-icon dashboard-no-access-form-section-icon--title">
+                                            <i class="fas fa-id-badge" aria-hidden="true"></i>
+                                        </span>
+                                        <h3 class="dashboard-no-access-form-section-title">
+                                            {{ _('Job Title') }}
+                                            <span class="required-mark">*</span>
+                                        </h3>
+                                    </div>
+                                    <p class="dashboard-no-access-form-section-hint">
+                                        {{ _('Your job title helps administrators identify you when reviewing this request.') }}
+                                    </p>
+                                    {{ request_access_form.title(id="request_access_title", class="dashboard-no-access-title-input", placeholder=_('e.g. Data Manager, Focal Point'), maxlength="100", required=true, autocomplete="organization-title") }}
+                                    {% for error in request_access_form.title.errors %}
+                                        <p class="text-red-600 text-sm">{{ error }}</p>
+                                    {% endfor %}
+                                </section>
+
                                 <section class="dashboard-no-access-form-section">
                                     <div class="dashboard-no-access-form-section-header">
                                         <span class="dashboard-no-access-form-section-icon dashboard-no-access-form-section-icon--country">

@@ -1,6 +1,6 @@
 {# Profile Completion Modal #}
 {# Shown once per login session when the user has not yet set their job title. #}
-{# They can dismiss it ("Later") but will see it again on the next login until they fill it in. #}
+{# Required: the modal cannot be dismissed until a job title is saved. #}
 {% if show_profile_completion %}
 <div id="profile-completion-modal"
      class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4"
@@ -70,12 +70,7 @@
                 </div>
 
                 {# Actions #}
-                <div class="flex items-center justify-between gap-3">
-                    <button type="button"
-                            id="profile-completion-later"
-                            class="text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 transition-colors">
-                        {{ _('Do it later') }}
-                    </button>
+                <div class="flex items-center justify-end gap-3">
                     <button type="submit"
                             id="profile-completion-submit"
                             class="btn btn-primary flex items-center gap-2">
@@ -100,20 +95,12 @@
     const errBox  = document.getElementById('profile-completion-error');
     const spinner = document.getElementById('profile-completion-spinner');
     const submitBtn = document.getElementById('profile-completion-submit');
-    const laterBtn  = document.getElementById('profile-completion-later');
 
     if (!modal || !form) return;
 
     function closeModal() {
         modal.classList.add('hidden');
     }
-
-    laterBtn.addEventListener('click', closeModal);
-
-    // Close on backdrop click
-    modal.addEventListener('click', function (e) {
-        if (e.target === modal) closeModal();
-    });
 
     form.addEventListener('submit', async function (e) {
         e.preventDefault();

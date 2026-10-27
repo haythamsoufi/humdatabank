@@ -466,6 +466,13 @@ def request_country_access():
 
     if form.validate_on_submit():
         try:
+            # Persist job title with the request (same field collected by the
+            # post-login profile modal; skipped there until the user has access).
+            title = (form.title.data or '').strip()
+            if title:
+                current_user.title = title
+                session.pop('prompt_profile_completion', None)
+
             requested_country_ids = form.requested_country_id.data
             if requested_country_ids and len(requested_country_ids) > 0:
                 # Ensure we have a list

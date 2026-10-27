@@ -519,7 +519,10 @@ class TestRequestCountryAccess:
     URL = "/request_country_access"
 
     def _post(self, client, data: dict, follow_redirects: bool = False):
-        return client.post(self.URL, data=data, follow_redirects=follow_redirects)
+        # Job title is required on the access-request form; default it for route tests
+        # unless the caller explicitly sets (or clears) it.
+        payload = {"title": "Focal Point", **data}
+        return client.post(self.URL, data=payload, follow_redirects=follow_redirects)
 
     def test_unauthenticated_redirects_to_login(self, client, db_session, app):
         resp = self._post(client, {})
@@ -549,6 +552,28 @@ class TestRequestCountryAccess:
              patch(f"{_NOTIF_AUDIENCE}.collect_entity_admin_audience_recipient_ids", return_value=[]):
             resp = self._post(client, {"requested_country_id": country.id}, follow_redirects=False)
         assert_redirect(resp)
+
+    def test_success_persists_job_title(self, client, db_session, app, test_user):
+        from app.models import User
+
+        country = create_test_country(db_session)
+        test_user.title = None
+        db_session.commit()
+        _login(client, test_user)
+        with patch("app.routes.main.assignments.is_organization_email", return_value=False), \
+             patch(f"{_APP_SETTINGS}.get_auto_approve_access_requests", return_value=False), \
+             patch(f"{_NOTIF_AUDIENCE}.collect_entity_admin_audience_recipient_ids", return_value=[]):
+            resp = self._post(
+                client,
+                {
+                    "title": "National Society Focal Point",
+                    "requested_country_id": country.id,
+                },
+                follow_redirects=False,
+            )
+        assert_redirect(resp)
+        saved = db_session.get(User, test_user.id)
+        assert saved.title == "National Society Focal Point"
 
     def test_success_records_audit_details_with_comment(self, client, db_session, app, test_user):
         country = create_test_country(db_session)

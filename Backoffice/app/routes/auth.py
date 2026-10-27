@@ -1739,7 +1739,10 @@ def account_settings():
         entity_access_list = []
 
     # Country access request form and request history
-    request_access_form = RequestCountryAccessForm(user_id=current_user.id)
+    request_access_form = RequestCountryAccessForm(
+        user_id=current_user.id,
+        default_title=(current_user.title or '').strip() or None,
+    )
     all_access_requests = []
     pending_access_requests = []
     try:

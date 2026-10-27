@@ -79,14 +79,22 @@ class ForgotPasswordForm(FlaskForm):
 
 
 class RequestCountryAccessForm(FlaskForm):
+    title = StringField(
+        'Job Title',
+        validators=[DataRequired(message='Job title is required.'), Length(max=100)],
+    )
     requested_country_id = SelectMultipleField('Requested Countries', coerce=int, validators=[DataRequired(message='Please select at least one country')])
     request_message = TextAreaField('Message to admins (optional)', validators=[Optional(), Length(max=1000)])
     submit = SubmitField('Request Access')
 
     def __init__(self, *args, **kwargs):
-        # Extract user_id from kwargs if provided
+        # Extract user_id / default_title from kwargs if provided
         user_id = kwargs.pop('user_id', None)
+        default_title = kwargs.pop('default_title', None)
         super(RequestCountryAccessForm, self).__init__(*args, **kwargs)
+        # Prefill job title on GET (not when binding a submitted request)
+        if not self.is_submitted() and default_title:
+            self.title.data = default_title
         try:
             # Import here to avoid circular imports
             from app.models import Country

@@ -53,6 +53,18 @@
             <form method="POST" action="{{ url_for('main.request_country_access') }}" id="modal-request-access-form" class="max-w-4xl">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="modal_request_access_csrf_token">
 
+                <div class="mb-6">
+                    <label for="modal_request_access_title" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ _('Job Title') }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ request_access_form.title(id="modal_request_access_title", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder=_('e.g. Data Manager, Focal Point'), maxlength="100", required=true, autocomplete="organization-title") }}
+                    {% for error in request_access_form.title.errors %}
+                        <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                    {% endfor %}
+                    <p class="mt-2 text-xs text-gray-500">{{ _('Your job title helps administrators identify you when reviewing this request.') }}</p>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {# Left column: Country selection #}
                     <div class="space-y-4">

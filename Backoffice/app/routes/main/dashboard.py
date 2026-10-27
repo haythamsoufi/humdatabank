@@ -233,7 +233,10 @@ def dashboard():
     # NEW: Instantiate ApproveAssignmentForm for CSRF protection on approve action
     approve_form = ApproveAssignmentForm()
     # NEW: Instantiate RequestCountryAccessForm for country access requests
-    request_access_form = RequestCountryAccessForm(user_id=current_user.id)
+    request_access_form = RequestCountryAccessForm(
+        user_id=current_user.id,
+        default_title=(current_user.title or '').strip() or None,
+    )
     can_request_multiple_countries = is_organization_email(getattr(current_user, "email", ""))
 
     show_country_select = False

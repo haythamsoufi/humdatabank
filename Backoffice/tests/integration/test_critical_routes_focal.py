@@ -204,7 +204,7 @@ class TestCriticalCountryAccessRoute:
 
         resp = client.post(
             "/request_country_access",
-            data={"requested_country_id": country_id},
+            data={"title": "Focal Point", "requested_country_id": country_id},
             follow_redirects=False,
         )
         assert resp.status_code in (301, 302, 303, 307, 308)
@@ -221,7 +221,7 @@ class TestCriticalCountryAccessRoute:
         # (that request commits and detaches the ORM user instance Flask-Login may reuse).
         resp = client.post(
             "/request_country_access",
-            data={"requested_country_id": str(country_id)},
+            data={"title": "Focal Point", "requested_country_id": str(country_id)},
             follow_redirects=False,
         )
         assert resp.status_code in (301, 302, 303, 307, 308)

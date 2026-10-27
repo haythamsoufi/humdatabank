@@ -225,3 +225,73 @@ class TestSyncAiDocumentFromSubmitted:
                 ingest.sync_ai_document_from_submitted(submitted, ai_doc=ai_doc)
 
         assert ai_doc.searchable is True
+
+
+class TestPrepareSubmittedDocumentAiImportReclaim:
+    def test_reclaims_standalone_ai_document_by_hash(self, app, tmp_path):
+        pdf_path = tmp_path / "report.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4 reclaim-test")
+
+        submitted = MagicMock()
+        submitted.id = 88
+        submitted.filename = "report.pdf"
+        submitted.storage_path = None
+        submitted.source_url = "https://example.test/fdrs/report.pdf"
+        submitted.source_url_unreachable = False
+        submitted.uploaded_by_user_id = 1
+        submitted.document_country = None
+        submitted.is_public = True
+
+        existing = MagicMock()
+        existing.id = 501
+        existing.submitted_document_id = None
+        existing.user_id = None
+        existing.country_id = None
+        existing.filename = "old.pdf"
+        existing.file_type = "pdf"
+        existing.file_size_bytes = 1
+        existing.content_hash = None
+        existing.source_url = "https://example.test/fdrs/report.pdf"
+        existing.storage_path = "/tmp/old.pdf"
+        existing.processing_status = "completed"
+        existing.processing_error = "x"
+        existing.is_public = False
+        existing.searchable = True
+
+        with app.app_context():
+            with patch("app.models.SubmittedDocument") as mock_sub:
+                mock_sub.query.get.return_value = submitted
+                with patch("app.models.AIDocument") as mock_ai:
+                    mock_ai.query.filter_by.return_value.first.return_value = None
+                    with patch.object(
+                        ingest,
+                        "_resolve_submitted_document_for_ai_processing",
+                        return_value={
+                            "ok": True,
+                            "file_path": str(pdf_path),
+                            "cleanup_temp": True,
+                            "filename": "report.pdf",
+                            "from_url": True,
+                            "source_url": "https://example.test/fdrs/report.pdf",
+                            "content_hash": "abc123",
+                            "file_type": "pdf",
+                            "file_size": 12,
+                        },
+                    ):
+                        with patch(
+                            "app.services.ai.documents.duplicates.find_reclaimable_ai_document",
+                            return_value=existing,
+                        ):
+                            with patch.object(ingest, "sync_ai_document_from_submitted"):
+                                with patch(
+                                    "app.services.ai.documents.submitted_metadata.apply_submitted_document_metadata_to_ai_doc"
+                                ):
+                                    with patch.object(ingest.db.session, "commit"):
+                                        result = ingest._prepare_submitted_document_ai_import(88, user_id=1)
+
+        assert result["ok"] is True
+        assert result["code"] == "reclaimed"
+        assert result["ai_document_id"] == 501
+        assert existing.submitted_document_id == 88
+        assert existing.content_hash == "abc123"
+        assert existing.processing_status == "pending"

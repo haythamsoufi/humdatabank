@@ -179,6 +179,10 @@ class AIDocument(db.Model):
             'processed_at': self.processed_at.isoformat() if self.processed_at else None,
             'metadata': self.extra_metadata,
             'source_url': self.source_url,
+            # Dedup / linkage (content_hash = SHA-256 of file bytes)
+            'content_hash': self.content_hash,
+            'submitted_document_id': self.submitted_document_id,
+            'guidance_document_id': self.guidance_document_id,
             # Enriched provenance metadata
             'document_date': self.document_date.isoformat() if self.document_date else None,
             'document_language': self.document_language,

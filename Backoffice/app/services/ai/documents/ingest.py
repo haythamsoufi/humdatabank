@@ -462,6 +462,56 @@ def _prepare_submitted_document_ai_import(
         except (TypeError, ValueError):
             uid = None
 
+    # Reclaim an existing standalone AIDocument with the same bytes/URL instead of
+    # creating a linked+standalone duplicate (common after FDRS sync vs IFRC import).
+    from app.services.ai.documents.duplicates import find_reclaimable_ai_document
+    from app.services.ai.documents.submitted_metadata import apply_submitted_document_metadata_to_ai_doc
+
+    reclaim = find_reclaimable_ai_document(
+        content_hash=content_hash,
+        source_url=source_url or getattr(submitted_doc, "source_url", None),
+        exclude_submitted_document_id=submitted_doc_id,
+    )
+    if reclaim is not None:
+        reclaim.submitted_document_id = submitted_doc_id
+        reclaim.processing_status = "pending"
+        reclaim.processing_error = None
+        reclaim.filename = filename or reclaim.filename
+        reclaim.file_type = file_type or reclaim.file_type
+        reclaim.file_size_bytes = file_size or reclaim.file_size_bytes
+        if content_hash:
+            reclaim.content_hash = content_hash
+        if from_url:
+            reclaim.source_url = source_url or reclaim.source_url
+            reclaim.storage_path = None
+        elif storage_path_for_ai:
+            reclaim.storage_path = storage_path_for_ai
+        if not reclaim.user_id and uid:
+            reclaim.user_id = uid
+        reclaim.is_public = _submitted_is_ai_public(submitted_doc)
+        reclaim.searchable = True
+        if derived_country and not reclaim.country_id:
+            reclaim.country_id = int(getattr(derived_country, "id", 0)) or None
+            reclaim.country_name = getattr(derived_country, "name", None)
+        sync_ai_document_from_submitted(submitted_doc, ai_doc=reclaim)
+        apply_submitted_document_metadata_to_ai_doc(reclaim, submitted_doc)
+        db.session.commit()
+        logger.info(
+            "Reclaimed AI document %s for submitted document %s (hash/url match, from_url=%s)",
+            reclaim.id,
+            submitted_doc_id,
+            from_url,
+        )
+        return {
+            "ok": True,
+            "code": "reclaimed",
+            "message": "Processing started",
+            "ai_document_id": reclaim.id,
+            "file_path": file_path,
+            "filename": filename,
+            "cleanup_temp": cleanup_temp,
+        }
+
     ai_doc = AIDocument(
         submitted_document_id=submitted_doc_id,
         title=filename,
@@ -478,7 +528,6 @@ def _prepare_submitted_document_ai_import(
         country_id=(int(getattr(derived_country, "id", 0)) or None) if derived_country else None,
         country_name=(getattr(derived_country, "name", None) if derived_country else None),
     )
-    from app.services.ai.documents.submitted_metadata import apply_submitted_document_metadata_to_ai_doc
 
     apply_submitted_document_metadata_to_ai_doc(ai_doc, submitted_doc)
     db.session.add(ai_doc)

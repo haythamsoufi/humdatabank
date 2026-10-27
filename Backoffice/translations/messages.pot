@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-27 20:38+0000\n"
+"POT-Creation-Date: 2026-10-27 22:28+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -790,7 +790,7 @@ msgid ""
 "granular RBAC permissions."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:649
+#: app/templates/admin/ai/knowledge_base.html:667
 msgid "AI import"
 msgstr ""
 
@@ -2246,7 +2246,7 @@ msgid "All Clear"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:409
-#: app/templates/admin/ai/knowledge_base.html:650
+#: app/templates/admin/ai/knowledge_base.html:668
 #: app/templates/admin/data_exploration/explore_data.html:97
 #: app/templates/admin/data_exploration/explore_data.html:1408
 #: app/templates/admin/data_exploration/explore_data.html:1466
@@ -2364,7 +2364,7 @@ msgstr ""
 msgid "All assignments of selected templates"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:592
+#: app/templates/admin/ai/knowledge_base.html:610
 msgid "All categories"
 msgstr ""
 
@@ -2427,7 +2427,7 @@ msgstr ""
 msgid "All language fields are already filled."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:598
+#: app/templates/admin/ai/knowledge_base.html:616
 #: plugins/ifrc/templates/pb_progress/manage.html:141
 #: plugins/upr/templates/upr/_language_select.html:21
 msgid "All languages"
@@ -2492,7 +2492,7 @@ msgstr ""
 msgid "All selected reviewers must be active IFRC admins."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:579
+#: app/templates/admin/ai/knowledge_base.html:597
 msgid "All statuses"
 msgstr ""
 
@@ -2517,8 +2517,8 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:387
-#: app/templates/admin/ai/knowledge_base.html:586
-#: app/templates/admin/ai/knowledge_base.html:651
+#: app/templates/admin/ai/knowledge_base.html:604
+#: app/templates/admin/ai/knowledge_base.html:669
 #: app/templates/admin/analytics/login_logs.html:43
 msgid "All types"
 msgstr ""
@@ -2966,7 +2966,7 @@ msgid ""
 "support sex/age disaggregation."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:606
+#: app/templates/admin/ai/knowledge_base.html:624
 #: app/templates/admin/ai/reasoning_traces.html:133
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:414
@@ -3462,7 +3462,7 @@ msgstr ""
 msgid "Aspect Ratio"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:653
+#: app/templates/admin/ai/knowledge_base.html:671
 msgid "Assessment"
 msgstr ""
 
@@ -3480,7 +3480,7 @@ msgid ""
 "access to data at the level they are assigned."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:823
+#: app/templates/admin/ai/knowledge_base.html:851
 #: app/templates/admin/assignments/public_submissions.html:225
 #: app/templates/admin/communication/center.html:714
 #: app/templates/admin/communication/center.html:775
@@ -3707,7 +3707,7 @@ msgstr ""
 msgid "Assignment status workflow"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:827
+#: app/templates/admin/ai/knowledge_base.html:855
 msgid "Assignment submission"
 msgstr ""
 
@@ -4100,7 +4100,7 @@ msgid ""
 "name"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:707
+#: app/templates/admin/ai/knowledge_base.html:735
 msgid "Available"
 msgstr ""
 
@@ -4725,7 +4725,7 @@ msgstr ""
 #: app/templates/admin/ai/knowledge_base.html:507
 #: app/templates/admin/ai/knowledge_base.html:516
 #: app/templates/admin/ai/knowledge_base.html:525
-#: app/templates/admin/ai/knowledge_base.html:654
+#: app/templates/admin/ai/knowledge_base.html:672
 #: app/templates/admin/ai/reasoning_traces.html:726
 #: app/templates/admin/analytics/security_events.html:133
 #: app/templates/admin/api_keys/create.html:94
@@ -4864,7 +4864,7 @@ msgstr ""
 msgid "Cancelling. Entities already processed keep their notifications."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:655
+#: app/templates/admin/ai/knowledge_base.html:673
 msgid "Cancelling..."
 msgstr ""
 
@@ -4944,7 +4944,7 @@ msgstr ""
 msgid "Categories"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:656
+#: app/templates/admin/ai/knowledge_base.html:674
 #: app/templates/admin/communication/center.html:710
 #: app/templates/admin/embed_content/manage_embed_content.html:47
 #: app/templates/admin/embed_content/manage_embed_content.html:146
@@ -5327,7 +5327,7 @@ msgid ""
 " content and sample placeholder values."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:657
+#: app/templates/admin/ai/knowledge_base.html:675
 msgid "Chunks"
 msgstr ""
 
@@ -5343,7 +5343,7 @@ msgid "Cleaned up %(count)d expired sessions."
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:395
-#: app/templates/admin/ai/knowledge_base.html:609
+#: app/templates/admin/ai/knowledge_base.html:627
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:34
 #: app/templates/admin/analytics/audit_trail.html:416
 #: app/templates/admin/analytics/page_path_analytics.html:54
@@ -5580,11 +5580,11 @@ msgstr ""
 msgid "Click suggestions or type a programme code (e.g. PB27-28) and press Enter."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:658
+#: app/templates/admin/ai/knowledge_base.html:676
 msgid "Click to change category"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:659
+#: app/templates/admin/ai/knowledge_base.html:677
 msgid "Click to change country or scope"
 msgstr ""
 
@@ -5606,11 +5606,11 @@ msgstr ""
 msgid "Click to expand"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:660
+#: app/templates/admin/ai/knowledge_base.html:678
 msgid "Click to make not public"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:661
+#: app/templates/admin/ai/knowledge_base.html:679
 msgid "Click to make public"
 msgstr ""
 
@@ -5740,7 +5740,7 @@ msgstr ""
 msgid "Closest indicators in the Indicator Bank (by semantic similarity):"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:662
+#: app/templates/admin/ai/knowledge_base.html:680
 msgid "Cluster"
 msgstr ""
 
@@ -6079,8 +6079,8 @@ msgid "Complete — click ▲ to restore"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:82
-#: app/templates/admin/ai/knowledge_base.html:580
-#: app/templates/admin/ai/knowledge_base.html:663
+#: app/templates/admin/ai/knowledge_base.html:598
+#: app/templates/admin/ai/knowledge_base.html:681
 #: app/templates/admin/ai/reasoning_traces.html:248
 #: app/templates/admin/ai/review_queue.html:29
 #: app/templates/admin/analytics/_user_detail_partial.html:367
@@ -6703,7 +6703,7 @@ msgstr ""
 msgid "Could not load data. Refresh the page and try again."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:751
+#: app/templates/admin/ai/knowledge_base.html:779
 msgid "Could not load documents."
 msgstr ""
 
@@ -6778,7 +6778,7 @@ msgstr ""
 msgid "Could not load visuals."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:728
+#: app/templates/admin/ai/knowledge_base.html:756
 msgid "Could not mark documents as the same publication"
 msgstr ""
 
@@ -6890,7 +6890,7 @@ msgstr ""
 msgid "Count of entries"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:665
+#: app/templates/admin/ai/knowledge_base.html:683
 #: app/templates/admin/analytics/audit_trail.html:453
 #: app/templates/admin/communication/center.html:235
 #: app/templates/admin/communication/center.html:1099
@@ -6950,7 +6950,7 @@ msgstr ""
 #: app/services/ai/planning/payload_inference.py:179
 #: app/services/ai/runtime/step_ux.py:211
 #: app/templates/admin/ai/knowledge_base.html:407
-#: app/templates/admin/ai/knowledge_base.html:666
+#: app/templates/admin/ai/knowledge_base.html:684
 #: app/templates/admin/analytics/audit_trail.html:372
 #: app/templates/admin/analytics/audit_trail.html:576
 #: app/templates/admin/analytics/import_change_log.html:108
@@ -6994,7 +6994,7 @@ msgstr ""
 msgid "Country"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:669
+#: app/templates/admin/ai/knowledge_base.html:687
 msgid "Country / Scope"
 msgstr ""
 
@@ -7024,11 +7024,11 @@ msgstr ""
 msgid "Country Names in Other Languages"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:667
+#: app/templates/admin/ai/knowledge_base.html:685
 msgid "Country Plan"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:668
+#: app/templates/admin/ai/knowledge_base.html:686
 msgid "Country Report"
 msgstr ""
 
@@ -7361,7 +7361,7 @@ msgstr ""
 
 #: app/templates/admin/ai/_trace_card.html:102
 #: app/templates/admin/ai/conversation_traces.html:113
-#: app/templates/admin/ai/knowledge_base.html:670
+#: app/templates/admin/ai/knowledge_base.html:688
 #: app/templates/admin/ai/reasoning_traces.html:439
 #: app/templates/admin/analytics/audit_trail.html:513
 #: app/templates/admin/api_keys/details.html:279
@@ -7711,7 +7711,7 @@ msgstr ""
 msgid "Data Reporting"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:671
+#: app/templates/admin/ai/knowledge_base.html:689
 msgid "Data Sheet"
 msgstr ""
 
@@ -7984,6 +7984,36 @@ msgstr ""
 msgid "Decline Document"
 msgstr ""
 
+#: app/templates/admin/ai/knowledge_base.html:577
+#: app/templates/admin/ai/knowledge_base.html:690
+msgid "Deduplicate"
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:542
+#: app/templates/admin/ai/knowledge_base.html:691
+msgid "Deduplicate all"
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:693
+msgid ""
+"Deduplicate all duplicate groups in the knowledge base? The best copy in "
+"each group is kept; extras are deleted."
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:692
+msgid ""
+"Deduplicate selected documents? The best copy in each group is kept; "
+"extras are deleted."
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:694
+msgid "Deduplication complete"
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:695
+msgid "Deduplication failed"
+msgstr ""
+
 #: app/services/notification/preview.py:67
 msgid "Default"
 msgstr ""
@@ -8072,8 +8102,8 @@ msgstr ""
 msgid "Delegation focal point"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:563
-#: app/templates/admin/ai/knowledge_base.html:675
+#: app/templates/admin/ai/knowledge_base.html:581
+#: app/templates/admin/ai/knowledge_base.html:703
 #: app/templates/admin/ai/reasoning_traces.html:726
 #: app/templates/admin/assignments/assignments.html:138
 #: app/templates/admin/assignments/public_submissions.html:277
@@ -8151,11 +8181,11 @@ msgstr ""
 msgid "Delete Document"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:673
+#: app/templates/admin/ai/knowledge_base.html:701
 msgid "Delete Document?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:674
+#: app/templates/admin/ai/knowledge_base.html:702
 msgid "Delete Documents?"
 msgstr ""
 
@@ -8223,7 +8253,7 @@ msgstr ""
 msgid "Delete data & import"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:672
+#: app/templates/admin/ai/knowledge_base.html:700
 msgid "Delete document"
 msgstr ""
 
@@ -8261,7 +8291,7 @@ msgstr ""
 msgid "Delete selected"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:676
+#: app/templates/admin/ai/knowledge_base.html:704
 msgid "Delete selected documents?"
 msgstr ""
 
@@ -8604,7 +8634,7 @@ msgid ""
 "banner."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:677
+#: app/templates/admin/ai/knowledge_base.html:705
 msgid "Detecting countries"
 msgstr ""
 
@@ -9043,14 +9073,14 @@ msgstr ""
 msgid "Do not share this key or commit it to version control"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:678
+#: app/templates/admin/ai/knowledge_base.html:706
 msgid "Doc Date"
 msgstr ""
 
 #: app/services/notification/notifiers/documents.py:49
 #: app/services/notification/notifiers/documents.py:188
 #: app/services/notification/notifiers/documents.py:336
-#: app/templates/admin/ai/knowledge_base.html:679
+#: app/templates/admin/ai/knowledge_base.html:707
 #: app/templates/admin/templates/partials/imputation_badges.html:16
 #: app/templates/forms/entry_form/validation_summary_pdf.html:80
 #: app/templates/forms/entry_form/validation_summary_pdf.html:82
@@ -9074,7 +9104,7 @@ msgstr ""
 msgid "Document File"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:680
+#: app/templates/admin/ai/knowledge_base.html:708
 msgid "Document ID"
 msgstr ""
 
@@ -9102,7 +9132,7 @@ msgstr ""
 msgid "Document Status"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:824
+#: app/templates/admin/ai/knowledge_base.html:852
 #: app/templates/admin/api_management.html:1222
 #: app/templates/admin/documents/documents.html:184
 #: app/templates/admin/documents/documents.html:681
@@ -9145,7 +9175,7 @@ msgstr ""
 msgid "Document declined."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:681
+#: app/templates/admin/ai/knowledge_base.html:709
 msgid "Document deleted"
 msgstr ""
 
@@ -9153,7 +9183,7 @@ msgstr ""
 msgid "Document deleted successfully."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:829
+#: app/templates/admin/ai/knowledge_base.html:857
 msgid "Document library"
 msgstr ""
 
@@ -9223,7 +9253,7 @@ msgid "Documentation"
 msgstr ""
 
 #: app/templates/admin/ai/dashboard.html:70
-#: app/templates/admin/ai/knowledge_base.html:534
+#: app/templates/admin/ai/knowledge_base.html:548
 #: app/templates/admin/analytics/import_change_log.html:64
 #: app/templates/admin/validation_dashboard.html:459
 #: app/templates/core/dashboard.html:1278
@@ -9271,7 +9301,7 @@ msgid ""
 "improve the assistant."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:684
+#: app/templates/admin/ai/knowledge_base.html:712
 #: app/templates/admin/communication/center.html:1572
 #: app/templates/forms/entry_form/validation_summary_progress.html:369
 #: app/templates/tours/tours.html:16
@@ -9282,7 +9312,7 @@ msgstr ""
 msgid "Done — reviewing what I found…"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:683
+#: app/templates/admin/ai/knowledge_base.html:711
 msgid "Done."
 msgstr ""
 
@@ -9296,8 +9326,8 @@ msgstr ""
 msgid "Double-click"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:539
-#: app/templates/admin/ai/knowledge_base.html:685
+#: app/templates/admin/ai/knowledge_base.html:553
+#: app/templates/admin/ai/knowledge_base.html:713
 #: app/templates/admin/monitoring/system_monitoring.html:181
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:958
 #: plugins/upr/templates/admin/_upr_guidance_script.html:17
@@ -9454,7 +9484,7 @@ msgid "Drag"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:318
-#: app/templates/admin/ai/knowledge_base.html:687
+#: app/templates/admin/ai/knowledge_base.html:715
 msgid "Drag and drop files here, or click to select"
 msgstr ""
 
@@ -9564,6 +9594,7 @@ msgstr ""
 msgid "Due date was not saved because this assignment has no entities yet."
 msgstr ""
 
+#: app/templates/admin/ai/knowledge_base.html:698
 #: app/templates/admin/templates/templates.html:271
 #: app/templates/components/ag_grid_i18n_js.html:50
 #: app/templates/forms/form_builder/form_builder.html:508
@@ -10544,7 +10575,7 @@ msgstr ""
 msgid "Entities that could not be notified"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:825
+#: app/templates/admin/ai/knowledge_base.html:853
 #: app/templates/admin/analytics/audit_trail.html:575
 #: app/templates/admin/communication/center.html:1567
 #: app/templates/admin/documents/documents.html:124
@@ -10725,7 +10756,7 @@ msgstr ""
 msgid "Error loading chart data"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:689
+#: app/templates/admin/ai/knowledge_base.html:717
 #: app/templates/admin/data_exploration/explore_data.html:1481
 msgid "Error loading countries"
 msgstr ""
@@ -10738,7 +10769,7 @@ msgstr ""
 msgid "Error loading deletion information. Please try again."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:690
+#: app/templates/admin/ai/knowledge_base.html:718
 msgid "Error loading documents"
 msgstr ""
 
@@ -10758,7 +10789,7 @@ msgstr ""
 msgid "Error loading years"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:691
+#: app/templates/admin/ai/knowledge_base.html:719
 msgid "Error processing documents:"
 msgstr ""
 
@@ -10792,7 +10823,7 @@ msgstr ""
 msgid "Error updating suggestion status."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:688
+#: app/templates/admin/ai/knowledge_base.html:716
 #: app/templates/admin/documents/documents.html:427
 #: app/templates/admin/documents/documents.html:462
 #: app/templates/admin/documents/documents.html:503
@@ -10825,7 +10856,7 @@ msgstr ""
 msgid "Errors"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:692
+#: app/templates/admin/ai/knowledge_base.html:720
 msgid "Errors:"
 msgstr ""
 
@@ -10968,7 +10999,7 @@ msgid ""
 "gaps are worked on the Issues tab."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:735
+#: app/templates/admin/ai/knowledge_base.html:763
 msgid ""
 "Every selected file has the same detected language. Reprocess metadata "
 "first if these are different language versions."
@@ -11122,7 +11153,7 @@ msgstr ""
 msgid "Excluded No-Mention Plans"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:715
+#: app/templates/admin/ai/knowledge_base.html:743
 msgid ""
 "Excluded from AI import until IFRC fixes the document URL. Re-run FDRS "
 "sync to refresh."
@@ -11471,7 +11502,7 @@ msgstr ""
 msgid "External sources"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:553
+#: app/templates/admin/ai/knowledge_base.html:567
 msgid ""
 "Extract English terms with the model, retrieve matching target-language "
 "chunks, and keep a pair only when the target wording is attested. Needs "
@@ -11592,8 +11623,8 @@ msgstr ""
 #: app/templates/admin/ai/_trace_card.html:432
 #: app/templates/admin/ai/conversation_traces.html:235
 #: app/templates/admin/ai/knowledge_base.html:96
-#: app/templates/admin/ai/knowledge_base.html:583
-#: app/templates/admin/ai/knowledge_base.html:696
+#: app/templates/admin/ai/knowledge_base.html:601
+#: app/templates/admin/ai/knowledge_base.html:724
 #: app/templates/admin/analytics/_user_detail_partial.html:369
 #: app/templates/admin/analytics/login_logs.html:139
 #: app/templates/admin/communication/center.html:1573
@@ -11653,7 +11684,7 @@ msgstr ""
 msgid "Failed to create follow-up question"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:697
+#: app/templates/admin/ai/knowledge_base.html:725
 msgid "Failed to delete document."
 msgstr ""
 
@@ -11669,7 +11700,7 @@ msgstr ""
 msgid "Failed to export emergencies"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:698
+#: app/templates/admin/ai/knowledge_base.html:726
 msgid "Failed to generate answer."
 msgstr ""
 
@@ -11698,11 +11729,11 @@ msgstr ""
 msgid "Failed to load document table"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:699
+#: app/templates/admin/ai/knowledge_base.html:727
 msgid "Failed to load documents"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:700
+#: app/templates/admin/ai/knowledge_base.html:728
 msgid "Failed to load documents from external API"
 msgstr ""
 
@@ -11762,7 +11793,7 @@ msgstr ""
 msgid "Failed to load verification table"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:701
+#: app/templates/admin/ai/knowledge_base.html:729
 msgid "Failed to process request."
 msgstr ""
 
@@ -11810,11 +11841,11 @@ msgstr ""
 msgid "Failed to start download"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:702
+#: app/templates/admin/ai/knowledge_base.html:730
 msgid "Failed to start import"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:703
+#: app/templates/admin/ai/knowledge_base.html:731
 msgid "Failed to start metadata reprocess."
 msgstr ""
 
@@ -11851,19 +11882,19 @@ msgstr ""
 msgid "Failed to uninstall plugin"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:705
+#: app/templates/admin/ai/knowledge_base.html:733
 msgid "Failed to update category."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:706
+#: app/templates/admin/ai/knowledge_base.html:734
 msgid "Failed to update country or scope."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:704
+#: app/templates/admin/ai/knowledge_base.html:732
 msgid "Failed to update."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:695
+#: app/templates/admin/ai/knowledge_base.html:723
 #, python-brace-format
 msgid "Failed: {count}"
 msgstr ""
@@ -11981,7 +12012,7 @@ msgstr ""
 msgid "File Type"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:713
+#: app/templates/admin/ai/knowledge_base.html:741
 msgid "File URL"
 msgstr ""
 
@@ -12035,7 +12066,7 @@ msgstr ""
 msgid "File uploaded"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:716
+#: app/templates/admin/ai/knowledge_base.html:744
 #: app/templates/admin/documents/documents.html:689
 msgid "Filename"
 msgstr ""
@@ -12268,7 +12299,7 @@ msgstr ""
 msgid "Filtered to session:"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:577
+#: app/templates/admin/ai/knowledge_base.html:595
 #: app/templates/admin/analytics/audit_trail.html:365
 #: app/templates/admin/analytics/login_logs.html:34
 #: app/templates/admin/analytics/page_path_analytics.html:30
@@ -12605,7 +12636,7 @@ msgstr ""
 msgid "Formula"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:717
+#: app/templates/admin/ai/knowledge_base.html:745
 #: app/templates/components/auto_translate_modal_js.html:32
 msgid "Found"
 msgstr ""
@@ -12652,6 +12683,13 @@ msgstr ""
 
 #: app/services/ai/runtime/step_ux.py:361
 msgid "Found data · reviewing…"
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:697
+#, python-brace-format
+msgid ""
+"Found {groups} duplicate group(s) ({extras} extra copies). Matching uses "
+"file content hash, then source URL."
 msgstr ""
 
 #: plugins/ifrc/templates/pb_progress/manage.html:143
@@ -12978,7 +13016,7 @@ msgstr ""
 msgid "Give a reason of at least %(n)s characters."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:718
+#: app/templates/admin/ai/knowledge_base.html:746
 #: app/templates/admin/rbac/grants.html:96
 #: app/templates/admin/user_management/users.html:378
 msgid "Global"
@@ -13236,7 +13274,7 @@ msgid ""
 "pagination) with access control filtering."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:711
+#: app/templates/admin/ai/knowledge_base.html:739
 #, python-brace-format
 msgid "HTTP {status}"
 msgstr ""
@@ -13321,7 +13359,7 @@ msgstr ""
 msgid "Hide Sections"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:719
+#: app/templates/admin/ai/knowledge_base.html:747
 #: app/templates/admin/validation_dashboard.html:403
 msgid "Hide details"
 msgstr ""
@@ -13858,7 +13896,7 @@ msgstr ""
 msgid "Import applied successfully."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:720
+#: app/templates/admin/ai/knowledge_base.html:748
 msgid "Import cancelled"
 msgstr ""
 
@@ -13866,7 +13904,7 @@ msgstr ""
 msgid "Import change log"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:721
+#: app/templates/admin/ai/knowledge_base.html:749
 msgid "Import complete"
 msgstr ""
 
@@ -13937,7 +13975,7 @@ msgstr ""
 msgid "Import into the database now?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:722
+#: app/templates/admin/ai/knowledge_base.html:750
 msgid "Import is in progress. Are you sure you want to leave?"
 msgstr ""
 
@@ -14049,7 +14087,7 @@ msgstr ""
 msgid "Importing"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:723
+#: app/templates/admin/ai/knowledge_base.html:751
 msgid "Importing documents"
 msgstr ""
 
@@ -14057,7 +14095,7 @@ msgstr ""
 msgid "Importing template…"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:724
+#: app/templates/admin/ai/knowledge_base.html:752
 msgid "Importing..."
 msgstr ""
 
@@ -14976,6 +15014,10 @@ msgstr ""
 msgid "KPI coverage"
 msgstr ""
 
+#: app/templates/admin/ai/knowledge_base.html:699
+msgid "Keep"
+msgstr ""
+
 #: app/templates/forms/form_builder/form_builder.html:1473
 msgid "Keep Data and Archive Item"
 msgstr ""
@@ -14988,6 +15030,12 @@ msgstr ""
 msgid ""
 "Keep national-level assignment, country permissions, and Select All by "
 "region controls visible (recommended)."
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:575
+msgid ""
+"Keep the best copy in each selected duplicate group and delete the "
+"extras. Matching uses file content hash, then source URL."
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:1474
@@ -15130,7 +15178,7 @@ msgid ""
 "current lookup."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:725
+#: app/templates/admin/ai/knowledge_base.html:753
 #: app/templates/admin/communication/registry.html:124
 #: app/templates/admin/documents/documents.html:193
 #: app/templates/admin/documents/documents.html:702
@@ -15733,7 +15781,7 @@ msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:363
 #: app/templates/admin/ai/knowledge_base.html:478
-#: app/templates/admin/ai/knowledge_base.html:615
+#: app/templates/admin/ai/knowledge_base.html:633
 #: app/templates/admin/documents/documents.html:81
 #: app/templates/admin/documents/documents.html:83
 msgid "Loading documents..."
@@ -16486,19 +16534,19 @@ msgstr ""
 msgid "Mark as read"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:559
-#: app/templates/admin/ai/knowledge_base.html:726
+#: app/templates/admin/ai/knowledge_base.html:573
+#: app/templates/admin/ai/knowledge_base.html:754
 msgid "Mark as same publication"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:557
+#: app/templates/admin/ai/knowledge_base.html:571
 msgid ""
 "Mark the selection as the same publication in different languages. "
 "Creates deferred language pairs for terminology mining. Sentence-level "
 "translation memory stays off."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:727
+#: app/templates/admin/ai/knowledge_base.html:755
 msgid "Mark these documents as the same publication in different languages?"
 msgstr ""
 
@@ -16801,11 +16849,11 @@ msgstr ""
 msgid "Meta"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:736
+#: app/templates/admin/ai/knowledge_base.html:764
 msgid "Metadata reprocess cancelled"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:737
+#: app/templates/admin/ai/knowledge_base.html:765
 msgid "Metadata reprocess complete"
 msgstr ""
 
@@ -16865,8 +16913,8 @@ msgstr ""
 msgid "Min minutes (session length or active time)"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:555
-#: app/templates/admin/ai/knowledge_base.html:729
+#: app/templates/admin/ai/knowledge_base.html:569
+#: app/templates/admin/ai/knowledge_base.html:757
 msgid "Mine terminology"
 msgstr ""
 
@@ -16891,7 +16939,7 @@ msgstr ""
 msgid "Minimum mobile app version"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:730
+#: app/templates/admin/ai/knowledge_base.html:758
 msgid "Mining terminology"
 msgstr ""
 
@@ -17120,7 +17168,7 @@ msgstr ""
 msgid "My projects"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:738
+#: app/templates/admin/ai/knowledge_base.html:766
 #: app/templates/admin/assignments/public_submissions.html:144
 #: app/templates/admin/assignments/public_submissions.html:145
 #: app/templates/admin/assignments/public_submissions.html:146
@@ -17656,7 +17704,7 @@ msgstr ""
 msgid "Newest first"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:753
+#: app/templates/admin/ai/knowledge_base.html:781
 #: app/templates/admin/analytics/login_logs.html:103
 #: app/templates/admin/analytics/sessions.html:124
 #: app/templates/admin/analytics/sessions.html:181
@@ -17811,7 +17859,7 @@ msgstr ""
 msgid "No SP/EF codes need translation"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:708
+#: app/templates/admin/ai/knowledge_base.html:736
 msgid "No URL"
 msgstr ""
 
@@ -18004,7 +18052,7 @@ msgstr ""
 msgid "No conversations match your search."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:739
+#: app/templates/admin/ai/knowledge_base.html:767
 msgid "No countries"
 msgstr ""
 
@@ -18156,16 +18204,20 @@ msgid ""
 "links."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:750
+#: app/templates/admin/ai/knowledge_base.html:778
 msgid "No documents"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:615
+#: app/templates/admin/ai/knowledge_base.html:633
 msgid "No documents found. Upload a document to get started."
 msgstr ""
 
 #: app/templates/admin/documents/documents.html:86
 msgid "No documents have been uploaded for this entity yet."
+msgstr ""
+
+#: app/templates/admin/ai/knowledge_base.html:696
+msgid "No duplicates in the current selection"
 msgstr ""
 
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:193
@@ -18712,7 +18764,7 @@ msgstr ""
 msgid "No sex or age disaggregation found for the current parameters."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:740
+#: app/templates/admin/ai/knowledge_base.html:768
 msgid "No sources found."
 msgstr ""
 
@@ -18845,7 +18897,7 @@ msgstr ""
 msgid "No types found. Run database migrations, then refresh."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:741
+#: app/templates/admin/ai/knowledge_base.html:769
 msgid "No types loaded"
 msgstr ""
 
@@ -18930,7 +18982,7 @@ msgstr ""
 msgid "Non-English versions fall back to English when empty."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:743
+#: app/templates/admin/ai/knowledge_base.html:771
 #: app/templates/admin/analytics/audit_trail.html:443
 #: app/templates/admin/indicator_bank/indicator_bank.html:2373
 #: app/templates/admin/validation_dashboard.html:409
@@ -18965,7 +19017,7 @@ msgstr ""
 msgid "Not Applicable"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:744
+#: app/templates/admin/ai/knowledge_base.html:772
 msgid "Not Processed"
 msgstr ""
 
@@ -19085,7 +19137,7 @@ msgstr ""
 msgid "Not provided"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:745
+#: app/templates/admin/ai/knowledge_base.html:773
 msgid "Not public"
 msgstr ""
 
@@ -19675,7 +19727,7 @@ msgstr ""
 msgid "Open data guidance"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:746
+#: app/templates/admin/ai/knowledge_base.html:774
 msgid "Open document"
 msgstr ""
 
@@ -20001,7 +20053,7 @@ msgid "Orphaned"
 msgstr ""
 
 #: app/services/documentation/service.py:411
-#: app/templates/admin/ai/knowledge_base.html:747
+#: app/templates/admin/ai/knowledge_base.html:775
 #: app/templates/admin/analytics/audit_trail.html:500
 #: app/templates/admin/data_exploration/explore_data.html:1590
 #: app/templates/admin/embed_content/manage_embed_content.html:152
@@ -20268,7 +20320,7 @@ msgstr ""
 #: app/routes/forms/validation_summary.py:863
 #: app/routes/forms/validation_summary.py:1835
 #: app/services/documentation/pdf_service.py:121
-#: app/templates/admin/ai/knowledge_base.html:749
+#: app/templates/admin/ai/knowledge_base.html:777
 #: app/templates/admin/api_management.html:1138
 #: app/templates/admin/api_management.html:1156
 #: app/templates/admin/api_management.html:1175
@@ -20382,7 +20434,7 @@ msgstr ""
 msgid "Page {n} of {total}"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:748
+#: app/templates/admin/ai/knowledge_base.html:776
 #: app/templates/admin/analytics/login_logs.html:143
 #: app/templates/admin/analytics/sessions.html:179
 #, python-brace-format
@@ -20625,8 +20677,8 @@ msgstr ""
 #: app/routes/main/helpers.py:1824
 #: app/services/communication/insights_service.py:94
 #: app/templates/admin/ai/knowledge_base.html:89
-#: app/templates/admin/ai/knowledge_base.html:581
-#: app/templates/admin/ai/knowledge_base.html:754
+#: app/templates/admin/ai/knowledge_base.html:599
+#: app/templates/admin/ai/knowledge_base.html:782
 #: app/templates/admin/ai/review_queue.html:29
 #: app/templates/admin/analytics/dashboard.html:174
 #: app/templates/admin/assignments/public_submissions.html:53
@@ -20769,7 +20821,7 @@ msgstr ""
 
 #: app/services/ai/planning/payload_inference.py:181
 #: app/services/ai/runtime/step_ux.py:217
-#: app/templates/admin/ai/knowledge_base.html:826
+#: app/templates/admin/ai/knowledge_base.html:854
 #: app/templates/admin/analytics/audit_trail.html:311
 #: app/templates/admin/assignments/assignments.html:120
 #: app/templates/admin/documents/documents.html:709
@@ -20901,7 +20953,7 @@ msgid ""
 "cannot be removed or changed."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:755
+#: app/templates/admin/ai/knowledge_base.html:783
 msgid "Plan"
 msgstr ""
 
@@ -20999,7 +21051,7 @@ msgstr ""
 msgid "Please enter a primary name to translate from."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:756
+#: app/templates/admin/ai/knowledge_base.html:784
 msgid "Please enter a query."
 msgstr ""
 
@@ -21040,7 +21092,7 @@ msgstr ""
 msgid "Please select a Year/Period for the document."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:758
+#: app/templates/admin/ai/knowledge_base.html:786
 msgid "Please select a file"
 msgstr ""
 
@@ -21078,7 +21130,7 @@ msgstr ""
 msgid "Please select at least one country."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:759
+#: app/templates/admin/ai/knowledge_base.html:787
 msgid "Please select at least one document"
 msgstr ""
 
@@ -21215,7 +21267,7 @@ msgstr ""
 msgid "Points:"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:760
+#: app/templates/admin/ai/knowledge_base.html:788
 msgid "Policy"
 msgstr ""
 
@@ -21333,7 +21385,7 @@ msgid "Preparing request..."
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:55
-#: app/templates/admin/ai/knowledge_base.html:761
+#: app/templates/admin/ai/knowledge_base.html:789
 msgid "Preparing..."
 msgstr ""
 
@@ -21455,7 +21507,7 @@ msgstr ""
 msgid "Preview: %(name)s"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:752
+#: app/templates/admin/ai/knowledge_base.html:780
 #: app/templates/admin/analytics/login_logs.html:99
 #: app/templates/admin/analytics/sessions.html:120
 #: app/templates/admin/analytics/sessions.html:180
@@ -21569,27 +21621,27 @@ msgid ""
 "stored in blob storage so they survive deploys and page reloads."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:762
+#: app/templates/admin/ai/knowledge_base.html:790
 msgid "Process"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:764
+#: app/templates/admin/ai/knowledge_base.html:792
 msgid "Process Documents?"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:505
-#: app/templates/admin/ai/knowledge_base.html:765
+#: app/templates/admin/ai/knowledge_base.html:793
 msgid "Process Selected"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:763
+#: app/templates/admin/ai/knowledge_base.html:791
 #, python-brace-format
 msgid ""
 "Process {count} document(s) with AI? This will extract text, create "
 "chunks, and generate embeddings."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:766
+#: app/templates/admin/ai/knowledge_base.html:794
 msgid "Processed"
 msgstr ""
 
@@ -21601,33 +21653,33 @@ msgstr ""
 msgid "Processed by"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:582
-#: app/templates/admin/ai/knowledge_base.html:768
+#: app/templates/admin/ai/knowledge_base.html:600
+#: app/templates/admin/ai/knowledge_base.html:796
 msgid "Processing"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:769
+#: app/templates/admin/ai/knowledge_base.html:797
 msgid "Processing complete"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:770
+#: app/templates/admin/ai/knowledge_base.html:798
 msgid "Processing documents"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:771
+#: app/templates/admin/ai/knowledge_base.html:799
 msgid "Processing failed"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:772
+#: app/templates/admin/ai/knowledge_base.html:800
 msgid "Processing finished"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:773
+#: app/templates/admin/ai/knowledge_base.html:801
 msgid "Processing upload"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:54
-#: app/templates/admin/ai/knowledge_base.html:767
+#: app/templates/admin/ai/knowledge_base.html:795
 msgid "Processing..."
 msgstr ""
 
@@ -21729,7 +21781,7 @@ msgid "Provider Priority"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:327
-#: app/templates/admin/ai/knowledge_base.html:774
+#: app/templates/admin/ai/knowledge_base.html:802
 #: app/templates/admin/api_management.html:1861
 #: app/templates/components/ag_grid_i18n_js.html:39
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:299
@@ -21807,7 +21859,7 @@ msgstr ""
 msgid "Public reporting"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:828
+#: app/templates/admin/ai/knowledge_base.html:856
 msgid "Public submission"
 msgstr ""
 
@@ -21921,7 +21973,7 @@ msgstr ""
 msgid "Putting together your answer…"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:775
+#: app/templates/admin/ai/knowledge_base.html:803
 #: app/templates/admin/translations/manage_translations.html:177
 #: app/templates/admin/translations/quality_dashboard.html:23
 msgid "Quality"
@@ -22100,21 +22152,21 @@ msgstr ""
 msgid "Re-run all"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:545
+#: app/templates/admin/ai/knowledge_base.html:559
 msgid "Re-run country detection (no re-chunk)"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:776
+#: app/templates/admin/ai/knowledge_base.html:804
 msgid "Re-run country detection for selected documents?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:777
+#: app/templates/admin/ai/knowledge_base.html:805
 msgid ""
 "Re-run metadata enrichment (date, language, category, quality, source "
 "org) for selected documents?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:549
+#: app/templates/admin/ai/knowledge_base.html:563
 msgid ""
 "Re-run metadata enrichment: date, language, category, quality, source org"
 " (no re-chunk)"
@@ -22230,7 +22282,7 @@ msgstr ""
 msgid "Reading change history for %(indicator)s…"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:731
+#: app/templates/admin/ai/knowledge_base.html:759
 msgid "Reading chunks and comparing languages..."
 msgstr ""
 
@@ -22443,16 +22495,16 @@ msgstr ""
 msgid "Red"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:779
+#: app/templates/admin/ai/knowledge_base.html:807
 msgid "Redetect Country"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:547
-#: app/templates/admin/ai/knowledge_base.html:778
+#: app/templates/admin/ai/knowledge_base.html:561
+#: app/templates/admin/ai/knowledge_base.html:806
 msgid "Redetect country"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:780
+#: app/templates/admin/ai/knowledge_base.html:808
 msgid "Redetecting..."
 msgstr ""
 
@@ -22518,7 +22570,7 @@ msgstr ""
 msgid "Refresh preview data"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:781
+#: app/templates/admin/ai/knowledge_base.html:809
 msgid "Refreshing document list..."
 msgstr ""
 
@@ -22558,7 +22610,7 @@ msgstr ""
 msgid "Region: {region}"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:782
+#: app/templates/admin/ai/knowledge_base.html:810
 msgid "Regional"
 msgstr ""
 
@@ -22970,7 +23022,7 @@ msgstr ""
 msgid "Replace organization logo"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:783
+#: app/templates/admin/ai/knowledge_base.html:811
 msgid "Report"
 msgstr ""
 
@@ -23116,53 +23168,53 @@ msgstr ""
 msgid "Reports submitted"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:543
-#: app/templates/admin/ai/knowledge_base.html:784
+#: app/templates/admin/ai/knowledge_base.html:557
+#: app/templates/admin/ai/knowledge_base.html:812
 msgid "Reprocess"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:787
+#: app/templates/admin/ai/knowledge_base.html:815
 msgid "Reprocess Document?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:788
+#: app/templates/admin/ai/knowledge_base.html:816
 msgid "Reprocess Documents?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:790
+#: app/templates/admin/ai/knowledge_base.html:818
 msgid "Reprocess Metadata?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:785
+#: app/templates/admin/ai/knowledge_base.html:813
 msgid "Reprocess cancelled"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:786
+#: app/templates/admin/ai/knowledge_base.html:814
 msgid "Reprocess complete"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:551
-#: app/templates/admin/ai/knowledge_base.html:789
+#: app/templates/admin/ai/knowledge_base.html:565
+#: app/templates/admin/ai/knowledge_base.html:817
 msgid "Reprocess metadata"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:791
+#: app/templates/admin/ai/knowledge_base.html:819
 msgid "Reprocess selected documents?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:792
+#: app/templates/admin/ai/knowledge_base.html:820
 msgid "Reprocess this document?"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:793
+#: app/templates/admin/ai/knowledge_base.html:821
 msgid "Reprocessing documents"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:794
+#: app/templates/admin/ai/knowledge_base.html:822
 msgid "Reprocessing metadata"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:795
+#: app/templates/admin/ai/knowledge_base.html:823
 msgid "Reprocessing started"
 msgstr ""
 
@@ -23376,7 +23428,7 @@ msgstr ""
 msgid "Resize navigation panel"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:796
+#: app/templates/admin/ai/knowledge_base.html:824
 #: app/templates/admin/security/event_detail.html:55
 #: app/templates/admin/user_management/access_requests.html:425
 msgid "Resolution"
@@ -23492,7 +23544,7 @@ msgstr ""
 msgid "Resuming verification..."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:797
+#: app/templates/admin/ai/knowledge_base.html:825
 msgid "Resuming..."
 msgstr ""
 
@@ -24560,7 +24612,7 @@ msgstr ""
 msgid "Search terms or meanings…"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:603
+#: app/templates/admin/ai/knowledge_base.html:621
 msgid "Search title/filename..."
 msgstr ""
 
@@ -25196,7 +25248,7 @@ msgstr ""
 msgid "Select at least one year."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:734
+#: app/templates/admin/ai/knowledge_base.html:762
 msgid "Select at least two documents"
 msgstr ""
 
@@ -25227,7 +25279,7 @@ msgstr ""
 msgid "Select countries..."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:801
+#: app/templates/admin/ai/knowledge_base.html:829
 #: app/templates/admin/validation_rules.html:114
 msgid "Select country"
 msgstr ""
@@ -25246,7 +25298,7 @@ msgstr ""
 msgid "Select document type..."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:798
+#: app/templates/admin/ai/knowledge_base.html:826
 msgid "Select documents in the grid"
 msgstr ""
 
@@ -25437,7 +25489,7 @@ msgstr ""
 msgid "Selectable header (dropdown)"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:800
+#: app/templates/admin/ai/knowledge_base.html:828
 msgid "Selected"
 msgstr ""
 
@@ -26076,7 +26128,7 @@ msgstr ""
 msgid "Show departments"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:802
+#: app/templates/admin/ai/knowledge_base.html:830
 #: app/templates/admin/validation_dashboard.html:402
 msgid "Show details"
 msgstr ""
@@ -26299,7 +26351,7 @@ msgid ""
 "off, not that the cell was removed."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:803
+#: app/templates/admin/ai/knowledge_base.html:831
 #, python-brace-format
 msgid ""
 "Showing {returned} of {total} matching documents. Refine search to see "
@@ -26395,7 +26447,7 @@ msgstr ""
 msgid "Single section"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:804
+#: app/templates/admin/ai/knowledge_base.html:832
 msgid "Situation Report"
 msgstr ""
 
@@ -26448,11 +26500,11 @@ msgstr ""
 msgid "Some countries could not be processed. Please try again."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:805
+#: app/templates/admin/ai/knowledge_base.html:833
 msgid "Some documents failed"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:806
+#: app/templates/admin/ai/knowledge_base.html:834
 msgid "Some documents failed."
 msgstr ""
 
@@ -26509,7 +26561,7 @@ msgstr ""
 msgid "Sort results by any field:"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:830
+#: app/templates/admin/ai/knowledge_base.html:858
 #: app/templates/admin/data_exploration/explore_data.html:1126
 #: app/templates/admin/templates/data_sync_imputation.html:1241
 #: app/templates/admin/translations/manage_translations.html:697
@@ -26523,7 +26575,7 @@ msgstr ""
 msgid "Source (30 days)"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:807
+#: app/templates/admin/ai/knowledge_base.html:835
 msgid "Source Org"
 msgstr ""
 
@@ -26616,7 +26668,7 @@ msgstr ""
 msgid "Staff and local units in Nigeria"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:809
+#: app/templates/admin/ai/knowledge_base.html:837
 msgid "Stage:"
 msgstr ""
 
@@ -26735,7 +26787,7 @@ msgstr ""
 msgid "Starting"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:811
+#: app/templates/admin/ai/knowledge_base.html:839
 msgid "Starting import"
 msgstr ""
 
@@ -26747,7 +26799,7 @@ msgstr ""
 msgid "Starting translation for"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:810
+#: app/templates/admin/ai/knowledge_base.html:838
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:516
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1081
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1632
@@ -26771,7 +26823,7 @@ msgstr ""
 #: app/templates/admin/ai/conversation_traces.html:107
 #: app/templates/admin/ai/conversation_traces.html:222
 #: app/templates/admin/ai/knowledge_base.html:489
-#: app/templates/admin/ai/knowledge_base.html:812
+#: app/templates/admin/ai/knowledge_base.html:840
 #: app/templates/admin/ai/reasoning_traces.html:354
 #: app/templates/admin/ai/review_queue.html:59
 #: app/templates/admin/analytics/_user_detail_partial.html:150
@@ -26972,7 +27024,7 @@ msgstr ""
 msgid "Stored sources only. Income sources are not imputed."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:813
+#: app/templates/admin/ai/knowledge_base.html:841
 msgid "Strategic Plan"
 msgstr ""
 
@@ -27237,7 +27289,7 @@ msgid ""
 "the browser or client."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:814
+#: app/templates/admin/ai/knowledge_base.html:842
 #, python-brace-format
 msgid "Successfully processed: {count}"
 msgstr ""
@@ -27716,7 +27768,7 @@ msgstr ""
 
 #: app/routes/admin/assignment_management.py:312
 #: app/services/ai/runtime/step_ux.py:216
-#: app/templates/admin/ai/knowledge_base.html:831
+#: app/templates/admin/ai/knowledge_base.html:859
 #: app/templates/admin/assignments/assignments.html:122
 #: app/templates/admin/assignments/gantt_chart.html:117
 #: app/templates/admin/assignments/public_submissions.html:234
@@ -27946,11 +27998,11 @@ msgstr ""
 msgid "Term"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:732
+#: app/templates/admin/ai/knowledge_base.html:760
 msgid "Terminology mining complete"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:733
+#: app/templates/admin/ai/knowledge_base.html:761
 msgid "Terminology mining failed"
 msgstr ""
 
@@ -29079,7 +29131,7 @@ msgstr ""
 msgid "Title and Embed URL are required."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:835
+#: app/templates/admin/ai/knowledge_base.html:863
 msgid "Title applies to a single file only"
 msgstr ""
 
@@ -29475,7 +29527,7 @@ msgstr ""
 msgid "Tracker"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:816
+#: app/templates/admin/ai/knowledge_base.html:844
 msgid "Training"
 msgstr ""
 
@@ -29886,7 +29938,7 @@ msgid "Two-letter locale code for localization"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:382
-#: app/templates/admin/ai/knowledge_base.html:817
+#: app/templates/admin/ai/knowledge_base.html:845
 #: app/templates/admin/communication/_insights.html:129
 #: app/templates/admin/communication/center.html:1406
 #: app/templates/admin/embed_content/manage_embed_content.html:49
@@ -29979,7 +30031,7 @@ msgstr ""
 msgid "Types & units"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:818
+#: app/templates/admin/ai/knowledge_base.html:846
 msgid "Typing"
 msgstr ""
 
@@ -30024,19 +30076,19 @@ msgstr ""
 msgid "URL / path"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:710
+#: app/templates/admin/ai/knowledge_base.html:738
 msgid "URL blocked (403)"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:709
+#: app/templates/admin/ai/knowledge_base.html:737
 msgid "URL error"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:712
+#: app/templates/admin/ai/knowledge_base.html:740
 msgid "URL not found (404)"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:714
+#: app/templates/admin/ai/knowledge_base.html:742
 msgid "URL unavailable"
 msgstr ""
 
@@ -30503,7 +30555,7 @@ msgstr ""
 msgid "Upload & import"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:832
+#: app/templates/admin/ai/knowledge_base.html:860
 #: app/templates/admin/documents/documents.html:752
 msgid "Upload Date"
 msgstr ""
@@ -30574,11 +30626,11 @@ msgstr ""
 msgid "Upload below"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:820
+#: app/templates/admin/ai/knowledge_base.html:848
 msgid "Upload complete"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:819
+#: app/templates/admin/ai/knowledge_base.html:847
 msgid "Upload complete!"
 msgstr ""
 
@@ -30588,7 +30640,7 @@ msgstr ""
 msgid "Upload failed"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:821
+#: app/templates/admin/ai/knowledge_base.html:849
 msgid "Upload failed:"
 msgstr ""
 
@@ -30642,7 +30694,7 @@ msgid ""
 "passes."
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:569
+#: app/templates/admin/ai/knowledge_base.html:587
 msgid "Upload/Import"
 msgstr ""
 
@@ -30651,13 +30703,13 @@ msgid "Upload/Import Documents"
 msgstr ""
 
 #: app/services/notification/preview.py:24
-#: app/templates/admin/ai/knowledge_base.html:834
+#: app/templates/admin/ai/knowledge_base.html:862
 #: app/templates/admin/validation_dashboard.html:438
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:55
 msgid "Uploaded"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:833
+#: app/templates/admin/ai/knowledge_base.html:861
 #: app/templates/admin/documents/documents.html:731
 msgid "Uploaded By"
 msgstr ""
@@ -30675,19 +30727,19 @@ msgstr ""
 msgid "Uploaded {count} guidance documents"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:822
+#: app/templates/admin/ai/knowledge_base.html:850
 #: plugins/upr/templates/admin/_upr_guidance_script.html:9
 #, python-brace-format
 msgid "Uploaded {ok} of {total} files. Failed: {failed}"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:836
+#: app/templates/admin/ai/knowledge_base.html:864
 #, python-brace-format
 msgid "Uploading {current} of {total}"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:338
-#: app/templates/admin/ai/knowledge_base.html:837
+#: app/templates/admin/ai/knowledge_base.html:865
 #: plugins/ifrc/templates/pb_progress/manage.html:231
 msgid "Uploading..."
 msgstr ""
@@ -31640,7 +31692,7 @@ msgstr ""
 msgid "View indicator suggestions"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:838
+#: app/templates/admin/ai/knowledge_base.html:866
 msgid "View or download"
 msgstr ""
 
@@ -32133,7 +32185,7 @@ msgstr ""
 msgid "Women in Volunteering"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:839
+#: app/templates/admin/ai/knowledge_base.html:867
 msgid "Work Plan"
 msgstr ""
 
@@ -32175,7 +32227,7 @@ msgstr ""
 msgid "Working on your form…"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:840
+#: app/templates/admin/ai/knowledge_base.html:868
 msgid "Working..."
 msgstr ""
 
@@ -32211,7 +32263,7 @@ msgid "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:403
-#: app/templates/admin/ai/knowledge_base.html:841
+#: app/templates/admin/ai/knowledge_base.html:869
 #: app/templates/admin/assignments/manage_assignment.html:253
 #: app/templates/admin/resources/manage_resources.html:175
 #: app/templates/admin/settings/manage_settings.html:1013
@@ -32714,7 +32766,7 @@ msgstr ""
 msgid "and"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:652
+#: app/templates/admin/ai/knowledge_base.html:670
 #, python-brace-format
 msgid "and {count} more"
 msgstr ""
@@ -32845,7 +32897,7 @@ msgstr ""
 msgid "completed"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:664
+#: app/templates/admin/ai/knowledge_base.html:682
 #: app/templates/admin/data_exploration/explore_data.html:1476
 #: app/templates/admin/organization/index.html:2920
 #: app/templates/admin/user_management/users.html:379
@@ -32908,7 +32960,7 @@ msgstr ""
 msgid "divisions"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:682
+#: app/templates/admin/ai/knowledge_base.html:710
 msgid "document(s) updated."
 msgstr ""
 
@@ -32924,7 +32976,7 @@ msgstr ""
 msgid "downloadable"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:686
+#: app/templates/admin/ai/knowledge_base.html:714
 msgid "downloading"
 msgstr ""
 
@@ -33097,7 +33149,7 @@ msgstr ""
 msgid "extra \"Other\" entries (beyond the option count limit)"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:693
+#: app/templates/admin/ai/knowledge_base.html:721
 #: app/templates/admin/analytics/dashboard.html:240
 #: app/templates/forms/entry_form/validation_summary_pdf.html:38
 #: app/templates/forms/entry_form/validation_summary_progress.html:364
@@ -33108,7 +33160,7 @@ msgstr ""
 msgid "failed logins in window"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:694
+#: app/templates/admin/ai/knowledge_base.html:722
 msgid "failed."
 msgstr ""
 
@@ -33730,7 +33782,7 @@ msgstr ""
 msgid "skipped"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:808
+#: app/templates/admin/ai/knowledge_base.html:836
 msgid "source(s)"
 msgstr ""
 
@@ -33842,7 +33894,7 @@ msgstr ""
 msgid "today"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:815
+#: app/templates/admin/ai/knowledge_base.html:843
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:48
 #: app/templates/admin/analytics/page_path_analytics.html:75
 #: app/templates/admin/communication/registry.html:47
@@ -34006,7 +34058,7 @@ msgstr ""
 msgid "{count} countries"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:757
+#: app/templates/admin/ai/knowledge_base.html:785
 #, python-brace-format
 msgid "{count} files selected"
 msgstr ""
@@ -34021,7 +34073,7 @@ msgstr ""
 msgid "{count} pending"
 msgstr ""
 
-#: app/templates/admin/ai/knowledge_base.html:799
+#: app/templates/admin/ai/knowledge_base.html:827
 #: app/templates/admin/templates/new_template.html:1209
 #: app/templates/admin/templates/new_template.html:1221
 #: app/templates/admin/translations/quality_dashboard.html:386
@@ -34100,7 +34152,7 @@ msgstr ""
 
 #: app/forms/form_builder/template_forms.py:42
 #: app/forms/form_builder/template_forms.py:62
-#: app/templates/admin/ai/knowledge_base.html:742
+#: app/templates/admin/ai/knowledge_base.html:770
 msgid "— None —"
 msgstr ""
 

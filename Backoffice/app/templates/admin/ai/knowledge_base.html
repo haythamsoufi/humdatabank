@@ -530,6 +530,20 @@
 
 <!-- Documents Table -->
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 min-w-0 overflow-hidden">
+    <div id="documentsDuplicatesBanner" class="hidden px-4 sm:px-6 py-3 border-b border-amber-200 bg-amber-50">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-2 min-w-0">
+                <i class="fas fa-clone text-amber-600 mt-0.5 shrink-0" aria-hidden="true"></i>
+                <p id="documentsDuplicatesBannerText" class="text-sm text-amber-900 m-0"></p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                <button type="button" id="dedupeAllDuplicatesBtn" class="btn btn-warning btn-sm">
+                    <i class="fas fa-object-group"></i>
+                    <span>{{ _('Deduplicate all') }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
     <div class="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between min-w-0">
         <h3 class="text-lg font-semibold text-gray-900 shrink-0">{{ _('Documents') }}</h3>
         <div class="flex flex-col gap-2 w-full min-w-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
@@ -557,6 +571,10 @@
                 <button type="button" id="bulkMarkSamePublicationBtn" class="btn btn-primary btn-sm" disabled title="{{ _('Mark the selection as the same publication in different languages. Creates deferred language pairs for terminology mining. Sentence-level translation memory stays off.')|forceescape }}">
                     <i class="fas fa-language"></i>
                     <span id="bulkMarkSamePublicationBtnLabel">{{ _('Mark as same publication') }}</span>
+                </button>
+                <button type="button" id="bulkDedupeBtn" class="btn btn-warning btn-sm" disabled title="{{ _('Keep the best copy in each selected duplicate group and delete the extras. Matching uses file content hash, then source URL.')|forceescape }}">
+                    <i class="fas fa-object-group"></i>
+                    <span id="bulkDedupeBtnLabel">{{ _('Deduplicate') }}</span>
                 </button>
                 <button type="button" id="bulkDeleteBtn" class="btn btn-danger btn-sm" disabled>
                     <i class="fas fa-trash"></i>
@@ -669,6 +687,16 @@ window.aiDocumentsConfig.t = {
   country_scope_281f8863: {{ _('Country / Scope')|tojson }},
   created_0eceeb45: {{ _('Created')|tojson }},
   data_sheet_063b405d: {{ _('Data Sheet')|tojson }},
+  deduplicate_3c8f1a2b: {{ _('Deduplicate')|tojson }},
+  deduplicate_all_9e2b4c1a: {{ _('Deduplicate all')|tojson }},
+  deduplicate_confirm_7a1d9e3c: {{ _('Deduplicate selected documents? The best copy in each group is kept; extras are deleted.')|tojson }},
+  deduplicate_all_confirm_2f6b8c4d: {{ _('Deduplicate all duplicate groups in the knowledge base? The best copy in each group is kept; extras are deleted.')|tojson }},
+  deduplicate_complete_5c9e2a1f: {{ _('Deduplication complete')|tojson }},
+  deduplicate_failed_8b3d1e6a: {{ _('Deduplication failed')|tojson }},
+  deduplicate_nothing_4a7c2e9b: {{ _('No duplicates in the current selection')|tojson }},
+  duplicates_banner_6d1f8a3c: {{ _('Found {groups} duplicate group(s) ({extras} extra copies). Matching uses file content hash, then source URL.')|tojson }},
+  duplicate_badge_1e9a4c2b: {{ _('Duplicate')|tojson }},
+  duplicate_keeper_badge_3b7e1d9a: {{ _('Keep')|tojson }},
   delete_document_137e0e00: {{ _('Delete document')|tojson }},
   delete_document_616cd122: {{ _('Delete Document?')|tojson }},
   delete_documents_13b47e67: {{ _('Delete Documents?')|tojson }},

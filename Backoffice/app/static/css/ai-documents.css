@@ -818,3 +818,35 @@
         min-height: 420px;
     }
 }
+
+/* Duplicate AI document rows in the Knowledge Base grid */
+#documentsGrid.ag-theme-alpine .ag-row.ai-doc-row-duplicate {
+    background-color: #fffbeb;
+}
+#documentsGrid.ag-theme-alpine .ag-row.ai-doc-row-duplicate.ag-row-hover {
+    background-color: #fef3c7;
+}
+#documentsGrid.ag-theme-alpine .ag-row.ai-doc-row-duplicate-keeper {
+    box-shadow: inset 3px 0 0 #d97706;
+}
+.ai-doc-duplicate-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 0.25rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    vertical-align: middle;
+    background: #fde68a;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+.ai-doc-duplicate-badge.is-keeper {
+    background: #ffedd5;
+    color: #9a3412;
+    border-color: #ea580c;
+}

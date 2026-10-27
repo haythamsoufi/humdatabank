@@ -1,10 +1,108 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap, ag_grid_js %}
 
 {% block title %}Emergency Operations Plugin Settings{% endblock %}
 
 {% block content %}
+<style nonce="{{ csp_nonce() }}">
+.eo-snapshot-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.75rem 1rem;
+    align-items: end;
+}
+.eo-snapshot-filters .eo-filter-appeal { grid-column: span 2; min-width: 14rem; }
+@media (max-width: 768px) {
+    .eo-snapshot-filters .eo-filter-appeal { grid-column: span 1; }
+}
+.eo-year-range-inputs {
+    display: flex;
+    gap: 0.35rem;
+}
+.eo-year-range-inputs input[type="number"] {
+    width: 100%;
+    min-width: 0;
+    padding: 0.25rem 0.35rem;
+    font-size: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+}
+.eo-dual-range {
+    position: relative;
+    height: 1.25rem;
+    margin-top: 0.35rem;
+    --eo-range-start: 0%;
+    --eo-range-end: 100%;
+}
+.eo-dual-range::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 4px;
+    margin-top: -2px;
+    border-radius: 999px;
+    background: #e5e7eb;
+}
+.eo-dual-range::after {
+    content: "";
+    position: absolute;
+    left: var(--eo-range-start);
+    width: calc(var(--eo-range-end) - var(--eo-range-start));
+    top: 50%;
+    height: 4px;
+    margin-top: -2px;
+    border-radius: 999px;
+    background: #4b5563;
+}
+.eo-dual-range input[type="range"] {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: 0;
+    height: 1.25rem;
+    margin: 0;
+    background: transparent;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.eo-dual-range input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: auto;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #374151;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #9ca3af;
+    cursor: pointer;
+}
+.eo-dual-range input[type="range"]::-moz-range-thumb {
+    pointer-events: auto;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #374151;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #9ca3af;
+    cursor: pointer;
+}
+.eo-dual-range input[type="range"]::-webkit-slider-runnable-track,
+.eo-dual-range input[type="range"]::-moz-range-track {
+    background: transparent;
+    border: none;
+}
+.eo-snapshot-filters .select2-container .select2-selection--single,
+.eo-snapshot-filters .select2-container .select2-selection--multiple {
+    min-height: 2.25rem;
+    border-color: #d1d5db;
+}
+</style>
 <div class="container mx-auto px-4 py-6">
     {{ page_header(
         title="Emergency Operations Plugin Settings",
@@ -311,7 +409,7 @@
                             Emergencies snapshot
                         </h3>
                         <p class="mt-1 text-sm text-gray-500">
-                            Read-only view of the on-disk appeals cache used by form fields.
+                            Read-only view of the appeals cache in app storage (survives deploys when upload storage is durable).
                         </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
@@ -319,65 +417,92 @@
                         <span>Pulled <span class="font-medium text-gray-800" id="snapshot-fetched-at">—</span></span>
                         <span>In cache <span class="font-medium text-gray-800" id="snapshot-record-count">—</span></span>
                         <span>Showing <span class="font-medium text-gray-800" id="snapshot-filtered-count">—</span></span>
+                        <button type="button" id="snapshot-reload-btn"
+                                class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                            <i class="fas fa-sync-alt" id="snapshot-reload-icon"></i>
+                            Reload
+                        </button>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3 mb-4">
-                    <div class="relative flex-1 min-w-[12rem] max-w-md">
-                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                        <input type="search" id="snapshot-search" placeholder="Search code, name, country…"
-                               class="w-full pl-9 pr-3 py-2 text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <select id="snapshot-status-filter"
-                            class="text-sm border-gray-300 rounded-md py-2 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="">All statuses</option>
-                        <option value="Active">Active</option>
-                        <option value="Closed">Closed</option>
-                    </select>
-                    <button type="button" id="snapshot-reload-btn"
-                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                        <i class="fas fa-sync-alt" id="snapshot-reload-icon"></i>
-                        Reload
-                    </button>
-                </div>
-
-                <div id="snapshot-empty" class="hidden rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <div id="snapshot-empty" class="hidden rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-4">
                     No cache file yet. Switch to Settings and use <strong>Pull from GO</strong> under Data Cache.
                 </div>
 
-                <div id="snapshot-table-wrap" class="overflow-auto border border-gray-200 rounded-md max-h-[70vh]">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Code</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Country</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Start</th>
-                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">End</th>
-                                <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Requested</th>
-                                <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Funded</th>
-                            </tr>
-                        </thead>
-                        <tbody id="snapshot-table-body" class="bg-white divide-y divide-gray-100">
-                            <tr>
-                                <td colspan="9" class="px-3 py-8 text-center text-gray-500">Loading snapshot…</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div id="snapshot-filters" class="mb-4 rounded-md border border-gray-200 bg-gray-50">
+                    <button type="button" id="snapshot-filters-toggle"
+                            class="w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
+                            aria-expanded="false" aria-controls="snapshot-filters-body">
+                        <span class="inline-flex items-center gap-2">
+                            <i class="fas fa-filter text-gray-500"></i>
+                            Filters
+                            <span id="snapshot-filters-summary" class="text-xs font-normal text-gray-500"></span>
+                        </span>
+                        <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform" id="snapshot-filters-chevron"></i>
+                    </button>
+                    <div id="snapshot-filters-body" class="eo-snapshot-filters hidden px-3 pb-3 pt-1 border-t border-gray-200">
+                        <div>
+                            <label for="snapshot-filter-region" class="block text-xs font-semibold text-gray-700 mb-1">Region</label>
+                            <select id="snapshot-filter-region" class="w-full text-sm border-gray-300 rounded-md">
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="snapshot-filter-country" class="block text-xs font-semibold text-gray-700 mb-1">Country</label>
+                            <select id="snapshot-filter-country" class="w-full text-sm border-gray-300 rounded-md">
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                        <div class="eo-filter-appeal">
+                            <label for="snapshot-filter-appeal" class="block text-xs font-semibold text-gray-700 mb-1">Appeal</label>
+                            <select id="snapshot-filter-appeal" class="w-full text-sm border-gray-300 rounded-md">
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="snapshot-filter-type" class="block text-xs font-semibold text-gray-700 mb-1">Appeal Type</label>
+                            <select id="snapshot-filter-type" class="w-full text-sm border-gray-300 rounded-md" multiple></select>
+                        </div>
+                        <div>
+                            <label for="snapshot-filter-disaster" class="block text-xs font-semibold text-gray-700 mb-1">Disaster Type</label>
+                            <select id="snapshot-filter-disaster" class="w-full text-sm border-gray-300 rounded-md">
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                        <div data-eo-year-range="start-year">
+                            <span class="block text-xs font-semibold text-gray-700 mb-1">Appeal Start Year</span>
+                            <div class="eo-year-range-inputs">
+                                <input type="number" id="snapshot-start-year-min" aria-label="Start year minimum">
+                                <input type="number" id="snapshot-start-year-max" aria-label="Start year maximum">
+                            </div>
+                            <div class="eo-dual-range">
+                                <input type="range" id="snapshot-start-year-min-range" aria-label="Start year minimum slider">
+                                <input type="range" id="snapshot-start-year-max-range" aria-label="Start year maximum slider">
+                            </div>
+                        </div>
+                        <div data-eo-year-range="end-year">
+                            <span class="block text-xs font-semibold text-gray-700 mb-1">Appeal End Year</span>
+                            <div class="eo-year-range-inputs">
+                                <input type="number" id="snapshot-end-year-min" aria-label="End year minimum">
+                                <input type="number" id="snapshot-end-year-max" aria-label="End year maximum">
+                            </div>
+                            <div class="eo-dual-range">
+                                <input type="range" id="snapshot-end-year-min-range" aria-label="End year minimum slider">
+                                <input type="range" id="snapshot-end-year-max-range" aria-label="End year maximum slider">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <p id="snapshot-page-info" class="text-sm text-gray-500">—</p>
-                    <div class="flex items-center gap-2">
-                        <button type="button" id="snapshot-prev-btn"
-                                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40"
-                                disabled>Previous</button>
-                        <button type="button" id="snapshot-next-btn"
-                                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40"
-                                disabled>Next</button>
-                    </div>
+                <div id="snapshot-grid-wrap">
+                    {{ ag_grid_header_toolbar(placeholder_id='eoSnapshotGrid-colvis', wrapper_class='mb-3') }}
+                    {{ ag_grid_body_wrap(
+                        'eoSnapshotGrid',
+                        loading_text='Loading snapshot…',
+                        placeholder_id='eoSnapshotGrid-colvis',
+                        grid_height='560px',
+                        empty_message='No emergencies match these filters.'
+                    ) }}
                 </div>
             </div>
         </div>
@@ -665,9 +790,11 @@ function refreshCache() {
         if (data.success) {
             showCacheMsg(`✓ Refreshed successfully — ${Number(data.record_count).toLocaleString()} records pulled (${data.fetched_at_display})`);
             loadCacheStatus();
-            snapshotState.loaded = false;
-            if (document.getElementById('panel-snapshot') && !document.getElementById('panel-snapshot').classList.contains('hidden')) {
-                loadSnapshotPreview();
+            if (window.EoSnapshotPreview) {
+                window.EoSnapshotPreview.markStale();
+                if (document.getElementById('panel-snapshot') && !document.getElementById('panel-snapshot').classList.contains('hidden')) {
+                    window.EoSnapshotPreview.load();
+                }
             }
         } else {
             showCacheMsg('Error: ' + (data.error || 'Unknown error'), true);
@@ -707,137 +834,6 @@ function saveCacheSettings() {
     .catch(err => showCacheMsg('Network error: ' + err.message, true));
 }
 
-// ── Snapshot Preview ────────────────────────────────────────────────────────
-
-const snapshotState = {
-    page: 1,
-    perPage: 50,
-    loaded: false,
-    searchTimer: null,
-};
-
-function escHtml(value) {
-    if (window.SafeDom && typeof window.SafeDom.escapeHtml === 'function') {
-        return window.SafeDom.escapeHtml(String(value == null ? '' : value));
-    }
-    return String(value == null ? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-function formatAmount(value) {
-    if (value == null || value === '') return '—';
-    const n = Number(value);
-    if (!Number.isFinite(n)) return '—';
-    return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
-
-function statusBadge(status) {
-    const label = status || '—';
-    const lower = String(label).toLowerCase();
-    let classes = 'bg-gray-100 text-gray-700';
-    if (lower === 'active') classes = 'bg-green-100 text-green-800';
-    else if (lower === 'closed') classes = 'bg-gray-100 text-gray-600';
-    return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classes}">${escHtml(label)}</span>`;
-}
-
-function loadSnapshotPreview() {
-    const tbody = document.getElementById('snapshot-table-body');
-    const emptyEl = document.getElementById('snapshot-empty');
-    const wrap = document.getElementById('snapshot-table-wrap');
-    const icon = document.getElementById('snapshot-reload-icon');
-    const q = (document.getElementById('snapshot-search')?.value || '').trim();
-    const status = document.getElementById('snapshot-status-filter')?.value || '';
-
-    if (icon) icon.classList.add('fa-spin');
-    if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="9" class="px-3 py-8 text-center text-gray-500">Loading snapshot…</td></tr>';
-    }
-
-    const params = new URLSearchParams({
-        page: String(snapshotState.page),
-        per_page: String(snapshotState.perPage),
-    });
-    if (q) params.set('q', q);
-    if (status) params.set('status', status);
-
-    fetch('/admin/plugins/emergency_operations/api/data-cache/preview?' + params.toString())
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) {
-                if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-8 text-center text-red-600">${escHtml(data.error || 'Failed to load snapshot')}</td></tr>`;
-                }
-                return;
-            }
-
-            const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-            setText('snapshot-source', data.exists ? (data.source || '—') : '—');
-            setText('snapshot-fetched-at', data.exists ? (data.fetched_at_display || '—') : 'Never');
-            setText('snapshot-record-count', data.exists ? Number(data.record_count || 0).toLocaleString() : '—');
-            setText('snapshot-filtered-count', data.exists ? Number(data.total || 0).toLocaleString() : '—');
-
-            if (!data.exists) {
-                if (emptyEl) emptyEl.classList.remove('hidden');
-                if (wrap) wrap.classList.add('hidden');
-                setText('snapshot-page-info', 'No snapshot');
-                document.getElementById('snapshot-prev-btn').disabled = true;
-                document.getElementById('snapshot-next-btn').disabled = true;
-                snapshotState.loaded = true;
-                return;
-            }
-
-            if (emptyEl) emptyEl.classList.add('hidden');
-            if (wrap) wrap.classList.remove('hidden');
-
-            const rows = data.rows || [];
-            if (!rows.length) {
-                if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="9" class="px-3 py-8 text-center text-gray-500">No emergencies match this filter.</td></tr>';
-                }
-            } else if (tbody) {
-                tbody.innerHTML = rows.map(row => `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-3 py-2 whitespace-nowrap font-mono text-xs text-gray-800">${escHtml(row.code)}</td>
-                        <td class="px-3 py-2 text-gray-800 max-w-xs truncate" title="${escHtml(row.name)}">${escHtml(row.name)}</td>
-                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.type || '—')}</td>
-                        <td class="px-3 py-2 whitespace-nowrap">${statusBadge(row.status)}</td>
-                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.country || '—')}</td>
-                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.start_date || '—')}</td>
-                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.end_date || '—')}</td>
-                        <td class="px-3 py-2 whitespace-nowrap text-right text-gray-700 tabular-nums">${formatAmount(row.amount_requested)}</td>
-                        <td class="px-3 py-2 whitespace-nowrap text-right text-gray-700 tabular-nums">${formatAmount(row.amount_funded)}</td>
-                    </tr>
-                `).join('');
-            }
-
-            const page = data.page || 1;
-            const pages = data.pages || 0;
-            const total = data.total || 0;
-            snapshotState.page = page;
-            setText(
-                'snapshot-page-info',
-                pages
-                    ? `Page ${page.toLocaleString()} of ${pages.toLocaleString()} · ${total.toLocaleString()} matching`
-                    : `${total.toLocaleString()} matching`
-            );
-            document.getElementById('snapshot-prev-btn').disabled = page <= 1;
-            document.getElementById('snapshot-next-btn').disabled = !pages || page >= pages;
-            snapshotState.loaded = true;
-        })
-        .catch(err => {
-            if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-8 text-center text-red-600">${escHtml(err.message || 'Network error')}</td></tr>`;
-            }
-        })
-        .finally(() => {
-            if (icon) icon.classList.remove('fa-spin');
-        });
-}
-
 function activateEoSettingsTab(tabId) {
     if (window.AdminUnderlineTabs && typeof window.AdminUnderlineTabs.activateStripTab === 'function') {
         window.AdminUnderlineTabs.activateStripTab('#eo-settings-tabs', tabId, {
@@ -860,8 +856,8 @@ function activateEoSettingsTab(tabId) {
         window.history.replaceState({}, '', url);
     } catch (e) { /* ignore */ }
 
-    if (tabId === 'snapshot' && !snapshotState.loaded) {
-        loadSnapshotPreview();
+    if (tabId === 'snapshot' && window.EoSnapshotPreview) {
+        window.EoSnapshotPreview.onTabShown();
     }
 }
 
@@ -885,31 +881,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', () => activateEoSettingsTab(btn.getAttribute('data-tab')));
     });
 
-    document.getElementById('snapshot-reload-btn')?.addEventListener('click', () => {
-        snapshotState.page = 1;
-        loadSnapshotPreview();
-    });
-    document.getElementById('snapshot-status-filter')?.addEventListener('change', () => {
-        snapshotState.page = 1;
-        loadSnapshotPreview();
-    });
-    document.getElementById('snapshot-search')?.addEventListener('input', () => {
-        clearTimeout(snapshotState.searchTimer);
-        snapshotState.searchTimer = setTimeout(() => {
-            snapshotState.page = 1;
-            loadSnapshotPreview();
-        }, 250);
-    });
-    document.getElementById('snapshot-prev-btn')?.addEventListener('click', () => {
-        if (snapshotState.page > 1) {
-            snapshotState.page -= 1;
-            loadSnapshotPreview();
-        }
-    });
-    document.getElementById('snapshot-next-btn')?.addEventListener('click', () => {
-        snapshotState.page += 1;
-        loadSnapshotPreview();
-    });
+    if (window.EoSnapshotPreview) window.EoSnapshotPreview.init();
 
     const initialTab = new URLSearchParams(window.location.search).get('tab');
     if (initialTab === 'snapshot') {
@@ -917,4 +889,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+{% endblock %}
+
+{% block extra_js %}
+{{ ag_grid_js() }}
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='emergency_operations', filename='js/snapshot_preview.js') }}"></script>
 {% endblock %}

@@ -1,10 +1,12 @@
 """
-Server-side persistent data cache for the Emergency Operations plugin.
+Persistent appeals catalogue cache for the Emergency Operations plugin.
 
-Stores the full IFRC GO API response as a JSON file on disk so that every
-form-load does NOT call the external API.  All country / date / type filtering
-continues to happen server-side at query time — we just read from a local file
-instead of calling GO.
+Stores the full IFRC GO API response via ``storage_service`` (filesystem
+``UPLOAD_FOLDER`` or Azure Blob) so the snapshot survives container redeploys
+when the upload provider is durable — unlike the old in-plugin ``data/`` path.
+
+All country / date / type filtering continues to happen server-side at query
+time; this module only stores and retrieves the raw catalogue.
 
 Admins can:
   • Trigger a manual refresh from the settings page
@@ -14,28 +16,32 @@ On each request the module checks whether a scheduled refresh is overdue and,
 if so, fires one in a background thread so the current request is never blocked.
 """
 
+from __future__ import annotations
+
 import json
 import logging
-import os
 import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 # ── Process-level memory cache ─────────────────────────────────────────────────
-# Avoids re-reading and re-parsing the JSON file on every Flask-cache miss.
-# Keyed by file mtime so it invalidates automatically whenever a background
-# refresh writes a new file (via os.replace the mtime always changes).
+# Avoids re-downloading and re-parsing the JSON on every Flask-cache miss.
+# Fingerprint is (byte_size, fetched_at) so a refresh from another worker that
+# changes size or timestamp invalidates this process's copy.
 
 _mem_data: Optional[Dict[str, Any]] = None
-_mem_mtime: float = -1.0
+_mem_fingerprint: Optional[Tuple[int, str]] = None
 _mem_lock = threading.Lock()
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-CACHE_FILENAME = 'appeals_cache.json'
+STORAGE_CATEGORY = 'emergency_operations'
+CACHE_REL_PATH = 'appeals_cache.json'
+# Pre-storage location (plugin package). Migrated once into storage_service.
+_LEGACY_CACHE_FILE = Path(__file__).parent / 'data' / CACHE_REL_PATH
 
 SCHEDULE_INTERVALS: Dict[str, Optional[timedelta]] = {
     'off':     None,
@@ -67,6 +73,20 @@ def _parse_iso(s: str) -> Optional[datetime]:
         return None
 
 
+def _invalidate_mem_cache() -> None:
+    global _mem_data, _mem_fingerprint
+    with _mem_lock:
+        _mem_data = None
+        _mem_fingerprint = None
+
+
+def _set_mem_cache(data: Dict[str, Any], fingerprint: Tuple[int, str]) -> None:
+    global _mem_data, _mem_fingerprint
+    with _mem_lock:
+        _mem_data = data
+        _mem_fingerprint = fingerprint
+
+
 # ── Core class ─────────────────────────────────────────────────────────────────
 
 class EmergencyOperationsDataStore:
@@ -82,61 +102,90 @@ class EmergencyOperationsDataStore:
         "results":      [ ... ]    // raw GO API results array, unfiltered
     }
 
-    All existing country / date / type filtering continues to happen at
-    query time inside the route layer; this class only stores and retrieves
-    the raw full dataset.
+    Bytes live under storage category ``emergency_operations`` / ``appeals_cache.json``.
     """
 
-    def __init__(self, data_dir: Path):
-        self.data_dir = Path(data_dir)
-        self.cache_file = self.data_dir / CACHE_FILENAME
-        try:
-            self.data_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            logger.warning(f'[EmOps DataStore] Could not create data dir: {e}')
+    def __init__(
+        self,
+        category: str = STORAGE_CATEGORY,
+        rel_path: str = CACHE_REL_PATH,
+    ):
+        self.category = category
+        self.rel_path = rel_path
 
     # ── Load / Save ────────────────────────────────────────────────────────────
 
-    def load(self) -> Optional[Dict[str, Any]]:
-        """Load cached data from disk.  Returns None if file is absent or corrupt."""
+    def _migrate_legacy_if_needed(self) -> None:
+        """Copy the old plugin-local cache into storage once, if present."""
+        from app.services.platform import storage_service
+
         try:
-            if not self.cache_file.exists():
+            if storage_service.exists(self.category, self.rel_path):
+                return
+            if not _LEGACY_CACHE_FILE.is_file():
+                return
+            raw = _LEGACY_CACHE_FILE.read_bytes()
+            if not raw:
+                return
+            storage_service.upload(self.category, self.rel_path, raw)
+            logger.info(
+                '[EmOps DataStore] Migrated legacy cache (%s bytes) → storage %s/%s',
+                len(raw),
+                self.category,
+                self.rel_path,
+            )
+        except Exception as e:
+            logger.warning('[EmOps DataStore] Legacy cache migration skipped: %s', e)
+
+    def load(self) -> Optional[Dict[str, Any]]:
+        """Load cached data from storage. Returns None if absent or corrupt."""
+        from app.services.platform import storage_service
+
+        try:
+            self._migrate_legacy_if_needed()
+            if not storage_service.exists(self.category, self.rel_path):
                 return None
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            raw = storage_service.download(self.category, self.rel_path)
+            data = json.loads(raw.decode('utf-8'))
             if not isinstance(data, dict) or 'results' not in data:
                 logger.warning('[EmOps DataStore] Cache file has unexpected structure; ignoring')
                 return None
             return data
         except Exception as e:
-            logger.warning(f'[EmOps DataStore] Failed to load cache file: {e}')
+            logger.warning(f'[EmOps DataStore] Failed to load cache: {e}')
             return None
 
     def load_cached(self) -> Optional[Dict[str, Any]]:
-        """Like load() but served from the module-level memory cache when the
-        file has not changed, avoiding repeated disk IO and JSON parsing."""
-        global _mem_data, _mem_mtime
-        try:
-            mtime = self.cache_file.stat().st_mtime if self.cache_file.exists() else None
-        except OSError:
-            return None
+        """Like load() but served from the process memory cache when unchanged."""
+        from app.services.platform import storage_service
 
-        if mtime is None:
+        try:
+            self._migrate_legacy_if_needed()
+            if not storage_service.exists(self.category, self.rel_path):
+                _invalidate_mem_cache()
+                return None
+            size = storage_service.get_size(self.category, self.rel_path)
+        except Exception as e:
+            logger.warning('[EmOps DataStore] Cache probe failed: %s', e)
             return None
 
         with _mem_lock:
-            if _mem_data is not None and _mem_mtime == mtime:
+            if (
+                _mem_data is not None
+                and _mem_fingerprint is not None
+                and _mem_fingerprint[0] == size
+            ):
                 return _mem_data
 
         data = self.load()
         if data is not None:
-            with _mem_lock:
-                _mem_data = data
-                _mem_mtime = mtime
+            _set_mem_cache(data, (size, str(data.get('fetched_at') or '')))
         return data
 
     def save(self, results: List[Dict], query_params: Dict, source: Optional[str] = None) -> bool:
-        """Write results to disk atomically (write-then-rename)."""
+        """Serialize results and upload to storage_service."""
+        from app.services.platform import storage_service
+
         try:
             payload = {
                 'fetched_at':   _utcnow().isoformat(),
@@ -145,12 +194,16 @@ class EmergencyOperationsDataStore:
                 'source':       source,
                 'results':      results,
             }
-            tmp = self.cache_file.with_suffix('.tmp')
-            with open(tmp, 'w', encoding='utf-8') as f:
-                json.dump(payload, f, ensure_ascii=False)
-            # Atomic rename — safe on POSIX; on Windows replaces atomically via os.replace
-            os.replace(tmp, self.cache_file)
-            logger.info(f'[EmOps DataStore] Saved {len(results)} records → {self.cache_file}')
+            raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+            storage_service.upload(self.category, self.rel_path, raw)
+            _set_mem_cache(payload, (len(raw), payload['fetched_at']))
+            logger.info(
+                '[EmOps DataStore] Saved %s records → storage %s/%s (%s bytes)',
+                len(results),
+                self.category,
+                self.rel_path,
+                len(raw),
+            )
             return True
         except Exception as e:
             logger.error(f'[EmOps DataStore] Failed to save cache: {e}')
@@ -160,7 +213,7 @@ class EmergencyOperationsDataStore:
 
     def get_status(self) -> Dict[str, Any]:
         """Return a status dict suitable for the settings page API."""
-        data = self.load()
+        data = self.load_cached()
         if data is None:
             return {
                 'exists':            False,
@@ -237,7 +290,7 @@ class EmergencyOperationsDataStore:
 
     def refresh_from_api(self, api_url: str, query_params: Dict, timeout: int = 15) -> Dict[str, Any]:
         """
-        Fetch a fresh copy from the GO API and save it to disk.
+        Fetch a fresh copy from the GO API and save it to storage.
         Returns {'success': bool, 'record_count': int, 'error': str|None}.
         """
         import requests as req
@@ -280,8 +333,8 @@ class EmergencyOperationsDataStore:
 # ── Module-level helpers ───────────────────────────────────────────────────────
 
 def get_data_store() -> EmergencyOperationsDataStore:
-    """Return a data store rooted in the plugin's own data/ directory."""
-    return EmergencyOperationsDataStore(Path(__file__).parent / 'data')
+    """Return the storage-backed appeals catalogue store."""
+    return EmergencyOperationsDataStore()
 
 
 def trigger_background_refresh(api_url: str, query_params: Dict, timeout: int = 15) -> bool:
@@ -294,17 +347,27 @@ def trigger_background_refresh(api_url: str, query_params: Dict, timeout: int = 
         logger.debug('[EmOps DataStore] Background refresh already in progress; skipping')
         return False
 
+    from flask import current_app, has_app_context
+
+    if not has_app_context():
+        logger.warning('[EmOps DataStore] Background refresh skipped — no Flask app context')
+        return False
+    app = current_app._get_current_object()
+
     def _worker():
         global _refresh_in_progress
         with _refresh_lock:
             _refresh_in_progress = True
             try:
-                store = get_data_store()
-                result = store.refresh_from_api(api_url, query_params, timeout)
-                if result['success']:
-                    logger.info(f'[EmOps DataStore] Background refresh completed: {result["record_count"]} records')
-                else:
-                    logger.warning(f'[EmOps DataStore] Background refresh failed: {result["error"]}')
+                with app.app_context():
+                    store = get_data_store()
+                    result = store.refresh_from_api(api_url, query_params, timeout)
+                    if result['success']:
+                        logger.info(
+                            f'[EmOps DataStore] Background refresh completed: {result["record_count"]} records'
+                        )
+                    else:
+                        logger.warning(f'[EmOps DataStore] Background refresh failed: {result["error"]}')
             finally:
                 _refresh_in_progress = False
 

@@ -22,6 +22,7 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
 
 from pathlib import Path
+from typing import Optional
 
 from .appeal_group import CACHE_SOURCE, format_operation_label
 from .data_store import get_data_store, trigger_background_refresh
@@ -562,7 +563,7 @@ def create_blueprint():
         Shared implementation for /api/operations and /api/operations/live.
 
         Data source priority:
-          1. Server-side file cache (data/appeals_cache.json) — always preferred.
+          1. Server-side file cache (storage ``emergency_operations/appeals_cache.json``) — always preferred.
              The full unfiltered dataset is stored; all filtering happens here.
           2. Live GO API call — used only when no cache file exists yet.
              The result is then saved to disk for future requests.
@@ -698,7 +699,7 @@ def create_blueprint():
     @bp.route('/api/data-cache/preview', methods=['GET'])
     @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def data_cache_preview():
-        """Paginated snapshot of emergencies from the on-disk appeals cache."""
+        """Snapshot of emergencies from the appeals cache (all rows or paginated)."""
         store = get_data_store()
         cached = store.load_cached()
         status_meta = store.get_status()
@@ -717,6 +718,7 @@ def create_blueprint():
                 record_count=0,
             )
 
+        want_all = str(request.args.get('all') or '').strip().lower() in ('1', 'true', 'yes')
         q = (request.args.get('q') or '').strip().lower()
         status_filter = (request.args.get('status') or '').strip().lower()
         try:
@@ -729,7 +731,11 @@ def create_blueprint():
             per_page = 50
         per_page = min(100, max(10, per_page))
 
-        rows = [_snapshot_preview_row(item) for item in (cached.get('results') or [])]
+        country_lookup = _snapshot_country_lookup()
+        rows = [
+            _snapshot_preview_row(item, country_lookup=country_lookup)
+            for item in (cached.get('results') or [])
+        ]
         if status_filter:
             rows = [r for r in rows if (r.get('status') or '').lower() == status_filter]
         if q:
@@ -741,16 +747,24 @@ def create_blueprint():
                     str(r.get('type') or ''),
                     str(r.get('status') or ''),
                     str(r.get('country') or ''),
+                    str(r.get('region') or ''),
+                    str(r.get('disaster_type') or ''),
                     str(r.get('part_of') or ''),
                 ]).lower()
             ]
 
         total = len(rows)
-        pages = (total + per_page - 1) // per_page if total else 0
-        if pages and page > pages:
-            page = pages
-        start = (page - 1) * per_page
-        page_rows = rows[start:start + per_page]
+        if want_all:
+            page_rows = rows
+            pages = 1 if total else 0
+            page = 1
+            per_page = total or per_page
+        else:
+            pages = (total + per_page - 1) // per_page if total else 0
+            if pages and page > pages:
+                page = pages
+            start = (page - 1) * per_page
+            page_rows = rows[start:start + per_page]
 
         return json_ok(
             success=True,
@@ -771,6 +785,26 @@ def create_blueprint():
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+def _operation_country_iso(item: dict) -> str:
+    """Best-effort ISO2 (or token) from a raw appeals catalogue row."""
+    country = item.get('country')
+    if isinstance(country, dict):
+        iso = (country.get('iso') or country.get('iso2') or '').strip().upper()
+        if iso:
+            return iso
+    countries = item.get('countries')
+    if isinstance(countries, list):
+        for c in countries:
+            if isinstance(c, dict):
+                iso = (c.get('iso') or c.get('iso2') or '').strip().upper()
+                if iso:
+                    return iso
+    gec = (item.get('group_geographical_code') or '').strip().upper()
+    if gec and len(gec) <= 3:
+        return gec
+    return ''
+
+
 def _operation_country_label(item: dict) -> str:
     """Human-readable country label from a raw appeals catalogue row."""
     country_names = []
@@ -788,20 +822,59 @@ def _operation_country_label(item: dict) -> str:
     return ', '.join(filter(None, country_names)) or '—'
 
 
-def _snapshot_preview_row(item: dict) -> dict:
-    """Slim row for the settings Snapshot Preview table."""
+def _snapshot_country_lookup() -> dict:
+    """Map ISO2 → {name, region} from the Country table (best-effort)."""
+    try:
+        from app.models import Country
+        rows = Country.query.with_entities(Country.iso2, Country.name, Country.region).all()
+    except Exception:
+        return {}
+    out = {}
+    for iso2, name, region in rows:
+        if not iso2:
+            continue
+        out[str(iso2).strip().upper()] = {
+            'name': name or '',
+            'region': region or '',
+        }
+    return out
+
+
+def _year_from_date(value) -> Optional[int]:
+    text = str(value or '')[:4]
+    if text.isdigit():
+        year = int(text)
+        if 1800 <= year <= 2200:
+            return year
+    return None
+
+
+def _snapshot_preview_row(item: dict, country_lookup: Optional[dict] = None) -> dict:
+    """Slim row for the settings Snapshot Preview table / AG Grid."""
     code = item.get('code') or ''
     name = item.get('name') or 'Unnamed Operation'
+    iso = _operation_country_iso(item)
+    meta = (country_lookup or {}).get(iso) or {}
+    raw_country = _operation_country_label(item)
+    country_name = meta.get('name') or raw_country
+    region = meta.get('region') or ''
+    start_date = str(item.get('start_date') or '')[:10] or None
+    end_date = str(item.get('end_date') or '')[:10] or None
     return {
         'code': code,
         'name': name,
         'label': format_operation_label(name, code, item.get('part_of')),
         'type': item.get('atype_display') or item.get('appeal_subtype') or '',
         'status': item.get('status_display') or item.get('status') or '',
-        'country': _operation_country_label(item),
+        'country': country_name,
+        'country_iso': iso,
+        'region': region,
+        'disaster_type': (item.get('disaster_type') or '').strip(),
         'part_of': item.get('part_of') or '',
-        'start_date': str(item.get('start_date') or '')[:10] or None,
-        'end_date': str(item.get('end_date') or '')[:10] or None,
+        'start_date': start_date,
+        'end_date': end_date,
+        'start_year': _year_from_date(start_date),
+        'end_year': _year_from_date(end_date),
         'amount_requested': item.get('amount_requested'),
         'amount_funded': item.get('amount_funded'),
     }

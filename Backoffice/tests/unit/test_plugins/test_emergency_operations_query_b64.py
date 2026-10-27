@@ -52,24 +52,33 @@ def test_apply_filters_end_date_gte_excludes_earlier_end_dates():
 def test_snapshot_preview_row_projects_slim_fields():
     from plugins.emergency_operations.routes import _snapshot_preview_row
 
-    row = _snapshot_preview_row({
-        "code": "MDRAF019",
-        "name": "Afghanistan - Earthquake",
-        "atype_display": "Emergency Appeal",
-        "status_display": "Active",
-        "country": {"iso": "AF", "name": "Afghanistan"},
-        "start_date": "2024-01-15T00:00:00",
-        "end_date": "2025-06-30T00:00:00",
-        "amount_requested": 1000000.0,
-        "amount_funded": 250000.5,
-        "part_of": "",
-    })
+    row = _snapshot_preview_row(
+        {
+            "code": "MDRAF019",
+            "name": "Afghanistan - Earthquake",
+            "atype_display": "Emergency Appeal",
+            "status_display": "Active",
+            "country": {"iso": "AF", "name": "AF"},
+            "disaster_type": "Earthquake",
+            "start_date": "2024-01-15T00:00:00",
+            "end_date": "2025-06-30T00:00:00",
+            "amount_requested": 1000000.0,
+            "amount_funded": 250000.5,
+            "part_of": "",
+        },
+        country_lookup={"AF": {"name": "Afghanistan", "region": "Asia Pacific"}},
+    )
     assert row["code"] == "MDRAF019"
     assert row["name"] == "Afghanistan - Earthquake"
     assert row["type"] == "Emergency Appeal"
     assert row["status"] == "Active"
     assert row["country"] == "Afghanistan"
+    assert row["country_iso"] == "AF"
+    assert row["region"] == "Asia Pacific"
+    assert row["disaster_type"] == "Earthquake"
     assert row["start_date"] == "2024-01-15"
     assert row["end_date"] == "2025-06-30"
+    assert row["start_year"] == 2024
+    assert row["end_year"] == 2025
     assert row["amount_requested"] == 1000000.0
     assert "label" in row

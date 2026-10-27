@@ -389,8 +389,139 @@ function mapDocToGridRow(doc) {
         document_language: doc.document_language || '',
         source_organization: doc.source_organization || '',
         document_category: doc.document_category || '',
-        quality_score: (doc.quality_score !== null && doc.quality_score !== undefined) ? doc.quality_score : null
+        quality_score: (doc.quality_score !== null && doc.quality_score !== undefined) ? doc.quality_score : null,
+        content_hash: doc.content_hash || '',
+        source_url: doc.source_url || '',
+        submitted_document_id: doc.submitted_document_id || null,
+        guidance_document_id: doc.guidance_document_id || null,
+        duplicate_group_id: doc.duplicate_group_id || null,
+        duplicate_match: doc.duplicate_match || null,
+        is_duplicate: !!doc.is_duplicate,
+        duplicate_keeper_id: doc.duplicate_keeper_id || null,
+        is_duplicate_keeper: !!doc.is_duplicate_keeper
     };
+}
+
+function normalizeDedupeSourceUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return '';
+    try {
+        const u = new URL(raw);
+        const scheme = (u.protocol || '').replace(':', '').toLowerCase();
+        let hostname = (u.hostname || '').toLowerCase();
+        let netloc = hostname;
+        const port = u.port ? Number(u.port) : null;
+        if (port && !((scheme === 'https' && port === 443) || (scheme === 'http' && port === 80))) {
+            netloc = hostname + ':' + port;
+        }
+        let path = u.pathname || '/';
+        path = path.replace(/\/{2,}/g, '/');
+        return scheme + '://' + netloc + path + (u.search || '');
+    } catch (e) {
+        return raw;
+    }
+}
+
+/**
+ * Client-side duplicate annotation (content_hash primary, source_url when hash missing).
+ * Used when the API did not annotate, and to refresh the banner after grid edits.
+ */
+function annotateDuplicateRows(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const hashBuckets = {};
+    const urlBuckets = {};
+
+    list.forEach(function(row) {
+        if (!row || row.id == null) return;
+        row.is_duplicate = false;
+        row.duplicate_group_id = null;
+        row.duplicate_match = null;
+        row.duplicate_keeper_id = null;
+        row.is_duplicate_keeper = false;
+
+        const hash = String(row.content_hash || '').trim().toLowerCase();
+        if (hash) {
+            if (!hashBuckets[hash]) hashBuckets[hash] = [];
+            hashBuckets[hash].push(row);
+            return;
+        }
+        const url = normalizeDedupeSourceUrl(row.source_url);
+        if (url) {
+            if (!urlBuckets[url]) urlBuckets[url] = [];
+            urlBuckets[url].push(row);
+        }
+    });
+
+    const chooseKeeper = function(members) {
+        return members.slice().sort(function(a, b) {
+            const linkedA = (a.submitted_document_id || a.guidance_document_id) ? 0 : 1;
+            const linkedB = (b.submitted_document_id || b.guidance_document_id) ? 0 : 1;
+            if (linkedA !== linkedB) return linkedA - linkedB;
+            const statusRank = { completed: 3, processing: 2, pending: 1, failed: 0 };
+            const sa = statusRank[String(a.processing_status || '').toLowerCase()] || 0;
+            const sb = statusRank[String(b.processing_status || '').toLowerCase()] || 0;
+            if (sa !== sb) return sb - sa;
+            const ca = Number(a.total_chunks || 0);
+            const cb = Number(b.total_chunks || 0);
+            if (ca !== cb) return cb - ca;
+            return Number(a.id) - Number(b.id);
+        })[0];
+    };
+
+    const applyGroup = function(matchType, matchValue, members) {
+        if (!members || members.length < 2) return;
+        const keeper = chooseKeeper(members);
+        const groupId = matchType + ':' + matchValue;
+        members.forEach(function(row) {
+            row.is_duplicate = true;
+            row.duplicate_group_id = groupId;
+            row.duplicate_match = matchType;
+            row.duplicate_keeper_id = keeper.id;
+            row.is_duplicate_keeper = Number(row.id) === Number(keeper.id);
+        });
+    };
+
+    Object.keys(hashBuckets).forEach(function(hash) {
+        applyGroup('hash', hash, hashBuckets[hash]);
+    });
+    Object.keys(urlBuckets).forEach(function(url) {
+        applyGroup('url', url, urlBuckets[url]);
+    });
+
+    return list;
+}
+
+function summarizeDuplicateRows(rows) {
+    const groups = {};
+    (rows || []).forEach(function(row) {
+        if (!row || !row.is_duplicate || !row.duplicate_group_id) return;
+        if (!groups[row.duplicate_group_id]) groups[row.duplicate_group_id] = [];
+        groups[row.duplicate_group_id].push(row);
+    });
+    const groupIds = Object.keys(groups);
+    let extras = 0;
+    groupIds.forEach(function(gid) {
+        extras += Math.max(0, groups[gid].length - 1);
+    });
+    return { groups: groupIds.length, extras: extras, groupMap: groups };
+}
+
+function updateDocumentsDuplicatesBanner(rows) {
+    const banner = document.getElementById('documentsDuplicatesBanner');
+    const textEl = document.getElementById('documentsDuplicatesBannerText');
+    if (!banner || !textEl) return;
+    const summary = summarizeDuplicateRows(rows);
+    if (!summary.groups) {
+        banner.classList.add('hidden');
+        textEl.textContent = '';
+        return;
+    }
+    const tpl = cfg.t.duplicates_banner_6d1f8a3c
+        || 'Found {groups} duplicate group(s) ({extras} extra copies). Matching uses file content hash, then source URL.';
+    textEl.textContent = tpl
+        .replace('{groups}', String(summary.groups))
+        .replace('{extras}', String(summary.extras));
+    banner.classList.remove('hidden');
 }
 
 /**
@@ -514,17 +645,27 @@ const columnDefs = [
         filter: 'agTextColumnFilter',
         sortable: true,
         cellRenderer: function(params) {
-            const data = params.data;
+            const data = params.data || {};
             const icon = getFileIcon(data.file_type);
             const downloadUrl = '/api/ai/documents/' + data.id + '/download';
             const title = escapeHtml(data.title || 'Untitled');
             const filename = escapeHtml(data.filename || '');
+            let badge = '';
+            if (data.is_duplicate) {
+                const isKeeper = !!data.is_duplicate_keeper;
+                const label = isKeeper
+                    ? (cfg.t.duplicate_keeper_badge_3b7e1d9a || 'Keep')
+                    : (cfg.t.duplicate_badge_1e9a4c2b || 'Duplicate');
+                const matchHint = data.duplicate_match === 'url' ? 'URL' : 'hash';
+                badge = '<span class="ai-doc-duplicate-badge' + (isKeeper ? ' is-keeper' : '') +
+                    '" title="' + escapeHtml(matchHint) + '">' + escapeHtml(label) + '</span>';
+            }
             return '<div class="flex items-center" style="height: 100%; padding: 8px 0;">' +
                    '<div class="flex-shrink-0 h-12 w-12 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200 mr-3">' +
                    icon + '</div>' +
                    '<div><div class="text-sm font-semibold text-gray-900">' +
                    '<a href="' + downloadUrl + '" class="text-blue-600 hover:text-blue-800 hover:underline" download>' +
-                   title + '</a></div>' +
+                   title + '</a>' + badge + '</div>' +
                    '<div class="text-xs text-gray-500 mt-0.5">' + filename + '</div></div></div>';
         },
         cellStyle: { 'white-space': 'normal', 'line-height': '1.4', 'display': 'flex', 'align-items': 'center' }
@@ -840,7 +981,10 @@ async function fetchAllDocumentsForGrid() {
     if (total > documents.length) {
         console.warn('documents grid: fetched', documents.length, 'of', total, 'rows');
     }
-    return documents.map(mapDocToGridRow);
+    const rows = documents.map(mapDocToGridRow);
+    // Re-annotate across the full fetched set so cross-page groups stay consistent
+    // even if a single API page annotation was incomplete.
+    return annotateDuplicateRows(rows);
 }
 
 function getDocumentsGridOptions() {
@@ -849,6 +993,13 @@ function getDocumentsGridOptions() {
         tooltipHideDelay: 12000,
         components: {
             countryScopeTooltip: CountryScopeTooltip
+        },
+        getRowClass: function(params) {
+            const data = params && params.data;
+            if (!data || !data.is_duplicate) return '';
+            return data.is_duplicate_keeper
+                ? 'ai-doc-row-duplicate ai-doc-row-duplicate-keeper'
+                : 'ai-doc-row-duplicate';
         }
     };
 }
@@ -892,6 +1043,7 @@ async function loadDocumentsGrid() {
         const rows = await fetchAllDocumentsForGrid();
         ensureDocumentsGrid(rows);
         ensureCountryOptions();
+        updateDocumentsDuplicatesBanner(rows);
 
         if (loadingEl) loadingEl.style.display = 'none';
         if (rows.length > 0) {
@@ -903,6 +1055,7 @@ async function loadDocumentsGrid() {
         }
     } catch (err) {
         console.error('loadDocumentsGrid failed:', err);
+        updateDocumentsDuplicatesBanner([]);
         if (loadingEl) loadingEl.style.display = 'none';
         if (containerEl) containerEl.style.display = 'none';
         if (emptyEl) {
@@ -938,6 +1091,7 @@ function initializeDocumentsBulkActions() {
     const reprocessMetaBtn = document.getElementById('bulkReprocessMetaBtn');
     const mineTerminologyBtn = document.getElementById('bulkMineTerminologyBtn');
     const markSamePublicationBtn = document.getElementById('bulkMarkSamePublicationBtn');
+    const dedupeBtn = document.getElementById('bulkDedupeBtn');
     const deleteBtn = document.getElementById('bulkDeleteBtn');
     const downloadLabel = document.getElementById('bulkDownloadBtnLabel');
     const reprocessLabel = document.getElementById('bulkReprocessBtnLabel');
@@ -945,7 +1099,9 @@ function initializeDocumentsBulkActions() {
     const reprocessMetaLabel = document.getElementById('bulkReprocessMetaBtnLabel');
     const mineTerminologyLabel = document.getElementById('bulkMineTerminologyBtnLabel');
     const markSamePublicationLabel = document.getElementById('bulkMarkSamePublicationBtnLabel');
+    const dedupeLabel = document.getElementById('bulkDedupeBtnLabel');
     const deleteLabel = document.getElementById('bulkDeleteBtnLabel');
+    const dedupeAllBtn = document.getElementById('dedupeAllDuplicatesBtn');
 
     const notifyDocs = function(msg, type) {
         if (window.showAlert) {
@@ -1016,6 +1172,13 @@ function initializeDocumentsBulkActions() {
             ? cfg.t.reprocess_metadata_4a7b1eab + ' (' + eligibleReprocess.length + ')'
             : cfg.t.reprocess_metadata_4a7b1eab;
 
+        const selectedDuplicates = (selectedRows || []).filter(function(r) { return r && r.is_duplicate; });
+        const selectedDupSummary = summarizeDuplicateRows(selectedDuplicates);
+        if (dedupeBtn) dedupeBtn.disabled = selectedDupSummary.extras < 1;
+        if (dedupeLabel) dedupeLabel.textContent = selectedDupSummary.extras > 0
+            ? (cfg.t.deduplicate_3c8f1a2b || 'Deduplicate') + ' (' + selectedDupSummary.extras + ')'
+            : (cfg.t.deduplicate_3c8f1a2b || 'Deduplicate');
+
         downloadLabel.textContent = selectedCount > 0
             ? cfg.t.download_801ab246 + ' (' + selectedCount + ')'
             : cfg.t.download_801ab246;
@@ -1025,6 +1188,112 @@ function initializeDocumentsBulkActions() {
         deleteLabel.textContent = selectedCount > 0
             ? cfg.t.delete_f2a6c498 + ' (' + selectedCount + ')'
             : cfg.t.delete_f2a6c498;
+    };
+
+    const runDedupeRequest = async function(payload) {
+        const response = await csrfFetch('/api/ai/documents/dedupe', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload || {})
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || (cfg.t.deduplicate_failed_8b3d1e6a || 'Deduplication failed'));
+        }
+        return result;
+    };
+
+    const bulkDedupeSelected = async function() {
+        const selectedRows = getSelectedDocs();
+        const selectedDuplicates = selectedRows.filter(function(r) { return r && r.is_duplicate; });
+        const summary = summarizeDuplicateRows(selectedDuplicates);
+        if (summary.extras < 1) {
+            notifyDocs(cfg.t.deduplicate_nothing_4a7c2e9b || 'No duplicates in the current selection', 'info');
+            return;
+        }
+        const ids = selectedDuplicates.map(function(r) { return r.id; });
+        const confirmMsg = (cfg.t.deduplicate_confirm_7a1d9e3c
+            || 'Deduplicate selected documents? The best copy in each group is kept; extras are deleted.')
+            + ' (' + summary.extras + ')';
+        const proceed = async function() {
+            try {
+                const result = await runDedupeRequest({ document_ids: ids });
+                const removed = (result.removed || []).length;
+                notifyDocs(
+                    (cfg.t.deduplicate_complete_5c9e2a1f || 'Deduplication complete')
+                        + ' (' + removed + ')',
+                    'success'
+                );
+                deselectAll();
+                await reloadDocumentsGrid();
+            } catch (error) {
+                notifyDocs(
+                    (cfg.t.deduplicate_failed_8b3d1e6a || 'Deduplication failed') + ': '
+                        + (error && error.message ? error.message : String(error)),
+                    'error'
+                );
+            }
+        };
+        if (window.showConfirmation) {
+            window.showConfirmation(
+                confirmMsg,
+                proceed,
+                null,
+                cfg.t.deduplicate_3c8f1a2b || 'Deduplicate',
+                cfg.t.cancel_ea478870,
+                cfg.t.deduplicate_3c8f1a2b || 'Deduplicate'
+            );
+        } else {
+            proceed();
+        }
+    };
+
+    const dedupeAllDuplicates = async function() {
+        const confirmMsg = cfg.t.deduplicate_all_confirm_2f6b8c4d
+            || 'Deduplicate all duplicate groups in the knowledge base? The best copy in each group is kept; extras are deleted.';
+        const proceed = async function() {
+            try {
+                const result = await runDedupeRequest({ all: true });
+                const removed = (result.removed || []).length;
+                notifyDocs(
+                    (cfg.t.deduplicate_complete_5c9e2a1f || 'Deduplication complete')
+                        + ' — ' + removed,
+                    'success'
+                );
+                deselectAll();
+                await reloadDocumentsGrid();
+            } catch (error) {
+                notifyDocs(
+                    (cfg.t.deduplicate_failed_8b3d1e6a || 'Deduplication failed') + ': '
+                        + (error && error.message ? error.message : String(error)),
+                    'error'
+                );
+            }
+        };
+        if (window.showDangerConfirmation) {
+            window.showDangerConfirmation(
+                confirmMsg,
+                proceed,
+                null,
+                cfg.t.deduplicate_all_9e2b4c1a || 'Deduplicate all',
+                cfg.t.cancel_ea478870,
+                cfg.t.deduplicate_all_9e2b4c1a || 'Deduplicate all'
+            );
+        } else if (window.showConfirmation) {
+            window.showConfirmation(
+                confirmMsg,
+                proceed,
+                null,
+                cfg.t.deduplicate_all_9e2b4c1a || 'Deduplicate all',
+                cfg.t.cancel_ea478870,
+                cfg.t.deduplicate_all_9e2b4c1a || 'Deduplicate all'
+            );
+        } else {
+            proceed();
+        }
     };
 
     const bulkDownloadSelected = function() {
@@ -1461,6 +1730,12 @@ function initializeDocumentsBulkActions() {
     });
     if (reprocessMetaBtn) reprocessMetaBtn.addEventListener('click', function() {
         bulkReprocessMetaSelected();
+    });
+    if (dedupeBtn) dedupeBtn.addEventListener('click', function() {
+        bulkDedupeSelected();
+    });
+    if (dedupeAllBtn) dedupeAllBtn.addEventListener('click', function() {
+        dedupeAllDuplicates();
     });
     deleteBtn.addEventListener('click', function() {
         bulkDeleteSelected();

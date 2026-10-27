@@ -148,6 +148,7 @@ class TestAIDocument:
                 quality_score=0.9,
                 source_url='https://example.com/report.pdf',
                 geographic_scope='global',
+                content_hash='abc123',
             )
             d = doc.to_dict()
             assert d['document_language'] == 'en'
@@ -156,6 +157,9 @@ class TestAIDocument:
             assert d['quality_score'] == 0.9
             assert d['source_url'] == 'https://example.com/report.pdf'
             assert d['geographic_scope'] == 'global'
+            assert d['content_hash'] == 'abc123'
+            assert 'submitted_document_id' in d
+            assert 'guidance_document_id' in d
 
     def test_to_dict_processing_error_empty(self, db_session, app):
         """Test to_dict returns empty string for None processing_error."""

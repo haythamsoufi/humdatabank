@@ -137,6 +137,16 @@ def _apply_document_geography(doc: AIDocument, data: dict):
     return None
 
 
+def _can_manage_ai_documents() -> bool:
+    from app.services.organization.authorization_service import AuthorizationService
+
+    return (
+        AuthorizationService.is_admin(current_user)
+        or AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")
+        or AuthorizationService.has_rbac_permission(current_user, "admin.ai.manage")
+    )
+
+
 @ai_docs_bp.route('/', methods=['GET'])
 @login_required
 def list_documents():
@@ -147,6 +157,7 @@ def list_documents():
     - page, per_page: Server-side pagination (default page=1, per_page=50, max 10000)
     - limit, offset: Legacy offset pagination (used when offset is supplied without page)
     - status, file_type, category, language, q: Same filters as the admin Knowledge Base page
+    - annotate_duplicates: when true (default for managers), add duplicate_* fields
 
     Returns:
         JSON with list of documents, total, and pagination metadata
@@ -172,12 +183,7 @@ def list_documents():
             joinedload(AIDocument.countries),
         )
 
-        from app.services.organization.authorization_service import AuthorizationService
-        can_manage_docs = (
-            AuthorizationService.is_admin(current_user)
-            or AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")
-            or AuthorizationService.has_rbac_permission(current_user, "admin.ai.manage")
-        )
+        can_manage_docs = _can_manage_ai_documents()
         if not can_manage_docs:
             from app.services.ai.documents.access import apply_document_read_filter, principal_for_user
 
@@ -195,9 +201,84 @@ def list_documents():
         )
 
         pages = math.ceil(total / per_page) if per_page else 0
+        doc_dicts = [doc.to_dict() for doc in documents]
+
+        # Annotate duplicates against the full accessible corpus (not just this page) so
+        # cross-page hash collisions still highlight when the client loads all pages.
+        annotate_raw = (request.args.get('annotate_duplicates') or '').strip().lower()
+        annotate = annotate_raw in ('1', 'true', 'yes') or (
+            annotate_raw == '' and can_manage_docs
+        )
+        if annotate and can_manage_docs and doc_dicts:
+            from app.services.ai.documents.duplicates import find_duplicate_groups
+
+            # Fresh query so joinedload options on the page query do not interfere.
+            corpus_query = apply_ai_document_library_filters(AIDocument.query, filters)
+            corpus = (
+                corpus_query.with_entities(
+                    AIDocument.id,
+                    AIDocument.content_hash,
+                    AIDocument.source_url,
+                    AIDocument.submitted_document_id,
+                    AIDocument.guidance_document_id,
+                    AIDocument.processing_status,
+                    AIDocument.total_chunks,
+                    AIDocument.title,
+                    AIDocument.filename,
+                )
+                .all()
+            )
+
+            class _Row:
+                __slots__ = (
+                    "id",
+                    "content_hash",
+                    "source_url",
+                    "submitted_document_id",
+                    "guidance_document_id",
+                    "processing_status",
+                    "total_chunks",
+                    "title",
+                    "filename",
+                )
+
+                def __init__(self, row):
+                    (
+                        self.id,
+                        self.content_hash,
+                        self.source_url,
+                        self.submitted_document_id,
+                        self.guidance_document_id,
+                        self.processing_status,
+                        self.total_chunks,
+                        self.title,
+                        self.filename,
+                    ) = row
+
+            groups = find_duplicate_groups([_Row(r) for r in corpus])
+            by_id = {}
+            for group in groups:
+                for doc_id in group["document_ids"]:
+                    by_id[int(doc_id)] = {
+                        "duplicate_group_id": group["group_id"],
+                        "duplicate_match": group["match_type"],
+                        "is_duplicate": True,
+                        "duplicate_keeper_id": group["keeper_id"],
+                        "is_duplicate_keeper": int(doc_id) == int(group["keeper_id"]),
+                    }
+            for d in doc_dicts:
+                info = by_id.get(int(d["id"]))
+                if info:
+                    d.update(info)
+                else:
+                    d["duplicate_group_id"] = None
+                    d["duplicate_match"] = None
+                    d["is_duplicate"] = False
+                    d["duplicate_keeper_id"] = None
+                    d["is_duplicate_keeper"] = False
 
         return json_ok(
-            documents=[doc.to_dict() for doc in documents],
+            documents=doc_dicts,
             total=total,
             limit=limit,
             offset=offset,
@@ -208,6 +289,106 @@ def list_documents():
 
     except Exception as e:
         logger.error(f"List documents error: {e}", exc_info=True)
+        return json_server_error(GENERIC_ERROR_MESSAGE)
+
+
+@ai_docs_bp.route('/duplicates', methods=['GET'])
+@login_required
+@limiter.limit("30 per minute")
+def list_duplicate_groups():
+    """List duplicate AI document groups (content_hash, else source_url). Admin/managers only."""
+    try:
+        if not _can_manage_ai_documents():
+            return json_forbidden('Access denied')
+
+        from app.services.ai.documents.duplicates import find_duplicate_groups
+
+        groups = find_duplicate_groups()
+        duplicate_docs = sum(max(0, len(g["document_ids"]) - 1) for g in groups)
+        return json_ok(
+            groups=groups,
+            total_groups=len(groups),
+            total_extra_copies=duplicate_docs,
+        )
+    except Exception as e:
+        logger.error("List duplicate groups error: %s", e, exc_info=True)
+        return json_server_error(GENERIC_ERROR_MESSAGE)
+
+
+@ai_docs_bp.route('/dedupe', methods=['POST'])
+@login_required
+@limiter.limit("10 per minute")
+def dedupe_documents():
+    """
+    Deduplicate AI documents.
+
+    JSON body (one of):
+    - ``{"all": true}`` — dedupe every detected group (auto keeper)
+    - ``{"document_ids": [1,2,3]}`` — dedupe groups intersecting these ids
+    - ``{"keep_id": 1, "remove_ids": [2,3]}`` — explicit keep/remove
+    Optional: ``dry_run`` (bool).
+    """
+    try:
+        if not _can_manage_ai_documents():
+            return json_forbidden('Access denied')
+
+        data = get_json_safe() or {}
+        dry_run = bool(data.get("dry_run"))
+        all_groups = bool(data.get("all") or data.get("all_groups"))
+        keep_id = data.get("keep_id")
+        remove_ids = data.get("remove_ids")
+        document_ids = data.get("document_ids")
+
+        if keep_id is not None:
+            try:
+                keep_id = int(keep_id)
+            except (TypeError, ValueError):
+                return json_bad_request("keep_id must be an integer")
+        if remove_ids is not None:
+            if not isinstance(remove_ids, (list, tuple)):
+                return json_bad_request("remove_ids must be a list")
+            try:
+                remove_ids = [int(x) for x in remove_ids]
+            except (TypeError, ValueError):
+                return json_bad_request("remove_ids must contain integers")
+        if document_ids is not None:
+            if not isinstance(document_ids, (list, tuple)):
+                return json_bad_request("document_ids must be a list")
+            try:
+                document_ids = [int(x) for x in document_ids]
+            except (TypeError, ValueError):
+                return json_bad_request("document_ids must contain integers")
+
+        from app.services.ai.documents.duplicates import dedupe_documents as run_dedupe
+
+        result = run_dedupe(
+            all_groups=all_groups,
+            document_ids=document_ids,
+            keep_id=keep_id,
+            remove_ids=remove_ids,
+            dry_run=dry_run,
+        )
+        if not result.get("ok"):
+            return json_bad_request(result.get("error") or "Dedupe failed")
+
+        logger.info(
+            "User %s deduped AI documents: groups=%s kept=%s removed=%s dry_run=%s",
+            getattr(current_user, "email", current_user.id),
+            result.get("groups_processed"),
+            result.get("kept"),
+            result.get("removed"),
+            dry_run,
+        )
+        return json_ok(
+            message='Documents deduplicated successfully' if not dry_run else 'Dry run complete',
+            kept=result.get("kept") or [],
+            removed=result.get("removed") or [],
+            groups_processed=result.get("groups_processed") or 0,
+            dry_run=dry_run,
+        )
+    except Exception as e:
+        logger.error("Dedupe documents error: %s", e, exc_info=True)
+        db.session.rollback()
         return json_server_error(GENERIC_ERROR_MESSAGE)
 
 

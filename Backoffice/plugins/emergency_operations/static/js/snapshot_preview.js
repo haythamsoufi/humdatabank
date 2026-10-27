@@ -432,7 +432,28 @@
       { field: 'country', headerName: 'Country', minWidth: 140, filter: 'customSetFilter' },
       { field: 'disaster_type', headerName: 'Disaster Type', minWidth: 140, filter: 'customSetFilter' },
       { field: 'start_date', headerName: 'Start', minWidth: 110, width: 120, filter: 'agTextColumnFilter' },
-      { field: 'end_date', headerName: 'End', minWidth: 110, width: 120, filter: 'agTextColumnFilter' },
+      {
+        field: 'end_date',
+        headerName: 'End',
+        minWidth: 130,
+        width: 140,
+        filter: 'agTextColumnFilter',
+        cellRenderer: function (p) {
+          const end = p.value || '';
+          if (!end) return '';
+          if (p.data && p.data.end_date_overridden) {
+            const src = p.data.source_end_date || '—';
+            return (
+              '<span title="Manual override (source: ' +
+              String(src).replace(/"/g, '&quot;') +
+              ')">' +
+              String(end) +
+              ' <span class="text-amber-600 text-xs font-semibold">*</span></span>'
+            );
+          }
+          return String(end);
+        },
+      },
       {
         field: 'amount_requested',
         headerName: 'Requested',

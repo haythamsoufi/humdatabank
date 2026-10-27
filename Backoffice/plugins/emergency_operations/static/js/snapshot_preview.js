@@ -505,11 +505,9 @@
   }
 
   function loadSnapshotPreview() {
-    var icon = $('snapshot-reload-icon');
     var emptyEl = $('snapshot-empty');
     var filtersEl = $('snapshot-filters');
     var gridWrap = $('snapshot-grid-wrap');
-    if (icon) icon.classList.add('fa-spin');
 
     fetch('/admin/plugins/emergency_operations/api/data-cache/preview?all=1')
       .then(function (r) {
@@ -557,9 +555,6 @@
       })
       .catch(function (err) {
         console.error('Snapshot preview load failed', err);
-      })
-      .finally(function () {
-        if (icon) icon.classList.remove('fa-spin');
       });
   }
 
@@ -608,13 +603,6 @@
         setFiltersExpanded(!open);
       });
       setFiltersExpanded(false);
-    }
-    var reload = $('snapshot-reload-btn');
-    if (reload) {
-      reload.addEventListener('click', function () {
-        state.loaded = false;
-        loadSnapshotPreview();
-      });
     }
   }
 

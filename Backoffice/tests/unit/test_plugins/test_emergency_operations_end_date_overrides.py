@@ -1,6 +1,5 @@
 """Manual tentative end-date overrides for Emergency Operations."""
 
-from plugins.emergency_operations import end_date_overrides as edo
 from plugins.emergency_operations.end_date_overrides import (
     PLUGIN_DATA_ID,
     apply_end_date_overrides,

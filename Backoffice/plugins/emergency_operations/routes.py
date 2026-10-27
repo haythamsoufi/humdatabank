@@ -800,6 +800,36 @@ def create_blueprint():
 
     # ── Manual end-date overrides (tentative ERP extensions) ─────────────────
 
+    @bp.route('/api/end-date-overrides/appeals', methods=['GET'])
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
+    def list_appeals_for_end_date_override():
+        """Slim appeal list from cache for the override search-select."""
+        store = get_data_store()
+        cached = store.load_cached() or {}
+        seen = set()
+        appeals = []
+        for item in cached.get('results') or []:
+            if not isinstance(item, dict):
+                continue
+            code = str(item.get('code') or '').strip().upper()
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            name = item.get('name') or 'Unnamed Operation'
+            appeals.append({
+                'code': code,
+                'name': name,
+                'label': format_operation_label(name, code, item.get('part_of')),
+                'end_date': str(item.get('end_date') or '')[:10] or None,
+            })
+        appeals.sort(key=lambda a: (a.get('label') or a['code']).lower())
+        return json_ok(
+            success=True,
+            appeals=appeals,
+            count=len(appeals),
+            cache_fetched_at=cached.get('fetched_at'),
+        )
+
     @bp.route('/api/end-date-overrides', methods=['GET'])
     @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def get_end_date_overrides():

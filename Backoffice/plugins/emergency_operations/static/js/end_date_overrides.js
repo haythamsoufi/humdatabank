@@ -5,7 +5,11 @@
   'use strict';
 
   const API = '/admin/plugins/emergency_operations/api/end-date-overrides';
+  const APPEALS_API = API + '/appeals';
+
   let loaded = false;
+  let appealsLoaded = false;
+  let appealsByCode = {};
 
   function csrfHeaders() {
     const token =
@@ -129,13 +133,104 @@
       .join('');
   }
 
-  function setReloadSpinning(on) {
-    const icon = document.getElementById('eo-overrides-reload-icon');
-    if (icon) icon.classList.toggle('fa-spin', !!on);
+  function destroyAppealSelect2() {
+    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+    const $el = window.jQuery('#eo-override-code');
+    if ($el.length && $el.data('select2')) {
+      $el.off('change.eoOverride');
+      $el.select2('destroy');
+    }
+  }
+
+  function initAppealSelect2() {
+    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+    const $ = window.jQuery;
+    const $el = $('#eo-override-code');
+    if (!$el.length) return;
+    if ($el.data('select2')) $el.select2('destroy');
+    const $parent = $('#eo-override-form');
+    $el.select2({
+      width: '100%',
+      allowClear: true,
+      placeholder: 'Search appeal code or name…',
+      dropdownParent: $parent.length ? $parent : $(document.body),
+    });
+    $el.off('change.eoOverride').on('change.eoOverride', onAppealSelected);
+  }
+
+  function updateSourceHint(code) {
+    const hint = document.getElementById('eo-override-source-hint');
+    if (!hint) return;
+    const appeal = code ? appealsByCode[code] : null;
+    if (!appeal) {
+      hint.textContent = '';
+      return;
+    }
+    hint.textContent = appeal.end_date
+      ? 'Source end date: ' + appeal.end_date
+      : 'No source end date in cache';
+  }
+
+  function onAppealSelected() {
+    const select = document.getElementById('eo-override-code');
+    const code = (select && select.value) || '';
+    updateSourceHint(code);
+  }
+
+  function fillAppealSelect(appeals) {
+    const select = document.getElementById('eo-override-code');
+    if (!select) return;
+    const keep = select.value;
+    destroyAppealSelect2();
+    appealsByCode = {};
+    let html = '<option value=""></option>';
+    (appeals || []).forEach(function (a) {
+      if (!a || !a.code) return;
+      appealsByCode[a.code] = a;
+      const label = a.label || a.code + ' — ' + (a.name || '');
+      html +=
+        '<option value="' +
+        esc(a.code) +
+        '">' +
+        esc(label) +
+        '</option>';
+    });
+    select.innerHTML = html;
+    if (keep && appealsByCode[keep]) select.value = keep;
+    else select.value = '';
+    initAppealSelect2();
+    updateSourceHint(select.value);
+  }
+
+  function resetAppealSelect() {
+    const select = document.getElementById('eo-override-code');
+    if (!select) return;
+    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+      window.jQuery(select).val(null).trigger('change');
+    } else {
+      select.value = '';
+      updateSourceHint('');
+    }
+  }
+
+  function loadAppeals() {
+    return fetch(APPEALS_API, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !data.success) {
+          throw new Error((data && (data.error || data.message)) || 'Failed to load appeals');
+        }
+        fillAppealSelect(data.appeals || []);
+        appealsLoaded = true;
+      })
+      .catch(function (err) {
+        showFormMsg(err.message || String(err), true);
+      });
   }
 
   function loadOverrides() {
-    setReloadSpinning(true);
     return fetch(API, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .then(function (r) {
         return r.json();
@@ -149,9 +244,6 @@
       })
       .catch(function (err) {
         showFormMsg(err.message || String(err), true);
-      })
-      .finally(function () {
-        setReloadSpinning(false);
       });
   }
 
@@ -161,7 +253,7 @@
     const endDate = document.getElementById('eo-override-end-date')?.value || '';
     const note = (document.getElementById('eo-override-note')?.value || '').trim();
     if (!code || !endDate) {
-      showFormMsg('Appeal code and end date are required.', true);
+      showFormMsg('Appeal and end date are required.', true);
       return;
     }
     const btn = document.getElementById('eo-override-save-btn');
@@ -183,8 +275,11 @@
           throw new Error((res.data && (res.data.error || res.data.message)) || 'Save failed');
         }
         showFormMsg('Saved override for ' + code, false);
-        const form = document.getElementById('eo-override-form');
-        if (form) form.reset();
+        const noteEl = document.getElementById('eo-override-note');
+        const dateEl = document.getElementById('eo-override-end-date');
+        if (noteEl) noteEl.value = '';
+        if (dateEl) dateEl.value = '';
+        resetAppealSelect();
         return loadOverrides();
       })
       .catch(function (err) {
@@ -220,30 +315,33 @@
       });
   }
 
+  function reloadAll() {
+    return Promise.all([loadAppeals(), loadOverrides()]);
+  }
+
   function init() {
     document.getElementById('eo-override-form')?.addEventListener('submit', saveOverride);
-    document.getElementById('eo-overrides-reload-btn')?.addEventListener('click', loadOverrides);
     document.getElementById('eo-overrides-tbody')?.addEventListener('click', function (ev) {
       const btn = ev.target.closest('.eo-override-delete');
       if (!btn) return;
       deleteOverride(btn.getAttribute('data-code'));
     });
-    const codeInput = document.getElementById('eo-override-code');
-    if (codeInput) {
-      codeInput.addEventListener('input', function () {
-        codeInput.value = codeInput.value.toUpperCase();
-      });
-    }
   }
 
   function onTabShown() {
-    if (!loaded) loadOverrides();
-    else loadOverrides();
+    if (!appealsLoaded) {
+      reloadAll();
+    } else {
+      loadOverrides();
+      if (window.jQuery && window.jQuery('#eo-override-code').length && !window.jQuery('#eo-override-code').data('select2')) {
+        initAppealSelect2();
+      }
+    }
   }
 
   window.EoEndDateOverrides = {
     init: init,
     onTabShown: onTabShown,
-    reload: loadOverrides,
+    reload: reloadAll,
   };
 })(window, document);

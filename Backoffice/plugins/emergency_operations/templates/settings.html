@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% block title %}Emergency Operations Plugin Settings{% endblock %}
 
@@ -15,274 +16,370 @@
         ]
     ) }}
 
-    <!-- ── Data Cache Panel ───────────────────────────────────────────────── -->
-    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
-        <div class="flex items-center gap-3 mb-5">
-            <h3 class="text-lg font-semibold text-gray-800">
-                <i class="fas fa-database text-indigo-600 mr-2"></i>
-                Data Cache
-            </h3>
-            <span id="cache-status-badge" class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Loading…</span>
-        </div>
+    <div class="bg-white rounded-lg shadow-md border border-gray-200 mt-6">
+        {% call scroll_tab_bar(inner_id='eo-settings-tabs', aria_label='Emergency Operations settings sections') %}
+            <button type="button" role="tab" data-tab="settings" aria-selected="true"
+                    class="{{ admin_underline_tab_btn_classes(true) }}">
+                <i class="fas fa-sliders-h mr-1.5"></i>Settings
+            </button>
+            <button type="button" role="tab" data-tab="snapshot" aria-selected="false"
+                    class="{{ admin_underline_tab_btn_classes(false) }}">
+                <i class="fas fa-table mr-1.5"></i>Snapshot Preview
+            </button>
+        {% endcall %}
 
-        <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
-            <div class="flex items-center gap-4">
-                <span class="text-sm text-gray-600">Source</span>
-                <div class="flex items-center gap-4">
-                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="data-source" value="file" id="data-source-file"
-                               class="form-radio h-4 w-4 text-indigo-600 border-gray-300">
-                        <span class="text-sm">File cache</span>
-                    </label>
-                    <select id="cache-schedule-select" class="text-sm border-gray-300 rounded py-1.5 pl-2 pr-8 focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="off">Off</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                    </select>
-                    <button type="button" id="eo-refresh-cache-btn" style="display: none"
-                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50">
-                        <i class="fas fa-sync-alt" id="refresh-icon"></i>
-                        Pull from GO
-                    </button>
-                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="data-source" value="live" id="data-source-live"
-                               class="form-radio h-4 w-4 text-indigo-600 border-gray-300">
-                        <span class="text-sm">Live API</span>
-                    </label>
-                </div>
-            </div>
-            <div class="flex items-center gap-3 ml-8 md:ml-12">
-                <button type="button" id="eo-save-cache-settings-btn"
-                        class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                    Save
-                </button>
-            </div>
-        </div>
+        <div class="p-6">
+            <!-- ── Settings tab ──────────────────────────────────────────────── -->
+            <div id="panel-settings" class="settings-panel space-y-6">
+                <!-- Data Cache Panel -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <div class="flex items-center gap-3 mb-5">
+                        <h3 class="text-lg font-semibold text-gray-800">
+                            <i class="fas fa-database text-indigo-600 mr-2"></i>
+                            Data Cache
+                        </h3>
+                        <span id="cache-status-badge" class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Loading…</span>
+                    </div>
 
-        <div class="mt-5 pt-4 border-t border-gray-100 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-            <span><span class="text-gray-500">Records</span> <span class="font-medium text-gray-800" id="cache-record-count">—</span></span>
-            <span><span class="text-gray-500">Last pulled</span> <span class="font-medium text-gray-800" id="cache-fetched-at">—</span></span>
-            <span><span class="text-gray-500">Age</span> <span class="font-medium text-gray-800" id="cache-age">—</span></span>
-            <span><span class="text-gray-500">Next</span> <span class="font-medium text-gray-800" id="cache-next-refresh">—</span></span>
-        </div>
+                    <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
+                        <div class="flex items-center gap-4">
+                            <span class="text-sm text-gray-600">Source</span>
+                            <div class="flex items-center gap-4">
+                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="data-source" value="file" id="data-source-file"
+                                           class="form-radio h-4 w-4 text-indigo-600 border-gray-300">
+                                    <span class="text-sm">File cache</span>
+                                </label>
+                                <select id="cache-schedule-select" class="text-sm border-gray-300 rounded py-1.5 pl-2 pr-8 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="off">Off</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                                <button type="button" id="eo-refresh-cache-btn" style="display: none"
+                                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50">
+                                    <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                                    Pull from GO
+                                </button>
+                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="data-source" value="live" id="data-source-live"
+                                           class="form-radio h-4 w-4 text-indigo-600 border-gray-300">
+                                    <span class="text-sm">Live API</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 ml-8 md:ml-12">
+                            <button type="button" id="eo-save-cache-settings-btn"
+                                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                Save
+                            </button>
+                        </div>
+                    </div>
 
-        <div id="cache-action-msg" class="hidden mt-4 text-sm rounded px-3 py-2"></div>
-    </div>
+                    <div class="mt-5 pt-4 border-t border-gray-100 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                        <span><span class="text-gray-500">Records</span> <span class="font-medium text-gray-800" id="cache-record-count">—</span></span>
+                        <span><span class="text-gray-500">Last pulled</span> <span class="font-medium text-gray-800" id="cache-fetched-at">—</span></span>
+                        <span><span class="text-gray-500">Age</span> <span class="font-medium text-gray-800" id="cache-age">—</span></span>
+                        <span><span class="text-gray-500">Next</span> <span class="font-medium text-gray-800" id="cache-next-refresh">—</span></span>
+                    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {% include "plugins/_plugin_info_card.html" %}
-
-        <!-- Plugin Actions -->
-        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-700 mb-4">
-                <i class="fas fa-cogs text-gray-600 mr-2"></i>
-                Plugin Actions
-            </h3>
-
-            <div class="space-y-3">
-                <button type="button"
-                        id="eo-reload-plugin-btn"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
-                    <i class="fas fa-sync-alt mr-2"></i>
-                    Reload Plugin
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Configuration Settings -->
-    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
-        <h3 class="text-lg font-semibold text-gray-700 mb-4">
-            <i class="fas fa-sliders-h text-green-600 mr-2"></i>
-            Configuration Settings
-        </h3>
-
-        <form id="plugin-settings-form" class="space-y-6">
-            <!-- API Settings -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="md:col-span-2">
-                    <label for="eo-api-feed" class="block text-sm font-medium text-gray-700 mb-2">
-                        Appeals feed
-                    </label>
-                    <select id="eo-api-feed"
-                            name="api_feed"
-                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
-                        {% for feed_id, feed in appeal_feeds.items() %}
-                        <option value="{{ feed_id }}">{{ feed.label }}</option>
-                        {% endfor %}
-                    </select>
-                    <p id="eo-api-feed-url" class="mt-1 text-xs text-gray-500 font-mono break-all"></p>
-                    <p class="mt-1 text-xs text-gray-500">
-                        Appeal group includes country-level child appeals. GO appeals is the previous public list.
-                    </p>
-                    <script type="application/json" id="eo-appeal-feeds">{{ appeal_feeds | tojson }}</script>
+                    <div id="cache-action-msg" class="hidden mt-4 text-sm rounded px-3 py-2"></div>
                 </div>
 
-                <div>
-                    <label for="eo-api-timeout" class="block text-sm font-medium text-gray-700 mb-2">
-                        Request Timeout (seconds)
-                    </label>
-                    <input type="number"
-                           id="eo-api-timeout"
-                           name="api_timeout"
-                           min="1"
-                           max="60"
-                           value="10"
-                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
-                    <p class="mt-1 text-xs text-gray-500">
-                        Timeout for API requests in seconds (1-60)
-                    </p>
-                </div>
-            </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {% include "plugins/_plugin_info_card.html" %}
 
-            <!-- Query Settings -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label for="eo-query-end-date" class="block text-sm font-medium text-gray-700 mb-2">
-                        Default End Date Filter
-                    </label>
-                    <input type="text"
-                           id="eo-query-end-date"
-                           name="query_end_date"
-                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
-                           placeholder="2023-12-31">
-                    <p class="mt-1 text-xs text-gray-500">
-                        Filter appeals with end dates greater than this date (YYYY-MM-DD)
-                    </p>
+                    <!-- Plugin Actions -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                            <i class="fas fa-cogs text-gray-600 mr-2"></i>
+                            Plugin Actions
+                        </h3>
+
+                        <div class="space-y-3">
+                            <button type="button"
+                                    id="eo-reload-plugin-btn"
+                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600">
+                                <i class="fas fa-sync-alt mr-2"></i>
+                                Reload Plugin
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div>
-                    <label for="eo-query-limit" class="block text-sm font-medium text-gray-700 mb-2">
-                        Query Limit
-                    </label>
-                    <input type="number"
-                           id="eo-query-limit"
-                           name="query_limit"
-                           min="1"
-                           max="10000"
-                           value="1000"
-                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
-                    <p class="mt-1 text-xs text-gray-500">
-                        Maximum number of appeals to fetch per request
-                    </p>
-                </div>
-            </div>
+                <!-- Configuration Settings -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                        <i class="fas fa-sliders-h text-green-600 mr-2"></i>
+                        Configuration Settings
+                    </h3>
 
-            <!-- Display Settings -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label for="eo-display-max-items" class="block text-sm font-medium text-gray-700 mb-2">
-                        Maximum Items Displayed
-                    </label>
-                    <input type="number"
-                           id="eo-display-max-items"
-                           name="display_max_items"
-                           min="1"
-                           max="100"
-                           value="10"
-                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
-                    <p class="mt-1 text-xs text-gray-500">
-                        Maximum number of appeals to display in form fields (1-100)
-                    </p>
-                </div>
+                    <form id="plugin-settings-form" class="space-y-6">
+                        <!-- API Settings -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="md:col-span-2">
+                                <label for="eo-api-feed" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Appeals feed
+                                </label>
+                                <select id="eo-api-feed"
+                                        name="api_feed"
+                                        class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                    {% for feed_id, feed in appeal_feeds.items() %}
+                                    <option value="{{ feed_id }}">{{ feed.label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <p id="eo-api-feed-url" class="mt-1 text-xs text-gray-500 font-mono break-all"></p>
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Appeal group includes country-level child appeals. GO appeals is the previous public list.
+                                </p>
+                                <script type="application/json" id="eo-appeal-feeds">{{ appeal_feeds | tojson }}</script>
+                            </div>
 
-                <div>
-                    <label for="eo-cache-duration" class="block text-sm font-medium text-gray-700 mb-2">
-                        Cache Duration (seconds)
-                    </label>
-                    <input type="number"
-                           id="eo-cache-duration"
-                           name="cache_duration"
-                           min="0"
-                           max="86400"
-                           value="3600"
-                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
-                    <p class="mt-1 text-xs text-gray-500">
-                        How long to cache API responses (0-86400 seconds, 0 = no cache)
-                    </p>
-                </div>
-            </div>
-
-            <!-- Display Options -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Display Options</label>
-                    <div class="space-y-2">
-                        <div class="flex items-center">
-                            <input type="checkbox"
-                                   id="eo-display-funded"
-                                   name="display_funded"
-                                   checked
-                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="eo-display-funded" class="ml-2 block text-sm text-gray-900">
-                                Show funded amount
-                            </label>
+                            <div>
+                                <label for="eo-api-timeout" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Request Timeout (seconds)
+                                </label>
+                                <input type="number"
+                                       id="eo-api-timeout"
+                                       name="api_timeout"
+                                       min="1"
+                                       max="60"
+                                       value="10"
+                                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Timeout for API requests in seconds (1-60)
+                                </p>
+                            </div>
                         </div>
 
-                        <div class="flex items-center">
-                            <input type="checkbox"
-                                   id="eo-display-requested"
-                                   name="display_requested"
-                                   checked
-                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="eo-display-requested" class="ml-2 block text-sm text-gray-900">
-                                Show requested amount
-                            </label>
+                        <!-- Query Settings -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="eo-query-end-date" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Default End Date Filter
+                                </label>
+                                <input type="text"
+                                       id="eo-query-end-date"
+                                       name="query_end_date"
+                                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                       placeholder="2023-12-31">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Filter appeals with end dates greater than this date (YYYY-MM-DD)
+                                </p>
+                            </div>
+
+                            <div>
+                                <label for="eo-query-limit" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Query Limit
+                                </label>
+                                <input type="number"
+                                       id="eo-query-limit"
+                                       name="query_limit"
+                                       min="1"
+                                       max="10000"
+                                       value="1000"
+                                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Maximum number of appeals to fetch per request
+                                </p>
+                            </div>
                         </div>
-                        <div class="flex items-center">
-                            <input type="checkbox"
-                                   id="eo-display-coverage"
-                                   name="display_coverage"
-                                   checked
-                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="eo-display-coverage" class="ml-2 block text-sm text-gray-900">
-                                Show coverage
-                            </label>
+
+                        <!-- Display Settings -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="eo-display-max-items" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Maximum Items Displayed
+                                </label>
+                                <input type="number"
+                                       id="eo-display-max-items"
+                                       name="display_max_items"
+                                       min="1"
+                                       max="100"
+                                       value="10"
+                                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Maximum number of appeals to display in form fields (1-100)
+                                </p>
+                            </div>
+
+                            <div>
+                                <label for="eo-cache-duration" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Cache Duration (seconds)
+                                </label>
+                                <input type="number"
+                                       id="eo-cache-duration"
+                                       name="cache_duration"
+                                       min="0"
+                                       max="86400"
+                                       value="3600"
+                                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    How long to cache API responses (0-86400 seconds, 0 = no cache)
+                                </p>
+                            </div>
                         </div>
-                        <div class="flex items-center">
-                            <input type="checkbox"
-                                   id="eo-display-closed"
-                                   name="display_closed"
-                                   checked
-                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="eo-display-closed" class="ml-2 block text-sm text-gray-900">
-                                Show closed operations
-                            </label>
+
+                        <!-- Display Options -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Display Options</label>
+                                <div class="space-y-2">
+                                    <div class="flex items-center">
+                                        <input type="checkbox"
+                                               id="eo-display-funded"
+                                               name="display_funded"
+                                               checked
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="eo-display-funded" class="ml-2 block text-sm text-gray-900">
+                                            Show funded amount
+                                        </label>
+                                    </div>
+
+                                    <div class="flex items-center">
+                                        <input type="checkbox"
+                                               id="eo-display-requested"
+                                               name="display_requested"
+                                               checked
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="eo-display-requested" class="ml-2 block text-sm text-gray-900">
+                                            Show requested amount
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox"
+                                               id="eo-display-coverage"
+                                               name="display_coverage"
+                                               checked
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="eo-display-coverage" class="ml-2 block text-sm text-gray-900">
+                                            Show coverage
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox"
+                                               id="eo-display-closed"
+                                               name="display_closed"
+                                               checked
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="eo-display-closed" class="ml-2 block text-sm text-gray-900">
+                                            Show closed operations
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Button -->
+                        <div class="flex justify-end">
+                            <button type="submit"
+                                    class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600">
+                                <i class="fas fa-save mr-2"></i>
+                                Save Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Usage Statistics -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                        <i class="fas fa-chart-bar text-purple-600 mr-2"></i>
+                        Usage Statistics
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="text-center p-4 bg-blue-50 rounded-lg">
+                            <div class="text-2xl font-bold text-blue-600" id="total_eo_fields">0</div>
+                            <div class="text-sm text-gray-600">Total EO Fields</div>
+                        </div>
+
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <div class="text-2xl font-bold text-green-600" id="active_forms">0</div>
+                            <div class="text-sm text-gray-600">Forms Using EO</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Save Button -->
-            <div class="flex justify-end">
-                <button type="submit"
-                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600">
-                    <i class="fas fa-save mr-2"></i>
-                    Save Settings
-                </button>
+            <!-- ── Snapshot Preview tab ──────────────────────────────────────── -->
+            <div id="panel-snapshot" class="settings-panel hidden">
+                <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">
+                            <i class="fas fa-table text-indigo-600 mr-2"></i>
+                            Emergencies snapshot
+                        </h3>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Read-only view of the on-disk appeals cache used by form fields.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+                        <span>Source <span class="font-medium text-gray-800" id="snapshot-source">—</span></span>
+                        <span>Pulled <span class="font-medium text-gray-800" id="snapshot-fetched-at">—</span></span>
+                        <span>In cache <span class="font-medium text-gray-800" id="snapshot-record-count">—</span></span>
+                        <span>Showing <span class="font-medium text-gray-800" id="snapshot-filtered-count">—</span></span>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <div class="relative flex-1 min-w-[12rem] max-w-md">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="search" id="snapshot-search" placeholder="Search code, name, country…"
+                               class="w-full pl-9 pr-3 py-2 text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <select id="snapshot-status-filter"
+                            class="text-sm border-gray-300 rounded-md py-2 pl-3 pr-8 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">All statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                    <button type="button" id="snapshot-reload-btn"
+                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        <i class="fas fa-sync-alt" id="snapshot-reload-icon"></i>
+                        Reload
+                    </button>
+                </div>
+
+                <div id="snapshot-empty" class="hidden rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    No cache file yet. Switch to Settings and use <strong>Pull from GO</strong> under Data Cache.
+                </div>
+
+                <div id="snapshot-table-wrap" class="overflow-auto border border-gray-200 rounded-md max-h-[70vh]">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Code</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Country</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Start</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">End</th>
+                                <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Requested</th>
+                                <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Funded</th>
+                            </tr>
+                        </thead>
+                        <tbody id="snapshot-table-body" class="bg-white divide-y divide-gray-100">
+                            <tr>
+                                <td colspan="9" class="px-3 py-8 text-center text-gray-500">Loading snapshot…</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <p id="snapshot-page-info" class="text-sm text-gray-500">—</p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="snapshot-prev-btn"
+                                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40"
+                                disabled>Previous</button>
+                        <button type="button" id="snapshot-next-btn"
+                                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40"
+                                disabled>Next</button>
+                    </div>
+                </div>
             </div>
-        </form>
-    </div>
-
-    <!-- Usage Statistics -->
-    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
-        <h3 class="text-lg font-semibold text-gray-700 mb-4">
-            <i class="fas fa-chart-bar text-purple-600 mr-2"></i>
-            Usage Statistics
-        </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="text-center p-4 bg-blue-50 rounded-lg">
-                <div class="text-2xl font-bold text-blue-600" id="total_eo_fields">0</div>
-                <div class="text-sm text-gray-600">Total EO Fields</div>
-            </div>
-
-            <div class="text-center p-4 bg-green-50 rounded-lg">
-                <div class="text-2xl font-bold text-green-600" id="active_forms">0</div>
-                <div class="text-sm text-gray-600">Forms Using EO</div>
-            </div>
-
         </div>
     </div>
 </div>
@@ -443,13 +540,13 @@ function loadCurrentSettings() {
                 // Populate API settings
                 if (config.api) {
                     const feedSelect = document.getElementById('eo-api-feed');
-                    if (feedSelect && config.api.feed && appealFeeds()[config.api.feed]) {
+                    if (feedSelect && config.api.feed) {
                         feedSelect.value = config.api.feed;
                     }
-                    showSelectedFeedUrl();
                     if (config.api.timeout) {
                         document.getElementById('eo-api-timeout').value = config.api.timeout;
                     }
+                    showSelectedFeedUrl();
                 }
 
                 // Populate query settings
@@ -467,18 +564,10 @@ function loadCurrentSettings() {
                     if (config.display_defaults.max_items) {
                         document.getElementById('eo-display-max-items').value = config.display_defaults.max_items;
                     }
-                    if (config.display_defaults.show_funded_amount !== undefined) {
-                        document.getElementById('eo-display-funded').checked = config.display_defaults.show_funded_amount;
-                    }
-                    if (config.display_defaults.show_requested_amount !== undefined) {
-                        document.getElementById('eo-display-requested').checked = config.display_defaults.show_requested_amount;
-                    }
-                    if (config.display_defaults.show_coverage !== undefined) {
-                        document.getElementById('eo-display-coverage').checked = config.display_defaults.show_coverage;
-                    }
-                    if (config.display_defaults.show_closed_operations !== undefined) {
-                        document.getElementById('eo-display-closed').checked = config.display_defaults.show_closed_operations;
-                    }
+                    document.getElementById('eo-display-funded').checked = config.display_defaults.show_funded_amount !== false;
+                    document.getElementById('eo-display-requested').checked = config.display_defaults.show_requested_amount !== false;
+                    document.getElementById('eo-display-coverage').checked = config.display_defaults.show_coverage !== false;
+                    document.getElementById('eo-display-closed').checked = config.display_defaults.show_closed_operations !== false;
                 }
 
                 // Populate cache settings
@@ -492,9 +581,9 @@ function loadCurrentSettings() {
         });
 }
 
-// ── Data Cache helpers ──────────────────────────────────────────────────────
+// ── Data Cache UI ───────────────────────────────────────────────────────────
 
-function showCacheMsg(text, isError = false) {
+function showCacheMsg(text, isError) {
     const el = document.getElementById('cache-action-msg');
     if (!el) return;
     el.textContent = text;
@@ -576,6 +665,10 @@ function refreshCache() {
         if (data.success) {
             showCacheMsg(`✓ Refreshed successfully — ${Number(data.record_count).toLocaleString()} records pulled (${data.fetched_at_display})`);
             loadCacheStatus();
+            snapshotState.loaded = false;
+            if (document.getElementById('panel-snapshot') && !document.getElementById('panel-snapshot').classList.contains('hidden')) {
+                loadSnapshotPreview();
+            }
         } else {
             showCacheMsg('Error: ' + (data.error || 'Unknown error'), true);
         }
@@ -614,6 +707,164 @@ function saveCacheSettings() {
     .catch(err => showCacheMsg('Network error: ' + err.message, true));
 }
 
+// ── Snapshot Preview ────────────────────────────────────────────────────────
+
+const snapshotState = {
+    page: 1,
+    perPage: 50,
+    loaded: false,
+    searchTimer: null,
+};
+
+function escHtml(value) {
+    if (window.SafeDom && typeof window.SafeDom.escapeHtml === 'function') {
+        return window.SafeDom.escapeHtml(String(value == null ? '' : value));
+    }
+    return String(value == null ? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatAmount(value) {
+    if (value == null || value === '') return '—';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function statusBadge(status) {
+    const label = status || '—';
+    const lower = String(label).toLowerCase();
+    let classes = 'bg-gray-100 text-gray-700';
+    if (lower === 'active') classes = 'bg-green-100 text-green-800';
+    else if (lower === 'closed') classes = 'bg-gray-100 text-gray-600';
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classes}">${escHtml(label)}</span>`;
+}
+
+function loadSnapshotPreview() {
+    const tbody = document.getElementById('snapshot-table-body');
+    const emptyEl = document.getElementById('snapshot-empty');
+    const wrap = document.getElementById('snapshot-table-wrap');
+    const icon = document.getElementById('snapshot-reload-icon');
+    const q = (document.getElementById('snapshot-search')?.value || '').trim();
+    const status = document.getElementById('snapshot-status-filter')?.value || '';
+
+    if (icon) icon.classList.add('fa-spin');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="9" class="px-3 py-8 text-center text-gray-500">Loading snapshot…</td></tr>';
+    }
+
+    const params = new URLSearchParams({
+        page: String(snapshotState.page),
+        per_page: String(snapshotState.perPage),
+    });
+    if (q) params.set('q', q);
+    if (status) params.set('status', status);
+
+    fetch('/admin/plugins/emergency_operations/api/data-cache/preview?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-8 text-center text-red-600">${escHtml(data.error || 'Failed to load snapshot')}</td></tr>`;
+                }
+                return;
+            }
+
+            const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            setText('snapshot-source', data.exists ? (data.source || '—') : '—');
+            setText('snapshot-fetched-at', data.exists ? (data.fetched_at_display || '—') : 'Never');
+            setText('snapshot-record-count', data.exists ? Number(data.record_count || 0).toLocaleString() : '—');
+            setText('snapshot-filtered-count', data.exists ? Number(data.total || 0).toLocaleString() : '—');
+
+            if (!data.exists) {
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                if (wrap) wrap.classList.add('hidden');
+                setText('snapshot-page-info', 'No snapshot');
+                document.getElementById('snapshot-prev-btn').disabled = true;
+                document.getElementById('snapshot-next-btn').disabled = true;
+                snapshotState.loaded = true;
+                return;
+            }
+
+            if (emptyEl) emptyEl.classList.add('hidden');
+            if (wrap) wrap.classList.remove('hidden');
+
+            const rows = data.rows || [];
+            if (!rows.length) {
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="px-3 py-8 text-center text-gray-500">No emergencies match this filter.</td></tr>';
+                }
+            } else if (tbody) {
+                tbody.innerHTML = rows.map(row => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 whitespace-nowrap font-mono text-xs text-gray-800">${escHtml(row.code)}</td>
+                        <td class="px-3 py-2 text-gray-800 max-w-xs truncate" title="${escHtml(row.name)}">${escHtml(row.name)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.type || '—')}</td>
+                        <td class="px-3 py-2 whitespace-nowrap">${statusBadge(row.status)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.country || '—')}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.start_date || '—')}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">${escHtml(row.end_date || '—')}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-right text-gray-700 tabular-nums">${formatAmount(row.amount_requested)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-right text-gray-700 tabular-nums">${formatAmount(row.amount_funded)}</td>
+                    </tr>
+                `).join('');
+            }
+
+            const page = data.page || 1;
+            const pages = data.pages || 0;
+            const total = data.total || 0;
+            snapshotState.page = page;
+            setText(
+                'snapshot-page-info',
+                pages
+                    ? `Page ${page.toLocaleString()} of ${pages.toLocaleString()} · ${total.toLocaleString()} matching`
+                    : `${total.toLocaleString()} matching`
+            );
+            document.getElementById('snapshot-prev-btn').disabled = page <= 1;
+            document.getElementById('snapshot-next-btn').disabled = !pages || page >= pages;
+            snapshotState.loaded = true;
+        })
+        .catch(err => {
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-8 text-center text-red-600">${escHtml(err.message || 'Network error')}</td></tr>`;
+            }
+        })
+        .finally(() => {
+            if (icon) icon.classList.remove('fa-spin');
+        });
+}
+
+function activateEoSettingsTab(tabId) {
+    if (window.AdminUnderlineTabs && typeof window.AdminUnderlineTabs.activateStripTab === 'function') {
+        window.AdminUnderlineTabs.activateStripTab('#eo-settings-tabs', tabId, {
+            panelSelector: '.settings-panel',
+            panelIdPrefix: 'panel-',
+        });
+    } else {
+        document.querySelectorAll('#eo-settings-tabs .settings-tab').forEach(btn => {
+            const active = btn.getAttribute('data-tab') === tabId;
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        document.querySelectorAll('.settings-panel').forEach(panel => {
+            panel.classList.toggle('hidden', panel.id !== 'panel-' + tabId);
+        });
+    }
+    try {
+        const url = new URL(window.location.href);
+        if (tabId === 'settings') url.searchParams.delete('tab');
+        else url.searchParams.set('tab', tabId);
+        window.history.replaceState({}, '', url);
+    } catch (e) { /* ignore */ }
+
+    if (tabId === 'snapshot' && !snapshotState.loaded) {
+        loadSnapshotPreview();
+    }
+}
+
 // ── Initialize page ─────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -630,6 +881,40 @@ document.addEventListener('DOMContentLoaded', function() {
     const reloadBtn = document.getElementById('eo-reload-plugin-btn');
     if (reloadBtn) reloadBtn.addEventListener('click', reloadPlugin);
 
+    document.querySelectorAll('#eo-settings-tabs .settings-tab').forEach(btn => {
+        btn.addEventListener('click', () => activateEoSettingsTab(btn.getAttribute('data-tab')));
+    });
+
+    document.getElementById('snapshot-reload-btn')?.addEventListener('click', () => {
+        snapshotState.page = 1;
+        loadSnapshotPreview();
+    });
+    document.getElementById('snapshot-status-filter')?.addEventListener('change', () => {
+        snapshotState.page = 1;
+        loadSnapshotPreview();
+    });
+    document.getElementById('snapshot-search')?.addEventListener('input', () => {
+        clearTimeout(snapshotState.searchTimer);
+        snapshotState.searchTimer = setTimeout(() => {
+            snapshotState.page = 1;
+            loadSnapshotPreview();
+        }, 250);
+    });
+    document.getElementById('snapshot-prev-btn')?.addEventListener('click', () => {
+        if (snapshotState.page > 1) {
+            snapshotState.page -= 1;
+            loadSnapshotPreview();
+        }
+    });
+    document.getElementById('snapshot-next-btn')?.addEventListener('click', () => {
+        snapshotState.page += 1;
+        loadSnapshotPreview();
+    });
+
+    const initialTab = new URLSearchParams(window.location.search).get('tab');
+    if (initialTab === 'snapshot') {
+        activateEoSettingsTab('snapshot');
+    }
 });
 </script>
 {% endblock %}

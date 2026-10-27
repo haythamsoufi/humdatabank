@@ -47,3 +47,29 @@ def test_apply_filters_end_date_gte_excludes_earlier_end_dates():
     ]
     filtered = _apply_filters(results, end_date_gt="2026-01-01")
     assert {r["code"] for r in filtered} == {"NEW", "OPEN"}
+
+
+def test_snapshot_preview_row_projects_slim_fields():
+    from plugins.emergency_operations.routes import _snapshot_preview_row
+
+    row = _snapshot_preview_row({
+        "code": "MDRAF019",
+        "name": "Afghanistan - Earthquake",
+        "atype_display": "Emergency Appeal",
+        "status_display": "Active",
+        "country": {"iso": "AF", "name": "Afghanistan"},
+        "start_date": "2024-01-15T00:00:00",
+        "end_date": "2025-06-30T00:00:00",
+        "amount_requested": 1000000.0,
+        "amount_funded": 250000.5,
+        "part_of": "",
+    })
+    assert row["code"] == "MDRAF019"
+    assert row["name"] == "Afghanistan - Earthquake"
+    assert row["type"] == "Emergency Appeal"
+    assert row["status"] == "Active"
+    assert row["country"] == "Afghanistan"
+    assert row["start_date"] == "2024-01-15"
+    assert row["end_date"] == "2025-06-30"
+    assert row["amount_requested"] == 1000000.0
+    assert "label" in row

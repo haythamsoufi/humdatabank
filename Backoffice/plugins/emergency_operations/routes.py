@@ -695,10 +695,117 @@ def create_blueprint():
             return json_ok(success=True, use_file_cache=use_file_cache)
         return json_server_error('Failed to save data source setting', success=False, error='Failed to save data source setting')
 
+    @bp.route('/api/data-cache/preview', methods=['GET'])
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
+    def data_cache_preview():
+        """Paginated snapshot of emergencies from the on-disk appeals cache."""
+        store = get_data_store()
+        cached = store.load_cached()
+        status_meta = store.get_status()
+        if not cached:
+            return json_ok(
+                success=True,
+                exists=False,
+                rows=[],
+                total=0,
+                page=1,
+                per_page=50,
+                pages=0,
+                fetched_at=None,
+                fetched_at_display='Never',
+                source=None,
+                record_count=0,
+            )
+
+        q = (request.args.get('q') or '').strip().lower()
+        status_filter = (request.args.get('status') or '').strip().lower()
+        try:
+            page = max(1, int(request.args.get('page') or 1))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            per_page = int(request.args.get('per_page') or 50)
+        except (TypeError, ValueError):
+            per_page = 50
+        per_page = min(100, max(10, per_page))
+
+        rows = [_snapshot_preview_row(item) for item in (cached.get('results') or [])]
+        if status_filter:
+            rows = [r for r in rows if (r.get('status') or '').lower() == status_filter]
+        if q:
+            rows = [
+                r for r in rows
+                if q in ' '.join([
+                    str(r.get('code') or ''),
+                    str(r.get('name') or ''),
+                    str(r.get('type') or ''),
+                    str(r.get('status') or ''),
+                    str(r.get('country') or ''),
+                    str(r.get('part_of') or ''),
+                ]).lower()
+            ]
+
+        total = len(rows)
+        pages = (total + per_page - 1) // per_page if total else 0
+        if pages and page > pages:
+            page = pages
+        start = (page - 1) * per_page
+        page_rows = rows[start:start + per_page]
+
+        return json_ok(
+            success=True,
+            exists=True,
+            rows=page_rows,
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=pages,
+            fetched_at=cached.get('fetched_at'),
+            fetched_at_display=status_meta.get('fetched_at_display'),
+            source=cached.get('source'),
+            record_count=cached.get('record_count') or len(cached.get('results') or []),
+        )
+
     return bp
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _operation_country_label(item: dict) -> str:
+    """Human-readable country label from a raw appeals catalogue row."""
+    country_names = []
+    country = item.get('country')
+    if isinstance(country, dict):
+        country_names.append(country.get('name') or country.get('iso') or '')
+    countries = item.get('countries')
+    if isinstance(countries, list):
+        for c in countries:
+            if isinstance(c, dict) and (c.get('name') or c.get('iso')):
+                country_names.append(c.get('name') or c.get('iso'))
+    gec = (item.get('group_geographical_code') or '').strip()
+    if gec and not country_names:
+        country_names.append(gec)
+    return ', '.join(filter(None, country_names)) or '—'
+
+
+def _snapshot_preview_row(item: dict) -> dict:
+    """Slim row for the settings Snapshot Preview table."""
+    code = item.get('code') or ''
+    name = item.get('name') or 'Unnamed Operation'
+    return {
+        'code': code,
+        'name': name,
+        'label': format_operation_label(name, code, item.get('part_of')),
+        'type': item.get('atype_display') or item.get('appeal_subtype') or '',
+        'status': item.get('status_display') or item.get('status') or '',
+        'country': _operation_country_label(item),
+        'part_of': item.get('part_of') or '',
+        'start_date': str(item.get('start_date') or '')[:10] or None,
+        'end_date': str(item.get('end_date') or '')[:10] or None,
+        'amount_requested': item.get('amount_requested'),
+        'amount_funded': item.get('amount_funded'),
+    }
+
 
 def _bg_refresh(cfg, store, limit_default, end_date_default, timeout_sec):
     """Kick off a non-blocking background refresh using the daemon thread helper."""

@@ -16,7 +16,7 @@ UPR / Unified Plan / UPL / Unified Report → documents via **`searchPublicDocum
 3. **"How many countries submitted…"** → `getSubmissionCoverage` (data) or `getPublicDocumentsCatalog` (documents) — never paginate + count manually
 4. **Country/period detail** → `getPublicData` (`page`, `per_page`; never `include_dimensions=true`)
 5. **Resolve country name/code** → `resolveCountry` (id, iso2, iso3, region)
-6. **Plan/report text** → `searchPublicDocuments`; truncated chunk → `getChunkContext(chunk_id)`
+6. **Plan/report text** → `searchPublicDocuments`; truncated chunk → `getChunkContext(chunk_id)` (opaque UUID from search — never invent integer ids)
 7. **Indicator metadata** → `getIndicatorById` or `getIndicatorBank` with `search` + `limit`
 8. **One-country one-pager** → `getCountryReport` (KPIs+trend+narrative, one call)
 

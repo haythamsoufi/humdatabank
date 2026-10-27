@@ -48,7 +48,7 @@ class TestToolsSurfaceCancellationInsteadOfSilentAbort:
 
     def test_get_chunk_context_tool(self):
         with patch("server.get_chunk_context", side_effect=asyncio.CancelledError()):
-            result = server.databank_get_chunk_context(chunk_id=17842)
+            result = server.databank_get_chunk_context(chunk_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         assert isinstance(result, str)
         assert "cancelled" in result.lower()
 
@@ -60,6 +60,6 @@ class TestToolsSurfaceCancellationInsteadOfSilentAbort:
 
     def test_get_public_document_tool(self):
         with patch("server.get_public_document", side_effect=asyncio.CancelledError()):
-            result = server.databank_get_public_document(document_id=244)
+            result = server.databank_get_public_document(document_id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
         assert isinstance(result, str)
         assert "cancelled" in result.lower()

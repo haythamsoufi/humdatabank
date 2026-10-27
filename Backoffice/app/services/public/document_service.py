@@ -296,21 +296,46 @@ def _ai_document_has_local_file(document: AIDocument) -> bool:
     return bool(getattr(document, "storage_path", None) and _ai_doc_source_ready(document))
 
 
+def _parse_public_uuid(raw: object):
+    """Parse a public opaque id; return None when the value is not a UUID."""
+    import uuid as _uuid
+
+    if isinstance(raw, _uuid.UUID):
+        return raw
+    try:
+        return _uuid.UUID(str(raw))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _opaque_document_id(document: AIDocument) -> str:
+    """Public API document id — always the opaque UUID string, never the integer PK."""
+    return str(document.public_id)
+
+
+def _opaque_chunk_id(chunk: AIDocumentChunk) -> str:
+    return str(chunk.public_id)
+
+
 def _public_document_link_fields(
-    document_id: int | None,
+    public_id: object | None,
     *,
     source_url: str | None = None,
     has_local_file: bool = False,
 ) -> Dict[str, str | None]:
-    """Build shareable links: external source_url and/or Databank-hosted download."""
+    """Build shareable links: external source_url and/or Databank-hosted download.
+
+    ``public_id`` must be the opaque UUID (never the integer primary key).
+    """
     download_url = None
-    if document_id and has_local_file:
+    opaque = _parse_public_uuid(public_id) if public_id is not None else None
+    if opaque and has_local_file:
         try:
             from flask import url_for
 
             download_url = url_for(
                 "api.public_download_ai_document",
-                document_id=int(document_id),
+                public_id=opaque,
                 _external=True,
             )
         except RuntimeError:
@@ -323,10 +348,15 @@ def _public_document_link_fields(
     }
 
 
-def _load_public_ai_document(document_id: int) -> AIDocument:
+def _load_public_ai_document(public_id: object) -> AIDocument:
+    opaque = _parse_public_uuid(public_id)
+    if opaque is None:
+        # Integer / non-UUID identifiers are not accepted on the public surface
+        # (anti-enumeration: unknown and invalid look the same).
+        raise ClientInputError("Document not found or not public")
     completed = AIDocumentProcessingStatusValue.completed.value
     doc = AIDocument.query.filter(
-        AIDocument.id == int(document_id),
+        AIDocument.public_id == opaque,
         AIDocument.is_public.is_(True),
         ai_document_read_filter(ANONYMOUS_PRINCIPAL),
         AIDocument.searchable.is_(True),
@@ -338,10 +368,10 @@ def _load_public_ai_document(document_id: int) -> AIDocument:
 
 
 def _document_scope_entry(document: AIDocument, *, check_local_file: bool = True) -> Dict[str, Any]:
-    doc_id = int(document.id)
+    opaque_id = _opaque_document_id(document)
     source_url = _document_source_url(document)
     entry = {
-        "document_id": doc_id,
+        "document_id": opaque_id,
         "document_title": document.title,
         "countries": _document_country_names(document),
     }
@@ -352,12 +382,55 @@ def _document_scope_entry(document: AIDocument, *, check_local_file: bool = True
     has_local_file = False if (source_url or not check_local_file) else _ai_document_has_local_file(document)
     entry.update(
         _public_document_link_fields(
-            doc_id,
+            opaque_id,
             source_url=source_url,
             has_local_file=has_local_file,
         )
     )
     return entry
+
+
+def _row_opaque_document_id(row: Dict[str, Any]) -> str | None:
+    """Opaque document id for public responses — never the integer primary key."""
+    opaque = row.get("document_public_id")
+    if opaque:
+        return str(opaque)
+    raw = row.get("document_id")
+    if raw is None:
+        return None
+    # Vector-store hits include document_public_id; resolve int PK only as a fallback
+    # when an older projection omitted it (still never emit the integer to clients).
+    try:
+        from flask import has_app_context
+
+        if not has_app_context():
+            return None
+        doc = db.session.get(AIDocument, int(raw))
+    except (TypeError, ValueError):
+        return None
+    if doc is None or not getattr(doc, "public_id", None):
+        return None
+    return str(doc.public_id)
+
+
+def _row_opaque_chunk_id(row: Dict[str, Any]) -> str | None:
+    opaque = row.get("chunk_public_id")
+    if opaque:
+        return str(opaque)
+    raw = row.get("chunk_id")
+    if raw is None:
+        return None
+    try:
+        from flask import has_app_context
+
+        if not has_app_context():
+            return None
+        chunk = db.session.get(AIDocumentChunk, int(raw))
+    except (TypeError, ValueError):
+        return None
+    if chunk is None or not getattr(chunk, "public_id", None):
+        return None
+    return str(chunk.public_id)
 
 
 def slim_public_document_chunk(
@@ -372,10 +445,11 @@ def slim_public_document_chunk(
     if not country_names and row.get("document_country_name"):
         country_names = [row["document_country_name"]]
 
-    doc_id = row.get("document_id")
+    opaque_doc_id = _row_opaque_document_id(row)
+    opaque_chunk_id = _row_opaque_chunk_id(row)
     source_url = _document_source_url(row)
     links = _public_document_link_fields(
-        int(doc_id) if doc_id is not None else None,
+        opaque_doc_id,
         source_url=source_url,
         has_local_file=bool(row.get("has_local_file")),
     )
@@ -388,8 +462,8 @@ def slim_public_document_chunk(
     )
 
     return {
-        "chunk_id": row.get("chunk_id"),
-        "document_id": doc_id,
+        "chunk_id": opaque_chunk_id,
+        "document_id": opaque_doc_id,
         "document_title": row.get("document_title"),
         "document_filename": row.get("document_filename"),
         "document_date": row.get("document_date"),
@@ -649,13 +723,13 @@ def prioritize_latest_documents_per_country(
                 continue
             superseded.append(
                 {
-                    "document_id": int(doc.id),
+                    "document_id": _opaque_document_id(doc),
                     "document_title": doc.title,
                     "countries": _document_country_names(doc),
                     "document_type": type_key,
                     "document_year": _document_year(doc),
                     "source_url": _document_source_url(doc),
-                    "superseded_by_document_id": int(best.id),
+                    "superseded_by_document_id": _opaque_document_id(best),
                     "superseded_by_title": best.title,
                 }
             )
@@ -718,9 +792,9 @@ def _catalog_document_entry(
     year: int,
     include_links: bool = True,
 ) -> Dict[str, Any]:
-    doc_id = int(document.id)
+    opaque_id = _opaque_document_id(document)
     entry: Dict[str, Any] = {
-        "document_id": doc_id,
+        "document_id": opaque_id,
         "document_title": document.title,
         "document_type": type_key,
         "year": year or None,
@@ -733,7 +807,7 @@ def _catalog_document_entry(
             has_local_file = _ai_document_has_local_file(document)
         entry.update(
             _public_document_link_fields(
-                doc_id,
+                opaque_id,
                 source_url=source_url,
                 has_local_file=has_local_file,
             )
@@ -1384,13 +1458,14 @@ def search_public_documents(
     return payload
 
 
-def get_public_document_metadata(document_id: int) -> Dict[str, Any]:
+def get_public_document_metadata(public_id: object) -> Dict[str, Any]:
     """Return public metadata for a single AI document (including shareable links)."""
-    doc = _load_public_ai_document(document_id)
+    doc = _load_public_ai_document(public_id)
+    opaque_id = _opaque_document_id(doc)
     doc_date = doc.document_date.isoformat() if doc.document_date else None
     source_url = _document_source_url(doc)
     payload = {
-        "document_id": int(doc.id),
+        "document_id": opaque_id,
         "document_title": doc.title,
         "document_filename": doc.filename,
         "document_date": doc_date,
@@ -1401,7 +1476,7 @@ def get_public_document_metadata(document_id: int) -> Dict[str, Any]:
     }
     payload.update(
         _public_document_link_fields(
-            int(doc.id),
+            opaque_id,
             source_url=source_url,
             has_local_file=bool(payload["has_local_file"]),
         )
@@ -1410,7 +1485,7 @@ def get_public_document_metadata(document_id: int) -> Dict[str, Any]:
 
 
 def get_public_document_chunk_context(
-    chunk_id: int,
+    chunk_public_id: object,
     *,
     before: int = 1,
     after: int = 1,
@@ -1421,17 +1496,22 @@ def get_public_document_chunk_context(
     without re-running a broad search over the whole document.
 
     Only chunks belonging to a public, searchable, completed document are returned —
-    same visibility rule as :func:`search_public_documents`.
+    same visibility rule as :func:`search_public_documents`. Lookup is by opaque
+    ``public_id`` only (integer chunk PKs are not accepted).
     """
     before = max(0, min(int(before), PUBLIC_DOC_CHUNK_CONTEXT_MAX_BEFORE_AFTER))
     after = max(0, min(int(after), PUBLIC_DOC_CHUNK_CONTEXT_MAX_BEFORE_AFTER))
+
+    opaque_chunk = _parse_public_uuid(chunk_public_id)
+    if opaque_chunk is None:
+        raise ClientInputError("Chunk not found, or its document is not public")
 
     completed = AIDocumentProcessingStatusValue.completed.value
     target = (
         db.session.query(AIDocumentChunk, AIDocument)
         .join(AIDocument, AIDocumentChunk.document_id == AIDocument.id)
         .filter(
-            AIDocumentChunk.id == int(chunk_id),
+            AIDocumentChunk.public_id == opaque_chunk,
             AIDocument.is_public.is_(True),
             ai_document_read_filter(ANONYMOUS_PRINCIPAL),
             AIDocument.searchable.is_(True),
@@ -1444,13 +1524,14 @@ def get_public_document_chunk_context(
         raise ClientInputError("Chunk not found, or its document is not public")
 
     target_chunk, document = target
-    doc_id = int(document.id)
+    opaque_doc_id = _opaque_document_id(document)
+    internal_doc_id = int(document.id)
     min_index = target_chunk.chunk_index - before
     max_index = target_chunk.chunk_index + after
 
     siblings = (
         AIDocumentChunk.query.filter(
-            AIDocumentChunk.document_id == doc_id,
+            AIDocumentChunk.document_id == internal_doc_id,
             AIDocumentChunk.chunk_index >= min_index,
             AIDocumentChunk.chunk_index <= max_index,
         )
@@ -1460,7 +1541,7 @@ def get_public_document_chunk_context(
 
     chunks = [
         {
-            "chunk_id": int(c.id),
+            "chunk_id": _opaque_chunk_id(c),
             "chunk_index": c.chunk_index,
             "page_number": c.page_number,
             "section_title": c.section_title,
@@ -1472,16 +1553,16 @@ def get_public_document_chunk_context(
 
     source_url = _document_source_url(document)
     links = _public_document_link_fields(
-        doc_id,
+        opaque_doc_id,
         source_url=source_url,
         has_local_file=_ai_document_has_local_file(document) if not source_url else False,
     )
 
     return {
-        "document_id": doc_id,
+        "document_id": opaque_doc_id,
         "document_title": document.title,
         "countries": _document_country_names(document),
-        "requested_chunk_id": int(target_chunk.id),
+        "requested_chunk_id": _opaque_chunk_id(target_chunk),
         "requested_chunk_index": target_chunk.chunk_index,
         "before": before,
         "after": after,
@@ -1496,7 +1577,7 @@ def get_public_document_chunk_context(
     }
 
 
-def stream_public_ai_document_download(document_id: int):
+def stream_public_ai_document_download(public_id: object):
     """Stream or redirect a public AI document file (no login required)."""
     import os
 
@@ -1505,7 +1586,7 @@ def stream_public_ai_document_download(document_id: int):
     from app.routes.ai_documents.helpers import _ai_doc_source_ready, _validate_ifrc_fetch_url
     from app.services.platform import storage_service as _storage
 
-    doc = _load_public_ai_document(document_id)
+    doc = _load_public_ai_document(public_id)
     source_url = _document_source_url(doc)
     if source_url:
         ok, _reason = _validate_ifrc_fetch_url(source_url)

@@ -304,9 +304,10 @@ def databank_get_documents_catalog(
 
 
 @mcp.tool()
-def databank_get_public_document(document_id: int) -> str:
+def databank_get_public_document(document_id: str) -> str:
     """Get public metadata for one AI document (title, countries, source_url, links).
 
+    ``document_id`` is the opaque UUID from search/catalog results (never an integer).
     Use when a databank_search_public_documents chunk lacks document_url and the
     user needs a shareable link, or to confirm a document's countries/date/category.
     """
@@ -317,9 +318,10 @@ def databank_get_public_document(document_id: int) -> str:
 
 
 @mcp.tool()
-def databank_get_chunk_context(chunk_id: int, before: int = 1, after: int = 1) -> str:
+def databank_get_chunk_context(chunk_id: str, before: int = 1, after: int = 1) -> str:
     """Fetch chunks immediately before/after a databank_search_public_documents result.
 
+    ``chunk_id`` is the opaque UUID from search results (never an integer).
     Use when a returned chunk is truncated ("…") or its match reason isn't visible in
     the shown text — this verifies/expands a hit without re-searching the whole document.
     Returns up to `before` + 1 + `after` chunks (each capped at 5) in document reading
@@ -549,8 +551,8 @@ def databank_api_info() -> str:
                 "GET /public/countries/resolve",
                 "GET /public/documents/search",
                 "GET /public/documents/catalog",
-                "GET /public/documents/<id>",
-                "GET /public/documents/<id>/download",
+                "GET /public/documents/<uuid>",
+                "GET /public/documents/<uuid>/download",
                 "GET /indicator-bank",
                 "GET /indicator-bank/<id>",
                 "GET /data (scoped, public privacy only)",
@@ -564,7 +566,7 @@ def databank_api_info() -> str:
                 "count_submissions": "databank_get_submission_coverage(template_id=21, period_name='Annual 2024')",
                 "count_documents": "databank_get_documents_catalog(document_type='annual_report', year=2024)",
                 "upr_documents": "databank_search_public_documents(query='Syria unified plan 2026')",
-                "one_document": "databank_get_public_document(document_id=ID)",
+                "one_document": "databank_get_public_document(document_id=UUID)",
                 "raw_rows": "databank_get_public_data(indicator_bank_id=ID, include_dimensions=false)",
                 "country_report": "databank_build_country_report(country='Syria', period_hint='2026 midyear')",
                 "report_template": "databank_get_report_template(style='default')",

@@ -227,17 +227,19 @@ def public_search_documents():
         return api_error("Could not search public documents", 500, error_id, None)
 
 
-@api_bp.route("/public/documents/chunks/<int:chunk_id>/context", methods=["GET"])
+@api_bp.route("/public/documents/chunks/<uuid:chunk_public_id>/context", methods=["GET"])
 @api_rate_limit()
-def public_get_document_chunk_context(chunk_id: int):
+def public_get_document_chunk_context(chunk_public_id):
     """
     Neighboring chunks (by chunk_index) around one search-result chunk, for verifying or
     expanding a truncated/ambiguous match without re-running a broad document search.
+
+    ``chunk_public_id`` is the opaque UUID from search results (never the integer PK).
     """
     try:
         before = request.args.get("before", default=1, type=int)
         after = request.args.get("after", default=1, type=int)
-        payload = get_public_document_chunk_context(chunk_id, before=before, after=after)
+        payload = get_public_document_chunk_context(chunk_public_id, before=before, after=after)
         response = json_response(payload)
         response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Public-Data-Access"] = "true"
@@ -248,7 +250,7 @@ def public_get_document_chunk_context(chunk_id: int):
         error_id = str(uuid.uuid4())
         current_app.logger.error(
             "public/documents/chunks/%s/context failed [ID: %s]: %s",
-            chunk_id,
+            chunk_public_id,
             error_id,
             exc,
             exc_info=True,
@@ -256,12 +258,16 @@ def public_get_document_chunk_context(chunk_id: int):
         return api_error("Could not load chunk context", 500, error_id, None)
 
 
-@api_bp.route("/public/documents/<int:document_id>", methods=["GET"])
+@api_bp.route("/public/documents/<uuid:public_id>", methods=["GET"])
 @api_rate_limit()
-def public_get_document(document_id: int):
-    """Public metadata for one AI document (title, countries, source_url)."""
+def public_get_document(public_id):
+    """Public metadata for one AI document (title, countries, source_url).
+
+    Path uses the opaque ``public_id`` UUID only — integer PKs do not match this route
+    (404), which prevents sequential enumeration of public documents.
+    """
     try:
-        payload = get_public_document_metadata(document_id)
+        payload = get_public_document_metadata(public_id)
         response = json_response(payload)
         response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
         response.headers["X-Public-Data-Access"] = "true"
@@ -272,7 +278,7 @@ def public_get_document(document_id: int):
         error_id = str(uuid.uuid4())
         current_app.logger.error(
             "public/documents/%s failed [ID: %s]: %s",
-            document_id,
+            public_id,
             error_id,
             exc,
             exc_info=True,
@@ -280,12 +286,15 @@ def public_get_document(document_id: int):
         return api_error("Could not load public document", 500, error_id, None)
 
 
-@api_bp.route("/public/documents/<int:document_id>/download", methods=["GET"])
+@api_bp.route("/public/documents/<uuid:public_id>/download", methods=["GET"])
 @api_rate_limit()
-def public_download_ai_document(document_id: int):
-    """Download or redirect to a public AI Knowledge Base document (no login)."""
+def public_download_ai_document(public_id):
+    """Download or redirect to a public AI Knowledge Base document (no login).
+
+    Path uses the opaque ``public_id`` UUID only — integer PKs do not match (404).
+    """
     try:
-        response = stream_public_ai_document_download(document_id)
+        response = stream_public_ai_document_download(public_id)
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
@@ -294,7 +303,7 @@ def public_download_ai_document(document_id: int):
         error_id = str(uuid.uuid4())
         current_app.logger.error(
             "public/documents/%s/download failed [ID: %s]: %s",
-            document_id,
+            public_id,
             error_id,
             exc,
             exc_info=True,

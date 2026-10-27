@@ -51,7 +51,7 @@ databank_search_public_documents(
 
 **Verify/expand a truncated or ambiguous match:**
 ```text
-databank_get_chunk_context(chunk_id=17842, before=1, after=1)
+databank_get_chunk_context(chunk_id="<uuid-from-search>", before=1, after=1)
   → neighboring chunks from the same document, in reading order
 ```
 

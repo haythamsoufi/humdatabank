@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from typing import Any
 
 import pytest
@@ -23,6 +24,10 @@ from app.services.public.document_service import (
 from plugins.upr.ai.query_detection import query_requests_multi_year_documents
 
 
+def _opaque() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestPublicDocumentHelpers:
     def test_extract_year_from_query(self):
         assert _extract_year("Syria unified plan 2026 focus areas") == 2026
@@ -39,6 +44,8 @@ class TestPublicDocumentHelpers:
         row = {
             "chunk_id": 1,
             "document_id": 9,
+            "document_public_id": "965550f8-5415-5260-9d2c-087e7aba7b80",
+            "chunk_public_id": "dcedca15-2b94-5a1b-9188-1996c31e8537",
             "document_title": "Syria Unified Plan 2026",
             "document_filename": "syria_upl_2026.pdf",
             "document_date": "2026-01-01",
@@ -63,6 +70,8 @@ class TestPublicDocumentHelpers:
         row = {
             "chunk_id": 1,
             "document_id": 9,
+            "document_public_id": "965550f8-5415-5260-9d2c-087e7aba7b80",
+            "chunk_public_id": "dcedca15-2b94-5a1b-9188-1996c31e8537",
             "document_title": "Syria Unified Plan 2026",
             "source_url": "https://idrl.ifrc.org/Document/Download/12345",
             "has_local_file": True,
@@ -74,10 +83,19 @@ class TestPublicDocumentHelpers:
         assert slim["document_url"] == "https://idrl.ifrc.org/Document/Download/12345"
 
     def test_public_document_link_fields_prefers_local_download_when_no_source(self):
-        links = _public_document_link_fields(42, source_url=None, has_local_file=True)
+        opaque = "11111111-1111-4111-8111-111111111111"
+        links = _public_document_link_fields(opaque, source_url=None, has_local_file=True)
         assert links["source_url"] is None
-        assert links["download_url"] is None or links["download_url"].endswith("/public/documents/42/download")
+        assert links["download_url"] is None or links["download_url"].endswith(
+            f"/public/documents/{opaque}/download"
+        )
         assert links["document_url"] == links["download_url"]
+
+    def test_public_document_link_fields_rejects_integer_ids(self):
+        # Integer PKs must not build public download URLs (anti-enumeration).
+        links = _public_document_link_fields(42, source_url=None, has_local_file=True)
+        assert links["download_url"] is None
+        assert links["document_url"] is None
 
     def test_query_requests_multi_year_documents(self):
         assert query_requests_multi_year_documents("Syria migration activities over years") is True
@@ -105,6 +123,7 @@ class TestPublicDocumentHelpers:
         docs = [
             AIDocument(
                 id=1,
+                public_id=_opaque(),
                 title="Syria Unified Plan 2024",
                 filename="syria_2024.pdf",
                 file_type="pdf",
@@ -113,6 +132,7 @@ class TestPublicDocumentHelpers:
             ),
             AIDocument(
                 id=2,
+                public_id=_opaque(),
                 title="Syria Unified Plan 2026",
                 filename="syria_2026.pdf",
                 file_type="pdf",
@@ -121,6 +141,7 @@ class TestPublicDocumentHelpers:
             ),
             AIDocument(
                 id=3,
+                public_id=_opaque(),
                 title="Kenya Unified Plan 2026",
                 filename="kenya_2026.pdf",
                 file_type="pdf",
@@ -136,12 +157,14 @@ class TestPublicDocumentHelpers:
         assert meta["latest_per_country_applied"] is True
         assert {doc.id for doc in selected} == {2, 3}
         assert len(meta["superseded_documents"]) == 1
-        assert meta["superseded_documents"][0]["document_id"] == 1
+        assert meta["superseded_documents"][0]["document_id"] == str(docs[0].public_id)
+        assert meta["superseded_documents"][0]["superseded_by_document_id"] == str(docs[1].public_id)
 
     def test_prioritize_latest_skipped_for_multi_year_query(self):
         docs = [
             AIDocument(
                 id=1,
+                public_id=_opaque(),
                 title="Syria Unified Plan 2024",
                 filename="syria_2024.pdf",
                 file_type="pdf",
@@ -150,6 +173,7 @@ class TestPublicDocumentHelpers:
             ),
             AIDocument(
                 id=2,
+                public_id=_opaque(),
                 title="Syria Unified Plan 2026",
                 filename="syria_2026.pdf",
                 file_type="pdf",
@@ -275,19 +299,20 @@ class TestGetPublicDocumentChunkContext:
     def test_returns_requested_chunk_with_neighbors_in_order(self, app, db_session):
         from app.services.public.document_service import get_public_document_chunk_context
 
-        _doc, chunks = self._seed_document(db_session, num_chunks=5)
+        doc, chunks = self._seed_document(db_session, num_chunks=5)
         middle = chunks[2]
 
         with app.app_context():
-            out = get_public_document_chunk_context(middle.id, before=1, after=1)
+            out = get_public_document_chunk_context(middle.public_id, before=1, after=1)
 
         returned_ids = [c["chunk_id"] for c in out["chunks"]]
-        assert returned_ids == [chunks[1].id, chunks[2].id, chunks[3].id]
+        assert returned_ids == [str(chunks[1].public_id), str(chunks[2].public_id), str(chunks[3].public_id)]
         flags = {c["chunk_id"]: c["is_requested_chunk"] for c in out["chunks"]}
-        assert flags[chunks[2].id] is True
-        assert flags[chunks[1].id] is False
-        assert flags[chunks[3].id] is False
-        assert out["requested_chunk_id"] == middle.id
+        assert flags[str(chunks[2].public_id)] is True
+        assert flags[str(chunks[1].public_id)] is False
+        assert flags[str(chunks[3].public_id)] is False
+        assert out["requested_chunk_id"] == str(middle.public_id)
+        assert out["document_id"] == str(doc.public_id)
 
     def test_clamps_to_available_chunks_at_document_start(self, app, db_session):
         from app.services.public.document_service import get_public_document_chunk_context
@@ -296,11 +321,11 @@ class TestGetPublicDocumentChunkContext:
         first = chunks[0]
 
         with app.app_context():
-            out = get_public_document_chunk_context(first.id, before=3, after=1)
+            out = get_public_document_chunk_context(first.public_id, before=3, after=1)
 
         # No chunk_index -3..-1 exists; only 0 and 1 should come back, not an error.
         returned_ids = [c["chunk_id"] for c in out["chunks"]]
-        assert returned_ids == [chunks[0].id, chunks[1].id]
+        assert returned_ids == [str(chunks[0].public_id), str(chunks[1].public_id)]
 
     def test_clamps_before_after_to_max(self, app, db_session):
         from app.services.public.document_service import (
@@ -311,7 +336,7 @@ class TestGetPublicDocumentChunkContext:
         _doc, chunks = self._seed_document(db_session, num_chunks=5)
 
         with app.app_context():
-            out = get_public_document_chunk_context(chunks[2].id, before=999, after=999)
+            out = get_public_document_chunk_context(chunks[2].public_id, before=999, after=999)
 
         assert out["before"] == PUBLIC_DOC_CHUNK_CONTEXT_MAX_BEFORE_AFTER
         assert out["after"] == PUBLIC_DOC_CHUNK_CONTEXT_MAX_BEFORE_AFTER
@@ -323,14 +348,22 @@ class TestGetPublicDocumentChunkContext:
 
         with app.app_context():
             with pytest.raises(ValueError, match="not public"):
-                get_public_document_chunk_context(chunks[0].id)
+                get_public_document_chunk_context(chunks[0].public_id)
 
     def test_raises_for_unknown_chunk_id(self, app, db_session):
         from app.services.public.document_service import get_public_document_chunk_context
 
         with app.app_context():
             with pytest.raises(ValueError):
-                get_public_document_chunk_context(999_999_999)
+                get_public_document_chunk_context(uuid.uuid4())
+
+    def test_integer_chunk_id_is_not_accepted(self, app, db_session):
+        from app.services.public.document_service import get_public_document_chunk_context
+
+        _doc, chunks = self._seed_document(db_session, num_chunks=1)
+        with app.app_context():
+            with pytest.raises(ValueError, match="not public"):
+                get_public_document_chunk_context(chunks[0].id)
 
 
 @pytest.mark.unit
@@ -458,6 +491,8 @@ class TestSearchPublicDocuments:
             {
                 "chunk_id": 10,
                 "document_id": 16701,
+                "document_public_id": "161a3f73-d65d-5287-8744-7f78bb72e778",
+                "chunk_public_id": "420321c8-aab8-57ca-a5bd-ec1b6df50936",
                 "document_title": "Syria Unified Plan 2026",
                 "content": "Health, WASH, and shelter are priority focus areas.",
                 "combined_score": 0.91,
@@ -519,6 +554,8 @@ class TestSearchPublicDocuments:
             {
                 "chunk_id": 1,
                 "document_id": 101,
+                "document_public_id": "f9f14a93-b716-5d7a-a11a-da19008f1505",
+                "chunk_public_id": "dcedca15-2b94-5a1b-9188-1996c31e8537",
                 "document_title": "Low-relevance doc",
                 "content": "Only marginally related content.",
                 "combined_score": 0.30,
@@ -526,6 +563,8 @@ class TestSearchPublicDocuments:
             {
                 "chunk_id": 2,
                 "document_id": 205,
+                "document_public_id": "45baa61b-f738-5e66-85a3-f116ec56cce2",
+                "chunk_public_id": "dcedca15-2b94-5a1b-9188-1996c31e8537",
                 "document_title": "Highly relevant doc",
                 "content": "Exact answer to the query.",
                 "combined_score": 0.95,
@@ -560,7 +599,7 @@ class TestSearchPublicDocuments:
                 svc.AIVectorStore = original
 
         assert out["count"] == 1
-        assert out["chunks"][0]["document_id"] == 205
+        assert out["chunks"][0]["document_id"] == "45baa61b-f738-5e66-85a3-f116ec56cce2"
         assert out["chunks"][0]["score"] == 0.95
 
     def test_min_score_rejects_chunk_relying_only_on_source_boost(self, app):
@@ -575,6 +614,8 @@ class TestSearchPublicDocuments:
         boost_only_row = {
             "chunk_id": 1,
             "document_id": 501,
+            "document_public_id": "40c22e25-a125-5318-8125-18f3a73affaf",
+            "chunk_public_id": "dcedca15-2b94-5a1b-9188-1996c31e8537",
             "document_title": "Unrelated system upload",
             "content": "Completely unrelated content that barely matched a stray keyword.",
             "vector_score": 0.0,
@@ -585,6 +626,8 @@ class TestSearchPublicDocuments:
         genuine_row = {
             "chunk_id": 2,
             "document_id": 502,
+            "document_public_id": "e902a7d0-a6de-56d7-a6a3-e43491ea5e1e",
+            "chunk_public_id": "ac3fa208-51b4-50b8-acb0-5fc5704aa8cf",
             "document_title": "Genuinely relevant doc",
             "content": "This directly answers the query.",
             "vector_score": 0.6,
@@ -611,8 +654,8 @@ class TestSearchPublicDocuments:
                 svc.AIVectorStore = original
 
         returned_doc_ids = {c["document_id"] for c in out["chunks"]}
-        assert 502 in returned_doc_ids
-        assert 501 not in returned_doc_ids
+        assert "e902a7d0-a6de-56d7-a6a3-e43491ea5e1e" in returned_doc_ids  # doc 502
+        assert "40c22e25-a125-5318-8125-18f3a73affaf" not in returned_doc_ids  # doc 501
 
     def test_api_route_returns_chunks(self, client, app):
         payload = {
@@ -1203,6 +1246,8 @@ class TestPublicDocumentSearchFixes:
 
         payload = {
             "document_id": 244,
+            "document_public_id": "767989a1-8121-5d0a-b6c4-fe78f7076c9b",
+            "chunk_public_id": "20d3c3f1-19c9-52fc-844a-67e89109f4d2",
             "document_title": "Lithuania Annual Report 2025",
             "requested_chunk_id": 17842,
             "requested_chunk_index": 40,
@@ -1249,6 +1294,8 @@ class TestPublicDocumentSearchFixes:
             {
                 "chunk_id": 1,
                 "document_id": 10,
+                "document_public_id": "3906e8f3-a167-5b6f-95b7-ad0c7964c82f",
+                "chunk_public_id": "dcedca15-2b94-5a1b-9188-1996c31e8537",
                 "document_title": "Doc A",
                 "document_country_name": "Kenya",
                 "document_countries": [{"name": "Kenya"}],
@@ -1258,6 +1305,8 @@ class TestPublicDocumentSearchFixes:
             {
                 "chunk_id": 2,
                 "document_id": 11,
+                "document_public_id": "a14f17bb-1875-5c48-a419-5efd59acecdb",
+                "chunk_public_id": "ac3fa208-51b4-50b8-acb0-5fc5704aa8cf",
                 "document_title": "Doc B",
                 "document_country_name": "Syria",
                 "document_countries": [{"name": "Syria"}],
@@ -1558,11 +1607,15 @@ class TestRequirePhraseLiteralSafetyNet:
         false_positive_row = {
             "chunk_id": 17842,
             "document_id": 244,
+            "document_public_id": "767989a1-8121-5d0a-b6c4-fe78f7076c9b",
+            "chunk_public_id": "8e192aa6-a7e5-592a-af4c-49e9d6c0416d",
             "content": self.LITHUANIA_LIKE_CONTENT,
         }
         genuine_row = {
             "chunk_id": 999,
             "document_id": 501,
+            "document_public_id": "40c22e25-a125-5318-8125-18f3a73affaf",
+            "chunk_public_id": "8e192aa6-a7e5-592a-af4c-49e9d6c0416d",
             "content": "Blood drives with the Seychelles Post Office partnership continued.",
         }
 
@@ -1585,6 +1638,8 @@ class TestRequirePhraseLiteralSafetyNet:
         false_positive_row = {
             "chunk_id": 17842,
             "document_id": 244,
+            "document_public_id": "767989a1-8121-5d0a-b6c4-fe78f7076c9b",
+            "chunk_public_id": "8e192aa6-a7e5-592a-af4c-49e9d6c0416d",
             "document_title": "Lithuania Annual Report 2025",
             "content": self.LITHUANIA_LIKE_CONTENT,
             "combined_score": 0.3857,
@@ -1592,6 +1647,8 @@ class TestRequirePhraseLiteralSafetyNet:
         genuine_row = {
             "chunk_id": 555,
             "document_id": 153,
+            "document_public_id": "b30e7ea9-cddd-5cc9-8c80-74fcdc123810",
+            "chunk_public_id": "5566dc6c-a159-5b52-b69b-074f97188002",
             "document_title": "Seychelles Annual Report 2025",
             "content": (
                 "The Red Cross Society of Seychelles ran blood drives in partnership with the "
@@ -1623,8 +1680,8 @@ class TestRequirePhraseLiteralSafetyNet:
             svc.AIVectorStore = original
 
         returned_chunk_ids = {c["chunk_id"] for c in out["chunks"]}
-        assert 17842 not in returned_chunk_ids
-        assert 555 in returned_chunk_ids
+        assert "8e192aa6-a7e5-592a-af4c-49e9d6c0416d" not in returned_chunk_ids  # chunk 17842
+        assert "5566dc6c-a159-5b52-b69b-074f97188002" in returned_chunk_ids  # chunk 555
         assert any("Dropped 1 chunk" in note for note in out["notes"])
 
     def test_snippet_around_phrase_centers_on_match_instead_of_head(self):
@@ -1645,6 +1702,8 @@ class TestRequirePhraseLiteralSafetyNet:
         row = {
             "chunk_id": 1,
             "document_id": 153,
+            "document_public_id": "b30e7ea9-cddd-5cc9-8c80-74fcdc123810",
+            "chunk_public_id": "dcedca15-2b94-5a1b-9188-1996c31e8537",
             "content": content,
             "combined_score": 0.9,
         }
@@ -1681,7 +1740,7 @@ class TestStreamPublicAiDocumentDownload:
                 return_value=fake_response,
             ) as mock_stream:
                 # ImportError on StorageService used to 500 every local-file download.
-                result = svc.stream_public_ai_document_download(583)
+                result = svc.stream_public_ai_document_download("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 
         assert result is fake_response
         mock_stream.assert_called_once_with(
@@ -1712,7 +1771,7 @@ class TestStreamPublicAiDocumentDownload:
                 "app.routes.ai_documents.helpers._validate_ifrc_fetch_url",
                 return_value=(True, None),
             ):
-                result = svc.stream_public_ai_document_download(10)
+                result = svc.stream_public_ai_document_download("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
 
         assert result.status_code == 302
         assert result.headers["Location"] == "https://www.ifrc.org/docs/plan.pdf"
@@ -1738,5 +1797,5 @@ class TestStreamPublicAiDocumentDownload:
                 "app.routes.ai_documents.helpers._ai_doc_source_ready", return_value=False
             ):
                 with pytest.raises(ClientInputError, match="not available"):
-                    svc.stream_public_ai_document_download(11)
+                    svc.stream_public_ai_document_download("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
 

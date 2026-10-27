@@ -283,18 +283,24 @@ def search_public_documents(
     )
 
 
-def get_public_document(document_id: int) -> Dict[str, Any]:
-    """Public metadata for one AI document via GET /public/documents/<id>."""
-    return _get(f"/public/documents/{int(document_id)}")
+def get_public_document(document_id: str) -> Dict[str, Any]:
+    """Public metadata for one AI document via GET /public/documents/<uuid>."""
+    opaque = (document_id or "").strip()
+    if not opaque:
+        raise DatabankAPIError("document_id is required")
+    return _get(f"/public/documents/{opaque}")
 
 
-def get_chunk_context(chunk_id: int, *, before: int = 1, after: int = 1) -> Dict[str, Any]:
-    """Neighboring chunks around one search-result chunk via GET /public/documents/chunks/<id>/context."""
+def get_chunk_context(chunk_id: str, *, before: int = 1, after: int = 1) -> Dict[str, Any]:
+    """Neighboring chunks around one search-result chunk via GET /public/documents/chunks/<uuid>/context."""
+    opaque = (chunk_id or "").strip()
+    if not opaque:
+        raise DatabankAPIError("chunk_id is required")
     params: Dict[str, Any] = {
         "before": max(0, min(int(before), 5)),
         "after": max(0, min(int(after), 5)),
     }
-    return _get(f"/public/documents/chunks/{int(chunk_id)}/context", params)
+    return _get(f"/public/documents/chunks/{opaque}/context", params)
 
 
 def get_public_documents_catalog(

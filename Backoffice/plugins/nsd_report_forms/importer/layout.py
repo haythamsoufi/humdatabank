@@ -123,7 +123,7 @@ SHEETS: Dict[str, List[Col]] = {
 REQUIRED_SHEETS = ('Projects',)
 OPTIONAL_SHEETS = ('Logframe', 'Schedule', 'Quarterly', 'FinalCBF')
 
-# Template names the importer writes into (created beforehand with the form builder)
+# Template names the importer writes into (auto-created/published on first import if missing)
 TEMPLATE_NAMES = {
     'profile': 'NSD Project profile - CBF',
     'CBF quarter': 'NSD Quarterly report - CBF',
@@ -134,5 +134,5 @@ FINAL_PERIOD = 'Final'
 
 
 def period_name(reference: str, suffix: str) -> str:
-    """Assignment period of one project report, e.g. 'CBF-XX-2401-001 Y1Q2'."""
+    """Legacy period name (``<reference> Y1Q2``). New imports use shared slots only (see schedule.py)."""
     return f'{reference} {suffix}'

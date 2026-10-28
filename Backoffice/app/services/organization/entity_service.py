@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 from app.models import db
 from app.models.core import Country
 from app.models.organization import NationalSociety, NSBranch, NSSubBranch, NSLocalUnit, SecretariatDivision, SecretariatDepartment, SecretariatRegionalOffice, SecretariatClusterOffice
+from app.models.projects import Project
 from app.models.enums import EntityType
 
 
@@ -28,6 +29,7 @@ class EntityService:
         EntityType.department.value: SecretariatDepartment,
         EntityType.regional_office.value: SecretariatRegionalOffice,
         EntityType.cluster_office.value: SecretariatClusterOffice,
+        EntityType.project.value: Project,
     }
 
     # Group order for document modal <optgroup> (matches components/entity_dropdown.html + national_society).
@@ -87,6 +89,7 @@ class EntityService:
                 EntityType.cluster_office.value: (
                     joinedload(SecretariatClusterOffice.regional_office),
                 ),
+                EntityType.project.value: (joinedload(Project.country),),
             }
         return cls._HIERARCHY_LOAD_OPTIONS_CACHE
 
@@ -161,6 +164,13 @@ class EntityService:
         if entity_type == EntityType.country.value:
             hierarchy_parts.append(entity.name)
 
+        elif entity_type == EntityType.project.value:
+            if getattr(entity, "country", None):
+                hierarchy_parts.append(entity.country.name)
+            elif getattr(entity, "organization_name", None):
+                hierarchy_parts.append(entity.organization_name)
+            hierarchy_parts.append(entity.name)
+
         elif entity_type == EntityType.ns_branch.value:
             if hasattr(entity, 'country') and entity.country:
                 hierarchy_parts.append(entity.country.name)
@@ -211,6 +221,13 @@ class EntityService:
 
         if entity_type == EntityType.country.value:
             hierarchy_parts.append(get_localized_country_name(entity))
+
+        elif entity_type == EntityType.project.value:
+            if getattr(entity, "country", None):
+                hierarchy_parts.append(get_localized_country_name(entity.country))
+            elif getattr(entity, "organization_name", None):
+                hierarchy_parts.append(entity.organization_name)
+            hierarchy_parts.append(entity.name)
 
         elif entity_type == EntityType.ns_branch.value:
             if hasattr(entity, 'country') and entity.country:
@@ -467,6 +484,9 @@ class EntityService:
         if entity_type == EntityType.country.value:
             return entity
 
+        if entity_type == EntityType.project.value:
+            return entity.country if hasattr(entity, "country") else None
+
         if entity_type == EntityType.ns_branch.value:
             return entity.country if hasattr(entity, 'country') else None
         if entity_type == EntityType.ns_subbranch.value:
@@ -603,6 +623,7 @@ class EntityService:
             EntityType.department.value: "Secretariat Department",
             EntityType.regional_office.value: "Regional Office",
             EntityType.cluster_office.value: "Cluster Office",
+            EntityType.project.value: "Project",
         }
         return labels.get(entity_type, entity_type.replace('_', ' ').title())
 

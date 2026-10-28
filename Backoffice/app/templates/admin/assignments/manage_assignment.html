@@ -55,18 +55,19 @@
 
 {% set resolved_entity_types = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
 {% set has_countries = 'countries' in resolved_entity_types %}
+{% set has_projects = 'projects' in resolved_entity_types %}
 {% set has_ns_structure = 'ns_structure' in resolved_entity_types %}
 {% set has_secretariat = 'secretariat' in resolved_entity_types %}
 {% set entity_tabs = namespace(order=[]) %}
 {% if assignment and assignment_entities %}
 {% set __ = entity_tabs.order.append('manage') %}{% endif %}
-{% if (not assignment or can_manage_assignment_entities) and (has_countries or has_secretariat) %}
+{% if (not assignment or can_manage_assignment_entities) and (has_countries or has_projects or has_secretariat) %}
 {% set __ = entity_tabs.order.append('add_entities') %}{% endif %}
 {% if (not assignment or can_manage_assignment_entities) and has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
 {% set show_main_tabs = entity_tabs.order|length > 0 %}
-{% set default_add_entities_subtab = 'countries' if has_countries else 'secretariat' %}
+{% set default_add_entities_subtab = 'countries' if has_countries else ('projects' if has_projects else 'secretariat') %}
 {# Determine if we should show sub-tabs within Add Entities: hide if only one sub-tab is available #}
-{% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_secretariat else 0) %}
+{% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_projects else 0) + (1 if has_secretariat else 0) %}
 {% set show_add_entities_subtabs = sub_tabs_count > 1 %}
 
 {# Assignment details form and entity management in one card with main tabs
@@ -869,6 +870,20 @@
                             </button>
                         </li>
                         {% endif %}
+                        {% if has_projects %}
+                        {% set is_projects_subtab_active = default_add_entities_subtab == 'projects' %}
+                        <li class="me-2" role="presentation">
+                            <button class="inline-block p-3 border-b-2 rounded-t-lg {% if is_projects_subtab_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                                    id="add-entities-projects-tab"
+                                    data-tabs-target="#add-entities-projects-panel"
+                                    type="button"
+                                    role="tab"
+                                    aria-controls="add-entities-projects-panel"
+                                    aria-selected="{{ 'true' if is_projects_subtab_active else 'false' }}">
+                                <i class="fas fa-folder-open mr-2"></i>{{ _('Projects') }}
+                            </button>
+                        </li>
+                        {% endif %}
                         {% if has_secretariat %}
                         {% set is_secretariat_subtab_active = default_add_entities_subtab == 'secretariat' %}
                         <li class="me-2" role="presentation">
@@ -959,6 +974,63 @@
 
 
                 </form>
+                    </div>
+                    {% endif %}
+
+                    {# Projects Sub-tab #}
+                    {% if has_projects %}
+                    {% set is_projects_subtab_active = default_add_entities_subtab == 'projects' %}
+                    <div class="{% if show_add_entities_subtabs and not is_projects_subtab_active %}hidden{% endif %}" id="add-entities-projects-panel" role="tabpanel" aria-labelledby="add-entities-projects-tab">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Assign Projects') }}</label>
+                            <p class="text-sm text-gray-600 mb-3">
+                                {{ _('Select projects to add to this assignment. Create projects under Admin → Projects first.') }}
+                                <a href="{{ url_for('project_management.project_list') }}" class="text-blue-600 hover:underline">{{ _('Manage projects') }}</a>
+                            </p>
+                        </div>
+                        {% if assignment %}
+                        <form id="add-projects-form" action="{{ url_for('assignment_management.add_projects_to_assignment', assignment_id=assignment.id) }}" method="POST">
+                            {{ form.csrf_token }}
+                            <div class="p-4 border border-gray-200 rounded-md bg-white max-h-96 overflow-y-auto">
+                                {% set assigned_project_ids = assignment_project_ids if assignment_project_ids is defined else [] %}
+                                {% set projects_for_assign = projects_for_assign if projects_for_assign is defined else [] %}
+                                {% if projects_for_assign %}
+                                <div class="flex items-center mb-3 pb-3 border-b border-gray-200">
+                                    <input type="checkbox" id="select-all-projects-entity" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                           onclick="document.querySelectorAll('.project-checkbox-entity:not(:disabled)').forEach(function(cb){ cb.checked = this.checked; }.bind(this))">
+                                    <label for="select-all-projects-entity" class="ml-2 text-sm font-bold text-gray-800">{{ _('Select all') }}</label>
+                                </div>
+                                {% for p in projects_for_assign %}
+                                {% set already = p.id in assigned_project_ids %}
+                                <div class="flex items-center mb-2">
+                                    <input type="checkbox" name="project_ids" id="project-entity-{{ p.id }}" value="{{ p.id }}"
+                                           class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 project-checkbox-entity"
+                                           {% if already %}checked disabled{% endif %}>
+                                    <label for="project-entity-{{ p.id }}" class="ml-2 text-sm {% if already %}text-gray-500{% else %}text-gray-900{% endif %}">
+                                        <span class="font-medium">{{ p.reference }}</span>
+                                        {% if p.title %} — {{ p.title }}{% endif %}
+                                        <span class="text-gray-500">({{ p.country_name }})</span>
+                                        {% if already %}<span class="ml-1 text-xs text-blue-600">({{ _('assigned') }})</span>{% endif %}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                                {% else %}
+                                <p class="text-sm text-gray-600">{{ _('No projects yet.') }}
+                                    <a href="{{ url_for('project_management.project_new') }}" class="text-blue-600 hover:underline">{{ _('Create a project') }}</a>
+                                </p>
+                                {% endif %}
+                            </div>
+                            {% if projects_for_assign %}
+                            <div class="mt-4">
+                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">
+                                    {{ _('Add selected projects') }}
+                                </button>
+                            </div>
+                            {% endif %}
+                        </form>
+                        {% else %}
+                        <p class="text-sm text-gray-600">{{ _('Save the assignment first, then add projects.') }}</p>
+                        {% endif %}
                     </div>
                     {% endif %}
 
@@ -1330,7 +1402,7 @@
 <script type="application/json" id="entity-management-data">[
 {% for aes in assignment_entities %}
 {% set aes_display_name = assignment_entity_display.get(aes.id, '') if assignment_entity_display is defined else EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) %}
-{% set fds_info = (assignment_entity_fds_members.get(aes.entity_id) if assignment_entity_fds_members is defined and aes.entity_type == 'country' else none) %}
+{% set fds_info = (assignment_entity_fds_members.get(aes.entity_id) if assignment_entity_fds_members is defined and aes.entity_type in ('country', 'project') else none) %}
 {% set setter_info = (assignment_entity_status_setters.get(aes.id) if assignment_entity_status_setters is defined else none) %}
 {
     "id": {{ aes.id }},
@@ -1344,6 +1416,7 @@
         'Department' if aes.entity_type == 'department' else
         'Regional Office' if aes.entity_type == 'regional_office' else
         'Cluster Office' if aes.entity_type == 'cluster_office' else
+        'Project' if aes.entity_type == 'project' else
         (aes.entity_type | replace('_', ' ') | title)
     )|tojson }},
     "entity_name": {{ aes_display_name|tojson }},

@@ -1563,16 +1563,28 @@ def edit_assignment(assignment_id):
     country_ids = [
         aes.entity_id for aes in assignment_entities if aes.entity_type == 'country'
     ]
+    # NSD projects: resolve FDS via the project's country (keyed by project id for the UI)
+    project_country_map: dict = {}
+    from app.models.projects import Project
+    project_ids = [
+        aes.entity_id for aes in assignment_entities if aes.entity_type == EntityType.project.value
+    ]
+    if project_ids:
+        for proj in Project.query.filter(Project.id.in_(project_ids)).all():
+            if proj.country_id:
+                project_country_map[proj.id] = proj.country_id
+                country_ids.append(proj.country_id)
     assignment_entity_fds_members = {}
     if country_ids:
         countries = (
             Country.query.options(joinedload(Country.fds_member_user))
-            .filter(Country.id.in_(country_ids))
+            .filter(Country.id.in_(set(country_ids)))
             .all()
         )
+        by_country = {}
         for country in countries:
             fds_user = country.fds_member_user
-            assignment_entity_fds_members[country.id] = {
+            by_country[country.id] = {
                 'fds_member_user_id': country.fds_member_user_id,
                 'fds_member_name': fds_member_user_display_name(fds_user),
                 'fds_member_email': (fds_user.email or '') if fds_user else '',
@@ -1581,6 +1593,29 @@ def edit_assignment(assignment_id):
                     (fds_user.profile_color or '') if fds_user else ''
                 ),
             }
+        assignment_entity_fds_members.update(by_country)
+        for project_id, country_id in project_country_map.items():
+            if country_id in by_country:
+                assignment_entity_fds_members[project_id] = by_country[country_id]
+
+    # Projects available to attach on the Add Entities → Projects tab
+    all_projects = (
+        Project.query.options(joinedload(Project.country))
+        .order_by(Project.reference.asc())
+        .all()
+    )
+    projects_for_assign = [
+        {
+            "id": p.id,
+            "reference": p.reference,
+            "title": p.title or "",
+            "country_name": (p.country.name if p.country else "") or "",
+        }
+        for p in all_projects
+    ]
+    assignment_project_ids = [
+        aes.entity_id for aes in assignment_entities if aes.entity_type == EntityType.project.value
+    ]
 
     # Create form for editing assignment entity status
     edit_aes_form = AssignmentEntityStatusForm()
@@ -1604,9 +1639,65 @@ def edit_assignment(assignment_id):
                          EntityService=EntityService,
                          title=f"Edit Assignment: {assignment.period_name}",
                          enabled_entity_types=enabled_entity_groups,
+                         projects_for_assign=projects_for_assign,
+                         assignment_project_ids=assignment_project_ids,
                          submission_review_recipient_users=_submission_review_recipient_users_for_template(form, assignment),
                          **_manage_assignment_permission_context(assignment=assignment),
                          **_manage_assignment_country_context())
+
+@bp.route("/assignments/edit/<int:assignment_id>/add_projects", methods=["POST"])
+@permission_required('admin.assignments.entities.manage')
+def add_projects_to_assignment(assignment_id):
+    from app.models.projects import Project
+    from app.services.projects.service import ensure_project_on_assignment
+
+    assignment = AssignedForm.query.get_or_404(assignment_id)
+    selected_ids = request.form.getlist("project_ids")
+    if not selected_ids:
+        flash(_("No projects selected."), "warning")
+        return redirect(url_for("assignment_management.edit_assignment", assignment_id=assignment_id))
+
+    try:
+        added = 0
+        created_aes_list = []
+        existing = {
+            aes.entity_id
+            for aes in AssignmentEntityStatus.query.filter(
+                AssignmentEntityStatus.assigned_form_id == assignment_id,
+                AssignmentEntityStatus.entity_type == EntityType.project.value,
+            ).all()
+        }
+        for raw_id in selected_ids:
+            try:
+                pid = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if pid in existing:
+                continue
+            project = Project.query.get(pid)
+            if not project:
+                continue
+            aes = ensure_project_on_assignment(assignment, project)
+            created_aes_list.append(aes)
+            existing.add(pid)
+            added += 1
+        db.session.flush()
+        if created_aes_list:
+            aes_ids_for_notify = [aes.id for aes in created_aes_list]
+            if not _queue_assignment_notification_job(aes_ids_for_notify, False, "add_projects"):
+                flash(
+                    _("Projects were added, but notifications could not be queued."),
+                    "warning",
+                )
+        flash(_("Added %(n)s project(s) to assignment.", n=added), "success")
+    except Exception as e:
+        request_transaction_rollback()
+        flash(_("Error adding projects."), "danger")
+        current_app.logger.error(
+            "Error adding projects to assignment %s: %s", assignment_id, e, exc_info=True
+        )
+    return redirect(url_for("assignment_management.edit_assignment", assignment_id=assignment_id))
+
 
 @bp.route("/assignments/edit/<int:assignment_id>/add_countries", methods=["POST"])
 @permission_required('admin.assignments.entities.manage')

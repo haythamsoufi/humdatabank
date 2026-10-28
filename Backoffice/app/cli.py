@@ -52,6 +52,18 @@ def register_commands(app):
             f"{len(summary['societies'])} societies."
         )
 
+    @app.cli.command("nsd-migrate-projects")
+    @click.option("--dry-run", is_flag=True, help="Simulate AES remaps without writing them.")
+    @with_appcontext
+    def nsd_migrate_projects(dry_run):
+        """Backfill core projects and remap legacy NSD report AES onto shared slots."""
+        from plugins.nsd_report_forms.migrate import run_migration
+
+        result = run_migration(dry_run=dry_run)
+        click.echo(f"dry_run={result['dry_run']}")
+        click.echo(f"projects: {result['projects']}")
+        click.echo(f"remap: {result['remap']}")
+
     # AI regression testing
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)

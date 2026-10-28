@@ -808,7 +808,14 @@ class AuthorizationService:
     # take away, reach that they do not have themselves.
 
     COUNTRY_LINKED_ENTITY_TYPES = frozenset(
-        {"country", "national_society", "ns_branch", "ns_subbranch", "ns_localunit"}
+        {
+            "country",
+            "national_society",
+            "ns_branch",
+            "ns_subbranch",
+            "ns_localunit",
+            "project",
+        }
     )
     GLOBAL_COUNTRY_SCOPE_PERMISSIONS = (
         "admin.countries.view",
@@ -839,6 +846,10 @@ class AuthorizationService:
             return chain
 
         if entity_type == "national_society":
+            country_id = getattr(entity, "country_id", None)
+            if country_id:
+                chain.append(("country", int(country_id)))
+        elif entity_type == "project":
             country_id = getattr(entity, "country_id", None)
             if country_id:
                 chain.append(("country", int(country_id)))
@@ -1017,20 +1028,12 @@ class AuthorizationService:
         if not AuthorizationService.has_rbac_permission(user, "assignment.view", scope=scope):
             return False
 
-        # Check entity access using UserEntityPermission
-        from app.models.core import UserEntityPermission
-
-        entity_type = assignment_entity_status.entity_type
-        entity_id = assignment_entity_status.entity_id
-
-        # Check if user has permission for this entity
-        has_entity_permission = UserEntityPermission.query.filter_by(
-            user_id=user.id,
-            entity_type=entity_type,
-            entity_id=entity_id
-        ).first() is not None
-
-        return has_entity_permission
+        # Entity access (country grant covers nsd_project via scope chain)
+        return AuthorizationService.user_can_access_entity(
+            user,
+            assignment_entity_status.entity_type,
+            assignment_entity_status.entity_id,
+        )
 
     @staticmethod
     def can_manage_closed_assignment(user) -> bool:

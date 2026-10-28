@@ -566,8 +566,30 @@ def dashboard():
                 f"{selected_entity_display_name} ({selected_entity_type}:{selected_entity_id})."
             )
 
-            # Query AssignmentEntityStatus for the selected entity (supports all entity types)
+            # Query AssignmentEntityStatus for the selected entity (supports all entity types).
+            # When viewing a country, also include NSD project reports for projects in that country.
             AF = aliased(AssignedForm)
+            entity_filter = db.and_(
+                AssignmentEntityStatus.entity_type == selected_entity_type,
+                AssignmentEntityStatus.entity_id == selected_entity_id,
+            )
+            if selected_entity_type == EntityType.country.value:
+                try:
+                    from app.models.projects import Project
+                    project_ids = [
+                        pid for (pid,) in db.session.query(Project.id)
+                        .filter(Project.country_id == selected_entity_id).all()
+                    ]
+                    if project_ids:
+                        entity_filter = db.or_(
+                            entity_filter,
+                            db.and_(
+                                AssignmentEntityStatus.entity_type == EntityType.project.value,
+                                AssignmentEntityStatus.entity_id.in_(project_ids),
+                            ),
+                        )
+                except Exception as e:
+                    current_app.logger.debug("Project dashboard filter skipped: %s", e)
             # Only active assignments (close no longer deactivates; deactivated rows are hidden)
             assigned_forms_statuses = (
                 apply_assignment_access(
@@ -583,8 +605,7 @@ def dashboard():
                     db.joinedload(AssignmentEntityStatus.sent_for_review_by_user),
                 )
                 .filter(
-                    AssignmentEntityStatus.entity_type == selected_entity_type,
-                    AssignmentEntityStatus.entity_id == selected_entity_id,
+                    entity_filter,
                     AF.is_active == True,
                 )
                 .order_by(

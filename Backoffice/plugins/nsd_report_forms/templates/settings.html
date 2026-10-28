@@ -1,0 +1,191 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+{% block title %}NSD Report Forms Settings{% endblock %}
+
+{% set can_import = has_permission('admin.nsd_funds.manage') or current_user_has_role('system_manager') %}
+{% set initial_tab = request.args.get('tab', 'overview') %}
+{% if initial_tab not in ('overview', 'import') %}
+  {% set initial_tab = 'overview' %}
+{% endif %}
+{% if initial_tab == 'import' and not can_import %}
+  {% set initial_tab = 'overview' %}
+{% endif %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {{ page_header(
+        title="NSD Report Forms Settings",
+        icon='fas fa-hand-holding-usd',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Plugins', 'url': url_for('admin.plugin_management')},
+            {'name': 'NSD Report Forms Settings'}
+        ]
+    ) }}
+
+    <div class="bg-white rounded-lg shadow-md border border-gray-200 mt-6">
+        {% call scroll_tab_bar(inner_id='nsd-settings-tabs', aria_label='NSD Report Forms settings sections') %}
+            <button type="button" role="tab" data-tab="overview"
+                    aria-selected="{{ 'true' if initial_tab == 'overview' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(initial_tab == 'overview') }}">
+                <i class="fas fa-sliders-h mr-1.5"></i>Overview
+            </button>
+            {% if can_import %}
+            <button type="button" role="tab" data-tab="import"
+                    aria-selected="{{ 'true' if initial_tab == 'import' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(initial_tab == 'import') }}">
+                <i class="fas fa-file-import mr-1.5"></i>Master import
+            </button>
+            {% endif %}
+        {% endcall %}
+
+        <div class="p-6">
+            {# ── Overview ─────────────────────────────────────────────────── #}
+            <div id="panel-overview"
+                 class="settings-panel space-y-6{% if initial_tab != 'overview' %} hidden{% endif %}">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {% include "plugins/_plugin_info_card.html" %}
+
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                            <i class="fas fa-cogs text-gray-600 mr-2"></i>
+                            Tools
+                        </h3>
+                        <div class="space-y-3">
+                            {% if can_import %}
+                            <button type="button" data-nsd-tab="import"
+                                    class="flex items-center w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg text-left">
+                                <i class="fas fa-file-import mr-2"></i>
+                                Master import
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('project_management.project_list') }}"
+                               class="flex items-center w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg">
+                                <i class="fas fa-folder-open mr-2"></i>
+                                Admin → Projects
+                            </a>
+                            <a href="{{ url_for('data_exploration.explore_data', tab='nsd_funds') }}"
+                               class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
+                                <i class="fas fa-chart-pie mr-2"></i>
+                                Explore Data → NSD funds
+                            </a>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <p class="text-sm text-gray-600">
+                                Master import upserts core <code>project</code> rows and attaches them to shared
+                                report slots (<code>Y1Q1</code>…<code>{{ settings.final_slot }}</code>).
+                                Import and overview need the <strong>Admin: NSD funds</strong> role
+                                (or System Manager).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                        <i class="fas fa-sliders-h text-green-600 mr-2"></i>
+                        Registry status
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-600">Entity type</span>
+                            <span class="font-medium text-gray-900"><code>{{ settings.entity_type }}</code></span>
+                        </div>
+                        <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-600">Template name prefix</span>
+                            <span class="font-medium text-gray-900"><code>{{ settings.template_name_prefix }}</code></span>
+                        </div>
+                        <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-600">Projects</span>
+                            <span class="font-medium text-gray-900">{{ settings.project_count }}</span>
+                        </div>
+                        <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-600">Open / Active</span>
+                            <span class="font-medium text-gray-900">{{ settings.open_project_count }}</span>
+                        </div>
+                        <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-600">Funds</span>
+                            <span class="font-medium text-gray-900">{{ settings.funds|join(', ') or '—' }}</span>
+                        </div>
+                        <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-600">Final slot</span>
+                            <span class="font-medium text-gray-900"><code>{{ settings.final_slot }}</code></span>
+                        </div>
+                    </div>
+                    {% if settings.projects_by_fund %}
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Projects by fund</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                            {% for fund, count in settings.projects_by_fund.items()|sort %}
+                            <div class="flex justify-between p-2 bg-gray-50 rounded">
+                                <span class="text-gray-600">{{ fund }}</span>
+                                <span class="font-medium text-gray-900">{{ count }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-600">
+                        <p class="mb-1"><span class="font-medium text-gray-700">Import sheets:</span>
+                            {{ settings.required_sheets|join(', ') }}</p>
+                        <p><span class="font-medium text-gray-700">Quarter slots:</span>
+                            {{ settings.quarter_slots|join(', ') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            {# ── Master import ────────────────────────────────────────────── #}
+            {% if can_import %}
+            <div id="panel-import"
+                 class="settings-panel space-y-6{% if initial_tab != 'import' %} hidden{% endif %}">
+                {% include "plugins/nsd_report_forms/nsd_import/_import_panel.html" %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  function activateNsdSettingsTab(tabId) {
+    if (window.AdminUnderlineTabs && typeof window.AdminUnderlineTabs.activateStripTab === 'function') {
+      window.AdminUnderlineTabs.activateStripTab('#nsd-settings-tabs', tabId, {
+        panelSelector: '.settings-panel',
+        panelIdPrefix: 'panel-',
+      });
+    } else {
+      document.querySelectorAll('#nsd-settings-tabs [role="tab"]').forEach(function (btn) {
+        var active = btn.getAttribute('data-tab') === tabId;
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      document.querySelectorAll('.settings-panel').forEach(function (panel) {
+        panel.classList.toggle('hidden', panel.id !== 'panel-' + tabId);
+      });
+    }
+    try {
+      var url = new URL(window.location.href);
+      if (tabId === 'overview') url.searchParams.delete('tab');
+      else url.searchParams.set('tab', tabId);
+      window.history.replaceState({}, '', url);
+    } catch (e) { /* ignore */ }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#nsd-settings-tabs [role="tab"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activateNsdSettingsTab(btn.getAttribute('data-tab'));
+      });
+    });
+    document.querySelectorAll('[data-nsd-tab]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        activateNsdSettingsTab(el.getAttribute('data-nsd-tab'));
+      });
+    });
+    var initial = {{ initial_tab|tojson }};
+    if (initial && initial !== 'overview') activateNsdSettingsTab(initial);
+  });
+})();
+</script>
+{% endblock %}

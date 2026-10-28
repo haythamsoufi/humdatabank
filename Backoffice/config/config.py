@@ -204,7 +204,7 @@ def _load_sex_categories_from_settings(default_sex_categories):
     """
     return list(default_sex_categories)
 
-ALLOWED_ENTITY_GROUPS = ['countries', 'ns_structure', 'secretariat']
+ALLOWED_ENTITY_GROUPS = ['countries', 'projects', 'ns_structure', 'secretariat']
 
 def _load_enabled_entity_types_from_settings(default_entity_groups):
     """Return default enabled entity groups.
@@ -846,7 +846,7 @@ class Config:
     DOCUMENT_TYPES = _load_document_types_from_settings([])
 
     # Entity type groups enabled across admin experiences
-    DEFAULT_ENABLED_ENTITY_TYPES = ['countries', 'ns_structure', 'secretariat']
+    DEFAULT_ENABLED_ENTITY_TYPES = ['countries', 'projects', 'ns_structure', 'secretariat']
     ENABLED_ENTITY_TYPES = _load_enabled_entity_types_from_settings(DEFAULT_ENABLED_ENTITY_TYPES)
 
     # NEW: Configuration for uploaded documents

@@ -13,6 +13,8 @@ If you also enable Playwright MCP in user-level Cursor config, **disable that en
 
 **Base URL:** `http://127.0.0.1:5000` (matches the Flask dev server bind address).
 
+**Screenshots / file artifacts:** Prefer omitting `filename` so files land under `--output-dir` (`.playwright-mcp/screenshots/`). If you pass `filename`, use a **basename only** (e.g. `access-request.png`) — never an absolute path and never a path outside `.playwright-mcp/screenshots/`. Playwright MCP resolves explicit `filename` against the workspace root (ignores `--output-dir`); project hooks rewrite/move strays into `.playwright-mcp/screenshots/` (gitignored).
+
 ## Logging In (Local Dev)
 
 In development with `DEBUG=true`, `/login` shows a yellow **"Act as (dev only)"** box (loopback only — panel hidden if `FLASK_CONFIG` is not `development`/`default` or request is not from `127.0.0.1` / `::1`).

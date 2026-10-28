@@ -1,15 +1,12 @@
-"""NSD admin project overview: project list and project detail (read-only).
+"""Legacy NSD overview URLs. The registry UI is Admin → Projects."""
 
-Own blueprint (``nsd_projects``, /admin/nsd-projects). Register it from ``NsdReportFormsPlugin`` with
-``get_additional_blueprints()`` (see overview_delivery/README.txt).
-"""
 from pathlib import Path
 
-from flask import Blueprint, abort, redirect, render_template, request, url_for
+from flask import Blueprint, abort, redirect, request, url_for
 
+from app.models.projects import Project
 from app.routes.admin.shared import admin_permission_required
 
-from plugins.nsd_report_forms.overview import data
 from plugins.nsd_report_forms.plugin import NSD_ADMIN_PERMISSION
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
@@ -21,27 +18,24 @@ projects_bp = Blueprint(
     template_folder=str(_PLUGIN_DIR / "templates"),
 )
 
-TEMPLATE_DIR = "plugins/nsd_report_forms/nsd_projects"
-
 
 @projects_bp.route("/", methods=["GET"])
 @admin_permission_required(NSD_ADMIN_PERMISSION)
 def project_list():
     args = request.args
-    # MOMO opens on the "Open" projects on the first visit (no status parameter at all)
+    params = {}
+    for key in ("fund", "country", "status"):
+        if args.get(key):
+            params[key] = args.get(key)
     if "status" not in args:
-        params = {k: args.get(k) for k in ("fund", "region", "country") if args.get(k)}
         params["status"] = "Open"
-        return redirect(url_for("nsd_projects.project_list", **params))
-    result = data.project_list(args.get("fund", "").strip(), args.get("region", "").strip(),
-                               args.get("country", "").strip(), args.get("status", "").strip())
-    return render_template(f"{TEMPLATE_DIR}/list.html", **result)
+    return redirect(url_for("project_management.project_list", **params))
 
 
 @projects_bp.route("/<path:reference>", methods=["GET"])
 @admin_permission_required(NSD_ADMIN_PERMISSION)
 def project_detail(reference):
-    project = data.project_detail(reference.strip())
+    project = Project.query.filter_by(reference=reference.strip()).first()
     if project is None:
         abort(404)
-    return render_template(f"{TEMPLATE_DIR}/detail.html", p=project)
+    return redirect(url_for("project_management.project_edit", project_id=project.id))

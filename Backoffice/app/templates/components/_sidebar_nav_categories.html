@@ -116,6 +116,10 @@
             {{ svg_icon('tasks', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Manage Assignments') }}</span>
         </a>
+        <a href="{{ url_for('project_management.project_list') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Projects')|forceescape }}">
+            <i class="fas fa-folder-open sidebar-icon w-6 h-6 mr-3 text-center"></i>
+            <span class="sidebar-text">{{ _('Projects') }}</span>
+        </a>
         {% endif %}
         {% if can_access_data_explorer %}
         <a href="{{ url_for('data_exploration.explore_data') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Explore Data')|forceescape }}">

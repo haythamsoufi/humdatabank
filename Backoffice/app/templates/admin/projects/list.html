@@ -1,0 +1,142 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
+
+{% block title %}{{ _('Projects') }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=title or _('Projects'),
+    icon='fas fa-diagram-project',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Assignment Management'), 'url': url_for('assignment_management.manage_assignments')},
+        {'name': _('Projects')}
+    ],
+    actions=(
+        [{
+            'type': 'link',
+            'text': _('New project'),
+            'url': url_for('project_management.project_new'),
+            'icon': 'fas fa-plus',
+            'classes': 'professional-action-btn professional-action-btn-green',
+            'attributes': {'title': _('Create a new project')}
+        }] if can_edit else []
+    ),
+    info_tooltip=_('Projects are the reporting units for project-based assignments (separate from country cycles). Add a project here, create an assignment for a reporting period, then attach projects on the assignment’s Projects tab.')
+) }}
+
+<div class="bg-white shadow-md border border-gray-200">
+  <div class="p-4 sm:p-6 border-b border-gray-200">
+    <form method="get" class="flex flex-wrap gap-3 items-end">
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">{{ _('Search') }}</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="{{ _('Reference or title')|forceescape }}">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">{{ _('Status') }}</label>
+        <select name="status" class="form-control">
+          <option value="">{{ _('All') }}</option>
+          {% for s in all_statuses %}
+          <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">{{ _('Category') }}</label>
+        <select name="portfolio" class="form-control">
+          <option value="">{{ _('All') }}</option>
+          {% for c in all_portfolios %}
+          <option value="{{ c }}" {% if portfolio_filter == c %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">{{ _('Fund') }}</label>
+        <select name="fund" class="form-control">
+          <option value="">{{ _('All') }}</option>
+          {% for f in all_funds %}
+          <option value="{{ f }}" {% if fund_filter == f %}selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">{{ _('Country') }}</label>
+        <select name="country" class="form-control">
+          <option value="">{{ _('All') }}</option>
+          {% for c in all_countries %}
+          <option value="{{ c }}" {% if country_filter == c %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if manager_filter %}
+      <input type="hidden" name="manager" value="{{ manager_filter }}">
+      {% endif %}
+      <button type="submit" class="professional-action-btn professional-action-btn-blue">
+        <i class="fas fa-filter"></i><span>{{ _('Filter') }}</span>
+      </button>
+    </form>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Reference') }}</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Title') }}</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Country') }}</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Category') }}</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Fund') }}</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Status') }}</th>
+          {% if can_edit %}
+          <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ _('Actions') }}</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for p in projects %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-sm font-semibold text-gray-900">
+            <a href="{{ url_for('project_management.project_edit', project_id=p.id) }}" class="text-blue-700 hover:underline">{{ p.reference }}</a>
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-700">{{ p.title or '—' }}</td>
+          <td class="px-4 py-3 text-sm text-gray-700">{{ p.country.name if p.country else '—' }}</td>
+          <td class="px-4 py-3 text-sm text-gray-700">{{ p.portfolio or '—' }}</td>
+          <td class="px-4 py-3 text-sm text-gray-700">{{ p.fund or '—' }}</td>
+          <td class="px-4 py-3 text-sm">
+            {% if p.status == 'Active' %}
+              {{ status_label(p.status, 'success') }}
+            {% elif p.status == 'Open' %}
+              {{ status_label(p.status, 'info') }}
+            {% elif p.status == 'Closed' %}
+              {{ status_label(p.status, 'warning') }}
+            {% elif p.status == 'Archived' %}
+              {{ status_label(p.status, 'neutral') }}
+            {% else %}
+              {{ status_label(p.status or '—', 'neutral') }}
+            {% endif %}
+          </td>
+          {% if can_edit %}
+          <td class="px-4 py-3 text-sm">
+            <div class="flex items-center justify-end gap-3">
+              <a href="{{ url_for('project_management.project_edit', project_id=p.id) }}"
+                 class="text-blue-600 hover:text-blue-900"
+                 title="{{ _('Edit')|forceescape }}">
+                <i class="fas fa-pen fa-fw"></i>
+              </a>
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 7 if can_edit else 6 }}" class="px-4 py-8 text-center text-sm text-gray-500">
+            {{ _('No projects yet.') }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

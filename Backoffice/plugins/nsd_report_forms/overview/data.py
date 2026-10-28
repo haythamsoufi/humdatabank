@@ -1,10 +1,8 @@
 """Read-only data layer for the NSD admin project overview.
 
-Every project is a hidden "project record" (an AssignedForm of the NSD Project profile template, period
-``<reference> Project``) plus report assignments (``<reference> Y1Q2``, ``<reference> Final``). Answers are
-FormData rows keyed by form item label. The list needs a handful of set-based queries (templates/items, project
-answers, report assignments, report answers, countries) and aggregates in Python, so there is no N+1.
-Nothing here writes.
+Projects come from the core ``project`` table. Reports are AES rows with
+``entity_type=project`` on shared slot assignments (period ``Y1Q2`` / ``Final``).
+During migration, legacy profile assignments are still readable as a fallback.
 """
 import calendar
 import datetime as dt
@@ -18,8 +16,10 @@ from sqlalchemy import func, or_
 from app import db
 from app.models import (AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, FormTemplate,
                         FormTemplateVersion)
+from app.models.projects import Project
 from app.utils.datetime_helpers import utcnow
 
+from plugins.nsd_report_forms.constants import ENTITY_TYPE, FINAL_SLOT
 from plugins.nsd_report_forms.importer import layout
 
 PROFILE, QUARTER, FINAL = 'profile', 'CBF quarter', 'CBF final report'
@@ -50,6 +50,10 @@ def status_value(s) -> str:
 
 
 def parse_date(v) -> Optional[dt.date]:
+    if isinstance(v, dt.datetime):
+        return v.date()
+    if isinstance(v, dt.date):
+        return v
     v = str(v or '').strip()
     for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
         try:
@@ -103,11 +107,18 @@ class Ctx:
     """Template and item ids, loaded once per request."""
 
     def __init__(self):
+        try:
+            from plugins.nsd_report_forms.ensure_templates import ensure_cbf_report_templates
+
+            ensure_cbf_report_templates(commit=True)
+        except Exception:
+            pass
         self.tpl: Dict[str, Optional[int]] = {}
         self.items: Dict[str, Dict[str, int]] = {}
         for key in (PROFILE, QUARTER, FINAL):
             self.tpl[key], self.items[key] = _template_items(key)
-        self.problems = [f'Template "{layout.TEMPLATE_NAMES[k]}" is not published.' for k in (PROFILE, QUARTER, FINAL)
+        # Profile template is optional once core projects exist; quarter+final still required for reports
+        self.problems = [f'Template "{layout.TEMPLATE_NAMES[k]}" is not published.' for k in (QUARTER, FINAL)
                          if self.tpl[k] is None]
 
     def ids(self, key: str, labels: Dict[str, str]) -> Dict[int, str]:
@@ -120,12 +131,57 @@ def norm_email(v) -> str:
     return str(v or '').strip().lower()
 
 
-def _profiles(ctx: Ctx, reference: Optional[str] = None, with_logframe: bool = False,
-              pm_email: Optional[str] = None) -> Dict[str, dict]:
-    """reference -> project dict (simple answers, the expected-spending cell, optionally the planned logframe).
+def _project_dict_from_row(row: Project) -> dict:
+    expected = parse_amount(row.expected_spending)
+    if expected is None:
+        expected = parse_amount(row.amount_granted)
+    return {
+        'project_id': row.id,
+        'reference': row.reference,
+        'title': row.title or '',
+        'ns': row.organization_name or '',
+        'status': row.status or 'Open',
+        'modality': row.funding_modality or '',
+        'categories': row.categories or '',
+        'start': row.start_date,
+        'end': row.end_date,
+        'granted': parse_amount(row.amount_granted),
+        'expected': expected,
+        'overview': row.planned_overview or '',
+        'ns_focal': row.focal_name or '',
+        'ns_focal_email': row.focal_email or '',
+        'pm': row.manager_name or '',
+        'pm_email': row.manager_email or '',
+        'country_id': row.country_id,
+        'logframe': row.plan_data if isinstance(row.plan_data, list) else None,
+        'aes_id': None,
+        'period_name': None,
+    }
 
-    ``pm_email`` keeps only the projects whose "IFRC project manager email" equals it (trimmed, case-insensitive).
-    """
+
+def _profiles_from_registry(reference: Optional[str] = None, with_logframe: bool = False,
+                            pm_email: Optional[str] = None) -> Dict[str, dict]:
+    q = Project.query
+    if reference:
+        q = q.filter(Project.reference == reference)
+    if pm_email is not None:
+        email = norm_email(pm_email)
+        if not email:
+            return {}
+        q = q.filter(func.lower(func.trim(Project.manager_email)) == email)
+    out: Dict[str, dict] = {}
+    for row in q.all():
+        d = _project_dict_from_row(row)
+        if not with_logframe:
+            d.pop('logframe', None)
+            d['logframe'] = None
+        out[row.reference] = d
+    return out
+
+
+def _profiles_legacy(ctx: Ctx, reference: Optional[str] = None, with_logframe: bool = False,
+                     pm_email: Optional[str] = None) -> Dict[str, dict]:
+    """Legacy: hidden profile assignments with period ``<reference> Project``."""
     if ctx.tpl[PROFILE] is None:
         return {}
     by_item = ctx.ids(PROFILE, PROFILE_LABELS)
@@ -152,7 +208,7 @@ def _profiles(ctx: Ctx, reference: Optional[str] = None, with_logframe: bool = F
     projects: Dict[int, dict] = {}
     for af_id, period, aes_id, country_id, item_id, value, numeric, disagg in q.all():
         p = projects.setdefault(af_id, {'period_name': period, 'aes_id': aes_id, 'country_id': country_id,
-                                        'expected': None, 'logframe': None})
+                                        'expected': None, 'logframe': None, 'project_id': None})
         if item_id == spend_id:
             p['expected'] = parse_amount((disagg or {}).get(EXPECTED_CELL))
         elif item_id == frame_id:
@@ -170,13 +226,72 @@ def _profiles(ctx: Ctx, reference: Optional[str] = None, with_logframe: bool = F
     return out
 
 
+def _profiles(ctx: Ctx, reference: Optional[str] = None, with_logframe: bool = False,
+              pm_email: Optional[str] = None) -> Dict[str, dict]:
+    """reference -> project dict. Prefers core ``project``; fills gaps from legacy profiles."""
+    registry = _profiles_from_registry(reference=reference, with_logframe=with_logframe, pm_email=pm_email)
+    if reference and registry:
+        return registry
+    legacy = _profiles_legacy(ctx, reference=reference, with_logframe=with_logframe, pm_email=pm_email)
+    if not registry:
+        return legacy
+    # Merge: registry wins; legacy only for refs not yet migrated
+    for ref, p in legacy.items():
+        registry.setdefault(ref, p)
+    return registry
+
+
 def _like_escape(text: str) -> str:
     return text.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
-def _report_rows(ctx: Ctx, reference: Optional[str] = None, with_answers: bool = True,
-                 references: Optional[Iterable[str]] = None) -> Dict[str, List[dict]]:
-    """reference -> report dicts (assignment, status, due date and the answers the overview needs)."""
+def _report_rows_modern(ctx: Ctx, project_ids: Dict[str, int], with_answers: bool = True) -> Dict[str, List[dict]]:
+    """Reports keyed by reference using entity_type=project AES on shared slots."""
+    if not project_ids:
+        return {}
+    tpl_ids = {ctx.tpl[QUARTER]: QUARTER, ctx.tpl[FINAL]: FINAL}
+    tpl_ids.pop(None, None)
+    if not tpl_ids:
+        return {}
+    id_to_ref = {pid: ref for ref, pid in project_ids.items()}
+    q = (db.session.query(AssignedForm.template_id, AssignedForm.period_name, AssignedForm.is_active,
+                          AssignmentEntityStatus.id, AssignmentEntityStatus.entity_id, AssignmentEntityStatus.status,
+                          AssignmentEntityStatus.due_date, AssignmentEntityStatus.completion_rate,
+                          AssignmentEntityStatus.submitted_at, AssignmentEntityStatus.status_timestamp)
+         .join(AssignmentEntityStatus, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+         .filter(AssignedForm.template_id.in_(list(tpl_ids)),
+                 AssignmentEntityStatus.entity_type == ENTITY_TYPE,
+                 AssignmentEntityStatus.entity_id.in_(list(id_to_ref))))
+    # reference -> country_id for API/overview
+    country_by_ref = {
+        ref: cid for ref, cid in db.session.query(Project.reference, Project.country_id)
+        .filter(Project.id.in_(list(id_to_ref.keys()))).all()
+    }
+    reports: Dict[int, dict] = {}
+    for tpl_id, period_name, active, aes_id, project_id, status, due, comp, submitted_at, status_ts in q.all():
+        ref = id_to_ref.get(project_id)
+        if not ref:
+            continue
+        period = period_name if period_name != FINAL_SLOT else FINAL_SLOT
+        reports[aes_id] = {
+            'aes_id': aes_id, 'reference': ref, 'period': period, 'kind': tpl_ids[tpl_id],
+            'active': bool(active), 'status': status_value(status), 'due': due,
+            'completion': float(comp) if comp is not None else None,
+            'submitted_at': submitted_at or status_ts,
+            'country_id': country_by_ref.get(ref), 'project_id': project_id,
+            'overall': None, 'activities': None, 'actual': None, 'author': None, 'frame': None,
+        }
+    if reports and with_answers:
+        _attach_answers(ctx, reports)
+    by_ref: Dict[str, List[dict]] = defaultdict(list)
+    for r in reports.values():
+        by_ref[r['reference']].append(r)
+    return by_ref
+
+
+def _report_rows_legacy(ctx: Ctx, reference: Optional[str] = None, with_answers: bool = True,
+                        references: Optional[Iterable[str]] = None) -> Dict[str, List[dict]]:
+    """Legacy: period_name = ``<reference> Y1Q2``, entity_type=country."""
     tpl_ids = {ctx.tpl[QUARTER]: QUARTER, ctx.tpl[FINAL]: FINAL}
     tpl_ids.pop(None, None)
     if not tpl_ids:
@@ -186,7 +301,8 @@ def _report_rows(ctx: Ctx, reference: Optional[str] = None, with_answers: bool =
                           AssignmentEntityStatus.due_date, AssignmentEntityStatus.completion_rate,
                           AssignmentEntityStatus.submitted_at, AssignmentEntityStatus.status_timestamp)
          .join(AssignmentEntityStatus, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
-         .filter(AssignedForm.template_id.in_(list(tpl_ids))))
+         .filter(AssignedForm.template_id.in_(list(tpl_ids)),
+                 AssignmentEntityStatus.entity_type == 'country'))
     if reference:
         escaped = reference.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
         q = q.filter(AssignedForm.period_name.like(escaped + ' %', escape='\\'))
@@ -200,6 +316,9 @@ def _report_rows(ctx: Ctx, reference: Optional[str] = None, with_answers: bool =
         ref, _, period = period_name.rpartition(' ')
         if not ref or (reference and ref != reference) or (wanted_refs is not None and ref not in wanted_refs):
             continue
+        # Skip shared-slot period names (no reference prefix)
+        if period_name in (FINAL_SLOT,) or re.match(r'^Y\d+Q\d+$', period_name or ''):
+            continue
         reports[aes_id] = {'aes_id': aes_id, 'reference': ref, 'period': period, 'kind': tpl_ids[tpl_id],
                            'active': bool(active), 'status': status_value(status), 'due': due,
                            'completion': float(comp) if comp is not None else None,
@@ -211,6 +330,47 @@ def _report_rows(ctx: Ctx, reference: Optional[str] = None, with_answers: bool =
     for r in reports.values():
         by_ref[r['reference']].append(r)
     return by_ref
+
+
+def _report_rows(ctx: Ctx, reference: Optional[str] = None, with_answers: bool = True,
+                 references: Optional[Iterable[str]] = None) -> Dict[str, List[dict]]:
+    """reference -> report dicts (assignment, status, due date and the answers the overview needs)."""
+    if reference:
+        wanted = {reference}
+    elif references is not None:
+        wanted = set(references)
+    else:
+        wanted = None
+
+    if wanted is not None and not wanted:
+        return {}
+
+    all_registry = _profiles_from_registry(reference=reference if reference else None)
+    if wanted is not None and not reference:
+        profiles = {r: p for r, p in all_registry.items() if r in wanted}
+    else:
+        profiles = all_registry
+
+    project_ids = {ref: p['project_id'] for ref, p in profiles.items() if p.get('project_id')}
+    modern = _report_rows_modern(ctx, project_ids, with_answers=with_answers) if project_ids else {}
+
+    missing = None
+    if wanted is not None:
+        missing = [r for r in wanted if not modern.get(r)]
+        if not missing and modern:
+            return modern
+    legacy = _report_rows_legacy(
+        ctx,
+        reference=reference if (wanted is None or len(wanted) == 1) else None,
+        with_answers=with_answers,
+        references=missing if missing is not None else None,
+    )
+    if not modern:
+        return legacy
+    for ref, rows in legacy.items():
+        if not modern.get(ref):
+            modern[ref] = rows
+    return modern
 
 
 def _attach_answers(ctx: Ctx, reports: Dict[int, dict]):
@@ -277,9 +437,9 @@ def _project_row(p: dict, countries: Dict[int, dict]) -> dict:
 
 # ------------------------------------------------------------------ list page (MOMO "welcome")
 def project_list(fund: str = '', region: str = '', country: str = '', status: str = '') -> dict:
-    """MOMO's welcome page for CBF: filter choices, totals and the project list, all from the project records."""
+    """MOMO's welcome page for CBF: filter choices, totals and the project list."""
     ctx = Ctx()
-    if ctx.tpl[PROFILE] is None:
+    if ctx.problems:
         return {'problems': ctx.problems}
     countries = _countries()
     rows = [_project_row(p, countries) for p in _profiles(ctx).values()]
@@ -344,7 +504,7 @@ def project_detail(reference: str, pm_email: Optional[str] = None) -> Optional[d
     ctx = Ctx()
     if ctx.problems:
         return None
-    p = _profiles(ctx, reference=reference, pm_email=pm_email).get(reference)
+    p = _profiles(ctx, reference=reference, pm_email=pm_email, with_logframe=True).get(reference)
     if not p or (pm_email is not None and norm_email(p.get('pm_email')) != norm_email(pm_email)):
         return None
     row = _project_row(p, _countries())
@@ -408,8 +568,7 @@ def spend_light(rate: Optional[float]) -> str:
 
 
 def _pm_project(p: dict, reports: List[dict], countries: Dict[int, dict], today: dt.date) -> dict:
-    """One card of the PM page: the latest report's traffic lights (MOMO takes the latest submission with an
-    overall assessment), spending rate (quarterly reports only, as in MOMO) and the next report deadline."""
+    """One card of the PM page: the latest report's traffic lights, spending rate and next deadline."""
     base = p.get('expected') or p.get('granted')
     done = [r for r in reports if r['overall'] and r['status'] not in ('pending', 'cancelled')]
     latest = max(done, key=lambda r: _naive(r['submitted_at'] or r['due']), default=None)
@@ -450,10 +609,7 @@ def _pm_project(p: dict, reports: List[dict], countries: Dict[int, dict], today:
 
 
 def pm_projects(email: str) -> dict:
-    """The projects whose "IFRC project manager email" equals ``email`` (trimmed, case-insensitive), as cards.
-
-    Three set-based queries (profiles of that PM, their reports and report answers, countries); no per-project query.
-    """
+    """The projects whose "IFRC project manager email" equals ``email``."""
     email = norm_email(email)
     empty = {'problems': [], 'projects': [], 'pm_name': '', 'email': email}
     ctx = Ctx()
@@ -467,6 +623,6 @@ def pm_projects(email: str) -> dict:
     countries = _countries()
     cards = [_pm_project(p, reports.get(ref, []), countries, today) for ref, p in profiles.items()]
     sev_order = {'red': 0, 'amber': 1, 'green': 2, 'grey': 3}
-    cards.sort(key=lambda c: (sev_order[c['severity']], c['status'], c['country'].casefold(), c['reference']))
-    names = [str(p.get('pm') or '').strip() for p in profiles.values() if str(p.get('pm') or '').strip()]
-    return {'problems': [], 'projects': cards, 'pm_name': min(names, key=len) if names else '', 'email': email}
+    cards.sort(key=lambda c: (sev_order.get(c['severity'], 9), (c['country'] or '').casefold(), c['reference']))
+    pm_name = next((p.get('pm') for p in profiles.values() if p.get('pm')), '')
+    return {'problems': [], 'projects': cards, 'pm_name': pm_name, 'email': email}

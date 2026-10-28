@@ -1,0 +1,149 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "macros/form_actions.html" import form_actions %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% set can_edit = can_edit if can_edit is defined else true %}
+{% set header_actions = namespace(items=[]) %}
+{% if can_edit %}
+{% set __ = header_actions.items.append({
+  'type': 'submit',
+  'text': form.submit.label.text if form.submit and form.submit.label else _('Save'),
+  'icon': 'fas fa-save',
+  'classes': 'professional-action-btn professional-action-btn-blue',
+  'attributes': {'form': 'projectForm'}
+}) %}
+{% if project %}
+  {% set __ = header_actions.items.append({
+    'type': 'button',
+    'text': _('Delete'),
+    'icon': 'fas fa-trash',
+    'classes': 'professional-action-btn professional-action-btn-red',
+    'attributes': {'id': 'deleteProjectBtn'}
+  }) %}
+{% endif %}
+{% endif %}
+
+{{ page_header(
+    title=(project.reference if project else _('New project')),
+    icon='fas fa-' + ('diagram-project' if project else 'plus'),
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Assignment Management'), 'url': url_for('assignment_management.manage_assignments')},
+        {'name': _('Projects'), 'url': url_for('project_management.project_list')},
+        {'name': (project.reference if project else _('New project'))}
+    ],
+    actions=header_actions.items,
+    pin_actions_on_scroll=True,
+    subtitle=_('Reporting unit for project-based assignments. Country cycles use countries instead of projects.')
+) }}
+
+<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-24">
+  <form id="projectForm" method="post">
+    {{ form.csrf_token }}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.reference.id }}">{{ form.reference.label.text }}</label>
+        {{ form.reference(class_='form-control w-full', id=form.reference.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.fund.id }}">{{ form.fund.label.text }}</label>
+        {{ form.fund(class_='form-control w-full', id=form.fund.id, placeholder='e.g. CBF', readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.portfolio.id }}">{{ form.portfolio.label.text }}</label>
+        {{ form.portfolio(class_='form-control w-full', id=form.portfolio.id, placeholder='e.g. NSD', readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.title.id }}">{{ form.title.label.text }}</label>
+        {{ form.title(class_='form-control w-full', id=form.title.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.country_id.id }}">{{ form.country_id.label.text }}</label>
+        {{ form.country_id(class_='form-control w-full', id=form.country_id.id, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.status.id }}">{{ form.status.label.text }}</label>
+        {{ form.status(class_='form-control w-full', id=form.status.id, disabled=not can_edit) }}
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.organization_name.id }}">{{ form.organization_name.label.text }}</label>
+        {{ form.organization_name(class_='form-control w-full', id=form.organization_name.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.funding_modality.id }}">{{ form.funding_modality.label.text }}</label>
+        {{ form.funding_modality(class_='form-control w-full', id=form.funding_modality.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.categories.id }}">{{ form.categories.label.text }}</label>
+        {{ form.categories(class_='form-control w-full', id=form.categories.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.start_date.id }}">{{ form.start_date.label.text }}</label>
+        {{ form.start_date(class_='form-control w-full', id=form.start_date.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.end_date.id }}">{{ form.end_date.label.text }}</label>
+        {{ form.end_date(class_='form-control w-full', id=form.end_date.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.amount_granted.id }}">{{ form.amount_granted.label.text }}</label>
+        {{ form.amount_granted(class_='form-control w-full', id=form.amount_granted.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.expected_spending.id }}">{{ form.expected_spending.label.text }}</label>
+        {{ form.expected_spending(class_='form-control w-full', id=form.expected_spending.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.focal_name.id }}">{{ form.focal_name.label.text }}</label>
+        {{ form.focal_name(class_='form-control w-full', id=form.focal_name.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.focal_email.id }}">{{ form.focal_email.label.text }}</label>
+        {{ form.focal_email(class_='form-control w-full', id=form.focal_email.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.manager_name.id }}">{{ form.manager_name.label.text }}</label>
+        {{ form.manager_name(class_='form-control w-full', id=form.manager_name.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.manager_email.id }}">{{ form.manager_email.label.text }}</label>
+        {{ form.manager_email(class_='form-control w-full', id=form.manager_email.id, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.planned_overview.id }}">{{ form.planned_overview.label.text }}</label>
+        {{ form.planned_overview(class_='form-control w-full', id=form.planned_overview.id, rows=4, readonly=not can_edit, disabled=not can_edit) }}
+      </div>
+    </div>
+
+    {% if can_edit %}
+    <div class="pt-6 mt-6 border-t border-gray-200">
+      {{ form_actions(
+        form.submit.label.text if form.submit and form.submit.label else _('Save'),
+        cancel_url=url_for('project_management.project_list')
+      ) }}
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+{% if project and can_edit %}
+<form id="delete-project-form" method="post" action="{{ url_for('project_management.project_delete', project_id=project.id) }}" class="hidden">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  var btn = document.getElementById('deleteProjectBtn');
+  var form = document.getElementById('delete-project-form');
+  if (!btn || !form) return;
+  btn.addEventListener('click', function () {
+    if (window.confirm({{ _('Delete this project?')|tojson }})) {
+      form.submit();
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

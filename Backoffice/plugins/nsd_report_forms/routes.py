@@ -1,12 +1,11 @@
 """NSD master import: upload, preview, run, status."""
 import io
-import os
 import re
 import threading
 import uuid
 from pathlib import Path
 
-from flask import current_app, render_template, request, send_file
+from flask import current_app, redirect, request, send_file, url_for
 from flask_login import current_user
 
 from app import db
@@ -41,8 +40,8 @@ def _stored_path(file_id: str):
 @bp.route('/', methods=['GET'])
 @admin_permission_required(NSD_ADMIN_PERMISSION)
 def import_page():
-    return render_template('plugins/nsd_report_forms/nsd_import/import.html', sheets=layout.SHEETS, required_sheets=layout.REQUIRED_SHEETS,
-                           template_names=layout.TEMPLATE_NAMES)
+    """Legacy URL — import UI lives on the plugin settings page."""
+    return redirect(url_for('nsd_settings.settings_page', tab='import'))
 
 
 @bp.route('/sample', methods=['GET'])

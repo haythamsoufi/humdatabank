@@ -1,0 +1,221 @@
+{# Master import UI (embedded in plugin settings). Expects sheets, required_sheets, template_names. #}
+<div id="nsd-import"
+     class="space-y-6 max-w-5xl"
+     data-upload-url="{{ url_for('nsd_import.upload') }}"
+     data-run-url="{{ url_for('nsd_import.run_import') }}"
+     data-status-url-prefix="{{ url_for('nsd_import.status', job_id='__JOB__') }}"
+     data-cancel-url-prefix="{{ url_for('nsd_import.cancel', job_id='__JOB__') }}"
+     data-sample-url="{{ url_for('nsd_import.download_blank') }}">
+
+  <div class="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
+    <h3 class="text-base font-semibold text-gray-900">1. Choose the master workbook</h3>
+    <p class="text-sm text-gray-600">
+      One workbook sets up projects, logframes, the reporting schedule and report history for CBF.
+      Nothing is saved until you confirm in step 3. Sheets:
+      {% for name, cols in sheets.items() %}
+        <span class="font-medium text-gray-800">{{ name }}</span>{% if name in required_sheets %}
+        <span class="text-gray-500">(required)</span>{% endif %}{% if not loop.last %}, {% endif %}
+      {% endfor %}.
+      <a href="{{ url_for('nsd_import.download_blank') }}"
+         class="text-red-700 hover:text-red-800 underline font-medium">Download an empty workbook</a>
+      with the right columns.
+    </p>
+    <p class="text-sm text-gray-600">
+      The importer writes into these templates (created and published automatically if missing):
+      {% for k, n in template_names.items() if k != 'profile' %}
+        <span class="font-medium text-gray-800">{{ n }}</span>{% if not loop.last %}, {% endif %}
+      {% endfor %}.
+    </p>
+    <div class="flex flex-wrap items-center gap-3">
+      <input type="file" id="nsdi-file" accept=".xlsx"
+             class="block w-full max-w-md text-sm text-gray-700">
+      <button type="button" class="btn btn-primary" id="nsdi-upload">Check workbook</button>
+      <span class="text-sm text-gray-500" id="nsdi-uploading" aria-live="polite"></span>
+    </div>
+  </div>
+
+  <div class="rounded-lg border border-gray-200 bg-white p-5 space-y-4 hidden" id="nsdi-preview">
+    <h3 class="text-base font-semibold text-gray-900">2. Preview</h3>
+    <div id="nsdi-messages" class="space-y-3"></div>
+    <div id="nsdi-analysis" class="space-y-3 text-sm text-gray-700"></div>
+  </div>
+
+  <div class="rounded-lg border border-gray-200 bg-white p-5 space-y-4 hidden" id="nsdi-run-card">
+    <h3 class="text-base font-semibold text-gray-900">3. Import</h3>
+    <label class="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+      <input type="checkbox" id="nsdi-overwrite" class="mt-1 rounded border-gray-300 text-red-600 focus:ring-red-500">
+      <span>
+        Overwrite report history that already has data in the app
+        <span class="block text-gray-500 mt-0.5">
+          Off: reports that already contain answers are left untouched; project details, logframe,
+          schedule and access are always updated.
+        </span>
+      </span>
+    </label>
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="button" class="btn btn-primary" id="nsdi-run">Run import</button>
+      <button type="button" class="btn btn-secondary hidden" id="nsdi-cancel">Cancel</button>
+    </div>
+    <div class="h-2 bg-gray-200 rounded-full overflow-hidden hidden" id="nsdi-bar">
+      <div class="h-full bg-emerald-600 transition-all duration-300" id="nsdi-bar-fill" style="width:0%"></div>
+    </div>
+    <div class="text-sm text-gray-500" id="nsdi-progress" aria-live="polite"></div>
+    <div id="nsdi-result" class="space-y-3 text-sm"></div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  var root = document.getElementById('nsd-import');
+  if (!root || root.dataset.bound === '1') return;
+  root.dataset.bound = '1';
+
+  var csrfEl = document.querySelector('meta[name="csrf-token"]');
+  var csrf = csrfEl ? csrfEl.getAttribute('content') : '';
+  var fileId = null, jobId = null, timer = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function show(id, on) { $(id).classList.toggle('hidden', !on); }
+  function jobUrl(prefix, id) { return prefix.replace('__JOB__', encodeURIComponent(id)); }
+
+  function post(url, body, isForm) {
+    var opts = { method: 'POST', headers: { 'X-CSRFToken': csrf } };
+    if (isForm) { opts.body = body; }
+    else { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body || {}); }
+    return fetch(url, opts).then(function (r) {
+      return r.json().then(function (j) { j._status = r.status; return j; });
+    });
+  }
+
+  function list(items) {
+    if (!items.length) return '';
+    return '<ul class="list-disc ml-5 mt-1 space-y-0.5">' +
+      items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  }
+  function alertBox(kind, html) {
+    var styles = {
+      err: 'bg-red-50 text-red-900 border-red-200',
+      warn: 'bg-amber-50 text-amber-900 border-amber-200',
+      ok: 'bg-emerald-50 text-emerald-900 border-emerald-200'
+    };
+    return '<div class="rounded-md border px-3 py-2 ' + (styles[kind] || styles.warn) + '">' + html + '</div>';
+  }
+  function stat(n, label) {
+    return '<div class="rounded-md bg-gray-50 border border-gray-100 px-3 py-2">' +
+      '<div class="text-xl font-semibold text-gray-900">' + esc(n) + '</div>' +
+      '<div class="text-xs text-gray-500">' + esc(label) + '</div></div>';
+  }
+
+  $('nsdi-upload').addEventListener('click', function () {
+    var f = $('nsdi-file').files[0];
+    if (!f) { $('nsdi-uploading').textContent = 'Choose a file first.'; return; }
+    var fd = new FormData(); fd.append('file', f);
+    $('nsdi-uploading').textContent = 'Reading workbook…';
+    show('nsdi-preview', false); show('nsdi-run-card', false); $('nsdi-result').innerHTML = '';
+    post(root.dataset.uploadUrl, fd, true).then(function (j) {
+      $('nsdi-uploading').textContent = '';
+      if (!j.success && !j.errors) {
+        $('nsdi-uploading').textContent = j.message || j.error || 'Upload failed.';
+        return;
+      }
+      fileId = j.file_id;
+      var html = '';
+      if (j.errors && j.errors.length) {
+        html += alertBox('err', '<b>This workbook cannot be imported:</b>' + list(j.errors.slice(0, 40)));
+      }
+      if (j.warnings && j.warnings.length) {
+        html += alertBox('warn', '<b>Warnings (' + j.warnings.length + '):</b>' + list(j.warnings.slice(0, 40)));
+      }
+      $('nsdi-messages').innerHTML = html;
+      var a = j.analysis, out = '';
+      if (a) {
+        if (a.problems.length) out += alertBox('err', list(a.problems));
+        out += '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
+          stat(a.projects.new, 'projects to create') +
+          stat(a.projects.existing, 'projects to update') +
+          stat(a.logframe_projects, 'projects with a logframe (' + a.logframe_rows + ' rows)') +
+          stat(Object.keys(a.schedule).map(function (k) { return a.schedule[k] + ' ' + k; }).join(', ') || 0, 'scheduled reports') +
+          stat(a.quarterly, 'quarterly reports with data') +
+          stat(a.final, 'final reports with data') + '</div>';
+        out += '<p>National Societies matched: <b>' + a.ns.matched + '</b> of ' + a.projects.total +
+          (a.ns.unmatched_count
+            ? ' · <b>' + a.ns.unmatched_count + '</b> names not found (these projects are skipped): ' +
+              esc(a.ns.unmatched_names.slice(0, 8).join('; ')) + (a.ns.unmatched_count > 8 ? ' …' : '')
+            : '') + '</p>';
+        out += '<p>Access by email: <b>' + a.access.matched + '</b> of ' + a.access.emails +
+          ' addresses already have accounts' +
+          (a.access.will_create || a.access.unknown
+            ? ' · <b>' + (a.access.will_create || a.access.unknown) +
+              '</b> will be created and added to Access Groups' +
+              (a.access.focal_group && a.access.pm_group
+                ? ' (<code>' + esc(a.access.focal_group) + '</code> → Final only; <code>' +
+                  esc(a.access.pm_group) + '</code> → all reports)'
+                : '') +
+              (a.access.will_create_sample || a.access.unknown_sample
+                ? ', e.g. ' + esc((a.access.will_create_sample || a.access.unknown_sample).slice(0, 4).join(', '))
+                : '')
+            : '') + '.</p>';
+      }
+      $('nsdi-analysis').innerHTML = out;
+      show('nsdi-preview', true);
+      show('nsdi-run-card', !(j.errors && j.errors.length) && !(a && a.problems.length));
+    }).catch(function () { $('nsdi-uploading').textContent = 'Upload failed.'; });
+  });
+
+  function poll() {
+    fetch(jobUrl(root.dataset.statusUrlPrefix, jobId)).then(function (r) { return r.json(); }).then(function (j) {
+      var job = j.job; if (!job) return;
+      var pct = job.total ? Math.round(100 * job.done / job.total) : 0;
+      $('nsdi-bar-fill').style.width = pct + '%';
+      $('nsdi-progress').textContent = job.state === 'running'
+        ? ('Importing ' + job.done + ' of ' + job.total + (job.current ? ' (' + job.current + ')' : ''))
+        : '';
+      if (job.state === 'running') { timer = setTimeout(poll, 1000); return; }
+      show('nsdi-cancel', false); $('nsdi-run').disabled = false;
+      var res = job.result || {}, s = res.stats || {}, html = '';
+      if (job.state === 'failed') {
+        html += alertBox('err', 'Import failed: ' + esc(job.error || ''));
+      } else {
+        html += alertBox(res.failed ? 'warn' : 'ok',
+          (job.state === 'cancelled' ? 'Import cancelled. ' : 'Import finished. ') +
+          (res.failed ? res.failed + ' project(s) failed (see below). ' : ''));
+        html += '<div class="overflow-x-auto"><table class="min-w-full text-sm border border-gray-200">' +
+          '<tbody>' + Object.keys(s).map(function (k) {
+            return '<tr class="border-t border-gray-100"><td class="px-3 py-1.5 text-gray-600">' +
+              esc(k.replace(/_/g, ' ')) + '</td><td class="px-3 py-1.5 font-medium text-gray-900">' +
+              esc(s[k]) + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+      if (res.messages && res.messages.length) {
+        html += alertBox('warn', list(res.messages.slice(0, 40)));
+      }
+      $('nsdi-result').innerHTML = html;
+    });
+  }
+
+  $('nsdi-run').addEventListener('click', function () {
+    if (!fileId) return;
+    $('nsdi-run').disabled = true; $('nsdi-result').innerHTML = '';
+    post(root.dataset.runUrl, {
+      file_id: fileId,
+      overwrite_reports: $('nsdi-overwrite').checked
+    }).then(function (j) {
+      if (!j.success) {
+        $('nsdi-result').innerHTML = alertBox('err', esc(j.message || j.error || 'Could not start the import.'));
+        $('nsdi-run').disabled = false;
+        return;
+      }
+      jobId = j.job_id; show('nsdi-bar', true); show('nsdi-cancel', true); poll();
+    });
+  });
+
+  $('nsdi-cancel').addEventListener('click', function () {
+    if (jobId) post(jobUrl(root.dataset.cancelUrlPrefix, jobId), {});
+  });
+})();
+</script>

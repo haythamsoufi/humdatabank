@@ -11,11 +11,13 @@ NSD admins (and System Managers) may add ``?as=<email>`` to preview another PM's
 """
 from pathlib import Path
 
-from flask import Blueprint, abort, jsonify, render_template, request, url_for
+from flask import Blueprint, abort, jsonify, redirect, request, url_for
 from flask_login import current_user
 
 from app.routes.admin.shared import permission_required
 from app.services.organization.authorization_service import AuthorizationService
+
+from app.models.projects import Project
 
 from plugins.nsd_report_forms.overview import data
 from plugins.nsd_report_forms.plugin import NSD_ADMIN_PERMISSION, NSD_PM_PERMISSION
@@ -45,38 +47,21 @@ def _viewing():
     return own, False
 
 
-def _as_args(email: str, previewing: bool) -> dict:
-    return {"as": email} if previewing else {}
-
-
 @pm_bp.route("/pm-overview", methods=["GET"])
 @permission_required(NSD_PM_PERMISSION)
 def pm_overview():
-    email, previewing = _viewing()
-    result = data.pm_projects(email)
-    extra = _as_args(email, previewing)
-    for p in result["projects"]:
-        p["url"] = url_for("nsd_pm.project_detail", reference=p["reference"], **extra)
-    return render_template(
-        f"{TEMPLATE_DIR}/nsd_pm/pm_overview.html", **result, previewing=previewing, can_preview=_can_preview(),
-        explore_url=url_for("data_exploration.explore_data", tab="nsd_funds"),
-    )
+    email, _previewing = _viewing()
+    return redirect(url_for("project_management.project_list", manager=email))
 
 
 @pm_bp.route("/projects/<path:reference>", methods=["GET"])
 @permission_required(NSD_PM_PERMISSION)
 def project_detail(reference):
-    email, previewing = _viewing()
-    # a project the PM is not named on is indistinguishable from one that does not exist
-    project = data.project_detail(reference.strip(), pm_email=email)
-    if project is None:
+    email, _previewing = _viewing()
+    project = Project.query.filter_by(reference=reference.strip()).first()
+    if project is None or data.norm_email(project.manager_email) != email:
         abort(404)
-    back = url_for("nsd_pm.pm_overview", **_as_args(email, previewing))
-    return render_template(
-        f"{TEMPLATE_DIR}/nsd_projects/detail.html", p=project,
-        brand_url=back, back_url=back, back_label="Back to my projects",
-        exit_url=url_for("data_exploration.explore_data", tab="nsd_funds"),
-    )
+    return redirect(url_for("project_management.project_edit", project_id=project.id))
 
 
 @pm_bp.route("/links", methods=["GET"])

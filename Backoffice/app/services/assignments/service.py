@@ -230,7 +230,13 @@ class AssignmentService:
                 status_counts[key] = 0
             status_counts[key] += 1
 
-            if getattr(aes, 'entity_type', None) == 'country':
+            et = getattr(aes, 'entity_type', None)
+            if et == 'country':
+                country_count += 1
+                if getattr(aes, 'is_public_available', False):
+                    public_country_count += 1
+            elif et == 'project':
+                # Count project entities in the same "who reports" bucket for admin overview
                 country_count += 1
                 if getattr(aes, 'is_public_available', False):
                     public_country_count += 1

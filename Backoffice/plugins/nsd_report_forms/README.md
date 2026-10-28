@@ -1,44 +1,37 @@
 # NSD funds (`nsd_report_forms`)
 
-Monitoring and reporting of National Society Development (NSD) funded projects (CBF first) inside the Databank,
-replacing the standalone MOMO system. Everything is plugin code and form-builder templates; no table is added to core.
+CBF monitoring of National Society Development funded projects inside the Databank,
+on top of **core project reporting** (`app.models.projects.Project`, `entity_type=project`).
 
-## What it contains
+## Split of responsibilities
 
-| Part | Where |
+| Layer | Owns |
 |---|---|
-| Two form field types: outcome / output tracking table (`nsd_logframe`), small add-row list (`nsd_list`) | `plugin.py`, `static/js`, `templates/field*.html` |
-| Entry-form behaviour for templates named "NSD ...": locked project information, traffic-light selectors, empty repeat sections | `static/js/nsd-report-forms.js` |
-| Master Excel import (preview, background run, safe to repeat) | `importer/`, `routes.py`, `templates/nsd_import/` |
-| Admin project overview (MOMO-style list and project page) | `routes_overview.py`, `overview/`, `templates/nsd_projects/` |
-| Personal page for IFRC project managers (`/nsd-funds/pm-overview`) | `routes_pm.py`, `templates/nsd_pm/` |
-| Explore Data tab "NSD funds" | `plugin.py` (`get_data_explorer_tab`), `templates/nsd_explorer/` |
-| Read-only API for other systems (`/api/v1/nsd-funds/deadlines`, `/projects`, `/kpis`; API key, `submissions:read`) | `api_routes.py`, `api_kpis.py` |
-| Roles and permissions (seeded by the plugin) | `plugin.py` (`get_seed_roles`, `get_seed_permissions`) |
-| Access for new accounts from project contact emails | `access_on_create.py` |
+| **Core** | `project` table, Admin → Projects CRUD, assign projects on an assignment, EntityService / access via country |
+| **This plugin** | CBF templates & field types, relative slots `Y1Q1`…`Final`, master Excel import, MOMO-style overview / PM / API |
 
-## Data model
+## Admin UI
 
-Projects live under their **country**. Each project has a hidden project record (an inactive assignment of the
-"NSD Project profile - CBF" template, period `<reference> Project`) and one assignment per report
-(`<reference> Y1Q2`, `<reference> Final`), all given to the project's country. Project information inside a report is a
-locked copy written by the import and refreshed on every import.
+**Plugin settings (standard):** Admin → Plugins → NSD Report Forms → Settings  
+(`/admin/plugins/nsd_report_forms/settings`) — Overview (status + tool links) and **Master import** tab.  
+Legacy `/admin/nsd-import/` redirects to `?tab=import`.  
+Legacy `/admin/nsd-projects/` and `/nsd-funds/pm-overview` redirect to **Admin → Projects** (`/admin/projects/`). PM pages are that list filtered to the manager email.
 
-## Roles
+**Core project reporting (manual):**
 
-| Role | Sees | Notes |
-|---|---|---|
-| Admin: NSD funds | everything NSD, overview, import | plus assignment management |
-| Assignment: NSD NS focal point | quarterly reports of their countries | never the final report |
-| Assignment: NSD IFRC project manager | quarterly and final reports of their countries, personal PM page | supersedes the focal role |
+1. **Admin → Projects** — create a project (reference, country, dates, contacts, …).
+2. **Admin → Manage Assignments** — create an assignment for the report template and period (e.g. a quarterly wave).
+3. On the assignment, **Add entities → Projects** — attach the projects that must report.
+4. Focal points with **country** access (and the right assignment roles) open those submissions.
 
-The import limits every NSD assignment to these roles with core's assignment access control
-(`AssignedForm.allowed_roles`), so ordinary assignment roles with country access do not see NSD reports.
-Contact emails in the project records give existing users their country access and role on import, and new accounts
-get them when they are created.
+**CBF master import** (automates steps 1–3 for workbooks / shared `Y1Qn` / `Final` slots):  
+Settings → Master import. Needs **Admin: NSD funds** (or System Manager).  
+Missing published templates (`NSD Quarterly report - CBF`, `NSD Final report - CBF`) are auto-created on first import/check.  
+Inactive National Societies are matched (not skipped). Missing contact emails create users and add them to Access Groups **NSD Focal Points** (`ns_focal_email`, Final reports only) and **NSD PMs** (`ifrc_pm_email`, all report slots), with country access and Assignment Editor/Submitter.
 
-## Install
+## Install / migrate
 
-Install the plugin zip (Admin > Plugin Management) and restart once so the field types, roles and permissions are
-loaded. Create the three CBF templates from the Excel files provided by the NSD team, then use Explore Data >
-NSD funds > NSD master import.
+1. Run migrations (`add_nsd_project_table` creates core `project`; `aes_entity_type_project` normalizes AES types; `ensure_core_project_table` is a no-op safety net if a draft `nsd_project` table was stamped earlier).
+2. Enable the **Projects** entity group in System Settings if it is not already on.
+3. Legacy data: `flask nsd-migrate-projects`
+4. Ongoing CBF updates: Settings → Master import.

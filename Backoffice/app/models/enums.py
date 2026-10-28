@@ -472,6 +472,8 @@ class EntityType(str, enum.Enum):
     department = 'department'
     regional_office = 'regional_office'
     cluster_office = 'cluster_office'
+    # Project-based periodic reporting (core); plugins may specialise workflows
+    project = 'project'
 
 
 class NotificationType(enum.Enum):

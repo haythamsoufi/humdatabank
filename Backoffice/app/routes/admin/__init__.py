@@ -24,6 +24,7 @@ from app.services.organization.authorization_service import AuthorizationService
 from app.routes.admin.form_builder import bp as form_builder_bp
 from app.routes.admin.user_management import bp as user_management_bp
 from app.routes.admin.assignment_management import bp as assignment_management_bp
+from app.routes.admin.project_management import bp as project_management_bp
 from app.routes.admin.content_management import bp as content_management_bp
 from app.routes.admin.system_admin import bp as system_admin_bp
 from app.routes.admin.analytics import bp as analytics_bp
@@ -76,6 +77,7 @@ def register_admin_blueprints(app):
     app.register_blueprint(form_builder_bp)
     app.register_blueprint(user_management_bp)
     app.register_blueprint(assignment_management_bp)
+    app.register_blueprint(project_management_bp)
     app.register_blueprint(content_management_bp)
     app.register_blueprint(system_admin_bp)
     app.register_blueprint(analytics_bp)

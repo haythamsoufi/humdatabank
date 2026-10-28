@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "node .cursor/hooks/playwright_mcp_output_path.js",
+        "matcher": "CallDynamicTool|browser_take_screenshot|browser_pdf_save|browser_network_requests|browser_console_messages|browser_snapshot",
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/playwright_mcp_cleanup_root.js",
+        "timeout": 15
+      }
+    ]
+  }
+}

@@ -16,6 +16,9 @@ ENTITY_GROUP_TYPE_MAP = {
     'countries': [
         EntityType.country.value,
     ],
+    'projects': [
+        EntityType.project.value,
+    ],
     'ns_structure': [
         EntityType.ns_branch.value,
         EntityType.ns_subbranch.value,

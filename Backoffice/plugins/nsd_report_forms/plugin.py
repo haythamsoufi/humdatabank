@@ -1,7 +1,7 @@
-"""NSD report forms: small entry-form behaviours for the NSD funds monitoring reports.
+"""NSD report forms: CBF monitoring on top of core project reporting.
 
-Loads one script on the entry form of every template whose name starts with
-"NSD " (see ``static/js/nsd-report-forms.js``). No tables, routes or core changes.
+Uses the core ``Project`` registry and ``entity_type=project`` assignments.
+This plugin adds CBF field types, master import, relative Y1Qn slots, overview/PM/API.
 """
 from typing import Any, Dict, List, Optional
 
@@ -130,14 +130,13 @@ class NsdReportFormsPlugin(BasePlugin):
 
     @property
     def version(self) -> str:
-        return "0.16.0"
+        return "0.17.0"
 
     @property
     def description(self) -> str:
         return (
-            "Entry-form behaviour for the NSD funds monitoring reports: MOMO-style project "
-            "information and traffic lights, read-only carried-forward spending, empty action-point lists, "
-            "the NSD Outcomes and Outputs field, and the NSD master Excel import."
+            "NSD funds monitoring: project registry, shared report slots (Y1Q1…Final), "
+            "MOMO-style overview and traffic lights, Outcomes/Outputs field, and master Excel import."
         )
 
     @property
@@ -147,17 +146,28 @@ class NsdReportFormsPlugin(BasePlugin):
     def get_field_types(self) -> List:
         return [NsdLogframeFieldType(), NsdListFieldType()]
 
-    def get_blueprint(self):
-        from plugins.nsd_report_forms import bp
+    def get_models(self) -> List:
+        # Project registry lives in core (app.models.projects.Project)
+        return []
 
+    def get_blueprint(self):
+        from plugins.nsd_report_forms import bp, load_routes
+
+        load_routes()
         return bp
 
     def get_additional_blueprints(self) -> list:
         from plugins.nsd_report_forms.api_routes import api_bp
         from plugins.nsd_report_forms.routes_overview import projects_bp
         from plugins.nsd_report_forms.routes_pm import pm_bp
+        from plugins.nsd_report_forms.routes_settings import settings_bp
 
-        return [projects_bp, api_bp, pm_bp]
+        return [projects_bp, api_bp, pm_bp, settings_bp]
+
+    def get_settings(self) -> Dict[str, Any]:
+        from plugins.nsd_report_forms.routes_settings import nsd_settings_status
+
+        return nsd_settings_status()
 
     def get_api_endpoints(self) -> list:
         from plugins.nsd_report_forms.api_routes import API_ENDPOINTS
@@ -175,6 +185,53 @@ class NsdReportFormsPlugin(BasePlugin):
             icon="fas fa-hand-holding-usd",
             manage_requires_system_manager=False,
         )
+
+    def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
+        from flask_login import current_user
+        from sqlalchemy.orm import joinedload
+
+        from app import db
+        from app.models.projects import Project
+        from app.services.organization.authorization_service import AuthorizationService
+
+        can_pm = AuthorizationService.has_rbac_permission(current_user, NSD_PM_PERMISSION)
+        can_view_all = (
+            AuthorizationService.is_system_manager(current_user)
+            or AuthorizationService.has_rbac_permission(current_user, "admin.assignments.view")
+            or AuthorizationService.has_rbac_permission(current_user, "admin.assignments.edit")
+            or AuthorizationService.has_rbac_permission(current_user, NSD_ADMIN_PERMISSION)
+        )
+        can_edit = AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(
+            current_user, "admin.assignments.edit"
+        )
+
+        base = (
+            Project.query.options(joinedload(Project.country))
+            .filter(Project.portfolio == "NSD")
+        )
+        my_projects: list[Project] = []
+        all_projects: list[Project] = []
+        if can_pm:
+            email = (getattr(current_user, "email", "") or "").strip()
+            if email:
+                my_projects = (
+                    base.filter(db.func.lower(Project.manager_email) == email.casefold())
+                    .order_by(Project.reference.asc())
+                    .all()
+                )
+        if can_view_all:
+            all_projects = base.order_by(Project.reference.asc()).all()
+
+        default_subtab = "my-projects" if can_pm else "all-projects"
+        return {
+            "explore_first_tab": first_tab,
+            "nsd_my_projects": my_projects,
+            "nsd_all_projects": all_projects,
+            "nsd_can_edit_projects": can_edit,
+            "nsd_show_my_projects_tab": can_pm,
+            "nsd_show_all_projects_tab": can_view_all,
+            "nsd_funds_default_subtab": default_subtab,
+        }
 
     def get_assignment_badges(self, assignment_entity_statuses):
         from plugins.nsd_report_forms.badges import assignment_badges

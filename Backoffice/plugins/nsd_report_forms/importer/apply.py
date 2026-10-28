@@ -1,7 +1,7 @@
-"""Apply a parsed NSD master workbook: project records, access, assignments and form data.
+"""Apply a parsed NSD master workbook onto core Project + shared CBF report slots.
 
-Projects live under their country: every report is one assignment (reference in the period name) given to the
-country of the National Society. No core changes.
+Projects are stored in core ``project``. Each report is an AES on a *shared* slot
+assignment (period ``Y1Q2`` / ``Final``) with ``entity_type=project``.
 
 analyze() reads only. run() writes, one project per transaction, so one bad project
 never blocks the others.
@@ -20,15 +20,19 @@ from app.models import (AssignedForm, AssignmentEntityStatus, Country, FormData,
                         FormTemplateVersion, RepeatGroupData, RepeatGroupInstance, User)
 from app.models.enums import AssignmentEntityStatusValue
 from app.models.organization import NationalSociety
+from app.models.projects import Project
 from app.services.assignments.completion_service import AssignmentCompletionService
 from app.services.assignments.workflow_service import apply_entity_status_change
 from app.utils.datetime_helpers import utcnow
+
+from plugins.nsd_report_forms.constants import ENTITY_TYPE, FINAL_SLOT
+from plugins.nsd_report_forms import schedule as nsd_schedule
 
 from . import restrictions
 from . import layout
 from .workbook import Book, logframe_structure
 
-ENTITY = 'country'
+ENTITY = 'country'  # geography grants still use country
 
 # items the importer prefills in each report; they do not count as report history
 PREFILLED = {
@@ -62,21 +66,44 @@ class Lookups:
     def __init__(self):
         self.templates: Dict[str, dict] = {}
         self.problems: List[str] = []
+        # Auto-create/publish CBF quarter + final if missing (idempotent).
+        try:
+            from plugins.nsd_report_forms.ensure_templates import ensure_cbf_report_templates
+
+            ensure_cbf_report_templates(commit=True)
+        except Exception as exc:
+            self.problems.append(f'Could not prepare NSD report templates: {exc}')
+        # Profile template is optional (identity lives in core project); quarter + final are required.
         for key, name in layout.TEMPLATE_NAMES.items():
-            self._load_template(key, name)
+            required = key != 'profile'
+            self._load_template(key, name, required=required)
         self.ns_index, self.ns_by_country = self._ns_index()
         self.ns_country = {i: c for i, c in db.session.query(NationalSociety.id, NationalSociety.country_id).all()}
         self.user_ids = {(e or '').strip().casefold(): uid for uid, e in db.session.query(User.id, User.email).all() if e}
         self.nsd_roles = restrictions.load_roles()
         for code in restrictions.missing_roles(self.nsd_roles):
             self.problems.append(f'Role "{code}" does not exist yet. Run the RBAC seed so the NSD admin permission role is created.')
+        try:
+            self.access_groups = restrictions.ensure_nsd_access_groups()
+            self.editor_role = restrictions.ensure_editor_role()
+            self.pm_overview_role = restrictions.ensure_pm_overview_role()
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            self.access_groups = {}
+            self.editor_role = None
+            self.pm_overview_role = None
+            self.problems.append(f'Could not prepare NSD Access Groups: {exc}')
 
-    def _load_template(self, key: str, name: str):
+    def _load_template(self, key: str, name: str, required: bool = True):
         row = (db.session.query(FormTemplate, FormTemplateVersion)
                .join(FormTemplateVersion, FormTemplateVersion.id == FormTemplate.published_version_id)
                .filter(FormTemplateVersion.name == name).first())
         if not row:
-            self.problems.append(f'Template "{name}" is not published. Create it with the form builder first.')
+            if required:
+                self.problems.append(
+                    f'Template "{name}" is not published and could not be auto-created.'
+                )
             return
         tpl, ver = row
         # plain objects, not ORM rows: ORM rows expire at every commit and would re-query on each access
@@ -90,10 +117,13 @@ class Lookups:
 
     @staticmethod
     def _ns_index():
-        """(normalised name -> NS ids, ISO3 -> NS ids) over the active National Societies."""
+        """(normalised name -> NS ids, ISO3 -> NS ids) over all National Societies (incl. inactive)."""
         by_name, by_country = defaultdict(set), defaultdict(set)
-        rows = (db.session.query(NationalSociety, Country.iso3).join(Country, Country.id == NationalSociety.country_id)
-                .filter(NationalSociety.is_active.is_(True)).all())
+        rows = (
+            db.session.query(NationalSociety, Country.iso3)
+            .join(Country, Country.id == NationalSociety.country_id)
+            .all()
+        )
         for ns, iso3 in rows:
             for n in [ns.name] + [v for v in (ns.name_translations or {}).values() if isinstance(v, str)]:
                 by_name[_norm_name(n)].add(ns.id)
@@ -102,10 +132,26 @@ class Lookups:
         return by_name, by_country
 
     def match_ns(self, name: str, iso3: str = '') -> Optional[int]:
-        """The National Society by name; failing that, the only one of the project's country (when its ISO3 is given)."""
-        ids = self.ns_index.get(_norm_name(name), set())
+        """Match an NS by name (active or inactive); ISO3 fallback when the country has exactly one NS.
+
+        Also accepts a workbook name that is a prefix of the stored name (e.g. ``Nicaraguan Red Cross``
+        vs ``Nicaraguan Red Cross* dissolved …``).
+        """
+        key = _norm_name(name)
+        ids = set(self.ns_index.get(key, set()))
+        if len(ids) != 1 and key:
+            cands = set()
+            for nkey, nids in self.ns_index.items():
+                if nkey == key:
+                    cands |= nids
+                elif nkey.startswith(key + " ") or key.startswith(nkey + " "):
+                    cands |= nids
+            if len(cands) == 1:
+                ids = cands
+            elif not ids and cands:
+                ids = cands
         if len(ids) != 1 and iso3:
-            ids = self.ns_by_country.get(iso3.strip().upper(), set())
+            ids = set(self.ns_by_country.get(iso3.strip().upper(), set()))
         return next(iter(ids)) if len(ids) == 1 else None
 
     def item(self, key: str, label: str, section: Optional[str] = None):
@@ -130,12 +176,17 @@ def analyze(book: Book) -> dict:
     lk = Lookups()
     projects = book.rows['Projects']
     refs = [p['reference'] for p in projects]
-    profile_tpl = lk.templates.get('profile')
     existing = set()
-    if refs and profile_tpl:
-        names = {layout.period_name(r, layout.PROFILE_PERIOD): r for r in refs}
-        existing = {names[n] for (n,) in db.session.query(AssignedForm.period_name).filter(
-            AssignedForm.template_id == profile_tpl['tpl'].id, AssignedForm.period_name.in_(list(names))).all()}
+    if refs:
+        existing = {
+            r for (r,) in db.session.query(Project.reference).filter(Project.reference.in_(refs)).all()
+        }
+        # Also count legacy profile assignments as "existing" during dual-read migration
+        profile_tpl = lk.templates.get('profile')
+        if profile_tpl:
+            names = {layout.period_name(r, layout.PROFILE_PERIOD): r for r in refs}
+            existing |= {names[n] for (n,) in db.session.query(AssignedForm.period_name).filter(
+                AssignedForm.template_id == profile_tpl['tpl'].id, AssignedForm.period_name.in_(list(names))).all()}
     unmatched_ns = sorted({p['ns_name'] for p in projects if lk.match_ns(p['ns_name'], p['country_iso3']) is None})
     emails = {p[k].strip().casefold() for p in projects for k in ('ns_focal_email', 'ifrc_pm_email') if p.get(k)}
     unknown_emails = sorted(e for e in emails if e not in lk.user_ids)
@@ -149,8 +200,16 @@ def analyze(book: Book) -> dict:
         'projects': {'total': len(projects), 'new': len(projects) - len(existing), 'existing': len(existing)},
         'ns': {'matched': len(projects) - sum(1 for p in projects if lk.match_ns(p['ns_name'], p['country_iso3']) is None),
                'unmatched_names': unmatched_ns[:30], 'unmatched_count': len(unmatched_ns)},
-        'access': {'emails': len(emails), 'matched': len(emails) - len(unknown_emails), 'unknown': len(unknown_emails),
-                   'unknown_sample': unknown_emails[:10]},
+        'access': {
+            'emails': len(emails),
+            'matched': len(emails) - len(unknown_emails),
+            'unknown': len(unknown_emails),
+            'unknown_sample': unknown_emails[:10],
+            'will_create': len(unknown_emails),
+            'will_create_sample': unknown_emails[:10],
+            'focal_group': restrictions.FOCAL_GROUP_NAME,
+            'pm_group': restrictions.PM_GROUP_NAME,
+        },
         'logframe_projects': len({r['reference'] for r in book.rows['Logframe']}),
         'logframe_rows': len(book.rows['Logframe']),
         'schedule': dict(types),
@@ -169,6 +228,7 @@ class Run:
         self.stats = defaultdict(int)
         self.roles = {}
         self.messages: List[str] = []
+        self._slots: Optional[Dict[str, AssignedForm]] = None
         self.logframes = defaultdict(list)
         for r in book.rows['Logframe']:
             self.logframes[r['reference']].append(r)
@@ -203,28 +263,32 @@ class Run:
         self.stats['values'] += 1
 
     def get_assignment(self, key: str, suffix: str, due: Optional[dt.datetime], proj: SimpleNamespace):
-        """One assignment per project and report (the reference is part of the period name), given to the country."""
-        tpl = self.lk.templates[key]['tpl']
-        period = layout.period_name(proj.reference, suffix)
-        # The project record (profile) is never a task: it stays inactive, like the reports of closed projects.
-        active = proj.active and key != 'profile'
-        af = AssignedForm.query.filter_by(template_id=tpl.id, period_name=period).first()
-        if not af:
-            af = AssignedForm(template_id=tpl.id, period_name=period, is_active=active)
-            db.session.add(af)
-            db.session.flush()
-            self.stats['assignments_created'] += 1
-        elif af.is_active != active:
-            af.is_active = active
-        aes = AssignmentEntityStatus.query.filter_by(assigned_form_id=af.id, entity_type=ENTITY, entity_id=proj.country_id).first()
-        if not aes:
-            aes = AssignmentEntityStatus(assigned_form_id=af.id, entity_type=ENTITY, entity_id=proj.country_id,
-                                         status=AssignmentEntityStatusValue.pending, due_date=due)
-            db.session.add(aes)
-            db.session.flush()
+        """AES on a shared slot assignment (period = Y1Q2 / Final), entity = the NSD project.
+
+        Profile key is no longer written as an assignment; project identity lives in core ``project``.
+        """
+        if key == 'profile':
+            raise TemplateProblem('NSD project profiles are stored in the core project registry, not as assignments')
+        slot = FINAL_SLOT if key == 'CBF final report' or suffix == layout.FINAL_PERIOD else suffix
+        if self._slots is None:
+            self._slots = nsd_schedule.ensure_shared_slots()
+        af = self._slots.get(slot)
+        if af is None:
+            existed_af = AssignedForm.query.filter_by(
+                template_id=self.lk.templates[key]['tpl'].id, period_name=slot
+            ).first()
+            af = nsd_schedule._get_or_create_slot(
+                self.lk.templates[key]['tpl'].id, slot, is_active=True
+            )
+            self._slots[slot] = af
+            if existed_af is None:
+                self.stats['assignments_created'] += 1
+        existed_aes = AssignmentEntityStatus.query.filter_by(
+            assigned_form_id=af.id, entity_type=ENTITY_TYPE, entity_id=proj.project.id
+        ).first()
+        aes = nsd_schedule.ensure_project_aes(proj.project, af, due=due, active=proj.active)
+        if existed_aes is None:
             self.stats['entities_created'] += 1
-        elif due is not None:
-            aes.due_date = due
         return aes
 
     def has_history(self, aes, key: str) -> bool:
@@ -282,22 +346,65 @@ class Run:
             self.stats['skipped_no_national_society'] += 1
             self.note(f'{ref}: National Society "{p["ns_name"]}" not found, project skipped')
             return
-        proj = SimpleNamespace(reference=ref, country_id=country_id, active=(p['status'] or 'Open') in ('Open', 'Active'), p=p)
-        existed = AssignedForm.query.filter_by(template_id=self.lk.templates['profile']['tpl'].id,
-                                               period_name=layout.period_name(ref, layout.PROFILE_PERIOD)).first()
+        frame = logframe_structure(self.logframes.get(ref, []))
+        existed = Project.query.filter_by(reference=ref).first() is not None
+        project = nsd_schedule.upsert_project_from_import(p, country_id, logframe=frame or None)
         self.stats['projects_updated' if existed else 'projects_created'] += 1
+        self.stats['profiles'] += 1
 
-        for em in (p['ns_focal_email'], p['ifrc_pm_email']):
-            uid = self.lk.user_ids.get((em or '').strip().casefold())
-            if uid:
-                db.session.get(User, uid).add_entity_permission(ENTITY, country_id)
-                self.stats['access_grants'] += 1
+        proj = SimpleNamespace(
+            reference=ref,
+            country_id=country_id,
+            active=(p['status'] or 'Open') in ('Open', 'Active'),
+            p=p,
+            project=project,
+        )
 
-        self.write_profile(proj)
+        self._ensure_contacts(p, country_id)
+
         for s in self.sched.get(ref, []):
             self.write_schedule_row(proj, s)
         if ref in self.final and not any(s['report_type'] == 'CBF final report' for s in self.sched.get(ref, [])):
             self.write_schedule_row(proj, {'report_type': 'CBF final report', 'period': layout.FINAL_PERIOD, 'deadline': ''})
+
+    def _ensure_contacts(self, p: dict, country_id: int) -> None:
+        """Create missing contact users, put them in NSD Access Groups, grant country access."""
+        groups = getattr(self.lk, 'access_groups', None) or {}
+        editor = getattr(self.lk, 'editor_role', None)
+        pm_role = getattr(self.lk, 'pm_overview_role', None)
+
+        contacts = (
+            ('ns_focal_email', 'ns_focal_name', 'focal', False),
+            ('ifrc_pm_email', 'ifrc_pm_name', 'pm', True),
+        )
+        for email_key, name_key, group_key, is_pm in contacts:
+            email = (p.get(email_key) or '').strip()
+            if not email or '@' not in email:
+                continue
+            group = groups.get(group_key)
+            if group is None:
+                # Fall back to country grant only when groups could not be prepared
+                uid = self.lk.user_ids.get(email.casefold())
+                if uid:
+                    db.session.get(User, uid).add_entity_permission(ENTITY, country_id)
+                    self.stats['access_grants'] += 1
+                continue
+            also = [r for r in (editor, pm_role if is_pm else None) if r is not None]
+            try:
+                user, created = restrictions.ensure_contact_user(
+                    email=email,
+                    name=(p.get(name_key) or '').strip(),
+                    group=group,
+                    also_roles=also,
+                )
+            except ValueError:
+                continue
+            user.add_entity_permission(ENTITY, country_id)
+            self.lk.user_ids[email.casefold()] = user.id
+            self.stats['access_grants'] += 1
+            if created:
+                self.stats['users_created'] += 1
+            self.stats['group_memberships'] += 1
 
     @staticmethod
     def _date(v: str) -> str:
@@ -317,29 +424,6 @@ class Run:
 
     def _expected(self, p: dict) -> str:
         return p['expected_spending_chf'] or p['amount_granted_chf'] or ''
-
-    def write_profile(self, proj: SimpleNamespace):
-        """The project record: one hidden form per project, read by the overview pages."""
-        p, key = proj.p, 'profile'
-        aes = self.get_assignment(key, layout.PROFILE_PERIOD, None, proj)
-        L = self.lk.item
-        for label, v in (('National Society', p['ns_name']), ('Title', p['title']), ('Reference', p['reference']),
-                         ('Status', p['status'] or 'Open'), ('Funding modality', p['funding_modality']),
-                         ('Categories / thematics', p['categories']), ('Start date', p['start_date']), ('End date', p['end_date']),
-                         ('Amount granted (CHF)', p['amount_granted_chf']), ('Overview of the initiative as planned', p['planned_overview']),
-                         ('NS focal person', p['ns_focal_name']), ('NS focal person email', p['ns_focal_email']),
-                         ('IFRC project manager', p['ifrc_pm_name']), ('IFRC project manager email', p['ifrc_pm_email'])):
-            if v not in (None, ''):
-                self.put(aes, L(key, label), value=v)
-        expected = self._expected(p)
-        if expected:
-            self.put(aes, L(key, 'Expected spending'), disagg={'Amount (CHF)_Expected spending (CHF)': expected}, dtype='matrix')
-        frame = logframe_structure(self.logframes.get(p['reference'], []))
-        if frame:
-            self.put(aes, L(key, 'Outcomes and outputs'), disagg=frame, dtype='plugin')
-            self.stats['logframes'] += 1
-        self.finish_aes(aes, 'Submitted', None)
-        self.stats['profiles'] += 1
 
     def prefill(self, aes, key: str, p: dict):
         """Project information in a report is a locked copy of the project record, refreshed on every import."""
@@ -469,8 +553,13 @@ def run(book: Book, user_id: int, overwrite_reports: bool, progress, cancelled) 
     r = Run(book, user_id, overwrite_reports, progress, cancelled)
     if r.lk.problems:
         return {'stats': {}, 'messages': r.lk.problems, 'failed': len(book.rows['Projects']), 'cancelled': False}
-    r.note('NSD assignments are not limited to an access group. Until "Who can access this assignment" is set, '
-           'anyone who can open that country can open them.')
+    r.note('NSD reports use shared slots (Y1Q1…Final) with entity_type=project. '
+           'Country access for contact emails still opens those project reports.')
+    try:
+        r._slots = nsd_schedule.ensure_shared_slots()
+        db.session.flush()
+    except RuntimeError as exc:
+        return {'stats': {}, 'messages': [str(exc)], 'failed': len(book.rows['Projects']), 'cancelled': False}
     projects = book.rows['Projects']
     failed = 0
     for i, p in enumerate(projects, 1):

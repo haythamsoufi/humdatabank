@@ -8,6 +8,7 @@
 # Required GitHub secrets (environment: staging):
 #   ACR_USERNAME / ACR_PASSWORD — ifrcimage.azurecr.io
 #   AZURE_MCP_PUBLISH_PROFILE — publish profile XML for ifrc-databank-mcp-staging
+#   AZURE_CREDENTIALS — service principal JSON (restart after deploy; same as Backoffice staging)
 
 name: Deploy MCP to Azure
 
@@ -21,6 +22,11 @@ on:
         required: true
         default: v1.1
         type: string
+      restart_after_deploy:
+        description: Restart the web app after deploy so it pulls the new image
+        required: false
+        default: true
+        type: boolean
 
 env:
   ACR_REGISTRY: ifrcimage.azurecr.io
@@ -68,6 +74,8 @@ jobs:
     environment: staging
     permissions:
       contents: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Deploy MCP to Azure Web App
@@ -76,6 +84,23 @@ jobs:
           app-name: ifrc-databank-mcp-staging
           images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}
           publish-profile: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
+
+      # Mutable ACR tags are not pulled again unless the App Service recycles.
+      # Requires AZURE_CREDENTIALS for the staging subscription (GitHub environment secret).
+      - name: Azure login
+        if: inputs.restart_after_deploy
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Restart Azure Web App
+        if: inputs.restart_after_deploy
+        run: |
+          set -euo pipefail
+          az account set --subscription "f585c1c3-801b-4641-8d7f-145aa50ffb04"
+          az webapp restart \
+            --name "ifrc-databank-mcp-staging" \
+            --resource-group "ifrctgo001rg"
 
       - name: Deployment summary
         run: |

@@ -8,7 +8,7 @@
 # Required GitHub secrets (environment: staging):
 #   ACR_USERNAME / ACR_PASSWORD — ifrcimage.azurecr.io
 #   AZURE_MCP_PUBLISH_PROFILE — publish profile XML for ifrc-databank-mcp-staging
-#   AZURE_CREDENTIALS — service principal JSON (restart after deploy; same as Backoffice staging)
+#     (deploy + Kudu /api/restart when restart_after_deploy is true)
 
 name: Deploy MCP to Azure
 
@@ -86,21 +86,62 @@ jobs:
           publish-profile: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
 
       # Mutable ACR tags are not pulled again unless the App Service recycles.
-      # Requires AZURE_CREDENTIALS for the staging subscription (GitHub environment secret).
-      - name: Azure login
+      # Staging AZURE_CREDENTIALS is scoped to Backoffice apps, not MCP — use Kudu
+      # deployment credentials from the MCP publish profile (same secret as deploy).
+      - name: Restart Azure Web App (Kudu)
         if: inputs.restart_after_deploy
-        uses: azure/login@v3
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Restart Azure Web App
-        if: inputs.restart_after_deploy
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
         run: |
           set -euo pipefail
-          az account set --subscription "f585c1c3-801b-4641-8d7f-145aa50ffb04"
-          az webapp restart \
-            --name "ifrc-databank-mcp-staging" \
-            --resource-group "ifrctgo001rg"
+          python3 <<'PY'
+          import base64
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+          import xml.etree.ElementTree as ET
+
+          xml = os.environ.get("PUBLISH_PROFILE", "")
+          if not xml.strip():
+              print("PUBLISH_PROFILE is empty", file=sys.stderr)
+              sys.exit(1)
+
+          root = ET.fromstring(xml)
+          profile = None
+          for pp in root.findall("publishProfile"):
+              if pp.get("publishMethod") == "MSDeploy":
+                  profile = pp
+                  break
+          if profile is None:
+              for pp in root.findall("publishProfile"):
+                  if "scm.azurewebsites.net" in (pp.get("publishUrl") or ""):
+                      profile = pp
+                      break
+          if profile is None:
+              print("No MSDeploy / SCM publishProfile in AZURE_MCP_PUBLISH_PROFILE", file=sys.stderr)
+              sys.exit(1)
+
+          host = (profile.get("publishUrl") or "").split(":")[0]
+          user = profile.get("userName") or ""
+          pwd = profile.get("userPWD") or ""
+          if not host or not user or not pwd:
+              print("publishProfile missing publishUrl, userName, or userPWD", file=sys.stderr)
+              sys.exit(1)
+
+          url = f"https://{host}/api/restart"
+          req = urllib.request.Request(url, method="POST", data=b"")
+          token = base64.b64encode(f"{user}:{pwd}".encode()).decode("ascii")
+          req.add_header("Authorization", f"Basic {token}")
+
+          try:
+              with urllib.request.urlopen(req, timeout=120) as resp:
+                  print(f"Restart requested via Kudu: HTTP {resp.status} ({url})")
+          except urllib.error.HTTPError as exc:
+              body = exc.read().decode("utf-8", errors="replace")
+              print(f"Kudu restart failed: HTTP {exc.code} {exc.reason}\n{body}", file=sys.stderr)
+              sys.exit(1)
+          PY
 
       - name: Deployment summary
         run: |

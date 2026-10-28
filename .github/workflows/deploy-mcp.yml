@@ -8,7 +8,7 @@
 # Required GitHub secrets (environment: staging):
 #   ACR_USERNAME / ACR_PASSWORD — ifrcimage.azurecr.io
 #   AZURE_MCP_PUBLISH_PROFILE — publish profile XML for ifrc-databank-mcp-staging
-#     (deploy + Kudu /api/restart when restart_after_deploy is true)
+#     (deploy + KuduLite POST /api/app/restart when restart_after_deploy is true)
 
 name: Deploy MCP to Azure
 
@@ -129,18 +129,26 @@ jobs:
               print("publishProfile missing publishUrl, userName, or userPWD", file=sys.stderr)
               sys.exit(1)
 
-          url = f"https://{host}/api/restart"
-          req = urllib.request.Request(url, method="POST", data=b"")
           token = base64.b64encode(f"{user}:{pwd}".encode()).decode("ascii")
-          req.add_header("Authorization", f"Basic {token}")
-
-          try:
-              with urllib.request.urlopen(req, timeout=120) as resp:
-                  print(f"Restart requested via Kudu: HTTP {resp.status} ({url})")
-          except urllib.error.HTTPError as exc:
-              body = exc.read().decode("utf-8", errors="replace")
-              print(f"Kudu restart failed: HTTP {exc.code} {exc.reason}\n{body}", file=sys.stderr)
-              sys.exit(1)
+          # Linux / custom containers use KuduLite (/api/app/restart), not classic /api/restart.
+          restart_paths = ("/api/app/restart", "/api/restart")
+          last_error = None
+          for path in restart_paths:
+              url = f"https://{host}{path}"
+              req = urllib.request.Request(url, method="POST", data=b"")
+              req.add_header("Authorization", f"Basic {token}")
+              req.add_header("X-MS-SITE-OPERATION", "restart")
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as resp:
+                      print(f"Restart requested via Kudu: HTTP {resp.status} ({url})")
+                      break
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode("utf-8", errors="replace")
+                  last_error = f"HTTP {exc.code} {exc.reason} ({url})\n{body}"
+                  if exc.code == 404 and path != restart_paths[-1]:
+                      continue
+                  print(f"Kudu restart failed: {last_error}", file=sys.stderr)
+                  sys.exit(1)
           PY
 
       - name: Deployment summary

@@ -831,8 +831,14 @@
     renderIndicatorsTable();
     setActionButtonsEnabled(false);
 
+    function preferredMainView(urlState) {
+        var view = (urlState && urlState.view) || currentView();
+        return VIEWS.indexOf(view) === -1 ? 'tracker' : view;
+    }
+
     async function restoreSavedScope() {
         var urlState = readUrlState();
+        var mainView = preferredMainView(urlState);
         urlWriteSuspended = true;
         try {
             syncCapacityTab(getTemplateId());
@@ -852,18 +858,18 @@
 
             if (!saved || !saved.templateId) {
                 if (getTemplateId()) await applyScope(null, null);
-                await notifyTracker(null);
+                await notifyTracker(null, mainView);
                 return;
             }
 
             if (!setTemplateId(saved.templateId)) {
                 if (getTemplateId()) await applyScope(null, null);
-                await notifyTracker(null);
+                await notifyTracker(null, mainView);
                 return;
             }
 
             await applyScope(saved.period, saved.countryId);
-            await notifyTracker(saved.period);
+            await notifyTracker(saved.period, mainView);
         } finally {
             urlWriteSuspended = false;
             if (urlState.view) activateView(urlState.view);
@@ -871,10 +877,13 @@
         }
     }
 
-    function notifyTracker(preferredPeriod) {
+    function notifyTracker(preferredPeriod, mainView) {
         var tracker = window.validationDashboardTracker;
         if (!tracker || !tracker.onTemplateChanged) return Promise.resolve();
-        return tracker.onTemplateChanged(preferredPeriod);
+        var view = mainView || preferredMainView(readUrlState());
+        return tracker.onTemplateChanged(preferredPeriod, {
+            loadData: view === 'tracker',
+        });
     }
 
     restoreSavedScope().catch(function (err) { console.error(err); });

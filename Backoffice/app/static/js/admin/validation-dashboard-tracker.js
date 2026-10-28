@@ -1362,8 +1362,15 @@
         } catch (err) {
             if (controller.signal.aborted || (err && err.name === 'AbortError')) return;
             console.error(err);
-            showFeedback(t.trackerLoadFailed || 'Tracker load failed', 'error');
+            if (trackerPanelVisible()) {
+                showFeedback(t.trackerLoadFailed || 'Tracker load failed', 'error');
+            }
         }
+    }
+
+    function trackerPanelVisible() {
+        var panel = el('panel-tracker');
+        return !!(panel && !panel.classList.contains('hidden'));
     }
 
     function saveTrackerScope() {
@@ -1462,13 +1469,15 @@
     }
 
     window.validationDashboardTracker = {
-        onTemplateChanged: async function (preferredPeriod) {
+        onTemplateChanged: async function (preferredPeriod, options) {
+            var loadData = !options || options.loadData !== false;
             state.loaded = false;
             var saved = readTrackerScope();
             var sameTemplate = saved && String(saved.templateId) === String(getTemplateId());
             var period = (sameTemplate && saved.period) ? saved.period : (preferredPeriod || null);
             var applied = await loadTrackerPeriods(period);
             if (!applied) return;
+            if (!loadData) return;
             if (el('vd-tracker-period')?.value) {
                 await loadTrackerData();
             } else {

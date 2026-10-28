@@ -354,8 +354,25 @@
                     <thead></thead>
                     <tbody></tbody>
                 </table>
+                <div id="vd-em-skeleton" class="vd-em-skeleton hidden" aria-hidden="true">
+                    <div class="vd-em-skeleton-head">
+                        <span class="vd-skeleton-bar"></span>
+                        <span class="vd-skeleton-bar vd-skeleton-bar--sm"></span>
+                        <span class="vd-skeleton-bar vd-skeleton-bar--sm"></span>
+                        <span class="vd-skeleton-bar vd-skeleton-bar--xs"></span>
+                    </div>
+                    {% for _ in range(10) %}
+                    <div class="vd-em-skeleton-row">
+                        <span class="vd-skeleton-bar vd-skeleton-bar--country"></span>
+                        <span class="vd-skeleton-bar"></span>
+                        <span class="vd-skeleton-bar vd-skeleton-bar--xs"></span>
+                        <span class="vd-skeleton-bar vd-skeleton-bar--xs"></span>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
             <p id="vd-em-empty" class="vd-table-empty">{{ _('Choose a round to see its emergencies.') }}</p>
+            <p id="vd-em-loading-status" class="vd-sr-only"></p>
         </div>
     </div>
 </div>
@@ -475,6 +492,7 @@
         'emergenciesEmpty': _('No emergencies apply to this round.'),
         'emergenciesEmptyFilter': _('No emergencies match this filter.'),
         'emergenciesLoadFailed': _('Failed to load emergencies'),
+        'emergenciesLoading': _('Loading emergencies…'),
         'emergenciesExportFailed': _('Failed to export emergencies'),
         'emergenciesUnavailable': _('The emergency list is not available yet.'),
         'emergencyCovered': _('Covered'),

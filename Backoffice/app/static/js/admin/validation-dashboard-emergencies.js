@@ -10,6 +10,8 @@
     var payload = null;
     var loadedKey = '';
     var loading = false;
+    var cacheByKey = {};
+    var emergenciesAbort = null;
     var sectionOpen = { single: true, grouped: true };
     var groupOpen = {};
 
@@ -104,6 +106,29 @@
         });
     }
 
+    function statEls() {
+        return [
+            el('vd-em-applicable'),
+            el('vd-em-covered'),
+            el('vd-em-missing'),
+            el('vd-em-countries'),
+        ].filter(Boolean);
+    }
+
+    function setLoadingUi(active) {
+        var panel = el('panel-emergencies');
+        var skeleton = el('vd-em-skeleton');
+        var status = el('vd-em-loading-status');
+        if (panel) panel.classList.toggle('is-loading-emergencies', !!active);
+        if (skeleton) skeleton.classList.toggle('hidden', !active);
+        statEls().forEach(function (node) {
+            node.classList.toggle('is-loading', !!active);
+        });
+        if (status) {
+            status.textContent = active ? (t.emergenciesLoading || 'Loading emergencies…') : '';
+        }
+    }
+
     function renderSummary() {
         var summary = (payload && payload.summary) || {};
         var applicable = el('vd-em-applicable');
@@ -114,6 +139,9 @@
         if (covered) covered.textContent = payload ? String(summary.covered || 0) : '—';
         if (missing) missing.textContent = payload ? String(summary.missing || 0) : '—';
         if (countries) countries.textContent = payload ? String(summary.countries || 0) : '—';
+        if (!loading) {
+            statEls().forEach(function (node) { node.classList.remove('is-loading'); });
+        }
     }
 
     function renderTable() {
@@ -433,22 +461,32 @@
         });
     }
 
-    async function loadEmergencies() {
+    async function loadEmergencies(options) {
+        var force = !!(options && options.force);
         var round = selectedRound();
         if (!round || !config.emergenciesUrl) {
             payload = null;
             loadedKey = '';
+            setLoadingUi(false);
+            renderTable();
+            return;
+        }
+        if (!force && cacheByKey[round.key]) {
+            payload = cacheByKey[round.key];
+            loadedKey = round.key;
+            setLoadingUi(false);
             renderTable();
             return;
         }
         if (loading && loadedKey === round.key) return;
+        if (emergenciesAbort) emergenciesAbort.abort();
+        var controller = new AbortController();
+        emergenciesAbort = controller;
         loading = true;
         loadedKey = round.key;
         var empty = el('vd-em-empty');
-        if (empty) {
-            empty.textContent = '…';
-            empty.classList.remove('hidden');
-        }
+        if (empty) empty.classList.add('hidden');
+        setLoadingUi(true);
         try {
             var url = config.emergenciesUrl +
                 '?template_id=' + encodeURIComponent(round.templateId) +
@@ -456,12 +494,15 @@
             var data = await window.apiFetch(url, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
+                signal: controller.signal,
             });
-            if (loadedKey !== round.key) return;
+            if (emergenciesAbort !== controller || loadedKey !== round.key) return;
             payload = data || { rows: [], sections: [], summary: {} };
+            cacheByKey[round.key] = payload;
             renderTable();
         } catch (err) {
-            if (loadedKey !== round.key) return;
+            if (controller.signal.aborted || (err && err.name === 'AbortError')) return;
+            if (emergenciesAbort !== controller || loadedKey !== round.key) return;
             payload = null;
             if (window.validationDashboardShowFeedback) {
                 window.validationDashboardShowFeedback(
@@ -471,7 +512,10 @@
             }
             renderTable();
         } finally {
-            loading = false;
+            if (emergenciesAbort === controller) {
+                loading = false;
+                setLoadingUi(false);
+            }
         }
     }
 
@@ -491,7 +535,7 @@
         if (window.validationDashboardTracker && window.validationDashboardTracker.markStale) {
             window.validationDashboardTracker.markStale();
         }
-        loadEmergencies().catch(function (err) { console.error(err); });
+        loadEmergencies({ force: true }).catch(function (err) { console.error(err); });
     });
 
     el('vd-tracker-period')?.addEventListener('change', function () {
@@ -499,7 +543,7 @@
             loadedKey = '';
             return;
         }
-        loadEmergencies().catch(function (err) { console.error(err); });
+        loadEmergencies({ force: true }).catch(function (err) { console.error(err); });
     });
 
     el('vd-em-status')?.addEventListener('change', renderTable);

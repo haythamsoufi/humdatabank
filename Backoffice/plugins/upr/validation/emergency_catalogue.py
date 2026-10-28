@@ -60,11 +60,14 @@ def load_round_emergencies(template_id: int, period_name: str) -> dict[str, Any]
     if int(template_id) not in UPR_VALIDATION_TEMPLATE_IDS:
         return {"available": False, "template_id": template_id, "period": period_name, **empty}
 
+    from sqlalchemy.orm import joinedload
+
     from app.models.assignments import AssignedForm, AssignmentEntityStatus
     from app.models.core import Country
 
     assignments = (
-        AssignedForm.query.filter(
+        AssignedForm.query.options(joinedload(AssignedForm.template))
+        .filter(
             AssignedForm.template_id == int(template_id),
             AssignedForm.period_name == period_name,
         )

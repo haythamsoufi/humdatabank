@@ -690,6 +690,66 @@
     color: rgb(107 114 128);
 }
 
+@keyframes vd-skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+.vd-skeleton-bar {
+    display: block;
+    height: 0.875rem;
+    border-radius: 0.25rem;
+    background: rgb(229 231 235);
+    animation: vd-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.vd-skeleton-bar--xs {
+    max-width: 3rem;
+}
+
+.vd-skeleton-bar--sm {
+    max-width: 5rem;
+}
+
+.vd-skeleton-bar--country {
+    max-width: 7rem;
+}
+
+.vd-em-skeleton {
+    padding: 0.5rem 0 0.25rem;
+}
+
+.vd-em-skeleton-head,
+.vd-em-skeleton-row {
+    display: grid;
+    grid-template-columns: minmax(5rem, 1.1fr) minmax(6rem, 2fr) minmax(3rem, 0.7fr) minmax(3rem, 0.6fr);
+    gap: 0.75rem 1rem;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid rgb(243 244 246);
+}
+
+.vd-em-skeleton-head .vd-skeleton-bar {
+    height: 0.75rem;
+    background: rgb(209 213 219);
+}
+
+.vd-cap-stat-value.is-loading {
+    color: rgb(209 213 219);
+    animation: vd-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+#panel-emergencies.is-loading-emergencies #vd-em-table {
+    visibility: hidden;
+    position: absolute;
+    pointer-events: none;
+}
+
+#panel-emergencies.is-loading-emergencies .vd-table-scroll {
+    position: relative;
+    min-height: 12rem;
+}
+
 .vd-sr-only {
     position: absolute;
     width: 1px;

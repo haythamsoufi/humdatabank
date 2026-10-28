@@ -13,6 +13,7 @@ block submission.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from contextlib import contextmanager
@@ -727,6 +728,8 @@ class _CoverageBatch:
         self.matrix_items = {}
         self.matrix_cells = {}
         self.repeat_selected = {}
+        self._country_codes_cache: dict[str, set[str] | None] = {}
+        self._operations_cache: dict[tuple, list] = {}
         if not self.catalogue_ok or not self.aes_list:
             return
         from app.utils.api_serialization import batch_countries_for_aes_list
@@ -744,22 +747,18 @@ class _CoverageBatch:
         if not sources:
             return []
 
-        from plugins.emergency_operations.section_binding import _fetch_ordered_operations
-
         iso = self._iso(aes)
         if not iso:
             return []
         period = self._period(aes)
-        country_codes = _country_operation_codes(iso)
+        country_codes = self._country_codes_for(iso)
         if country_codes is None:
             return None
 
         coverages: list[FieldEmergencyCoverage] = []
         for section_name, plugin_config, selected in sources:
-            try:
-                operations = _fetch_ordered_operations(iso, plugin_config, period) or []
-            except Exception:
-                logger.debug("Applicable emergency lookup failed", exc_info=True)
+            operations = self._ordered_operations(iso, plugin_config, period)
+            if operations is None:
                 return None
             applicable = [ref for op in operations if (ref := _ref_from_operation(op))]
             coverages.append(FieldEmergencyCoverage(
@@ -767,6 +766,27 @@ class _CoverageBatch:
                 coverage=classify_emergency_coverage(applicable, selected, country_codes),
             ))
         return coverages
+
+    def _country_codes_for(self, iso: str) -> set[str] | None:
+        if iso not in self._country_codes_cache:
+            self._country_codes_cache[iso] = _country_operation_codes(iso)
+        return self._country_codes_cache[iso]
+
+    def _ordered_operations(self, iso: str, plugin_config, period: str | None) -> list | None:
+        from plugins.emergency_operations.section_binding import _fetch_ordered_operations
+
+        key = (
+            iso,
+            json.dumps(plugin_config, sort_keys=True, default=str),
+            period or "",
+        )
+        if key not in self._operations_cache:
+            try:
+                self._operations_cache[key] = _fetch_ordered_operations(iso, plugin_config, period) or []
+            except Exception:
+                logger.debug("Applicable emergency lookup failed", exc_info=True)
+                return None
+        return self._operations_cache[key]
 
     def _sources(self, aes):
         form = self.forms.get(getattr(aes, "assigned_form_id", None))

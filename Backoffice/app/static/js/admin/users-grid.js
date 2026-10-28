@@ -248,7 +248,42 @@
             var countries = member.countries || [];
             return countries.length ? name + ' (' + countries.join(', ') + ')' : name;
         }).filter(Boolean).join('; ');
+        user.access_groups = user.access_groups || [];
+        user.access_groups_text = user.access_groups.join(', ');
     });
+
+    // One tone per group name, in name order, so the same group stays the same colour.
+    var ACCESS_GROUP_CHIP_TONES = [
+        'bg-indigo-50 text-indigo-800',
+        'bg-emerald-50 text-emerald-800',
+        'bg-amber-50 text-amber-800',
+        'bg-sky-50 text-sky-800',
+        'bg-blue-50 text-blue-800',
+        'bg-violet-50 text-violet-800',
+        'bg-teal-50 text-teal-800',
+        'bg-orange-50 text-orange-800',
+        'bg-cyan-50 text-cyan-800',
+        'bg-purple-50 text-purple-800'
+    ];
+    var accessGroupChipToneByName = (function () {
+        var seen = {};
+        usersData.forEach(function (user) {
+            (user.access_groups || []).forEach(function (name) {
+                var key = String(name || '').trim().toLowerCase();
+                if (key) seen[key] = true;
+            });
+        });
+        var map = {};
+        Object.keys(seen).sort().forEach(function (key, index) {
+            map[key] = ACCESS_GROUP_CHIP_TONES[index % ACCESS_GROUP_CHIP_TONES.length];
+        });
+        return map;
+    })();
+
+    function accessGroupChipClass(name) {
+        var key = String(name || '').trim().toLowerCase();
+        return accessGroupChipToneByName[key] || ACCESS_GROUP_CHIP_TONES[0];
+    }
 
     var columnDefs = [
         {
@@ -309,6 +344,42 @@
                 return '<span class="cursor-help" title="' + escapeHtmlAttr(tooltip) + '">' + escapeHtml(text) + '</span>';
             },
             cellStyle: { 'white-space': 'pre-line', 'word-wrap': 'break-word', 'overflow-wrap': 'break-word', 'line-height': '1.4' }
+        },
+        {
+            field: 'access_groups_text',
+            headerName: t.access_groups_e3ec7263 || 'Access Groups',
+            width: 220, minWidth: 160, maxWidth: 360,
+            filter: 'customSetFilter', sortable: true,
+            wrapText: true,
+            autoHeight: true,
+            filterValueGetter: function (params) {
+                var groups = params.data && params.data.access_groups;
+                return groups && groups.length ? groups : ['-'];
+            },
+            valueGetter: function (params) {
+                return params.data ? (params.data.access_groups_text || '') : '';
+            },
+            exportValueGetter: function (params) {
+                return params.data ? (params.data.access_groups_text || '') : '';
+            },
+            cellRenderer: function (params) {
+                var groups = params.data && params.data.access_groups;
+                if (!groups || !groups.length) {
+                    return '<span class="text-gray-400">-</span>';
+                }
+                var chips = groups.map(function (name) {
+                    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium '
+                        + accessGroupChipClass(name) + '">'
+                        + escapeHtml(name) + '</span>';
+                }).join('');
+                return '<div class="flex flex-wrap gap-1 w-full">' + chips + '</div>';
+            },
+            cellStyle: {
+                'white-space': 'normal',
+                'line-height': '1.4',
+                'display': 'flex',
+                'align-items': 'center'
+            }
         },
         {
             field: 'active',
@@ -425,7 +496,7 @@
     }
 
     function initializeGrid() {
-        var result = AgGridHelper.create('usersGrid', 'users-v6', columnDefs, usersData, {
+        var result = AgGridHelper.create('usersGrid', 'users-v7', columnDefs, usersData, {
             gridOptions: {
                 getRowClass: function (params) {
                     return (!params.data.active) ? 'inactive-user-row' : null;
@@ -459,6 +530,9 @@
                     }
                     if (colId === 'last_login') {
                         return formatLastLogin(params.node.data.last_login);
+                    }
+                    if (colId === 'access_groups_text') {
+                        return params.node.data.access_groups_text || '';
                     }
                     return params.value != null ? params.value : '';
                 }

@@ -5,6 +5,8 @@
 {% block title %}{{ _('Projects') }}{% endblock %}
 
 {% block content %}
+{% set project_edit_url_template = url_for('project_management.project_edit', project_id=999999)|replace('999999', '__ID__') %}
+<div{% if open_edit_id %} data-open-project-edit="{{ open_edit_id }}" data-project-edit-url-template="{{ project_edit_url_template }}"{% endif %}>
 {{ page_header(
     title=title or _('Projects'),
     icon='fas fa-diagram-project',
@@ -97,7 +99,8 @@
         {% for p in projects %}
         <tr class="hover:bg-gray-50">
           <td class="px-4 py-3 text-sm font-semibold text-gray-900">
-            <a href="{{ url_for('project_management.project_edit', project_id=p.id) }}" class="text-blue-700 hover:underline">{{ p.reference }}</a>
+            <a href="{{ url_for('project_management.project_detail', project_id=p.id) }}"
+               class="text-blue-700 hover:underline font-semibold">{{ p.reference }}</a>
           </td>
           <td class="px-4 py-3 text-sm text-gray-700">{{ p.title or '—' }}</td>
           <td class="px-4 py-3 text-sm text-gray-700">{{ p.country.name if p.country else '—' }}</td>
@@ -119,11 +122,12 @@
           {% if can_edit %}
           <td class="px-4 py-3 text-sm">
             <div class="flex items-center justify-end gap-3">
-              <a href="{{ url_for('project_management.project_edit', project_id=p.id) }}"
-                 class="text-blue-600 hover:text-blue-900"
-                 title="{{ _('Edit')|forceescape }}">
+              <button type="button"
+                      class="text-blue-600 hover:text-blue-900"
+                      title="{{ _('Edit')|forceescape }}"
+                      data-project-edit="{{ url_for('project_management.project_edit', project_id=p.id) }}">
                 <i class="fas fa-pen fa-fw"></i>
-              </a>
+              </button>
             </div>
           </td>
           {% endif %}
@@ -139,4 +143,11 @@
     </table>
   </div>
 </div>
+</div>
+
+{% include "admin/projects/_edit_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/admin/projects-modal.js') }}" nonce="{{ csp_nonce() }}"></script>
 {% endblock %}

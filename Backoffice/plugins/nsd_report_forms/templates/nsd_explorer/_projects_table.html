@@ -17,7 +17,8 @@
       {% for p in projects %}
       <tr class="hover:bg-gray-50">
         <td class="px-4 py-3 text-sm font-semibold text-gray-900">
-          <a href="{{ url_for('project_management.project_edit', project_id=p.id) }}" class="text-blue-700 hover:underline">{{ p.reference }}</a>
+          <a href="{{ url_for('project_management.project_detail', project_id=p.id) }}"
+             class="text-blue-700 hover:underline font-semibold">{{ p.reference }}</a>
         </td>
         <td class="px-4 py-3 text-sm text-gray-700">{{ p.title or '—' }}</td>
         <td class="px-4 py-3 text-sm text-gray-700">{{ p.country.name if p.country else '—' }}</td>
@@ -38,11 +39,12 @@
         {% if nsd_can_edit_projects %}
         <td class="px-4 py-3 text-sm">
           <div class="flex items-center justify-end gap-3">
-            <a href="{{ url_for('project_management.project_edit', project_id=p.id) }}"
-               class="text-blue-600 hover:text-blue-900"
-               title="{{ _('Edit')|forceescape }}">
+            <button type="button"
+                    class="text-blue-600 hover:text-blue-900"
+                    title="{{ _('Edit')|forceescape }}"
+                    data-project-edit="{{ url_for('project_management.project_edit', project_id=p.id) }}">
               <i class="fas fa-pen fa-fw"></i>
-            </a>
+            </button>
           </div>
         </td>
         {% endif %}

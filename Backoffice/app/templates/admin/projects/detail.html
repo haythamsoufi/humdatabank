@@ -1,0 +1,287 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
+{% from "plugins/nsd_report_forms/nsd_projects/_macros.html" import date, currency, no_decimal %}
+
+{% block title %}{{ p.reference }} — {{ _('Project') }}{% endblock %}
+
+{% block content %}
+{% set edit_url = url_for('project_management.project_edit', project_id=project.id) %}
+<div{% if open_edit_id == project.id %} data-open-project-edit="{{ project.id }}" data-project-edit-url-template="{{ edit_url }}"{% endif %}>
+{{ page_header(
+    title=p.reference,
+    subtitle=p.title or '',
+    icon='fas fa-diagram-project',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Assignment Management'), 'url': url_for('assignment_management.manage_assignments')},
+        {'name': _('Projects'), 'url': list_url},
+        {'name': p.reference}
+    ],
+    actions=(
+        ([{
+            'type': 'link',
+            'text': _('Country dashboard'),
+            'url': url_for('main.dashboard', entity_select='country:%d' % p.country_id),
+            'icon': 'fas fa-th-large',
+            'classes': 'professional-action-btn',
+        }] if p.country_id else [])
+        + ([{
+            'type': 'button',
+            'text': _('Edit project'),
+            'icon': 'fas fa-pen',
+            'classes': 'professional-action-btn professional-action-btn-blue',
+            'attributes': {'type': 'button', 'data-project-edit': edit_url, 'title': _('Edit project')|forceescape}
+        }] if can_edit else [])
+    )
+) }}
+
+<div class="space-y-6">
+  <div class="bg-white shadow-md border border-gray-200 rounded-sm">
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">{{ _('Project information') }}</h2>
+    </div>
+    <div class="p-4 sm:p-6">
+      <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 text-sm">
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('National Society') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ p.ns or '—' }}</dd>
+        </div>
+        <div class="sm:col-span-2 lg:col-span-3">
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Title') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ p.title or '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Reference') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ p.reference }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Funding modality') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ p.modality or '—' }}</dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Categories / thematics') }}</dt>
+          <dd class="mt-1">
+            {% if p.categories_list and p.categories_list|length > 1 %}
+              <div class="flex flex-wrap gap-1">
+                {% for cat in p.categories_list %}
+                  <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">{{ cat }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="font-medium text-gray-900">{{ p.categories or '—' }}</span>
+            {% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Start date') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ date(p.start) }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('End date') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ date(p.end) }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Amount granted (CHF)') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ currency(p.granted) }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Actual expenditure (CHF)') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">{{ currency(p.expenditure) }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('NS focal person') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">
+            {{ p.ns_focal or '—' }}
+            {% if p.ns_focal_email %}<div class="text-gray-500 font-normal text-xs mt-0.5">{{ p.ns_focal_email }}</div>{% endif %}
+          </dd>
+        </div>
+        <div class="sm:col-span-2 lg:col-span-3">
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('IFRC project manager') }}</dt>
+          <dd class="mt-1 font-medium text-gray-900">
+            {{ p.pm or '—' }}
+            {% if p.pm_email %}<div class="text-gray-500 font-normal text-xs mt-0.5">{{ p.pm_email }}</div>{% endif %}
+          </dd>
+        </div>
+        {% if p.status %}
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Status') }}</dt>
+          <dd class="mt-1">
+            {% if p.status == 'Active' %}
+              {{ status_label(p.status, 'success') }}
+            {% elif p.status == 'Open' %}
+              {{ status_label(p.status, 'info') }}
+            {% elif p.status == 'Closed' %}
+              {{ status_label(p.status, 'warning') }}
+            {% elif p.status == 'Archived' %}
+              {{ status_label(p.status, 'neutral') }}
+            {% else %}
+              {{ status_label(p.status, 'neutral') }}
+            {% endif %}
+          </dd>
+        </div>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+  <div class="bg-white shadow-md border border-gray-200 rounded-sm">
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">{{ _('Implementation monitoring') }}</h2>
+    </div>
+    <div class="overflow-x-auto">
+      {% if p.reports %}
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Period') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Reporting start') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Reporting end') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Deadline') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Submitted') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Report') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Overall') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Spending rate') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Activities') }}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for report in p.reports %}
+          {% set is_final = report.kind == 'CBF final report' %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-3 py-3 whitespace-nowrap font-medium text-gray-900">{{ report.label or '—' }}</td>
+            <td class="px-3 py-3 whitespace-nowrap text-gray-700">{{ date(report.start) }}</td>
+            <td class="px-3 py-3 whitespace-nowrap text-gray-700">{{ date(report.end) }}</td>
+            <td class="px-3 py-3 whitespace-nowrap">
+              {% if report.done %}
+                {{ status_label(date(report.due), 'success') }}
+              {% elif report.deadline_status == 'red' %}
+                {{ status_label(date(report.due), 'danger') }}
+              {% elif report.deadline_status == 'yellow' %}
+                {{ status_label(date(report.due), 'warning') }}
+              {% else %}
+                <span class="text-gray-700">{{ date(report.due) }}</span>
+              {% endif %}
+            </td>
+            <td class="px-3 py-3 whitespace-nowrap text-gray-700">{{ date(report.submitted) }}</td>
+            <td class="px-3 py-3 whitespace-nowrap">
+              <a href="/assignment/{{ report.aes_id }}" target="_blank" rel="noopener" class="inline-flex">
+                {% if is_final %}
+                  <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold text-white bg-blue-800">{{ _('CBF final') }}</span>
+                {% else %}
+                  <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold text-gray-800 bg-blue-200">{{ _('CBF quarter') }}</span>
+                {% endif %}
+              </a>
+            </td>
+            <td class="px-3 py-3 text-gray-700">
+              {% if report.overall %}
+                {% set a = report.overall %}
+                {% if is_final %}
+                  {{ a }}
+                {% elif a == 'All on track' %}
+                  {{ status_label(a, 'success') }}
+                {% elif a == 'Partially on track' %}
+                  {{ status_label(a, 'warning') }}
+                {% elif a == 'Not on track' %}
+                  {{ status_label(a, 'danger') }}
+                {% else %}
+                  {{ a }}
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="px-3 py-3 whitespace-nowrap text-gray-700">{% if report.rate is not none %}{{ report.rate }}%{% else %}—{% endif %}</td>
+            <td class="px-3 py-3 text-gray-700">
+              {% if report.activities %}
+                {% set a = report.activities %}
+                {% if a in ('On track', 'All achieved') %}
+                  {{ status_label(a, 'success') }}
+                {% elif a in ('Partially on track', 'Partially achieved') %}
+                  {{ status_label(a, 'warning') }}
+                {% elif a in ('Not on track', 'Not achieved') %}
+                  {{ status_label(a, 'danger') }}
+                {% else %}
+                  {{ a }}
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="px-6 py-10 text-center text-sm text-gray-500">{{ _('No reporting cycles found for this project.') }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if p.outcomes %}
+  <div class="bg-white shadow-md border border-gray-200 rounded-sm">
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">{{ _('Outcomes & indicators') }}</h2>
+      <p class="text-xs text-gray-500 mt-1">{{ _('From the CBF final report (read-only).') }}</p>
+    </div>
+    <div class="p-4 sm:p-6 space-y-6">
+      {% for outcome in p.outcomes %}
+      <div class="border border-gray-200 rounded-sm p-4 bg-gray-50/50">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4 text-sm">
+          <div>
+            <div class="text-xs font-semibold text-gray-500">{{ _('Outcome') }} {{ loop.index }}</div>
+            <div class="mt-1 font-medium text-gray-900">{{ outcome.category or '—' }}</div>
+          </div>
+          <div class="lg:col-span-2">
+            <div class="text-xs font-semibold text-gray-500">{{ _('Definition') }}</div>
+            <div class="mt-1 text-gray-800">
+              {% if outcome.definition == 'Other' %}{{ outcome.custom or outcome.category or '—' }}{% else %}{{ outcome.definition or '—' }}{% endif %}
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-gray-500">{{ _('Planned budget') }}</div>
+            <div class="mt-1 text-gray-900">{% if outcome.planned_budget %}{{ no_decimal(outcome.planned_budget) }}{% else %}—{% endif %}</div>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-gray-500">{{ _('Actual budget') }}</div>
+            <div class="mt-1 text-gray-900">{% if outcome.actual_budget %}{{ no_decimal(outcome.actual_budget) }}{% else %}—{% endif %}</div>
+          </div>
+        </div>
+        {% if outcome.indicators %}
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm border border-gray-200 bg-white">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">{{ _('Indicator') }}</th>
+                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">{{ _('Baseline') }}</th>
+                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">{{ _('Planned target') }}</th>
+                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">{{ _('Actual target') }}</th>
+                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">%</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              {% for ind in outcome.indicators %}
+              <tr>
+                <td class="px-3 py-2 text-gray-800">{{ ind.name or '—' }}</td>
+                <td class="px-3 py-2 text-gray-700">{{ ind.baseline or '—' }}</td>
+                <td class="px-3 py-2 text-gray-700">{{ ind.target or '—' }}</td>
+                <td class="px-3 py-2 text-gray-700">{{ ind.actual_target or '—' }}</td>
+                <td class="px-3 py-2 text-gray-700">
+                  {% if ind.actual_target and ind.target and ind.target|float > 0 %}{{ ((ind.actual_target|float / ind.target|float) * 100)|round(1) }}%{% else %}—{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+</div>
+
+{% include "admin/projects/_edit_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/admin/projects-modal.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% endblock %}

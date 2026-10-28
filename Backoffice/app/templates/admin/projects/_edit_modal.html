@@ -1,0 +1,9 @@
+{% from "macros/modal_shell.html" import modal_shell %}
+{% call modal_shell('projectEditModal', _('Project'), max_width='max-w-4xl', z_index=60, align='start', content_class='max-h-[min(calc(100dvh-10rem),780px)] overflow-y-auto') %}
+<div id="projectEditModalBody" class="min-h-[8rem]">
+  <p class="text-sm text-gray-500 flex items-center gap-2" id="projectEditModalLoading">
+    <i class="fas fa-spinner fa-spin text-gray-400" aria-hidden="true"></i>
+    {{ _('Loading…') }}
+  </p>
+</div>
+{% endcall %}

@@ -1,0 +1,23 @@
+{# Inline on dashboard card action row: pick a cycle to open its assignment form #}
+<div class="relative inline-flex items-center min-w-0 max-w-xs h-8 rounded-md border border-gray-300 bg-white shadow-sm hover:border-gray-400 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+    <span class="pl-2 pr-1 text-gray-400 shrink-0 pointer-events-none" aria-hidden="true">
+        <i class="fas fa-list-ul text-xs"></i>
+    </span>
+    <select id="project-cycle-{{ project_cycle_nav_id }}"
+            class="project-cycle-nav-select border-0 bg-transparent text-sm text-gray-700 py-0 pl-0 pr-7 min-w-0 w-full truncate cursor-pointer focus:outline-none focus:ring-0"
+            data-project-cycle-nav
+            title="{{ _('Open another reporting cycle')|forceescape }}"
+            aria-label="{{ _('Open another reporting cycle')|forceescape }}">
+        <option value="">{{ _('Other cycles…') }}</option>
+        {% for cycle in project_cycle_nav_cycles %}
+        {% set af = cycle.item_object.assigned_form %}
+        {% set period = af.period_name if af else _('Cycle') %}
+        <option value="{{ url_for('assignments.view_assignment', aes_id=cycle.item_object.id) }}">
+            {{ period }} · {{ localize_status(cycle.status) }}
+        </option>
+        {% endfor %}
+    </select>
+    <span class="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400 pointer-events-none" aria-hidden="true">
+        <i class="fas fa-chevron-down text-xs"></i>
+    </span>
+</div>

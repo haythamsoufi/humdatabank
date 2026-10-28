@@ -318,6 +318,8 @@
             "role_codes": {{ user_role_codes|tojson }},
             "role_display": {{ role_display_text|tojson }},
             "role_tooltip": {{ role_tooltip_text|tojson }},
+            {% set user_access_groups = access_groups_by_user_id.get(user.id, []) if access_groups_by_user_id is defined else [] %}
+            "access_groups": {{ (user_access_groups | map(attribute='name') | list) | tojson }},
             "active": {{ user.active|tojson }},
             "date_joined": {{ (user.created_at.isoformat() if user.created_at else '')|tojson }},
             {% set last_login_at = last_login_by_user_id.get(user.id) if last_login_by_user_id is defined else none %}
@@ -369,6 +371,7 @@ window.usersGridConfig.t = {
     email_ce8ae9da: {{ _('Email')|tojson }},
     title_b78a3223: {{ _('Title')|tojson }},
     role_2e083440: {{ _('Role')|tojson }},
+    access_groups_e3ec7263: {{ _('Access Groups')|tojson }},
     status_ec53a8c4: {{ _('Status')|tojson }},
     date_joined_32816422: {{ _('Date joined')|tojson }},
     last_login_9c1e4b70: {{ _('Last login')|tojson }},

@@ -206,6 +206,42 @@ class TestManageUsers:
         assert rows[failed_only_user.id]["last_login"] == ""
         assert "Last login" in resp.text
 
+    def test_grid_payload_lists_access_groups_separately_from_roles(
+        self, logged_in_client, db_session
+    ):
+        """Access groups render as their own column and stay out of the role label."""
+        from app.models.rbac import RbacRole, RbacUserRole
+
+        user = create_test_user(db_session, email="grouped_user@example.com")
+        plain_user = create_test_user(db_session, email="ungrouped_user@example.com")
+        finance = RbacRole(code="group_finance_list", name="Finance", kind="group")
+        hr = RbacRole(code="group_hr_list", name="HR", kind="group")
+        db_session.add_all([finance, hr])
+        db_session.flush()
+        db_session.add_all(
+            [
+                RbacUserRole(user_id=user.id, role_id=finance.id),
+                RbacUserRole(user_id=user.id, role_id=hr.id),
+            ]
+        )
+        db_session.commit()
+
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        match = re.search(
+            r'<script type="application/json" id="users-grid-data">(.*?)</script>',
+            resp.text,
+            re.DOTALL,
+        )
+        assert match is not None
+        rows = {row["id"]: row for row in json.loads(match.group(1))}
+        assert rows[user.id]["access_groups"] == ["Finance", "HR"]
+        assert "group_finance_list" not in rows[user.id]["role_codes"]
+        assert "group_hr_list" not in rows[user.id]["role_codes"]
+        assert "Finance" not in rows[user.id]["role_display"]
+        assert rows[plain_user.id]["access_groups"] == []
+        assert "Access Groups" in resp.text
+
     def test_page_handles_rbac_roles_exception(self, logged_in_client, db_session, app):
         """Cover except branch for rbac_roles_by_user_id query."""
         with patch(

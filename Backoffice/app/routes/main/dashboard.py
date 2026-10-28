@@ -52,6 +52,7 @@ from app.routes.main.helpers import (
     format_activity_value,
     render_activity_summary,
     render_matrix_change,
+    group_dashboard_project_assignments,
 )
 
 
@@ -890,6 +891,9 @@ def dashboard():
             past_assignments.sort(
                 key=dashboard_assignment_period_sort_key,
                 reverse=True,
+            )
+            current_assignments = group_dashboard_project_assignments(
+                current_assignments, current_date
             )
             past_assignment_periods = sort_period_names(
                 [

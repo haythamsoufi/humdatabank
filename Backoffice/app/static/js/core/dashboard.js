@@ -1549,4 +1549,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    document.querySelectorAll('[data-project-dashboard-card] [data-dashboard-card-actions]').forEach(function (actions) {
+        layoutDashboardCardActions(actions);
+    });
+
+    document.addEventListener('change', function (event) {
+        const nav = event.target.closest('[data-project-cycle-nav]');
+        if (!nav || !nav.value) {
+            return;
+        }
+        const target = nav.value;
+        nav.selectedIndex = 0;
+        window.location.assign(target);
+    });
+
 });

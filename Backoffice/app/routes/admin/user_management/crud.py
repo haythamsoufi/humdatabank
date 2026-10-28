@@ -67,8 +67,10 @@ from .helpers import (
 def manage_users():
     # Default ordering for the Users grid: stable, predictable by primary key
     users = User.query.order_by(User.id.asc()).all()
-    # Preload RBAC roles for display (avoid N+1 queries in templates)
+    # Preload RBAC roles and access groups for display (avoid N+1 queries in templates).
+    # Access Groups share rbac_user_role but are not permission roles.
     rbac_roles_by_user_id = {}
+    access_groups_by_user_id = {}
     try:
         from app.models.rbac import RbacUserRole, RbacRole
         user_ids = [u.id for u in users]
@@ -80,13 +82,17 @@ def manage_users():
             r = roles_by_id.get(ur.role_id)
             if not r:
                 continue
-            # Access Groups are not roles; keep the grid's role chips permission-only.
+            entry = {"id": r.id, "code": r.code, "name": r.name}
             if getattr(r, "is_group", False):
-                continue
-            rbac_roles_by_user_id.setdefault(ur.user_id, []).append({"id": r.id, "code": r.code, "name": r.name})
+                access_groups_by_user_id.setdefault(ur.user_id, []).append(entry)
+            else:
+                rbac_roles_by_user_id.setdefault(ur.user_id, []).append(entry)
+        for groups in access_groups_by_user_id.values():
+            groups.sort(key=lambda item: (item.get("name") or "").casefold())
     except Exception as e:
         current_app.logger.debug("rbac_roles_by_user_id query failed: %s", e)
         rbac_roles_by_user_id = {}
+        access_groups_by_user_id = {}
 
     # Preload entity permission counts + country names (avoid N+1 queries in templates)
     entity_counts_by_user_id = {}
@@ -214,6 +220,7 @@ def manage_users():
                            user_overview_stats=user_overview_stats,
                            can_view_analytics=can_view_analytics,
                            rbac_roles_by_user_id=rbac_roles_by_user_id,
+                           access_groups_by_user_id=access_groups_by_user_id,
                            entity_counts_by_user_id=entity_counts_by_user_id,
                            user_countries_by_id=user_countries_by_id,
                            fds_members_by_user_id=fds_members_by_user_id,

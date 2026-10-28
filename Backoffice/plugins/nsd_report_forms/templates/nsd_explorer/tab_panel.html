@@ -58,6 +58,9 @@
   {% endif %}
 </div>
 
+{% include "admin/projects/_edit_modal.html" %}
+<script src="{{ static_url('js/admin/projects-modal.js') }}" nonce="{{ csp_nonce() }}"></script>
+
 {% if show_nsd_subtabs %}
 <script nonce="{{ csp_nonce() }}">
 (function () {

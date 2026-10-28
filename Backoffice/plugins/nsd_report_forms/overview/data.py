@@ -426,10 +426,6 @@ def _quarter_index(period: str) -> Optional[int]:
     return (int(m.group(1)) - 1) * 4 + int(m.group(2)) - 1 if m else None
 
 
-def _quarter_label(idx: int) -> str:
-    return f'Y{idx // 4 + 1}Q{idx % 4 + 1}'
-
-
 def _project_row(p: dict, countries: Dict[int, dict]) -> dict:
     c = countries.get(p['country_id'], {})
     return {**p, 'country': c.get('name') or p.get('ns') or '', 'region': c.get('region', '')}
@@ -513,7 +509,6 @@ def project_detail(reference: str, pm_email: Optional[str] = None) -> Optional[d
     final = next((r for r in reports if r['kind'] == FINAL), None)
     base = row.get('expected') or row.get('granted')
 
-    last_idx = max((i for i in (_quarter_index(q['period']) for q in quarters) if i is not None), default=None)
     # a final report that was only prefilled by the import (still "pending") has no results to show
     outcomes = _outcomes(final['frame']) if final and final['status'] != 'pending' else []
     for r in reports:
@@ -533,7 +528,7 @@ def project_detail(reference: str, pm_email: Optional[str] = None) -> Optional[d
             if r['actual'] is not None and base:
                 r['rate'] = round(100.0 * r['actual'] / base, 2)
         else:
-            r['label'] = _quarter_label(last_idx + 1) if last_idx is not None else 'Final'
+            r['label'] = 'Final'
             r['start'], r['end'] = p['start'], p['end']
             planned = sum(parse_amount(o.get('planned_budget')) or 0 for o in outcomes)
             actual = sum(parse_amount(o.get('actual_budget')) or 0 for o in outcomes)

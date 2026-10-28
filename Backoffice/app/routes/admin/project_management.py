@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_babel import _
 from flask_login import current_user
 from flask_wtf import FlaskForm
@@ -15,7 +15,9 @@ from app.models.projects import Project
 from app.routes.admin.shared import permission_required
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.projects.service import upsert_project
+from app.utils.api_responses import json_bad_request, json_ok
 from app.utils.datetime_helpers import utcnow
+from app.utils.request_utils import is_json_request
 from app.utils.transactions import request_transaction_rollback
 
 bp = Blueprint("project_management", __name__, url_prefix="/admin/projects")
@@ -86,6 +88,36 @@ def _country_choices():
     ]
 
 
+def _wants_json_post() -> bool:
+    return is_json_request() or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _project_form_partial(
+    form: ProjectForm,
+    *,
+    project: Project | None,
+    can_edit: bool,
+    form_action_url: str,
+    modal_title: str,
+    delete_url: str | None = None,
+) -> str:
+    return render_template(
+        "admin/projects/_form_partial.html",
+        form=form,
+        project=project,
+        can_edit=can_edit,
+        form_action_url=form_action_url,
+        delete_url=delete_url,
+        modal=True,
+        modal_title=modal_title,
+    )
+
+
+def _populate_project_form(form: ProjectForm, project: Project) -> None:
+    form.country_id.data = project.country_id
+    form.status.data = project.status or "Open"
+
+
 @bp.before_request
 def _gate():
     if not current_user.is_authenticated:
@@ -139,6 +171,7 @@ def project_list():
             .all()
         ) if name
     })
+    open_edit_id = request.args.get("edit", type=int)
     return render_template(
         "admin/projects/list.html",
         projects=projects,
@@ -155,6 +188,36 @@ def project_list():
         all_countries=countries,
         can_edit=_can_manage_projects(),
         title=_("My projects") if scoped_to_self else _("Projects"),
+        open_edit_id=open_edit_id if open_edit_id else None,
+    )
+
+
+@bp.route("/<int:project_id>", methods=["GET"])
+def project_detail(project_id: int):
+    project = Project.query.get_or_404(project_id)
+    if not _can_see_project(project):
+        abort(403)
+    pm_email = None
+    scoped_to_self = False
+    if not _can_view_all_projects() and _is_pm_viewer():
+        pm_email = (getattr(current_user, "email", "") or "").strip()
+        scoped_to_self = True
+    from plugins.nsd_report_forms.overview import data as nsd_overview
+
+    overview = nsd_overview.project_detail(project.reference, pm_email=pm_email)
+    if overview is None:
+        abort(404)
+    list_params = {}
+    if scoped_to_self and pm_email:
+        list_params["manager"] = pm_email
+    return render_template(
+        "admin/projects/detail.html",
+        project=project,
+        p=overview,
+        can_edit=_can_manage_projects(),
+        scoped_to_self=scoped_to_self,
+        list_url=url_for("project_management.project_list", **list_params),
+        open_edit_id=request.args.get("edit", type=int),
     )
 
 
@@ -192,7 +255,7 @@ def project_new():
                 )
                 db.session.commit()
                 flash(_("Project %(ref)s created.", ref=proj.reference), "success")
-                return redirect(url_for("project_management.project_edit", project_id=proj.id))
+                return redirect(url_for("project_management.project_detail", project_id=proj.id))
             except Exception as e:
                 request_transaction_rollback()
                 current_app.logger.error("Create project failed: %s", e, exc_info=True)
@@ -203,6 +266,8 @@ def project_new():
         project=None,
         can_edit=True,
         title=_("New project"),
+        form_action_url=url_for("project_management.project_new"),
+        modal=False,
     )
 
 
@@ -216,19 +281,47 @@ def project_edit(project_id):
         abort(403)
     form = ProjectForm(obj=project)
     form.country_id.choices = _country_choices()
+    edit_url = url_for("project_management.project_edit", project_id=project.id)
+    delete_url = url_for("project_management.project_delete", project_id=project.id)
+    modal_title = project.reference
+    if can_edit:
+        modal_title = str(_("Edit project %(ref)s", ref=project.reference))
+
     if request.method == "GET":
-        form.country_id.data = project.country_id
-        form.status.data = project.status or "Open"
+        if request.args.get("partial") != "1":
+            return redirect(url_for("project_management.project_detail", project_id=project_id))
+        _populate_project_form(form, project)
+        return _project_form_partial(
+            form,
+            project=project,
+            can_edit=can_edit,
+            form_action_url=edit_url,
+            modal_title=modal_title,
+            delete_url=delete_url if can_edit else None,
+        )
+
     if form.validate_on_submit():
         if form.country_id.data == 0:
-            flash(_("Select a country."), "warning")
+            msg = _("Select a country.")
+            if _wants_json_post():
+                return json_bad_request(msg, form_html=_project_form_partial(
+                    form, project=project, can_edit=can_edit, form_action_url=edit_url,
+                    modal_title=modal_title, delete_url=delete_url if can_edit else None,
+                ))
+            flash(msg, "warning")
         else:
             other = Project.query.filter(
                 Project.reference == form.reference.data.strip(),
                 Project.id != project.id,
             ).first()
             if other:
-                flash(_("A project with this reference already exists."), "warning")
+                msg = _("A project with this reference already exists.")
+                if _wants_json_post():
+                    return json_bad_request(msg, form_html=_project_form_partial(
+                        form, project=project, can_edit=can_edit, form_action_url=edit_url,
+                        modal_title=modal_title, delete_url=delete_url if can_edit else None,
+                    ))
+                flash(msg, "warning")
             else:
                 try:
                     project.reference = form.reference.data.strip()
@@ -253,18 +346,43 @@ def project_edit(project_id):
                         manager_email=form.manager_email.data,
                     )
                     db.session.commit()
+                    if _wants_json_post():
+                        return json_ok(message=_("Project saved."))
                     flash(_("Project saved."), "success")
-                    return redirect(url_for("project_management.project_edit", project_id=project.id))
+                    return redirect(url_for("project_management.project_detail", project_id=project.id))
                 except Exception as e:
                     request_transaction_rollback()
                     current_app.logger.error("Update project failed: %s", e, exc_info=True)
+                    if _wants_json_post():
+                        return json_bad_request(_("Could not save the project."))
                     flash(_("Could not save the project."), "danger")
+    elif _wants_json_post():
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "errors": form.errors,
+                    "form_html": _project_form_partial(
+                        form,
+                        project=project,
+                        can_edit=can_edit,
+                        form_action_url=edit_url,
+                        modal_title=modal_title,
+                        delete_url=delete_url if can_edit else None,
+                    ),
+                }
+            ),
+            400,
+        )
+    _populate_project_form(form, project)
     return render_template(
         "admin/projects/form.html",
         form=form,
         project=project,
         can_edit=can_edit,
-        title=_("Edit project %(ref)s", ref=project.reference) if can_edit else project.reference,
+        title=modal_title,
+        form_action_url=edit_url,
+        modal=False,
     )
 
 
@@ -279,18 +397,22 @@ def project_delete(project_id):
         entity_type=EntityType.project.value, entity_id=project.id
     ).count()
     if in_use:
-        flash(
-            _("Cannot delete %(ref)s: it is on %(n)s assignment submission(s).", ref=project.reference, n=in_use),
-            "warning",
-        )
-        return redirect(url_for("project_management.project_edit", project_id=project.id))
+        msg = _("Cannot delete %(ref)s: it is on %(n)s assignment submission(s).", ref=project.reference, n=in_use)
+        if _wants_json_post():
+            return json_bad_request(msg)
+        flash(msg, "warning")
+        return redirect(url_for("project_management.project_detail", project_id=project.id))
     try:
         ref = project.reference
         db.session.delete(project)
         db.session.commit()
+        if _wants_json_post():
+            return json_ok(message=_("Deleted project %(ref)s.", ref=ref))
         flash(_("Deleted project %(ref)s.", ref=ref), "success")
     except Exception as e:
         request_transaction_rollback()
         current_app.logger.error("Delete project failed: %s", e, exc_info=True)
+        if _wants_json_post():
+            return json_bad_request(_("Could not delete the project."))
         flash(_("Could not delete the project."), "danger")
     return redirect(url_for("project_management.project_list"))

@@ -38,4 +38,4 @@ def project_detail(reference):
     project = Project.query.filter_by(reference=reference.strip()).first()
     if project is None:
         abort(404)
-    return redirect(url_for("project_management.project_edit", project_id=project.id))
+    return redirect(url_for("project_management.project_detail", project_id=project.id))

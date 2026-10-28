@@ -1,0 +1,32 @@
+{# One dashboard card per project: active cycle on the card; inline nav opens other rounds #}
+{% set active_idx = item.active_cycle_index|int %}
+{% set active_cycle = item.cycles[active_idx] %}
+{% set active_af = active_cycle.item_object.assigned_form %}
+{% set active_period = active_af.period_name if active_af else '' %}
+{% set nav_cycles = item.cycles %}
+{% set nav_project_id = item.project_id %}
+{% set is_overdue = active_cycle.type == 'assigned' and active_cycle.date_info and active_cycle.date_info.date() < current_date
+    and active_cycle.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review', 'cancelled'] %}
+<div class="dashboard-assignment-card dashboard-project-group-card p-4 rounded-lg shadow-md flex flex-col justify-between relative transition-all duration-200 ease-out hover:shadow-xl {% if not is_overdue %}hover:-translate-y-0.5{% endif %} motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-md {% if is_overdue %}dashboard-assignment-card--overdue{% endif %} bg-gray-50 border {% if is_overdue %}border-2 border-red-500 ring-2 ring-red-300{% else %}border-gray-300 hover:border-gray-400 hover:bg-white{% endif %}"
+     data-project-dashboard-card>
+    <div class="flex-1 min-w-0">
+        <p class="text-base font-semibold text-gray-900 leading-snug pr-2">
+            {{ item.project_title or item.project_reference }}
+        </p>
+        {% if item.project_title %}
+        <p class="text-xs text-gray-500 mt-1 font-medium">{{ item.project_reference }}</p>
+        {% endif %}
+        <p class="text-sm text-gray-700 mt-2">
+            <span class="text-gray-500">{{ _('Reporting cycle') }}:</span>
+            <span class="font-semibold text-gray-900">{{ active_period or '—' }}</span>
+        </p>
+
+        <div class="relative mt-1">
+            {% with item=active_cycle, dashboard_project_cycle=true, project_cycle_nav_cycles=nav_cycles, project_cycle_nav_id=nav_project_id %}
+            {% set is_overdue = item.type == 'assigned' and item.date_info and item.date_info.date() < current_date
+                and item.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review', 'cancelled'] %}
+            {% include "core/dashboard/_assignment_card_body.html" %}
+            {% endwith %}
+        </div>
+    </div>
+</div>

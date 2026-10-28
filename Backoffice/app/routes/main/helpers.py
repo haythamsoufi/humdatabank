@@ -1978,3 +1978,123 @@ def render_activity_summary(activity):
             return messages[key]
 
     return ""
+
+
+_DASHBOARD_DONE_STATUSES = frozenset(
+    {"submitted", "approved", "requires_revision", "sent_for_review", "cancelled"}
+)
+
+
+def _dashboard_reporting_period_sort_key(period: str):
+    m = re.match(r"^Y(\d+)Q(\d+)$", (period or "").strip())
+    if m:
+        return (0, int(m.group(1)), int(m.group(2)), "")
+    if (period or "").casefold() == "final":
+        return (1, 0, 0, period or "")
+    return (2, 0, 0, period or "")
+
+
+def dashboard_assignment_is_overdue(item: dict, current_date) -> bool:
+    if item.get("type") != "assigned":
+        return False
+    date_info = item.get("date_info")
+    if not date_info:
+        return False
+    try:
+        due = date_info.date() if hasattr(date_info, "date") else date_info
+    except (AttributeError, TypeError, ValueError):
+        return False
+    if due >= current_date:
+        return False
+    return item.get("status") not in _DASHBOARD_DONE_STATUSES
+
+
+def _pick_project_dashboard_cycle_index(cycles, current_date) -> int:
+    if not cycles:
+        return 0
+    for i, cycle in enumerate(cycles):
+        if dashboard_assignment_is_overdue(cycle, current_date):
+            return i
+    for i, cycle in enumerate(cycles):
+        if cycle.get("status") not in ("submitted", "approved", "cancelled"):
+            return i
+    return len(cycles) - 1
+
+
+def _dashboard_item_is_project_assignment(item: dict) -> bool:
+    if item.get("type") != "assigned":
+        return False
+    aes = item.get("item_object")
+    return bool(aes and getattr(aes, "entity_type", None) == EntityType.project.value)
+
+
+def group_dashboard_project_assignments(items, current_date):
+    """Collapse project entity AES rows into one dashboard card with cycle dropdown."""
+    from collections import defaultdict
+
+    from app.models.projects import Project
+
+    by_project = defaultdict(list)
+    for item in items or []:
+        if _dashboard_item_is_project_assignment(item):
+            by_project[item["item_object"].entity_id].append(item)
+    if not by_project:
+        return items
+
+    projects = {
+        p.id: p for p in Project.query.filter(Project.id.in_(list(by_project.keys()))).all()
+    }
+    groups = {}
+    for pid, cycle_items in by_project.items():
+        cycle_items.sort(
+            key=lambda it: _dashboard_reporting_period_sort_key(
+                it["item_object"].assigned_form.period_name
+                if it.get("item_object") and it["item_object"].assigned_form
+                else ""
+            )
+        )
+        proj = projects.get(pid)
+        active = _pick_project_dashboard_cycle_index(cycle_items, current_date)
+        groups[pid] = {
+            "type": "project_group",
+            "project_id": pid,
+            "project_reference": proj.reference if proj else f"#{pid}",
+            "project_title": (proj.title or "") if proj else "",
+            "cycles": cycle_items,
+            "active_cycle_index": active,
+            "is_public": False,
+            "any_overdue": any(
+                dashboard_assignment_is_overdue(c, current_date) for c in cycle_items
+            ),
+        }
+
+    seen = set()
+    grouped = []
+    for item in items:
+        if _dashboard_item_is_project_assignment(item):
+            pid = item["item_object"].entity_id
+            if pid in seen:
+                continue
+            seen.add(pid)
+            grouped.append(groups[pid])
+        else:
+            grouped.append(item)
+    return grouped
+
+
+def dashboard_item_reporting_periods(item) -> list:
+    """Period names for slicers (project groups expose all cycles)."""
+    if item.get("type") == "project_group":
+        periods = []
+        for cycle in item.get("cycles") or []:
+            aes = cycle.get("item_object")
+            if aes and aes.assigned_form and aes.assigned_form.period_name:
+                periods.append(aes.assigned_form.period_name)
+        return periods
+    if item.get("type") == "assigned":
+        aes = item.get("item_object")
+        if aes and aes.assigned_form and aes.assigned_form.period_name:
+            return [aes.assigned_form.period_name]
+    if item.get("period"):
+        return [item["period"]]
+    return []

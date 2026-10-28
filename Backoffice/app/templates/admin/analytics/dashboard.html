@@ -154,25 +154,37 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
             <h5 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
                 <i class="fas fa-chart-bar mr-2 text-blue-500"></i> {{ _('Frequency of use') }}
             </h5>
-            <p class="text-xs text-gray-500 mb-4">{{ _('Among MAU, by distinct active days in the selected window') }}</p>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Among MAU, by distinct active workdays (Mon–Fri) in the selected window') }}</p>
             <div class="chart-container">
                 <canvas id="productFrequencyChart" aria-label="{{ _('Frequency of use chart')|forceescape }}"></canvas>
             </div>
         </div>
         <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
             <h5 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
+                <i class="fas fa-user-clock mr-2 text-indigo-500"></i> {{ _('Active users') }}
+            </h5>
+            <p class="text-xs text-gray-500 mb-4">
+                {{ _('Unique users active in the last day, week, and month (fixed windows)') }}
+                {% if product_analytics.active_users and product_analytics.active_users.stickiness_dau_mau is not none %}
+                · {{ _('DAU/MAU') }} {{ '%.0f'|format(product_analytics.active_users.stickiness_dau_mau * 100) }}%
+                {% endif %}
+            </p>
+            <div class="chart-container">
+                <canvas id="productActiveUsersChart" aria-label="{{ _('DAU WAU MAU chart')|forceescape }}"></canvas>
+            </div>
+        </div>
+        <div class="bg-white p-4 md:p-6 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <h5 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
                 <i class="fas fa-users mr-2 text-teal-500"></i> {{ _('Primary user types') }}
             </h5>
-            <p class="text-xs text-gray-500 mb-4">{{ _('Secretariat staff, National Societies, volunteers, and similar business categories') }}</p>
-            <div class="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-gray-200 bg-gray-50">
-                <i class="fas fa-hourglass-half text-3xl text-gray-300 mb-3" aria-hidden="true"></i>
-                <p class="text-sm font-medium text-gray-600">{{ _('Pending') }}</p>
-                <p class="text-xs text-gray-500 mt-1 max-w-sm">{{ _('User-type classification is not available yet. Technical RBAC roles are not used here.') }}</p>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Among MAU: IFRC (Secretariat) vs National Society') }}</p>
+            <div class="chart-container">
+                <canvas id="productUserTypesChart" aria-label="{{ _('Primary user types chart')|forceescape }}"></canvas>
             </div>
         </div>
     </div>
@@ -807,6 +819,112 @@ document.addEventListener('DOMContentLoaded', function () {
                         'rgba(16, 185, 129, 0.85)',
                         'rgba(148, 163, 184, 0.85)'
                     ],
+                    borderWidth: 0,
+                    borderRadius: 0,
+                    maxBarThickness: 56
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#6b7280', precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    x: {
+                        ticks: { color: '#6b7280', maxRotation: 0, autoSkip: false },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db'
+                    }
+                }
+            }
+        }));
+    }
+
+    const activeUsersCtx = document.getElementById('productActiveUsersChart');
+    if (activeUsersCtx && product.active_users && product.active_users.labels && product.active_users.labels.length) {
+        registerChart(new Chart(activeUsersCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: product.active_users.labels,
+                datasets: [{
+                    label: 'Unique users',
+                    data: product.active_users.counts || [],
+                    backgroundColor: [
+                        'rgba(99, 102, 241, 0.85)',
+                        'rgba(59, 130, 246, 0.85)',
+                        'rgba(14, 165, 233, 0.85)'
+                    ],
+                    borderWidth: 0,
+                    borderRadius: 0,
+                    maxBarThickness: 56
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#6b7280', precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    x: {
+                        ticks: { color: '#6b7280', maxRotation: 0, autoSkip: false },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        callbacks: {
+                            afterBody: function () {
+                                var s = product.active_users || {};
+                                var lines = [];
+                                if (s.stickiness_dau_mau != null) {
+                                    lines.push('DAU/MAU stickiness: ' + Math.round(s.stickiness_dau_mau * 100) + '%');
+                                }
+                                if (s.stickiness_wau_mau != null) {
+                                    lines.push('WAU/MAU stickiness: ' + Math.round(s.stickiness_wau_mau * 100) + '%');
+                                }
+                                return lines;
+                            }
+                        }
+                    }
+                }
+            }
+        }));
+    }
+
+    const userTypesCtx = document.getElementById('productUserTypesChart');
+    if (userTypesCtx && product.user_types && product.user_types.labels && product.user_types.labels.length) {
+        const typeColors = {
+            IFRC: 'rgba(239, 68, 68, 0.85)',
+            NS: 'rgba(20, 184, 166, 0.85)',
+            Unclassified: 'rgba(148, 163, 184, 0.85)'
+        };
+        registerChart(new Chart(userTypesCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: product.user_types.labels,
+                datasets: [{
+                    label: 'Users',
+                    data: product.user_types.counts || [],
+                    backgroundColor: (product.user_types.labels || []).map(function (label) {
+                        return typeColors[label] || 'rgba(100, 116, 139, 0.85)';
+                    }),
                     borderWidth: 0,
                     borderRadius: 0,
                     maxBarThickness: 56

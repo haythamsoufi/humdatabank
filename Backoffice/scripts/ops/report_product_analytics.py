@@ -243,20 +243,29 @@ def build_report(months: int, days_mau: int = 30) -> Dict[str, Any]:
             for uid, code, _name in role_rows:
                 roles_by_user[uid].add(code)
 
-    user_type_counts: Counter = Counter()
+    from app.services.platform.product_analytics_service import (
+        PRIMARY_USER_TYPE_ORDER,
+        _count_workdays,
+        _frequency_thresholds,
+        _record_active_workday,
+        classify_ifrc_vs_ns,
+    )
+
+    user_type_detail_counts: Counter = Counter()
+    user_type_counts: Counter = Counter({k: 0 for k in PRIMARY_USER_TYPE_ORDER})
     user_type_examples: Dict[str, List[str]] = defaultdict(list)
     segment_counts: Counter = Counter()
     mau_country_ids: Set[int] = set()
 
     for u in active_users:
-        ut = classify_user_type(
-            u.email,
-            entities_by_user.get(u.id, set()),
-            roles_by_user.get(u.id, set()),
-        )
-        user_type_counts[ut] += 1
-        if len(user_type_examples[ut]) < 5:
-            user_type_examples[ut].append(u.email)
+        ents = entities_by_user.get(u.id, set())
+        roles = roles_by_user.get(u.id, set())
+        detail = classify_user_type(u.email, ents, roles)
+        primary = classify_ifrc_vs_ns(u.email, ents, roles)
+        user_type_detail_counts[detail] += 1
+        user_type_counts[primary] += 1
+        if len(user_type_examples[primary]) < 5:
+            user_type_examples[primary].append(u.email)
         segs = groups_by_user.get(u.id) or set()
         if segs:
             for s in segs:
@@ -278,8 +287,11 @@ def build_report(months: int, days_mau: int = 30) -> Dict[str, Any]:
         ).all():
             ns_by_country[ns.country_id] = ns.name
 
-    # Frequency: active days in last 30 for each MAU user
-    # Use session last_activity + login + activity timestamps collapsed to dates
+    # Frequency: Mon–Fri active days only (aligned with product_analytics_service)
+    workdays_in_window = _count_workdays(mau_since, now)
+    daily_min, weekly_min, freq_labels = _frequency_thresholds(
+        days_mau, workdays=workdays_in_window
+    )
     active_days_by_user: Dict[int, Set[str]] = defaultdict(set)
     if mau_ids:
         for uid, ts in (
@@ -290,8 +302,7 @@ def build_report(months: int, days_mau: int = 30) -> Dict[str, Any]:
             )
             .all()
         ):
-            if ts:
-                active_days_by_user[uid].add(ts.strftime("%Y-%m-%d"))
+            _record_active_workday(active_days_by_user, uid, ts)
         for uid, ts in (
             db.session.query(UserLoginLog.user_id, UserLoginLog.timestamp)
             .filter(
@@ -301,8 +312,7 @@ def build_report(months: int, days_mau: int = 30) -> Dict[str, Any]:
             )
             .all()
         ):
-            if ts:
-                active_days_by_user[uid].add(ts.strftime("%Y-%m-%d"))
+            _record_active_workday(active_days_by_user, uid, ts)
         for uid, ts in (
             db.session.query(UserActivityLog.user_id, UserActivityLog.timestamp)
             .filter(
@@ -311,18 +321,17 @@ def build_report(months: int, days_mau: int = 30) -> Dict[str, Any]:
             )
             .all()
         ):
-            if ts:
-                active_days_by_user[uid].add(ts.strftime("%Y-%m-%d"))
+            _record_active_workday(active_days_by_user, uid, ts)
 
-    freq_buckets = Counter({"daily (20+ days)": 0, "weekly (4–19 days)": 0, "monthly (1–3 days)": 0})
+    freq_buckets = Counter({label: 0 for label in freq_labels})
     for uid in mau_ids:
         n = len(active_days_by_user.get(uid, set()))
-        if n >= 20:
-            freq_buckets["daily (20+ days)"] += 1
-        elif n >= 4:
-            freq_buckets["weekly (4–19 days)"] += 1
+        if n >= daily_min:
+            freq_buckets[freq_labels[0]] += 1
+        elif n >= weekly_min:
+            freq_buckets[freq_labels[1]] += 1
         else:
-            freq_buckets["monthly (1–3 days)"] += 1
+            freq_buckets[freq_labels[2]] += 1
 
     # Sessions in MAU window
     session_stats = (
@@ -518,18 +527,22 @@ def build_report(months: int, days_mau: int = 30) -> Dict[str, Any]:
         },
         "frequency_of_use": {
             "definition": (
-                "Among MAU, bucketed by distinct active calendar days "
-                f"in the last {days_mau} days"
+                "Among MAU, bucketed by distinct active workdays (Mon–Fri) "
+                f"in the last {days_mau} days "
+                f"({workdays_in_window} workdays in window; weekends excluded)"
             ),
+            "workdays_in_window": workdays_in_window,
             "buckets": dict(freq_buckets),
         },
         "primary_user_types": {
             "definition": (
-                "Heuristic from entity permissions (secretariat vs NS), "
-                "email domain, and RBAC roles. Volunteers are not a "
-                "distinct account type in this platform."
+                "Among MAU: IFRC (@ifrc.org, secretariat entities, or admin) "
+                "vs NS (country/NS entities or assignment-only; @ifrc.org wins "
+                "even with country scope). Volunteers are not a distinct "
+                "account type in this platform."
             ),
-            "counts": dict(user_type_counts),
+            "counts": {k: int(user_type_counts.get(k, 0)) for k in PRIMARY_USER_TYPE_ORDER},
+            "detail_counts": dict(user_type_detail_counts),
             "examples": {k: v for k, v in user_type_examples.items()},
             "top_permission_roles_among_mau": dict(role_mau_counts.most_common(15)),
         },

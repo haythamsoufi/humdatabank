@@ -1189,3 +1189,51 @@ class TestUpdateImageFields:
         app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
         _update_image_fields(image, form, {'label_translations': json.dumps({'fr': 'Légende'})})
         assert image.label_translations == {'fr': 'Légende'}
+
+
+class TestSanitizeBlankBodyHtml:
+    def test_preserves_empty_line_between_paragraphs(self):
+        from app.routes.admin.form_builder.helpers.item_updaters import sanitize_blank_body_html
+
+        html = (
+            'First paragraph.'
+            '<div><br></div>'
+            '<div><b>Second</b> paragraph.</div>'
+        )
+        out = sanitize_blank_body_html(html)
+        assert 'First paragraph.<br><br><b>Second</b>' in out
+
+    def test_preserves_empty_line_after_unwrapped_first_block(self):
+        from app.routes.admin.form_builder.helpers.item_updaters import sanitize_blank_body_html
+
+        # Content re-loaded from DB is often flat text before an empty contenteditable div.
+        html = (
+            'First paragraph.'
+            '<div><br></div>'
+            '<div><b>Funding requirement:</b> details.</div>'
+        )
+        out = sanitize_blank_body_html(html)
+        assert 'First paragraph.<br><br><b>Funding requirement:</b>' in out
+
+    def test_collapses_trailing_soft_break_in_block(self):
+        from app.routes.admin.form_builder.helpers.item_updaters import sanitize_blank_body_html
+
+        html = 'Line one<br><div>Line two</div>'
+        out = sanitize_blank_body_html(html)
+        assert out == 'Line one<br>Line two'
+
+    def test_preserves_leading_break_in_block_after_unwrapped_text(self):
+        from app.routes.admin.form_builder.helpers.item_updaters import sanitize_blank_body_html
+
+        html = (
+            'First paragraph.'
+            '<div><br><b>Funding requirement:</b> details.</div>'
+        )
+        out = sanitize_blank_body_html(html)
+        assert 'First paragraph.<br><br><b>Funding requirement:</b>' in out
+
+    def test_idempotent_on_stored_double_break(self):
+        from app.routes.admin.form_builder.helpers.item_updaters import sanitize_blank_body_html
+
+        once = 'First.<br><br><b>Second</b>'
+        assert sanitize_blank_body_html(once) == once

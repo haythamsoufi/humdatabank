@@ -14,6 +14,50 @@ ENTRY_FORM_HINT_STYLES = frozenset({'normal', 'info', 'warning', 'tip', 'importa
 DEFAULT_ENTRY_FORM_HINT_STYLE = 'warning'
 
 
+# Survives bleach as plain text; replaced with an extra <br> after block normalization.
+_BLANK_PARA_GAP = '\uE000fb_para_gap\uE001'
+_EMPTY_BLOCK_INNER = r'(?:\s|&nbsp;|&#160;|&#xA0;|<br\s*/?>\s*)*'
+
+
+def _expand_blank_para_gaps(html: str) -> str:
+    """Turn empty-block markers into <br> runs (one blank line in the editor)."""
+    import re
+
+    if _BLANK_PARA_GAP not in html:
+        return html
+    parts = html.split(_BLANK_PARA_GAP)
+    out = parts[0]
+    for part in parts[1:]:
+        if re.search(r'(?:<br\s*/?>\s*)$', out, re.I):
+            out += '<br>'
+        else:
+            out += '<br><br>'
+        out += part
+    return out
+
+
+def _mark_leading_break_in_blocks(html: str) -> str:
+    """Contenteditable often starts a new block with <br> before the next paragraph."""
+    import re
+
+    for tag in ('div', 'p'):
+        html = re.sub(
+            rf'(?is)<{tag}[^>]*>\s*<br\s*/?>\s*(?=.+?</{tag}\s*>)',
+            rf'<{tag}>{_BLANK_PARA_GAP}',
+            html,
+        )
+    return html
+
+
+def _block_close_to_br(html: str, tag: str) -> str:
+    """Convert block closings to <br> without doubling a trailing soft break inside the block."""
+    import re
+
+    html = re.sub(rf'(?i)<br\s*/?>\s*</{tag}\s*>', '<br>', html)
+    html = re.sub(rf'(?i)</{tag}\s*>', '<br>', html)
+    return html
+
+
 def sanitize_blank_body_html(html: str) -> str:
     """
     Sanitize HTML produced by the Blank/Note rich-text body editor.
@@ -37,19 +81,27 @@ def sanitize_blank_body_html(html: str) -> str:
     # Always keep a single space for any inter-tag whitespace.
     html = re.sub(r'>[\s\u00a0]+<', '> <', html)
 
+    # Empty contenteditable blocks (user pressed Enter twice) must stay as a visible
+    # blank line. Mark them before <div>/<p> → <br> conversion.
+    for tag in ('div', 'p'):
+        html = re.sub(
+            rf'(?i)<{tag}[^>]*>{_EMPTY_BLOCK_INNER}</{tag}>',
+            _BLANK_PARA_GAP,
+            html,
+        )
+
+    html = _mark_leading_break_in_blocks(html)
+
     # Contenteditable wraps lines in <div>/<p>; turn those into <br>.
     html = re.sub(r'(?i)<div[^>]*>', '', html)
-    html = re.sub(r'(?i)</div>', '<br>', html)
+    html = _block_close_to_br(html, 'div')
     html = re.sub(r'(?i)<p[^>]*>', '', html)
-    html = re.sub(r'(?i)</p>', '<br>', html)
+    html = _block_close_to_br(html, 'p')
 
     # Any leftover newlines inside text are also word separators.
     html = html.replace('\n', ' ')
     html = re.sub(r' {2,}', ' ', html)
 
-    # Soft-break at end of a block + block→br yields <br><br>. Collapse runs so
-    # spacing matches what the user saw in the editor (single line breaks).
-    html = re.sub(r'(?i)(?:<br\s*/?>\s*){2,}', '<br>', html)
     html = re.sub(r'(?:<br\s*/?>)+\s*$', '', html)
 
     try:
@@ -91,7 +143,8 @@ def sanitize_blank_body_html(html: str) -> str:
             return tag
 
         cleaned = re.sub(r'<a\b[^>]*>', _force_link, cleaned)
-        cleaned = re.sub(r'(?i)(?:<br\s*/?>\s*){2,}', '<br>', cleaned)
+        if _BLANK_PARA_GAP in cleaned:
+            cleaned = _expand_blank_para_gaps(cleaned)
         cleaned = re.sub(r'(?:<br\s*/?>)+\s*$', '', cleaned)
         return cleaned
     except Exception:

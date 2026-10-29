@@ -510,7 +510,7 @@ def test_reach_full_row_packs_when_all_icons_present():
     assert "upr-dot--on" not in support
     assert "upr-support-fill--on" in support
     assert "upr-support-table--plan" in support
-    assert ">Year</th>" in support
+    assert ">Year</span></th>" in support
     assert "Confirmed<br>Funding" in support
     assert "2026" in support
     assert "Funding<br>Requirement" in support
@@ -542,7 +542,7 @@ def test_reach_full_row_packs_when_all_icons_present():
     empty_funding = _payload()
     empty_funding["support"][0]["funding_display"] = ""
     empty_html = render_dashboard_html(empty_funding, "support")
-    assert "<td class='upr-num' dir='ltr'>&nbsp;</td>" in empty_html
+    assert "<td class='upr-num upr-support-funding' dir='ltr'>&nbsp;</td>" in empty_html
     assert "upr-support-total" in empty_html
 
     # Zero total → blank cell, never "CHF 0".

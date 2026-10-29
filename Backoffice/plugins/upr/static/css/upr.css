@@ -400,9 +400,14 @@
 }
 
 .upr-block--support .upr-block__title,
-.upr-block--reach .upr-block__title {
+.upr-block--reach .upr-block__title,
+.upr-block--plan-support .upr-block__title {
   margin-bottom: 0.65rem;
   padding-bottom: 0.1rem;
+}
+
+.upr-block--plan-support .upr-block__title {
+  font-weight: 400;
 }
 
 .upr-block--reach {
@@ -1335,31 +1340,93 @@
 
 .upr-support-table--plan .upr-ns {
   vertical-align: top;
-  font-weight: 600;
+  font-weight: 400;
+  border-inline-end: none;
 }
 
 .upr-support-year {
   text-align: center;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: 400;
   width: 4.25rem;
 }
 
-.upr-support-confirmed {
+.upr-support-table--plan td.upr-support-year {
   color: #6d6e71;
 }
 
-.upr-support-table th.upr-support-th--plan {
-  height: auto;
-  padding: 0.35rem 0.45rem 0.4rem;
-  vertical-align: bottom;
+.upr-support-table td.upr-support-confirmed {
+  color: #6d6e71;
 }
 
-.upr-support-th--plan span {
+/* NS through Confirmed Funding: no vertical rules between those columns. */
+.upr-support-table--plan .upr-support-year {
+  border-inline-start: none;
+  border-inline-end: none;
+}
+
+.upr-support-table--plan .upr-support-funding {
+  border-inline-start: none;
+  border-inline-end: none;
+}
+
+.upr-support-table--plan .upr-support-confirmed {
+  border-inline-start: none;
+}
+
+/* WeasyPrint does not middle-align text in this tall header row, so the
+   label is centered in the cell the same way as the rotated SP headers. */
+.upr-support-table--plan thead th.upr-ns,
+.upr-support-table--plan thead th.upr-support-year,
+.upr-support-table--plan thead th.upr-support-funding,
+.upr-support-table--plan thead th.upr-support-confirmed {
+  position: relative;
+  height: 28mm;
+  vertical-align: middle;
+}
+
+.upr-support-table--plan thead th.upr-ns > span,
+.upr-support-table--plan thead th.upr-support-year > span,
+.upr-support-table--plan thead th.upr-support-funding > span,
+.upr-support-table--plan thead th.upr-support-confirmed > span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   display: block;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+}
+
+.upr-support-table--plan thead th.upr-ns > span {
+  text-align: start;
+  padding-inline: 0.45rem;
+}
+
+.upr-support-table th.upr-support-th--plan {
+  position: relative;
+  height: 28mm;
+  padding: 0.2rem 0.15rem;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+/* Same size as the other headers. Narrow PDF columns still meet the
+   vertical rules at a 1pt reduction, so the label stands upright instead. */
+.upr-support-table--plan th.upr-support-th--plan span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: 26mm;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.15;
   white-space: normal;
-  font-size: 0.58rem;
-  line-height: 1.12;
+  text-align: center;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  transform-origin: center center;
 }
 
 .upr-support-fill {
@@ -1371,8 +1438,51 @@
 .upr-support-fill--on {
   color: #fff;
   font-weight: 400;
-  font-size: 0.72rem;
+  font-size: inherit;
   white-space: nowrap;
+}
+
+/* Planning support: one face, one body size, regular weight only. */
+.upr-support-table--plan,
+.upr-support-table--plan th,
+.upr-support-table--plan td,
+.upr-support-table--plan .upr-ns,
+.upr-support-table--plan .upr-support-year,
+.upr-support-table--plan th.upr-support-th,
+.upr-support-table--plan th.upr-support-th span,
+.upr-support-table--plan .upr-support-th--plan span,
+.upr-support-table--plan tfoot td,
+.upr-support-table--plan .upr-support-fill,
+.upr-support-table--plan .upr-support-fill--on,
+.upr-support-table--plan .upr-num,
+.upr-support-table--plan .upr-amt,
+.upr-support-table--plan .upr-amt__unit,
+.upr-support-table--plan .upr-amt__num {
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
+}
+
+.upr-support-table--plan th,
+.upr-support-table--plan th.upr-support-th,
+.upr-support-table--plan th.upr-support-th span,
+.upr-support-table--plan td,
+.upr-support-table--plan .upr-ns,
+.upr-support-table--plan .upr-support-year,
+.upr-support-table--plan .upr-num,
+.upr-support-table--plan .upr-support-fill--on,
+.upr-support-table--plan td.upr-support-total {
+  font-family: "Open Sans", "Segoe UI", sans-serif;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+
+.upr-support-table--plan td.upr-support-total,
+.upr-support-table--plan td.upr-support-total .upr-amt,
+.upr-support-table--plan td.upr-support-total .upr-amt__unit,
+.upr-support-table--plan td.upr-support-total .upr-amt__num {
+  font-weight: 700;
 }
 
 .upr-not-reported {

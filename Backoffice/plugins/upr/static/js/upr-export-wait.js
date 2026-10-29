@@ -7,6 +7,7 @@
   var started = Date.now();
   var maxMs = 8 * 60 * 1000;
   var lastPayload = {};
+  var finished = false;
   var friendly = {
     Queued: "Gathering the latest figures…",
     "Starting export…": "Gathering the latest figures…",
@@ -62,7 +63,52 @@
     document.body.appendChild(frame);
   }
 
+  function markDownloadReady() {
+    var card = document.querySelector(".upr-export-wait");
+    var status = document.getElementById("upr-export-wait-status");
+    var elapsed = document.getElementById("upr-export-wait-elapsed");
+    var heading = card && card.querySelector("h1");
+    if (card) {
+      card.setAttribute("data-ready", "1");
+      card.removeAttribute("data-failed");
+    }
+    document.title = "Download ready";
+    if (heading) heading.textContent = "Your download is ready";
+    if (status) {
+      status.textContent = "The file should appear in your downloads. You can close this tab.";
+    }
+    if (elapsed) elapsed.textContent = "";
+  }
+
+  function triggerFileDownload() {
+    // Keep this wait document mounted so we can update copy / close the tab.
+    // Navigating with location.replace() leaves Chrome stuck on "Preparing…".
+    var frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.tabIndex = -1;
+    frame.style.cssText =
+      "position:fixed;width:0;height:0;border:0;visibility:hidden;pointer-events:none";
+    frame.src = fileUrl;
+    document.body.appendChild(frame);
+  }
+
+  function finishDownload() {
+    if (finished) return;
+    finished = true;
+    markDownloadReady();
+    triggerFileDownload();
+    // Script-opened tabs can close themselves after the download starts.
+    setTimeout(function () {
+      try {
+        window.close();
+      } catch (_err) {
+        /* ignore */
+      }
+    }, 900);
+  }
+
   function poll() {
+    if (finished) return;
     if (Date.now() - started > maxMs) {
       fail("This is taking longer than expected. Try again in a moment.");
       return;
@@ -74,6 +120,7 @@
         });
       })
       .then(function (result) {
+        if (finished) return;
         var data = result.data || {};
         var payload = data.status && typeof data.status === "object" ? data.status : {};
         var status = payload.status || data.status || "";
@@ -84,7 +131,7 @@
         }
         if (status === "completed") {
           if (openMode === "inline") showInlineFile();
-          else window.location.replace(fileUrl);
+          else finishDownload();
           return;
         }
         if (status === "failed" || status === "cancelled") {
@@ -95,6 +142,7 @@
         setTimeout(poll, 400);
       })
       .catch(function () {
+        if (finished) return;
         paint(lastPayload);
         setTimeout(poll, 400);
       });

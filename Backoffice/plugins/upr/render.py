@@ -1083,7 +1083,7 @@ def _support_plan(payload: dict[str, Any]) -> str:
     rows = payload.get("support") or []
     if not rows:
         return (
-            f"<section class='upr-block'><h2 class='upr-block__title'>{title}</h2>"
+            f"<section class='upr-block upr-block--plan-support'><h2 class='upr-block__title'>{title}</h2>"
             f"<p class='upr-empty'>{escape(t('No participating National Societies reported.'))}</p></section>"
         )
     n_areas = len(SUPPORT_AREA_CODES)
@@ -1106,7 +1106,7 @@ def _support_plan(payload: dict[str, Any]) -> str:
             cells.append(f"<td class='upr-support-year'>{escape(str(row.get('year') or ''))}</td>")
             funding = _amount_html(row.get("funding_display")) or "&nbsp;"
             confirmed = _amount_html(row.get("confirmed_display")) or "&nbsp;"
-            cells.append(f"<td class='upr-num'{_ltr_num_attr()}>{funding}</td>")
+            cells.append(f"<td class='upr-num upr-support-funding'{_ltr_num_attr()}>{funding}</td>")
             cells.append(f"<td class='upr-num upr-support-confirmed'{_ltr_num_attr()}>{confirmed}</td>")
             cells.extend(_plan_support_area_cell(row, code) for code in SUPPORT_AREA_CODES)
             body.append(f"<tr>{_ltr_row(cells)}</tr>")
@@ -1124,21 +1124,21 @@ def _support_plan(payload: dict[str, Any]) -> str:
         *["<col class='upr-support-col-fill'>" for _ in range(n_areas)],
     ]
     heads = [
-        f"<th class='upr-ns'>{escape(t('National Society'))}</th>",
-        f"<th class='upr-support-year'>{escape(t('Year'))}</th>",
-        f"<th class='upr-support-th'><span>{_wrapped_th_label(meta.get('support_funding_label') or t('Funding Requirement'))}</span></th>",
-        f"<th class='upr-support-th'><span>{_wrapped_th_label(meta.get('support_confirmed_label') or t('Confirmed Funding'))}</span></th>",
+        f"<th class='upr-ns'><span>{escape(t('National Society'))}</span></th>",
+        f"<th class='upr-support-year'><span>{escape(t('Year'))}</span></th>",
+        f"<th class='upr-support-th upr-support-funding'><span>{_wrapped_th_label(meta.get('support_funding_label') or t('Funding Requirement'))}</span></th>",
+        f"<th class='upr-support-th upr-support-confirmed'><span>{_wrapped_th_label(meta.get('support_confirmed_label') or t('Confirmed Funding'))}</span></th>",
         *_support_area_header_cells(plan=True),
     ]
     foot = [
         f"<td class='upr-ns'>{escape(t('Total'))}</td>",
-        "<td></td>",
-        f"<td class='upr-num upr-support-total'{_ltr_num_attr()}>{total_amount}</td>",
+        "<td class='upr-support-year'></td>",
+        f"<td class='upr-num upr-support-funding upr-support-total'{_ltr_num_attr()}>{total_amount}</td>",
         f"<td class='upr-num upr-support-confirmed'{_ltr_num_attr()}>{_amount_html(confirmed_total_display) or '&nbsp;'}</td>",
         f"<td colspan='{n_areas}'></td>",
     ]
     return (
-        f"<section class='upr-block'><h2 class='upr-block__title'>{title}</h2>"
+        f"<section class='upr-block upr-block--plan-support'><h2 class='upr-block__title'>{title}</h2>"
         "<table class='upr-support-table upr-support-table--plan' dir='ltr'>"
         f"<colgroup>{_ltr_row(cols)}</colgroup>"
         f"<thead><tr>{_ltr_row(heads)}</tr></thead><tbody>{''.join(body)}</tbody>"

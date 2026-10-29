@@ -563,27 +563,44 @@
     }
   }
 
+  function withParam(url, key, value) {
+    const joiner = url.indexOf("?") >= 0 ? "&" : "?";
+    return `${url}${joiner}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+  }
+
+  function openExportWaitTab(path) {
+    // Prefer a real <a target=_blank> click: window.open(..., "noopener") returns null
+    // even when the tab opens, and a null-check fallback was navigating this page too.
+    const link = document.createElement("a");
+    link.href = path;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   function startSimpleDownload(aesId, dashboardId, format, ui) {
     if (format === "png") {
       startInPagePngDownload(aesId, dashboardId, ui);
       return;
     }
     if (format === "idml") {
-      window.location.href = withScope(withLang(`/assignment/${encodeURIComponent(aesId)}/idml`));
+      openExportWaitTab(withScope(withLang(`/assignment/${encodeURIComponent(aesId)}/idml`)));
       return;
     }
-    const kind = format === "pdf" ? "pdf" : "png";
-    const path =
-      kind === "pdf" && dashboardId === "combined"
+    let path =
+      dashboardId === "combined"
         ? withScope(withLang(`/assignment/${encodeURIComponent(aesId)}/pdf`))
         : withScope(
-            withLang(`/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(dashboardId)}`)
+            withLang(`/assignment/${encodeURIComponent(aesId)}/pdf/${encodeURIComponent(dashboardId)}`)
           );
-    if (kind === "pdf" && dashboardId === "combined") {
-      window.open(path, "_blank", "noopener");
-    } else {
-      window.location.href = path;
+    // Menu "PDF" always means attachment download in a separate wait tab.
+    if (!/[?&]download=/.test(path)) {
+      path = withParam(path, "download", "1");
     }
+    openExportWaitTab(path);
   }
 
   function bindDownloadMenu({ button, menu, wrap, aesIdFn, dashboardFn }) {

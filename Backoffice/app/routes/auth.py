@@ -1234,25 +1234,39 @@ def logout():
         or url_for("auth.login", _external=True)
     )
     if "localhost" in post_logout_uri or "127.0.0.1" in post_logout_uri:
+        current_app.logger.info("B2C logout skipped: localhost/development redirect URI")
         return _logout_redirect(url_for("auth.login"))
 
-    # End the Azure B2C SSO session only when we can identify the session being
-    # ended. Production custom policies may enforce id_token_hint on logout;
-    # sending a bare post_logout_redirect_uri produces a B2C error page. The
-    # local session is already cleared, so fall back to /login when the hint
-    # was unavailable (for example, after a worker restart without Redis).
+    # The hint is optional in OIDC. Policies enforcing EnforceIdTokenHintOnLogout
+    # may reject a hintless request, but local logout has already completed.
     cfg = _b2c_get_required_config()
-    if cfg and b2c_id_token:
-        with suppress(Exception):
+    if cfg:
+        try:
             meta = _b2c_metadata(cfg["tenant"], cfg["policy"])
             end_session_endpoint = meta.get("end_session_endpoint")
             if end_session_endpoint:
                 params = {
                     'post_logout_redirect_uri': post_logout_uri,
-                    'id_token_hint': b2c_id_token,
                 }
+                if isinstance(b2c_id_token, str) and b2c_id_token.strip():
+                    params['id_token_hint'] = b2c_id_token
+                    current_app.logger.info("B2C logout initiated with id_token_hint")
+                else:
+                    # client_id identifies the app when no token is supplied
+                    # (required for application-isolated SSO).
+                    params['client_id'] = cfg["client_id"]
+                    current_app.logger.warning(
+                        "B2C logout initiated without id_token_hint; policies enforcing "
+                        "EnforceIdTokenHintOnLogout may reject the request. Local logout is complete."
+                    )
                 logout_url = f"{end_session_endpoint}?{urlencode(params)}"
                 return _logout_redirect(logout_url)
+            current_app.logger.warning("B2C logout skipped: metadata has no end_session_endpoint")
+        except Exception:
+            # Do not log exception details: they may contain credential-bearing URLs.
+            current_app.logger.warning("B2C logout skipped: metadata or logout redirect unavailable")
+    else:
+        current_app.logger.info("B2C logout skipped: configuration unavailable")
 
     return _logout_redirect(url_for("auth.login"))
 

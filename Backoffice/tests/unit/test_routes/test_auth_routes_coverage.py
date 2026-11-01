@@ -1025,42 +1025,35 @@ class TestAzureCallbackCoverage:
 
 
 class TestLogoutB2c:
-    def test_logout_without_id_token_hint_stays_local(self, app, admin_user, db_session):
+    @pytest.mark.parametrize("scenario,token_source", [
+        ("configured", "server"),
+        ("configured", "legacy"),
+        ("configured", None),
+        ("configured", "empty"),
+        ("configured", "blank"),
+        ("configured", "invalid-type"),
+        ("default-redirect", None),
+        ("missing-config", "server"),
+        ("missing-config", None),
+        ("metadata-failure", "server"),
+        ("metadata-failure", None),
+        ("missing-endpoint", None),
+        ("localhost", "server"),
+        ("localhost", None),
+        ("loopback", None),
+    ])
+    def test_logout_redirect_and_local_cleanup(self, app, caplog, scenario, token_source):
+        import logging
+        import jwt
+        import requests
+        from flask import session
+        from flask_login import current_user
+        from urllib.parse import parse_qs, urlparse
+
         from app.routes.auth import logout
-        from app.models import User
+        from app.utils.datetime_helpers import utcnow
+        from app.utils.session_persistence import pop_oauth_logout_hint, store_oauth_logout_hint
 
-        with app.app_context():
-            user_id = int(admin_user.id)
-            user = User.query.get(user_id)
-
-        meta = {"end_session_endpoint": "https://b2c.example.com/endsession"}
-        cfg = {
-            "tenant": "t", "policy": "p", "client_id": "cid",
-            "client_secret": "cs", "redirect_uri": "http://r", "scope": "openid",
-        }
-        with app.test_request_context("/logout"):
-            login_user(user)
-            with patch("app.routes.auth.log_user_activity"), \
-                 patch("app.routes.auth.log_logout"), \
-                 patch("app.routes.auth._b2c_get_required_config", return_value=cfg), \
-                 patch("app.routes.auth._b2c_metadata", return_value=meta) as mock_metadata, \
-                 patch("app.routes.auth.clear_mobile_app_embed_cookie", side_effect=lambda r: r), \
-                 patch("app.routes.auth.current_app") as mock_capp:
-                mock_capp.config = {
-                    **app.config,
-                    "AZURE_B2C_POST_LOGOUT_REDIRECT_URI": "https://example.com/post-logout",
-                }
-                mock_capp.logger = MagicMock()
-                resp = logout()
-        assert resp.status_code in (301, 302, 303, 307, 308)
-        assert (resp.headers.get("Location") or "").endswith("/login")
-        mock_metadata.assert_not_called()
-
-    def test_logout_uses_server_side_id_token_hint(self, app):
-        from app.routes.auth import logout
-        from app.utils.session_persistence import reset_oauth_logout_hint_cache_for_tests, store_oauth_logout_hint
-
-        reset_oauth_logout_hint_cache_for_tests()
         user = MagicMock()
         user.id = 42
         user.email = "admin@example.com"
@@ -1069,31 +1062,106 @@ class TestLogoutB2c:
         user.is_anonymous = False
         user.get_id.return_value = "42"
 
+        token = jwt.encode(
+            {"sub": "42", "exp": int(utcnow().timestamp()) + 3600},
+            "test-signing-key-not-a-production-credential",
+            algorithm="HS256",
+        )
+        post_logout_uri = {
+            "default-redirect": "",
+            "localhost": "http://localhost:5000/login",
+            "loopback": "http://127.0.0.1:5000/login",
+        }.get(scenario, "https://example.com/post-logout")
         meta = {"end_session_endpoint": "https://b2c.example.com/endsession"}
         cfg = {
             "tenant": "t", "policy": "p", "client_id": "cid",
-            "client_secret": "cs", "redirect_uri": "http://r", "scope": "openid",
+            "client_secret": "test-b2c-client-secret", "redirect_uri": "http://r", "scope": "openid",
         }
-        with app.test_request_context("/logout"):
-            from flask import session
+
+        def log_logout_event(logged_user, session_duration_minutes):
+            assert logged_user._get_current_object() is user
+            assert session_duration_minutes == 0
+
+        def metadata(tenant, policy):
+            # Local logout must finish before discovery can fail.
+            assert dict(session) == {}
+            assert not current_user.is_authenticated
+            if scenario == "metadata-failure":
+                raise requests.Timeout(f"credential-bearing error: {token} {cfg['client_secret']}")
+            return {} if scenario == "missing-endpoint" else meta
+
+        with patch.dict(app.config, {"AZURE_B2C_POST_LOGOUT_REDIRECT_URI": post_logout_uri}), \
+             app.test_request_context("/logout", base_url="https://example.com"):
             login_user(user)
             session["session_id"] = "sid-logout-hint"
-            store_oauth_logout_hint("sid-logout-hint", "stored-id-token")
-            with patch("app.routes.auth.log_user_activity"), \
-                 patch("app.routes.auth.log_logout"), \
-                 patch("app.routes.auth._b2c_get_required_config", return_value=cfg), \
-                 patch("app.routes.auth._b2c_metadata", return_value=meta), \
-                 patch("app.routes.auth.clear_mobile_app_embed_cookie", side_effect=lambda r: r), \
-                 patch("app.routes.auth.current_app") as mock_capp:
-                mock_capp.config = {
-                    **app.config,
-                    "AZURE_B2C_POST_LOGOUT_REDIRECT_URI": "https://example.com/post-logout",
-                }
-                mock_capp.logger = MagicMock()
+            session["session_start"] = utcnow().isoformat()
+            session["csrf_token"] = "stale-csrf-token"
+            if token_source == "server":
+                store_oauth_logout_hint("sid-logout-hint", token)
+                session["b2c_id_token"] = "stale-legacy-token"
+            elif token_source == "legacy":
+                session["b2c_id_token"] = token
+            elif token_source is not None:
+                session["b2c_id_token"] = {
+                    "empty": "", "blank": "   ", "invalid-type": {"not": "a-token"},
+                }[token_source]
+            with caplog.at_level(logging.INFO, logger=app.logger.name), \
+                 patch("app.routes.auth.log_user_activity") as activity, \
+                 patch("app.routes.auth.log_logout", side_effect=log_logout_event) as log_event, \
+                 patch("app.routes.auth.add_session_to_blacklist") as blacklist, \
+                 patch("app.routes.auth._b2c_get_required_config",
+                       return_value=None if scenario == "missing-config" else cfg) as config, \
+                 patch("app.routes.auth._b2c_metadata", side_effect=metadata) as discovery:
                 resp = logout()
-        assert resp.status_code in (301, 302, 303, 307, 308)
-        assert "id_token_hint=stored-id-token" in (resp.headers.get("Location") or "")
-        reset_oauth_logout_hint_cache_for_tests()
+
+            assert dict(session) == {}
+            assert not current_user.is_authenticated
+            assert pop_oauth_logout_hint("sid-logout-hint") is None
+            blacklist.assert_called_once_with("sid-logout-hint")
+            activity.assert_called_once()
+            assert activity.call_args.kwargs["activity_type"] == "logout"
+            log_event.assert_called_once()
+
+        assert resp.status_code == 302
+        assert any(
+            cookie.startswith("HD_MOBILE_EMBED=;") and "Max-Age=0" in cookie
+            for cookie in resp.headers.getlist("Set-Cookie")
+        )
+        location = urlparse(resp.headers["Location"])
+        if scenario in ("configured", "default-redirect"):
+            assert (location.scheme, location.netloc, location.path) == (
+                "https", "b2c.example.com", "/endsession",
+            )
+            expected_params = {
+                "post_logout_redirect_uri": [post_logout_uri or "https://example.com/login"],
+            }
+            if token_source in ("server", "legacy"):
+                expected_params["id_token_hint"] = [token]
+                assert "B2C logout initiated with id_token_hint" in caplog.text
+            else:
+                expected_params["client_id"] = [cfg["client_id"]]
+                assert "B2C logout initiated without id_token_hint" in caplog.text
+                assert "EnforceIdTokenHintOnLogout" in caplog.text
+            assert parse_qs(location.query) == expected_params
+        else:
+            assert location.path == "/login"
+            assert not location.query
+            reason = {
+                "missing-config": "configuration unavailable",
+                "metadata-failure": "metadata or logout redirect unavailable",
+                "missing-endpoint": "metadata has no end_session_endpoint",
+                "localhost": "localhost/development redirect URI",
+                "loopback": "localhost/development redirect URI",
+            }[scenario]
+            assert f"B2C logout skipped: {reason}" in caplog.text
+        if scenario in ("localhost", "loopback", "missing-config"):
+            discovery.assert_not_called()
+        else:
+            discovery.assert_called_once_with("t", "p")
+        if scenario in ("localhost", "loopback"):
+            config.assert_not_called()
+        assert token not in caplog.text
+        assert cfg["client_secret"] not in caplog.text
 
     def test_logout_with_session_duration_calculation(self, app, admin_user, db_session):
         from app.routes.auth import logout

@@ -20,6 +20,7 @@ from app.utils.api_helpers import (
     api_error,
     json_response,
 )
+from app.utils.api_data_filters import parse_assignment_id_filters
 from app.utils.auth import require_api_key_or_session
 from app.services.security.api_key_permissions import DATA_READ
 from app.utils.error_handling import handle_json_view_exception
@@ -57,8 +58,15 @@ _UPR_QUERY_PARAMS = [
         "name": "iso3",
         "type": "select",
         "option_source": "country_iso3",
-        "description": "Filter by ISO 3166-1 alpha-3",
+        "description": "Filter by ISO 3166-1 alpha-3 (alias: country_iso3)",
     },
+    {"name": "submission_id", "type": "text", "description": "One assignment-country submission id (AssignmentEntityStatus id)."},
+    {"name": "assignment_id", "type": "text", "description": "Assignment (AssignedForm) id; comma-separated or repeated for several."},
+    {"name": "template_id", "type": "text", "description": "Numeric form template id: 22, 23, 24 or 33."},
+    {"name": "country_id", "type": "text", "description": "Filter by country id."},
+    {"name": "country_iso2", "type": "text", "description": "Filter by ISO 3166-1 alpha-2."},
+    {"name": "period_name", "type": "text", "description": "Exact assignment period name, for example 2027."},
+    {"name": "item_id", "type": "text", "description": "Limit /data and /master to one form item id."},
 ]
 
 API_ENDPOINTS = [
@@ -331,6 +339,36 @@ def _round_param() -> str | None:
     return ",".join(codes) if codes else None
 
 
+def _request_scope() -> tuple[dict, str | None]:
+    """Filters shared with ``/api/v1/data``: ids, template_id, country, period, item.
+
+    Returns ``(scope, iso3)``; ``country_iso3`` is an alias of ``iso3``. Raises ``ValueError``
+    for malformed values.
+    """
+    scope: dict = {}
+    for key in ("submission_id", "template_id", "country_id", "item_id"):
+        raw = (request.args.get(key) or "").strip()
+        if raw:
+            if not raw.isdigit():
+                raise ValueError(f"{key} must be an integer")
+            scope[key] = int(raw)
+    assignment_ids = parse_assignment_id_filters(request.args)
+    if assignment_ids:
+        scope["assignment_ids"] = sorted(assignment_ids)
+    iso2 = (request.args.get("country_iso2") or request.args.get("iso2") or "").strip().upper()
+    if iso2:
+        if len(iso2) != 2 or not iso2.isalpha():
+            raise ValueError("country_iso2 must be a 2-letter country code")
+        scope["iso2"] = iso2
+    period = (request.args.get("period_name") or "").strip()
+    if period:
+        scope["period_name"] = period
+    iso3 = (request.args.get("iso3") or request.args.get("country_iso3") or "").strip().upper() or None
+    if iso3 and (len(iso3) != 3 or not iso3.isalpha()):
+        raise ValueError("iso3 must be a 3-letter country code")
+    return scope, iso3
+
+
 def _extract_response(body, *, cache_hit: bool):
     response = json_response(body)
     response.headers["X-UPR-Cache"] = "HIT" if cache_hit else "MISS"
@@ -357,13 +395,14 @@ def get_upr_data():
             return api_error("template must be report, plan, or pns", 400)
 
         round_code = _round_param()
-        iso3 = (request.args.get("iso3") or "").strip().upper() or None
+        scope, iso3 = _request_scope()
         section = (request.args.get("section") or request.args.get("table") or "").strip().lower() or None
         params = {
             "template": template,
             "round": round_code,
             "iso3": iso3,
             "section": section,
+            "scope": scope,
         }
         payload, cache_hit = get_or_build_upr_payload(
             "data",
@@ -373,6 +412,7 @@ def get_upr_data():
                 round_code=round_code,
                 iso3=iso3,
                 table=section,
+                scope=scope,
             ),
         )
         facts = payload["data"]
@@ -388,6 +428,8 @@ def get_upr_data():
             },
             cache_hit=cache_hit,
         )
+    except ValueError as error:
+        return api_error(str(error), 400)
     except Exception as error:
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
@@ -402,11 +444,12 @@ def get_upr_submissions():
             return api_error("template must be report, plan, or pns", 400)
 
         round_code = _round_param()
-        iso3 = (request.args.get("iso3") or "").strip().upper() or None
+        scope, iso3 = _request_scope()
         params = {
             "template": template,
             "round": round_code,
             "iso3": iso3,
+            "scope": scope,
         }
         payload, cache_hit = get_or_build_upr_payload(
             "submissions",
@@ -415,6 +458,7 @@ def get_upr_submissions():
                 template=template,
                 round_code=round_code,
                 iso3=iso3,
+                scope=scope,
             ),
         )
         rows = payload["data"]
@@ -428,6 +472,8 @@ def get_upr_submissions():
             },
             cache_hit=cache_hit,
         )
+    except ValueError as error:
+        return api_error(str(error), 400)
     except Exception as error:
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
@@ -442,13 +488,14 @@ def get_upr_master():
             return api_error("template must be report, plan, or pns", 400)
 
         round_code = _round_param()
-        iso3 = (request.args.get("iso3") or "").strip().upper() or None
+        scope, iso3 = _request_scope()
         section = (request.args.get("section") or "").strip().lower() or None
         params = {
             "template": template,
             "round": round_code,
             "iso3": iso3,
             "section": section,
+            "scope": scope,
         }
         payload, cache_hit = get_or_build_upr_payload(
             "master",
@@ -458,6 +505,7 @@ def get_upr_master():
                 round_code=round_code,
                 iso3=iso3,
                 section=section,
+                scope=scope,
             ),
         )
         rows = payload["data"]
@@ -471,6 +519,8 @@ def get_upr_master():
             },
             cache_hit=cache_hit,
         )
+    except ValueError as error:
+        return api_error(str(error), 400)
     except Exception as error:
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 

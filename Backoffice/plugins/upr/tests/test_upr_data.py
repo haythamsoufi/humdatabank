@@ -538,3 +538,23 @@ def test_master_comment_and_other_indicator_and_pns_host():
     assert pns[0]["PNS Value"] == 900
     assert pns[0]["PNS reported"] == "Yes"
     assert pns[0]["indicatorId"] == 733
+
+
+def test_pns_plan_t22_funding_is_emitted_per_host_country_and_year():
+    from plugins.upr.catalog import PNS_PLAN_TEMPLATE_ID
+
+    place = {**_PLACE, "template": "pns", "iso3": "NOR", "country": "Norway", "period_name": "2027", "round": "P27", "source": "PNS Data"}
+    item = _item(template_id=PNS_PLAN_TEMPLATE_ID, item_type="matrix", label="Funding Requirement", bank_id=None, bank_name=None, bank_area=None)
+    assert classify_item(item) == "pns_plan_funding"
+    rows = facts_for_item(
+        item,
+        "pns_plan_funding",
+        place,
+        value=None,
+        disagg={"mode": "matrix", "values": {"45_fr_tot_2027": 1000, "45_SP1_2027": 400, "45_fr_tot_2028": 500}},
+        country_by_id={45: "Colombia"},
+    )
+    totals = {(r["Year"], r["Value"]) for r in rows if r["Attribute"] == "Total"}
+    assert totals == {(2027, 1000), (2028, 500)}
+    assert all(r["Entity"] == "Colombia" and r["Source"] == "PNS Data" for r in rows)
+    assert any(r["SP/EF"] == "SP1" and r["Year"] == 2027 for r in rows)

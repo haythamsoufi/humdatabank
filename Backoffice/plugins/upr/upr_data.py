@@ -39,6 +39,8 @@ from plugins.upr.catalog import (
     PLAN_ITEM_FALLBACKS,
     PLAN_LABEL_NEEDLES,
     PLAN_TEMPLATE_ID,
+    PNS_PLAN_LABEL_NEEDLES,
+    PNS_PLAN_TEMPLATE_ID,
     PNS_REPORT_LABEL_NEEDLES,
     PNS_REPORT_TEMPLATE_ID,
     REPORT_ITEM_FALLBACKS,
@@ -60,6 +62,7 @@ TEMPLATE_KIND = {
     REPORT_TEMPLATE_ID: "report",
     PLAN_TEMPLATE_ID: "plan",
     PNS_REPORT_TEMPLATE_ID: "pns",
+    PNS_PLAN_TEMPLATE_ID: "pns",
 }
 TEMPLATE_IDS = frozenset(TEMPLATE_KIND)
 
@@ -75,7 +78,7 @@ _REPORT_FUNDING_IDS = frozenset(
     REPORT_ITEM_FALLBACKS[key] for key in ("funding_sources", "expenditure", "sp_breakdown")
 )
 _MATRIX_ROLES = frozenset(
-    {"support", "funding", "activity", "reach", "emergency", "plan_funding", "pns_funding"}
+    {"support", "funding", "activity", "reach", "emergency", "plan_funding", "pns_funding", "pns_plan_funding"}
 )
 _EA_CODE_RE = re.compile(r"\(([^)]+)\)")
 _APPEAL_CODE_RE = re.compile(r"\b(MDR[A-Z0-9]{2,})\b", re.IGNORECASE)
@@ -206,6 +209,8 @@ def classify_item(item: ItemView) -> str:
         return _classify_plan(item, label)
     if item.template_id == PNS_REPORT_TEMPLATE_ID:
         return _classify_pns(item, label)
+    if item.template_id == PNS_PLAN_TEMPLATE_ID:
+        return _classify_pns_plan(item, label)
     return "skip"
 
 
@@ -246,6 +251,15 @@ def _classify_pns(item: ItemView, label: str) -> str:
         return "pns_funding"
     if "fund" in label or "expend" in label:
         return "pns_funding"
+    return "skip"
+
+
+def _classify_pns_plan(item: ItemView, label: str) -> str:
+    """T22: a PNS's planned/confirmed funding per host country (row = ``Country.id``)."""
+    if "staff" in label or "delegate" in label:
+        return "skip"
+    if item.item_type == "matrix" or _matches(label, PNS_PLAN_LABEL_NEEDLES["funding"]) or "fund" in label:
+        return "pns_plan_funding"
     return "skip"
 
 
@@ -548,6 +562,7 @@ def facts_for_item(
     not_applicable: bool = False,
     ns_by_id: dict[int, str] | None = None,
     emergency_index: dict[tuple[int, str], int] | None = None,
+    country_by_id: dict[int, str] | None = None,
 ) -> list[dict[str, Any]]:
     if role == "comment" or role == "skip":
         return []
@@ -562,6 +577,7 @@ def facts_for_item(
             disagg,
             ns_by_id=ns_by_id,
             emergency_index=emergency_index,
+            country_by_id=country_by_id or {},
         )
     table, section, indicator = _scalar_labels(item, role)
     spef = spef_label(item.bank_area) or spef_label(item.section_name)
@@ -604,8 +620,11 @@ def _matrix_facts(
     *,
     ns_by_id: dict[int, str],
     emergency_index: dict[tuple[int, str], int],
+    country_by_id: dict[int, str] | None = None,
 ) -> list[dict[str, Any]]:
     cells = _matrix_cells_from_disagg(disagg)
+    if role == "pns_plan_funding":
+        return _pns_plan_funding_facts(place, cells, country_by_id or {})
     if role == "support":
         return _support_facts(place, cells, ns_by_id, table="Support")
     if role == "activity":
@@ -812,6 +831,52 @@ def _pns_funding_facts(
                 "Attribute": "Funding Source",
                 "SP/EF": spef_label(area_token),
                 "Indicator": indicator,
+            }
+        )
+        rows.append(_with_value(fact, number))
+    return rows
+
+
+_T22_COLUMN = re.compile(r"^(?P<code>SP[1-5]|EFs|fr_tot|confirmedfn)(?:_(?P<year>\d{4}))?$", re.IGNORECASE)
+
+
+def _pns_plan_funding_facts(
+    place: dict[str, Any],
+    cells: dict[str, Any],
+    country_by_id: dict[int, str],
+) -> list[dict[str, Any]]:
+    """T22 cells ``{host_country_id}_{SP1|...|fr_tot|confirmedfn}_{year}`` (legacy: no year suffix)."""
+    first_year = assignment_year(place)
+    rows = []
+    for row_key, col, number in _iter_matrix_numbers(cells):
+        col = (col or "").strip()
+        match = _T22_COLUMN.match(col)
+        if match:
+            code = match.group("code")
+            year = int(match.group("year")) if match.group("year") else first_year
+        elif col.lower() in {"total", "row_total"}:
+            code, year = "fr_tot", first_year
+        else:
+            continue
+        lower = code.lower()
+        if lower == "fr_tot":
+            attribute, spef, indicator = "Total", None, "Funding"
+        elif lower == "confirmedfn":
+            attribute, spef, indicator = "Total", None, "Confirmed Funding"
+        else:
+            attribute, spef, indicator = "Funding Source", spef_label(code), "Funding"
+        host = country_by_id.get(int(row_key)) if row_key.isdigit() else (row_key or None)
+        fact = blank_fact(place)
+        fact.update(
+            {
+                "Section": "Funding",
+                "SectionB": "Funding",
+                "Source": "PNS Data",
+                "Entity": host,
+                "Attribute": attribute,
+                "SP/EF": spef,
+                "Indicator": indicator,
+                "Year": year,
             }
         )
         rows.append(_with_value(fact, number))
@@ -1368,10 +1433,11 @@ def build_upr_data(
     round_code: str | None = None,
     iso3: str | None = None,
     table: str | None = None,
+    scope: dict[str, Any] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Load UPR assignments and return facts and submissions."""
     template_ids = _template_ids(template)
-    places = _load_places(template_ids, iso3=iso3, round_code=round_code)
+    places = _load_places(template_ids, iso3=iso3, round_code=round_code, scope=scope)
     ns_by_id, ns_by_country, _ns_country = _load_national_societies()
     for place in places:
         if not place.get("ns") and place.get("country_id"):
@@ -1379,8 +1445,15 @@ def build_upr_data(
 
     aes_ids = [place["submission_id"] for place in places]
     entries = _load_form_data(aes_ids)
+    if scope and scope.get("item_id") is not None:
+        entries = [entry for entry in entries if entry.form_item_id == int(scope["item_id"])]
     items = _load_items({entry.form_item_id for entry in entries})
     emergency_index: dict[tuple[int, str], int] = {}
+    country_by_id = (
+        {int(cid): name for cid, name in db.session.query(Country.id, Country.name).all()}
+        if any(item.template_id == PNS_PLAN_TEMPLATE_ID for item in items.values())
+        else {}
+    )
     facts: list[dict[str, Any]] = []
     by_submission = {place["submission_id"]: place for place in places}
 
@@ -1406,11 +1479,17 @@ def build_upr_data(
                 not_applicable=bool(entry.not_applicable),
                 ns_by_id=ns_by_id,
                 emergency_index=emergency_index,
+                country_by_id=country_by_id,
             )
         )
 
-    facts.extend(_dynamic_facts(places, by_submission))
-    if template in (None, "report"):
+    item_scoped = bool(scope and scope.get("item_id") is not None)
+    if not item_scoped:
+        facts.extend(_dynamic_facts(places, by_submission))
+    assignment_scoped = bool(
+        scope and any(scope.get(key) is not None for key in ("submission_id", "assignment_ids", "template_id", "period_name"))
+    )
+    if not item_scoped and not assignment_scoped and template in (None, "report"):
         facts.extend(_system_facts(round_code=round_code, iso3=iso3))
 
     if table:
@@ -1437,9 +1516,10 @@ def build_upr_submissions(
     template: str | None = None,
     round_code: str | None = None,
     iso3: str | None = None,
+    scope: dict[str, Any] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Return country assignment statuses across all matching UPR rounds."""
-    places = _load_places(_template_ids(template), iso3=iso3, round_code=round_code)
+    places = _load_places(_template_ids(template), iso3=iso3, round_code=round_code, scope=scope)
     _ns_by_id, ns_by_country, _ns_country = _load_national_societies()
     for place in places:
         if not place.get("ns") and place.get("country_id"):
@@ -1470,6 +1550,7 @@ def build_upr_master(
     round_code: str | None = None,
     iso3: str | None = None,
     section: str | None = None,
+    scope: dict[str, Any] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Rows shaped like the UPR Master workbook sheet ``UPR Data``.
 
@@ -1477,7 +1558,7 @@ def build_upr_master(
     collapsed to the total. IFRC system snapshots are not part of that sheet.
     """
     template_ids = _template_ids(template)
-    places = _load_places(template_ids, iso3=iso3, round_code=round_code)
+    places = _load_places(template_ids, iso3=iso3, round_code=round_code, scope=scope)
     ns_by_id, ns_by_country, ns_country_by_id = _load_national_societies()
     for place in places:
         if not place.get("ns") and place.get("country_id"):
@@ -1485,6 +1566,8 @@ def build_upr_master(
 
     aes_ids = [place["submission_id"] for place in places]
     entries = _load_form_data(aes_ids)
+    if scope and scope.get("item_id") is not None:
+        entries = [entry for entry in entries if entry.form_item_id == int(scope["item_id"])]
     items = _load_items({entry.form_item_id for entry in entries})
     emergency_index: dict[tuple[int, str], int] = {}
     rows: list[dict[str, Any]] = []
@@ -1546,7 +1629,21 @@ def parse_round_codes(value: str | None) -> tuple[str, ...]:
     return tuple(sorted(codes))
 
 
-def _load_places(template_ids: set[int], *, iso3: str | None, round_code: str | None) -> list[dict[str, Any]]:
+def _load_places(
+    template_ids: set[int],
+    *,
+    iso3: str | None,
+    round_code: str | None,
+    scope: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Load assignment places. *scope* mirrors ``/api/v1/data`` filters where they apply.
+
+    Keys: ``template_id``, ``assignment_ids`` (AssignedForm ids), ``submission_id``
+    (AssignmentEntityStatus id), ``country_id``, ``iso2``, ``period_name``.
+    """
+    scope = scope or {}
+    if scope.get("template_id") is not None:
+        template_ids = {tid for tid in template_ids if tid == int(scope["template_id"])}
     if not template_ids:
         return []
     rows = (
@@ -1576,8 +1673,18 @@ def _load_places(template_ids: set[int], *, iso3: str | None, round_code: str | 
         )
         .filter(AssignedForm.template_id.in_(template_ids))
         .filter(AssignmentEntityStatus.entity_type == "country")
-        .all()
     )
+    if scope.get("assignment_ids"):
+        rows = rows.filter(AssignmentEntityStatus.assigned_form_id.in_(list(scope["assignment_ids"])))
+    if scope.get("submission_id") is not None:
+        rows = rows.filter(AssignmentEntityStatus.id == int(scope["submission_id"]))
+    if scope.get("country_id") is not None:
+        rows = rows.filter(AssignmentEntityStatus.entity_id == int(scope["country_id"]))
+    if scope.get("iso2"):
+        rows = rows.filter(Country.iso2 == str(scope["iso2"]).upper())
+    if scope.get("period_name"):
+        rows = rows.filter(AssignedForm.period_name == scope["period_name"])
+    rows = rows.all()
     wanted_rounds = set(parse_round_codes(round_code))
     wanted_iso = (iso3 or "").strip().upper()
     places = []
@@ -1589,7 +1696,7 @@ def _load_places(template_ids: set[int], *, iso3: str | None, round_code: str | 
         if wanted_iso and str(country_iso3 or "").upper() != wanted_iso:
             continue
         template_id = int(row[7])
-        kind = "plan" if template_id == PLAN_TEMPLATE_ID else "report"
+        kind = "plan" if template_id in (PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID) else "report"
         code = period_to_round(row[8], kind)
         if wanted_rounds and code.upper() not in wanted_rounds:
             continue

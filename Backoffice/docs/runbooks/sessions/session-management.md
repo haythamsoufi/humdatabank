@@ -82,6 +82,33 @@ Without `REDIS_URL`:
 - ARR Affinity must be enabled for those in-memory features.
 - AI WebSocket connections (`/api/ai/v2/ws`) require ARR affinity or single-worker deployment.
 
+### Azure B2C logout
+
+`/logout` logs activity, blacklists the local session, signs out Flask-Login, clears
+the session, and removes the mobile embed cookie before attempting B2C sign-out.
+When B2C is configured and discovery supplies `end_session_endpoint`, the browser
+is redirected there with the existing `AZURE_B2C_POST_LOGOUT_REDIRECT_URI` (or the
+external login URL). A stored ID token is sent as `id_token_hint` when available;
+its absence no longer skips B2C sign-out (the app then sends `client_id` instead, as Microsoft requires for application-isolated SSO). Localhost/127.0.0.1 redirect URIs still
+use local-only logout. Missing configuration or unavailable metadata falls back
+to `/login` after local cleanup; the upstream SSO session may remain active.
+
+ID tokens are kept server-side using `store_oauth_logout_hint` (Redis when
+available, otherwise process memory). A worker restart, cache expiry, or a request
+to another worker without shared Redis can leave logout without a hint.
+
+Microsoft defines `id_token_hint` as optional, but custom policies with
+`EnforceIdTokenHintOnLogout` enabled (**Require ID Token in logout requests**) may
+reject tokenless requests and show a B2C error instead of returning to the app.
+Local logout has already completed even in that case; the application cannot
+bypass the policy or guarantee upstream SSO termination without the token.
+Keep hints available via shared Redis, or have the identity-policy owner permit
+tokenless logout after reviewing the logout-redirect security implications.
+Logs distinguish requests with/without a hint and skipped B2C logout, without
+recording tokens, credentials, or credential-bearing URLs.
+
+See Microsoft's [OIDC sign-out request documentation](https://learn.microsoft.com/en-us/azure/active-directory-b2c/active-directory-b2c-reference-oidc#send-a-sign-out-request).
+
 ---
 
 ## 4. Presence Heartbeats (Form Collaboration)

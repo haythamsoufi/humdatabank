@@ -1108,6 +1108,7 @@ def master_rows_for_item(
     ns_by_id: dict[int, str] | None = None,
     ns_country_by_id: dict[int, dict[str, Any]] | None = None,
     emergency_index: dict[tuple[int, str], int] | None = None,
+    country_by_id: dict[int, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """One UPR Data-sheet row per area, not per disaggregation."""
     if role in {"comment", "skip"}:
@@ -1125,6 +1126,7 @@ def master_rows_for_item(
             ns_by_id=ns_by_id,
             ns_country_by_id=ns_country_by_id,
             emergency_index=emergency_index,
+            country_by_id=country_by_id or {},
         )
     total = _master_total(value, None if _disagg_mode(disagg) == "matrix" else disagg)
     status = availability_label(data_not_available=data_not_available, not_applicable=not_applicable)
@@ -1169,14 +1171,17 @@ def _master_matrix_rows(
     ns_by_id: dict[int, str],
     ns_country_by_id: dict[int, dict[str, Any]],
     emergency_index: dict[tuple[int, str], int],
+    country_by_id: dict[int, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     cells = _matrix_cells_from_disagg(disagg)
+    if role == "pns_plan_funding":
+        return _master_pns_plan_funding_rows(place, cells, country_by_id or {})
     if role in {"support", "activity"}:
         return _master_support_rows(item, place, cells, ns_by_id, planned=role == "activity")
     if role == "funding":
         return _master_report_funding_rows(place, cells)
     if role == "plan_funding":
-        return _master_plan_funding_rows(item, place, cells)
+        return _master_plan_funding_rows(item, place, cells, ns_by_id)
     if role == "pns_funding":
         return _master_pns_funding_rows(place, cells, ns_country_by_id)
     if role in {"reach", "emergency"}:
@@ -1256,11 +1261,16 @@ def _master_report_funding_rows(place: dict[str, Any], cells: dict[str, Any]) ->
     return rows
 
 
-def _master_plan_funding_rows(item: ItemView, place: dict[str, Any], cells: dict[str, Any]) -> list[dict[str, Any]]:
+def _master_plan_funding_rows(
+    item: ItemView,
+    place: dict[str, Any],
+    cells: dict[str, Any],
+    ns_by_id: dict[int, str] | None = None,
+) -> list[dict[str, Any]]:
     year = horizon_year(place.get("period_name"), item.label, item.id)
     rows = []
     for row_key, col, number in _iter_matrix_numbers(cells):
-        entity, _ns_name = _named_row(row_key, {})
+        entity, ns_name = _named_row(row_key, ns_by_id or {})
         lower_col = (col or "").strip().lower()
         area = "Total" if lower_col in {"total", "row_total"} else (spef_label(col) or col or "Total")
         row = blank_master(place)
@@ -1268,6 +1278,8 @@ def _master_plan_funding_rows(item: ItemView, place: dict[str, Any], cells: dict
             {
                 "Section": "Funding",
                 "Entity": entity or "HNS",
+                # A PNS row names that PNS so it lines up with the PNS's own T22 report.
+                "NS": ns_name or place.get("ns"),
                 "Area": area,
                 "Attribute": "Total",
                 "Indicator": "Funding Requirement",
@@ -1277,6 +1289,112 @@ def _master_plan_funding_rows(item: ItemView, place: dict[str, Any], cells: dict
         )
         rows.append(_put_master_amount(row, number, funding=True))
     return rows
+
+
+def _master_pns_plan_funding_rows(
+    place: dict[str, Any],
+    cells: dict[str, Any],
+    country_by_id: dict[int, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """T22 rows shaped like the host plan's PNS rows: ISO3/Country are the host, NS the PNS."""
+    first_year = assignment_year(place)
+    rows = []
+    for row_key, col, number in _iter_matrix_numbers(cells):
+        col = (col or "").strip()
+        match = _T22_COLUMN.match(col)
+        if match:
+            code = match.group("code")
+            year = int(match.group("year")) if match.group("year") else first_year
+        elif col.lower() in {"total", "row_total"}:
+            code, year = "fr_tot", first_year
+        else:
+            continue
+        lower = code.lower()
+        if lower == "fr_tot":
+            area, indicator = "Total", "Funding Requirement"
+        elif lower == "confirmedfn":
+            area, indicator = "Total", "Confirmed Funding"
+        else:
+            area, indicator = spef_label(code) or code, "Funding Requirement"
+        host = country_by_id.get(int(row_key)) if row_key.isdigit() else None
+        row = blank_master(place)
+        row.update(
+            {
+                "ISO3": (host or {}).get("iso3") or place.get("iso3"),
+                "Country": (host or {}).get("name") or place.get("country"),
+                "Section": "Funding",
+                "Entity": "PNS",
+                "Source": "PNS Data",
+                "Area": area,
+                "Attribute": "Total",
+                "Indicator": indicator,
+                "indicatorId": _SHEET_INDICATOR_IDS.get(indicator),
+                "Year": year,
+                "_submission_id": place.get("submission_id"),
+            }
+        )
+        rows.append(_put_master_amount(row, number, funding=True))
+    return rows
+
+
+def _master_funding_key(row: dict[str, Any]) -> tuple:
+    return (
+        row.get("Round"),
+        row.get("ISO3"),
+        row.get("NS"),
+        row.get("Indicator"),
+        row.get("Year"),
+        row.get("Area"),
+        row.get("Attribute"),
+    )
+
+
+def _merge_master_pns_plan_funding(
+    rows: list[dict[str, Any]],
+    all_places: list[dict[str, Any]],
+    extra_places: list[dict[str, Any]],
+    *,
+    hosts: set[Any],
+) -> list[dict[str, Any]]:
+    """Merge each PNS's own T22 figure into the host plan's PNS row; a reporting PNS wins.
+
+    ``PNS reported`` is ``Yes`` once that PNS submitted or approved its plan; ``ValueNum`` then
+    follows ``PNS Value``, which is null when the PNS left that host blank.
+    """
+    extra_ids = {p["submission_id"] for p in extra_places}
+    reported = {
+        (p.get("round"), p.get("ns"))
+        for p in all_places
+        if p.get("template_id") == PNS_PLAN_TEMPLATE_ID and _pns_reported(p)
+    }
+    host_rows: dict[tuple, dict[str, Any]] = {}
+    for row in rows:
+        if (
+            row.get("Section") == "Funding"
+            and row.get("Source") == "Country Data"
+            and row.get("Entity") == "PNS"
+            and row.get("Indicator") == "Funding Requirement"
+        ):
+            host_rows[_master_funding_key(row)] = row
+
+    merged: list[dict[str, Any]] = []
+    for row in rows:
+        submission_id = row.pop("_submission_id", None)
+        if submission_id is None:
+            merged.append(row)
+            continue
+        if submission_id in extra_ids and row.get("ISO3") not in hosts:
+            continue
+        target = host_rows.get(_master_funding_key(row))
+        if target is not None:
+            target["PNS Value"] = row.get("PNS Value")
+        else:
+            merged.append(row)
+    for row in host_rows.values():
+        if (row.get("Round"), row.get("NS")) in reported:
+            row["PNS reported"] = "Yes"
+            row["ValueNum"] = row.get("PNS Value")
+    return merged
 
 
 def _master_pns_funding_rows(
@@ -1474,14 +1592,7 @@ def build_upr_data(
         entries = [entry for entry in entries if entry.form_item_id == int(scope["item_id"])]
     items = _load_items({entry.form_item_id for entry in entries})
     emergency_index: dict[tuple[int, str], int] = {}
-    country_by_id = (
-        {
-            int(cid): {"name": name, "iso3": code, "region": region}
-            for cid, name, code, region in db.session.query(Country.id, Country.name, Country.iso3, Country.region).all()
-        }
-        if any(item.template_id == PNS_PLAN_TEMPLATE_ID for item in items.values())
-        else {}
-    )
+    country_by_id = _country_lookup() if any(i.template_id == PNS_PLAN_TEMPLATE_ID for i in items.values()) else {}
     facts: list[dict[str, Any]] = []
     by_submission = {place["submission_id"]: place for place in all_places}
 
@@ -1539,6 +1650,13 @@ def build_upr_data(
         for place in places
     ]
     return {"data": facts, "submissions": submissions}
+
+
+def _country_lookup() -> dict[int, dict[str, Any]]:
+    return {
+        int(cid): {"name": name, "iso3": code, "region": region}
+        for cid, name, code, region in db.session.query(Country.id, Country.name, Country.iso3, Country.region).all()
+    }
 
 
 _REPORTED_STATUSES = {"submitted", "approved"}
@@ -1677,19 +1795,22 @@ def build_upr_master(
     """
     template_ids = _template_ids(template)
     places = _load_places(template_ids, iso3=iso3, round_code=round_code, scope=scope)
+    extra_places = _supplementary_pns_plan_places(places)
+    all_places = places + extra_places
     ns_by_id, ns_by_country, ns_country_by_id = _load_national_societies()
-    for place in places:
+    for place in all_places:
         if not place.get("ns") and place.get("country_id"):
             place["ns"] = ns_by_country.get(place["country_id"])
 
-    aes_ids = [place["submission_id"] for place in places]
+    aes_ids = [place["submission_id"] for place in all_places]
     entries = _load_form_data(aes_ids)
     if scope and scope.get("item_id") is not None:
         entries = [entry for entry in entries if entry.form_item_id == int(scope["item_id"])]
     items = _load_items({entry.form_item_id for entry in entries})
     emergency_index: dict[tuple[int, str], int] = {}
+    country_by_id = _country_lookup() if any(i.template_id == PNS_PLAN_TEMPLATE_ID for i in items.values()) else {}
     rows: list[dict[str, Any]] = []
-    by_submission = {place["submission_id"]: place for place in places}
+    by_submission = {place["submission_id"]: place for place in all_places}
 
     for entry in entries:
         place = by_submission.get(entry.assignment_entity_status_id)
@@ -1714,9 +1835,11 @@ def build_upr_master(
                 ns_by_id=ns_by_id,
                 ns_country_by_id=ns_country_by_id,
                 emergency_index=emergency_index,
+                country_by_id=country_by_id,
             )
         )
 
+    rows = _merge_master_pns_plan_funding(rows, all_places, extra_places, hosts={p["iso3"] for p in places})
     rows.extend(_dynamic_facts(places, by_submission, master=True))
     if section:
         wanted = section.strip().lower()

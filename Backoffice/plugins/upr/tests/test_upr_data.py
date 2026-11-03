@@ -583,3 +583,25 @@ def test_pns_reported_value_wins_over_country_value_in_merge():
     assert (y27["Country Value"], y27["PNS Value"], y27["PNS reported"], y27["ValueNum"]) == (500, 300, "Yes", 300)
     y28 = next(r for r in out if r["Year"] == 2028)
     assert (y28["Country Value"], y28["PNS Value"], y28["PNS reported"], y28["ValueNum"]) == (70, None, "Yes", None)
+
+
+def test_master_pns_reported_value_wins_over_country_value():
+    from plugins.upr.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.upr_data import _merge_master_pns_plan_funding, _master_pns_plan_funding_rows
+
+    place = {**_PLACE, "template": "pns", "iso3": "NOR", "country": "Norway", "ns": "Norwegian Red Cross",
+             "round": "P27", "period_name": "2027", "status": "submitted", "source": "PNS Data", "submission_id": 2,
+             "template_id": PNS_PLAN_TEMPLATE_ID}
+    pns_rows = _master_pns_plan_funding_rows(
+        place, {"45_fr_tot_2027": 300}, {45: {"name": "Colombia", "iso3": "COL", "region": "Americas"}}
+    )
+    host = {"Round": "P27", "ISO3": "COL", "NS": "Norwegian Red Cross", "Section": "Funding", "Source": "Country Data",
+            "Entity": "PNS", "Indicator": "Funding Requirement", "Year": 2027, "Area": "Total", "Attribute": "Total",
+            "ValueNum": 500, "Country Value": 500, "PNS Value": None, "PNS reported": None}
+    host2 = {**host, "Year": 2028, "ValueNum": 70, "Country Value": 70}
+    out = _merge_master_pns_plan_funding([host, host2] + pns_rows, [place], [place], hosts={"COL"})
+    assert len(out) == 2
+    a = next(r for r in out if r["Year"] == 2027)
+    assert (a["Country Value"], a["PNS Value"], a["PNS reported"], a["ValueNum"]) == (500, 300, "Yes", 300)
+    b = next(r for r in out if r["Year"] == 2028)
+    assert (b["Country Value"], b["PNS Value"], b["PNS reported"], b["ValueNum"]) == (70, None, "Yes", None)

@@ -63,19 +63,20 @@ def _norm_name(s: str) -> str:
 class Lookups:
     """Templates, National Societies and users, loaded once per run."""
 
-    def __init__(self):
+    def __init__(self, write: bool = False):
         self.templates: Dict[str, dict] = {}
         self.problems: List[str] = []
-        # Auto-create/publish CBF quarter + final if missing (idempotent).
-        try:
-            from plugins.nsd_report_forms.ensure_templates import ensure_cbf_report_templates
+        # Only a real import creates templates and Access Groups; analysis must not write.
+        if write:
+            try:
+                from plugins.nsd_report_forms.ensure_templates import ensure_cbf_report_templates
 
-            ensure_cbf_report_templates(commit=True)
-        except Exception as exc:
-            self.problems.append(f'Could not prepare NSD report templates: {exc}')
+                ensure_cbf_report_templates(commit=True)
+            except Exception as exc:
+                self.problems.append(f'Could not prepare NSD report templates: {exc}')
         # Profile template is optional (identity lives in core project); quarter + final are required.
         for key, name in layout.TEMPLATE_NAMES.items():
-            required = key != 'profile'
+            required = key != 'profile' and write
             self._load_template(key, name, required=required)
         self.ns_index, self.ns_by_country = self._ns_index()
         self.ns_country = {i: c for i, c in db.session.query(NationalSociety.id, NationalSociety.country_id).all()}
@@ -83,17 +84,21 @@ class Lookups:
         self.nsd_roles = restrictions.load_roles()
         for code in restrictions.missing_roles(self.nsd_roles):
             self.problems.append(f'Role "{code}" does not exist yet. Run the RBAC seed so the NSD admin permission role is created.')
-        try:
-            self.access_groups = restrictions.ensure_nsd_access_groups()
-            self.editor_role = restrictions.ensure_editor_role()
-            self.pm_overview_role = restrictions.ensure_pm_overview_role()
-            db.session.commit()
-        except Exception as exc:
-            db.session.rollback()
-            self.access_groups = {}
-            self.editor_role = None
-            self.pm_overview_role = None
-            self.problems.append(f'Could not prepare NSD Access Groups: {exc}')
+        self.access_groups = {}
+        self.editor_role = None
+        self.pm_overview_role = None
+        if write:
+            try:
+                self.access_groups = restrictions.ensure_nsd_access_groups()
+                self.editor_role = restrictions.ensure_editor_role()
+                self.pm_overview_role = restrictions.ensure_pm_overview_role()
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                self.access_groups = {}
+                self.editor_role = None
+                self.pm_overview_role = None
+                self.problems.append(f'Could not prepare NSD Access Groups: {exc}')
 
     def _load_template(self, key: str, name: str, required: bool = True):
         row = (db.session.query(FormTemplate, FormTemplateVersion)
@@ -224,7 +229,7 @@ class Run:
                  cancelled: Callable[[], bool]):
         self.book, self.uid, self.overwrite = book, user_id, overwrite_reports
         self.progress, self.cancelled = progress, cancelled
-        self.lk = Lookups()
+        self.lk = Lookups(write=True)
         self.stats = defaultdict(int)
         self.roles = {}
         self.messages: List[str] = []

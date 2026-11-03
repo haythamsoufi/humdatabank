@@ -1538,11 +1538,22 @@ class TestGetApiEndpoints:
         plugin_c = MagicMock()
         plugin_c.get_api_endpoints.return_value = None
         pm.plugins = {"fdrs": plugin_a, "broken": plugin_b, "empty": plugin_c}
+        pm.active_plugins = {"fdrs", "broken", "empty"}
 
         rows = pm.get_api_endpoints()
         assert len(rows) == 1
         assert rows[0]["path"] == "/api/v1/fdrs/published-data"
         assert rows[0]["plugin_id"] == "fdrs"
+
+    def test_skips_inactive_plugins(self, tmp_path):
+        pm, _ = _make_manager(tmp_path)
+        plugin = MagicMock()
+        plugin.get_api_endpoints.return_value = [{"path": "/api/v1/x"}]
+        pm.plugins = {"x": plugin}
+        pm.active_plugins = set()
+
+        assert pm.get_api_endpoints() == []
+        plugin.get_api_endpoints.assert_not_called()
 
 
 @pytest.mark.unit

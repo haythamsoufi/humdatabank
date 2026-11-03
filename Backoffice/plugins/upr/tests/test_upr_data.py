@@ -552,9 +552,34 @@ def test_pns_plan_t22_funding_is_emitted_per_host_country_and_year():
         place,
         value=None,
         disagg={"mode": "matrix", "values": {"45_fr_tot_2027": 1000, "45_SP1_2027": 400, "45_fr_tot_2028": 500}},
-        country_by_id={45: "Colombia"},
+        country_by_id={45: {"name": "Colombia", "iso3": "COL", "region": "Americas"}},
     )
     totals = {(r["Year"], r["Value"]) for r in rows if r["Attribute"] == "Total"}
     assert totals == {(2027, 1000), (2028, 500)}
-    assert all(r["Entity"] == "Colombia" and r["Source"] == "PNS Data" for r in rows)
+    assert all(r["ISO3"] == "COL" and r["Entity"] == "PNS" and r["Source"] == "PNS Data" for r in rows)
     assert any(r["SP/EF"] == "SP1" and r["Year"] == 2027 for r in rows)
+
+
+def test_pns_reported_value_wins_over_country_value_in_merge():
+    from plugins.upr.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.upr_data import _merge_pns_plan_funding
+
+    def row(sub, source, num, entity="PNS", **kw):
+        base = {"Round": "P27", "ISO3": "COL", "NS": "Norwegian Red Cross", "Section": "Funding", "Indicator": "Funding",
+                "Year": 2027, "Attribute": "Total", "SP/EF": None, "Source": source, "Entity": entity, "submission_id": sub,
+                "Value": num, "ValueNum": num, "Country Value": None, "PNS Value": None, "PNS reported": None}
+        base.update(kw)
+        return base
+
+    places = {
+        1: {"template_id": PLAN_TEMPLATE_ID, "round": "P27", "ns": "Colombian Red Cross", "status": "approved"},
+        2: {"template_id": PNS_PLAN_TEMPLATE_ID, "round": "P27", "ns": "Norwegian Red Cross", "status": "submitted"},
+    }
+    t24 = [row(1, "Country Data", 500), row(1, "Country Data", 70, Year=2028)]
+    t22 = row(2, "PNS Data", 300, **{"PNS Value": 300, "PNS reported": "Yes"})
+    out = _merge_pns_plan_funding(t24 + [t22], places, [places[2] | {"submission_id": 2}], hosts={"COL"})
+    assert len(out) == 2
+    y27 = next(r for r in out if r["Year"] == 2027)
+    assert (y27["Country Value"], y27["PNS Value"], y27["PNS reported"], y27["ValueNum"]) == (500, 300, "Yes", 300)
+    y28 = next(r for r in out if r["Year"] == 2028)
+    assert (y28["Country Value"], y28["PNS Value"], y28["PNS reported"], y28["ValueNum"]) == (70, None, "Yes", None)

@@ -45,7 +45,19 @@ _GRANT_COUNTRY = text("""
 """)
 
 
+def _plugin_active() -> bool:
+    try:
+        from flask import current_app
+
+        manager = getattr(current_app, 'plugin_manager', None)
+        return bool(manager and manager.is_plugin_active('nsd_report_forms'))
+    except RuntimeError:  # no app context
+        return False
+
+
 def grant_for_new_user(mapper, connection, user):
+    if not _plugin_active():
+        return
     email = (user.email or '').strip().lower()
     if not email:
         return

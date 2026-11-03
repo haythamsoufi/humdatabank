@@ -168,6 +168,29 @@ def _emops_filters_from_request():
     return []
 
 
+def _index_by_country_iso(results):
+    """Map each 2/3-letter ISO to its operations, in catalogue order."""
+    index = {}
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        isos = set()
+        country = item.get('country')
+        if isinstance(country, dict):
+            isos.add((country.get('iso') or '').upper())
+            isos.add((country.get('iso3') or '').upper())
+        countries = item.get('countries')
+        if isinstance(countries, list):
+            for c in countries:
+                if isinstance(c, dict):
+                    isos.add((c.get('iso') or '').upper())
+                    isos.add((c.get('iso3') or '').upper())
+        isos.discard('')
+        for iso in isos:
+            index.setdefault(iso, []).append(item)
+    return index
+
+
 def _filter_by_country_iso(results, iso):
     """
     Filter operations by country ISO code (2 or 3 letter).
@@ -1535,7 +1558,11 @@ def get_emergency_operations_data(country_iso=None, config=None):
                 "cache" if from_cache else "live",
             )
         raw_results, end_date_default = catalogue
-        results = apply_end_date_overrides(list(raw_results))
+        results = direct_cache.get("_overridden") if direct_cache is not None else None
+        if results is None:
+            results = apply_end_date_overrides(list(raw_results))
+            if direct_cache is not None:
+                direct_cache["_overridden"] = results
 
         # Use end_date_gt from config if provided, otherwise use plugin default
         end_date_gt = config.get('end_date_gt', end_date_default)
@@ -1552,7 +1579,14 @@ def get_emergency_operations_data(country_iso=None, config=None):
 
         # Filter by country ISO if provided
         if country_iso:
-            results = _filter_by_country_iso(results, country_iso)
+            if direct_cache is not None:
+                by_iso = direct_cache.get("_by_iso")
+                if by_iso is None:
+                    by_iso = _index_by_country_iso(results)
+                    direct_cache["_by_iso"] = by_iso
+                results = by_iso.get(str(country_iso).upper(), [])
+            else:
+                results = _filter_by_country_iso(results, country_iso)
             current_app.logger.debug(f"[EmOps Direct] Filtered by iso={country_iso}: {len(results)} results")
 
         if end_date_gt:

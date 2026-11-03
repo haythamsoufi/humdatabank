@@ -279,6 +279,21 @@ def _claim_job_item(item_id: int) -> bool:
     return False
 
 
+def _fail_item_after_crash(item_id: int, exc: BaseException) -> None:
+    """Mark an item failed when its processor raised before recording a terminal status."""
+    logger.error("AI job item processor raised: item=%s err=%s", item_id, exc, exc_info=exc)
+    try:
+        with _isolated_job_session() as session:
+            from app.models import AIJobItem
+
+            row = session.get(AIJobItem, int(item_id))
+            if row and _status_str(row.status) in _ACTIVE_ITEM_STATUSES:
+                row.status = "failed"
+                row.error = row.error or "Processing failed unexpectedly."
+    except Exception:
+        logger.exception("Could not mark crashed AI job item failed: item=%s", item_id)
+
+
 def _finalize_running_job(job_id: str, *, cancelled: bool) -> None:
     from app.extensions import db
     from app.models import AIJob, AIJobItem
@@ -383,14 +398,15 @@ def run_ai_job(
 
                 with ThreadPoolExecutor(max_workers=concurrency) as pool:
                     futures = []
+                    future_items = {}
                     for item_id in batch_ids:
                         if job_cancel_requested(job_id):
                             break
                         if not _claim_job_item(item_id):
                             continue
-                        futures.append(
-                            pool.submit(item_processor, app, job_id=job_id, item_id=int(item_id))
-                        )
+                        future = pool.submit(item_processor, app, job_id=job_id, item_id=int(item_id))
+                        futures.append(future)
+                        future_items[future] = int(item_id)
                         if stagger_seconds > 0:
                             time.sleep(stagger_seconds)
 
@@ -402,6 +418,11 @@ def run_ai_job(
                         _done, pending = wait_futures(pending, timeout=_LOCK_KEEPALIVE_SECONDS)
                         if pending:
                             _touch_lock_connection(job_id)
+
+                    for future, done_item_id in future_items.items():
+                        crash = future.exception()
+                        if crash is not None:
+                            _fail_item_after_crash(done_item_id, crash)
 
             _finalize_running_job(job_id, cancelled=job_cancel_requested(job_id))
         except Exception as exc:

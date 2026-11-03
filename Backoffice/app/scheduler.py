@@ -118,7 +118,15 @@ def _evaluate_scheduler_worker(app) -> SchedulerLockResult | None:
     return result
 
 
-def _run_scheduled_job(app, label: str, fn) -> None:
+def _plugin_is_active(app, plugin_id: str) -> bool:
+    manager = getattr(app, "plugin_manager", None)
+    if manager is None:
+        return False
+    manager.sync_activation_state()
+    return manager.is_plugin_active(plugin_id)
+
+
+def _run_scheduled_job(app, label: str, fn, plugin_id: str | None = None) -> None:
     """Execute fn inside an app context with standardised error handling and duration logging.
 
     All scheduler jobs should be invoked through this helper so that:
@@ -129,6 +137,7 @@ def _run_scheduled_job(app, label: str, fn) -> None:
     - Unhandled exceptions are caught, logged with exc_info, and never propagate
       into APScheduler's thread pool (where a bare raise would silence future runs).
     - Jobs taking ≥2 s are surfaced as INFO; ≥30 s as WARNING for alerting.
+    - A job owned by a plugin (``plugin_id``) is skipped while that plugin is inactive.
 
     Note: job bodies (fn) must manage their own transactions. They should NOT
     be wrapped in atomic() externally — that would commit an already-committed
@@ -145,6 +154,9 @@ def _run_scheduled_job(app, label: str, fn) -> None:
     app.logger.debug("[SCHED_JOB] pid=%s '%s' starting", os.getpid(), label)
     try:
         with app.app_context():
+            if plugin_id and not _plugin_is_active(app, plugin_id):
+                app.logger.debug("[SCHED_JOB] '%s' skipped: plugin '%s' inactive", label, plugin_id)
+                return
             fn()
     except Exception as exc:
         app.logger.error("Scheduled job '%s' failed: %s", label, exc, exc_info=True)
@@ -288,7 +300,7 @@ def init_scheduler(app, is_reloader):
 
                     scheduler.add_job(
                         func=lambda: _run_scheduled_job(
-                            app, 'fdrs_public_export_snapshot', _refresh_fdrs_public_export
+                            app, 'fdrs_public_export_snapshot', _refresh_fdrs_public_export, plugin_id='fdrs'
                         ),
                         trigger=CronTrigger(hour=4, minute=15, timezone="UTC"),
                         id='fdrs_public_export_snapshot',

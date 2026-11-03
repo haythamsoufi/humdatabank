@@ -107,12 +107,6 @@ class Ctx:
     """Template and item ids, loaded once per request."""
 
     def __init__(self):
-        try:
-            from plugins.nsd_report_forms.ensure_templates import ensure_cbf_report_templates
-
-            ensure_cbf_report_templates(commit=True)
-        except Exception:
-            pass
         self.tpl: Dict[str, Optional[int]] = {}
         self.items: Dict[str, Dict[str, int]] = {}
         for key in (PROFILE, QUARTER, FINAL):

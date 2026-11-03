@@ -183,6 +183,8 @@ def _fetch_ordered_operations(
     country_iso: Optional[str],
     eo_cfg: Dict,
     assignment_period: Optional[str] = None,
+    *,
+    cache_verified: bool = False,
 ) -> List[Dict]:
     """Fetch operations for the country with the field's filters, de-duplicated and deterministically sorted.
 
@@ -203,7 +205,7 @@ def _fetch_ordered_operations(
         from plugins.emergency_operations.data_store import get_data_store, trigger_background_refresh
         from plugins.emergency_operations.routes import _appeals_feed_url, plugin_config as _eo_plugin_config
         _store = get_data_store()
-        if _store.load_cached() is None:
+        if not cache_verified and _store.load_cached() is None:
             logger.info(
                 "[EmOps] Cache cold during form render (iso=%s); "
                 "triggering background refresh — skipping blocking server-side EO binding.",

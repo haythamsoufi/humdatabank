@@ -860,7 +860,7 @@ class PluginManager:
         return self.plugins.get(plugin_name)
 
     def _integrating_plugins(self) -> Dict[str, BasePlugin]:
-        """Active plugins that plug into core behavior (validation packs, form assets)."""
+        """Active plugins that plug into core behavior (validation packs, assets, badges, tabs, CSP, API catalog)."""
         return {
             plugin_id: plugin
             for plugin_id, plugin in self.plugins.items()
@@ -1401,7 +1401,7 @@ class PluginManager:
         from flask import url_for
 
         offered: list[dict[str, str]] = []
-        for plugin_id, plugin in self.plugins.items():
+        for plugin_id, plugin in self._integrating_plugins().items():
             try:
                 visuals = plugin.get_embed_visuals() or []
             except Exception as exc:
@@ -1433,7 +1433,7 @@ class PluginManager:
 
     def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
         tabs: List[DataExplorerTabConfig] = []
-        for plugin in self.plugins.values():
+        for plugin in self._integrating_plugins().values():
             try:
                 contributed = plugin.get_data_explorer_tabs() or []
             except Exception as exc:
@@ -1546,7 +1546,7 @@ class PluginManager:
         merged: Dict[int, list] = {}
         if not assignment_entity_statuses:
             return merged
-        for plugin_id, plugin in self.plugins.items():
+        for plugin_id, plugin in self._integrating_plugins().items():
             try:
                 result = plugin.get_assignment_badges(assignment_entity_statuses) or {}
             except Exception as exc:
@@ -1578,7 +1578,7 @@ class PluginManager:
     def get_csp_override(self, endpoint: Optional[str], path: str) -> Optional[CspOverride]:
         if not endpoint:
             return None
-        for plugin in self.plugins.values():
+        for plugin in self._integrating_plugins().values():
             for override in plugin.get_csp_overrides():
                 if override.endpoint == endpoint and override.path_predicate(path):
                     return override
@@ -1587,16 +1587,16 @@ class PluginManager:
     def get_panel_render_context(
         self, plugin_id: str, flags: dict[str, bool], first_tab: str
     ) -> Dict[str, Any]:
-        plugin = self.plugins.get(plugin_id)
+        plugin = self._integrating_plugins().get(plugin_id)
         if plugin is None:
             return {}
         return plugin.get_panel_render_context(flags, first_tab)
 
     def get_api_endpoints(self) -> List[Dict[str, Any]]:
-        """Collect API Management registry rows from every loaded plugin."""
+        """Collect API Management registry rows from every active plugin."""
         catalog: List[Dict[str, Any]] = []
         seen: Set[str] = set()
-        for plugin_id, plugin in self.plugins.items():
+        for plugin_id, plugin in self._integrating_plugins().items():
             try:
                 endpoints = plugin.get_api_endpoints() or []
             except Exception as exc:

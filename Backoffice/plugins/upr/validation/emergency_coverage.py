@@ -479,6 +479,20 @@ def _matrix_items(template_id: int):
     return items if isinstance(items, list) else []
 
 
+def _is_emergency_matrix(item) -> bool:
+    """True when the matrix takes emergency rows or has emergency column headers."""
+    config = item.config if isinstance(getattr(item, "config", None), dict) else {}
+    matrix = config.get("matrix_config") if isinstance(config.get("matrix_config"), dict) else {}
+    if any(
+        isinstance(col, dict) and str(col.get("header_lookup_list_id") or "").strip() == "emergency_operations"
+        for col in (matrix.get("columns") or [])
+    ):
+        return True
+    row_mode = str(matrix.get("row_mode") or "").strip().lower()
+    row_lookup = str(matrix.get("lookup_list_id") or getattr(item, "lookup_list_id", "") or "").strip()
+    return row_mode in {"list_library", "hybrid"} and row_lookup == "emergency_operations"
+
+
 def _matrix_emergency_sources(
     aes,
     items=None,
@@ -782,7 +796,9 @@ class _CoverageBatch:
         )
         if key not in self._operations_cache:
             try:
-                self._operations_cache[key] = _fetch_ordered_operations(iso, plugin_config, period) or []
+                self._operations_cache[key] = _fetch_ordered_operations(
+                    iso, plugin_config, period, cache_verified=True
+                ) or []
             except Exception:
                 logger.debug("Applicable emergency lookup failed", exc_info=True)
                 return None
@@ -852,7 +868,10 @@ class _CoverageBatch:
             defs = _repeat_field_defs(template_id, versions.get(template_id))
             self.repeat_defs[template_id] = defs
             repeat_item_ids.extend(item.id for item, _, _ in defs if isinstance(getattr(item, "id", None), int))
-            items = _matrix_items(template_id)
+            items = [
+                item for item in _matrix_items(template_id)
+                if _is_emergency_matrix(item) and (not versions.get(template_id) or item.version_id in (versions[template_id], None))
+            ]
             self.matrix_items[template_id] = items
             matrix_item_ids.extend(item.id for item in items if isinstance(getattr(item, "id", None), int))
         self.matrix_cells = _bulk_matrix_cells(aes_ids, matrix_item_ids)

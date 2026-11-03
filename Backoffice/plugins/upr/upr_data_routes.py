@@ -402,8 +402,9 @@ def get_upr_data():
             "round": round_code,
             "iso3": iso3,
             "section": section,
-            "scope": scope,
         }
+        if scope:
+            params["scope"] = scope
         payload, cache_hit = get_or_build_upr_payload(
             "data",
             params,
@@ -449,8 +450,9 @@ def get_upr_submissions():
             "template": template,
             "round": round_code,
             "iso3": iso3,
-            "scope": scope,
         }
+        if scope:
+            params["scope"] = scope
         payload, cache_hit = get_or_build_upr_payload(
             "submissions",
             params,
@@ -495,8 +497,9 @@ def get_upr_master():
             "round": round_code,
             "iso3": iso3,
             "section": section,
-            "scope": scope,
         }
+        if scope:
+            params["scope"] = scope
         payload, cache_hit = get_or_build_upr_payload(
             "master",
             params,
@@ -552,6 +555,10 @@ def get_ns_key_data():
             iso2, iso3, year = _ns_key_filters()
         except ValueError as error:
             return api_error(str(error), 400)
+
+        if scope:
+
+            params["scope"] = scope
 
         payload, cache_hit = get_or_build_upr_payload(
             "nskeydata-period",

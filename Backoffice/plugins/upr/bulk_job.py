@@ -40,6 +40,7 @@ from plugins.upr.audience import apply_narrative_audience, resolve_narrative_aud
 from plugins.upr.bulk import match_narrative_path, normalize_export_format
 from plugins.upr.catalog import dashboards_for_kind, kind_for_template
 from plugins.upr.data import build_payload, filename_from_visual_title
+from plugins.upr.errors import UprError
 from plugins.upr.i18n import export_locale, parse_export_language
 from plugins.upr.render import render_dashboard_html
 from app.utils.pg_advisory_lock import acquire_transaction_advisory_lock
@@ -443,6 +444,18 @@ def _update_job_progress(job_id: str, item_id: int | None = None, *, force: bool
         logger.exception("Failed to persist UPR job progress %s", job_id)
 
 
+def _force_item_terminal(item_id: int, status: str, error: str | None) -> None:
+    """Record the final item status on a fresh connection when the worker session is unusable."""
+    try:
+        with _isolated_job_session() as session:
+            row = session.get(AIJobItem, int(item_id))
+            if row and _status_str(row.status) not in _TERMINAL_JOB_STATUSES:
+                row.status = status
+                row.error = error
+    except Exception:
+        logger.exception("UPR forced item status update failed: item=%s", item_id)
+
+
 def _persist_country_files(
     *,
     assigned_form_id: int,
@@ -565,6 +578,8 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                         done += len(dashboards)
                         _update_job_progress(job_id, item_id, progress=done)
                         continue
+                    # Don't hold an idle-in-transaction connection through slow renders.
+                    db.session.rollback()
                     meta = country_payload["meta"]
                     iso3 = meta.get("iso3") or row.get("iso3") or "UNK"
                     round_code = meta.get("round_code") or "round"
@@ -701,13 +716,18 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
             item.error = "Could not generate this export."
             terminal_item_status = "failed"
         finally:
-            if item.status not in ("completed", "failed", "cancelled"):
-                item.status = terminal_item_status
             try:
+                final_status = item.status if item.status in ("completed", "failed", "cancelled") else terminal_item_status
+                final_error = item.error
+            except Exception:
+                final_status, final_error = terminal_item_status, None
+            try:
+                item.status = final_status
                 db.session.commit()
             except Exception:
                 db.session.rollback()
                 logger.exception("UPR job item commit failed: job=%s", job_id)
+                _force_item_terminal(item_id, final_status, final_error)
             shutil.rmtree(job_dir, ignore_errors=True)
             try:
                 zip_path.unlink()

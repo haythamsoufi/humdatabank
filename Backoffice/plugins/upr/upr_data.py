@@ -156,6 +156,9 @@ FACT_COLUMNS = (
     "Indicator",
     "Value",
     "ValueNum",
+    "Country Value",
+    "PNS Value",
+    "PNS reported",
     "Year",
     "EA Code",
     "submission_id",
@@ -485,6 +488,9 @@ def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
         "Indicator": None,
         "Value": None,
         "ValueNum": None,
+        "Country Value": None,
+        "PNS Value": None,
+        "PNS reported": None,
         "Year": assignment_year(place),
         "EA Code": None,
         "submission_id": place.get("submission_id"),
@@ -772,14 +778,15 @@ def _plan_funding_facts(
                 attribute = "Longer-term"
             else:
                 attribute = col or None
-        entity, _ns_name = _named_row(row_key, ns_by_id)
+        entity, ns_name = _named_row(row_key, ns_by_id)
         fact = blank_fact(place)
         fact.update(
             {
                 "Section": "Funding",
                 "SectionB": None,
                 "Entity": entity or (row_key or None),
-                "NS": place.get("ns"),
+                # A PNS row names that PNS, so it lines up with the PNS's own T22 report.
+                "NS": ns_name or place.get("ns"),
                 "Attribute": attribute,
                 "SP/EF": spef,
                 "Indicator": "Funding",
@@ -833,7 +840,10 @@ def _pns_funding_facts(
                 "Indicator": indicator,
             }
         )
-        rows.append(_with_value(fact, number))
+        fact = _with_value(fact, number)
+        fact["PNS Value"] = fact["ValueNum"]
+        fact["PNS reported"] = "Yes" if _pns_reported(place) else None
+        rows.append(fact)
     return rows
 
 
@@ -843,9 +853,14 @@ _T22_COLUMN = re.compile(r"^(?P<code>SP[1-5]|EFs|fr_tot|confirmedfn)(?:_(?P<year
 def _pns_plan_funding_facts(
     place: dict[str, Any],
     cells: dict[str, Any],
-    country_by_id: dict[int, str],
+    country_by_id: dict[int, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """T22 cells ``{host_country_id}_{SP1|...|fr_tot|confirmedfn}_{year}`` (legacy: no year suffix)."""
+    """T22 cells ``{host_country_id}_{SP1|...|fr_tot|confirmedfn}_{year}`` (legacy: no year suffix).
+
+    Rows are shaped like the host country's own plan rows: ISO3/Country are the host, NS is the
+    reporting PNS, so they merge with the T24 PNS rows (see ``_merge_pns_plan_funding``).
+    """
+    reported = _pns_reported(place)
     first_year = assignment_year(place)
     rows = []
     for row_key, col, number in _iter_matrix_numbers(cells):
@@ -864,22 +879,28 @@ def _pns_plan_funding_facts(
         elif lower == "confirmedfn":
             attribute, spef, indicator = "Total", None, "Confirmed Funding"
         else:
-            attribute, spef, indicator = "Funding Source", spef_label(code), "Funding"
-        host = country_by_id.get(int(row_key)) if row_key.isdigit() else (row_key or None)
+            attribute, spef, indicator = "Longer-term", spef_label(code), "Funding"
+        host = country_by_id.get(int(row_key)) if row_key.isdigit() else None
         fact = blank_fact(place)
         fact.update(
             {
+                "ISO3": (host or {}).get("iso3") or place.get("iso3"),
+                "Country": (host or {}).get("name") or place.get("country"),
+                "Region": (host or {}).get("region") or place.get("region"),
                 "Section": "Funding",
-                "SectionB": "Funding",
+                "SectionB": None,
                 "Source": "PNS Data",
-                "Entity": host,
+                "Entity": "PNS",
                 "Attribute": attribute,
                 "SP/EF": spef,
                 "Indicator": indicator,
                 "Year": year,
+                "PNS reported": "Yes" if reported else None,
             }
         )
-        rows.append(_with_value(fact, number))
+        fact = _with_value(fact, number)
+        fact["PNS Value"] = fact["ValueNum"]
+        rows.append(fact)
     return rows
 
 
@@ -1438,24 +1459,31 @@ def build_upr_data(
     """Load UPR assignments and return facts and submissions."""
     template_ids = _template_ids(template)
     places = _load_places(template_ids, iso3=iso3, round_code=round_code, scope=scope)
+    # Submitted PNS plans (T22) for the same rounds, so the host plan's PNS rows can be merged
+    # with what the PNS itself reported even when the request is scoped to the host submission.
+    extra_places = _supplementary_pns_plan_places(places)
+    all_places = places + extra_places
     ns_by_id, ns_by_country, _ns_country = _load_national_societies()
-    for place in places:
+    for place in all_places:
         if not place.get("ns") and place.get("country_id"):
             place["ns"] = ns_by_country.get(place["country_id"])
 
-    aes_ids = [place["submission_id"] for place in places]
+    aes_ids = [place["submission_id"] for place in all_places]
     entries = _load_form_data(aes_ids)
     if scope and scope.get("item_id") is not None:
         entries = [entry for entry in entries if entry.form_item_id == int(scope["item_id"])]
     items = _load_items({entry.form_item_id for entry in entries})
     emergency_index: dict[tuple[int, str], int] = {}
     country_by_id = (
-        {int(cid): name for cid, name in db.session.query(Country.id, Country.name).all()}
+        {
+            int(cid): {"name": name, "iso3": code, "region": region}
+            for cid, name, code, region in db.session.query(Country.id, Country.name, Country.iso3, Country.region).all()
+        }
         if any(item.template_id == PNS_PLAN_TEMPLATE_ID for item in items.values())
         else {}
     )
     facts: list[dict[str, Any]] = []
-    by_submission = {place["submission_id"]: place for place in places}
+    by_submission = {place["submission_id"]: place for place in all_places}
 
     for entry in entries:
         place = by_submission.get(entry.assignment_entity_status_id)
@@ -1483,6 +1511,8 @@ def build_upr_data(
             )
         )
 
+    facts = _merge_pns_plan_funding(facts, by_submission, extra_places, hosts={p["iso3"] for p in places})
+
     item_scoped = bool(scope and scope.get("item_id") is not None)
     if not item_scoped:
         facts.extend(_dynamic_facts(places, by_submission))
@@ -1509,6 +1539,94 @@ def build_upr_data(
         for place in places
     ]
     return {"data": facts, "submissions": submissions}
+
+
+_REPORTED_STATUSES = {"submitted", "approved"}
+
+
+def _pns_reported(place: dict[str, Any]) -> bool:
+    """A PNS has reported once its form is submitted or approved."""
+    return _status_text(place.get("status")).lower() in _REPORTED_STATUSES
+
+
+def _supplementary_pns_plan_places(places: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Reported T22 places for the rounds of the loaded T24 places that are not already loaded."""
+    plan_rounds = {p["round"] for p in places if p.get("template_id") == PLAN_TEMPLATE_ID and p.get("round")}
+    if not plan_rounds:
+        return []
+    loaded = {p["submission_id"] for p in places}
+    extra = _load_places({PNS_PLAN_TEMPLATE_ID}, iso3=None, round_code=",".join(sorted(plan_rounds)))
+    return [p for p in extra if p["submission_id"] not in loaded and _pns_reported(p)]
+
+
+def _funding_key(row: dict[str, Any]) -> tuple:
+    return (
+        row.get("Round"),
+        row.get("ISO3"),
+        row.get("NS"),
+        row.get("Indicator"),
+        row.get("Year"),
+        row.get("Attribute"),
+        row.get("SP/EF"),
+    )
+
+
+def _merge_pns_plan_funding(
+    facts: list[dict[str, Any]],
+    by_submission: dict[int, dict[str, Any]],
+    extra_places: list[dict[str, Any]],
+    *,
+    hosts: set[Any],
+) -> list[dict[str, Any]]:
+    """Fill Country/PNS Value columns and let a reporting PNS's own figure win.
+
+    A host's plan (T24) lists each PNS's funding under Country Data. When that PNS has submitted
+    its own plan (T22), its figure is authoritative, even when blank: ``PNS reported`` is ``Yes``,
+    ``PNS Value`` holds its figure (null when it left the host blank), and ``Value`` / ``ValueNum``
+    follow ``PNS Value`` instead of ``Country Value``.
+    """
+    extra_ids = {p["submission_id"] for p in extra_places}
+    reported = {
+        (p.get("round"), p.get("ns"))
+        for p in by_submission.values()
+        if p.get("template_id") == PNS_PLAN_TEMPLATE_ID and _pns_reported(p)
+    }
+    host_rows: dict[tuple, dict[str, Any]] = {}
+    for row in facts:
+        if row.get("Section") != "Funding":
+            continue
+        place = by_submission.get(row.get("submission_id")) or {}
+        if row.get("Source") == "Country Data":
+            row["Country Value"] = row.get("ValueNum")
+            if place.get("template_id") == PLAN_TEMPLATE_ID and row.get("Entity") == "PNS":
+                host_rows[_funding_key(row)] = row
+
+    merged: list[dict[str, Any]] = []
+    for row in facts:
+        place = by_submission.get(row.get("submission_id")) or {}
+        if place.get("template_id") != PNS_PLAN_TEMPLATE_ID:
+            merged.append(row)
+            continue
+        if row.get("submission_id") in extra_ids and row.get("ISO3") not in hosts:
+            continue
+        target = host_rows.get(_funding_key(row))
+        if target is not None:
+            target["PNS Value"] = row.get("PNS Value")
+        else:
+            row["Value"] = row["ValueNum"] = row.get("PNS Value")
+            merged.append(row)
+
+    for row in host_rows.values():
+        if (row.get("Round"), row.get("NS")) in reported:
+            row["PNS reported"] = "Yes"
+            row["Value"] = row["ValueNum"] = row.get("PNS Value")
+    for row in merged:
+        if row.get("Section") == "Funding" and row.get("Source") == "PNS Data" and row.get("PNS Value") is None:
+            place = by_submission.get(row.get("submission_id")) or {}
+            if place.get("template_id") == PNS_REPORT_TEMPLATE_ID:
+                row["PNS Value"] = row.get("ValueNum")
+                row["PNS reported"] = "Yes" if _pns_reported(place) else None
+    return merged
 
 
 def build_upr_submissions(
@@ -1705,6 +1823,7 @@ def _load_places(
             {
                 "submission_id": row[0],
                 "assigned_form_id": row[1],
+                "template_id": template_id,
                 "status": row[4],
                 "submitted_at": row[5],
                 "due_date": row[6],

@@ -185,16 +185,16 @@ def _current_funding(ctx: _Ctx) -> tuple[str | None, dict[str, list[Observation]
     return current_round, _by_country(ctx.usable(obs))
 
 
-def _rule_yoy(ctx: _Ctx) -> list[dict[str, Any]]:
-    current_round = latest_plan_round(ctx.data, ctx.filters)
-    if not current_round:
-        ctx.skip("No plan round is available in scope.")
-        return []
+def _yoy_by_country(ctx: _Ctx, current_round: str) -> tuple[str, int | None, dict[str, tuple]] | None:
+    """Round-on-round funding change per country, or ``None`` when there is no comparable baseline round.
+
+    Each value is ``(current, baseline, percent_change, current_obs, baseline_obs)``.
+    """
     previous = previous_comparable_round(current_round)
     baseline_data = ctx.baseline(previous) if previous else None
     if baseline_data is None:
         ctx.skip(f"No comparable baseline round ({previous or 'unknown'}) is available.")
-        return []
+        return None
     current_year = _round_year(current_round)
     baseline_year = _round_year(previous)
     current = _by_country(
@@ -203,8 +203,7 @@ def _rule_yoy(ctx: _Ctx) -> list[dict[str, Any]]:
     baseline = _by_country(
         ctx.usable([o for o in baseline_data.obs("funding_requirement") if o.round == previous and o.year == baseline_year])
     )
-    threshold = float(ctx.rule["condition"]["value"])
-    flags = []
+    rows: dict[str, tuple] = {}
     for iso3, cur_obs in sorted(current.items()):
         base_obs = baseline.get(iso3)
         if not base_obs:
@@ -215,8 +214,24 @@ def _rule_yoy(ctx: _Ctx) -> list[dict[str, Any]]:
         if base == 0:
             ctx.skip("Some countries have a zero baseline, so a percentage change is undefined.")
             continue
+        rows[iso3] = (cur, base, (cur - base) / base * 100, cur_obs, base_obs)
+    return previous, baseline_year, rows
+
+
+def _rule_yoy(ctx: _Ctx) -> list[dict[str, Any]]:
+    current_round = latest_plan_round(ctx.data, ctx.filters)
+    if not current_round:
+        ctx.skip("No plan round is available in scope.")
+        return []
+    result = _yoy_by_country(ctx, current_round)
+    if result is None:
+        return []
+    previous, baseline_year, rows = result
+    current_year = _round_year(current_round)
+    threshold = float(ctx.rule["condition"]["value"])
+    flags = []
+    for iso3, (cur, base, change, cur_obs, base_obs) in rows.items():
         ctx.outcome.entities_evaluated += 1
-        change = (cur - base) / base * 100
         if abs(change) < threshold:
             continue
         flags.append(
@@ -247,34 +262,186 @@ def _rule_yoy(ctx: _Ctx) -> list[dict[str, Any]]:
     return flags
 
 
-def _rule_missing_target(ctx: _Ctx) -> list[dict[str, Any]]:
+def _rule_priority(ctx: _Ctx) -> list[dict[str, Any]]:
+    """Countries meeting enough published signals that leadership may want to prioritise them, with reasons.
+
+    No weighted score: a country is listed when it meets ``value`` or more signals and is ordered by how many it
+    meets, then by size of requirement.
+    """
+    condition = ctx.rule["condition"]
+    needed = int(condition["value"])
+    growth_pct = float(condition.get("growth_pct", 30))
+    share_pct = float(condition.get("share_pct", 10))
+    min_entities = int(condition.get("min_entities", 5))
+    emergency_pct = float(condition.get("emergency_share_pct", 25))
+    max_partners = int(condition.get("max_pns_partners", 1))
     current_round, funding = _current_funding(ctx)
     if not current_round:
         return []
-    people = _by_country([o for o in ctx.data.obs("people_targeted") if o.round == current_round])
+    totals = {iso3: sum(o.value or 0 for o in obs) for iso3, obs in funding.items()}
+    totals = {iso3: total for iso3, total in totals.items() if total > 0}
+    scope_total = sum(totals.values())
+
+    expected = {s.iso3 for s in ctx.data.submissions if s.kind == "plan" and s.round == current_round}
+    unassessed = expected - set(totals)
+    if unassessed:
+        ctx.skip(
+            f"{len(unassessed)} of {len(expected)} countries have no usable {current_round} plan and are not assessed; "
+            "that does not mean they need less support."
+        )
+    share_assessed = len(totals) >= min_entities
+    if not share_assessed:
+        ctx.skip(f"Fewer than {min_entities} countries with a funding requirement, so share of the network is not assessed.")
+    yoy = _yoy_by_country(ctx, current_round)
+    emergency = _by_country(
+        ctx.usable([o for o in ctx.data.obs("emergency_funding_requirement") if o.round == current_round and o.state == REPORTED])
+    )
+    partners = _by_country([o for o in ctx.data.obs("pns_support_count") if o.round == current_round])
+    reasons_t = ctx.rule.get("reasons") or {}
+
+    def reason(key: str, values: dict[str, Any]) -> str:
+        return render_template(tr(reasons_t.get(key), ctx.lang), values)
+
     flags = []
-    for iso3, f_obs in sorted(funding.items()):
-        total = sum(o.value or 0 for o in f_obs)
+    for iso3, total in sorted(totals.items()):
+        ctx.outcome.entities_evaluated += 1
+        obs = funding[iso3]
+        reasons: list[str] = []
+        signals: list[str] = []
+        evidence: list[Observation] = []
+        assessed = 2 + (1 if share_assessed else 0)
+        trigger: dict[str, Any] = {"requirement": total, "currency": "CHF"}
+        base_values = {"current_value": _fmt_money(total), "scope_total": _fmt_money(scope_total)}
+        baseline_period = None
+
+        if yoy is not None and iso3 in yoy[2]:
+            assessed += 1
+            previous, baseline_year, rows = yoy
+            cur, base, change, cur_obs, base_obs = rows[iso3]
+            if change >= growth_pct:
+                baseline_period = f"{previous} ({baseline_year})"
+                signals.append("growth")
+                reasons.append(
+                    reason(
+                        "growth",
+                        {**base_values, "percent_change": f"{change:.0f}", "baseline_value": _fmt_money(base),
+                         "current_value": _fmt_money(cur), "baseline_period": baseline_period},
+                    )
+                )
+                trigger.update({"baseline": base, "percent_change": round(change, 1)})
+                evidence += cur_obs + base_obs
+        if share_assessed and total / scope_total * 100 >= share_pct:
+            share = total / scope_total * 100
+            signals.append("share")
+            reasons.append(reason("share", {**base_values, "share_pct": f"{share:.0f}"}))
+            trigger["share_of_network_pct"] = round(share, 1)
+            evidence += obs
+        emergency_total = sum(o.value or 0 for o in emergency.get(iso3, []))
+        if emergency_total > 0 and emergency_total / total * 100 >= emergency_pct:
+            share = emergency_total / total * 100
+            signals.append("emergency")
+            reasons.append(
+                reason("emergency", {**base_values, "emergency_share_pct": f"{share:.0f}", "emergency_value": _fmt_money(emergency_total)})
+            )
+            trigger["emergency_requirement"] = emergency_total
+            evidence += emergency[iso3]
+        partner_obs = partners.get(iso3, [])
+        partner_count = int(sum(o.value or 0 for o in partner_obs))
+        if partner_count <= max_partners:
+            signals.append("support")
+            reasons.append(reason("support", {**base_values, "partners": partner_count}))
+            trigger["pns_partners"] = partner_count
+            evidence += partner_obs
+
+        if len(signals) < needed:
+            continue
+        trigger.update({"signals_met": len(signals), "signals_assessed": assessed, "signals": signals})
+        flag = ctx.flag(
+            entity_type="country",
+            entity_id=iso3,
+            entity_name=obs[0].entity_name,
+            period_id=current_round,
+            baseline_period=baseline_period,
+            trigger=trigger,
+            message_values={"count": len(signals), "assessed": assessed, "reasons": " ".join(reasons)},
+            observations=evidence or obs,
+        )
+        flag["reasons"] = reasons
+        if len(signals) > needed:
+            flag["severity"] = "important"
+        flags.append(flag)
+    return flags
+
+
+def _rule_missing_target(ctx: _Ctx) -> list[dict[str, Any]]:
+    """Flag countries with a reported value for the rule's metric but no value for ``other_metric_id``."""
+    metric_id = ctx.rule["metric_id"]
+    other_id = ctx.rule.get("other_metric_id") or "people_targeted"
+    current_round = latest_plan_round(ctx.data, ctx.filters)
+    if not current_round:
+        ctx.skip("No plan round is available in scope.")
+        return []
+    primary = _by_country(
+        ctx.usable([o for o in ctx.data.obs(metric_id) if o.round == current_round and o.state == REPORTED])
+    )
+    other = _by_country([o for o in ctx.data.obs(other_id) if o.round == current_round])
+    flags = []
+    for iso3, p_obs in sorted(primary.items()):
+        total = sum(o.value or 0 for o in p_obs)
         if total <= 0:
             continue
         ctx.outcome.entities_evaluated += 1
-        p_obs = people.get(iso3, [])
-        state = aggregate(p_obs, ())[0]["state"] if p_obs else NOT_REPORTED
+        o_obs = other.get(iso3, [])
+        state = aggregate(o_obs, ())[0]["state"] if o_obs else NOT_REPORTED
         if state in (REPORTED, NOT_APPLICABLE):
             continue
+        unit = p_obs[0].unit or ""
         flags.append(
             ctx.flag(
                 entity_type="country",
                 entity_id=iso3,
-                entity_name=f_obs[0].entity_name,
+                entity_name=p_obs[0].entity_name,
+                period_id=current_round,
+                trigger={metric_id: total, "currency": unit, f"{other_id}_state": state},
+                message_values={"current_value": _fmt_money(total), "currency": unit},
+                observations=p_obs + o_obs,
+            )
+        )
+    return flags
+
+
+def _rule_pns_unreported(ctx: _Ctx) -> list[dict[str, Any]]:
+    """PNS contributions that rest on the host's entry because the PNS has not submitted its own plan."""
+    current_round, funding = _current_funding(ctx)
+    if not current_round:
+        return []
+    threshold = float(ctx.rule["condition"]["value"])
+    flags = []
+    for iso3, obs in sorted(funding.items()):
+        pns = [o for o in obs if o.funding_source == "PNS" and (o.value or 0) > 0]
+        if not pns:
+            continue
+        ctx.outcome.entities_evaluated += 1
+        pending = [o for o in pns if o.extra.get("pns_reported") != "Yes"]
+        names = sorted({o.ns or "" for o in pending if o.ns})
+        if len(pending) < max(threshold, 1):
+            continue
+        amount = sum(o.value or 0 for o in pending)
+        flags.append(
+            ctx.flag(
+                entity_type="country",
+                entity_id=iso3,
+                entity_name=obs[0].entity_name,
                 period_id=current_round,
                 trigger={
-                    "funding_requirement": total,
+                    "pns_without_own_plan": len(pending),
+                    "pns_total": len({o.ns for o in pns}),
+                    "requirement_from_host_entry": amount,
                     "currency": "CHF",
-                    "people_targeted_state": state,
+                    "national_societies": names[:25],
                 },
-                message_values={"current_value": _fmt_money(total), "currency": "CHF"},
-                observations=f_obs + p_obs,
+                message_values={"count": len(pending), "current_value": _fmt_money(amount), "currency": "CHF"},
+                observations=pending,
             )
         )
     return flags
@@ -467,6 +634,8 @@ _OPERATORS: dict[str, Callable[[_Ctx], list[dict[str, Any]]]] = {
     "overdue_days_gte": _rule_overdue,
     "unavailable_count_gte": _rule_unavailable,
     "coverage_below_pct": _rule_coverage,
+    "pns_unreported_gte": _rule_pns_unreported,
+    "priority_signals_gte": _rule_priority,
 }
 
 
@@ -510,5 +679,14 @@ def evaluate_decision(
             flag["status"] = state["status"]
             flag["review_note"] = state.get("note")
             flag["reviewed_at"] = state.get("updated_at")
-    flags.sort(key=lambda f: (-SEVERITIES.index(f["severity"]), f["entity_name"], f["rule_id"], f["period_id"] or ""))
+    flags.sort(
+        key=lambda f: (
+            -SEVERITIES.index(f["severity"]),
+            -f["trigger_values"].get("signals_met", 0),
+            -f["trigger_values"].get("requirement", 0),
+            f["entity_name"],
+            f["rule_id"],
+            f["period_id"] or "",
+        )
+    )
     return flags, outcomes

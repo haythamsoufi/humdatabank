@@ -1,4 +1,4 @@
-"""Decision Support: configuration-backed decision pages, flags and evidence for the IFRC Network Databank."""
+"""Decision Maker: configuration-backed decision pages, flags and evidence for the IFRC Network Databank."""
 
 from pathlib import Path
 

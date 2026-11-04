@@ -1,4 +1,4 @@
-"""Decision Support tables: versioned configuration, flag state, feedback, rule runs."""
+"""Decision Maker tables: versioned configuration, flag state, feedback, rule runs."""
 
 from __future__ import annotations
 

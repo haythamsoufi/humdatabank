@@ -209,8 +209,8 @@ def _evidence_extra(row: dict[str, Any], sub: Submission | None, built_at: str |
 
 def _funding_observations(
     facts: Iterable[dict[str, Any]], subs: dict[Any, Submission], built_at: str | None
-) -> tuple[list[Observation], list[Observation]]:
-    """Totals per (submission, year, source, PNS) and a breakdown by Strategic Priority.
+) -> tuple[list[Observation], list[Observation], list[Observation]]:
+    """Totals per (submission, year, source, PNS), a breakdown by Strategic Priority and the emergency share.
 
     Mirrors the Backoffice's own rule: the sum of the Strategic Priority columns is used when present,
     otherwise the Total column. Zero cells are not emitted by the extract, so an absent row is
@@ -218,6 +218,7 @@ def _funding_observations(
     """
     totals: dict[tuple, dict[str, Any]] = {}
     breakdown: list[Observation] = []
+    emergency: list[Observation] = []
     for row in facts:
         if row.get("Section") != "Funding" or row.get("Indicator") != "Funding":
             continue
@@ -239,22 +240,21 @@ def _funding_observations(
         slot["parts"] += float(number)
         slot["has_parts"] = True
         priority = row.get("SP/EF") or ("Emergency operations" if attribute == "Emergency Operations" else attribute)
-        breakdown.append(
-            _funding_obs(
-                "funding_requirement_by_priority",
-                row,
-                sub,
-                float(number),
-                built_at,
-                priority=str(priority),
-                evidence_key=(attribute, priority),
+        targets = [("funding_requirement_by_priority", breakdown)]
+        if attribute == "Emergency Operations":
+            targets.append(("emergency_funding_requirement", emergency))
+        for metric_id, bucket in targets:
+            bucket.append(
+                _funding_obs(
+                    metric_id, row, sub, float(number), built_at,
+                    priority=str(priority), evidence_key=(attribute, priority),
+                )
             )
-        )
     out = []
     for slot in totals.values():
         value = slot["parts"] if slot["has_parts"] else slot["total"]
         out.append(_funding_obs("funding_requirement", slot["row"], slot["sub"], value, built_at))
-    return out, breakdown
+    return out, breakdown, emergency
 
 
 def _funding_obs(
@@ -360,6 +360,160 @@ def _people_obs(
         evidence_id=evidence_id_for("people_targeted", row.get("submission_id"), year),
         extra=_evidence_extra(row, sub, built_at),
     )
+
+
+def _emergency_people_observations(
+    facts: Iterable[dict[str, Any]], subs: dict[Any, Submission], built_at: str | None
+) -> list[Observation]:
+    """People to be reached per emergency operation (largest cell), added across operations."""
+    per_operation: dict[tuple, float] = {}
+    for row in facts:
+        if row.get("Section") != "Emergencies" or row.get("Indicator") != "People to be reached":
+            continue
+        number = row.get("ValueNum")
+        if not isinstance(number, (int, float)) or isinstance(number, bool):
+            continue
+        key = (row.get("submission_id"), row.get("Year"), row.get("Attribute"))
+        per_operation[key] = max(per_operation.get(key, 0.0), float(number))
+    grouped: dict[tuple, list[float]] = {}
+    for (sid, year, _operation), number in per_operation.items():
+        grouped.setdefault((sid, year), []).append(number)
+    out = []
+    for (sid, year), numbers in grouped.items():
+        sub = subs.get(sid)
+        if sub is None:
+            continue
+        out.append(
+            Observation(
+                metric_id="emergency_people_targeted",
+                entity_id=sub.iso3,
+                entity_name=sub.country,
+                region=sub.region,
+                round=sub.round,
+                year=year,
+                state=REPORTED,
+                value=sum(numbers),
+                validation_state=sub.validation_state,
+                submission_id=sid,
+                status=sub.status,
+                unit="people",
+                evidence_id=evidence_id_for("emergency_people_targeted", sid, year),
+                extra={
+                    "source_system": "ifrc_databank",
+                    "dataset": "unified_plan",
+                    "submission_id": sid,
+                    "operations": len(numbers),
+                    "visibility": "ifrc_internal",
+                    "synchronized_at": built_at,
+                },
+            )
+        )
+    return out
+
+
+def _pns_support_observations(
+    facts: Iterable[dict[str, Any]],
+    funding: Iterable[Observation],
+    subs: dict[Any, Submission],
+    built_at: str | None,
+) -> list[Observation]:
+    """Distinct PNS per country and round with a planned contribution or bilateral support. Absent means not reported."""
+    partners: dict[tuple, dict[str, Any]] = {}
+
+    def add(sid: Any, iso3: Any, round_code: Any, country: Any, region: Any, name: str) -> None:
+        entry = partners.setdefault((sid, iso3, round_code), {"names": set(), "country": country, "region": region})
+        entry["names"].add(name)
+
+    for obs in funding:
+        if obs.funding_source == "PNS" and obs.ns and (obs.value or 0) > 0:
+            add(obs.submission_id, obs.entity_id, obs.round, obs.entity_name, obs.region, obs.ns)
+    for row in facts:
+        number = row.get("ValueNum")
+        if (
+            row.get("Section") == "Support"
+            and row.get("Entity") == "PNS"
+            and row.get("NS")
+            and isinstance(number, (int, float))
+            and not isinstance(number, bool)
+            and number > 0
+        ):
+            add(row.get("submission_id"), row.get("ISO3"), row.get("Round"), row.get("Country"), row.get("Region"), str(row["NS"]))
+    out = []
+    for (sid, iso3, round_code), entry in partners.items():
+        sub = subs.get(sid)
+        if sub is None or not iso3:
+            continue
+        out.append(
+            Observation(
+                metric_id="pns_support_count",
+                entity_id=str(iso3),
+                entity_name=str(entry["country"] or iso3),
+                region=entry["region"],
+                round=round_code,
+                year=_round_year(round_code),
+                state=REPORTED,
+                value=float(len(entry["names"])),
+                validation_state=sub.validation_state,
+                submission_id=sid,
+                status=sub.status,
+                unit="count",
+                evidence_id=evidence_id_for("pns_support_count", sid),
+                extra={
+                    "source_system": "ifrc_databank",
+                    "dataset": "unified_plan",
+                    "submission_id": sid,
+                    "partners": sorted(entry["names"])[:25],
+                    "visibility": "ifrc_internal",
+                    "synchronized_at": built_at,
+                },
+            )
+        )
+    return out
+
+
+_CORE_SECTIONS = frozenset({"Core indicators", "NS Data"})
+
+
+def _core_indicator_observations(
+    facts: Iterable[dict[str, Any]], subs: dict[Any, Submission], built_at: str | None
+) -> list[Observation]:
+    per_sub: dict[Any, set[str]] = {}
+    for row in facts:
+        number = row.get("ValueNum")
+        if row.get("Section") not in _CORE_SECTIONS or not isinstance(number, (int, float)) or isinstance(number, bool):
+            continue
+        per_sub.setdefault(row.get("submission_id"), set()).add(str(row.get("Indicator") or row.get("SectionB") or ""))
+    out = []
+    for sid, names in per_sub.items():
+        sub = subs.get(sid)
+        if sub is None:
+            continue
+        out.append(
+            Observation(
+                metric_id="core_indicators_reported",
+                entity_id=sub.iso3,
+                entity_name=sub.country,
+                region=sub.region,
+                round=sub.round,
+                year=sub.year,
+                state=REPORTED,
+                value=float(len(names)),
+                validation_state=sub.validation_state,
+                submission_id=sid,
+                status=sub.status,
+                unit="count",
+                evidence_id=evidence_id_for("core_indicators_reported", sid),
+                extra={
+                    "source_system": "ifrc_databank",
+                    "dataset": "unified_plan",
+                    "submission_id": sid,
+                    "indicators": sorted(n for n in names if n)[:25],
+                    "visibility": "ifrc_internal",
+                    "synchronized_at": built_at,
+                },
+            )
+        )
+    return out
 
 
 def _unavailable_observations(
@@ -478,8 +632,11 @@ def build_decision_data(
     if filters.year:
         facts = [row for row in facts if row.get("Year") == filters.year]
 
-    totals, breakdown = _funding_observations(facts, subs_by_id, built_at)
+    totals, breakdown, emergency_funding = _funding_observations(facts, subs_by_id, built_at)
     people = _people_observations(facts, plan_subs, built_at)
+    emergency_people = _emergency_people_observations(facts, subs_by_id, built_at)
+    pns_support = _pns_support_observations(facts, totals, subs_by_id, built_at)
+    core_indicators = _core_indicator_observations(facts, subs_by_id, built_at)
     unavailable = _unavailable_observations(facts, subs_by_id, built_at)
     workflow = _workflow_observations(subs, today, built_at)
 
@@ -504,6 +661,10 @@ def build_decision_data(
             "funding_requirement": keep(totals),
             "funding_requirement_by_priority": keep(breakdown),
             "people_targeted": keep(people),
+            "emergency_funding_requirement": keep(emergency_funding),
+            "emergency_people_targeted": keep(emergency_people),
+            "pns_support_count": keep(pns_support),
+            "core_indicators_reported": keep(core_indicators),
             "indicators_data_unavailable": keep(unavailable),
             "submissions_stalled_days": keep([o for o in workflow if o.metric_id == "submissions_stalled_days"]),
             "submissions_overdue_days": keep([o for o in workflow if o.metric_id == "submissions_overdue_days"]),

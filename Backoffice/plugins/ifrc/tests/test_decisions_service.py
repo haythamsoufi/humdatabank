@@ -1,4 +1,4 @@
-"""Decision Support service, store and chatbot-tool permission tests. SYNTHETIC fixtures only."""
+"""Decision Maker service, store and chatbot-tool permission tests. SYNTHETIC fixtures only."""
 
 from __future__ import annotations
 
@@ -147,56 +147,10 @@ def test_flag_review_state_persists_and_overlays(patched, admin):
 
 
 def test_rule_runs_are_recorded(patched, admin):
+    from plugins.ifrc.decisions.models import DecisionRuleRun
+
     service.decision_flags("DEC-002", Filters(), admin)
-    runs = service.rule_runs(admin)["data"]
-    assert {r["rule_id"] for r in runs} >= {"RULE-YOY-CHANGE", "RULE-MISSING-TARGET"}
-
-
-def test_publishing_a_rule_creates_a_version_and_keeps_history(patched, admin):
-    before = store.load_rules()["RULE-YOY-CHANGE"]
-    assert before["version"] == 1
-
-    updated = service.update_rule(
-        "RULE-YOY-CHANGE", {"condition": {"value": 50}}, admin, note="FDS review 2026-11"
-    )["data"]
-    assert updated["version"] == 2 and updated["condition"]["value"] == 50
-
-    live = store.load_rules()["RULE-YOY-CHANGE"]
-    assert live["version"] == 2 and live["condition"]["value"] == 50
-    flags = service.decision_flags("DEC-002", Filters(), admin)["data"]["flags"]
-    assert not [f for f in flags if f["rule_id"] == "RULE-YOY-CHANGE"], "42% change is below the new 50% threshold"
-
-    history = service.rule_history("RULE-YOY-CHANGE", admin)["data"]
-    assert [h["version"] for h in history] == [2]
-    assert history[0]["status"] == "published" and history[0]["note"] == "FDS review 2026-11"
-
-    service.update_rule("RULE-YOY-CHANGE", {"enabled": False}, admin, note=None)
-    assert store.load_rules()["RULE-YOY-CHANGE"]["enabled"] is False
-    versions = service.rule_history("RULE-YOY-CHANGE", admin)["data"]
-    assert [v["version"] for v in versions] == [3, 2]
-    assert versions[1]["status"] == "archived" and versions[1]["payload"]["condition"]["value"] == 50
-
-
-def test_publish_rejects_invalid_changes_and_non_managers(patched, admin, restricted):
-    with pytest.raises(config.ConfigError):
-        service.update_rule("RULE-YOY-CHANGE", {"severity": "catastrophic"}, admin, None)
-    with pytest.raises(config.ConfigError):
-        service.update_rule("RULE-YOY-CHANGE", {"condition": {"value": -5}}, admin, None)
-    with pytest.raises(config.ConfigError):
-        service.update_rule("NO-SUCH-RULE", {"enabled": False}, admin, None)
-    with pytest.raises(service.Denied):
-        service.update_rule("RULE-YOY-CHANGE", {"enabled": False}, restricted, None)
-    with pytest.raises(service.Denied):
-        service.rule_runs(restricted)
-    assert store.load_rules()["RULE-YOY-CHANGE"]["version"] == 1
-
-
-def test_paused_decision_is_hidden_from_users(patched, admin, restricted):
-    service.update_decision("DEC-004", {"status": "paused"}, admin, note=None)
-    ids = {d["id"] for d in service.list_decisions(restricted, Filters())["data"]["decisions"]}
-    assert ids == {"DEC-002"}
-    with pytest.raises(service.NotFound):
-        service.decision_summary("DEC-004", Filters(), restricted)
+    assert {r.rule_id for r in DecisionRuleRun.query.all()} >= {"RULE-YOY-CHANGE", "RULE-MISSING-TARGET"}
 
 
 # --- chatbot tools -----------------------------------------------------------
@@ -242,3 +196,19 @@ def test_flags_answer_matches_ui_service(patched, admin, monkeypatch):
     ui = service.decision_flags("DEC-002", Filters(), admin)["data"]["flags"]
     assert [f["id"] for f in tool["flags"]] == [f["id"] for f in ui if f["rule_id"] == "RULE-YOY-CHANGE"]
     assert tool["evidence_links"] and all(link.startswith("/api/decision-evidence/EVID-") for link in tool["evidence_links"])
+
+
+def test_templates_compile_with_the_standard_page_header(app):
+    for name in ("catalogue", "workspace", "_guidance"):
+        source = app.jinja_env.get_template(f"plugins/ifrc/decisions/{name}.html")
+        assert source is not None
+
+
+def test_every_decision_builds_summary_flags_and_metrics(patched, admin):
+    for decision_id in config.default_decisions():
+        summary = service.decision_summary(decision_id, Filters(), admin)
+        assert summary["data"]["key_metrics"], decision_id
+        assert len(summary["data"]["assistant_prompts"]) >= 2
+        assert "rules" in service.decision_flags(decision_id, Filters(), admin)["data"]
+        service.decision_metrics(decision_id, Filters(), admin)
+

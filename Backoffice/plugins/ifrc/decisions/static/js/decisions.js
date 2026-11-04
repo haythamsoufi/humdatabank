@@ -1,4 +1,4 @@
-/* Decision Support UI. All server data is inserted with textContent, never as HTML. */
+/* Decision Maker UI. All server data is inserted with textContent, never as HTML. */
 (function () {
   'use strict';
 
@@ -162,30 +162,45 @@
   // Catalogue
   // -------------------------------------------------------------------------
 
-  function initCatalogue() {
-    var form = document.getElementById('dec-filters');
-    var cards = document.getElementById('dec-cards');
+  function initTabs() {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.dec-tab[data-tab]'));
+    if (!tabs.length) return;
 
-    function filtersFromForm() {
-      var data = new FormData(form);
-      return {
-        region: (data.get('region') || '').trim(),
-        round: (data.get('round') || '').trim().toUpperCase(),
-        validation_state: data.get('validation_state') || '',
-        lang: lang
-      };
+    function select(name, focus) {
+      tabs.forEach(function (tab) {
+        var active = tab.dataset.tab === name;
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.tabIndex = active ? 0 : -1;
+        var panel = document.getElementById(tab.getAttribute('aria-controls'));
+        if (panel) panel.hidden = !active;
+        if (active && focus) tab.focus();
+      });
+      if (window.history && history.replaceState) {
+        history.replaceState(null, '', name === 'decisions' ? location.pathname + location.search : '#' + name);
+      }
     }
 
-    function render(payload) {
-      var data = new FormData(form);
-      var needle = String(data.get('q') || '').trim().toLowerCase();
-      var attention = data.get('attention') === 'on';
-      var filters = filtersFromForm();
-      var list = (payload.data.decisions || []).filter(function (d) {
-        if (needle && (d.title + ' ' + d.question).toLowerCase().indexOf(needle) < 0) return false;
-        if (attention && !(d.flag_counts && d.flag_counts.open > 0)) return false;
-        return true;
+    tabs.forEach(function (tab, index) {
+      tab.addEventListener('click', function () { select(tab.dataset.tab, false); });
+      tab.addEventListener('keydown', function (event) {
+        var step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+        if (document.documentElement.dir === 'rtl' || app.getAttribute('dir') === 'rtl') step = step ? -step : step;
+        if (event.key === 'Home') step = -index;
+        if (event.key === 'End') step = tabs.length - 1 - index;
+        if (!step) return;
+        event.preventDefault();
+        select(tabs[(index + step + tabs.length) % tabs.length].dataset.tab, true);
       });
+    });
+    if (location.hash === '#guidance') select('guidance', false);
+  }
+
+  function initCatalogue() {
+    initTabs();
+    var cards = document.getElementById('dec-cards');
+
+    function render(payload) {
+      var list = payload.data.decisions || [];
       clear(cards);
       if (!list.length) {
         setStatus(t('noData'));
@@ -207,7 +222,7 @@
             h('div', {}, h('strong', { text: counts.open + ' ' + t('flagsOpen') }), ' ', chips),
             h('p', { class: 'dec-muted', text: t('audience') + ': ' + (d.audience || []).join(', ') }),
             h('p', { class: 'dec-muted', text: t('owner') + ': ' + (d.owner_team || '') + ' | ' + t('lastRefresh') + ': ' + formatDate(d.last_refresh) }),
-            h('a', { class: 'dec-open dec-focus', href: app.dataset.workspaceBase.replace(/\/$/, '') + '/' + encodeURIComponent(d.slug) + query({ region: filters.region, round: filters.round, validation_state: filters.validation_state }), text: t('open') })
+            h('a', { class: 'dec-open dec-focus', href: app.dataset.workspaceBase.replace(/\/$/, '') + '/' + encodeURIComponent(d.slug), text: t('open') })
           )
         );
       });
@@ -215,15 +230,11 @@
 
     function load() {
       setStatus(t('loading'));
-      api(app.dataset.apiList + query(filtersFromForm()))
+      api(app.dataset.apiList + query({ lang: lang }))
         .then(render)
         .catch(function (error) { setStatus(error.message, true); });
     }
 
-    form.addEventListener('submit', function (event) {
-      event.preventDefault();
-      load();
-    });
     load();
   }
 
@@ -357,20 +368,11 @@
   function renderHeader() {
     var s = state.summary;
     var d = s.data.decision;
-    document.getElementById('dec-title').textContent = d.title;
-    document.getElementById('dec-question').textContent = d.question;
     document.title = d.title;
-    var back = document.getElementById('dec-back');
-    back.textContent = t('back');
     var ask = document.getElementById('dec-ask');
-    ask.textContent = t('askAssistant');
     ask.onclick = function () { askAssistant((s.data.assistant_prompts || [])[0] || d.question); };
-    var exp = document.getElementById('dec-export');
-    exp.textContent = t('exportEvidence');
-    exp.onclick = exportEvidence;
-    var method = document.getElementById('dec-method');
-    method.textContent = t('viewMethodology');
-    method.onclick = showMethodology;
+    document.getElementById('dec-export').onclick = exportEvidence;
+    document.getElementById('dec-method').onclick = showMethodology;
 
     var scope = s.scope || {};
     var scopeText = [scope.round || '', scope.region || '', scope.country || ''].filter(Boolean).join(' | ') || '-';
@@ -555,12 +557,7 @@
       var v = flag.trigger_values[key];
       return [key.replace(/_/g, ' '), Array.isArray(v) ? v.join(', ') : (typeof v === 'number' ? numberFormat.format(v) : v)];
     });
-    return h('article', { class: 'dec-flag sev-' + flag.severity },
-      h('div', { class: 'dec-flag-head' },
-        severityBadge(flag.severity),
-        h('span', { class: 'dec-badge dec-badge-unavailable', text: t(flag.status) }),
-        h('strong', { text: flag.title })),
-      h('p', { text: flag.message }),
+    var detail = [
       dl([
         [t('rule'), flag.rule_id + ' v' + flag.rule_version],
         [t('threshold'), thr.operator + ' ' + thr.value + (thr.provisional ? ' (' + t('provisionalThreshold') + ')' : '')],
@@ -571,7 +568,7 @@
         [t('source'), t('ruleBased')],
         [t('generated'), formatDate(flag.generated_at)]
       ].concat(trigger.map(function (pair) { return [t('trigger') + ': ' + pair[0], pair[1]]; }))),
-      flag.suggested_follow_up ? h('div', { class: 'dec-note' }, h('strong', { text: t('followUp') + ': ' }), flag.suggested_follow_up) : null,
+      flag.suggested_follow_up && !flag.reasons ? h('div', { class: 'dec-note' }, h('strong', { text: t('followUp') + ': ' }), flag.suggested_follow_up) : null,
       h('div', { class: 'dec-flag-actions' }, flag.evidence_ids.slice(0, 8).map(function (id) {
         return h('button', { type: 'button', class: 'dec-btn dec-focus', text: t('viewEvidence') + ' ' + id.slice(5, 11), onclick: function () { showEvidence(id); } });
       })),
@@ -585,13 +582,38 @@
         feedbackButton(flag, 'useful', t('useful')),
         feedbackButton(flag, 'not_useful', t('notUseful')),
         feedbackButton(flag, 'incorrect', t('incorrect')),
-        feedbackButton(flag, 'expected', t('expectedFb'))));
+        feedbackButton(flag, 'expected', t('expectedFb')))
+    ];
+    if (flag.reasons) {
+      var met = (flag.trigger_values || {}).signals_met || flag.reasons.length;
+      var assessed = (flag.trigger_values || {}).signals_assessed || met;
+      return h('article', { class: 'dec-flag sev-' + flag.severity },
+        h('div', { class: 'dec-flag-head' },
+          h('strong', { text: flag.entity_name }),
+          severityBadge(flag.severity),
+          h('span', { class: 'dec-badge dec-badge-unavailable', text: t('signals') + ': ' + met + '/' + assessed }),
+          h('span', { class: 'dec-badge dec-badge-unavailable', text: t(flag.status) })),
+        h('ul', { class: 'dec-reasons' }, flag.reasons.map(function (reason) { return h('li', { text: reason }); })),
+        flag.suggested_follow_up ? h('p', { class: 'dec-muted' }, h('strong', { text: t('followUp') + ': ' }), flag.suggested_follow_up) : null,
+        h('details', { class: 'dec-details' }, h('summary', { text: t('howDetermined') }), detail));
+    }
+    return h('article', { class: 'dec-flag sev-' + flag.severity },
+      h('div', { class: 'dec-flag-head' },
+        severityBadge(flag.severity),
+        h('span', { class: 'dec-badge dec-badge-unavailable', text: t(flag.status) }),
+        h('strong', { text: flag.title })),
+      h('p', { text: flag.message }),
+      detail);
+  }
+
+  function isPriorityList() {
+    return (state.flags.data.flags || []).some(function (flag) { return flag.reasons; });
   }
 
   function renderFlags() {
     var flags = state.flags.data.flags || [];
     if (!flags.length) return h('p', { class: 'dec-muted', text: t('none') });
-    return h('div', {}, flags.map(renderFlag));
+    return h('div', {}, isPriorityList() ? h('div', { class: 'dec-note', text: t('priorityNote') }) : null, flags.map(renderFlag));
   }
 
   function exportEvidence() {
@@ -610,7 +632,7 @@
       h('p', { text: d.description }),
       dl([[t('audience'), (d.audience || []).join(', ')], [t('owner'), d.owner_team], ['v', d.version]]))));
     root.appendChild(section('summary', t('summary'), renderKpis()));
-    root.appendChild(section('flags', t('flags') + ' (' + (state.flags.data.counts.total || 0) + ')', renderFlags()));
+    root.appendChild(section('flags', (isPriorityList() ? t('priorityCountries') : t('flags')) + ' (' + (state.flags.data.counts.total || 0) + ')', renderFlags()));
     root.appendChild(section('metrics', t('metrics'), renderSources()));
     root.appendChild(section('trends', t('trends'), renderTrend()));
     root.appendChild(section('table', t('table'), renderCountries()));
@@ -629,114 +651,13 @@
     drawerTitle = document.getElementById('dec-drawer-title');
     drawerBody = document.getElementById('dec-drawer-body');
     var close = document.getElementById('dec-drawer-close');
-    close.textContent = t('close');
     close.addEventListener('click', function () { drawer.hidden = true; });
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && !drawer.hidden) drawer.hidden = true;
     });
-    var form = document.getElementById('dec-filters');
-    var params = currentFilters();
-    Array.prototype.forEach.call(form.elements, function (el) {
-      if (el.name && params[el.name]) el.value = params[el.name];
-    });
-    form.addEventListener('submit', function (event) {
-      event.preventDefault();
-      var data = new FormData(form);
-      var next = {};
-      ['region', 'country', 'round', 'validation_state'].forEach(function (key) {
-        var v = String(data.get(key) || '').trim();
-        if (v) next[key] = key === 'round' || key === 'country' ? v.toUpperCase() : v;
-      });
-      window.history.replaceState(null, '', window.location.pathname + query(next));
-      loadWorkspace();
-    });
     loadWorkspace();
-  }
-
-  // -------------------------------------------------------------------------
-  // Administration
-  // -------------------------------------------------------------------------
-
-  function initAdmin() {
-    var root = document.getElementById('dec-admin');
-    var SEVERITIES = ['information', 'review', 'important', 'urgent'];
-    var QUALITIES = ['any', 'reviewable', 'validated'];
-
-    function select(options, value, labelFn) {
-      var el = h('select', {}, options.map(function (o) { return h('option', { value: o, text: labelFn ? labelFn(o) : o }); }));
-      el.value = value;
-      return el;
-    }
-
-    function ruleRow(rule) {
-      var enabled = h('input', { type: 'checkbox', 'aria-label': 'enabled' });
-      enabled.checked = rule.enabled;
-      var threshold = h('input', { type: 'number', min: '0', step: 'any', value: rule.condition.value, 'aria-label': t('threshold') });
-      var severity = select(SEVERITIES, rule.severity, t);
-      var quality = select(QUALITIES, rule.minimum_data_quality);
-      var note = h('input', { type: 'text', maxlength: '2000', placeholder: t('addNote'), 'aria-label': t('addNote') });
-      var save = h('button', { type: 'button', class: 'dec-btn dec-btn-primary', text: t('apply') });
-      save.addEventListener('click', function () {
-        var value = parseFloat(threshold.value);
-        if (!isFinite(value)) { setStatus(t('error'), true); return; }
-        api(app.dataset.ruleBase + '/' + encodeURIComponent(rule.id), {
-          method: 'PUT',
-          body: { changes: { enabled: enabled.checked, severity: severity.value, minimum_data_quality: quality.value, condition: { value: value } }, note: note.value }
-        }).then(function () { setStatus(t('saved')); load(); }).catch(function (error) { setStatus((error.body && error.body.errors ? error.body.errors.join(' ') : error.message), true); });
-      });
-      var history = h('button', { type: 'button', class: 'dec-btn', text: 'v' + rule.version });
-      history.addEventListener('click', function () {
-        api(app.dataset.ruleBase + '/' + encodeURIComponent(rule.id) + '/history').then(function (body) {
-          var cell = history.parentNode;
-          var old = cell.querySelector('.dec-note');
-          if (old) old.remove();
-          cell.appendChild(h('div', { class: 'dec-note' }, body.data.map(function (v) {
-            return h('div', { text: 'v' + v.version + ' ' + v.status + ' ' + formatDate(v.created_at) + ' ' + (v.note || '') + ' | ' + v.payload.condition.operator + ' ' + v.payload.condition.value });
-          })));
-        });
-      });
-      return [rule.id, rule.name, enabled, threshold, severity, quality, note, save, h('div', {}, history)];
-    }
-
-    function load() {
-      setStatus(t('loading'));
-      Promise.all([
-        api(app.dataset.adminBase),
-        api(app.dataset.runsUrl),
-        api(app.dataset.feedbackUrl),
-        api(app.dataset.integrationsUrl)
-      ]).then(function (results) {
-        setStatus('');
-        var overview = results[0].data;
-        clear(root);
-        root.appendChild(section('rules', t('rule'), table(
-          [t('rule'), '', 'on', t('threshold'), t('severity'), t('validation'), t('addNote'), '', ''],
-          overview.rules.map(ruleRow))));
-        root.appendChild(section('decisions', t('flags'), table(
-          ['id', t('question'), t('status'), t('visibility'), 'v'],
-          overview.decisions.map(function (d) {
-            var status = select(['active', 'paused', 'archived', 'draft'], d.status);
-            status.addEventListener('change', function () {
-              api(app.dataset.decisionBase + '/' + encodeURIComponent(d.id), { method: 'PUT', body: { changes: { status: status.value } } })
-                .then(function () { setStatus(t('saved')); load(); }).catch(function (error) { setStatus(error.message, true); });
-            });
-            return [d.id, d.title, status, d.visibility, String(d.version)];
-          }))));
-        root.appendChild(section('runs', t('ruleRuns'), table(
-          [t('rule'), 'v', t('status'), t('evaluated'), t('raised'), t('generated')],
-          results[1].data.map(function (r) { return [r.decision_id + ' / ' + r.rule_id, String(r.rule_version), r.status, String(r.entities_evaluated), String(r.flags_raised), formatDate(r.ran_at)]; }), [3, 4])));
-        root.appendChild(section('feedback', t('useful'), table(
-          [t('rule'), 'v', '', '#'],
-          results[2].data.map(function (r) { return [r.rule_id, String(r.rule_version), r.verdict, String(r.count)]; }), [3])));
-        root.appendChild(section('integrations', t('sourceSystem'), table(
-          [t('sourceSystem'), t('dataset'), t('status'), t('synced')],
-          results[3].data.sources.map(function (s) { return [s.source_system, s.dataset || '', s.status, formatDate(s.synchronized_at)]; }))));
-      }).catch(function (error) { setStatus(error.message, true); });
-    }
-    load();
   }
 
   if (view === 'catalogue') initCatalogue();
   else if (view === 'workspace') initWorkspace();
-  else if (view === 'admin') initAdmin();
 })();

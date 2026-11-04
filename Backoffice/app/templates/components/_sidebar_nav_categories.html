@@ -2,7 +2,7 @@
 {% from "components/_svg_icons.html" import svg_icon %}
 {% set can_access_dashboard = is_system_manager or has_permission('assignment.view') %}
 {% set can_access_decisions = is_plugin_active('ifrc') and (is_system_manager or has_permission('decisions.view')) %}
-{% set can_access_general = can_access_dashboard or can_access_decisions or is_system_manager or has_permission('admin.analytics.view') or has_permission('admin.documents.manage') or has_permission('admin.translations.manage') or has_permission('admin.plugins.manage') or has_permission('admin.settings.manage') or has_permission('admin.communication.manage') or has_permission('admin.docs.view') %}
+{% set can_access_general = can_access_dashboard or is_system_manager or has_permission('admin.analytics.view') or has_permission('admin.documents.manage') or has_permission('admin.translations.manage') or has_permission('admin.plugins.manage') or has_permission('admin.settings.manage') or has_permission('admin.communication.manage') or has_permission('admin.docs.view') %}
 {% if can_access_general %}
 <div class="space-y-2" data-category="general">
     <div class="collapsable-category-title">
@@ -14,13 +14,6 @@
         <a href="{{ url_for('main.dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Dashboard')|forceescape }}">
             {{ svg_icon('home', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Dashboard') }}</span>
-        </a>
-        {% endif %}
-        {# Decision Support (IFRC plugin) - requires decisions.view #}
-        {% if can_access_decisions %}
-        <a href="{{ url_for('decisions.page_catalogue') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Decision Support')|forceescape }}">
-            {{ svg_icon('chart', 'sidebar-icon w-6 h-6 mr-3') }}
-            <span class="sidebar-text">{{ _('Decision Support') }}</span>
         </a>
         {% endif %}
         {# Admin Dashboard - requires admin.analytics.view #}
@@ -211,7 +204,7 @@
 {% set has_security_item = is_system_manager or has_permission('admin.security.view') %}
 {% set has_governance_item = is_system_manager or has_permission('admin.governance.view') %}
 {% set has_api_item = is_system_manager or has_permission('admin.api.manage') %}
-{% if has_analytics_item or has_audit_item or has_security_item or has_governance_item or has_api_item %}
+{% if has_analytics_item or has_audit_item or has_security_item or has_governance_item or has_api_item or can_access_decisions %}
 <div class="space-y-2 mt-4" data-category="analytics-monitoring">
     <div class="collapsable-category-title">
          <h3 class="sidebar-section-title">{{ _('Analytics & Monitoring') }}</h3>
@@ -252,6 +245,13 @@
          <a href="{{ url_for('monitoring.system_monitoring') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('System Monitoring')|forceescape }}">
             {{ svg_icon('server', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('System Monitoring') }}</span>
+        </a>
+         {% endif %}
+         {# Decision Maker (IFRC plugin) - requires decisions.view #}
+         {% if can_access_decisions %}
+         <a href="{{ url_for('decisions.page_catalogue') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Decision Maker')|forceescape }}">
+            <i class="fas fa-clipboard-check sidebar-icon w-6 h-6 mr-3 text-center"></i>
+            <span class="sidebar-text">{{ _('Decision Maker') }}</span>
         </a>
          {% endif %}
     </div>

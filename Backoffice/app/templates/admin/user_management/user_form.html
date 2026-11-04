@@ -293,7 +293,7 @@
                         {% endif %}
 
                         {# Group roles for readability (based on role name) #}
-                        {% set rbac_groups = namespace(system=[], core_roles=[], admin=[], assignment=[], translator=[], other=[]) %}
+                        {% set rbac_groups = namespace(system=[], core_roles=[], admin=[], plugin=[], assignment=[], translator=[], other=[]) %}
                         {% for subfield in form.rbac_roles %}
                             {% set role_name = (subfield.label.text or '') %}
                             {% if role_name == 'System Manager' %}
@@ -317,6 +317,9 @@
                                 {% endif %}
                             {% elif role_name.startswith('Assignment') %}
                                 {% set __ = rbac_groups.assignment.append(subfield) %}
+                            {% elif ': ' in role_name %}
+                                {# Plugin roles are named "Feature: action" and belong with the admin roles #}
+                                {% set __ = rbac_groups.plugin.append(subfield) %}
                             {% else %}
                                 {% set __ = rbac_groups.other.append(subfield) %}
                             {% endif %}
@@ -440,13 +443,13 @@
                             <div id="admin-sections" class="admin-sections-container{% if not show_admin_sections %} hidden{% endif %}">
 
                             {# Admin Roles: Presets + Categorized Admin Roles #}
-                            {% if (rbac_groups.system|length or rbac_groups.core_roles|length) or rbac_groups.admin|length %}
+                            {% if (rbac_groups.system|length or rbac_groups.core_roles|length) or rbac_groups.admin|length or rbac_groups.plugin|length %}
                             <div id="roles-core-group" class="p-3 border border-gray-200 rounded-md bg-gray-50">
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="text-sm font-semibold text-gray-800">
                                         <i class="fas fa-shield-alt mr-2 text-blue-600"></i>Admin Roles
                                     </div>
-                                    <div class="text-xs text-gray-600">{{ (rbac_groups.system|length + rbac_groups.core_roles|length + rbac_groups.admin|length) }} role(s)</div>
+                                    <div class="text-xs text-gray-600">{{ (rbac_groups.system|length + rbac_groups.core_roles|length + rbac_groups.admin|length + rbac_groups.plugin|length) }} role(s)</div>
                                 </div>
 
                                 {# Presets: System Manager, Full, Core #}
@@ -524,10 +527,10 @@
                                 {% endif %}
 
                                 {# Categorized Admin Roles #}
-                                {% if rbac_groups.admin|length %}
+                                {% if rbac_groups.admin|length or rbac_groups.plugin|length %}
                                 {# Group admin roles by sidebar-like categories, then by feature (View/Manage/...) #}
                                 {% set admin_features = [] %}
-                                {% for subfield in rbac_groups.admin %}
+                                {% for subfield in rbac_groups.admin + rbac_groups.plugin %}
                                     {% set raw_label = (subfield.label.text or '') %}
                                     {% set display_label = raw_label %}
                                     {# Avoid repeating "Admin: ..." inside the Admin group #}
@@ -537,6 +540,8 @@
                                     {% set feature = display_label %}
                                     {% if ' (' in display_label and display_label.endswith(')') %}
                                         {% set feature = display_label.rsplit(' (', 1)[0] %}
+                                    {% elif subfield in rbac_groups.plugin %}
+                                        {% set feature = display_label.split(': ', 1)[0] %}
                                     {% endif %}
                                     {# Only include Plugins if current user is a system manager #}
                                     {% if feature and feature not in admin_features %}
@@ -602,7 +607,7 @@
                                                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                                         <div class="text-sm font-medium text-gray-800">{{ _('Communication') if feature == 'Notifications' else feature }}</div>
                                                         <div class="flex flex-wrap gap-x-4 gap-y-2">
-                                                            {% for subfield in rbac_groups.admin %}
+                                                            {% for subfield in rbac_groups.admin + rbac_groups.plugin %}
                                                                 {% set raw_label = (subfield.label.text or '') %}
                                                                 {% set display_label = raw_label[7:] if raw_label.startswith('Admin: ') else raw_label %}
                                                                 {% set row_feature = display_label %}
@@ -610,6 +615,9 @@
                                                                 {% if ' (' in display_label and display_label.endswith(')') %}
                                                                     {% set row_feature = display_label.rsplit(' (', 1)[0] %}
                                                                     {% set action_label = display_label.rsplit(' (', 1)[1][:-1] %}
+                                                                {% elif subfield in rbac_groups.plugin %}
+                                                                    {% set row_feature = display_label.split(': ', 1)[0] %}
+                                                                    {% set action_label = display_label.split(': ', 1)[1] %}
                                                                 {% endif %}
                                                                 {% if row_feature == feature %}
                                                                     {# Only show Plugins if current user is a system manager #}
@@ -757,7 +765,7 @@
 {# The RBAC roles panel above only renders (and sets rbac_groups/default_role_type/
    show_admin_sections via {% set %}) when there are assignable roles for this actor/user;
    otherwise they stay undefined. Keep the debug snapshot below crash-safe either way. #}
-{% set rbac_groups = rbac_groups if rbac_groups is defined else namespace(system=[], core_roles=[], admin=[], assignment=[], translator=[], other=[]) %}
+{% set rbac_groups = rbac_groups if rbac_groups is defined else namespace(system=[], core_roles=[], admin=[], plugin=[], assignment=[], translator=[], other=[]) %}
 {% set default_role_type = default_role_type if default_role_type is defined else none %}
 {% set show_admin_sections = show_admin_sections if show_admin_sections is defined else false %}
 <script nonce="{{ csp_nonce() }}">
@@ -788,6 +796,7 @@ window.userFormConfig = {
             system: {{ rbac_groups.system|length }},
             core: {{ rbac_groups.core_roles|length }},
             admin: {{ rbac_groups.admin|length }},
+            plugin: {{ rbac_groups.plugin|length }},
             assignment: {{ rbac_groups.assignment|length }},
             translator: {{ rbac_groups.translator|length }},
             other: {{ rbac_groups.other|length }}

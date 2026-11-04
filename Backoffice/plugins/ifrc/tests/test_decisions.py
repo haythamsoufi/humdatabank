@@ -1,4 +1,4 @@
-"""Decision Support rules, metrics and permission filtering. SYNTHETIC fixtures only: not real National Society data."""
+"""Decision Maker rules, metrics and permission filtering. SYNTHETIC fixtures only: not real National Society data."""
 
 from __future__ import annotations
 
@@ -414,3 +414,145 @@ def test_ai_tool_specs_match_implementations():
         params = spec["function"]["parameters"]
         assert params["type"] == "object"
         assert set(params["required"]) <= set(params["properties"])
+
+
+# --- decisions covering the eight network purposes ------------------------------------------------
+
+def _plan_fact(iso3, name, sid, section, indicator, amount, *, entity=None, attribute="Total", ns=None, year=2027, **extra):
+    return {
+        "Round": "P27", "ISO3": iso3, "Country": name, "NS": ns or f"{name} NS", "Region": "Testregion",
+        "Section": section, "Source": "Country Data", "Entity": entity, "Attribute": attribute, "SP/EF": None,
+        "Applicable/Data not available": "Applicable", "Indicator": indicator, "ValueNum": amount,
+        "Year": year, "submission_id": sid, **extra,
+    }
+
+
+def _funding(iso3, name, sid, amount=1_000_000, **kwargs):
+    return _plan_fact(iso3, name, sid, "Funding", "Funding", amount, entity=kwargs.pop("entity", "HNS"), **kwargs)
+
+
+def _plan_subs(*pairs):
+    return [_sub(iso3, name, "P27", sid) for iso3, name, sid in pairs]
+
+
+def test_every_network_purpose_has_a_decision():
+    decisions = config.default_decisions()
+    assert list(decisions) == [f"DEC-00{n}" for n in range(1, 9)]
+    for decision in decisions.values():
+        assert decision["rule_ids"] and decision["metric_ids"]
+        assert set(decision["rule_ids"]) <= set(config.default_rules())
+
+
+def test_rules_can_be_configured_for_every_decision_purpose():
+    for decision_id in config.default_decisions():
+        _d, _flags, outcomes = _run(_two_round_extract(), decision_id=decision_id)
+        assert outcomes and all(o.status == "ok" for o in outcomes), decision_id
+
+
+def test_no_pns_support_flags_only_countries_without_a_partner():
+    facts = [
+        _funding("AAA", "Alpha", 1),
+        _funding("BBB", "Beta", 3),
+        _plan_fact("BBB", "Beta", 3, "Support", None, 1, entity="PNS", ns="Gamma NS"),
+    ]
+    extract = _extract(facts, _plan_subs(("AAA", "Alpha", 1), ("BBB", "Beta", 3)))
+    data, flags, _o = _run(extract, decision_id="DEC-006")
+    assert [f["entity_id"] for f in _by_rule(flags, "RULE-NO-PNS-SUPPORT")] == ["AAA"]
+    (partners,) = [o for o in data.obs("pns_support_count") if o.entity_id == "BBB"]
+    assert partners.value == 1 and partners.extra["partners"] == ["Gamma NS"]
+
+
+def test_pns_figure_from_host_entry_is_flagged_until_the_pns_reports():
+    pns = _funding("AAA", "Alpha", 1, 400_000, entity="PNS", ns="Gamma NS")
+    extract = _extract([_funding("AAA", "Alpha", 1), pns], _plan_subs(("AAA", "Alpha", 1)))
+    _d, flags, _o = _run(extract, decision_id="DEC-006")
+    (flag,) = _by_rule(flags, "RULE-PNS-UNREPORTED")
+    assert flag["trigger_values"]["national_societies"] == ["Gamma NS"]
+    assert flag["trigger_values"]["requirement_from_host_entry"] == 400_000
+
+    pns["PNS reported"] = "Yes"
+    _d, flags, _o = _run(extract, decision_id="DEC-006")
+    assert not _by_rule(flags, "RULE-PNS-UNREPORTED")
+
+
+def test_emergency_target_and_funding_must_match():
+    emergency_funding = lambda iso3, name, sid: _funding(  # noqa: E731
+        iso3, name, sid, 2_000_000, entity="IFRC Secretariat", attribute="Emergency Operations"
+    )
+    emergency_people = lambda iso3, name, sid: _plan_fact(  # noqa: E731
+        iso3, name, sid, "Emergencies", "People to be reached", 5_000, attribute="E1"
+    )
+    facts = [
+        emergency_people("AAA", "Alpha", 1),
+        emergency_funding("BBB", "Beta", 2),
+        emergency_people("CCC", "Gamma", 3),
+        emergency_funding("CCC", "Gamma", 3),
+    ]
+    extract = _extract(facts, _plan_subs(("AAA", "Alpha", 1), ("BBB", "Beta", 2), ("CCC", "Gamma", 3)))
+    _d, flags, _o = _run(extract, decision_id="DEC-005")
+    assert [f["entity_id"] for f in _by_rule(flags, "RULE-EMERGENCY-TARGET-NO-FUNDING")] == ["AAA"]
+    assert [f["entity_id"] for f in _by_rule(flags, "RULE-EMERGENCY-FUNDING-NO-TARGET")] == ["BBB"]
+
+
+def test_emergency_people_use_the_largest_cell_per_operation():
+    facts = [
+        _plan_fact("AAA", "Alpha", 1, "Emergencies", "People to be reached", 3_000, attribute="E1"),
+        _plan_fact("AAA", "Alpha", 1, "Emergencies", "People to be reached", 2_000, attribute="E1"),
+        _plan_fact("AAA", "Alpha", 1, "Emergencies", "People to be reached", 500, attribute="E2"),
+    ]
+    data = build_decision_data(_extract(facts, _plan_subs(("AAA", "Alpha", 1))), ADMIN, Filters(), today=TODAY)
+    (obs,) = data.obs("emergency_people_targeted")
+    assert obs.value == 3_500 and obs.extra["operations"] == 2
+
+
+def test_funding_without_core_indicators_is_flagged():
+    facts = [
+        _funding("AAA", "Alpha", 1),
+        _funding("BBB", "Beta", 2),
+        _plan_fact("BBB", "Beta", 2, "Core indicators", "Volunteers", 120),
+    ]
+    extract = _extract(facts, _plan_subs(("AAA", "Alpha", 1), ("BBB", "Beta", 2)))
+    _d, flags, _o = _run(extract, decision_id="DEC-003")
+    assert [f["entity_id"] for f in _by_rule(flags, "RULE-NO-CORE-INDICATORS")] == ["AAA"]
+
+
+# --- DEC-001 priority countries ---------------------------------------------------------------------
+
+def _priority_extract():
+    names = [("AAA", "Alpha"), ("BBB", "Beta"), ("CCC", "Gamma"), ("DDD", "Delta"), ("EEE", "Epsilon"), ("FFF", "Zeta")]
+    facts, subs = [], []
+    for i, (iso3, name) in enumerate(names, start=1):
+        facts.append(_funding(iso3, name, i, 10_000_000 if iso3 == "AAA" else 1_000_000))
+        baseline = {"AAA": 5_000_000, "CCC": 1_500_000}.get(iso3, 1_000_000)
+        facts.append(_funding(iso3, name, 100 + i, baseline, year=2026, Round="P26"))
+        subs += [_sub(iso3, name, "P27", i), _sub(iso3, name, "P26", 100 + i)]
+    facts.append(_funding("CCC", "Gamma", 3, 500_000, entity="IFRC Secretariat", attribute="Emergency Operations"))
+    for ns in ("Partner One", "Partner Two"):
+        facts.append(_plan_fact("DDD", "Delta", 4, "Support", None, 1, entity="PNS", ns=ns))
+    subs.append(_sub("GGG", "Eta", "P27", 7))
+    return _extract(facts, subs)
+
+
+def test_priority_list_gives_reasons_and_orders_by_signals_met():
+    _d, flags, _o = _run(_priority_extract(), decision_id="DEC-001")
+    listed = _by_rule(flags, "RULE-PRIORITY-COUNTRY")
+    assert [f["entity_id"] for f in listed] == ["AAA", "CCC"]
+    top, second = listed
+    assert top["severity"] == "important" and set(top["trigger_values"]["signals"]) == {"growth", "share", "support"}
+    assert any("up 100%" in r for r in top["reasons"]) and "3 of 4" in top["message"]
+    assert second["severity"] == "review" and set(second["trigger_values"]["signals"]) == {"emergency", "support"}
+    assert top["evidence_ids"]
+
+
+def test_priority_list_says_which_countries_were_not_assessed():
+    _d, _flags, outcomes = _run(_priority_extract(), decision_id="DEC-001")
+    (outcome,) = outcomes
+    assert any("1 of 7 countries" in reason for reason in outcome.not_evaluable)
+
+
+def test_priority_threshold_is_configurable():
+    _d, flags, _o = _run(
+        _priority_extract(), decision_id="DEC-001",
+        rule_overrides={"RULE-PRIORITY-COUNTRY": {"condition": {**config.default_rules()["RULE-PRIORITY-COUNTRY"]["condition"], "value": 3}}},
+    )
+    assert [f["entity_id"] for f in _by_rule(flags, "RULE-PRIORITY-COUNTRY")] == ["AAA"]

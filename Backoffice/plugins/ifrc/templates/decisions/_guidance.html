@@ -1,0 +1,109 @@
+{# Static guidance for the Decision Maker catalogue. Avoid percent signs: they would be read as format markers. #}
+<section class="dec-section" aria-labelledby="dec-g-what">
+  <h2 class="dec-h2" id="dec-g-what">{{ _('What Decision Maker is') }}</h2>
+  <p>{{ _("Decision Maker brings together Unified Plan and Unified Report data to help prepare Federation-wide decisions. It shows the evidence and raises prompts for people to review. It does not make decisions, and it never scores or ranks National Societies.") }}</p>
+</section>
+
+<section class="dec-section" aria-labelledby="dec-g-how">
+  <h2 class="dec-h2" id="dec-g-how">{{ _('How it works') }}</h2>
+  <ol>
+    <li><strong>{{ _('Data.') }}</strong> {{ _("Plan and report submissions already in the Databank are read. Nothing is entered here.") }}</li>
+    <li><strong>{{ _('Your scope.') }}</strong> {{ _("Rows are limited to the countries you may see before anything is calculated, so totals and flags never include other countries.") }}</li>
+    <li><strong>{{ _('Metrics.') }}</strong> {{ _("Every number comes from one registered metric with a fixed definition, unit, source and set of valid breakdowns. The same definition feeds the pages, exports and the assistant.") }}</li>
+    <li><strong>{{ _('Rules.') }}</strong> {{ _("Each decision has rules with a threshold, for example a funding requirement that changed by 30 percent or more between rounds. A rule gives the same result on the same data every time.") }}</li>
+    <li><strong>{{ _('Flags.') }}</strong> {{ _("When a rule is triggered, a flag shows the exact values, the threshold, the comparison period and links to the evidence records behind it.") }}</li>
+    <li><strong>{{ _('Human review.') }}</strong> {{ _("You acknowledge, mark under review, resolve or dismiss a flag, add a note, and say whether it was useful, incorrect or expected. FDS uses this feedback to tune thresholds.") }}</li>
+  </ol>
+</section>
+
+<section class="dec-section" aria-labelledby="dec-g-decisions">
+  <h2 class="dec-h2" id="dec-g-decisions">{{ _('What the decisions watch') }}</h2>
+  <div class="dec-table-wrap">
+    <table class="dec-table">
+      <thead>
+        <tr><th scope="col">{{ _('Purpose') }}</th><th scope="col">{{ _('What is monitored') }}</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{{ _('Prioritise countries and National Societies requiring greater Federation-wide support and attention') }}</td>
+          <td>{{ _("A shortlist with reasons, not a ranking: countries meeting at least two of four signals in the latest plan round. The signals are a fast-growing requirement, a large share of the network's requirement, a heavy emergency load, and limited partner support.") }}</td>
+        </tr>
+        <tr>
+          <td>{{ _('Inform strategic planning and resource prioritisation') }}</td>
+          <td>{{ _("Funding requirements and people to be reached, round-on-round change, concentration in a few countries, requirements not yet validated.") }}</td>
+        </tr>
+        <tr>
+          <td>{{ _('Understand the global footprint, capacity, reach and resources of the network') }}</td>
+          <td>{{ _("Countries covered, requirements, people to be reached, PNS support and core and capacity indicators, with how complete each is.") }}</td>
+        </tr>
+        <tr>
+          <td>{{ _('Identify trends, gaps and inconsistencies requiring management attention') }}</td>
+          <td>{{ _("Large changes between rounds, stalled reviews, overdue submissions, indicators with data unavailable and low reporting coverage.") }}</td>
+        </tr>
+        <tr>
+          <td>{{ _('Inform planning, monitoring and reporting for major emergencies and global initiatives') }}</td>
+          <td>{{ _("Emergency operations requirements and people to be reached, and whether each is matched by the other.") }}</td>
+        </tr>
+        <tr>
+          <td>{{ _('Understand the collective contribution of Host National Societies, Partner National Societies and the Secretariat') }}</td>
+          <td>{{ _("Requirement by funding source and Strategic Priority, how many PNS support each country, and PNS figures that come only from the host plan.") }}</td>
+        </tr>
+        <tr>
+          <td>{{ _('Support accountability and strategic dialogue with consistent evidence') }}</td>
+          <td>{{ _("Whether evidence is complete, validated and comparable before it is used with National Societies, leadership or governance.") }}</td>
+        </tr>
+        <tr>
+          <td>{{ _('Answer cross-cutting strategic questions') }}</td>
+          <td>{{ _("Comparable plan data across country, region, round, funding source and Strategic Priority, also available through the assistant.") }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="dec-section" aria-labelledby="dec-g-workspace">
+  <h2 class="dec-h2" id="dec-g-workspace">{{ _('Reading a decision workspace') }}</h2>
+  <ul>
+    <li><strong>{{ _('Decision question and purpose') }}</strong>: {{ _("what the decision is for and who it is meant for.") }}</li>
+    <li><strong>{{ _('Current evidence summary') }}</strong>: {{ _("the key metrics for the selected round and scope.") }}</li>
+    <li><strong>{{ _('Attention flags') }}</strong>: {{ _("what the rules found, most severe first.") }}</li>
+    <li><strong>{{ _('Trends and comparisons') }}</strong>: {{ _("how the main figure moved across rounds.") }}</li>
+    <li><strong>{{ _('Data quality and coverage') }}</strong>: {{ _("how many expected submissions are in, and the validation mix. Read this before quoting a total.") }}</li>
+    <li><strong>{{ _('Evidence records and lineage') }}</strong>: {{ _("the source record behind every figure and flag.") }}</li>
+    <li><strong>{{ _('Methodology') }}</strong>: {{ _("how the numbers and rules are defined.") }}</li>
+  </ul>
+</section>
+
+<section class="dec-section" aria-labelledby="dec-g-terms">
+  <h2 class="dec-h2" id="dec-g-terms">{{ _('Terms you will see') }}</h2>
+  <dl class="dec-dl">
+    <dt>{{ _('Severity') }}</dt>
+    <dd>{{ _("Information, Review, Important and Urgent show how soon a person should look at a flag. They do not rate how serious a situation is.") }}</dd>
+    <dt>{{ _('Validation') }}</dt>
+    <dd>{{ _("Validated means approved. Provisional means submitted or in review. Draft means not yet submitted and is left out of totals.") }}</dd>
+    <dt>{{ _('Data states') }}</dt>
+    <dd>{{ _("A reported zero is a real zero. Not applicable, data unavailable and not reported are different states and are never treated as zero or as a low value.") }}</dd>
+    <dt>{{ _('Readiness') }}</dt>
+    <dd>{{ _("Ready, Partial or Limited, based on how many expected submissions have been received. The bands are provisional.") }}</dd>
+    <dt>{{ _('Provisional threshold') }}</dt>
+    <dd>{{ _("An example value awaiting FDS approval. It is not policy.") }}</dd>
+    <dt>{{ _('Evidence ID') }}</dt>
+    <dd>{{ _("A stable reference to the exact record a figure came from. Use it to trace or cite a number.") }}</dd>
+  </dl>
+</section>
+
+<section class="dec-section" aria-labelledby="dec-g-limits">
+  <h2 class="dec-h2" id="dec-g-limits">{{ _('Limits to keep in mind') }}</h2>
+  <ul>
+    <li>{{ _("Flags are prompts for follow-up, not conclusions. Check the evidence and the submission context first.") }}</li>
+    <li>{{ _("Only Databank data is used. GO and ERP are not connected, so live emergency and operational data are not included.") }}</li>
+    <li>{{ _("Funding figures are planned requirements, not confirmed income or spending.") }}</li>
+    <li>{{ _("An empty value means nothing was reported, not that the answer is zero.") }}</li>
+    <li>{{ _("The assistant explains the evidence and suggests questions. Flags come only from the rules.") }}</li>
+  </ul>
+</section>
+
+<section class="dec-section" aria-labelledby="dec-g-admin">
+  <h2 class="dec-h2" id="dec-g-admin">{{ _('Changing thresholds') }}</h2>
+  <p>{{ _("Decisions, rules and thresholds are set in the product configuration, not in this tool. To change one, ask the FDS team. Every flag names the rule and threshold that raised it.") }}</p>
+</section>

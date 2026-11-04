@@ -134,6 +134,58 @@ METRIC_REGISTRY: dict[str, MetricDefinition] = {
             quality_tests=("non_negative",),
         ),
         MetricDefinition(
+            id="emergency_funding_requirement",
+            name={"en": "Emergency operations funding requirement", "fr": "Besoin de financement des opérations d'urgence"},
+            description="Part of the funding requirement planned for emergency operations.",
+            definition="Sum of the 'Emergency Operations' column of the Unified Plan funding matrices, across funding sources.",
+            unit="CHF",
+            currency="CHF",
+            valid_dimensions=_FUNDING_DIMS,
+            source_precedence="Same as funding_requirement.",
+            time_logic="Same as funding_requirement.",
+            quality_tests=("non_negative", "not_above_funding_requirement"),
+        ),
+        MetricDefinition(
+            id="emergency_people_targeted",
+            name={"en": "People to be reached in emergencies", "fr": "Personnes à atteindre en situation d'urgence"},
+            description="People the plan aims to reach through listed emergency operations.",
+            definition=(
+                "For each emergency operation in the Unified Plan emergency matrix, the largest figure entered; "
+                "operations are then added together. Figures across Strategic Priorities are not added."
+            ),
+            unit="people",
+            valid_dimensions=("country", "region", "round", "year", "validation_state"),
+            source_precedence="Host plan (T24).",
+            time_logic="Planning year of the matrix.",
+            provisional_mapping=True,
+            quality_tests=("non_negative",),
+        ),
+        MetricDefinition(
+            id="pns_support_count",
+            name={"en": "Participating National Societies supporting", "fr": "Sociétés nationales participantes en appui"},
+            description="Number of Participating National Societies with a planned contribution or bilateral support.",
+            definition=(
+                "Distinct PNS with a funding requirement above zero or a planned bilateral support entry in the host "
+                "Unified Plan. Summed across countries it counts country-PNS relationships, not distinct PNS."
+            ),
+            unit="count",
+            valid_dimensions=("country", "region", "round", "year", "validation_state"),
+            source_precedence="Host plan (T24) and the PNS's own plan (T22) where submitted.",
+            time_logic="Round year. Absence means no support is recorded, not that none exists.",
+            quality_tests=("pns_names_resolved",),
+        ),
+        MetricDefinition(
+            id="core_indicators_reported",
+            name={"en": "Core and capacity indicators reported", "fr": "Indicateurs de base et de capacité renseignés"},
+            description="Number of core and National Society capacity indicators with a reported value.",
+            definition="Distinct indicators in the Core indicators and NS Data sections of a Unified Plan that carry a number.",
+            unit="count",
+            valid_dimensions=("country", "region", "round", "year", "validation_state"),
+            source_precedence="Host plan (T24).",
+            time_logic="Per assignment round.",
+            quality_tests=("non_negative",),
+        ),
+        MetricDefinition(
             id="submission_coverage",
             name={"en": "Submission coverage", "fr": "Couverture des soumissions"},
             description="Share of expected submissions that have been submitted or approved.",

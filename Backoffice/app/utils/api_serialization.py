@@ -5,6 +5,7 @@ Extracted from routes/api.py for better organization and reusability.
 """
 
 import logging
+import re
 from datetime import date, datetime
 from typing import Any, Optional
 
@@ -305,6 +306,9 @@ def _resolve_matrix_entity_snapshot(join_dimension, row_entity_id, dim_indexes):
                 'entity_id': entity.get('id'),
                 'entity_name': entity.get('name'),
                 'entity_code': entity.get('code'),
+                # ISO codes of the society's own country.
+                'entity_iso2': entity.get('country_iso2'),
+                'entity_iso3': entity.get('country_iso3'),
                 'entity_country_id': entity.get('country_id'),
                 'entity_country_name': entity.get('country_name'),
             })
@@ -326,6 +330,8 @@ def build_matrix_context(
     join_dimension=None,
     column_key=None,
     column_label=None,
+    column_header=None,
+    column_header_code=None,
     source='reported',
     entity_id=None,
     entity_name=None,
@@ -347,6 +353,10 @@ def build_matrix_context(
         'column': {
             'key': column_key,
             'label': column_label,
+            # Value picked in a selectable column header (e.g. the emergency appeal behind
+            # "EA1") and the appeal code (MDR...) parsed from it, when there is one.
+            'header': column_header,
+            'code': column_header_code,
         },
         'entity': {
             'id': entity_id,
@@ -367,6 +377,8 @@ _MATRIX_CELL_NESTED_KEYS = frozenset({
     'join_dimension',
     'column_key',
     'column_label',
+    'column_header',
+    'column_header_code',
     'source',
     'entity_id',
     'entity_name',
@@ -407,6 +419,14 @@ def enrich_matrix_cells(
         matrix_config = form_item.get('matrix_config') or {}
         join_dimension = cell.get('join_dimension') or matrix_config.get('join_dimension')
         row_entity_id = cell.get('row_entity_id')
+        row_entity_type = cell.get('row_entity_type')
+        if not join_dimension and matrix_config.get('row_mode') == 'hybrid':
+            # Hybrid matrices mix typed rows (HNS, IFRC Secretariat) with rows picked from a
+            # lookup list; the picked rows are saved by id (e.g. a National Society id).
+            known = _MATRIX_LOOKUP_DIMENSIONS.get(matrix_config.get('lookup_list_id') or '')
+            if known and isinstance(row_entity_id, int) and not isinstance(row_entity_id, bool):
+                join_dimension = known['join_dimension']
+                row_entity_type = known['row_entity_type']
         column_key = cell.get('column_key')
         column_label = _lookup_matrix_column_label(matrix_config, column_key)
 
@@ -431,11 +451,13 @@ def enrich_matrix_cells(
         }
         out['matrix'] = build_matrix_context(
             row_entity_id=row_entity_id,
-            row_entity_type=cell.get('row_entity_type'),
+            row_entity_type=row_entity_type,
             row_entity_label=row_entity_label,
             join_dimension=join_dimension,
             column_key=column_key,
             column_label=column_label,
+            column_header=cell.get('column_header'),
+            column_header_code=cell.get('column_header_code'),
             source=cell.get('source') or 'reported',
             entity_id=entity_snapshot.get('entity_id'),
             entity_name=entity_snapshot.get('entity_name'),
@@ -618,6 +640,8 @@ def _iter_matrix_data_cells(values, matrix_config, *, row_total_only=False):
         if col.get('counts_toward_row_total') and col.get('type') != 'calculated'
     }
     for key, raw in (values or {}).items():
+        if _is_matrix_metadata_key(key):
+            continue
         row_id, column_key = _parse_matrix_cell_key(key, matrix_config)
         if row_id is None or not column_key:
             continue
@@ -784,14 +808,21 @@ def _compute_matrix_calculated_total_rows(values, matrix_config, formula_by_row=
                     value for _, column_key, value in data_cells
                     if column_key == col['name']
                 )
-            totals.append({
+            column_total = {
                 'row_entity_id': None,
                 'column_key': col['name'],
                 'column_label': col['label'],
                 'value': col_sum,
                 'is_calculated_total': True,
                 'total_kind': 'column',
-            })
+            }
+            header = _matrix_column_header_text(values, col['name'])
+            if header:
+                column_total['column_header'] = header
+                code = _MATRIX_HEADER_CODE_RE.search(header)
+                if code:
+                    column_total['column_header_code'] = code.group(1).upper()
+            totals.append(column_total)
 
     if show_row_totals and show_column_totals:
         if _matrix_config_flag(matrix_config, 'row_total_manual_enabled', False) or adjusts_row_total:
@@ -813,6 +844,18 @@ def _compute_matrix_calculated_total_rows(values, matrix_config, formula_by_row=
     return totals
 
 
+_MATRIX_HEADER_CODE_RE = re.compile(r'\b(MDR[A-Z0-9]{2,})\b', re.IGNORECASE)
+
+
+def _matrix_column_header_text(values, column_key):
+    """Selected text of a selectable column header (``col_header|{column}``), if any."""
+    raw = (values or {}).get(f'{MATRIX_HEADER_KEY_PREFIX}{column_key}')
+    if isinstance(raw, dict):
+        raw = raw.get('label') or raw.get('value')
+    text = str(raw).strip() if raw is not None else ''
+    return text or None
+
+
 def _build_matrix_long_rows_from_values(values, matrix_config):
     from app.utils.matrix_calculation import calculation_saves_value
 
@@ -824,6 +867,8 @@ def _build_matrix_long_rows_from_values(values, matrix_config):
     }
     rows = []
     for key, val in (values or {}).items():
+        if _is_matrix_metadata_key(key):
+            continue
         if _is_matrix_row_total_key(key) and _matrix_config_flag(matrix_config, 'show_row_totals', True):
             continue
         row_entity_raw, column_key = _parse_matrix_cell_key(key, matrix_config)
@@ -839,6 +884,12 @@ def _build_matrix_long_rows_from_values(values, matrix_config):
         column_label = _lookup_matrix_column_label(matrix_config, column_key)
         if column_label:
             cell['column_label'] = column_label
+        header = _matrix_column_header_text(values, column_key)
+        if header:
+            cell['column_header'] = header
+            code = _MATRIX_HEADER_CODE_RE.search(header)
+            if code:
+                cell['column_header_code'] = code.group(1).upper()
         rows.append(cell)
     formula_rows, formula_by_row = _matrix_formula_long_rows(values, matrix_config)
     rows.extend(formula_rows)
@@ -939,7 +990,7 @@ def build_matrix_cells_from_data_rows(data_rows, form_items_table=None, *, strip
                     'source': source,
                     **({
                         k: cell[k]
-                        for k in ('is_calculated_total', 'total_kind', 'is_formula')
+                        for k in ('is_calculated_total', 'total_kind', 'is_formula', 'column_header', 'column_header_code')
                         if k in cell
                     }),
                 })
@@ -2477,7 +2528,7 @@ def format_bridge_disagg_rows(
                 'value': cell.get('value'),
                 **({
                     k: cell[k]
-                    for k in ('is_calculated_total', 'total_kind', 'is_formula')
+                    for k in ('is_calculated_total', 'total_kind', 'is_formula', 'column_header', 'column_header_code')
                     if k in cell
                 }),
             })

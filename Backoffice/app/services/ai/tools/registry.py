@@ -108,7 +108,7 @@ def _extract_indicator_search_phrase(query: str) -> str:
 
 
 def _decision_tool_names() -> frozenset:
-    """Names of the IFRC Decision Support tools. Empty when the plugin cannot be imported."""
+    """Names of the IFRC Decision Maker tools. Empty when the plugin cannot be imported."""
     try:
         from plugins.ifrc.decisions.ai_tools import DECISION_TOOL_NAMES
 
@@ -118,7 +118,7 @@ def _decision_tool_names() -> frozenset:
 
 
 def _decision_tool_specs() -> List[Dict[str, Any]]:
-    """Decision Support tool specs, only for a user who may use the module and while the plugin is active."""
+    """Decision Maker tool specs, only for a user who may use the module and while the plugin is active."""
     try:
         from plugins.ifrc.decisions.ai_tools import DECISION_TOOL_SPECS, tools_available
 
@@ -867,7 +867,7 @@ class AIToolsRegistry:
 
     @tool_wrapper
     def list_decisions(self, **kwargs: Any) -> Dict[str, Any]:
-        """List Decision Support decisions the user may see (IFRC plugin)."""
+        """List Decision Maker decisions the user may see (IFRC plugin)."""
         return self._decision_tool("list_decisions", **kwargs)
 
     @tool_wrapper

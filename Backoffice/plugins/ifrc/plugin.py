@@ -94,7 +94,7 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
         return (
             "IFRC programme tools: Pilot Programmatic Partnership embeds, "
             "Plan & Budget visuals (Quarto/Playwright report pipeline), and "
-            "Decision Support (evidence, flags and methodology for Federation-wide decisions)."
+            "Decision Maker (evidence, flags and methodology for Federation-wide decisions)."
         )
 
     def is_admin_feature(self) -> bool:
@@ -179,12 +179,12 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
             ),
             SeedPermission(
                 code="decisions.view",
-                name="Decision Support: view",
-                description="Open Decision Support pages and use its evidence and flags within your country scope",
+                name="Decision Maker: view",
+                description="Open Decision Maker pages and use its evidence and flags within your country scope",
             ),
             SeedPermission(
                 code="admin.decisions.manage",
-                name="Decision Support: administer",
+                name="Decision Maker: administer",
                 description="Edit decision definitions, rule thresholds and review rule history",
             ),
         ]
@@ -199,14 +199,14 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
             ),
             SeedRole(
                 code="decisions_viewer",
-                name="Decision Support: viewer",
-                description="View Decision Support within the user's country scope.",
+                name="Decision Maker: viewer",
+                description="View Decision Maker within the user's country scope.",
                 permission_codes=["decisions.view"],
             ),
             SeedRole(
                 code="admin_decisions_manager",
-                name="Admin: Decision Support",
-                description="Administer Decision Support configuration.",
+                name="Admin: Decision Maker",
+                description="Administer Decision Maker configuration.",
                 permission_codes=["decisions.view", "admin.decisions.manage"],
             ),
         ]

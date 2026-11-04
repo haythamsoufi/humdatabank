@@ -1,8 +1,8 @@
-"""Chatbot tools for Decision Support.
+"""Chatbot tools for Decision Maker.
 
 The model never queries tables or writes SQL. Each tool calls the same service functions as the UI, with
 the requesting user's access context, and returns presentation-ready objects with provenance. A user who
-cannot see Decision Support gets no tools and a refusal if a call is forced.
+cannot see Decision Maker gets no tools and a refusal if a call is forced.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def _spec(name: str, description: str, properties: dict[str, Any], required: lis
 DECISION_TOOL_SPECS: list[dict[str, Any]] = [
     _spec(
         "list_decisions",
-        "List the Decision Support decisions the user may see, each with its question, data readiness, coverage "
+        "List the Decision Maker decisions the user may see, each with its question, data readiness, coverage "
         "and number of open attention flags. Use first when the user asks what decisions or decision views exist.",
         {k: _FILTER_PROPERTIES[k] for k in ("region", "round")},
     ),
@@ -119,7 +119,7 @@ DECISION_TOOL_NAMES = frozenset(spec["function"]["name"] for spec in DECISION_TO
 
 
 def tools_available() -> bool:
-    """True when the plugin is active and the request user may use Decision Support."""
+    """True when the plugin is active and the request user may use Decision Maker."""
     try:
         from flask import current_app
 
@@ -176,7 +176,7 @@ def _wrap(payload: dict[str, Any], *, open_view: str | None = None, evidence_ids
     return out
 
 
-def _refused(reason: str = "You do not have access to Decision Support data.") -> dict[str, Any]:
+def _refused(reason: str = "You do not have access to Decision Maker data.") -> dict[str, Any]:
     return {"success": False, "error": reason}
 
 

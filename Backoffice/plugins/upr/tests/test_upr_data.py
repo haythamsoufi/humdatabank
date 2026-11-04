@@ -605,3 +605,11 @@ def test_master_pns_reported_value_wins_over_country_value():
     assert (a["Country Value"], a["PNS Value"], a["PNS reported"], a["ValueNum"]) == (500, 300, "Yes", 300)
     b = next(r for r in out if r["Year"] == 2028)
     assert (b["Country Value"], b["PNS Value"], b["PNS reported"], b["ValueNum"]) == (70, None, "Yes", None)
+
+
+def test_plan_funding_ea_column_takes_code_from_selected_header():
+    from plugins.upr.upr_data import _plan_funding_facts
+
+    cells = {"IFRC Secretariat_EA1": 11500000, "col_header|EA1": "Afghanistan: Population Movement (MDRAF070)"}
+    rows = _plan_funding_facts(_item(label="Funding Requirement"), _PLACE, cells, {})
+    assert [r["EA Code"] for r in rows] == ["MDRAF070"]

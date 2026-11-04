@@ -330,7 +330,16 @@ def horizon_year(period_name: str | None, label: str | None, item_id: int | None
 
 
 def ea_code_from_text(text: str | None) -> str | None:
-    match = _EA_CODE_RE.search(text or "")
+    """Appeal code from an emergency row label.
+
+    The label may be ``Name (MDRXX123)``, a bare ``MDRXX123``, or a WAF-wrapped ``b64:`` value, so
+    look for an MDR code first and only then fall back to any parenthesised text.
+    """
+    decoded = _decode_waf_b64_label(text or "")
+    appeal = _APPEAL_CODE_RE.search(decoded)
+    if appeal:
+        return appeal.group(1).upper()
+    match = _EA_CODE_RE.search(decoded)
     if not match:
         return None
     code = match.group(1).strip()
@@ -757,6 +766,14 @@ def _report_funding_facts(place: dict[str, Any], cells: dict[str, Any]) -> list[
     return rows
 
 
+def _header_ea_code(cells: dict[str, Any], col: str | None) -> str | None:
+    """Appeal code picked in the matrix's selectable column header (``col_header|EA1``)."""
+    raw = cells.get(f"col_header|{(col or '').strip()}")
+    if isinstance(raw, dict):
+        raw = raw.get("label") or raw.get("value")
+    return ea_code_from_text(str(raw)) if raw else None
+
+
 def _plan_funding_facts(
     item: ItemView,
     place: dict[str, Any],
@@ -791,6 +808,7 @@ def _plan_funding_facts(
                 "SP/EF": spef,
                 "Indicator": "Funding",
                 "Year": year,
+                "EA Code": _header_ea_code(cells, col),
             }
         )
         rows.append(_with_value(fact, number))
@@ -1283,6 +1301,8 @@ def _master_plan_funding_rows(
                 "Area": area,
                 "Attribute": "Total",
                 "Indicator": "Funding Requirement",
+                "EA Code": _header_ea_code(cells, col),
+                "_sub": place.get("submission_id"),
                 "indicatorId": _SHEET_INDICATOR_IDS["Funding Requirement"],
                 "Year": year,
             }
@@ -1622,6 +1642,7 @@ def build_upr_data(
             )
         )
 
+    _fill_funding_ea_codes(facts, emergency_index, area_key="SP/EF")
     facts = _merge_pns_plan_funding(facts, by_submission, extra_places, hosts={p["iso3"] for p in places})
 
     item_scoped = bool(scope and scope.get("item_id") is not None)
@@ -1650,6 +1671,34 @@ def build_upr_data(
         for place in places
     ]
     return {"data": facts, "submissions": submissions}
+
+
+def _fill_funding_ea_codes(
+    rows: list[dict[str, Any]],
+    emergency_index: dict[tuple[int, str], int],
+    *,
+    area_key: str,
+) -> None:
+    """Give plan funding columns ``EA1``..``EAn`` the appeal code of the matching emergency slot.
+
+    The emergency appeals matrix numbers each appeal ``E1``..``En`` in the order it is listed;
+    funding column ``EAn`` belongs to the same slot.
+    """
+    code_by_slot: dict[tuple[int, int], str] = {}
+    for (submission_id, label), slot in emergency_index.items():
+        code = ea_code_from_text(label)
+        if code:
+            code_by_slot[(submission_id, slot)] = code
+    for row in rows:
+        sub = row.pop("_sub", None)
+        if not code_by_slot or row.get("Section") != "Funding" or row.get("EA Code"):
+            continue
+        area = str(row.get(area_key) or "")
+        if not (area.startswith("EA") and area[2:].isdigit()):
+            continue
+        code = code_by_slot.get((int(row.get("submission_id") or sub or 0), int(area[2:])))
+        if code:
+            row["EA Code"] = code
 
 
 def _country_lookup() -> dict[int, dict[str, Any]]:
@@ -1839,6 +1888,7 @@ def build_upr_master(
             )
         )
 
+    _fill_funding_ea_codes(rows, emergency_index, area_key="Area")
     rows = _merge_master_pns_plan_funding(rows, all_places, extra_places, hosts={p["iso3"] for p in places})
     rows.extend(_dynamic_facts(places, by_submission, master=True))
     if section:

@@ -1,4 +1,4 @@
-"""Decision Support service: one implementation behind the UI, the API, exports and the chatbot tools."""
+"""Decision Maker service: one implementation behind the UI, the API, exports and the chatbot tools."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from plugins.ifrc.decisions import config, facts, rules, store
 from plugins.ifrc.decisions.access import AccessContext
-from plugins.ifrc.decisions.config import ConfigError, tr
+from plugins.ifrc.decisions.config import tr
 from plugins.ifrc.decisions.facts import DecisionData, Filters, _round_year, build_decision_data
 from plugins.ifrc.decisions.metrics import (
     DRAFT,
@@ -29,14 +29,22 @@ _READY_PCT = 80.0
 _PARTIAL_PCT = 50.0
 _RUN_DEDUPE_SECONDS = 60
 _RESTRICTED_NOTE = "Totals include only the countries you are permitted to see."
+_PLAN_METRICS = frozenset(
+    {
+        "funding_requirement",
+        "funding_requirement_by_priority",
+        "people_targeted",
+        "indicators_data_unavailable",
+        "emergency_funding_requirement",
+        "emergency_people_targeted",
+        "pns_support_count",
+        "core_indicators_reported",
+    }
+)
 
 
 class NotFound(LookupError):
     """Raised for unknown records and for records the user may not see (indistinguishable on purpose)."""
-
-
-class Denied(PermissionError):
-    pass
 
 
 def _now() -> datetime:
@@ -450,7 +458,7 @@ def _metric_result(
         result["groups"] = _coverage_groups(data, group_by, round_code)
         return result
     observations = list(data.obs(metric_id))
-    plan_metric = metric_id in ("funding_requirement", "funding_requirement_by_priority", "people_targeted", "indicators_data_unavailable")
+    plan_metric = metric_id in _PLAN_METRICS
     if plan_metric and round_code:
         observations = [o for o in observations if o.round == round_code]
         result["round"] = round_code
@@ -586,17 +594,42 @@ def decision_summary(
 
 def _assistant_prompts(decision_id: str, round_code: str | None) -> list[str]:
     period = round_code or "the latest plan round"
-    if decision_id == "DEC-002":
-        return [
+    shared = "What data is missing before this regional summary can be used?"
+    prompts = {
+        "DEC-001": [
+            f"Which countries should be prioritised for greater Federation-wide support in {period}, and why?",
+            f"Which countries meet three or more priority signals in {period}?",
+        ],
+        "DEC-002": [
             f"Which countries have funding requirements that changed by more than 30% compared with the previous planning round ({period})?",
             f"Which Strategic Priorities account for the largest share of {period} requirements?",
-            "What data is missing before this regional summary can be used?",
-        ]
-    return [
+        ],
+        "DEC-003": [
+            f"How many countries, and how much funding requirement and people to be reached, does {period} cover?",
+            f"Which regions have the weakest coverage in {period}?",
+        ],
+        "DEC-005": [
+            f"Which countries plan emergency operations in {period}, and what funding requirement do they state?",
+            f"Which {period} plans have emergency targets without emergency funding, or the reverse?",
+        ],
+        "DEC-006": [
+            f"How is the {period} funding requirement split between host National Societies, PNS and the Secretariat?",
+            f"Which {period} PNS figures come from the host's plan rather than the PNS's own plan?",
+        ],
+        "DEC-007": [
+            f"Which {period} figures are not yet validated and should be caveated before use?",
+            "Which submissions have been waiting for review the longest?",
+        ],
+        "DEC-008": [
+            f"Compare {period} funding requirement by region and funding source.",
+            f"What is the funding requirement by Strategic Priority for each region in {period}?",
+        ],
+    }
+    default = [
         f"Show countries with an incomplete or unvalidated {period} plan.",
         "Which submissions have been waiting for review the longest?",
-        "What data is missing before this regional summary can be used?",
     ]
+    return [*prompts.get(decision_id, default), shared]
 
 
 def _trend(loaded: _Loaded, filters: Filters) -> list[dict[str, Any]]:
@@ -832,7 +865,7 @@ def _evidence_record(obs: Observation, decision: dict[str, Any]) -> dict[str, An
         "accessed_at": _now().isoformat(),
         "definition": {"metric_id": definition.id, "version": definition.version, "name": definition.name.get("en")},
         "decision_id": decision["id"],
-        "extra": {k: v for k, v in obs.extra.items() if k in ("indicators", "anchor_date", "pns_reported", "source", "kind")},
+        "extra": {k: v for k, v in obs.extra.items() if k in ("indicators", "partners", "operations", "anchor_date", "pns_reported", "source", "kind")},
     }
 
 
@@ -890,117 +923,7 @@ def flag_evidence(flag_id: str, access: AccessContext, *, loaded: _Loaded | None
     return flag_detail(flag_id, access, loaded=loaded)
 
 
-# ---------------------------------------------------------------------------
-# Administration
-# ---------------------------------------------------------------------------
-
-
-def _require_manage(access: AccessContext) -> None:
-    if not (access.authenticated and access.can_manage):
-        raise Denied("manage")
-
-
-def admin_overview(access: AccessContext) -> dict[str, Any]:
-    _require_manage(access)
-    decisions = store.load_decisions()
-    rule_map = store.load_rules()
-    return {
-        "data": {
-            "decisions": [{**_decision_view(d, "en"), "status": d.get("status")} for d in decisions.values()],
-            "rules": [_rule_view(r, "en") for r in rule_map.values()],
-            "metrics": [m.to_dict("en") for m in METRIC_REGISTRY.values()],
-            "operators": list(config.OPERATORS),
-            "severities": list(config.SEVERITIES),
-        }
-    }
-
-
-def update_rule(rule_id: str, changes: dict[str, Any], access: AccessContext, note: str | None) -> dict[str, Any]:
-    _require_manage(access)
-    published = store.publish_rule(rule_id, changes, user_id=access.user_id, note=note)
-    return {"data": _rule_view(published, "en")}
-
-
-def update_decision(decision_id: str, changes: dict[str, Any], access: AccessContext, note: str | None) -> dict[str, Any]:
-    _require_manage(access)
-    published = store.publish_decision(decision_id, changes, user_id=access.user_id, note=note)
-    return {"data": _decision_view(published, "en")}
-
-
-def rule_history(rule_id: str, access: AccessContext) -> dict[str, Any]:
-    _require_manage(access)
-    if rule_id not in store.load_rules():
-        raise NotFound("rule")
-    return {"data": store.history("rule", rule_id)}
-
-
-def rule_runs(access: AccessContext, *, limit: int = 100) -> dict[str, Any]:
-    _require_manage(access)
-    from plugins.ifrc.decisions.models import DecisionRuleRun
-
-    rows = DecisionRuleRun.query.order_by(DecisionRuleRun.ran_at.desc()).limit(max(1, min(limit, 500))).all()
-    return {
-        "data": [
-            {
-                "decision_id": r.decision_id,
-                "rule_id": r.rule_id,
-                "rule_version": r.rule_version,
-                "status": r.status,
-                "entities_evaluated": r.entities_evaluated,
-                "flags_raised": r.flags_raised,
-                "error": r.error,
-                "ran_at": r.ran_at.isoformat() if r.ran_at else None,
-            }
-            for r in rows
-        ]
-    }
-
-
-def feedback_summary(access: AccessContext) -> dict[str, Any]:
-    _require_manage(access)
-    from app.extensions import db
-    from plugins.ifrc.decisions.models import DecisionFlagFeedback
-
-    rows = (
-        db.session.query(
-            DecisionFlagFeedback.rule_id,
-            DecisionFlagFeedback.rule_version,
-            DecisionFlagFeedback.verdict,
-            db.func.count(DecisionFlagFeedback.id),
-        )
-        .group_by(DecisionFlagFeedback.rule_id, DecisionFlagFeedback.rule_version, DecisionFlagFeedback.verdict)
-        .all()
-    )
-    return {"data": [{"rule_id": r, "rule_version": v, "verdict": verdict, "count": n} for r, v, verdict, n in rows]}
-
-
-def integration_health(access: AccessContext) -> dict[str, Any]:
-    """Freshness of the source extract the decisions read. GO and ERP are not integrated yet."""
-    _require_manage(access)
-    extract, hit = facts.load_extract()
-    return {
-        "data": {
-            "sources": [
-                {
-                    "source_system": "ifrc_databank",
-                    "dataset": "Unified Plan and Report extract",
-                    "synchronized_at": extract.get("built_at"),
-                    "served_from_cache": hit,
-                    "plan_fact_rows": len(extract.get("plan_facts") or []),
-                    "plan_submissions": len(extract.get("plan_submissions") or []),
-                    "report_submissions": len(extract.get("report_submissions") or []),
-                    "status": "ok",
-                },
-                {"source_system": "go", "status": "not_integrated"},
-                {"source_system": "erp", "status": "not_integrated"},
-            ]
-        }
-    }
-
-
 __all__ = [
-    "ConfigError",
-    "Denied",
     "NotFound",
     "list_decisions",
     "get_definition",

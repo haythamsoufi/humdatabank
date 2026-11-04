@@ -1,4 +1,4 @@
-"""Decision Support routes for Admin -> API Management. Browser-session endpoints only; no API-key access."""
+"""Decision Maker routes for Admin -> API Management. Browser-session endpoints only; no API-key access."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ _COMMON = [
 
 def _row(path: str, methods: list[str], description: str, *, params: list | None = None) -> dict:
     return {
-        "group": "Decision Support",
+        "group": "Decision Maker",
         "path": path,
         "methods": methods,
         "auth": "session",
@@ -56,11 +56,4 @@ API_ENDPOINTS = [
     _row("/api/decision-sources/<path:reference>", ["GET"], "Source record, by evidence id or submission:<id>."),
     _row("/api/metric-definitions", ["GET"], "Metric registry with definitions, units and disclosure rules.", params=_COMMON[-1:]),
     _row("/api/decision-methodologies/<decision_id>", ["GET"], "Published methodology, metrics and rule thresholds.", params=_COMMON[-1:]),
-    _row("/api/admin/decisions", ["GET"], "Administration overview of decisions, rules and metrics."),
-    _row("/api/admin/decisions/<decision_id>", ["PUT"], "Publish a new decision version."),
-    _row("/api/admin/decision-rules/<rule_id>", ["PUT"], "Publish a new rule version (threshold, severity, enabled)."),
-    _row("/api/admin/decision-rules/<rule_id>/history", ["GET"], "All published versions of a rule."),
-    _row("/api/admin/decision-runs", ["GET"], "Recent rule executions."),
-    _row("/api/admin/decision-feedback", ["GET"], "Flag feedback counts by rule version."),
-    _row("/api/admin/decision-integrations", ["GET"], "Source freshness and integration health."),
 ]

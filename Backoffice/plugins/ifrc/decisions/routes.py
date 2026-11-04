@@ -1,4 +1,4 @@
-"""Decision Support pages and JSON API."""
+"""Decision Maker pages and JSON API."""
 
 from __future__ import annotations
 
@@ -17,13 +17,12 @@ from app.utils.api_responses import (
     json_not_found,
 )
 from app.utils.client_ip import get_client_ip
-from app.routes.admin.shared import permission_required
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.rate_limiting import rate_limit
 from plugins.ifrc.decisions import _PLUGIN_DIR, bp
 from plugins.ifrc.decisions import service
 from plugins.ifrc.decisions.access import AccessContext, resolve_access_context
-from plugins.ifrc.decisions.config import ConfigError
+from plugins.ifrc.decisions.config import LANGUAGES
 from plugins.ifrc.decisions.facts import Filters
 from plugins.ifrc.decisions.metrics import METRIC_REGISTRY
 
@@ -45,7 +44,7 @@ def _access() -> AccessContext:
     return cached
 
 
-def api_view(*, manage: bool = False, per_minute: int = 120) -> Callable:
+def api_view(*, per_minute: int = 120) -> Callable:
     """Session-authenticated JSON endpoint. Unreadable and missing records both answer 404."""
 
     def decorator(fn: Callable) -> Callable:
@@ -57,18 +56,11 @@ def api_view(*, manage: bool = False, per_minute: int = 120) -> Callable:
             access = _access()
             if not access.can_view:
                 logger.info("decision_support access_denied user=%s path=%s", access.user_id, request.path)
-                return json_forbidden("You do not have access to Decision Support.")
-            if manage and not access.can_manage:
-                logger.info("decision_support access_denied user=%s path=%s", access.user_id, request.path)
-                return json_forbidden("You do not have permission to administer Decision Support.")
+                return json_forbidden("You do not have access to Decision Maker.")
             try:
                 return fn(access, *args, **kwargs)
             except service.NotFound:
                 return json_not_found("Not found.")
-            except service.Denied:
-                return json_forbidden("You do not have permission to administer Decision Support.")
-            except ConfigError as exc:
-                return json_bad_request("Invalid configuration.", errors=exc.errors)
             except ValueError as exc:
                 return json_bad_request(str(exc))
             except Exception as exc:  # noqa: BLE001 - surfaced as a generic JSON error
@@ -223,59 +215,6 @@ def api_methodology(access: AccessContext, decision_id: str):
     return _json(service.methodology(resolved, access, _filters().lang))
 
 
-# Administration ------------------------------------------------------------
-
-
-@bp.route("/api/admin/decisions", methods=["GET"])
-@api_view(manage=True)
-def api_admin_overview(access: AccessContext):
-    return _json(service.admin_overview(access))
-
-
-@bp.route("/api/admin/decision-rules/<rule_id>", methods=["PUT"])
-@api_view(manage=True, per_minute=30)
-def api_admin_rule_update(access: AccessContext, rule_id: str):
-    body = _body()
-    changes = body.get("changes")
-    if not isinstance(changes, dict):
-        raise ValueError("changes is required")
-    return _json(service.update_rule(rule_id, changes, access, _note(body)))
-
-
-@bp.route("/api/admin/decision-rules/<rule_id>/history", methods=["GET"])
-@api_view(manage=True)
-def api_admin_rule_history(access: AccessContext, rule_id: str):
-    return _json(service.rule_history(rule_id, access))
-
-
-@bp.route("/api/admin/decisions/<decision_id>", methods=["PUT"])
-@api_view(manage=True, per_minute=30)
-def api_admin_decision_update(access: AccessContext, decision_id: str):
-    body = _body()
-    changes = body.get("changes")
-    if not isinstance(changes, dict):
-        raise ValueError("changes is required")
-    return _json(service.update_decision(decision_id, changes, access, _note(body)))
-
-
-@bp.route("/api/admin/decision-runs", methods=["GET"])
-@api_view(manage=True)
-def api_admin_runs(access: AccessContext):
-    return _json(service.rule_runs(access))
-
-
-@bp.route("/api/admin/decision-feedback", methods=["GET"])
-@api_view(manage=True)
-def api_admin_feedback(access: AccessContext):
-    return _json(service.feedback_summary(access))
-
-
-@bp.route("/api/admin/decision-integrations", methods=["GET"])
-@api_view(manage=True)
-def api_admin_integrations(access: AccessContext):
-    return _json(service.integration_health(access))
-
-
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
@@ -289,7 +228,7 @@ def _page_guard():
         flash("Access denied. Please log in.", "warning")
         return redirect(url_for("auth.login", next=request.full_path.rstrip("?")))
     if not _access().can_view:
-        flash("Access denied. Decision Support permission required.", "warning")
+        flash("Access denied. Decision Maker permission required.", "warning")
         return redirect(url_for("main.dashboard"))
     return None
 
@@ -305,12 +244,29 @@ def _page(template: str, **context: Any):
     return render_template(f"plugins/ifrc/decisions/{template}", **context)
 
 
+def _workspace(slug: str, decision_id: str, **context: Any):
+    from app.i18n import get_locale
+
+    lang = str(get_locale() or "en").replace("-", "_").split("_")[0]
+    definition = service.get_definition(decision_id, _access(), lang if lang in LANGUAGES else "en")
+    return _page(
+        "workspace.html",
+        decision_id=decision_id,
+        slug=slug,
+        decision_title=definition["title"],
+        decision_question=definition["question"],
+        country=context.pop("country", ""),
+        region=context.pop("region", ""),
+        **context,
+    )
+
+
 @bp.route("/decisions", methods=["GET"])
 def page_catalogue():
     denied = _page_guard()
     if denied is not None:
         return denied
-    return _page("catalogue.html", can_manage=_access().can_manage)
+    return _page("catalogue.html")
 
 
 @bp.route("/decisions/<slug>", methods=["GET"])
@@ -322,7 +278,7 @@ def page_workspace(slug: str):
         decision_id = service.resolve_decision_id(slug, _access())
     except service.NotFound:
         return json_not_found("Not found.")
-    return _page("workspace.html", decision_id=decision_id, slug=slug, country="", region="")
+    return _workspace(slug, decision_id)
 
 
 @bp.route("/decisions/<slug>/country/<country_code>", methods=["GET"])
@@ -339,7 +295,7 @@ def page_country(slug: str, country_code: str):
         return json_not_found("Not found.")
     if not _access().can_read_iso3(code):
         return json_not_found("Not found.")
-    return _page("workspace.html", decision_id=decision_id, slug=slug, country=code, region="")
+    return _workspace(slug, decision_id, country=code)
 
 
 @bp.route("/decisions/<slug>/region/<region_code>", methods=["GET"])
@@ -351,7 +307,7 @@ def page_region(slug: str, region_code: str):
         decision_id = service.resolve_decision_id(slug, _access())
     except service.NotFound:
         return json_not_found("Not found.")
-    return _page("workspace.html", decision_id=decision_id, slug=slug, country="", region=region_code[:80])
+    return _workspace(slug, decision_id, region=region_code[:80])
 
 
 @bp.route("/decisions/<slug>/evidence", methods=["GET"])
@@ -363,10 +319,4 @@ def page_evidence(slug: str):
         decision_id = service.resolve_decision_id(slug, _access())
     except service.NotFound:
         return json_not_found("Not found.")
-    return _page("workspace.html", decision_id=decision_id, slug=slug, country="", region="", focus="evidence")
-
-
-@bp.route("/admin/decisions", methods=["GET"])
-@permission_required("admin.decisions.manage")
-def page_admin():
-    return _page("admin.html")
+    return _workspace(slug, decision_id, focus="evidence")

@@ -68,9 +68,12 @@
                                         </div>
                                         {% set card_badges = assignment_badges.get(item.item_object.id, []) if assignment_badges is defined else [] %}
                                         {% if card_badges %}
-                                            <div class="text-sm text-gray-600 mb-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+                                            <div class="my-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                 {% for b in card_badges %}
-                                                    <span class="whitespace-nowrap">{{ b.label }}:</span>{{ status_label(b.value, b.tone, 'mr-2') }}
+                                                    <div class="rounded-md border border-gray-200 bg-white px-2 py-1.5 min-w-0">
+                                                        <div class="text-[11px] uppercase tracking-wide text-gray-500 truncate">{{ b.label }}</div>
+                                                        <div class="mt-0.5">{{ status_label(b.value, b.tone, '') }}</div>
+                                                    </div>
                                                 {% endfor %}
                                             </div>
                                         {% endif %}
@@ -242,9 +245,6 @@
                                         </a>
                                         {% endif %}
                                     {% endif %}
-                                    {% if project_cycle_nav_cycles is defined and project_cycle_nav_cycles|length > 1 and project_cycle_nav_id is defined %}
-                                        {% include "core/dashboard/_project_cycle_nav_inline.html" %}
-                                    {% endif %}
                                     </div>
                                     <div class="dashboard-card-actions-bar flex flex-1 min-w-0 items-center gap-2">
                                     <div class="dashboard-card-actions-inline flex flex-nowrap items-center gap-2 min-w-0 overflow-hidden">
@@ -369,4 +369,7 @@
                                              role="menu"></div>
                                     </div>
                                     </div>
+                                    {% if project_cycle_nav_cycles is defined and project_cycle_nav_cycles|length > 1 and project_cycle_nav_id is defined %}
+                                        {% include "core/dashboard/_project_cycle_nav_inline.html" %}
+                                    {% endif %}
                                 </div>

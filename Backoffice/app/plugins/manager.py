@@ -875,6 +875,16 @@ class PluginManager:
                 active_plugin_instances[plugin_id] = self.plugins[plugin_id]
         return active_plugin_instances
 
+    def _has_settings_page(self, plugin_name: str) -> bool:
+        """True when ``/admin/plugins/<id>/settings`` resolves to a registered GET route."""
+        try:
+            from flask import current_app
+            adapter = current_app.url_map.bind('localhost')
+            adapter.match(f'/admin/plugins/{plugin_name}/settings', method='GET')
+            return True
+        except Exception:
+            return False
+
     def get_plugin_info(self, plugin_name: str) -> Optional[Dict[str, Any]]:
         """Get information about a specific plugin."""
         if plugin_name not in self.plugins:
@@ -890,6 +900,7 @@ class PluginManager:
         info['status'] = self.get_plugin_status(plugin_name)
         info['always_on'] = self.is_always_on(plugin_name)
         info['first_party'] = self.is_first_party(plugin_name)
+        info['has_settings'] = self._has_settings_page(plugin_name)
         info['requires'] = self.get_required_plugins(plugin_name)
         info['missing_dependencies'] = self.get_missing_dependencies(plugin_name)
         info['dependents'] = self.get_dependents(plugin_name)

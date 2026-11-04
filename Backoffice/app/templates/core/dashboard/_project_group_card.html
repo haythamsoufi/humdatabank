@@ -11,7 +11,10 @@
      data-project-dashboard-card>
     <div class="flex-1 min-w-0">
         <p class="text-base font-semibold text-gray-900 leading-snug pr-2">
-            {{ item.project_title or item.project_reference }}
+            <a href="{{ url_for('assignments.view_assignment', aes_id=active_cycle.item_object.id) }}"
+               class="hover:text-blue-700 hover:underline focus:outline-none focus:underline">
+                {{ item.project_title or item.project_reference }}
+            </a>
         </p>
         {% if item.project_title %}
         <p class="text-xs text-gray-500 mt-1 font-medium">{{ item.project_reference }}</p>
@@ -22,7 +25,7 @@
         </p>
 
         <div class="relative mt-1">
-            {% with item=active_cycle, dashboard_project_cycle=true, project_cycle_nav_cycles=nav_cycles, project_cycle_nav_id=nav_project_id %}
+            {% with item=active_cycle, dashboard_project_cycle=true, project_cycle_nav_cycles=nav_cycles, project_cycle_nav_id=nav_project_id, project_cycle_nav_active_idx=active_idx %}
             {% set is_overdue = item.type == 'assigned' and item.date_info and item.date_info.date() < current_date
                 and item.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review', 'cancelled'] %}
             {% include "core/dashboard/_assignment_card_body.html" %}

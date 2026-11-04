@@ -259,11 +259,16 @@
                                 class="text-blue-600 hover:text-blue-900 inline-flex items-center justify-center" title="${i18n.title_view_details}">
                             <i class="fas fa-eye text-base align-middle leading-none"></i>
                         </button>
-                        <button data-action="settings"
+                        ${plugin.has_settings ? `<button data-action="settings"
                                 class="text-green-600 hover:text-green-900 inline-flex items-center justify-center" title="${i18n.title_settings}">
                             <i class="fas fa-cog text-base align-middle leading-none"></i>
-                        </button>
-                        ${plugin.always_on ? '' : (plugin.is_active ?
+                        </button>` : `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${i18n.title_settings}" aria-disabled="true">
+                            <i class="fas fa-cog text-base align-middle leading-none"></i>
+                        </span>`}
+                        ${plugin.always_on ?
+                            `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${plugin.is_active ? i18n.title_deactivate : i18n.title_activate}" aria-disabled="true">
+                                <i class="fas ${plugin.is_active ? 'fa-pause' : 'fa-play'} text-base align-middle leading-none"></i>
+                            </span>` : (plugin.is_active ?
                             `<button data-action="deactivate"
                                      class="text-orange-600 hover:text-orange-900 inline-flex items-center justify-center" title="${i18n.title_deactivate}">
                                 <i class="fas fa-pause text-base align-middle leading-none"></i>
@@ -277,7 +282,9 @@
                                 class="text-yellow-600 hover:text-yellow-900 inline-flex items-center justify-center" title="${i18n.title_reload}">
                             <i class="fas fa-sync-alt text-base align-middle leading-none"></i>
                         </button>
-                        ${plugin.first_party ? '' : `<button data-action="uninstall"
+                        ${plugin.first_party ? `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${i18n.title_uninstall}" aria-disabled="true">
+                            <i class="fas fa-trash text-base align-middle leading-none"></i>
+                        </span>` : `<button data-action="uninstall"
                                 class="text-red-600 hover:text-red-900 inline-flex items-center justify-center" title="${i18n.title_uninstall}">
                             <i class="fas fa-trash text-base align-middle leading-none"></i>
                         </button>`}

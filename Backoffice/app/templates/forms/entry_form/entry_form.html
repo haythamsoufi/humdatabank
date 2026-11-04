@@ -945,6 +945,22 @@
                                         {# Render direct fields of the parent section #}
                                         {% if section.section_type == 'discussion' %}
                                             {% include 'forms/entry_form/partials/discussion_panel_section.html' %}
+                                        {% elif ((section.config and section.config.get('display_mode') == 'summary') or section.name == 'Project information') and section.fields_ordered %}
+                                            {# Project metadata summary: read-only key/value grid instead of regular input items #}
+                                            {% set _wide_labels = ['title', 'categories/thematics', 'ns focal person', 'ifrc project manager'] %}
+                                            <div class="project-summary rounded-lg border border-gray-200 bg-white overflow-hidden" data-section-summary="true">
+                                            <dl class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 -mt-px">
+                                                {% for field in section.fields_ordered %}
+                                                    {% set _lbl = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
+                                                    {% set _val = existing_data.get('field_value[' ~ field.id ~ ']') %}
+                                                    {% set _has_val = _val is not none and (_val|string)|trim %}
+                                                    <div class="min-w-0 bg-white px-4 py-3 border-t border-gray-100 {% if (_lbl or '')|lower|trim in _wide_labels %}sm:col-span-2 xl:col-span-3{% endif %}" data-item-id="{{ field.id }}">
+                                                        <dt class="text-xs font-medium text-gray-500 mb-1">{{ _lbl }}</dt>
+                                                        <dd class="text-[15px] leading-snug break-words whitespace-pre-wrap {% if _has_val %}font-semibold text-gray-900{% else %}text-gray-400{% endif %}">{% if _has_val %}{{ _val }}{% else %}—{% endif %}</dd>
+                                                    </div>
+                                                {% endfor %}
+                                            </dl>
+                                            </div>
                                         {% elif section.fields_ordered %}
                                             {% for field in section.fields_ordered %}
                                                 {# Unified FormItem approach - check for document fields #}

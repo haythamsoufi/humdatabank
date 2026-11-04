@@ -2009,14 +2009,40 @@ def dashboard_assignment_is_overdue(item: dict, current_date) -> bool:
     return item.get("status") not in _DASHBOARD_DONE_STATUSES
 
 
+def _dashboard_cycle_due_date(cycle):
+    """Due date (date) of a dashboard cycle item, or None."""
+    date_info = cycle.get("date_info")
+    if not date_info:
+        return None
+    try:
+        return date_info.date() if hasattr(date_info, "date") else date_info
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _dashboard_cycle_sort_key(cycle):
+    """Chronological order: by due date (undated last), then period name."""
+    import datetime as _dt
+
+    due = _dashboard_cycle_due_date(cycle)
+    af = getattr(cycle.get("item_object"), "assigned_form", None)
+    period = af.period_name if af else ""
+    return (due is None, due or _dt.date.max, _dashboard_reporting_period_sort_key(period))
+
+
 def _pick_project_dashboard_cycle_index(cycles, current_date) -> int:
+    """Active round = the cycle with the next due date on/after today.
+
+    Cycles must be sorted by due date. If every cycle is past due, the latest one is active.
+    """
     if not cycles:
         return 0
     for i, cycle in enumerate(cycles):
-        if dashboard_assignment_is_overdue(cycle, current_date):
+        due = _dashboard_cycle_due_date(cycle)
+        if due is not None and due >= current_date:
             return i
-    for i, cycle in enumerate(cycles):
-        if cycle.get("status") not in ("submitted", "approved", "cancelled"):
+    for i in range(len(cycles) - 1, -1, -1):
+        if _dashboard_cycle_due_date(cycles[i]) is not None:
             return i
     return len(cycles) - 1
 
@@ -2046,13 +2072,7 @@ def group_dashboard_project_assignments(items, current_date):
     }
     groups = {}
     for pid, cycle_items in by_project.items():
-        cycle_items.sort(
-            key=lambda it: _dashboard_reporting_period_sort_key(
-                it["item_object"].assigned_form.period_name
-                if it.get("item_object") and it["item_object"].assigned_form
-                else ""
-            )
-        )
+        cycle_items.sort(key=_dashboard_cycle_sort_key)
         proj = projects.get(pid)
         active = _pick_project_dashboard_cycle_index(cycle_items, current_date)
         groups[pid] = {

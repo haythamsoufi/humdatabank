@@ -160,12 +160,16 @@ def _section(
     order: float,
     section_type: str = "standard",
 ) -> FormSection:
+    # Project information is a locked copy of the project record: show it as a metadata summary.
+    config = {"display_mode": "summary"} if name == "Project information" else {}
     existing = (
         FormSection.query.filter_by(version_id=version.id, archived=False)
         .filter(FormSection.name == name)
         .first()
     )
     if existing:
+        if config and (existing.config or {}).get("display_mode") != "summary":
+            existing.config = {**(existing.config or {}), **config}
         return existing
     sec = FormSection(
         template_id=template.id,
@@ -173,6 +177,7 @@ def _section(
         name=name,
         order=order,
         section_type=section_type,
+        config=config,
     )
     db.session.add(sec)
     db.session.flush()

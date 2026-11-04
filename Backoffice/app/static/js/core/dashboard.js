@@ -1553,14 +1553,39 @@ document.addEventListener('DOMContentLoaded', function() {
         layoutDashboardCardActions(actions);
     });
 
-    document.addEventListener('change', function (event) {
-        const nav = event.target.closest('[data-project-cycle-nav]');
-        if (!nav || !nav.value) {
+    // Project card cycle switcher popover
+    function closeCycleMenus(except) {
+        document.querySelectorAll('[data-project-cycle-nav]').forEach(function (nav) {
+            if (nav === except) return;
+            const menu = nav.querySelector('.project-cycle-nav-menu');
+            const btn = nav.querySelector('[data-project-cycle-nav-toggle]');
+            if (menu) menu.classList.add('hidden');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        const toggle = event.target.closest('[data-project-cycle-nav-toggle]');
+        if (toggle) {
+            const nav = toggle.closest('[data-project-cycle-nav]');
+            const menu = nav.querySelector('.project-cycle-nav-menu');
+            const willOpen = menu.classList.contains('hidden');
+            closeCycleMenus(nav);
+            menu.classList.toggle('hidden', !willOpen);
+            toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            if (willOpen) {
+                const current = menu.querySelector('.project-cycle-nav-item.bg-blue-50\\/60');
+                if (current) current.scrollIntoView({ block: 'nearest' });
+            }
             return;
         }
-        const target = nav.value;
-        nav.selectedIndex = 0;
-        window.location.assign(target);
+        if (!event.target.closest('[data-project-cycle-nav]')) {
+            closeCycleMenus(null);
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeCycleMenus(null);
     });
 
 });

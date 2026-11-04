@@ -556,10 +556,6 @@ def get_ns_key_data():
         except ValueError as error:
             return api_error(str(error), 400)
 
-        if scope:
-
-            params["scope"] = scope
-
         payload, cache_hit = get_or_build_upr_payload(
             "nskeydata-period",
             {},

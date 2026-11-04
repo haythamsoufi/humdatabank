@@ -1,0 +1,67 @@
+/* Decision Support. Logical properties keep the layout correct in right-to-left languages. */
+.dec-root { max-width: 80rem; margin-inline: auto; padding: 1rem; color: #1f2937; }
+.dec-root[dir="rtl"] { text-align: start; }
+.dec-muted { color: #6b7280; font-size: 0.8125rem; }
+.dec-h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.25rem; }
+.dec-h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.5rem; }
+.dec-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem; margin-block-end: 1rem; }
+.dec-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.dec-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.dec-card a.dec-open { margin-block-start: auto; align-self: flex-start; background: #b91c1c; color: #fff; padding: 0.4rem 0.8rem; border-radius: 0.375rem; text-decoration: none; font-size: 0.875rem; }
+.dec-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; margin-block-end: 1rem; }
+.dec-toolbar label { display: flex; flex-direction: column; font-size: 0.75rem; color: #4b5563; gap: 0.15rem; }
+.dec-toolbar input, .dec-toolbar select { border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.35rem 0.5rem; font-size: 0.875rem; min-width: 9rem; background: #fff; }
+.dec-btn { border: 1px solid #d1d5db; background: #fff; border-radius: 0.375rem; padding: 0.35rem 0.7rem; font-size: 0.8125rem; cursor: pointer; }
+.dec-btn:hover { background: #f3f4f6; }
+.dec-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.dec-btn-primary { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+.dec-btn-primary:hover { background: #991b1b; }
+.dec-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.75rem; align-items: flex-start; }
+.dec-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; font-size: 0.8125rem; color: #374151; margin-block: 0.5rem; }
+.dec-meta strong { font-weight: 600; }
+.dec-badge { display: inline-flex; align-items: center; gap: 0.25rem; border-radius: 9999px; padding: 0.1rem 0.55rem; font-size: 0.75rem; font-weight: 600; border: 1px solid transparent; }
+.dec-badge-ready { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.dec-badge-partial { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.dec-badge-limited { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
+.dec-badge-unavailable { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.dec-sev-information { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.dec-sev-review { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.dec-sev-important { background: #fff7ed; color: #9a3412; border-color: #fdba74; }
+.dec-sev-urgent { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+.dec-table-wrap { overflow-x: auto; }
+.dec-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.dec-table th, .dec-table td { text-align: start; padding: 0.4rem 0.5rem; border-block-end: 1px solid #e5e7eb; vertical-align: top; }
+.dec-table th { background: #f9fafb; font-weight: 600; white-space: nowrap; }
+.dec-table td.num, .dec-table th.num { text-align: end; font-variant-numeric: tabular-nums; }
+.dec-table tr:hover td { background: #fafafa; }
+.dec-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.75rem; }
+.dec-kpi { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.6rem 0.75rem; }
+.dec-kpi .v { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dec-flag { border: 1px solid #e5e7eb; border-inline-start-width: 4px; border-radius: 0.375rem; padding: 0.6rem 0.75rem; margin-block-end: 0.6rem; background: #fff; }
+.dec-flag.sev-information { border-inline-start-color: #3b82f6; }
+.dec-flag.sev-review { border-inline-start-color: #f59e0b; }
+.dec-flag.sev-important { border-inline-start-color: #ea580c; }
+.dec-flag.sev-urgent { border-inline-start-color: #dc2626; }
+.dec-flag-head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-block-end: 0.25rem; }
+.dec-flag-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-block-start: 0.5rem; }
+.dec-note { background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.8125rem; margin-block-start: 0.5rem; }
+.dec-caveats { background: #fffbeb; border: 1px solid #fde68a; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.8125rem; }
+.dec-caveats ul { margin: 0.25rem 0 0; padding-inline-start: 1.1rem; }
+.dec-drawer { position: fixed; inset-block: 0; inset-inline-end: 0; width: min(28rem, 100vw); background: #fff; border-inline-start: 1px solid #d1d5db; box-shadow: -4px 0 16px rgba(0,0,0,0.12); padding: 1rem; overflow-y: auto; z-index: 60; }
+.dec-drawer[hidden] { display: none; }
+.dec-dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.75rem; font-size: 0.8125rem; }
+.dec-dl dt { color: #6b7280; }
+.dec-dl dd { margin: 0; word-break: break-word; }
+.dec-chart { width: 100%; height: auto; max-height: 14rem; }
+.dec-chart text { font-size: 10px; fill: #4b5563; }
+.dec-bar-row { display: grid; grid-template-columns: 9rem 1fr 7rem; gap: 0.5rem; align-items: center; font-size: 0.8125rem; margin-block-end: 0.3rem; }
+.dec-bar { height: 0.7rem; background: #b91c1c; border-radius: 0.2rem; min-width: 1px; }
+.dec-tabs { display: flex; gap: 0.25rem; margin-block-end: 0.75rem; border-block-end: 1px solid #e5e7eb; }
+.dec-tab { padding: 0.4rem 0.8rem; border: 0; background: none; cursor: pointer; font-size: 0.875rem; border-block-end: 2px solid transparent; }
+.dec-tab[aria-selected="true"] { border-block-end-color: #b91c1c; font-weight: 600; }
+.dec-prompts { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.dec-prompt { text-align: start; }
+.dec-label-ai { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
+.dec-error { color: #991b1b; }
+.dec-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.dec-focus:focus-visible, .dec-btn:focus-visible, .dec-tab:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }

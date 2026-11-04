@@ -1,0 +1,68 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ _('Decision workspace') }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('decisions.static_file', filename='css/decisions.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set ui_lang = current_ui_language() %}
+<main class="dec-root" id="dec-app" data-view="workspace" data-lang="{{ ui_lang }}"
+      data-decision-id="{{ decision_id }}" data-slug="{{ slug }}"
+      data-country="{{ country }}" data-region="{{ region }}" data-focus="{{ focus|default('') }}"
+      data-api-base="{{ url_for('decisions.api_list') }}"
+      data-flag-base="{{ url_for('decisions.api_list').replace('/api/decisions', '/api/decision-flags') }}"
+      data-evidence-base="{{ url_for('decisions.api_list').replace('/api/decisions', '/api/decision-evidence') }}"
+      data-methodology-base="{{ url_for('decisions.api_list').replace('/api/decisions', '/api/decision-methodologies') }}"
+      data-catalogue-url="{{ url_for('decisions.page_catalogue') }}"
+      dir="{{ 'rtl' if ui_lang == 'ar' else 'ltr' }}">
+  <p><a class="dec-focus" href="{{ url_for('decisions.page_catalogue') }}" id="dec-back"></a></p>
+
+  <header class="dec-section" id="dec-header">
+    <div class="dec-header">
+      <div>
+        <h1 class="dec-h1" id="dec-title">{{ _('Loading...') }}</h1>
+        <p class="dec-muted" id="dec-question"></p>
+      </div>
+      <div class="dec-flag-actions">
+        <button type="button" class="dec-btn dec-btn-primary" id="dec-ask"></button>
+        <button type="button" class="dec-btn" id="dec-export"></button>
+        <button type="button" class="dec-btn" id="dec-method"></button>
+      </div>
+    </div>
+    <div class="dec-meta" id="dec-meta"></div>
+    <div id="dec-caveats"></div>
+  </header>
+
+  <form class="dec-toolbar" id="dec-filters" aria-label="{{ _('Filters') }}">
+    <label>{{ _('Region') }}<input type="text" name="region" autocomplete="off"></label>
+    <label>{{ _('Country') }}<input type="text" name="country" maxlength="3" placeholder="TUR" autocomplete="off"></label>
+    <label>{{ _('Round') }}<input type="text" name="round" maxlength="5" placeholder="P27" autocomplete="off"></label>
+    <label>{{ _('Validation') }}
+      <select name="validation_state">
+        <option value="">{{ _('All') }}</option>
+        <option value="validated">{{ _('Validated') }}</option>
+        <option value="provisional">{{ _('Provisional') }}</option>
+      </select>
+    </label>
+    <button type="submit" class="dec-btn dec-btn-primary">{{ _('Apply') }}</button>
+  </form>
+
+  <div id="dec-status" class="dec-muted" role="status" aria-live="polite"></div>
+  <div id="dec-sections"></div>
+
+  <aside class="dec-drawer" id="dec-drawer" hidden role="dialog" aria-modal="false" aria-labelledby="dec-drawer-title" tabindex="-1">
+    <div class="dec-flag-head">
+      <h2 class="dec-h2" id="dec-drawer-title"></h2>
+      <button type="button" class="dec-btn" id="dec-drawer-close"></button>
+    </div>
+    <div id="dec-drawer-body"></div>
+  </aside>
+</main>
+{% include "plugins/ifrc/decisions/_i18n.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('decisions.static_file', filename='js/decisions.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+{% endblock %}

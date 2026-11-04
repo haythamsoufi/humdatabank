@@ -1,0 +1,43 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ _('Decision Support') }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('decisions.static_file', filename='css/decisions.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set ui_lang = current_ui_language() %}
+<main class="dec-root" id="dec-app" data-view="catalogue" data-lang="{{ ui_lang }}"
+      data-api-list="{{ url_for('decisions.api_list') }}"
+      data-workspace-base="{{ url_for('decisions.page_catalogue') }}"
+      data-admin-url="{{ url_for('decisions.page_admin') if can_manage else '' }}"
+      dir="{{ 'rtl' if ui_lang == 'ar' else 'ltr' }}">
+  <h1 class="dec-h1">{{ _('Decision Support') }}</h1>
+  <p class="dec-muted">{{ _('Evidence for review. Flags are prompts for human follow-up, not conclusions, and no National Society is ranked or scored.') }}</p>
+
+  <form class="dec-toolbar" id="dec-filters" role="search" aria-label="{{ _('Filter decisions') }}">
+    <label>{{ _('Search') }}<input type="search" name="q" autocomplete="off"></label>
+    <label>{{ _('Region') }}<input type="text" name="region" autocomplete="off"></label>
+    <label>{{ _('Round') }}<input type="text" name="round" placeholder="P27" maxlength="5" autocomplete="off"></label>
+    <label>{{ _('Validation') }}
+      <select name="validation_state">
+        <option value="">{{ _('All') }}</option>
+        <option value="validated">{{ _('Validated') }}</option>
+        <option value="provisional">{{ _('Provisional') }}</option>
+      </select>
+    </label>
+    <label class="dec-inline"><span><input type="checkbox" name="attention"> {{ _('Only show decisions with items requiring attention') }}</span></label>
+    <button type="submit" class="dec-btn dec-btn-primary">{{ _('Apply') }}</button>
+    {% if can_manage %}<a class="dec-btn" href="{{ url_for('decisions.page_admin') }}">{{ _('Administer') }}</a>{% endif %}
+  </form>
+
+  <div id="dec-status" class="dec-muted" role="status" aria-live="polite"></div>
+  <div id="dec-cards" class="dec-grid"></div>
+</main>
+{% include "plugins/ifrc/decisions/_i18n.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('decisions.static_file', filename='js/decisions.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+{% endblock %}

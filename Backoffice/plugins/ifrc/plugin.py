@@ -93,7 +93,8 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
     def description(self) -> str:
         return (
             "IFRC programme tools: Pilot Programmatic Partnership embeds, "
-            "and Plan & Budget visuals (Quarto/Playwright report pipeline)."
+            "Plan & Budget visuals (Quarto/Playwright report pipeline), and "
+            "Decision Support (evidence, flags and methodology for Federation-wide decisions)."
         )
 
     def is_admin_feature(self) -> bool:
@@ -105,10 +106,26 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
         return bp
 
     def get_additional_blueprints(self):
+        from plugins.ifrc.decisions import bp as decisions_bp
         from plugins.ifrc.pb_progress import bp as pb_bp
         from plugins.ifrc.pb_progress import settings_bp
 
-        return [pb_bp, settings_bp]
+        return [pb_bp, settings_bp, decisions_bp]
+
+    def get_models(self):
+        from plugins.ifrc.decisions.models import (
+            DecisionConfigVersion,
+            DecisionFlagFeedback,
+            DecisionFlagState,
+            DecisionRuleRun,
+        )
+
+        return [DecisionConfigVersion, DecisionFlagState, DecisionFlagFeedback, DecisionRuleRun]
+
+    def get_api_endpoints(self):
+        from plugins.ifrc.decisions.api_registry import API_ENDPOINTS
+
+        return list(API_ENDPOINTS)
 
     def get_settings(self):
         from plugins.ifrc.routes import ifrc_settings_status
@@ -160,6 +177,16 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
                 name="Data Explorer: P&B visuals",
                 description="Access the Plan and Budget visuals tab in Data Explorer",
             ),
+            SeedPermission(
+                code="decisions.view",
+                name="Decision Support: view",
+                description="Open Decision Support pages and use its evidence and flags within your country scope",
+            ),
+            SeedPermission(
+                code="admin.decisions.manage",
+                name="Decision Support: administer",
+                description="Edit decision definitions, rule thresholds and review rule history",
+            ),
         ]
 
     def get_seed_roles(self) -> list[SeedRole]:
@@ -169,6 +196,18 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
                 name="Admin: Data Explorer (P&B visuals)",
                 description="Access the Plan and Budget visuals tab in Data Explorer.",
                 permission_codes=["admin.data_explore.pb_progress"],
+            ),
+            SeedRole(
+                code="decisions_viewer",
+                name="Decision Support: viewer",
+                description="View Decision Support within the user's country scope.",
+                permission_codes=["decisions.view"],
+            ),
+            SeedRole(
+                code="admin_decisions_manager",
+                name="Admin: Decision Support",
+                description="Administer Decision Support configuration.",
+                permission_codes=["decisions.view", "admin.decisions.manage"],
             ),
         ]
 

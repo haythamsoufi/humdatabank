@@ -1,0 +1,30 @@
+{% extends "core/layout.html" %}
+
+{% block title %}{{ _('Decision Support administration') }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('decisions.static_file', filename='css/decisions.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set ui_lang = current_ui_language() %}
+<main class="dec-root" id="dec-app" data-view="admin" data-lang="{{ ui_lang }}"
+      data-admin-base="{{ url_for('decisions.api_admin_overview') }}"
+      data-rule-base="{{ url_for('decisions.api_admin_overview').replace('/api/admin/decisions', '/api/admin/decision-rules') }}"
+      data-decision-base="{{ url_for('decisions.api_admin_overview') }}"
+      data-runs-url="{{ url_for('decisions.api_admin_runs') }}"
+      data-feedback-url="{{ url_for('decisions.api_admin_feedback') }}"
+      data-integrations-url="{{ url_for('decisions.api_admin_integrations') }}"
+      dir="{{ 'rtl' if ui_lang == 'ar' else 'ltr' }}">
+  <p><a class="dec-focus" href="{{ url_for('decisions.page_catalogue') }}">{{ _('All decisions') }}</a></p>
+  <h1 class="dec-h1">{{ _('Decision Support administration') }}</h1>
+  <p class="dec-muted">{{ _('Thresholds are provisional until FDS approves them. Each save publishes a new version and keeps the previous one.') }}</p>
+  <div id="dec-status" class="dec-muted" role="status" aria-live="polite"></div>
+  <div id="dec-admin"></div>
+</main>
+{% include "plugins/ifrc/decisions/_i18n.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('decisions.static_file', filename='js/decisions.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+{% endblock %}

@@ -107,6 +107,26 @@ def _extract_indicator_search_phrase(query: str) -> str:
     return q
 
 
+def _decision_tool_names() -> frozenset:
+    """Names of the IFRC Decision Support tools. Empty when the plugin cannot be imported."""
+    try:
+        from plugins.ifrc.decisions.ai_tools import DECISION_TOOL_NAMES
+
+        return DECISION_TOOL_NAMES
+    except Exception:
+        return frozenset()
+
+
+def _decision_tool_specs() -> List[Dict[str, Any]]:
+    """Decision Support tool specs, only for a user who may use the module and while the plugin is active."""
+    try:
+        from plugins.ifrc.decisions.ai_tools import DECISION_TOOL_SPECS, tools_available
+
+        return list(DECISION_TOOL_SPECS) if tools_available() else []
+    except Exception:
+        return []
+
+
 def openapi_function_name(tool_def: Dict[str, Any]) -> Optional[str]:
     """Return the ``function.name`` field from an OpenAI-style tool specification dict."""
     try:
@@ -233,7 +253,7 @@ def tool_wrapper(func: Callable) -> Callable:
                     "get_country_information", "get_template_details",
                     "get_user_assignments", "get_assignment_indicator_values",
                     "get_form_field_value", "get_form_field_values_for_all_countries",
-                }
+                } | set(_decision_tool_names())
                 upr_tools = UPR_KPI_TOOL_NAMES
                 # Inside the form-builder panel, indicator resolution must keep working
                 # regardless of the user's source toggles.
@@ -838,6 +858,47 @@ class AIToolsRegistry:
             period=period,
             assignment_period=assignment_period,
         )
+
+    def _decision_tool(self, name: str, **kwargs: Any) -> Dict[str, Any]:
+        kwargs.pop("_progress_callback", None)
+        from plugins.ifrc.decisions.ai_tools import TOOL_FUNCTIONS
+
+        return TOOL_FUNCTIONS[name](**kwargs)
+
+    @tool_wrapper
+    def list_decisions(self, **kwargs: Any) -> Dict[str, Any]:
+        """List Decision Support decisions the user may see (IFRC plugin)."""
+        return self._decision_tool("list_decisions", **kwargs)
+
+    @tool_wrapper
+    def get_decision_definition(self, decision_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Definition, metrics, rules and methodology of one decision."""
+        return self._decision_tool("get_decision_definition", decision_id=decision_id, **kwargs)
+
+    @tool_wrapper
+    def get_decision_summary(self, decision_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Evidence summary for one decision."""
+        return self._decision_tool("get_decision_summary", decision_id=decision_id, **kwargs)
+
+    @tool_wrapper
+    def get_decision_metrics(self, decision_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Metric values for one decision, optionally grouped."""
+        return self._decision_tool("get_decision_metrics", decision_id=decision_id, **kwargs)
+
+    @tool_wrapper
+    def get_decision_flags(self, decision_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """Rule-based attention flags for one decision."""
+        return self._decision_tool("get_decision_flags", decision_id=decision_id, **kwargs)
+
+    @tool_wrapper
+    def get_flag_evidence(self, flag_id: str, **kwargs: Any) -> Dict[str, Any]:
+        """One flag with its rule and evidence records."""
+        return self._decision_tool("get_flag_evidence", flag_id=flag_id, **kwargs)
+
+    @tool_wrapper
+    def get_source_record(self, reference: str, **kwargs: Any) -> Dict[str, Any]:
+        """One evidence or submission source record."""
+        return self._decision_tool("get_source_record", reference=reference, **kwargs)
 
     @tool_wrapper
     def get_upr_kpi_value(
@@ -2303,6 +2364,7 @@ class AIToolsRegistry:
             },
         ]
         tool_defs.extend(UPR_TOOL_SPECS)
+        tool_defs.extend(_decision_tool_specs())
         tool_defs = _filter_indicator_bank_mgmt_tools(tool_defs)
 
         # Form-builder assistant: when panel context is active, NEVER expose the full catalog.
@@ -2350,6 +2412,9 @@ class AIToolsRegistry:
                     "search_indicator_bank",
                 }
             )
+
+        if sources_norm.get("historical"):
+            allowed.update(_decision_tool_names())
 
         allowed.update(ib_mgmt_allowed)
         # NOTE: form-builder tool gating (including the "search_indicator_bank stays

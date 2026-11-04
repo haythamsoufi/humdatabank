@@ -115,6 +115,7 @@ class DashboardRepository {
     final entities = <Entity>[];
     final nsFocalPoints = <FocalPointContact>[];
     final orgFocalPoints = <FocalPointContact>[];
+    final fdsMembers = <FocalPointContact>[];
     Entity? selectedEntity;
 
     if (root.containsKey('current_assignments')) {
@@ -147,6 +148,12 @@ class DashboardRepository {
           .toList());
     }
 
+    if (root.containsKey('fds_members')) {
+      fdsMembers.addAll((root['fds_members'] as List)
+          .map((item) => FocalPointContact.fromJson(item as Map<String, dynamic>))
+          .toList());
+    }
+
     // Handle selected_entity from API response
     if (root.containsKey('selected_entity') &&
         root['selected_entity'] != null) {
@@ -175,6 +182,7 @@ class DashboardRepository {
       selectedEntity: selectedEntity,
       nsFocalPoints: nsFocalPoints,
       orgFocalPoints: orgFocalPoints,
+      fdsMembers: fdsMembers,
       timestamp: DateTime.now(),
     );
   }
@@ -219,6 +227,10 @@ class DashboardRepository {
           .map((json) => FocalPointContact.fromJson(json as Map<String, dynamic>))
           .toList();
 
+      final fdsMembers = (data['fds_members'] as List? ?? const [])
+          .map((json) => FocalPointContact.fromJson(json as Map<String, dynamic>))
+          .toList();
+
       // Try to load entities from cache
       final entities = await loadEntitiesFromCache();
 
@@ -247,6 +259,7 @@ class DashboardRepository {
         selectedEntity: selectedEntity,
         nsFocalPoints: nsFocalPoints,
         orgFocalPoints: orgFocalPoints,
+        fdsMembers: fdsMembers,
         timestamp: cacheTime,
       );
     } catch (e) {
@@ -265,6 +278,7 @@ class DashboardRepository {
         'past_assignments': data.pastAssignments.map((a) => a.toJson()).toList(),
         'ns_focal_points': data.nsFocalPoints.map((fp) => fp.toJson()).toList(),
         'org_focal_points': data.orgFocalPoints.map((fp) => fp.toJson()).toList(),
+        'fds_members': data.fdsMembers.map((fp) => fp.toJson()).toList(),
       };
       await _storage.setString(
           AppConfig.cachedDashboardKey, jsonEncode(cacheData));

@@ -507,7 +507,12 @@ class OfflineFormStore {
       if (!await file.exists()) return null;
       final raw = jsonDecode(await file.readAsString());
       if (raw is Map) return Map<String, dynamic>.from(raw);
-    } catch (_) {}
+    } catch (e) {
+      DebugLogger.logWarn(
+        'OFFLINE_STORE',
+        'Unreadable ${p.basename(file.path)} in ${p.basename(p.dirname(file.path))}: $e',
+      );
+    }
     return null;
   }
 

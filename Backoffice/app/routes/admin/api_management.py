@@ -742,6 +742,20 @@ MOBILE_ENDPOINT_REGISTRY = [
          'Optional: template_id, period_name, locale. Path has no <id> segment — ID is only in the query string.'
      ),
      'flutter': 'GlobalOverviewDataService'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/country-profile/<iso3>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Public country profile: key figures, indicator series, cover images and public documents. '
+         'Optional query: template_id, locale.'
+     ),
+     'flutter': 'CountryDetailScreen'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/region-profile/<slug>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Regional analysis: key indicators summed across the region per period, with reporting '
+         'coverage and top countries. Optional query: template_id, locale.'
+     ),
+     'flutter': 'RegionDetailScreen'},
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/disaggregation-overview', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': True, 'paginated': False,
      'description': (

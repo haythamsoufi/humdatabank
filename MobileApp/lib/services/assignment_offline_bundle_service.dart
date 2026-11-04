@@ -289,7 +289,8 @@ class AssignmentOfflineBundleService {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool(_autoDownloadPrefKey) ?? false;
-    } catch (_) {
+    } catch (e) {
+      DebugLogger.logWarn('OFFLINE_BUNDLE', 'Could not read auto-download setting: $e');
       return false;
     }
   }
@@ -866,6 +867,7 @@ class AssignmentOfflineBundleService {
         id,
         'saved files=${assets.length} missing=${outcome.missing.length}',
       );
+      _warnMissing(id, key, outcome.missing);
     } catch (e) {
       _trace(id, 'build failed ${_describeError(e)}');
       if (await dir.exists()) await dir.delete(recursive: true);
@@ -964,6 +966,16 @@ class AssignmentOfflineBundleService {
       packageStaticVersion: meta.staticVersion,
     );
     _trace(id, 'saved page new-files=${outcome.savedPaths.length}');
+    _warnMissing(id, key, outcome.missing);
+  }
+
+  void _warnMissing(int id, String key, List<Uri> missing) {
+    if (missing.isEmpty) return;
+    DebugLogger.logWarn(
+      'OFFLINE_BUNDLE',
+      '${missing.length} file(s) not saved for assignment $id ($key): '
+          '${missing.take(5).map(_tracePath).join(', ')}',
+    );
   }
 
   static Map<String, String> _headersWithoutCredentials(

@@ -137,9 +137,9 @@ class _LandingAiEntryCardState extends State<LandingAiEntryCard>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final glass = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.white.withValues(alpha: 0.14);
-    final border = Colors.white.withValues(alpha: 0.22);
+        ? Colors.white.withValues(alpha: 0.16)
+        : Colors.white.withValues(alpha: 0.26);
+    final border = Colors.white.withValues(alpha: 0.3);
     final accent = Color(AppConstants.ifrcRed);
 
     return Padding(

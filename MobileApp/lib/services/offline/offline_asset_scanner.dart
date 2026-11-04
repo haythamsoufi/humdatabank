@@ -195,7 +195,8 @@ class OfflineAssetScanner {
     } catch (_) {}
 
     try {
-      final relRe = RegExp(r'(?<!/plugins)' + tail, caseSensitive: false);
+      // A preceding path character means a longer path (/upr/static/, /plugins/static/).
+      final relRe = RegExp(r'(?<![\w.-])' + tail, caseSensitive: false);
       for (final m in relRe.allMatches(html)) {
         out.add(pageUri.resolve(m.group(0)!));
       }

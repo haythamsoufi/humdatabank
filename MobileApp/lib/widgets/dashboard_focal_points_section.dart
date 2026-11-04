@@ -24,17 +24,33 @@ Color avatarColorFor(String key) {
   return _avatarPalette[hash % _avatarPalette.length];
 }
 
-class DashboardFocalPointsSection extends StatelessWidget {
+class DashboardFocalPointsSection extends StatefulWidget {
   const DashboardFocalPointsSection({
     super.key,
     required this.entityLabel,
     required this.nsFocalPoints,
     required this.orgFocalPoints,
+    this.fdsMembers = const [],
   });
 
   final String entityLabel;
   final List<FocalPointContact> nsFocalPoints;
   final List<FocalPointContact> orgFocalPoints;
+  final List<FocalPointContact> fdsMembers;
+
+  @override
+  State<DashboardFocalPointsSection> createState() =>
+      _DashboardFocalPointsSectionState();
+}
+
+class _DashboardFocalPointsSectionState
+    extends State<DashboardFocalPointsSection> {
+  bool _expanded = true;
+
+  List<FocalPointContact> get nsFocalPoints => widget.nsFocalPoints;
+  List<FocalPointContact> get orgFocalPoints => widget.orgFocalPoints;
+  List<FocalPointContact> get fdsMembers => widget.fdsMembers;
+  String get entityLabel => widget.entityLabel;
 
   String _orgFocalPointsTitle(AppLocalizations localizations) {
     if (OrganizationConfigService().isInitialized) {
@@ -71,73 +87,89 @@ class DashboardFocalPointsSection extends StatelessWidget {
     final localizations = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final hasContacts = nsFocalPoints.isNotEmpty || orgFocalPoints.isNotEmpty;
-    final cardColor = isDark
-        ? scheme.surfaceContainerHigh
-        : GroupedDashboardPalette.card;
-    final borderColor = isDark
-        ? scheme.outlineVariant.withValues(alpha: 0.45)
-        : GroupedDashboardPalette.hairline;
-    final total = nsFocalPoints.length + orgFocalPoints.length;
+    final hasContacts = nsFocalPoints.isNotEmpty ||
+        orgFocalPoints.isNotEmpty ||
+        fdsMembers.isNotEmpty;
+    final total =
+        nsFocalPoints.length + orgFocalPoints.length + fdsMembers.length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-            child: DashboardSectionLabel(
-              title: localizations.focalPoints,
-              count: hasContacts ? total : null,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: borderColor),
-              ),
-              child: hasContacts
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (nsFocalPoints.isNotEmpty)
-                          _ContactGroup(
-                            title: localizations.nationalSocietyFocalPoints,
-                            contacts: nsFocalPoints,
-                            onLaunch: _launchContactUri,
-                          ),
-                        if (nsFocalPoints.isNotEmpty &&
-                            orgFocalPoints.isNotEmpty)
-                          Divider(height: 1, thickness: 1, color: borderColor),
-                        if (orgFocalPoints.isNotEmpty)
-                          _ContactGroup(
-                            title: _orgFocalPointsTitle(localizations),
-                            contacts: orgFocalPoints,
-                            onLaunch: _launchContactUri,
-                          ),
-                      ],
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 28,
-                      ),
-                      child: Text(
-                        '${localizations.noFocalPointsAssignedTo} $entityLabel ${localizations.yet}',
-                        style: IOSTextStyle.subheadline(context).copyWith(
-                          color: scheme.onSurface.withValues(alpha: 0.6),
-                          height: 1.35,
-                        ),
-                        textAlign: TextAlign.center,
+          Semantics(
+            button: true,
+            expanded: _expanded,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _expanded = !_expanded);
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DashboardSectionLabel(
+                        title: localizations.focalPoints,
+                        count: hasContacts ? total : null,
                       ),
                     ),
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Icons.expand_more_rounded,
+                        size: 22,
+                        color: scheme.onSurface.withValues(alpha: 0.48),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
+          if (_expanded)
+            if (hasContacts)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (nsFocalPoints.isNotEmpty)
+                    _ContactGroup(
+                      title: localizations.nationalSocietyFocalPoints,
+                      contacts: nsFocalPoints,
+                      onLaunch: _launchContactUri,
+                    ),
+                  if (orgFocalPoints.isNotEmpty)
+                    _ContactGroup(
+                      title: _orgFocalPointsTitle(localizations),
+                      contacts: orgFocalPoints,
+                      onLaunch: _launchContactUri,
+                    ),
+                  if (fdsMembers.isNotEmpty)
+                    _ContactGroup(
+                      title: localizations.translate('fds_member'),
+                      contacts: fdsMembers,
+                      onLaunch: _launchContactUri,
+                    ),
+                ],
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                child: Text(
+                  '${localizations.noFocalPointsAssignedTo} $entityLabel ${localizations.yet}',
+                  style: IOSTextStyle.subheadline(context).copyWith(
+                    color: scheme.onSurface.withValues(alpha: 0.6),
+                    height: 1.35,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
         ],
       ),
     );
@@ -162,7 +194,7 @@ class _ContactGroup extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
           child: Text(
             title.toUpperCase(),
             style: IOSTextStyle.caption2(context).copyWith(
@@ -213,7 +245,7 @@ class _ContactRow extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+          padding: const EdgeInsets.fromLTRB(20, 10, 14, 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -308,7 +340,7 @@ class _ContactRow extends StatelessWidget {
         ),
         if (showDivider)
           Padding(
-            padding: const EdgeInsets.only(left: 62),
+            padding: const EdgeInsets.only(left: 70, right: 20),
             child: Divider(height: 1, thickness: 1, color: borderColor),
           ),
       ],

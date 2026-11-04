@@ -39,6 +39,8 @@ import '../screens/public/unified_planning_documents_screen.dart';
 import '../screens/public/unified_planning_analytics_screen.dart';
 import '../screens/public/disaggregation_analysis_screen.dart';
 import '../screens/public/countries_screen.dart';
+import '../screens/public/country_detail_screen.dart';
+import '../screens/public/region_detail_screen.dart';
 import '../screens/public/ns_structure_screen.dart';
 import '../screens/public/quiz_game_screen.dart';
 import '../screens/public/leaderboard_screen.dart';
@@ -126,7 +128,8 @@ class AppGoRouter {
         GoRoute(
           path: AppRoutes.settings,
           name: 'settings',
-          builder: (context, state) => const SettingsScreen(),
+          builder: (context, state) =>
+              const SettingsScreen(showBottomNav: true),
         ),
 
         // AI Chat with slide transition
@@ -212,6 +215,24 @@ class AppGoRouter {
           path: '/countries',
           name: 'countries',
           builder: (context, state) => const CountriesScreen(),
+          routes: [
+            GoRoute(
+              path: ':iso3',
+              name: 'countryDetail',
+              builder: (context, state) => CountryDetailScreen(
+                iso3: state.pathParameters['iso3']!.toUpperCase(),
+                countryName: state.extra is String ? state.extra as String : null,
+              ),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/regions/:slug',
+          name: 'regionDetail',
+          builder: (context, state) => RegionDetailScreen(
+            regionSlug: state.pathParameters['slug']!,
+            regionName: state.extra is String ? state.extra as String : null,
+          ),
         ),
         GoRoute(
           path: '/ns-structure',

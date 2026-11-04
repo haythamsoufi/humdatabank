@@ -55,6 +55,17 @@ class AppRoutes {
   static const String pdfViewer = '/pdf-viewer';
   static const String disaggregationAnalysis = '/disaggregation-analysis';
   static const String countries = '/countries';
+
+  /// Native country profile (optional route `arguments`: display name as [String]).
+  static String countryDetail(String iso3) => '/countries/$iso3';
+
+  /// URL-safe region identifier, e.g. "Asia Pacific" -> "asia-pacific".
+  static String regionSlug(String regionName) =>
+      regionName.trim().toLowerCase().replaceAll(RegExp(r'[\s/]+'), '-');
+
+  /// Native regional analysis (optional route `arguments`: display name as [String]).
+  static String regionDetail(String regionName) =>
+      '/regions/${regionSlug(regionName)}';
   static const String nsStructure = '/ns-structure';
   static String nsStructureForCountry(int countryId) => '/ns-structure/$countryId';
   static const String quizGame = '/quiz-game';

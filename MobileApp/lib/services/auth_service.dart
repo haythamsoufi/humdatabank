@@ -99,6 +99,11 @@ class AuthService {
   /// clearing auth state during the OAuth browser flow.
   static set oauthFlowPending(bool pending) => _oauthFlowPending = pending;
 
+  // True while logout() runs: the server has blacklisted the JWT, so any
+  // in-flight authenticated request would 401 and trigger a spurious refresh.
+  static bool _isLoggingOut = false;
+  static bool get isLoggingOut => _isLoggingOut;
+
   // Session metrics tracking
   int _refreshSuccessCount = 0;
   int _refreshFailureCount = 0;
@@ -456,6 +461,7 @@ class AuthService {
   /// server logout endpoint. Used when the server has already rejected the
   /// session (401/403 on refresh or session check) or auth is otherwise dead.
   Future<void> invalidateLocalAuth({String? reason}) async {
+    if (_isLoggingOut) return;
     final hadJwt = await _jwtService.hasTokens();
     final hadSession = await _session.hasSession();
     final hadUser = _currentUser != null;
@@ -489,6 +495,15 @@ class AuthService {
 
   // Logout
   Future<void> logout() async {
+    _isLoggingOut = true;
+    try {
+      await _performLogout();
+    } finally {
+      _isLoggingOut = false;
+    }
+  }
+
+  Future<void> _performLogout() async {
     // Unregister device BEFORE the logout API call because logout blacklists
     // the JWT — any authenticated request after that would get 401.
     try {
@@ -516,6 +531,7 @@ class AuthService {
     } catch (e) {
       DebugLogger.logError('Error during logout API call: $e');
     } finally {
+      // Clear tokens first so concurrent requests stop sending the blacklisted JWT.
       await _jwtService.clearTokens();
       await AiChatService().clearToken();
       await _session.clearSession();

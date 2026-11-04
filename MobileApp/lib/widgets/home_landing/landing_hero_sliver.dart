@@ -252,8 +252,12 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
                                 opacity: _titleFade,
                                 child: Center(
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
+                                    padding: EdgeInsets.fromLTRB(
+                                      20,
+                                      // Centers the description between the title row and the footer.
+                                      widget.topLeading != null ? 60 : 0,
+                                      20,
+                                      0,
                                     ),
                                     child: FadeTransition(
                                       opacity: _fadeIn,
@@ -264,22 +268,25 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
                                           crossAxisAlignment:
                                               CrossAxisAlignment.stretch,
                                           children: [
-                                            Text(
-                                              widget.title,
-                                              textAlign: TextAlign.center,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .headlineSmall
-                                                  ?.copyWith(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w800,
-                                                    height: 1.2,
-                                                    letterSpacing: -0.4,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 8),
+                                            if (widget.topLeading == null) ...[
+                                              Text(
+                                                widget.title,
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .headlineSmall
+                                                    ?.copyWith(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      height: 1.2,
+                                                      letterSpacing: -0.4,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                            ],
                                             Text(
                                               widget.description,
                                               textAlign: TextAlign.center,
@@ -352,7 +359,28 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
               PositionedDirectional(
                 top: topInset + 4,
                 start: 8,
-                child: widget.topLeading!,
+                end: 16,
+                child: Row(
+                  children: [
+                    widget.topLeading!,
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: FadeTransition(
+                        opacity: _titleFade,
+                        child: Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
           ],
         ),

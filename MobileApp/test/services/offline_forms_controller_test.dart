@@ -181,8 +181,23 @@ void main() {
       );
       expect(controller.statusFor(6).available, isTrue);
       expect(controller.statusFor(7).available, isTrue);
-      expect(busy, everyElement(isFalse));
+      expect(busy, contains(true));
+      expect(controller.isBusy(6), isFalse);
       expect(await service.hasOfflineForm(6), isTrue);
+    });
+
+    test('pages are shown as pending before any disk work', () async {
+      await controller.save(assignment(5), env);
+      final all = [assignment(6)];
+
+      controller.expectPages(all: all, eligible: all, language: 'en');
+      expect(controller.isBusy(6), isTrue);
+      expect(controller.statusFor(6).available, isFalse);
+
+      await controller.reconcile(all: all, eligible: all, env: env);
+      await controller.idle;
+      expect(controller.isBusy(6), isFalse);
+      expect(controller.statusFor(6).available, isTrue);
     });
 
     test('a second reconcile does no more work', () async {

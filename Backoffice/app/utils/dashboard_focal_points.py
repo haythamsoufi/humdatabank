@@ -64,3 +64,12 @@ def get_focal_points_for_country(country_id: int) -> tuple[list[dict], list[dict
         if is_org_email(fp.email) and fp.id not in admin_role_user_ids
     ]
     return ns_focal_points, org_focal_points
+
+
+def get_fds_members_for_country(country_id: int) -> list[dict]:
+    """Return the country's designated FDS member as a 0/1-item contact list."""
+    from app.models.core import Country
+
+    country = Country.query.get(country_id)
+    fds_user = country.fds_member_user if country else None
+    return [_serialize_focal_point(fds_user)] if fds_user else []

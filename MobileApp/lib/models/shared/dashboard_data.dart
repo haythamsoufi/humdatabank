@@ -10,6 +10,7 @@ class DashboardData {
   final Entity? selectedEntity;
   final List<FocalPointContact> nsFocalPoints;
   final List<FocalPointContact> orgFocalPoints;
+  final List<FocalPointContact> fdsMembers;
   final DateTime? timestamp;
 
   DashboardData({
@@ -19,6 +20,7 @@ class DashboardData {
     this.selectedEntity,
     this.nsFocalPoints = const [],
     this.orgFocalPoints = const [],
+    this.fdsMembers = const [],
     this.timestamp,
   });
 }

@@ -202,7 +202,7 @@ MapOptions fdrsWorldMapOptions(
   );
 }
 
-/// IFRC-style Mapbox raster tiles (public token). Falls back to Carto when unset.
+/// IFRC-style Mapbox raster tiles (public token). Falls back to OpenStreetMap when unset.
 List<Widget> fdrsWorldMapTiles(ThemeData theme) {
   final isDark = theme.brightness == Brightness.dark;
   final token = AppConfig.mapboxAccessToken;
@@ -214,12 +214,10 @@ List<Widget> fdrsWorldMapTiles(ThemeData theme) {
       TileLayer(urlTemplate: url, userAgentPackageName: 'hum_databank_app'),
     ];
   }
+  // Carto's free basemap CDN now serves "API KEY REQUIRED" tiles.
   return [
     TileLayer(
-      urlTemplate: isDark
-          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-      subdomains: const ['a', 'b', 'c', 'd'],
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       userAgentPackageName: 'hum_databank_app',
     ),
   ];

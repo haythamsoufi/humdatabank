@@ -259,6 +259,22 @@ class TestBaselineHeaders:
         for feature in ("camera=()", "microphone=()", "payment=()", "usb=()", "display-capture=()", "geolocation=(self)"):
             assert feature in pp
 
+    @pytest.mark.parametrize(
+        "headers",
+        [
+            {"X-Mobile-App": "IFRC-Databank-Flutter"},
+            {"User-Agent": "Mozilla/5.0 (Linux; Android 14; Pixel; wv) AppleWebKit/537.36 Chrome/120 Mobile"},
+        ],
+    )
+    def test_permissions_policy_omits_desktop_only_features_for_mobile_webview(self, app, headers):
+        from flask import make_response
+
+        with app.test_request_context("/dashboard", headers=headers):
+            pp = add_security_headers(make_response("html", 200)).headers["Permissions-Policy"]
+        for feature in ("usb", "serial", "hid", "browsing-topics"):
+            assert f"{feature}=" not in pp
+        assert "camera=()" in pp
+
     def test_hsts_includes_subdomains_and_one_year(self, app):
         hsts = _headers(app, secure=True).headers["Strict-Transport-Security"]
         assert "max-age=31536000" in hsts and "includeSubDomains" in hsts

@@ -1,6 +1,7 @@
 import '../config/app_config.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
+import '../services/auth_service.dart';
 import '../services/jwt_token_service.dart';
 import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
 import '../utils/network_availability.dart';
@@ -101,6 +102,8 @@ class ScreenViewTracker {
     if (raw == '/indicator-bank/propose') return 'Propose Indicator';
     if (raw.startsWith('/indicator-bank/')) return 'Indicator Detail';
     if (raw.startsWith('/ns-structure/')) return 'NS Structure';
+    if (raw.startsWith('/countries/')) return 'Country Detail';
+    if (raw.startsWith('/regions/')) return 'Region Overview';
     if (raw.startsWith('/admin/indicator_bank/edit/')) return 'Edit Indicator';
     if (raw.startsWith('/admin/assignments/')) return 'Assignment detail';
     if (raw.startsWith('/admin/organization/edit/')) return 'Edit Entity';
@@ -170,8 +173,9 @@ class ScreenViewTracker {
       // Skip the Backoffice POST when the user has no stored tokens — this
       // happens at app startup before auth is established and would always
       // produce an auth error, generating noisy [ERROR] log lines.
+      if (AuthService.isLoggingOut) return;
       final hasTokens = await _jwtService.hasTokens();
-      if (!hasTokens) return;
+      if (!hasTokens || AuthService.isLoggingOut) return;
 
       // Only gate on OS connectivity. Do not use [shouldDeferRemoteFetch]
       // (backend reachability): it can stay false for 45s and drop every

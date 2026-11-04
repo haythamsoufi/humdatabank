@@ -36,7 +36,10 @@ from app.utils.form_localization import get_localized_template_name
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.services.organization.entity_service import EntityService
 from app.utils.api_helpers import json_response, api_error, PAST_ASSIGNMENT_DAYS, get_json_safe
-from app.utils.dashboard_focal_points import get_focal_points_for_country
+from app.utils.dashboard_focal_points import (
+    get_fds_members_for_country,
+    get_focal_points_for_country,
+)
 from app.utils.request_validation import enforce_csrf_json
 from app.routes.main.helpers import DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
 from app.static_version import deploy_asset_version
@@ -985,6 +988,7 @@ def get_dashboard():
 
         ns_focal_points = []
         org_focal_points = []
+        fds_members = []
         if selected_entity:
             entity_country = EntityService.get_country_for_entity(
                 selected_entity['entity_type'],
@@ -994,6 +998,7 @@ def get_dashboard():
                 ns_focal_points, org_focal_points = get_focal_points_for_country(
                     entity_country.id,
                 )
+                fds_members = get_fds_members_for_country(entity_country.id)
 
         return json_response({
             'current_assignments': current_assignments,
@@ -1002,6 +1007,7 @@ def get_dashboard():
             'selected_entity': selected_entity,
             'ns_focal_points': ns_focal_points,
             'org_focal_points': org_focal_points,
+            'fds_members': fds_members,
         })
 
     except Exception as e:

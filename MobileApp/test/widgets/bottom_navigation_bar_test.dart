@@ -128,26 +128,19 @@ void main() {
     expect(barRect.bottom - pillRect.bottom, closeTo(12, 0.5));
   });
 
-  testWidgets('Android floats the capsule above the system inset', (
+  testWidgets('Android uses a flat full-width bar above the system inset', (
     tester,
   ) async {
     await _pumpBar(tester, platform: TargetPlatform.android, bottomInset: 48);
 
     final barRect = tester.getRect(find.byType(AppBottomNavigationBar));
-    final pillRect = tester.getRect(
-      find.byKey(AppBottomNavigationBar.floatingPillKey),
-    );
     expect(
       barRect.height,
-      closeTo(
-        AppBottomNavigationBar.floatingTopGap +
-            AppBottomNavigationBar.floatingPillHeight +
-            48,
-        0.5,
-      ),
+      closeTo(AppBottomNavigationBar.floatingPillHeight + 48, 0.5),
     );
-    expect(barRect.bottom - pillRect.bottom, closeTo(48, 0.5));
-    expect(pillRect.left, greaterThan(10));
+    expect(barRect.left, 0);
+    expect(find.byKey(AppBottomNavigationBar.floatingPillKey), findsNothing);
+    expect(find.byType(BackdropFilter), findsNothing);
   });
 
   testWidgets('iPhone landscape keeps the side safe inset', (tester) async {

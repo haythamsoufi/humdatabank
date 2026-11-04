@@ -217,10 +217,13 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         if template_id not in (PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID):
             return []
-        return [
+        assets = [
             {"kind": "stylesheet", "url": upr_static_url("css/upr-emergency-coverage.css")},
             {"kind": "script", "url": upr_static_url("js/upr-emergency-coverage.js")},
         ]
+        if template_id == PLAN_TEMPLATE_ID:
+            assets.append({"kind": "script", "url": upr_static_url("js/upr-ns-row-sync.js")})
+        return assets
 
     def get_embed_visuals(self) -> list[EmbedVisual]:
         from flask_babel import gettext as _

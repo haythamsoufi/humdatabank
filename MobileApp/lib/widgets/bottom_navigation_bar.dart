@@ -495,6 +495,39 @@ class AppBottomNavigationBar extends StatelessWidget {
       hairline = context.borderColor.withValues(alpha: 0.85);
     }
 
+    if (platform == TargetPlatform.android) {
+      // Android convention: a regular full-width bar flush with the system navigation bar.
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: backgroundColor ??
+              (isDark ? context.surfaceColor : context.cardColor),
+          border: Border(top: BorderSide(color: hairline, width: 0.6)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: safe.left,
+            right: safe.right,
+            bottom: math.max(
+              safe.bottom,
+              MediaQuery.viewPaddingOf(context).bottom,
+            ),
+          ),
+          child: SizedBox(
+            height: floatingPillHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: enableCustomization
+                  ? GestureDetector(
+                      onLongPress: () => TabCustomizationDialog.show(context),
+                      child: child,
+                    )
+                  : child,
+            ),
+          ),
+        ),
+      );
+    }
+
     final radius = BorderRadius.circular(floatingPillHeight / 2);
     // Theme.platform is not enough: widget tests set it to iOS on a host that
     // cannot build a UiKitView. Real iOS (and not web) gets the system material.

@@ -501,6 +501,169 @@ class TestMobileFdrsOverview:
 
 
 # ---------------------------------------------------------------------------
+# mobile_country_profile
+# ---------------------------------------------------------------------------
+
+class TestMobileCountryProfile:
+    def test_invalid_iso3_returns_400(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_profile
+
+        with app.test_request_context('/api/mobile/v1/data/country-profile/12', method='GET'):
+            resp = mobile_country_profile('12')
+
+        _, status = _parse(resp)
+        assert status == 400
+
+    def test_unknown_country_returns_404(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_profile
+
+        with app.test_request_context('/api/mobile/v1/data/country-profile/ZZZ', method='GET'):
+            resp = mobile_country_profile('ZZZ')
+
+        _, status = _parse(resp)
+        assert status == 404
+
+    def test_returns_published_series_only_for_public_items(self, app, db_session):
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.models import FormData, IndicatorBank
+        from app.routes.api.mobile.public_data import mobile_country_profile
+        from tests.factories import (
+            create_test_assignment_entity_status,
+            create_test_country,
+            create_test_item,
+            create_test_section,
+            create_test_template,
+        )
+
+        template = create_test_template(db_session, name="Country profile template")
+        section = create_test_section(db_session, template)
+        indicator = IndicatorBank(name="Volunteers profile", type="number", unit="people", archived=False)
+        db_session.add(indicator)
+        db_session.commit()
+        item = create_test_item(
+            db_session, section, template, label="Public volunteers", indicator_bank_id=indicator.id,
+        )
+        item.set_privacy("public")
+        flag_modified(item, "config")
+        db_session.commit()
+
+        country = create_test_country(db_session, name="Profileland", iso3="PRF")
+        aes = create_test_assignment_entity_status(
+            db_session, country=country, template=template, period_name="2024",
+        )
+        db_session.add(FormData(
+            assignment_entity_status_id=aes.id,
+            form_item_id=item.id,
+            value="999",
+            numeric_value=999,
+            published_value="40",
+            published_numeric_value=40,
+        ))
+        db_session.commit()
+
+        with app.test_request_context(
+            f'/api/mobile/v1/data/country-profile/prf?template_id={template.id}', method='GET',
+        ):
+            resp = mobile_country_profile('prf')
+
+        body, status = _parse(resp)
+        assert status == 200
+        data = body.get_json()['data']
+        assert data['country']['iso3'] == 'PRF'
+        assert data['periods'] == ['2024']
+        assert len(data['indicators']) == 1
+        entry = data['indicators'][0]
+        assert entry['id'] == indicator.id
+        assert entry['latest_value'] == 40
+        assert entry['series'] == [{'period': '2024', 'value': 40}]
+        assert data['documents'] == []
+        assert data['cover_images'] == []
+
+
+class TestMobileRegionProfile:
+    def test_unknown_region_returns_404(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_region_profile
+
+        with app.test_request_context('/api/mobile/v1/data/region-profile/nowhere', method='GET'):
+            resp = mobile_region_profile('nowhere')
+
+        _, status = _parse(resp)
+        assert status == 404
+
+    def test_sums_key_indicator_across_region_countries(self, app, db_session):
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.models import FormData, IndicatorBank
+        from app.routes.api.mobile.public_data import mobile_region_profile
+        from tests.factories import (
+            create_test_assignment_entity_status,
+            create_test_country,
+            create_test_item,
+            create_test_section,
+            create_test_template,
+        )
+
+        template = create_test_template(db_session, name="Region profile template")
+        section = create_test_section(db_session, template)
+        indicator = IndicatorBank(
+            name="Reached with health", type="number", unit="people", archived=False,
+            fdrs_kpi_code="KPI_ReachH",
+        )
+        db_session.add(indicator)
+        db_session.commit()
+        item = create_test_item(
+            db_session, section, template, label="Public volunteers", indicator_bank_id=indicator.id,
+        )
+        item.set_privacy("public")
+        flag_modified(item, "config")
+        db_session.commit()
+
+        first_aes = None
+        for name, iso3, value in (("Regionone", "RG1", 40), ("Regiontwo", "RG2", 10)):
+            country = create_test_country(db_session, name=name, iso3=iso3, region="Test Region")
+            if first_aes is None:
+                aes = first_aes = create_test_assignment_entity_status(
+                    db_session, country=country, template=template, period_name="2024",
+                )
+            else:
+                from app.models.assignments import AssignmentEntityStatus
+
+                aes = AssignmentEntityStatus(
+                    assigned_form_id=first_aes.assigned_form_id,
+                    entity_type="country",
+                    entity_id=country.id,
+                    status="in_progress",
+                )
+                db_session.add(aes)
+                db_session.flush()
+            db_session.add(FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=item.id,
+                published_value=str(value),
+                published_numeric_value=value,
+            ))
+        db_session.commit()
+
+        with app.test_request_context(
+            f'/api/mobile/v1/data/region-profile/test-region?template_id={template.id}',
+            method='GET',
+        ):
+            resp = mobile_region_profile('test-region')
+
+        body, status = _parse(resp)
+        assert status == 200
+        data = body.get_json()['data']
+        assert data['region']['country_count'] == 2
+        entry = data['indicators'][0]
+        assert entry['key'] == 'KPI_ReachH'
+        assert entry['group'] == 'people_reached'
+        assert entry['latest_value'] == 50
+        assert entry['reporting_countries'] == 2
+        assert [c['iso3'] for c in entry['top_countries']] == ['RG1', 'RG2']
+
+
+# ---------------------------------------------------------------------------
 # public_resources
 # ---------------------------------------------------------------------------
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,7 @@ import '../../config/app_config.dart';
 import '../../config/routes.dart';
 import '../../theme/chat_immersive_palette.dart';
 import '../../utils/theme_extensions.dart';
+import '../../utils/constants.dart';
 import '../../utils/accessibility_helper.dart';
 import '../../utils/ai_chat_plain_text.dart';
 import '../../utils/ai_chat_message_html_split.dart';
@@ -712,8 +714,10 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   Widget _buildAssistantMessageHtml(BuildContext context, ThemeData theme, String processedData) {
     return Html(
       data: processedData,
-      extensions: const [
-        ChatResponseSourcesDetailsExtension(),
+      extensions: [
+        ChatResponseSourcesDetailsExtension(
+          onOpenLink: (url) => _handleLinkTap(context, url),
+        ),
       ],
       style: {
         'body': Style(
@@ -901,6 +905,70 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   @override
   bool get wantKeepAlive => true;
 
+  /// Frosted panel (iOS-style glass): blur, translucent white fill and a hairline edge.
+  Widget _glassPanel({
+    required ThemeData theme,
+    required double radius,
+    required Widget child,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+  }) {
+    final dark = theme.isDarkTheme;
+    final tint = Colors.white; // theme-drift-ok
+    final r = BorderRadius.circular(radius);
+    return ClipRRect(
+      borderRadius: r,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: tint.withValues(alpha: dark ? 0.06 : 0.7),
+            borderRadius: r,
+            border: Border.all(
+              color: dark
+                  ? tint.withValues(alpha: 0.12)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.09),
+              width: dark ? 0.6 : 0.8,
+            ),
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+  }
+
+  /// Soft colour glows behind the chat so the glass panels have something to blur.
+  Widget _glassBackdrop(ThemeData theme) {
+    final dark = theme.isDarkTheme;
+    Widget glow(Color c, double alpha) => DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [c.withValues(alpha: alpha), c.withValues(alpha: 0)],
+            ),
+          ),
+        );
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PositionedDirectional(
+            top: -120,
+            end: -140,
+            width: 420,
+            height: 420,
+            child: glow(theme.colorScheme.primary, dark ? 0.2 : 0.12),
+          ),
+          PositionedDirectional(
+            bottom: 60,
+            start: -160,
+            width: 440,
+            height: 440,
+            child: glow(Color(AppConstants.ifrcRed), dark ? 0.16 : 0.09),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -974,7 +1042,11 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
         ],
       ),
       drawer: _buildDrawer(context, auth, ai, isAuthed),
-      body: SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          _glassBackdrop(theme),
+          SafeArea(
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -1080,7 +1152,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                         _welcomeAssistantName(context),
                                         style: TextStyle(
                                           fontSize: 28,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: FontWeight.w600,
                                           letterSpacing: -0.6,
                                           height: 1.2,
                                           color: _chatBody(theme),
@@ -1210,14 +1282,14 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                             localizations.aiTryAsking,
                                             style: TextStyle(
                                               fontSize: 13,
-                                              fontWeight: FontWeight.w600,
+                                              fontWeight: FontWeight.w500,
                                               letterSpacing: 0.2,
                                               color: _chatMuted(theme),
                                             ),
                                           ),
                                         ),
                                         for (var p = 0; p < quickPrompts.length; p++) ...[
-                                          if (p > 0) const SizedBox(height: 8),
+                                          if (p > 0) const SizedBox(height: 6),
                                           _buildPromptChip(
                                             theme: theme,
                                             prompt: quickPrompts[p],
@@ -1266,9 +1338,10 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
 
                               // Defer only when structured cards render; otherwise keep Sources in the same bubble.
                               final hasStructuredVisuals = m.structuredPayloads.isNotEmpty;
-                              final assistantBodySplit = (!isUser && !isLastAssistant && hasStructuredVisuals)
+                              final assistantBodySplit = (!isUser && !isLastAssistant)
                                   ? splitAssistantHtmlForVisualsAfterBody(m.content)
                                   : null;
+                              final sourcesHtml = assistantBodySplit?.trailingSourcesHtml;
 
                               final isEditing = _editingMessageIndex == i;
                               final assistantMaxWidth =
@@ -1293,7 +1366,10 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                     children: [
                                       // Message bubble (ChatGPT-style: soft pill for user, flat for assistant)
                                       Container(
-                                        margin: EdgeInsets.symmetric(vertical: isUser ? 6 : 10),
+                                        margin: EdgeInsets.only(
+                                          top: isUser ? 6 : 10,
+                                          bottom: isUser ? 6 : (hasStructuredVisuals ? 0 : 10),
+                                        ),
                                         padding: EdgeInsets.symmetric(
                                           horizontal: isUser ? 16 : 8,
                                           vertical: isUser ? 10 : 6,
@@ -1340,7 +1416,11 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                                 : _buildAssistantMessageHtml(
                                                     context,
                                                     theme,
-                                                    _processHtmlForMobile(assistantBodySplit?.mainHtml ?? m.content),
+                                                    _processHtmlForMobile(
+                                                      trimTrailingEmptyHtml(
+                                                        assistantBodySplit?.mainHtml ?? m.content,
+                                                      ),
+                                                    ),
                                                   ),
                                       ),
                                       // Show structured payloads (maps/charts) even while the assistant row
@@ -1409,19 +1489,6 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                                 payloads: m.structuredPayloads,
                                               ),
                                             ],
-                                          ),
-                                        ),
-                                      if (!isUser &&
-                                          !isLastAssistant &&
-                                          assistantBodySplit != null &&
-                                          (assistantBodySplit.trailingSourcesHtml != null) &&
-                                          assistantBodySplit.trailingSourcesHtml!.trim().isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 8),
-                                          child: _buildAssistantMessageHtml(
-                                            context,
-                                            theme,
-                                            _processHtmlForMobile(assistantBodySplit.trailingSourcesHtml!),
                                           ),
                                         ),
                                       // Icons (below the bubble)
@@ -1501,6 +1568,18 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                                     tooltip: localizations.aiTooltipNotHelpful,
                                                   ),
                                                 ],
+                                                if (sourcesHtml != null && sourcesHtml.trim().isNotEmpty) ...[
+                                                  Container(
+                                                    width: 1,
+                                                    height: 16,
+                                                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                                                    color: _chatOutline(theme),
+                                                  ),
+                                                  ChatResponseSourcesButton(
+                                                    sourcesHtml: sourcesHtml,
+                                                    onOpenLink: (url) => _handleLinkTap(context, url),
+                                                  ),
+                                                ],
                                               ],
                                             ],
                                           ),
@@ -1533,40 +1612,10 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
-                            child: Text(
-                              localizations.aiFooterModelWarning,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 11,
-                                height: 1.25,
-                                color: _chatMuted(theme),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-                            decoration: BoxDecoration(
-                              color: theme.isDarkTheme
-                                  ? _chatComposer(theme)
-                                  : theme.cardColor,
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(
-                                color: _chatOutline(theme).withValues(alpha: 0.6),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme.ambientShadow(
-                                    lightOpacity: 0.10,
-                                    darkOpacity: 0.35,
-                                  ),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
+                          _glassPanel(
+                            theme: theme,
+                            radius: 28,
+                            padding: const EdgeInsets.all(4),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
@@ -1744,6 +1793,8 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
           },
         ),
       ),
+        ],
+      ),
     ),
     );
   }
@@ -1827,14 +1878,14 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
 
   Widget _drawerConversationSectionHeader(ThemeData theme, String label, {required bool isFirst}) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(4, isFirst ? 0 : 14, 4, 6),
+      padding: EdgeInsets.fromLTRB(8, isFirst ? 0 : 16, 8, 6),
       child: Text(
-        label,
+        label.toUpperCase(),
         style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.35,
-          color: _chatMuted(theme),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: _chatMuted(theme).withValues(alpha: 0.85),
         ),
       ),
     );
@@ -1870,18 +1921,21 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       child: SafeArea(
+        // extendBody inflates padding.bottom to the tab-bar height; the footer uses viewPadding instead.
+        bottom: false,
         child: Column(
           children: [
             // Title
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
               child: Row(
                 children: [
                   Text(
                     loc.aiConversationsDrawerTitle,
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
                       color: _chatBody(theme),
                     ),
                   ),
@@ -1891,14 +1945,14 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
           // Search bar — pill style aligned with main chat composer
           if (ai.conversations.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
                 decoration: BoxDecoration(
                   color: _chatComposer(theme),
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: _chatOutline(theme),
+                    color: _chatOutline(theme).withValues(alpha: 0.7),
                     width: 1,
                   ),
                 ),
@@ -2031,7 +2085,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                               ),
                             )
                           : ListView(
-                              padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
                               children: [
                                 if (pinnedFiltered.isNotEmpty) ...[
                                   _drawerConversationSectionHeader(theme, loc.aiSectionPinned, isFirst: true),
@@ -2066,12 +2120,18 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
             decoration: BoxDecoration(
               border: Border(
                 top: BorderSide(
-                  color: _chatOutline(theme),
+                  color: _chatOutline(theme).withValues(alpha: 0.7),
                   width: 1,
                 ),
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              8,
+              12,
+              // The shell inflates MediaQuery padding/viewPadding to the tab-bar height; read the raw system inset.
+              8 + MediaQueryData.fromView(View.of(context)).viewPadding.bottom,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -2129,9 +2189,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                           });
                         }
                       },
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                         child: Row(
                           children: [
                             Icon(
@@ -2139,12 +2199,12 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                               size: 20,
                               color: cs.error,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             Text(
                               loc.aiClearAllRow,
                               style: TextStyle(
-                                fontSize: 15,
-                                color: _chatGptDark(theme) ? Colors.white : cs.onSurface,
+                                fontSize: 14,
+                                color: cs.error,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -2161,9 +2221,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                       Navigator.pop(context);
                       _showHelpDialog(context);
                     },
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                       child: Row(
                         children: [
                           Icon(
@@ -2171,11 +2231,12 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                             size: 20,
                             color: _chatMuted(theme),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Text(
                             loc.aiHelpAboutRow,
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                               color: _chatBody(theme),
                             ),
                           ),
@@ -2357,7 +2418,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
     final muted = _chatMuted(theme);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 2),
       child: Builder(
         builder: (anchorContext) {
           return Material(
@@ -2373,13 +2434,13 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
               onLongPress: () {
                 _showConversationActionMenu(anchorContext, theme, conversation, isAuthed);
               },
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                 decoration: BoxDecoration(
                   color: isSelected ? _chatBubble(theme) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
@@ -2683,51 +2744,42 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   }) {
     final accent = _chatLink(theme);
     return Material(
-      color: Colors.transparent,
+      color: theme.isDarkTheme ? _chatBubble(theme) : theme.cardColor,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: theme.isDarkTheme
+              ? Colors.white.withValues(alpha: 0.12) // theme-drift-ok
+              : theme.colorScheme.onSurface.withValues(alpha: 0.09),
+          width: theme.isDarkTheme ? 0.6 : 0.8,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
-          decoration: BoxDecoration(
-            color: theme.isDarkTheme ? _chatBubble(theme) : theme.cardColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _chatOutline(theme).withValues(alpha: 0.55),
-              width: 1,
-            ),
-            boxShadow: theme.isDarkTheme
-                ? null
-                : [
-                    BoxShadow(
-                      color: theme.ambientShadow(lightOpacity: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-          ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 5, 16, 5),
           child: Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
+                  color: accent.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Icon(Icons.north_east_rounded, size: 16, color: accent),
+                child: Icon(Icons.north_east_rounded, size: 13, color: accent),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   prompt,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14,
-                    height: 1.3,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    height: 1.25,
+                    fontWeight: FontWeight.w400,
                     color: _chatBody(theme),
                   ),
                 ),

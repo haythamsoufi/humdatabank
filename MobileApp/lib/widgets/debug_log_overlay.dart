@@ -21,6 +21,9 @@ class DebugLogOverlay extends StatefulWidget {
 class _DebugLogOverlayState extends State<DebugLogOverlay>
     with SingleTickerProviderStateMixin {
   bool _panelOpen = false;
+  // User-dragged pill position (null = default placement).
+  double? _pillRight;
+  double? _pillBottom;
   late final AnimationController _animCtrl;
   late final Animation<Offset> _slideAnim;
 
@@ -67,10 +70,12 @@ class _DebugLogOverlayState extends State<DebugLogOverlay>
         ValueListenableBuilder<List<LogEntry>>(
           valueListenable: DebugLogger.logNotifier,
           builder: (context, entries, _) {
-            final warnCount =
-                entries.where((e) => e.level == LogLevel.warn).length;
-            final errorCount =
-                entries.where((e) => e.level == LogLevel.error).length;
+            final warnCount = entries
+                .where((e) => e.level == LogLevel.warn)
+                .length;
+            final errorCount = entries
+                .where((e) => e.level == LogLevel.error)
+                .length;
             return _DebugOverlayContent(
               entries: entries,
               warnCount: warnCount,
@@ -79,6 +84,12 @@ class _DebugLogOverlayState extends State<DebugLogOverlay>
               slideAnim: _slideAnim,
               onToggle: _toggle,
               onClose: _close,
+              pillRight: _pillRight,
+              pillBottom: _pillBottom,
+              onPillMoved: (right, bottom) => setState(() {
+                _pillRight = right;
+                _pillBottom = bottom;
+              }),
             );
           },
         ),
@@ -95,6 +106,9 @@ class _DebugOverlayContent extends StatelessWidget {
   final Animation<Offset> slideAnim;
   final VoidCallback onToggle;
   final VoidCallback onClose;
+  final double? pillRight;
+  final double? pillBottom;
+  final void Function(double right, double bottom) onPillMoved;
 
   const _DebugOverlayContent({
     required this.entries,
@@ -104,6 +118,9 @@ class _DebugOverlayContent extends StatelessWidget {
     required this.slideAnim,
     required this.onToggle,
     required this.onClose,
+    required this.pillRight,
+    required this.pillBottom,
+    required this.onPillMoved,
   });
 
   Color get _badgeColor {
@@ -142,6 +159,13 @@ class _DebugOverlayContent extends StatelessWidget {
     final mq = MediaQuery.of(context);
     final bottomInset = mq.padding.bottom;
     final panelHeight = mq.size.height * 0.45;
+    final defaultBottom = panelOpen
+        ? panelHeight + bottomInset + 8
+        : bottomInset + 76;
+    final maxRight = mq.size.width - 90;
+    final maxBottom = mq.size.height - 80;
+    final right = (pillRight ?? 12).clamp(0.0, maxRight);
+    final bottom = (pillBottom ?? defaultBottom).clamp(0.0, maxBottom);
 
     return Stack(
       children: [
@@ -164,15 +188,17 @@ class _DebugOverlayContent extends StatelessWidget {
         ),
         // Floating toggle button (above panel when open)
         Positioned(
-          right: 12,
-          bottom: panelOpen
-              ? panelHeight + bottomInset + 8
-              : bottomInset + 76,
+          right: right,
+          bottom: bottom,
           child: _TogglePill(
             label: _badgeLabel,
             color: _badgeColor,
             onTap: onToggle,
             isOpen: panelOpen,
+            onDrag: (delta) => onPillMoved(
+              (right - delta.dx).clamp(0.0, maxRight),
+              (bottom - delta.dy).clamp(0.0, maxBottom),
+            ),
           ),
         ),
       ],
@@ -185,51 +211,58 @@ class _TogglePill extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final bool isOpen;
+  final ValueChanged<Offset> onDrag;
 
   const _TogglePill({
     required this.label,
     required this.color,
     required this.onTap,
     required this.isOpen,
+    required this.onDrag,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'monospace',
+    // Material ancestor stops Text from rendering the debug yellow double underline.
+    return Material(
+      type: MaterialType.transparency,
+      child: GestureDetector(
+        onTap: onTap,
+        onPanUpdate: (d) => onDrag(d.delta),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              isOpen ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-              color: Colors.white,
-              size: 16,
-            ),
-          ],
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'monospace',
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                isOpen ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
+                color: Colors.white,
+                size: 16,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -264,9 +297,7 @@ class _LogPanel extends StatelessWidget {
         decoration: const BoxDecoration(
           color: Color(0xFF1A1A2E),
           borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-          border: Border(
-            top: BorderSide(color: Color(0xFF374151), width: 1),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFF374151), width: 1)),
         ),
         child: Column(
           children: [
@@ -291,10 +322,7 @@ class _LogPanel extends StatelessWidget {
                       ),
                     )
                   : ListView.separated(
-                      padding: EdgeInsets.only(
-                        bottom: bottomInset + 4,
-                        top: 4,
-                      ),
+                      padding: EdgeInsets.only(bottom: bottomInset + 4, top: 4),
                       itemCount: reversed.length,
                       separatorBuilder: (_, _) => const Divider(
                         height: 1,
@@ -335,7 +363,11 @@ class _PanelHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.bug_report_outlined, color: Color(0xFF9CA3AF), size: 16),
+          const Icon(
+            Icons.bug_report_outlined,
+            color: Color(0xFF9CA3AF),
+            size: 16,
+          ),
           const SizedBox(width: 6),
           Text(
             'Debug Logs ($entryCount)',
@@ -422,13 +454,11 @@ class _LogEntryTile extends StatelessWidget {
   final LogEntry entry;
   const _LogEntryTile({required this.entry});
 
-  Color get _levelColor =>
-      entry.level == LogLevel.error
-          ? const Color(0xFFFC8181)
-          : const Color(0xFFFBD38D);
+  Color get _levelColor => entry.level == LogLevel.error
+      ? const Color(0xFFFC8181)
+      : const Color(0xFFFBD38D);
 
-  String get _levelLabel =>
-      entry.level == LogLevel.error ? 'ERR' : 'WRN';
+  String get _levelLabel => entry.level == LogLevel.error ? 'ERR' : 'WRN';
 
   String get _timeLabel {
     final t = entry.time;
@@ -463,12 +493,16 @@ class _LogEntryTile extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: _levelColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(3),
-                    border: Border.all(color: _levelColor.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: _levelColor.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Text(
                     _levelLabel,

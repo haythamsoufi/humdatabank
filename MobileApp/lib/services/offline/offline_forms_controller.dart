@@ -178,6 +178,7 @@ class OfflineFormsController extends ChangeNotifier {
   OfflineFormsIndex _index = OfflineFormsIndex.empty;
   Map<int, OfflineFormStatus> _statuses = const {};
   final Set<int> _busy = {};
+  final Set<int> _pending = {};
   final Map<String, DateTime> _failedAt = {};
   final Map<int, Future<OfflineSaveResult>> _explicit = {};
   final ListQueue<_QueuedJob> _queue = ListQueue();
@@ -202,15 +203,42 @@ class OfflineFormsController extends ChangeNotifier {
   void _onStorageChanged() {
     _queue.clear();
     unawaited(
-      refresh(_all, language: _lastEnv?.language ?? '').catchError((_) {}),
+      refresh(_all, language: _lastEnv?.language ?? '').catchError((Object e) {
+        DebugLogger.logWarn('OFFLINE_BUNDLE', 'Refresh after storage change failed: $e');
+      }),
     );
   }
 
   OfflineFormStatus statusFor(int assignmentId) =>
       _statuses[assignmentId] ?? OfflineFormStatus.none;
 
-  /// A heavy or user-requested save for this assignment is running.
-  bool isBusy(int assignmentId) => _busy.contains(assignmentId);
+  /// A save for this assignment is running or waiting in the queue (including
+  /// the automatic page download when its template is already saved).
+  bool isBusy(int assignmentId) =>
+      _busy.contains(assignmentId) ||
+      _pending.contains(assignmentId) ||
+      _running.contains('page:$assignmentId') ||
+      _queue.any((q) => q.job.assignment.id == assignmentId);
+
+  /// Marks the pages [reconcile] is about to download, using the index already
+  /// in memory, so cards show progress instead of waiting for disk reads.
+  void expectPages({
+    required Iterable<Assignment> all,
+    required Iterable<Assignment> eligible,
+    required String language,
+  }) {
+    _all = all.toList();
+    _statuses = {
+      for (final a in _all) a.id: evaluateOfflineForm(a, _index, language: language),
+    };
+    _pending
+      ..clear()
+      ..addAll([
+        for (final a in eligible)
+          if (statusFor(a.id).needsPage && !_recentlyFailed('page:${a.id}')) a.id,
+      ]);
+    notifyListeners();
+  }
 
   /// Some saved template no longer matches the server's static files.
   bool get hasOutdatedPackages =>
@@ -249,6 +277,7 @@ class OfflineFormsController extends ChangeNotifier {
     _statuses = const {};
     _index = OfflineFormsIndex.empty;
     _busy.clear();
+    _pending.clear();
     _failedAt.clear();
     _all = const [];
     _lastEligible = const [];
@@ -269,16 +298,24 @@ class OfflineFormsController extends ChangeNotifier {
     bool clearFailures = false,
   }) async {
     final generation = _generation;
-    await refresh(all, language: env.language);
-    if (generation != _generation) return;
-    if (clearFailures) _failedAt.clear();
-    _lastEligible = eligible.toList();
-    _lastEnv = env;
-    if (!env.online) {
-      _queue.clear();
-      return;
+    try {
+      await refresh(all, language: env.language);
+      if (generation != _generation) return;
+      if (clearFailures) _failedAt.clear();
+      _lastEligible = eligible.toList();
+      _lastEnv = env;
+      if (!env.online) {
+        _queue.clear();
+        return;
+      }
+      await _enqueuePlan();
+    } finally {
+      if (_pending.isNotEmpty) {
+        _pending.clear();
+        notifyListeners();
+      }
     }
-    await _enqueuePlan();
+    notifyListeners();
     unawaited(_pump());
   }
 
@@ -308,7 +345,7 @@ class OfflineFormsController extends ChangeNotifier {
     try {
       while (generation == _generation && passes++ < 4) {
         while (_queue.isNotEmpty && generation == _generation) {
-          final next = _queue.removeFirst();
+            final next = _queue.removeFirst();
           await _run(next, explicit: false);
         }
         if (!_progressed || generation != _generation) break;
@@ -403,7 +440,9 @@ class OfflineFormsController extends ChangeNotifier {
       _busy.remove(a.id);
       try {
         await refresh(_withAssignment(a), language: queued.env.language);
-      } catch (_) {}
+      } catch (e) {
+        DebugLogger.logWarn('OFFLINE_BUNDLE', 'Refresh after job failed: $e');
+      }
       notifyListeners();
     }
   }

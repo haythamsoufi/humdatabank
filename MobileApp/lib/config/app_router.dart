@@ -20,6 +20,8 @@ import '../screens/public/unified_planning_documents_screen.dart';
 import '../screens/public/unified_planning_analytics_screen.dart';
 import '../screens/public/disaggregation_analysis_screen.dart';
 import '../screens/public/countries_screen.dart';
+import '../screens/public/country_detail_screen.dart';
+import '../screens/public/region_detail_screen.dart';
 import '../screens/public/ns_structure_screen.dart';
 import '../screens/public/quiz_game_screen.dart';
 import '../screens/public/leaderboard_screen.dart';
@@ -71,7 +73,8 @@ class AppRouter {
           final tabIndex = args is int ? args : null;
           return MainNavigationScreen(initialTabIndex: tabIndex);
         },
-        AppRoutes.settings: (context) => const SettingsScreen(),
+        AppRoutes.settings: (context) =>
+            const SettingsScreen(showBottomNav: true),
         AppRoutes.notifications: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           final tabIndex = args is int ? args : 0;
@@ -203,6 +206,36 @@ class AppRouter {
           body: Center(child: Text('Missing translation data.')),
         ),
       );
+    }
+
+    // Region overview: /regions/{slug}
+    if (settings.name != null && settings.name!.startsWith('/regions/')) {
+      final slug = settings.name!.substring('/regions/'.length).trim();
+      if (slug.isNotEmpty) {
+        final args = settings.arguments;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (context) => RegionDetailScreen(
+            regionSlug: slug,
+            regionName: args is String ? args : null,
+          ),
+        );
+      }
+    }
+
+    // Country profile: /countries/{iso3}
+    if (settings.name != null && settings.name!.startsWith('/countries/')) {
+      final iso3 = settings.name!.split('/').last.trim();
+      if (iso3.length == 3) {
+        final args = settings.arguments;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (context) => CountryDetailScreen(
+            iso3: iso3.toUpperCase(),
+            countryName: args is String ? args : null,
+          ),
+        );
+      }
     }
 
     // NS structure with country ID: /ns-structure/{id}

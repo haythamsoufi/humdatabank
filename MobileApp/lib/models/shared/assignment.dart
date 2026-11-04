@@ -144,7 +144,9 @@ class Assignment {
     if (status == 'submitted' ||
         status == 'approved' ||
         status == 'requires_revision' ||
-        status == 'sent_for_review') {
+        status == 'sent_for_review' ||
+        status == 'cancelled' ||
+        status == 'canceled') {
       return false;
     }
 

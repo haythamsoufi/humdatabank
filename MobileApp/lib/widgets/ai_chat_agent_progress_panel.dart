@@ -5,7 +5,7 @@ import '../models/shared/ai_chat.dart';
 import '../utils/ai_chat_agent_progress_localize.dart';
 import '../utils/constants.dart';
 
-/// Mirrors Backoffice `chat-progress-panel` / `chat-progress-steps` (chatbot.css).
+/// Single status line showing the current agent step; tap to expand the full workflow.
 class AiChatAgentProgressPanel extends StatefulWidget {
   final List<AiChatAgentStep> steps;
 
@@ -19,7 +19,13 @@ class AiChatAgentProgressPanel extends StatefulWidget {
 }
 
 class _AiChatAgentProgressPanelState extends State<AiChatAgentProgressPanel> {
-  final Set<int> _collapsed = {};
+  bool _expanded = false;
+
+  Widget _spinner(Color color) => SizedBox(
+        width: 14,
+        height: 14,
+        child: CircularProgressIndicator(strokeWidth: 2, color: color),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -30,10 +36,24 @@ class _AiChatAgentProgressPanelState extends State<AiChatAgentProgressPanel> {
     final cs = theme.colorScheme;
     final muted = cs.onSurfaceVariant;
     final subtle = cs.outline;
-    final doneGreen = const Color(AppConstants.successColor);
     final doneIconColor = theme.brightness == Brightness.dark
         ? const Color(0xFFBDBDBD)
-        : doneGreen;
+        : const Color(AppConstants.successColor);
+
+    final textStyle = theme.textTheme.bodyLarge?.copyWith(
+          height: 1.35,
+          letterSpacing: -0.2,
+          color: muted,
+        ) ??
+        TextStyle(fontSize: 16, height: 1.35, letterSpacing: -0.2, color: muted);
+    final detailStyle = theme.textTheme.bodyMedium?.copyWith(
+          height: 1.4,
+          color: subtle,
+        ) ??
+        TextStyle(fontSize: 14, height: 1.4, color: subtle);
+
+    final current = widget.steps.last;
+    final lastIndex = widget.steps.length - 1;
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -44,115 +64,106 @@ class _AiChatAgentProgressPanelState extends State<AiChatAgentProgressPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                AiChatAgentProgressCopy.panelTitle(loc),
-                style: theme.textTheme.titleSmall?.copyWith(
-                      color: muted,
-                    ) ??
-                    TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: muted,
+              InkWell(
+                onTap: () => setState(() => _expanded = !_expanded),
+                borderRadius: BorderRadius.circular(4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(width: 18, child: _spinner(muted)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: Text(
+                          AiChatAgentProgressCopy.stepMessage(loc, current.message),
+                          key: ValueKey<String>(current.message),
+                          style: textStyle,
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: subtle,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 6),
-              ...List.generate(widget.steps.length, (i) {
-                final step = widget.steps[i];
-                final isLast = i == widget.steps.length - 1;
-                final displayDetails =
-                    AiChatAgentProgressCopy.detailLinesForDisplay(loc, step.detailLines);
-                final hasDetail = displayDetails.isNotEmpty;
-                final collapsed = _collapsed.contains(i);
-                final detailText = displayDetails.join('\n');
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      InkWell(
-                        onTap: hasDetail
-                            ? () => setState(() {
-                                  if (collapsed) {
-                                    _collapsed.remove(i);
-                                  } else {
-                                    _collapsed.add(i);
-                                  }
-                                })
-                            : null,
-                        borderRadius: BorderRadius.circular(4),
-                        child: Row(
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                alignment: Alignment.topLeft,
+                child: _expanded
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 2),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SizedBox(
-                              width: 18,
-                              child: isLast
-                                  ? SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: FittedBox(
-                                        fit: BoxFit.contain,
-                                        child: SizedBox(
-                                          width: 36,
-                                          height: 36,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: muted,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : Icon(Icons.check, size: 16, color: doneIconColor),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                AiChatAgentProgressCopy.stepMessage(loc, step.message),
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                      height: 1.35,
-                                      letterSpacing: -0.2,
-                                      color: muted,
-                                    ) ??
-                                    TextStyle(
-                                      fontSize: 16,
-                                      height: 1.35,
-                                      letterSpacing: -0.2,
-                                      color: muted,
-                                    ),
-                              ),
-                            ),
-                            if (hasDetail)
-                              Icon(
-                                collapsed ? Icons.chevron_right : Icons.expand_more,
-                                size: 16,
-                                color: subtle,
+                            for (var i = 0; i < widget.steps.length; i++)
+                              _stepRow(
+                                loc: loc,
+                                step: widget.steps[i],
+                                isCurrent: i == lastIndex,
+                                muted: muted,
+                                doneIconColor: doneIconColor,
+                                textStyle: textStyle,
+                                detailStyle: detailStyle,
                               ),
                           ],
                         ),
-                      ),
-                      if (hasDetail && !collapsed)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 24, top: 2, right: 8),
-                          child: Text(
-                            detailText,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                                  height: 1.4,
-                                  color: subtle,
-                                ) ??
-                                TextStyle(
-                                  fontSize: 14,
-                                  height: 1.4,
-                                  color: subtle,
-                                ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _stepRow({
+    required AppLocalizations loc,
+    required AiChatAgentStep step,
+    required bool isCurrent,
+    required Color muted,
+    required Color doneIconColor,
+    required TextStyle textStyle,
+    required TextStyle detailStyle,
+  }) {
+    final details = AiChatAgentProgressCopy.detailLinesForDisplay(loc, step.detailLines);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 18,
+                child: isCurrent
+                    ? Align(
+                        alignment: Alignment.centerLeft,
+                        child: _spinner(muted),
+                      )
+                    : Icon(Icons.check, size: 16, color: doneIconColor),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  AiChatAgentProgressCopy.stepMessage(loc, step.message),
+                  style: textStyle.copyWith(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          if (details.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 24, top: 2, right: 8),
+              child: Text(details.join('\n'), style: detailStyle.copyWith(fontSize: 13)),
+            ),
+        ],
       ),
     );
   }

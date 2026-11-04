@@ -12,6 +12,46 @@ class AiChatAssistantDisplayHtmlSplit {
   });
 }
 
+/// Drops trailing `<br>`, empty paragraphs/divs and `&nbsp;` so no blank space is left
+/// below the last line of narrative text.
+String trimTrailingEmptyHtml(String html) {
+  return html.replaceFirst(
+    RegExp(
+      r'(?:\s|&nbsp;|<br\s*/?>|<(p|div)[^>]*>(?:\s|&nbsp;|<br\s*/?>|<(strong|b|em|i|span)[^>]*>\s*</\2>)*</\1>)+$',
+      caseSensitive: false,
+    ),
+    '',
+  );
+}
+
+/// Removes empty `<p>`/`<strong>`/... left behind when a block is lifted out; an empty
+/// paragraph still renders a blank line plus margins.
+void _pruneEmptyWrappers(dom.Node root) {
+  const tags = {'p', 'div', 'strong', 'b', 'em', 'i', 'span'};
+  var removed = true;
+  while (removed) {
+    removed = false;
+    final empties = root
+        .nodes
+        .expand<dom.Element>(_descendantElements)
+        .where((e) => tags.contains(e.localName) && e.children.isEmpty && e.text.trim().isEmpty)
+        .toList();
+    for (final e in empties) {
+      e.remove();
+      removed = true;
+    }
+  }
+}
+
+Iterable<dom.Element> _descendantElements(dom.Node n) sync* {
+  if (n is dom.Element) {
+    yield n;
+    for (final c in n.nodes) {
+      yield* _descendantElements(c);
+    }
+  }
+}
+
 /// Removes `.chat-response-sources` blocks (details or div) from the narrative HTML
 /// so they can be rendered **after** charts/maps/tables. Matches Backoffice: Sources
 /// should sit at the bottom of the response when structured visuals are present.
@@ -34,6 +74,7 @@ AiChatAssistantDisplayHtmlSplit splitAssistantHtmlForVisualsAfterBody(String? ra
   for (final el in found) {
     el.remove();
   }
+  _pruneEmptyWrappers(fragment);
   return AiChatAssistantDisplayHtmlSplit(
     mainHtml: fragment.outerHtml,
     trailingSourcesHtml: trailing.isEmpty ? null : trailing.toString(),

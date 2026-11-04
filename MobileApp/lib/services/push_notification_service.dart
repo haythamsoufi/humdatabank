@@ -59,6 +59,9 @@ class PushNotificationService {
   String? _lastRegisteredToken;
   String? _lastRegisteredUserEmail;
 
+  /// Set when the backend reports PUSH_NOT_ENABLED; skips registration and heartbeats.
+  bool _pushDisabledByServer = false;
+
   /// Initialize push notifications
   Future<void> initialize() async {
     if (_initialized) {
@@ -567,6 +570,7 @@ class PushNotificationService {
 
   /// Register token with backend API
   Future<void> _registerTokenWithBackend(String token) async {
+    if (_pushDisabledByServer) return;
     try {
       final platform = Platform.isIOS ? 'ios' : 'android';
       final packageInfo = await _getPackageInfo();
@@ -601,6 +605,12 @@ class PushNotificationService {
         _lastRegisteredToken = token;
         _lastRegisteredUserEmail = await StorageService().getString(AppConfig.userEmailKey);
         DebugLogger.logNotifications('✅ Device registered successfully: $data');
+      } else if (response.statusCode == 400 &&
+          response.body.contains('PUSH_NOT_ENABLED')) {
+        _pushDisabledByServer = true;
+        _stopHeartbeat();
+        DebugLogger.logNotifications(
+            'Push notifications not enabled on this deployment — skipping device registration');
       } else {
         DebugLogger.logError(
             '❌ Failed to register device: ${response.statusCode}');
@@ -746,7 +756,7 @@ class PushNotificationService {
 
   /// Send heartbeat to backend
   Future<void> _sendHeartbeat() async {
-    if (shouldDeferRemoteFetch) {
+    if (shouldDeferRemoteFetch || _pushDisabledByServer) {
       return;
     }
 

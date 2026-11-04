@@ -19,6 +19,7 @@ class DashboardProvider with ChangeNotifier {
   List<Entity> _entities = [];
   List<FocalPointContact> _nsFocalPoints = [];
   List<FocalPointContact> _orgFocalPoints = [];
+  List<FocalPointContact> _fdsMembers = [];
   Entity? _selectedEntity;
   bool _isLoading = false;
   String? _error;
@@ -28,6 +29,7 @@ class DashboardProvider with ChangeNotifier {
   List<Entity> get entities => _entities;
   List<FocalPointContact> get nsFocalPoints => _nsFocalPoints;
   List<FocalPointContact> get orgFocalPoints => _orgFocalPoints;
+  List<FocalPointContact> get fdsMembers => _fdsMembers;
   Entity? get selectedEntity => _selectedEntity;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -169,11 +171,21 @@ class DashboardProvider with ChangeNotifier {
 
   /// Update provider state from repository data.
   void _updateStateFromData(DashboardData data, {bool preserveSelectedEntity = false}) {
-    _currentAssignments = data.currentAssignments;
-    _pastAssignments = data.pastAssignments;
+    // Cancelled assignments always belong in the past list, regardless of API/cache grouping.
+    bool isCancelled(Assignment a) {
+      final s = a.status.toLowerCase().trim();
+      return s == 'cancelled' || s == 'canceled';
+    }
+
+    _currentAssignments = data.currentAssignments.where((a) => !isCancelled(a)).toList();
+    _pastAssignments = [
+      ...data.pastAssignments,
+      ...data.currentAssignments.where(isCancelled),
+    ];
     _entities = data.entities;
     _nsFocalPoints = data.nsFocalPoints;
     _orgFocalPoints = data.orgFocalPoints;
+    _fdsMembers = data.fdsMembers;
     // Preserve current selection if flag is set, otherwise use API response or keep current
     if (preserveSelectedEntity) {
       // Keep the current selection - don't overwrite it
@@ -271,6 +283,7 @@ class DashboardProvider with ChangeNotifier {
     _entities = [];
     _nsFocalPoints = [];
     _orgFocalPoints = [];
+    _fdsMembers = [];
     _selectedEntity = null;
     notifyListeners();
   }
@@ -285,6 +298,7 @@ class DashboardProvider with ChangeNotifier {
     _entities = [];
     _nsFocalPoints = [];
     _orgFocalPoints = [];
+    _fdsMembers = [];
     // Restore the preserved entity
     _selectedEntity = preservedEntity;
     notifyListeners();

@@ -5,7 +5,6 @@ import '../../providers/shared/language_provider.dart';
 import '../../utils/constants.dart';
 import '../../widgets/app_bar.dart';
 import '../../utils/theme_extensions.dart';
-import '../../utils/url_helper.dart';
 import '../../config/app_config.dart';
 import '../../config/routes.dart';
 import '../../l10n/app_localizations.dart';
@@ -151,13 +150,10 @@ class _CountriesScreenState extends State<CountriesScreen> {
     }).toList();
   }
 
-  void _navigateToCountry(String iso3) {
-    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    final language = languageProvider.currentLanguage;
-    final fullUrl = UrlHelper.buildFrontendUrlWithLanguage('/countries/$iso3', language);
+  void _navigateToCountry(String iso3, String name) {
     Navigator.of(context).pushNamed(
-      AppRoutes.webview,
-      arguments: fullUrl,
+      AppRoutes.countryDetail(iso3),
+      arguments: name,
     );
   }
 
@@ -418,30 +414,12 @@ class _CountriesScreenState extends State<CountriesScreen> {
             children: [
               if (_selectedRegion != null)
                 GestureDetector(
-                  onTap: () {
-                    final languageProvider =
-                        Provider.of<LanguageProvider>(
-                      context,
-                      listen: false,
-                    );
-                    final language =
-                        languageProvider.currentLanguage;
-                    // Navigate to region overview
-                    final regionSlug = _selectedRegion!
-                        .toLowerCase()
-                        .replaceAll(' ', '-');
-                    final fullUrl = UrlHelper
-                        .buildFrontendUrlWithLanguage(
-                      '/regions/$regionSlug',
-                      language,
-                    );
-                    Navigator.of(context).pushNamed(
-                      AppRoutes.webview,
-                      arguments: fullUrl,
-                    );
-                  },
+                  onTap: () => Navigator.of(context).pushNamed(
+                    AppRoutes.regionDetail(_selectedRegion!),
+                    arguments: _selectedRegion,
+                  ),
                   child: Text(
-                    'See $_selectedRegion Region Overview',
+                    localizations.regionOverviewLink(_selectedRegion!),
                     style: TextStyle(
                       color: Color(AppConstants.ifrcRed),
                       fontSize: 14,
@@ -535,7 +513,7 @@ class _CountriesScreenState extends State<CountriesScreen> {
 
                   return InkWell(
                     onTap: iso3 != null
-                        ? () => _navigateToCountry(iso3)
+                        ? () => _navigateToCountry(iso3, name)
                         : null,
                     borderRadius: BorderRadius.circular(8),
                     child: Container(

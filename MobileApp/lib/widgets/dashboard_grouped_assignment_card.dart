@@ -295,10 +295,11 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
         GroupedDashboardPalette.review,
       );
     case 'cancelled':
+    case 'canceled':
       return _toneFor(
         context,
         label == status ? _titleCase(status) : label,
-        GroupedDashboardPalette.danger,
+        GroupedDashboardPalette.neutral,
       );
     default:
       return _toneFor(

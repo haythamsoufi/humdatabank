@@ -351,6 +351,12 @@ class AppConfig {
 
   // Public data (via mobile API)
   static const String mobileCountryMapEndpoint = '$mobileApiPrefix/data/countrymap';
+
+  /// Append `/{iso3}`; public country profile (key figures, indicators, documents).
+  static const String mobileCountryProfileEndpoint = '$mobileApiPrefix/data/country-profile';
+
+  /// Append `/{slug}`; regional analysis (summed key indicators, top countries).
+  static const String mobileRegionProfileEndpoint = '$mobileApiPrefix/data/region-profile';
   static const String mobileSectorsSubsectorsEndpoint = '$mobileApiPrefix/data/sectors-subsectors';
   static const String mobilePublicIndicatorBankEndpoint = '$mobileApiPrefix/data/indicator-bank';
   static const String mobilePublicResourcesEndpoint = '$mobileApiPrefix/data/resources';
@@ -511,7 +517,7 @@ class AppConfig {
 
   /// Public Mapbox token for raster tiles (same style family as the website).
   /// Set `MAPBOX_ACCESS_TOKEN` in `.env` or `--dart-define=MAPBOX_ACCESS_TOKEN=pk.…`.
-  /// When empty, the app falls back to Carto basemaps in `fdrs_world_map.dart`.
+  /// When empty, the app falls back to OpenStreetMap tiles in `fdrs_world_map.dart`.
   static String get mapboxAccessToken {
     final env = dotenv.env['MAPBOX_ACCESS_TOKEN']?.trim();
     if (env != null && env.isNotEmpty) return env;

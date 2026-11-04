@@ -6,9 +6,13 @@ import '../utils/constants.dart';
 import '../utils/theme_extensions.dart';
 import '../utils/ios_constants.dart';
 
-/// Drawer panel flush with the scaffold edge (no corner rounding).
+/// Drawer panel with rounded corners on the trailing (inner) edge.
 ShapeBorder modernDrawerShape() {
-  return const RoundedRectangleBorder();
+  return const RoundedRectangleBorder(
+    borderRadius: BorderRadiusDirectional.horizontal(
+      end: Radius.circular(24),
+    ),
+  );
 }
 
 /// Top block: title + optional signed-in user row.
@@ -135,21 +139,28 @@ class ModernDrawerHeader extends StatelessWidget {
                   );
 
                   final tappable = onProfileTap != null;
-                  Widget child = profileRow;
+                  final cardRadius = BorderRadius.circular(16);
+                  Widget child = Container(
+                    padding: const EdgeInsets.all(IOSSpacing.sm + 2),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withValues(
+                        alpha: theme.isDarkTheme ? 0.45 : 0.6,
+                      ),
+                      borderRadius: cardRadius,
+                    ),
+                    child: profileRow,
+                  );
                   if (tappable) {
                     child = Material(
                       color: Colors.transparent,
+                      borderRadius: cardRadius,
+                      clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         onTap: onProfileTap,
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusLarge,
-                        ),
+                        borderRadius: cardRadius,
                         splashColor: cs.primary.withValues(alpha: 0.12),
                         highlightColor: cs.primary.withValues(alpha: 0.06),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: profileRow,
-                        ),
+                        child: child,
                       ),
                     );
                   }
@@ -180,36 +191,33 @@ class ModernDrawerSectionTitle extends StatelessWidget {
     final cs = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        IOSSpacing.lg,
         IOSSpacing.lg + 4,
         IOSSpacing.lg,
-        IOSSpacing.sm,
+        IOSSpacing.lg,
+        IOSSpacing.xs,
       ),
       child: Row(
         children: [
-          Container(
-            width: 3,
-            height: 14,
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(2),
-            ),
+          Text(
+            label,
+            style:
+                theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+                ) ??
+                IOSTextStyle.footnote(context).copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: cs.onSurfaceVariant,
+                ),
           ),
           const SizedBox(width: IOSSpacing.sm),
           Expanded(
-            child: Text(
-              label,
-              style:
-                  theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.15,
-                    color: cs.onSurfaceVariant,
-                  ) ??
-                  IOSTextStyle.footnote(context).copyWith(
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                    color: cs.onSurfaceVariant,
-                  ),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: cs.outlineVariant.withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -225,7 +233,7 @@ class ModernDrawerTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
-    this.showChevron = true,
+    this.showChevron = false,
     this.iconColor,
     this.selected = false,
   });
@@ -243,38 +251,38 @@ class ModernDrawerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final iconTint = iconColor ??
-        (selected ? cs.primary : cs.primary.withValues(alpha: 0.88));
+    final accent = Color(AppConstants.ifrcRed);
+    final iconTint = iconColor ?? (selected ? accent : cs.onSurfaceVariant);
     final rowFill = selected
-        ? cs.primary.withValues(alpha: theme.isDarkTheme ? 0.14 : 0.08)
+        ? accent.withValues(alpha: theme.isDarkTheme ? 0.18 : 0.08)
         : Colors.transparent;
     final titleStyle =
         (theme.textTheme.titleSmall ?? IOSTextStyle.body(context)).copyWith(
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          color: selected ? cs.onSurface : null,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          color: selected ? accent : cs.onSurface,
         );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
         color: rowFill,
-        borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+        borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-          splashColor: cs.primary.withValues(alpha: 0.12),
-          highlightColor: cs.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          splashColor: accent.withValues(alpha: 0.10),
+          highlightColor: accent.withValues(alpha: 0.05),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
               children: [
                 SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: Icon(icon, color: iconTint, size: 24),
+                  width: 28,
+                  height: 28,
+                  child: Icon(icon, color: iconTint, size: 22),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     title,
@@ -287,7 +295,7 @@ class ModernDrawerTile extends StatelessWidget {
                   Icon(
                     Icons.chevron_right_rounded,
                     color: selected
-                        ? cs.primary.withValues(alpha: 0.65)
+                        ? accent.withValues(alpha: 0.7)
                         : cs.onSurfaceVariant.withValues(alpha: 0.45),
                     size: 22,
                   ),

@@ -48,7 +48,8 @@ class OfflineApiRecorder {
             if (e is Map) Map<String, dynamic>.from(e),
         ],
       );
-    } catch (_) {
+    } catch (e) {
+      DebugLogger.logWarn('OFFLINE_API', 'Unreadable recorder payload: $e');
       return null;
     }
   }
@@ -158,14 +159,19 @@ class OfflineApiRecorder {
             )
             .timeout(const Duration(seconds: 5));
         await Future<void>.delayed(const Duration(milliseconds: 300));
-      } catch (_) {}
+      } catch (e) {
+        DebugLogger.logWarn('OFFLINE_API', 'Recorder flush failed: $e');
+      }
     } finally {
       try {
         await headless.dispose().timeout(const Duration(seconds: 5));
-      } catch (_) {}
+      } catch (e) {
+        DebugLogger.logWarn('OFFLINE_API', 'Headless WebView dispose failed: $e');
+      }
     }
 
     if (failure != null) {
+      DebugLogger.logWarn('OFFLINE_API', 'Recording $formUrl failed: $failure');
       throw AssignmentOfflineBundleException(failure!);
     }
     DebugLogger.logInfo(

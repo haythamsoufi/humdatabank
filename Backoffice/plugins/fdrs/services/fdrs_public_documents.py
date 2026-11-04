@@ -258,6 +258,16 @@ def _submitted_entry(document: SubmittedDocument) -> Optional[dict[str, Any]]:
     }
 
 
+def country_documents(country_id: int) -> list[dict[str, Any]]:
+    """Public approved submitted documents for one country, newest first."""
+    documents: list[dict[str, Any]] = []
+    for document in _submitted_documents_for_country(country_id):
+        entry = _submitted_entry(document)
+        if entry is not None:
+            documents.append(entry)
+    return documents
+
+
 def society_documents(don_code: str) -> Optional[list[dict[str, Any]]]:
     """``None`` when the DON code is not an active society."""
     society = NationalSociety.query.filter(

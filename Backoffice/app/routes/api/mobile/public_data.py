@@ -3,7 +3,9 @@
 
 Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
-    indicator-suggestions, data/periods, data/fdrs-overview, data/disaggregation-overview
+    indicator-suggestions, data/periods, data/fdrs-overview, data/country-profile/<iso3>,
+    data/region-profile/<slug>,
+    data/disaggregation-overview
     (global/regional for anonymous; country breakdown for authenticated org users), data/resources,
     data/unified-planning-config (appeals URL + unified planning type IDs for the mobile app),
     data/unified-planning-thumbnail (JPEG first page — server-rendered; IFRC URL allowlist;
@@ -43,22 +45,24 @@ def countrymap():
     Intentionally public and rate-limited. ``GET /api/v1/countrymap`` stays behind
     an API key or session because that prefix is the integration API.
     """
-    from app.models import Country
+    from app.services import CountryService
 
     locale = request.args.get('locale', 'en')
-    countries = Country.query.order_by(Country.name.asc()).all()
+    countries = CountryService.get_all_with_national_societies(ordered=True).all()
 
     items = []
     for c in countries:
         name = c.name
         if locale != 'en' and hasattr(c, f'name_{locale}'):
             name = getattr(c, f'name_{locale}', None) or c.name
+        ns = c.primary_national_society
         items.append({
             'id': c.id,
             'name': name,
             'iso2': getattr(c, 'iso2', None),
             'iso3': getattr(c, 'iso3', None),
             'region': getattr(c, 'region', None),
+            'national_society_name': ns.name if ns else None,
         })
 
     return mobile_ok(data={'countries': items}, meta={'total': len(items)})
@@ -349,6 +353,24 @@ def mobile_fdrs_overview():
     from plugins.fdrs.mobile import fdrs_overview as _impl
 
     return _impl()
+
+
+@mobile_bp.route('/data/country-profile/<iso3>', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def mobile_country_profile(iso3):
+    """Public country profile (key figures, indicator series, cover images, documents)."""
+    from plugins.fdrs.mobile import country_profile as _impl
+
+    return _impl(iso3)
+
+
+@mobile_bp.route('/data/region-profile/<slug>', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def mobile_region_profile(slug):
+    """Public regional analysis (summed key indicators and top countries)."""
+    from plugins.fdrs.mobile import region_profile as _impl
+
+    return _impl(slug)
 
 
 @mobile_bp.route('/data/disaggregation-overview', methods=['GET'])

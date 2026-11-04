@@ -25,7 +25,10 @@ import '../../l10n/app_localizations.dart';
 import '../../models/shared/user.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  /// True when pushed as a route; false when embedded in the tab shell (which has its own bar).
+  final bool showBottomNav;
+
+  const SettingsScreen({super.key, this.showBottomNav = false});
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +48,15 @@ class SettingsScreen extends StatelessWidget {
 
         return IOSSettingsPageScaffold(
           title: localizations.accountSettings,
+          bottomNavigationBar: showBottomNav
+              ? AppBottomNavigationBar(
+                  // The admin layout has no Settings tab, so nothing is highlighted.
+                  currentIndex: (user?.isAdmin ?? false)
+                      ? AppBottomNavigationBar.noTabSelected
+                      : ((user?.chatbotEnabled ?? false) ? 6 : 5),
+                  chatbotEnabled: user?.chatbotEnabled ?? false,
+                )
+              : null,
           children: bodyChildren,
         );
       },

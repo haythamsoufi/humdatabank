@@ -31,18 +31,28 @@ _PERMISSIONS_POLICY = (
     "microphone=(), "
     "camera=(), "
     "payment=(), "
-    "usb=(), "
     "magnetometer=(), "
     "gyroscope=(), "
     "accelerometer=(), "
     "display-capture=(), "
     "midi=(), "
-    "serial=(), "
-    "hid=(), "
-    "browsing-topics=(), "
     "fullscreen=(self), "
     "sync-xhr=()"
 )
+# Desktop-only features: Android WebView's Chromium rejects them as unrecognised and logs a console error.
+_DESKTOP_ONLY_PERMISSIONS = "usb=(), serial=(), hid=(), browsing-topics=()"
+
+
+def _is_mobile_webview():
+    if request.headers.get("X-Mobile-App"):
+        return True
+    return "; wv)" in request.headers.get("User-Agent", "")
+
+
+def _permissions_policy():
+    if _is_mobile_webview():
+        return _PERMISSIONS_POLICY
+    return f"{_PERMISSIONS_POLICY}, {_DESKTOP_ONLY_PERMISSIONS}"
 
 
 def _config_value(name):
@@ -68,7 +78,7 @@ def _apply_baseline_headers(response):
     """Headers that do not depend on the CSP variant (shared by the default and plugin-override paths)."""
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    response.headers['Permissions-Policy'] = _PERMISSIONS_POLICY
+    response.headers['Permissions-Policy'] = _permissions_policy()
     response.headers['X-Permitted-Cross-Domain-Policies'] = 'none'
     # Keeps window.opener for popups this page opens (OAuth/print/map helpers) while isolating it from
     # cross-origin pages that open us.

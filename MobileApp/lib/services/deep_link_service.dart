@@ -146,6 +146,16 @@ class DeepLinkService {
       navigatorState.pushNamed(AppRoutes.resources);
     } else if (path == '/countries') {
       navigatorState.pushNamed(AppRoutes.countries);
+    } else if (path.startsWith('/countries/')) {
+      final iso3 = path.split('/').last.trim();
+      if (iso3.length == 3) {
+        navigatorState.pushNamed(AppRoutes.countryDetail(iso3.toUpperCase()));
+      }
+    } else if (path.startsWith('/regions/')) {
+      final slug = path.substring('/regions/'.length).trim();
+      if (slug.isNotEmpty) {
+        navigatorState.pushNamed('/regions/$slug');
+      }
     } else if (path.startsWith('/ns-structure/')) {
       final idStr = path.split('/').last;
       final countryId = int.tryParse(idStr);

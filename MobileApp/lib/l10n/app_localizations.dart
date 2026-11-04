@@ -525,6 +525,7 @@ class AppLocalizations {
       'focal_points_for': 'Focal Points for',
       'national_society_focal_points': 'National Society Focal Points',
       'ifrc_focal_points': 'IFRC Focal Points',
+      'fds_member': 'FDS Member',
       'no_focal_points_assigned_to': 'No focal points assigned to',
       'your_user_account_not_associated':
           'Your user account is not associated with any countries.',
@@ -1085,6 +1086,37 @@ class AppLocalizations {
       'countries_search_hint': 'Search countries…',
       'countries_no_results': 'No countries found',
       'countries_no_available': 'No countries available',
+      'country_detail_key_figures': 'Key figures',
+      'country_detail_key_indicators': 'Key indicators',
+      'country_detail_top_sectors': 'Top sectors',
+      'country_detail_documents': 'Documents',
+      'country_detail_all_types': 'All types',
+      'country_detail_no_trend': 'No trend data for this indicator',
+      'country_detail_no_documents': 'No public documents available',
+      'country_detail_not_found': 'Country not found',
+      'country_detail_open_failed': 'Could not open this document',
+      'region_overview_link': 'See %s region overview',
+      'region_total_countries': 'Total countries',
+      'region_coverage': 'Based on %s of %s countries',
+      'region_top_countries': 'Top countries',
+      'region_analysis_title': 'Regional analysis',
+      'region_no_data': 'No data available for this region',
+      'reach_kpi_KPI_ReachH': 'Health services',
+      'reach_kpi_KPI_ReachHPM': 'Mental health & psychosocial',
+      'reach_kpi_KPI_ReachHI': 'Immunization',
+      'reach_kpi_KPI_ReachM': 'Migrants & displaced people',
+      'reach_kpi_KPI_ReachWASH': 'Water, sanitation & hygiene',
+      'reach_kpi_KPI_ReachS': 'Shelter',
+      'reach_kpi_KPI_ReachL': 'Livelihoods',
+      'reach_kpi_KPI_ReachRCRCEd': 'Education',
+      'reach_kpi_KPI_ReachSI': 'Protection, gender & inclusion',
+      'reach_kpi_KPI_ReachCTP': 'Cash transfer',
+      'reach_kpi_KPI_Climate': 'Climate & environment',
+      'reach_kpi_KPI_ClimateHeat': 'Heatwave',
+      'reach_kpi_KPI_ReachDRR': 'Disaster risk reduction',
+      'reach_kpi_KPI_ReachDRER': 'Disaster response & recovery',
+      'reach_kpi_KPI_ReachLTSPD': 'Long-term services',
+      'region_not_found': 'Region not found',
 
       // NS structure
       'ns_select_branch_prompt': 'Select a branch to view sub-branches',
@@ -8706,6 +8738,31 @@ class AppLocalizations {
   String get countriesSearchHint => translate('countries_search_hint');
   String get countriesNoResults => translate('countries_no_results');
   String get countriesNoAvailable => translate('countries_no_available');
+  String get countryDetailKeyFigures => translate('country_detail_key_figures');
+  String get countryDetailKeyIndicators =>
+      translate('country_detail_key_indicators');
+  String get countryDetailTopSectors => translate('country_detail_top_sectors');
+  String get countryDetailDocuments => translate('country_detail_documents');
+  String get countryDetailAllTypes => translate('country_detail_all_types');
+  String get countryDetailNoTrend => translate('country_detail_no_trend');
+  String get countryDetailNoDocuments => translate('country_detail_no_documents');
+  String get countryDetailNotFound => translate('country_detail_not_found');
+  String get countryDetailOpenFailed => translate('country_detail_open_failed');
+  String regionOverviewLink(String region) =>
+      translate('region_overview_link').replaceAll('%s', region);
+  String get regionTotalCountries => translate('region_total_countries');
+  String regionCoverage(int reporting, int total) =>
+      translate('region_coverage')
+          .replaceFirst('%s', '$reporting')
+          .replaceFirst('%s', '$total');
+  String get regionTopCountries => translate('region_top_countries');
+  String get regionAnalysisTitle => translate('region_analysis_title');
+  String get regionNoData => translate('region_no_data');
+
+  /// Short English label for a people-reached KPI code, or null when none exists.
+  String? reachIndicatorShortLabel(String kpiCode) =>
+      _translations['en']!['reach_kpi_$kpiCode'];
+  String get regionNotFound => translate('region_not_found');
 
   String get nsSelectBranchPrompt => translate('ns_select_branch_prompt');
 

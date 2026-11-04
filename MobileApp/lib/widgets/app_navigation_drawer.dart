@@ -82,8 +82,8 @@ class AppNavigationDrawer extends StatelessWidget {
     final language = languageProvider.currentLanguage;
 
     final drawerWidth = math.min(
-      MediaQuery.sizeOf(context).width * 0.88,
-      320.0,
+      MediaQuery.sizeOf(context).width * 0.75,
+      280.0,
     );
 
     return Drawer(
@@ -94,6 +94,9 @@ class AppNavigationDrawer extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       shape: modernDrawerShape(),
       child: SafeArea(
+        // The shell's extendBody inflates padding.bottom to the tab-bar height,
+        // which would leave a blank band under the list.
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -111,7 +114,7 @@ class AppNavigationDrawer extends StatelessWidget {
                   0,
                   IOSSpacing.sm,
                   0,
-                  IOSSpacing.lg,
+                  IOSSpacing.xl + IOSSpacing.lg,
                 ),
                 children: [
                   ModernDrawerTile(

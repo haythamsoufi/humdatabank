@@ -187,6 +187,17 @@ class _DashboardScreenState extends State<DashboardScreen>
     ].join(',');
     if (signature == _lastAssignmentSetSignature) return;
     _lastAssignmentSetSignature = signature;
+    final env = _offlineEnvironment();
+    if (env.online) {
+      final role = Provider.of<AuthProvider>(context, listen: false).user?.role;
+      _offlineForms.expectPages(
+        all: [...provider.currentAssignments, ...provider.pastAssignments],
+        eligible: provider.currentAssignments.where(
+          (a) => _shouldShowEnterDataButton(role, a),
+        ),
+        language: env.language,
+      );
+    }
     unawaited(_reconcileOfflineForms());
   }
 
@@ -662,7 +673,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     required AppLocalizations localizations,
   }) {
     final assignments = provider.currentAssignments;
-    if (assignments.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -675,6 +686,29 @@ class _DashboardScreenState extends State<DashboardScreen>
             count: assignments.length,
           ),
         ),
+        if (assignments.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 40,
+                  color: scheme.onSurface.withValues(alpha: 0.3),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  localizations.noAssignmentsYet,
+                  style: IOSTextStyle.subheadline(context).copyWith(
+                    color: scheme.onSurface.withValues(alpha: 0.6),
+                    height: 1.35,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
@@ -1312,7 +1346,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                               // Open assignments (collapsible; title: "You have …")
                               if (provider.currentAssignments.isNotEmpty ||
-                                  provider.pastAssignments.isNotEmpty)
+                                  provider.pastAssignments.isNotEmpty ||
+                                  (_hasLoadedOnce &&
+                                      !provider.isLoading &&
+                                      provider.error == null))
                                 _buildCurrentAssignmentsSection(
                                   provider: provider,
                                   authProvider: authProvider,
@@ -1337,68 +1374,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       entityLabel: entity.displayLabel,
                                       nsFocalPoints: provider.nsFocalPoints,
                                       orgFocalPoints: provider.orgFocalPoints,
+                                      fdsMembers: provider.fdsMembers,
                                     );
                                   },
-                                ),
-
-                              // Empty State - only show after we've loaded at least once
-                              if (provider.currentAssignments.isEmpty &&
-                                  provider.pastAssignments.isEmpty &&
-                                  !provider.isLoading &&
-                                  _hasLoadedOnce &&
-                                  provider.error == null)
-                                SizedBox(
-                                  height:
-                                      MediaQuery.of(context).size.height * 0.6,
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 40,
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.inbox_rounded,
-                                            size: 72,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.25),
-                                          ),
-                                          SizedBox(
-                                            height: IOSSpacing.xlOf(context),
-                                          ),
-                                          Text(
-                                            localizations.noAssignmentsYet,
-                                            style: IOSTextStyle.title2(context),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                          SizedBox(
-                                            height: IOSSpacing.smOf(context),
-                                          ),
-                                          Text(
-                                            localizations
-                                                .newAssignmentsWillAppear,
-                                            style:
-                                                IOSTextStyle.subheadline(
-                                                  context,
-                                                ).copyWith(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurface
-                                                      .withValues(alpha: 0.6),
-                                                  height: 1.4,
-                                                ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
                                 ),
 
                               // Clears the floating tab bar (padding.bottom is its

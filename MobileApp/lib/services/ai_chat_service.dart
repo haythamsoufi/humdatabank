@@ -51,6 +51,10 @@ class AiChatService {
     }
   }
 
+  /// An invalid AI Bearer token makes the backend fall back to cookie auth, which then fails CSRF.
+  bool _isCsrfRejection(int statusCode, String body) =>
+      statusCode == 400 && body.contains('CSRF validation failed');
+
   Map<String, dynamic> _buildChatRequestBody({
     required String message,
     String? conversationId,
@@ -112,7 +116,10 @@ class AiChatService {
       );
 
       // Token might be expired/invalid: refresh once then retry the request.
-      if (isAuthenticated && (resp.statusCode == 401 || resp.statusCode == 403)) {
+      if (isAuthenticated &&
+          (resp.statusCode == 401 ||
+              resp.statusCode == 403 ||
+              _isCsrfRejection(resp.statusCode, resp.body))) {
         DebugLogger.logWarn(
           'AI',
           'Chat HTTP ${resp.statusCode}; refreshing token and retrying once',
@@ -239,8 +246,17 @@ class AiChatService {
           handle.close();
           return;
         }
-        if (isAuthenticated &&
-            (handle.response.statusCode == 401 || handle.response.statusCode == 403)) {
+        var tokenRejected = isAuthenticated &&
+            (handle.response.statusCode == 401 || handle.response.statusCode == 403);
+        if (isAuthenticated && handle.response.statusCode == 400) {
+          final errorBody = await handle.response.stream.bytesToString();
+          if (!_isCsrfRejection(400, errorBody)) {
+            handle.close();
+            throw AiChatHttpException.fromResponse(400, errorBody);
+          }
+          tokenRejected = true;
+        }
+        if (tokenRejected) {
           handle.close();
           DebugLogger.logWarn(
             'AI',

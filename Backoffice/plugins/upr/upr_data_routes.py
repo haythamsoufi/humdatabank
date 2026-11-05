@@ -123,8 +123,8 @@ API_ENDPOINTS = [
             "Indicators are matched by Indicator Bank id per country and year. "
             "FDRS takes priority; where FDRS has no figure, Unified Reporting is used "
             "(annual report first, then mid-year). Data source is FDRS or Unified Reporting. "
-            "Unified Plan, PNS reporting and PNS plan data (templates 24, 23, 22) are included as in /api/v1/upr/data, with Data source Unified Planning, PNS Reporting or PNS Planning. "
-            "Only approved assignments are read. "
+            "Unified Reporting, Unified Plan, and PNS data (templates 33, 24, 23, 22) include every "
+            "workflow status, as in /api/v1/upr/data. FDRS (template 21) is approved-only. "
             "Filters: iso3, year, section. Returns the complete filtered extract; this endpoint is not paginated."
         ),
         "consumers": "Power BI, Backoffice session",
@@ -505,7 +505,8 @@ def get_upr_overall():
                     "columns": list(OVERALL_COLUMNS),
                     "priority": (
                         "Per country, year and indicator: FDRS, then Unified Reporting "
-                        "annual report, then Unified Reporting mid-year. Approved assignments only."
+                        "annual report, then Unified Reporting mid-year. "
+                        "FDRS approved only; Unified Reporting any status."
                     ),
                     "data_sources": ["FDRS", "Unified Reporting"],
                 },

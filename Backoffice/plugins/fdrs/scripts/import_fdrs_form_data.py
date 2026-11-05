@@ -681,8 +681,43 @@ def _normalize_sex_choice(value: Any) -> str:
     return "Other"  # fallback
 
 
-def _merge_disability_into_disagg_data(disagg_data: str, disability: Dict[str, bool]) -> str:
-    """Merge disability answers into disagg_data JSON (entry-form compatible)."""
+def _disagg_values_have_headline_or_breakdown(values: Any) -> bool:
+    """True when values already carry a total or sex/age breakdown (not just disability flags)."""
+    if not isinstance(values, dict) or not values:
+        return False
+    total = values.get("total")
+    if total is not None and not isinstance(total, (dict, bool)) and str(total).strip() != "":
+        return True
+    direct = values.get("direct")
+    if isinstance(direct, dict) and len(direct) > 0:
+        return True
+    if direct is not None and not isinstance(direct, (dict, bool)) and str(direct).strip() != "":
+        return True
+    skip = {"disability", "indirect", "direct", "total"}
+    for key, val in values.items():
+        if key in skip or isinstance(val, bool):
+            continue
+        if isinstance(val, dict):
+            if val:
+                return True
+            continue
+        if val is not None and str(val).strip() != "":
+            return True
+    return False
+
+
+def _merge_disability_into_disagg_data(
+    disagg_data: str,
+    disability: Dict[str, bool],
+    *,
+    scalar_value: Any = None,
+) -> str:
+    """Merge disability answers into disagg_data JSON (entry-form compatible).
+
+    When a scalar total exists but disagg has no headline/breakdown yet, also store
+    it under ``values.total``. The entry form prefers ``disagg_data`` over ``value``,
+    so disability-only disagg would otherwise hide the imported figure.
+    """
     if not disability:
         return disagg_data or ""
     if disagg_data:
@@ -696,6 +731,10 @@ def _merge_disability_into_disagg_data(disagg_data: str, disability: Dict[str, b
         obj = {"mode": "total", "values": {}}
     values = dict(obj.get("values") or {})
     values["disability"] = disability
+    if not _disagg_values_have_headline_or_breakdown(values):
+        scalar_text = "" if scalar_value is None else str(scalar_value).strip()
+        if scalar_text:
+            values["total"] = scalar_text
     obj["values"] = values
     if "mode" not in obj:
         obj["mode"] = "total"
@@ -955,7 +994,9 @@ def build_ready_to_import_from_new_pipeline(
                 imputed_value = _format_imputed_for_import(imputed_value)
             disagg_data = disagg_by_key.get((iso3, year, base_kpi)) or ""
             if disability_meta:
-                disagg_data = _merge_disability_into_disagg_data(disagg_data, disability_meta)
+                disagg_data = _merge_disability_into_disagg_data(
+                    disagg_data, disability_meta, scalar_value=value
+                )
         aes_id = assignment_by_key[(year, iso3)]
         sub_at = submitted_at_default.strftime("%d/%m/%Y  %H:%M:%S") if submitted_at_default else ""
         kpi_code = (r.get("KPI_code") or base_kpi or "").strip() if r else base_kpi
@@ -997,7 +1038,9 @@ def build_ready_to_import_from_new_pipeline(
             else:
                 published_disagg = published_disagg_by_key.get((iso3, year, base_kpi)) or ""
                 if published_value and disability_meta:
-                    published_disagg = _merge_disability_into_disagg_data(published_disagg, disability_meta)
+                    published_disagg = _merge_disability_into_disagg_data(
+                        published_disagg, disability_meta, scalar_value=published_value
+                    )
 
         out.append(_normalize_headers({
             "_debug_year": year,

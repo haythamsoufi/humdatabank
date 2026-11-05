@@ -141,6 +141,95 @@ def test_disagg_total_is_not_duplicated_and_labels_are_stable():
     assert attribute_label("male_50_") == "Male 50+"
 
 
+def test_nested_sex_disagg_flattens_direct_indirect_and_sex():
+    points = list(
+        iter_measure_points(
+            "58264",
+            {
+                "mode": "sex",
+                "values": {
+                    "direct": {"male": 3597, "female": 3686},
+                    "indirect": 50981,
+                },
+            },
+        )
+    )
+    assert points == [
+        ("Total", 58264.0),
+        ("Total male", 3597.0),
+        ("Total female", 3686.0),
+        ("Direct", 7283.0),
+        ("Indirect", 50981.0),
+    ]
+
+
+def test_nested_sex_age_disagg_flattens_age_bands():
+    points = list(
+        iter_measure_points(
+            None,
+            {
+                "mode": "sex_age",
+                "values": {
+                    "direct": {
+                        "male__5": 10,
+                        "female_5_17": 4,
+                        "unknown_18_49": 2,
+                    },
+                    "indirect": 30,
+                },
+            },
+        )
+    )
+    assert ("Male <5", 10.0) in points
+    assert ("Female 5-17", 4.0) in points
+    assert ("Other/Unknown 18-49", 2.0) in points
+    assert ("Direct", 16.0) in points
+    assert ("Indirect", 30.0) in points
+
+
+def test_fact_and_master_columns_include_shared_shaping_fields():
+    from plugins.upr.upr_data import FACT_COLUMNS, MASTER_COLUMNS
+
+    assert "Breakdown" in FACT_COLUMNS
+    assert "Data status" in FACT_COLUMNS
+    assert "Indicator ID" in FACT_COLUMNS
+    assert FACT_COLUMNS.index("Breakdown") == FACT_COLUMNS.index("Attribute") + 1
+    assert "Breakdown" in MASTER_COLUMNS
+    assert "Data status" in MASTER_COLUMNS
+    assert "indicatorId" in MASTER_COLUMNS
+
+
+def test_master_scalar_attaches_breakdown_json():
+    from plugins.upr.upr_data import breakdown_from_disagg, master_rows_for_item
+
+    disagg = {
+        "mode": "sex",
+        "values": {"direct": {"male": 7, "female": 5}, "indirect": 10},
+    }
+    assert breakdown_from_disagg("22", disagg) == {
+        "Total male": 7,
+        "Total female": 5,
+        "Direct": 12,
+        "Indirect": 10,
+    }
+    rows = master_rows_for_item(
+        _item(bank_id=619),
+        "core",
+        _PLACE,
+        value="22",
+        disagg=disagg,
+    )
+    assert len(rows) == 1
+    assert rows[0]["Attribute"] == "Total"
+    assert rows[0]["ValueNum"] == 22
+    assert rows[0]["Breakdown"] == {
+        "Total male": 7,
+        "Total female": 5,
+        "Direct": 12,
+        "Indirect": 10,
+    }
+
+
 def test_other_indicator_yes_becomes_one_and_no_is_dropped():
     yes = dynamic_facts(
         _PLACE,
@@ -327,9 +416,10 @@ def test_planning_emergency_numbers_and_ea_code():
         },
     }
     rows = facts_for_item(item, "emergency", place, value=None, disagg=disagg, emergency_index=index)
-    assert [row["Attribute"] for row in rows] == ["E1", "E2"]
+    assert [row["SP/EF"] for row in rows] == ["EA1", "EA2"]
+    assert [row["Attribute"] for row in rows] == ["SP2", "SP1"]
     assert [row["EA Code"] for row in rows] == ["MDRAF015", "MDRAF016"]
-    assert rows[0]["Section"] == "Emergencies"
+    assert rows[0]["Section"] == "Reach"
     assert rows[0]["Year"] == 2026
     assert rows[0]["SectionB"] is None
 
@@ -560,6 +650,44 @@ def test_pns_plan_t22_funding_is_emitted_per_host_country_and_year():
     assert any(r["SP/EF"] == "SP1" and r["Year"] == 2027 for r in rows)
 
 
+def test_pns_report_t23_funding_is_emitted_per_host_country():
+    from plugins.upr.catalog import PNS_REPORT_TEMPLATE_ID
+
+    place = {
+        **_PLACE,
+        "template": "pns",
+        "iso3": "AUT",
+        "country": "Austria",
+        "ns": "Austrian Red Cross",
+        "region": "Europe and Central Asia",
+        "period_name": "Jan-Jun 2026",
+        "round": "MYR26",
+        "source": "PNS Data",
+        "status": "approved",
+    }
+    item = _item(
+        template_id=PNS_REPORT_TEMPLATE_ID,
+        item_type="matrix",
+        label="Funding",
+        bank_id=None,
+        bank_name=None,
+        bank_area=None,
+    )
+    assert classify_item(item) == "pns_funding"
+    rows = facts_for_item(
+        item,
+        "pns_funding",
+        place,
+        value=None,
+        disagg={"mode": "matrix", "values": {"26_Total Funding": 507361, "26_Total Expenditure": 49841}},
+        country_by_id={26: {"name": "Burkina Faso", "iso3": "BFA", "region": "Africa"}},
+    )
+    assert {(r["Indicator"], r["Value"]) for r in rows} == {("Funding", 507361), ("Expenditure", 49841)}
+    assert all(r["ISO3"] == "BFA" and r["Country"] == "Burkina Faso" for r in rows)
+    assert all(r["NS"] == "Austrian Red Cross" and r["Entity"] == "PNS" and r["Source"] == "PNS Data" for r in rows)
+    assert all(r["PNS Value"] == r["ValueNum"] and r["PNS reported"] == "Yes" for r in rows)
+
+
 def test_pns_reported_value_wins_over_country_value_in_merge():
     from plugins.upr.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
     from plugins.upr.upr_data import _merge_pns_plan_funding
@@ -613,3 +741,19 @@ def test_plan_funding_ea_column_takes_code_from_selected_header():
     cells = {"IFRC Secretariat_EA1": 11500000, "col_header|EA1": "Afghanistan: Population Movement (MDRAF070)"}
     rows = _plan_funding_facts(_item(label="Funding Requirement"), _PLACE, cells, {})
     assert [r["EA Code"] for r in rows] == ["MDRAF070"]
+
+
+def test_plan_funding_skips_col_header_go_unmatched_flags():
+    from plugins.upr.upr_data import _plan_funding_facts
+
+    cells = {
+        "IFRC Secretariat_EA1": 120000000,
+        "col_header|EA1": "Iran Earthquake (MDRIR018)",
+        "col_header_go_unmatched|EA1": 1,
+        "row_go_unmatched|Some label": 1,
+    }
+    rows = _plan_funding_facts(_item(label="Funding Requirement"), _PLACE, cells, {})
+    assert len(rows) == 1
+    assert rows[0]["Entity"] == "IFRC Secretariat"
+    assert rows[0]["EA Code"] == "MDRIR018"
+    assert rows[0]["ValueNum"] == 120000000

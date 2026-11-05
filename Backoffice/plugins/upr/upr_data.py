@@ -88,6 +88,8 @@ _DISAGG_LABELS = {
     "total": "Total",
     "total_direct": "Direct",
     "total_indirect": "Indirect",
+    "direct": "Direct",
+    "indirect": "Indirect",
     "male": "Total male",
     "female": "Total female",
     "female__5": "Female <5",
@@ -100,11 +102,18 @@ _DISAGG_LABELS = {
     "female_50_": "Female 50+",
     "female_unknown": "Female Unknown age",
     "male_unknown": "Male Unknown age",
+    "__5": "Ages <5",
     "5_17": "Ages 5-17",
     "18_49": "Ages 18-49",
+    "50_": "Ages 50+",
     "non_binary": "Non-binary",
     "non_binary_18_49": "Non-binary 18-49",
     "unknown": "Other/Unknown",
+    "unknown__5": "Other/Unknown <5",
+    "unknown_5_17": "Other/Unknown 5-17",
+    "unknown_18_49": "Other/Unknown 18-49",
+    "unknown_50_": "Other/Unknown 50+",
+    "unknown_unknown": "Other/Unknown Unknown age",
 }
 
 # Workbook indicatorId values on the UPR Data sheet (not always an IndicatorBank id).
@@ -121,13 +130,15 @@ MASTER_COLUMNS = (
     "Country",
     "Round",
     "Year",
+    "Source",
+    "Data status",
     "Section",
     "SectionB",
     "Entity",
     "NS",
-    "Source",
     "Area",
     "Attribute",
+    "Breakdown",
     "Indicator",
     "indicatorId",
     "ValueNum",
@@ -141,27 +152,51 @@ MASTER_COLUMNS = (
 )
 
 FACT_COLUMNS = (
-    "Round",
+    "submission_id",
     "ISO3",
+    "Year",
+    "Round",
+    "Source",
+    "Data status",
+    "Region",
     "Country",
     "NS",
-    "Region",
     "Section",
     "SectionB",
-    "Source",
     "Entity",
     "Attribute",
+    "Breakdown",
     "SP/EF",
+    "EA Code",
     "Applicable/Data not available",
     "Indicator",
+    "Indicator ID",
     "Value",
     "ValueNum",
     "Country Value",
     "PNS Value",
     "PNS reported",
-    "Year",
-    "EA Code",
+)
+
+# Sex/age/direct-indirect attributes folded into Breakdown JSON on the Total row.
+BREAKDOWN_ATTRIBUTES = frozenset(label for key, label in _DISAGG_LABELS.items() if key != "total")
+FACT_COLLAPSE_KEY_FIELDS = (
     "submission_id",
+    "ISO3",
+    "Year",
+    "Round",
+    "Source",
+    "Data status",
+    "Region",
+    "Country",
+    "NS",
+    "Section",
+    "SectionB",
+    "Entity",
+    "SP/EF",
+    "EA Code",
+    "Applicable/Data not available",
+    "Indicator",
 )
 
 SUBMISSION_COLUMNS = (
@@ -406,6 +441,27 @@ def resolve_emergency_appeal(
     return code, (int(slot) if slot is not None else None)
 
 
+def _is_disagg_meta_key(key: str) -> bool:
+    """True for payload meta keys like ``_meta``; age band ``__5`` stays usable."""
+    return bool(re.match(r"^_[A-Za-z]", key))
+
+
+def _iter_nested_disagg_numbers(
+    raw: dict[str, Any],
+    *,
+    yes_no: bool = False,
+) -> list[tuple[str, float]]:
+    points: list[tuple[str, float]] = []
+    for child_key, child_raw in raw.items():
+        if not isinstance(child_key, str) or _is_disagg_meta_key(child_key):
+            continue
+        number = _yes_no_number(child_raw) if yes_no else to_number(child_raw)
+        if number is None:
+            continue
+        points.append((child_key, number))
+    return points
+
+
 def iter_measure_points(
     value: Any,
     disagg: Any,
@@ -413,6 +469,9 @@ def iter_measure_points(
     yes_no: bool = False,
 ) -> Iterator[tuple[str, float]]:
     """Scalar value is attribute Total. Disagg keys are additional attributes.
+
+    Nested ``direct`` / ``indirect`` objects (sex, age, sex_age modes) are flattened
+    into their leaf attributes, and Direct/Indirect is also emitted as the nested sum.
 
     A stored total is skipped when the scalar already supplied Total, so the
     same amount is not emitted twice.
@@ -433,6 +492,17 @@ def iter_measure_points(
     values = _disagg_values(disagg)
     for key, raw in values.items():
         if key == "total" and scalar_emitted:
+            continue
+        if isinstance(raw, dict):
+            nested = _iter_nested_disagg_numbers(raw, yes_no=yes_no)
+            for child_key, number in nested:
+                yield attribute_label(child_key), number
+            if nested and key in {"direct", "indirect", "total_direct", "total_indirect"}:
+                container_key = {
+                    "direct": "total_direct",
+                    "indirect": "total_indirect",
+                }.get(key, key)
+                yield attribute_label(container_key), sum(number for _, number in nested)
             continue
         number = _yes_no_number(raw) if yes_no else to_number(raw)
         if number is None:
@@ -490,11 +560,14 @@ def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
         "Section": None,
         "SectionB": None,
         "Source": place.get("source") or "Country Data",
+        "Data status": data_status_label(place.get("status")),
         "Entity": None,
         "Attribute": None,
+        "Breakdown": None,
         "SP/EF": None,
         "Applicable/Data not available": "Applicable",
         "Indicator": None,
+        "Indicator ID": None,
         "Value": None,
         "ValueNum": None,
         "Country Value": None,
@@ -504,6 +577,137 @@ def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
         "EA Code": None,
         "submission_id": place.get("submission_id"),
     }
+
+
+def data_status_label(status: Any) -> str | None:
+    """Display form for assignment status: ``pending`` → ``Pending``, ``in_progress`` → ``In Progress``."""
+    text = _status_text(status).strip()
+    if not text:
+        return None
+    return text.replace("_", " ").title()
+
+
+def _is_emergency_section(section: Any) -> bool:
+    text = str(section or "").strip()
+    return text == "Emergencies" or text.startswith("Emergency")
+
+
+def fill_section_b(fact: dict[str, Any]) -> None:
+    """``SectionB`` is the appeal code when the row has one; otherwise it repeats ``Section``."""
+    section = fact.get("Section")
+    ea_code = fact.get("EA Code") or None
+    if ea_code:
+        fact["SectionB"] = ea_code
+        return
+    if not section:
+        return
+    if _is_emergency_section(section):
+        fact["SectionB"] = fact.get("SectionB") or section
+        return
+    fact["SectionB"] = section
+
+
+def fill_entity(fact: dict[str, Any]) -> None:
+    """Blank Entity becomes ``PNS`` for PNS Data rows and ``HNS`` otherwise."""
+    if fact.get("Entity") is not None:
+        return
+    if fact.get("Source") == "PNS Data":
+        fact["Entity"] = "PNS"
+    else:
+        fact["Entity"] = "HNS"
+
+
+def breakdown_from_disagg(value: Any, disagg: Any, *, yes_no: bool = False) -> dict[str, int | float] | None:
+    """Sex/age/direct-indirect leaf amounts for a ``Breakdown`` JSON object."""
+    out: dict[str, int | float] = {}
+    for attribute, number in iter_measure_points(value, disagg, yes_no=yes_no):
+        if attribute in BREAKDOWN_ATTRIBUTES:
+            out[attribute] = _json_number(number)
+    return out or None
+
+
+def collapse_breakdowns(
+    rows: list[dict[str, Any]],
+    *,
+    columns: tuple[str, ...],
+    key_fields: tuple[str, ...],
+    blank_value_fields: tuple[str, ...] = ("Value", "ValueNum"),
+) -> list[dict[str, Any]]:
+    """Fold Direct / sex-age attributes into ``Breakdown`` JSON on the Total row.
+
+    Funding sources, support ticks, reach SP/EA attributes, and other non-disaggregation
+    attributes stay as their own rows.
+    """
+    grouped: dict[tuple, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(tuple(row.get(field) for field in key_fields), []).append(row)
+
+    collapsed: list[dict[str, Any]] = []
+    for members in grouped.values():
+        breakdown_rows = [row for row in members if row.get("Attribute") in BREAKDOWN_ATTRIBUTES]
+        if not breakdown_rows:
+            collapsed.extend(members)
+            continue
+
+        breakdown = {
+            str(row["Attribute"]): row["ValueNum"]
+            for row in breakdown_rows
+            if row.get("Attribute") is not None and row.get("ValueNum") is not None
+        }
+        kept = [row for row in members if row.get("Attribute") not in BREAKDOWN_ATTRIBUTES]
+        totals = [row for row in kept if row.get("Attribute") == "Total"]
+
+        if totals:
+            main = max(
+                totals,
+                key=lambda row: (row.get("ValueNum") is not None, abs(float(row["ValueNum"] or 0))),
+            )
+            others = [row for row in kept if row is not main]
+        else:
+            main = {field: breakdown_rows[0].get(field) for field in columns}
+            main["Attribute"] = "Total"
+            for field in blank_value_fields:
+                main[field] = None
+            others = kept
+
+        main["Breakdown"] = breakdown or None
+        collapsed.append(main)
+        collapsed.extend(others)
+    return collapsed
+
+
+def finish_fact_rows(
+    facts: list[dict[str, Any]],
+    *,
+    status_by_submission: dict[Any, Any],
+    columns: tuple[str, ...] = FACT_COLUMNS,
+    key_fields: tuple[str, ...] = FACT_COLLAPSE_KEY_FIELDS,
+) -> list[dict[str, Any]]:
+    """SectionB / Entity defaults, Breakdown collapse, and column projection for ``/data``."""
+    for fact in facts:
+        if fact.get("Data status") is None:
+            fact["Data status"] = data_status_label(status_by_submission.get(fact.get("submission_id")))
+        fill_section_b(fact)
+        fill_entity(fact)
+        fact.setdefault("Breakdown", None)
+        fact.setdefault("Indicator ID", None)
+    collapsed = collapse_breakdowns(facts, columns=columns, key_fields=key_fields)
+    return [{column: row.get(column) for column in columns} for row in collapsed]
+
+
+def finish_master_rows(
+    rows: list[dict[str, Any]],
+    *,
+    status_by_submission: dict[Any, Any],
+) -> list[dict[str, Any]]:
+    """SectionB / Entity defaults and column projection for ``/master``."""
+    for row in rows:
+        if row.get("Data status") is None:
+            row["Data status"] = data_status_label(status_by_submission.get(row.get("submission_id")))
+        fill_section_b(row)
+        fill_entity(row)
+        row.setdefault("Breakdown", None)
+    return [{column: row.get(column) for column in MASTER_COLUMNS} for row in rows]
 
 
 def _with_value(row: dict[str, Any], number: float) -> dict[str, Any]:
@@ -585,7 +789,7 @@ def facts_for_item(
     if emergency_index is None:
         emergency_index = {}
     if role in _MATRIX_ROLES:
-        return _matrix_facts(
+        rows = _matrix_facts(
             item,
             role,
             place,
@@ -594,22 +798,29 @@ def facts_for_item(
             emergency_index=emergency_index,
             country_by_id=country_by_id or {},
         )
-    table, section, indicator = _scalar_labels(item, role)
-    spef = spef_label(item.bank_area) or spef_label(item.section_name)
-    if place.get("template") == "plan":
-        section = None
-    return measure_facts(
-        place,
-        table=table,
-        indicator=indicator,
-        section=section,
-        spef=spef,
-        year=None,
-        value=value,
-        disagg=None if _disagg_mode(disagg) == "matrix" else disagg,
-        data_not_available=data_not_available,
-        not_applicable=not_applicable,
-    )
+    else:
+        table, section, indicator = _scalar_labels(item, role)
+        spef = spef_label(item.bank_area) or spef_label(item.section_name)
+        if place.get("template") == "plan":
+            section = None
+        rows = measure_facts(
+            place,
+            table=table,
+            indicator=indicator,
+            section=section,
+            spef=spef,
+            year=None,
+            value=value,
+            disagg=None if _disagg_mode(disagg) == "matrix" else disagg,
+            data_not_available=data_not_available,
+            not_applicable=not_applicable,
+        )
+    if item.bank_id is not None:
+        bank_id = int(item.bank_id)
+        for row in rows:
+            if row.get("Indicator ID") is None:
+                row["Indicator ID"] = bank_id
+    return rows
 
 
 def _scalar_labels(item: ItemView, role: str) -> tuple[str, str | None, str]:
@@ -649,7 +860,7 @@ def _matrix_facts(
     if role == "plan_funding":
         return _plan_funding_facts(item, place, cells, ns_by_id)
     if role == "pns_funding":
-        return _pns_funding_facts(place, cells, ns_by_id)
+        return _pns_funding_facts(place, cells, country_by_id or {})
     if role == "reach":
         return _reach_facts(item, place, cells, ns_by_id, emergencies=False, emergency_index=emergency_index)
     if role == "emergency":
@@ -710,7 +921,9 @@ def _support_facts(
                 "NS": ns_name or place.get("ns"),
                 "Attribute": attribute or None,
                 "SP/EF": spef_label(spef),
-                "Indicator": "Planned Bilateral Support" if table == "Activities" else None,
+                "Indicator": (
+                    "Planned Bilateral Support" if table == "Activities" else "Bilateral Support"
+                ),
             }
         )
         rows.append(_with_value(fact, number))
@@ -837,22 +1050,30 @@ def _pns_column_indicator(col: str) -> str | None:
 def _pns_funding_facts(
     place: dict[str, Any],
     cells: dict[str, Any],
-    ns_by_id: dict[int, str],
+    country_by_id: dict[int, dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    """T23 cells ``{host_country_id}_{Total Funding|...}``.
+
+    Rows are shaped like the host country's own rows: ISO3/Country are the host,
+    NS is the reporting PNS (same pattern as T22 plan funding and the master sheet).
+    """
     rows = []
     for row_key, col, number in _iter_matrix_numbers(cells):
         indicator = _pns_column_indicator(col)
         if indicator is None:
             continue
-        host = ns_by_id.get(int(row_key)) if row_key.isdigit() else (row_key or None)
+        host = country_by_id.get(int(row_key)) if row_key.isdigit() else None
         area_token = (col or "").strip().split("_", 1)[0].split(" ", 1)[0]
         fact = blank_fact(place)
         fact.update(
             {
+                "ISO3": (host or {}).get("iso3") or place.get("iso3"),
+                "Country": (host or {}).get("name") or place.get("country"),
+                "Region": (host or {}).get("region") or place.get("region"),
                 "Section": "Funding",
                 "SectionB": "Funding",
                 "Source": "PNS Data",
-                "Entity": host,
+                "Entity": "PNS",
                 "Attribute": "Funding Source",
                 "SP/EF": spef_label(area_token),
                 "Indicator": indicator,
@@ -937,15 +1158,24 @@ def _reach_facts(
     for row_key, col, number in _iter_matrix_numbers(cells):
         entity, ns_name = _named_row(row_key, ns_by_id)
         label = row_key if not row_key.isdigit() else (ns_name or row_key)
+        if emergencies:
+            # Same layout as plan funding: SP/EF holds EA1..EAn; Attribute is the matrix column.
+            attribute = spef_label(col) or col or "Total"
+            spef = _emergency_attribute(emergency_index, submission_id, label)
+        else:
+            attribute = col or None
+            spef = spef_label(col)
         fact = blank_fact(place)
         fact.update(
             {
-                "Section": "Emergencies" if emergencies else "Reach",
+                # Same section as longer-term reach and the UPR Master sheet; emergency appeals
+                # stay identifiable via SP/EF (EA1..) and EA Code.
+                "Section": "Reach",
                 "SectionB": None,
                 "Entity": entity,
                 "NS": place.get("ns"),
-                "Attribute": _emergency_attribute(emergency_index, submission_id, label) if emergencies else (col or None),
-                "SP/EF": spef_label(col),
+                "Attribute": attribute,
+                "SP/EF": spef,
                 "Indicator": "People to be reached",
                 "Year": year,
                 "EA Code": ea_code_from_text(label) if emergencies else None,
@@ -956,11 +1186,15 @@ def _reach_facts(
 
 
 def _emergency_attribute(index: dict[tuple[int, str], int], submission_id: Any, label: str) -> str:
+    """Stable ``EA1``..``EAn`` for an emergency appeal (SP/EF; matches funding columns).
+
+    The slot number is stored in *index*; nothing is persisted to the database.
+    """
     key = (int(submission_id or 0), label)
     if key not in index:
         used = sum(1 for sub, _label in index if sub == key[0])
         index[key] = used + 1
-    return f"E{index[key]}"
+    return f"EA{index[key]}"
 
 
 def dynamic_facts(
@@ -1070,13 +1304,15 @@ def blank_master(place: dict[str, Any]) -> dict[str, Any]:
         "Country": place.get("country"),
         "Round": place.get("round") or None,
         "Year": assignment_year(place),
+        "Source": place.get("source") or "Country Data",
+        "Data status": data_status_label(place.get("status")),
         "Section": None,
         "SectionB": None,
         "Entity": "HNS",
         "NS": place.get("ns"),
-        "Source": place.get("source") or "Country Data",
         "Area": "Total",
         "Attribute": "Total",
+        "Breakdown": None,
         "Indicator": None,
         "indicatorId": None,
         "ValueNum": None,
@@ -1146,7 +1382,8 @@ def master_rows_for_item(
             emergency_index=emergency_index,
             country_by_id=country_by_id or {},
         )
-    total = _master_total(value, None if _disagg_mode(disagg) == "matrix" else disagg)
+    measure_disagg = None if _disagg_mode(disagg) == "matrix" else disagg
+    total = _master_total(value, measure_disagg)
     status = availability_label(data_not_available=data_not_available, not_applicable=not_applicable)
     if total is None and status == "Applicable":
         return []
@@ -1157,6 +1394,7 @@ def master_rows_for_item(
             "Section": section,
             "Area": area,
             "Attribute": "Total",
+            "Breakdown": breakdown_from_disagg(value, measure_disagg),
             "Indicator": "Expenditure" if role == "expenditure" else indicator_name(item),
             "indicatorId": _sheet_indicator_id(item, "Expenditure" if role == "expenditure" else indicator_name(item)),
             "Applicable/Data not available": status,
@@ -1462,8 +1700,7 @@ def _master_reach_rows(
         _entity, ns_name = _named_row(row_key, {})
         label = row_key if not str(row_key).isdigit() else (ns_name or row_key)
         if emergencies:
-            slot = _emergency_attribute(emergency_index, place.get("submission_id"), label)
-            area = "EA" + slot[1:]
+            area = _emergency_attribute(emergency_index, place.get("submission_id"), label)
             ea_code = ea_code_from_text(label)
         else:
             area = spef_label(col) or (col or "Total")
@@ -1516,6 +1753,7 @@ def master_dynamic_rows(
             "SectionB": section_b,
             "Area": spef_label(area) or "Total",
             "Attribute": "Total",
+            "Breakdown": breakdown_from_disagg(value, disagg, yes_no=True),
             "Indicator": strip_trailing_period(indicator),
             "indicatorId": indicator_id,
             "EA Code": ea_code,
@@ -1596,7 +1834,11 @@ def build_upr_data(
 ) -> dict[str, list[dict[str, Any]]]:
     """Load UPR assignments and return facts and submissions."""
     template_ids = _template_ids(template)
-    places = _load_places(template_ids, iso3=iso3, round_code=round_code, scope=scope)
+    # PNS forms are assigned to the PNS country; matrix rows are remapped to the host.
+    # Apply ``iso3`` to facts after build, not when loading those places.
+    pns_only = template_ids and template_ids <= {PNS_REPORT_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID}
+    place_iso3 = None if (iso3 and pns_only) else iso3
+    places = _load_places(template_ids, iso3=place_iso3, round_code=round_code, scope=scope)
     # Submitted PNS plans (T22) for the same rounds, so the host plan's PNS rows can be merged
     # with what the PNS itself reported even when the request is scoped to the host submission.
     extra_places = _supplementary_pns_plan_places(places)
@@ -1612,7 +1854,11 @@ def build_upr_data(
         entries = [entry for entry in entries if entry.form_item_id == int(scope["item_id"])]
     items = _load_items({entry.form_item_id for entry in entries})
     emergency_index: dict[tuple[int, str], int] = {}
-    country_by_id = _country_lookup() if any(i.template_id == PNS_PLAN_TEMPLATE_ID for i in items.values()) else {}
+    country_by_id = (
+        _country_lookup()
+        if any(i.template_id in (PNS_PLAN_TEMPLATE_ID, PNS_REPORT_TEMPLATE_ID) for i in items.values())
+        else {}
+    )
     facts: list[dict[str, Any]] = []
     by_submission = {place["submission_id"]: place for place in all_places}
 
@@ -1661,6 +1907,9 @@ def build_upr_data(
         code = iso3.strip().upper()
         facts = [row for row in facts if str(row.get("ISO3") or "").upper() == code]
 
+    status_by_submission = {place["submission_id"]: place.get("status") for place in all_places}
+    facts = finish_fact_rows(facts, status_by_submission=status_by_submission)
+
     submissions = [
         submission_row(
             place,
@@ -1681,8 +1930,9 @@ def _fill_funding_ea_codes(
 ) -> None:
     """Give plan funding columns ``EA1``..``EAn`` the appeal code of the matching emergency slot.
 
-    The emergency appeals matrix numbers each appeal ``E1``..``En`` in the order it is listed;
-    funding column ``EAn`` belongs to the same slot.
+    The emergency reach matrix numbers each appeal ``EA1``..``EAn`` in the order it is listed;
+    funding column ``EAn`` belongs to the same slot. Slot numbers live only in memory
+    (``emergency_index``); the form stores appeal labels / ``col_header|EA*``, not ``E1``.
     """
     code_by_slot: dict[tuple[int, int], str] = {}
     for (submission_id, label), slot in emergency_index.items():
@@ -1897,6 +2147,7 @@ def build_upr_master(
     if iso3:
         code = iso3.strip().upper()
         rows = [row for row in rows if str(row.get("ISO3") or "").upper() == code]
+    rows = finish_master_rows(rows, status_by_submission={})
     return {"data": rows}
 
 

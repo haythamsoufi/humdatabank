@@ -425,7 +425,8 @@
               {% if form_type == 'assignment' and _draft_restore_assignment_status %}data-assignment-status="{{ _draft_restore_assignment_status }}"{% endif %}
               {% if review_enabled is defined %}data-review-enabled="{{ 'true' if review_enabled else 'false' }}"{% endif %}
               {% if is_delegation_user is defined %}data-is-delegation-user="{{ 'true' if is_delegation_user else 'false' }}"{% endif %}
-              {% if enable_page_submission %}data-page-submission="true"{% endif %}>
+              {% if enable_page_submission %}data-page-submission="true"{% endif %}
+              {% if enable_page_submission and is_admin_user %}data-bypass-page-lock="true"{% endif %}>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="submit_form" value="1">
             {% if template_id is defined %}
@@ -922,7 +923,20 @@
                                 {% set _page_participates = enable_page_submission and section.section_type != 'discussion' and _page_id_for_section %}
                                 {% set _is_page_first = _page_participates and page_first_section_ids.get(_page_id_for_section|string) == section.id %}
                                 {% set _is_page_last = _page_participates and page_last_section_ids.get(_page_id_for_section|string) == section.id %}
-                                {% set _section_locked = _page_participates and _page_wf in scoped_locked_statuses %}
+                                {% set _bypass_page_lock = is_admin_user %}
+                                {% set _page_wf_locked = _page_participates and _page_wf in scoped_locked_statuses %}
+                                {% set _section_locked = _page_wf_locked and not _bypass_page_lock %}
+                                {% if _page_participates and _is_page_first and not _bypass_page_lock %}
+                                <div class="page-locked-banner bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 flex flex-wrap items-center gap-2{% if not _section_locked %} hidden{% endif %}"
+                                     role="status"
+                                     aria-live="polite"
+                                     data-page-id="{{ _page_id_for_section }}"
+                                     data-page-number="{{ page_number_main }}"
+                                     data-page-name="{{ page_name_main }}">
+                                    <i class="fas fa-lock text-blue-600" aria-hidden="true"></i>
+                                    <span class="text-sm font-medium">{{ _('This page is locked and cannot be edited.') }}</span>
+                                </div>
+                                {% endif %}
                                 <div id="section-container-{{ section.id }}" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20{% if section.hide_section_header %} section-container--no-header{% endif %}{% if _section_locked %} section-container--locked{% endif %}" data-section-type="{{ section.section_type }}" data-page-number="{{ page_number_main }}" data-page-name="{{ page_name_main }}"{% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and section.max_entries %} data-max-entries="{{ section.max_entries }}"{% endif %}{% if section.section_type == 'repeat' and section.entry_label_item_id %} data-entry-label-item-id="{{ section.entry_label_item_id }}"{% endif %}{% if section.section_type == 'repeat' and section.show_entries_in_navigation %} data-show-entries-in-navigation="true"{% endif %}{% if section.hide_section_header %} data-hide-section-header="true"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ section.id }}" data-scope-name="{{ section.display_name|e }}"{% if section.relevance_condition %} data-relevance-condition='{{ section.relevance_condition|tojson }}' data-item-id="{{ section.id }}"{% endif %}{% if _page_id_for_section %} data-page-id="{{ _page_id_for_section }}"{% endif %}{% if _page_participates %} data-page-workflow="{{ _page_wf }}"{% if _section_locked %} data-page-locked="true"{% endif %}{% endif %}>
                                     {% if not section.hide_section_header %}
                                     <h3 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center gap-2">
@@ -934,12 +948,6 @@
                                             <i class="fas fa-chevron-up"></i>
                                         </button>
                                     </h3>
-                                    {% endif %}
-                                    {% if _section_locked and _is_page_first %}
-                                    <div class="page-locked-banner bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 mb-4 flex flex-wrap items-center gap-2" data-page-id="{{ _page_id_for_section }}">
-                                        <i class="fas fa-lock text-blue-600" aria-hidden="true"></i>
-                                        <span class="text-sm font-medium">{{ _('This page is locked and cannot be edited.') }}</span>
-                                    </div>
                                     {% endif %}
 
                                     <div id="collapsible-content-{{ section.id }}" data-collapsible-content class="space-y-4 sm:space-y-6"> {# Container for parent section's direct fields AND its sub-sections #}

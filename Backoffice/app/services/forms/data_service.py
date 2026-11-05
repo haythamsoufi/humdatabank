@@ -257,7 +257,20 @@ class FormDataService(
         field_changes_tracker = []
         validation_errors = []
         locked_ids = set()
-        if page_mode:
+        # Admins / system managers may edit submitted pages without reopening
+        # (same bypass as assignment-level can_edit_assignment).
+        bypass_page_lock = False
+        if page_mode and not is_public_submission:
+            try:
+                from app.services.organization.authorization_service import AuthorizationService
+                bypass_page_lock = bool(
+                    current_user
+                    and getattr(current_user, 'is_authenticated', False)
+                    and AuthorizationService.is_admin(current_user)
+                )
+            except Exception:
+                bypass_page_lock = False
+        if page_mode and not bypass_page_lock:
             locked_ids |= locked_page_section_ids(assignment_entity_status, all_sections)
         if target_page_id and section_scope_ids and section_scope_ids <= locked_ids:
             return {

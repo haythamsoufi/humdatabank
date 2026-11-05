@@ -170,7 +170,10 @@
                             {% set is_empty = false %}
                         {% else %}
                             {% set ns = namespace(has_any_value=false) %}
-                            {% for k, v in values_dict.items() %}
+                            {# Skip values.disability — metadata only; not a reported figure.
+                               TODO(fdrs): once disability Q&A is added to the FDRS PDF template,
+                               treat answered disability questions as content (see disability_questions.html). #}
+                            {% for k, v in values_dict.items() if k != 'disability' %}
                                 {% if v is not none and v != '' %}
                                     {% set ns.has_any_value = true %}
                                 {% endif %}
@@ -751,6 +754,10 @@
                                 {% set total_val = values_dict.get('total') if values_dict.get('total') is not none else (values_dict.get('direct') if values_dict.get('direct') is not mapping and values_dict.get('direct') is not none else none) %}
                                 {% set sex_cats = field.model.effective_sex_categories if (field.model is defined and field.model) else (config.DEFAULT_SEX_CATEGORIES or []) %}
                                 {% set age_grps = field.model.effective_age_groups if (field.model is defined and field.model) else (config.DEFAULT_AGE_GROUPS or []) %}
+                                {# TODO(fdrs): Add disability Q&A (disaggregated_by_disability /
+                                   washington_group_compliant from values.disability) to the FDRS
+                                   PDF template — currently omitted so raw dict dumps do not appear.
+                                   Entry-form UI: forms/entry_form/partials/disability_questions.html #}
                                 {% if mode == 'total' and total_val is not none %}
                                     <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ total_val | format_number }}</span>
                                 {% elif mode == 'sex' and sex_cats %}
@@ -819,22 +826,30 @@
                                 {% elif total_val is not none %}
                                     <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ total_val | format_number }}</span>
                                 {% elif direct_or_flat and direct_or_flat is mapping %}
+                                    {% set ns_flat = namespace(count=0) %}
+                                    {% for k in direct_or_flat.keys() if k != 'disability' %}
+                                        {% set ns_flat.count = ns_flat.count + 1 %}
+                                    {% endfor %}
+                                    {% if ns_flat.count > 0 %}
                                     <table class="table">
                                         <thead>
                                             <tr>
-                                                {% for k in direct_or_flat.keys() %}
+                                                {% for k in direct_or_flat.keys() if k != 'disability' %}
                                                     <th>{{ k }}</th>
                                                 {% endfor %}
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                {% for k, v in direct_or_flat.items() %}
+                                                {% for k, v in direct_or_flat.items() if k != 'disability' %}
                                                     <td>{{ (v | format_number) if v is not none and v|string|trim != '' else '-' }}</td>
                                                 {% endfor %}
                                             </tr>
                                         </tbody>
                                     </table>
+                                    {% else %}
+                                    <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
+                                    {% endif %}
                                 {% else %}
                                     <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
                                 {% endif %}

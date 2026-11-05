@@ -170,9 +170,25 @@ def _funding_entity(row: str | None) -> str | None:
     return None
 
 
+def _is_matrix_meta_key(key: str) -> bool:
+    """True for header / GO-unmatched flags that must not become fact rows.
+
+    Examples: ``col_header|EA1``, ``col_header_go_unmatched|EA1``, ``row_go_unmatched|…``.
+    """
+    text = str(key or "")
+    lower = text.lower()
+    return (
+        lower.startswith("col_header")
+        or lower.startswith("row_go_unmatched")
+        or text.startswith("_")
+    )
+
+
 def _iter_matrix_numbers(cells: dict[str, Any]) -> Iterator[tuple[str, str, float]]:
     """Yield ``(row, col, number)`` for numeric matrix cells (zero skipped)."""
     for key, raw in cells.items():
+        if _is_matrix_meta_key(str(key)):
+            continue
         number = to_number(_resolve_matrix_cell(raw))
         if not number:
             continue

@@ -223,6 +223,38 @@ class TestProcessExistingDataForTemplate:
         result = process_existing_data_for_template(entry)
         assert result == {"values": {"a": 1}}
 
+    def test_disability_only_disagg_merges_sibling_scalar_value(self):
+        entry = self._entry(
+            value="4160",
+            disagg_data={
+                "mode": "total",
+                "values": {
+                    "disability": {
+                        "disaggregated_by_disability": True,
+                        "washington_group_compliant": True,
+                    }
+                },
+            },
+        )
+        result = process_existing_data_for_template(entry)
+        assert result["mode"] == "total"
+        assert result["values"]["total"] == "4160"
+        assert result["values"]["disability"]["disaggregated_by_disability"] is True
+
+    def test_disability_disagg_with_existing_total_keeps_disagg_total(self):
+        entry = self._entry(
+            value="999",
+            disagg_data={
+                "mode": "total",
+                "values": {
+                    "total": "4160",
+                    "disability": {"disaggregated_by_disability": False},
+                },
+            },
+        )
+        result = process_existing_data_for_template(entry)
+        assert result["values"]["total"] == "4160"
+
     def test_prefilled_disagg_data_returned(self):
         entry = self._entry(prefilled_disagg_data={"values": {"b": 2}})
         result = process_existing_data_for_template(entry)

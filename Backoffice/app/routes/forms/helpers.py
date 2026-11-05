@@ -163,16 +163,56 @@ def process_existing_data_for_template(data_entry, *, include_prefilled=True):
     elif not_applicable:
         return "not_applicable"
 
+    def _with_scalar_if_disability_only(disagg_payload, scalar_value):
+        """Heal disability-only disagg so a sibling scalar value still shows in the form.
+
+        FDRS import historically wrote ``value=4160`` plus
+        ``disagg_data={mode:total, values:{disability:...}}``. The loader prefers
+        disagg_data, which hid the scalar. Mirror FormItemProcessor storage by
+        injecting ``values.total`` when no headline/breakdown is present.
+        """
+        if not isinstance(disagg_payload, dict):
+            return disagg_payload
+        values = disagg_payload.get('values')
+        if not isinstance(values, dict) or 'disability' not in values:
+            return disagg_payload
+        if values.get('total') is not None and str(values.get('total')).strip() != '':
+            return disagg_payload
+        direct = values.get('direct')
+        if isinstance(direct, dict) and len(direct) > 0:
+            return disagg_payload
+        if direct is not None and not isinstance(direct, (dict, bool)) and str(direct).strip() != '':
+            return disagg_payload
+        skip = {'disability', 'indirect', 'direct', 'total'}
+        for key, val in values.items():
+            if key in skip or isinstance(val, bool):
+                continue
+            if isinstance(val, dict):
+                if val:
+                    return disagg_payload
+                continue
+            if val is not None and str(val).strip() != '':
+                return disagg_payload
+        if scalar_value is None or str(scalar_value).strip() == '':
+            return disagg_payload
+        merged_values = dict(values)
+        merged_values['total'] = str(scalar_value).strip()
+        return {**disagg_payload, 'values': merged_values}
+
     disagg_data = getattr(data_entry, 'disagg_data', None)
     if disagg_data is not None:
-        return disagg_data
+        return _with_scalar_if_disability_only(disagg_data, getattr(data_entry, 'value', None))
     if include_prefilled:
         prefilled_disagg_data = getattr(data_entry, 'prefilled_disagg_data', None)
         if prefilled_disagg_data is not None:
-            return prefilled_disagg_data
+            return _with_scalar_if_disability_only(
+                prefilled_disagg_data, getattr(data_entry, 'prefilled_value', None)
+            )
     imputed_disagg_data = getattr(data_entry, 'imputed_disagg_data', None)
     if imputed_disagg_data is not None:
-        return imputed_disagg_data
+        return _with_scalar_if_disability_only(
+            imputed_disagg_data, getattr(data_entry, 'imputed_value', None)
+        )
 
     value = getattr(data_entry, 'value', None)
     if value:

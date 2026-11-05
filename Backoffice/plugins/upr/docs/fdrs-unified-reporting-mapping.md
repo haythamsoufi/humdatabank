@@ -2,6 +2,8 @@
 
 Endpoint: `GET /api/v1/upr/overall` (same auth as `/api/v1/upr/data`; code in `plugins/upr/overall_data.py`).
 
+Shaping shared with `/api/v1/upr/data` and `/api/v1/upr/master` (no FDRS merge on those): nested sex/age/direct-indirect → `Breakdown` on the Total row, `Data status`, `Indicator ID` / `indicatorId`, SectionB = EA Code when present else Section, blank Entity → HNS/PNS, and plan emergency reach with `SP/EF` = `EA1`.. (Attribute holds the matrix column).
+
 Generated from the local dev database on 2026-11-05. Indicator Bank ids are stable, so the matching below holds on other environments as long as the templates carry the same form items; re-check after template changes.
 
 ## Rules
@@ -10,18 +12,22 @@ Generated from the local dev database on 2026-11-05. Indicator Bank ids are stab
 2. **Priority**: `FDRS` (template 21) first. If FDRS has no figure for that country, year and indicator, use `Unified Reporting` (template 33): the **annual report** (period `2024`, round `AR24`) first, then the **mid-year report** (`Jan-Jun 2024`, round `MYR24`).
 3. **A figure counts** when the winning source has a number. A source that only says "data not available / not applicable" loses to a source with a number; if no source has a number, the highest-priority flag is kept.
 4. **A source is taken whole.** All attributes (Total, Direct, Indirect, male/female age bands) come from the one source that won, so disaggregations from two sources are never mixed.
-5. **Only approved country assignments** are read, for both templates.
+5. **FDRS** uses approved assignments only. **Unified Reporting, Unified Planning, and PNS** include every workflow status (same as `/upr/data`).
 6. **Data source** column replaces `Source`: `FDRS` or `Unified Reporting`. `Round` shows the exact round (`FDRS24`, `AR24`, `MYR24`) and `submission_id` the exact submission.
 7. Everything FDRS does not collect (emergency appeal indicators, bilateral support, funding sources, comments) is passed through from Unified Reporting unchanged; no matching is applied.
 8. Year: FDRS period `2024` and Unified Reporting `2024` / `Jan-Jun 2024` all mean calendar year 2024. Mid-year only covers January to June, so it is the last choice.
 
-9. **Planning and PNS data** are included the way `/api/v1/upr/data` builds them, with no FDRS matching (FDRS has no plans): Unified Plan (template 24) is `Data source` = `Unified Planning`, PNS reports (23) are `PNS Reporting`, PNS plans (22) are `PNS Planning` (including the PNS rows merged into the host plan). Approved submissions only. `Year` and `Round` follow `/upr/data` (a plan round such as P27 has horizon years in `Year`).
+9. **Planning and PNS data** are included the way `/api/v1/upr/data` builds them, with no FDRS matching (FDRS has no plans): Unified Plan (template 24) is `Data source` = `Unified Planning`, PNS reports (23) are `PNS Reporting`, PNS plans (22) are `PNS Planning` (including the PNS rows merged into the host plan). `Year` and `Round` follow `/upr/data` (a plan round such as P27 has horizon years in `Year`).
 
 ## Output columns
 
 Column order:
 
-`submission_id, ISO3, Year, Round, Data source, Region, Country, NS, Section, SectionB, Entity, Attribute, SP/EF, EA Code, Applicable/Data not available, Indicator, Value, ValueNum, FDRS Value, UPR Value, PNS Value, PNS reported`
+`submission_id, ISO3, Year, Round, Data source, Data status, Region, Country, NS, Section, SectionB, Entity, Attribute, Breakdown, SP/EF, EA Code, Applicable/Data not available, Indicator, Indicator ID, Value, ValueNum, FDRS Value, UPR Value, PNS Value, PNS reported`
+
+- `Breakdown`: JSON object of sex/age/direct-indirect attributes (e.g. `{"Direct": 2275, "Indirect": 19887, "Total female": 9000}`). Those attributes are not separate rows; `Value` on the `Total` row is the headline figure.
+
+- `Data status`: assignment workflow status, title-cased (`Approved`, `Pending`, `Submitted`, `In Progress`, …). FDRS rows are always `Approved`; Unified Reporting, Planning, and PNS rows can be any status.
 
 - `Value` / `ValueNum`: the final figure, from the winning source (`Data source`).
 - `FDRS Value`: what FDRS reported for the same cell (same indicator and attribute); blank if none.
@@ -102,9 +108,11 @@ Notes:
 | Output row | FDRS (template 21) | Unified Reporting (template 33) | Matching |
 |---|---|---|---|
 | `Funding (CHF)`, Attribute `Total`, Indicator ID 733 | item `1530` Funding (CHF), bank 733 | **sum of the rows** of matrix item `1403` (National Society Funding CHF) | One figure per country and year; FDRS first |
-| `Funding (CHF)`, Attribute `Funding Source`, Entity `IFRC Secretariat`, Indicator ID 733 | item `943` Income Sources, row `IFRC` | item `1403`, row `IFRC Secretariat` | Matched; FDRS first |
-| `Funding (CHF)`, Entity `PNS` / `Other sources` | none | item `1403`, rows `PNSs` / `HNS other sources` | Unified Reporting only |
-| `Funding (CHF)`, Entity `Home Government`, `Foreign Government`, `Individuals`, `Corporations`, `Foundations`, `UN Agencies & other Multilateral Agencies`, `Pooled funds`, `Non-governmental organizations`, `Service income`, `Income generating activity`, `Other National Society`, `ICRC`, `Other` | item `943`, same-named rows | none | FDRS only |
+| `Funding (CHF)`, Attribute `Funding Source` (whole set) | item `943` Income Sources (all rows) | item `1403` (all rows) | **All-or-nothing per country and year.** If FDRS has any income-source figure, keep every FDRS source row and drop every Unified Reporting source row. Otherwise keep Unified Reporting sources and drop FDRS. Never mix the two sets. |
+| → Entity `IFRC Secretariat` | row `IFRC` | row `IFRC Secretariat` | Same entity name in both |
+| → Entity `Other National Society` | row `Other National Society` | row `PNSs` | Mapped to `Other National Society` |
+| → Entity `HNS other sources` | sum of every FDRS source except IFRC and Other National Society | row `HNS other sources` | When Unified Reporting wins, `FDRS Value` on this row is that FDRS sum |
+| → Entity `Home Government`, `Foreign Government`, `Individuals`, `Corporations`, `Foundations`, `UN Agencies & other Multilateral Agencies`, `Pooled funds`, `Non-governmental organizations`, `Service income`, `Income generating activity`, `ICRC`, `Other`, … | item `943` same-named rows | (rolled into `HNS other sources` above) | Appear as their own rows only when FDRS wins the source set |
 | `Expenditure`, Attribute `Total`, Indicator ID 734 | item `1531` Expenditure (CHF), bank 734 | item `1404` Expenditure (CHF), bank 734 | Same indicator; FDRS first |
 | (not carried) | items `939` Funding and `941` Expenditure, reporting currency (banks 1131, 1132) | none | Left out; the CHF items are used |
 

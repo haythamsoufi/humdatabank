@@ -10,7 +10,8 @@ indicators. They are matched on the Indicator Bank id behind each form item,
 for each country and calendar year. When both reported the indicator, FDRS wins.
 Otherwise Unified Reporting is used: the annual report first, then mid-year.
 A source is only taken whole, so disaggregations from two sources are never mixed.
-Only approved country assignments are read.
+FDRS assignments are approved-only. Unified Reporting, Unified Planning, and PNS
+forms include every workflow status (same coverage as ``/api/v1/upr/data``).
 
 Everything that FDRS does not collect (emergency appeals, bilateral support, funding
 sources, comments) comes from Unified Reporting unchanged.
@@ -25,6 +26,7 @@ from plugins.upr.catalog import REPORT_ITEM_FALLBACKS, REPORT_TEMPLATE_ID
 from plugins.upr.formatters import to_number
 from plugins.upr.matrix import _funding_entity
 from plugins.upr.upr_data import (
+    FACT_COLLAPSE_KEY_FIELDS,
     _KPI_BANK_ID_SET,
     ItemView,
     _dynamic_facts,
@@ -40,9 +42,13 @@ from plugins.upr.upr_data import (
     build_upr_data,
     assignment_year,
     blank_fact,
-    comment_fact,
-    facts_for_item,
     classify_item,
+    collapse_breakdowns,
+    comment_fact,
+    data_status_label,
+    facts_for_item,
+    fill_entity,
+    fill_section_b,
 )
 
 SOURCE_FDRS = "FDRS"
@@ -57,6 +63,7 @@ OVERALL_COLUMNS: tuple[str, ...] = (
     "Year",
     "Round",
     "Data source",
+    "Data status",
     "Region",
     "Country",
     "NS",
@@ -64,10 +71,12 @@ OVERALL_COLUMNS: tuple[str, ...] = (
     "SectionB",
     "Entity",
     "Attribute",
+    "Breakdown",
     "SP/EF",
     "EA Code",
     "Applicable/Data not available",
     "Indicator",
+    "Indicator ID",
     "Value",
     "ValueNum",
     "FDRS Value",
@@ -77,6 +86,11 @@ OVERALL_COLUMNS: tuple[str, ...] = (
 )
 
 _CELL_FIELDS = ("Section", "SectionB", "Indicator", "Attribute", "Entity", "SP/EF", "EA Code")
+
+# Same grouping as /data, with ``Data source`` instead of ``Source``.
+_COLLAPSE_KEY_FIELDS = tuple(
+    "Data source" if field == "Source" else field for field in FACT_COLLAPSE_KEY_FIELDS
+)
 
 # Lower wins. Annual reporting covers the full year, mid-year only January to June.
 _RANK_FDRS = 0
@@ -95,17 +109,29 @@ FDRS_FUNDING_TOTAL_BANK_ID = 733
 FDRS_INCOME_SOURCES_ITEM_ID = 943
 # Reporting-currency twins of funding and expenditure. The CHF items are used instead.
 _FDRS_SKIPPED_BANK_IDS = frozenset({1131, 1132})
-# FDRS source name -> the name Unified Reporting uses for the same row.
-_FDRS_SOURCE_ENTITY = {"IFRC": "IFRC Secretariat"}
+# FDRS item 943 row label -> output Entity. Unified Reporting item 1403 uses the same names.
+_FDRS_SOURCE_ENTITY = {
+    "IFRC": "IFRC Secretariat",
+    "Other National Society": "Other National Society",
+}
+# Unified Reporting item 1403 row -> output Entity.
+# PNSs ↔ FDRS "Other National Society". HNS other sources = every FDRS source except those two.
+_UR_SOURCE_ENTITY = {
+    "IFRC Secretariat": "IFRC Secretariat",
+    "IFRC": "IFRC Secretariat",
+    "PNSs": "Other National Society",
+    "PNS": "Other National Society",
+    "HNS other sources": "HNS other sources",
+    "Other sources": "HNS other sources",
+}
 _UR_FUNDING_COLUMN = "_ns_fun"
-
-_SCALAR_ROLES = frozenset({"ns_data", "core", "expenditure"})
+# Entities that are a single FDRS income-source row (not rolled into HNS other sources).
+_FDRS_DIRECT_SOURCE_ENTITIES = frozenset({"IFRC Secretariat", "Other National Society"})
 
 TOKEN_FUNDING_TOTAL = ("funding_total",)
-
-
-def _funding_source_token(entity: str) -> tuple:
-    return ("funding_source", entity)
+# All Funding Source rows for a country and year share this token so FDRS and Unified
+# Reporting never mix: one source set wins, the other is dropped.
+TOKEN_FUNDING_SOURCES = ("funding_sources",)
 
 
 def fdrs_role(item: ItemView) -> str:
@@ -167,7 +193,11 @@ def _fdrs_funding_total_facts(place: dict[str, Any], entry: Any) -> list[dict[st
 
 
 def _fdrs_income_source_facts(place: dict[str, Any], entry: Any) -> list[tuple[tuple, dict[str, Any]]]:
-    """One row per income source. Keys look like ``IFRC_Funding``."""
+    """One row per income source. Keys look like ``IFRC_Funding``.
+
+    Every source row shares ``TOKEN_FUNDING_SOURCES`` so the whole FDRS set wins or loses
+    against Unified Reporting together.
+    """
     found = []
     for key, raw in _matrix_cells_from_disagg(entry.disagg_data).items():
         number = to_number(raw)
@@ -175,14 +205,20 @@ def _fdrs_income_source_facts(place: dict[str, Any], entry: Any) -> list[tuple[t
             continue
         source = key.rsplit("_", 1)[0].strip()
         entity = _FDRS_SOURCE_ENTITY.get(source, source)
-        found.append((_funding_source_token(entity), _funding_fact(place, number, attribute="Funding Source", entity=entity)))
+        found.append((TOKEN_FUNDING_SOURCES, _funding_fact(place, number, attribute="Funding Source", entity=entity)))
     return found
+
+
+def _ur_source_entity(row: str) -> str:
+    name = row.strip()
+    return _UR_SOURCE_ENTITY.get(name) or _UR_SOURCE_ENTITY.get(_funding_entity(name) or "") or name
 
 
 def _ur_funding_facts(place: dict[str, Any], entry: Any) -> list[tuple[tuple | None, dict[str, Any]]]:
     """Rows of the NS funding matrix, plus their sum as the Total.
 
     Keys look like ``IFRC Secretariat_ns_fun`` (the column name has an underscore itself).
+    Source rows share ``TOKEN_FUNDING_SOURCES`` with FDRS item 943.
     """
     found: list[tuple[tuple | None, dict[str, Any]]] = []
     total = 0.0
@@ -191,14 +227,30 @@ def _ur_funding_facts(place: dict[str, Any], entry: Any) -> list[tuple[tuple | N
         if not number:
             continue
         row = key[: -len(_UR_FUNDING_COLUMN)] if key.endswith(_UR_FUNDING_COLUMN) else key.rsplit("_", 1)[0]
-        entity = _funding_entity(row.strip()) or row.strip()
+        entity = _ur_source_entity(row)
         total += number
         found.append(
-            (_funding_source_token(entity), _funding_fact(place, number, attribute="Funding Source", entity=entity))
+            (TOKEN_FUNDING_SOURCES, _funding_fact(place, number, attribute="Funding Source", entity=entity))
         )
     if found:
         found.append((TOKEN_FUNDING_TOTAL, _funding_fact(place, total, attribute="Total", entity=None)))
     return found
+
+
+def _hns_other_from_fdrs(rows: list[dict[str, Any]]) -> float | None:
+    """Sum of FDRS income sources that roll into Unified Reporting ``HNS other sources``."""
+    total = 0.0
+    found = False
+    for row in rows:
+        if row.get("Attribute") != "Funding Source":
+            continue
+        if row.get("Entity") in _FDRS_DIRECT_SOURCE_ENTITIES:
+            continue
+        if not _is_numeric(row):
+            continue
+        total += float(row["ValueNum"])
+        found = True
+    return total if found else None
 
 
 def _place_rank(place: dict[str, Any]) -> int:
@@ -209,11 +261,17 @@ def _place_rank(place: dict[str, Any]) -> int:
     return _RANK_ANNUAL
 
 
-def _approved_places(template_id: int, *, iso3: str | None, year: int | None) -> list[dict[str, Any]]:
+def _places(
+    template_id: int,
+    *,
+    iso3: str | None,
+    year: int | None,
+    approved_only: bool = False,
+) -> list[dict[str, Any]]:
     places = _load_places({template_id}, iso3=iso3, round_code=None)
     kept = []
     for place in places:
-        if _status_text(place.get("status")).lower() != "approved":
+        if approved_only and _status_text(place.get("status")).lower() != "approved":
             continue
         place_year = assignment_year(place)
         if place_year is None or (year is not None and place_year != year):
@@ -276,10 +334,20 @@ def merge_facts(tagged: list[tuple[tuple | None, int, dict[str, Any]]]) -> list[
                     upr_values.setdefault(cell, number)
         winner = pick_sources(candidates)
         winner_rank = next(rank for rank in sorted(candidates) if candidates[rank] is winner)
+        hns_other = _hns_other_from_fdrs(candidates.get(_RANK_FDRS, []))
         for fact in winner:
             cell = _cell(fact)
             fact["FDRS Value"] = fdrs_values.get(cell)
             fact["UPR Value"] = upr_values.get(cell)
+            # UR's single "HNS other sources" row is the sum of every FDRS source except
+            # IFRC Secretariat and Other National Society.
+            if (
+                fact.get("Entity") == "HNS other sources"
+                and fact.get("Attribute") == "Funding Source"
+                and fact["FDRS Value"] is None
+                and hns_other is not None
+            ):
+                fact["FDRS Value"] = int(hns_other) if hns_other == int(hns_other) else hns_other
             rows.append((fact, winner_rank))
     return rows
 
@@ -293,21 +361,44 @@ def _planning_data_source(fact: dict[str, Any]) -> str:
 
 
 def _planning_and_pns_facts(*, iso3: str | None, year: int | None) -> list[dict[str, Any]]:
-    """Plan and PNS facts from approved submissions, labelled by where they came from."""
+    """Plan and PNS facts labelled by where they came from.
+
+    Same status coverage as ``/api/v1/upr/data`` (not approved-only): a PNS can have entered
+    host-country figures while its assignment is still pending. PNS forms (templates 22/23)
+    are assigned to the PNS country, but each matrix row is remapped to the host; filter by
+    host ``ISO3`` after build.
+
+    ``build_upr_data(template=plan)`` also merges T22 PNS rows into the host extract, but those
+    keep the PNS ``submission_id``, which is not listed in the plan ``submissions`` payload.
+    Skip those here — the ``template=pns`` pass emits them with a resolvable status — and look
+    up status across every plan/PNS assignment so nothing is left blank.
+    """
+    from plugins.upr.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID, PNS_REPORT_TEMPLATE_ID
+
+    status_by_submission = {
+        place["submission_id"]: place.get("status")
+        for place in _load_places(
+            {PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID, PNS_REPORT_TEMPLATE_ID},
+            iso3=None,
+            round_code=None,
+        )
+    }
     facts: list[dict[str, Any]] = []
+    wanted = (iso3 or "").strip().upper() or None
     for template in ("plan", "pns"):
-        built = build_upr_data(template=template, iso3=iso3)
-        approved = {
-            row["submission_id"]
-            for row in built["submissions"]
-            if str(row.get("status") or "").lower() == "approved"
-        }
+        # Host-country filter applies after remap for PNS; for Unified Plan it can filter places.
+        place_iso3 = None if template == "pns" else iso3
+        built = build_upr_data(template=template, iso3=place_iso3)
         for fact in built["data"]:
-            if fact.get("submission_id") not in approved:
+            if template == "plan" and fact.get("Source") == "PNS Data":
+                continue
+            if wanted and str(fact.get("ISO3") or "").upper() != wanted:
                 continue
             if year is not None and fact.get("Year") != year:
                 continue
             fact["_data_source"] = _planning_data_source(fact)
+            if fact.get("Data status") is None:
+                fact["Data status"] = data_status_label(status_by_submission.get(fact.get("submission_id")))
             facts.append(fact)
     return facts
 
@@ -315,7 +406,15 @@ def _planning_and_pns_facts(*, iso3: str | None, year: int | None) -> list[dict[
 def _finish(fact: dict[str, Any], rank: int) -> dict[str, Any]:
     fact.pop("_bank_id", None)
     override = fact.pop("_data_source", None)
-    fact["Data source"] = override or (SOURCE_FDRS if rank == _RANK_FDRS else SOURCE_UNIFIED_REPORTING)
+    data_source = override or (SOURCE_FDRS if rank == _RANK_FDRS else SOURCE_UNIFIED_REPORTING)
+    fact["Data source"] = data_source
+    if data_source in (SOURCE_PNS_REPORTING, SOURCE_PNS_PLANNING):
+        fact["Source"] = "PNS Data"
+    if fact.get("Indicator ID") is None and fact.get("indicatorId") is not None:
+        fact["Indicator ID"] = fact.get("indicatorId")
+    fill_section_b(fact)
+    fill_entity(fact)
+    fact.setdefault("Breakdown", None)
     return {column: fact.get(column) for column in OVERALL_COLUMNS}
 
 
@@ -326,8 +425,8 @@ def build_overall_data(
     section: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Merged FDRS and Unified Reporting facts."""
-    fdrs_places = _approved_places(FDRS_TEMPLATE_ID, iso3=iso3, year=year)
-    report_places = _approved_places(REPORT_TEMPLATE_ID, iso3=iso3, year=year)
+    fdrs_places = _places(FDRS_TEMPLATE_ID, iso3=iso3, year=year, approved_only=True)
+    report_places = _places(REPORT_TEMPLATE_ID, iso3=iso3, year=year)
     places = fdrs_places + report_places
     ns_by_id, ns_by_country, _ns_country = _load_national_societies()
     for place in places:
@@ -352,11 +451,16 @@ def build_overall_data(
         rank = _place_rank(place)
         year_value = assignment_year(place)
         for fact in facts:
-            if bank_id is not None:
+            fact["Data status"] = data_status_label(place.get("status"))
+            if bank_id is not None and fact.get("Indicator ID") is None:
                 fact["Indicator ID"] = int(bank_id)
             match = token
             if match is None:
-                bank = bank_id if bank_id is not None else fact.get("_bank_id")
+                bank = (
+                    fact.get("Indicator ID")
+                    if fact.get("Indicator ID") is not None
+                    else (bank_id if bank_id is not None else fact.get("_bank_id"))
+                )
                 match = ("bank", int(bank)) if bank is not None else None
             key = (place["country_id"], year_value, match) if match is not None else None
             if (
@@ -367,7 +471,9 @@ def build_overall_data(
             ):
                 fact["Entity"] = NATIONAL_SOCIETY_ENTITY
             if "_indicator_id" in fact:
-                fact["Indicator ID"] = fact.pop("_indicator_id")
+                tagged_id = fact.pop("_indicator_id")
+                if fact.get("Indicator ID") is None:
+                    fact["Indicator ID"] = tagged_id
             tagged.append((key, rank, fact))
 
     for entry in entries:
@@ -408,7 +514,7 @@ def build_overall_data(
             ns_by_id=ns_by_id,
             emergency_index=emergency_index,
         )
-        add(place, facts, bank_id=item.bank_id if role in _SCALAR_ROLES else None)
+        add(place, facts, bank_id=item.bank_id)
 
     # Emergency appeal rows and other dynamic indicators exist only in Unified Reporting.
     # Country-level "Other indicators" carry their bank id so FDRS can still take priority.
@@ -423,7 +529,12 @@ def build_overall_data(
     all_facts = [fact for _key, _rank, fact in tagged]
     _fill_funding_ea_codes(all_facts, emergency_index, area_key="SP/EF")
 
-    rows = [_finish(fact, rank) for fact, rank in merge_facts(tagged)]
+    rows = collapse_breakdowns(
+        [_finish(fact, rank) for fact, rank in merge_facts(tagged)],
+        columns=OVERALL_COLUMNS,
+        key_fields=_COLLAPSE_KEY_FIELDS,
+        blank_value_fields=("Value", "ValueNum", "FDRS Value", "UPR Value"),
+    )
 
     if section:
         wanted = section.strip().lower()

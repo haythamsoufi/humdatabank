@@ -897,6 +897,7 @@ def test_merge_disability_into_disagg_data_preserves_existing_breakdown():
     merged = _merge_disability_into_disagg_data(
         json.dumps({"mode": "sex_age", "values": {"direct": {"male": 10}, "indirect": 5}}),
         {"disaggregated_by_disability": True, "washington_group_compliant": True},
+        scalar_value="15",
     )
     obj = json.loads(merged)
     assert obj["values"]["direct"]["male"] == 10
@@ -904,6 +905,26 @@ def test_merge_disability_into_disagg_data_preserves_existing_breakdown():
     assert obj["values"]["disability"] == {
         "disaggregated_by_disability": True,
         "washington_group_compliant": True,
+    }
+    assert "total" not in obj["values"]
+
+
+def test_merge_disability_into_disagg_data_injects_scalar_when_disability_only():
+    merged = _merge_disability_into_disagg_data(
+        "",
+        {"disaggregated_by_disability": True, "washington_group_compliant": True},
+        scalar_value="4160",
+    )
+    obj = json.loads(merged)
+    assert obj == {
+        "mode": "total",
+        "values": {
+            "total": "4160",
+            "disability": {
+                "disaggregated_by_disability": True,
+                "washington_group_compliant": True,
+            },
+        },
     }
 
 
@@ -941,6 +962,48 @@ def test_build_ready_to_import_merges_disability_into_disagg_data():
     )
     assert len(rows) == 1
     disagg = json.loads(rows[0]["disagg_data"])
+    assert disagg["values"]["disability"] == {
+        "disaggregated_by_disability": True,
+        "washington_group_compliant": True,
+    }
+    assert disagg["values"]["direct"]["total"] == 500
+    # Existing breakdown present — do not duplicate scalar under values.total
+    assert "total" not in disagg["values"] or disagg["values"].get("total") is None
+
+
+def test_build_ready_to_import_puts_scalar_total_beside_disability_when_no_breakdown():
+    """Disability flags alone must not hide the imported scalar (entry form prefers disagg)."""
+    fdrs_data = [
+        {
+            "ISO3": "SYR",
+            "year": "2023",
+            "BaseKPI": "KPI_PeopleVol",
+            "KPI_code": "KPI_PeopleVol_Tot",
+            "Value": "4160",
+        },
+    ]
+    disability_by_key = {
+        ("SYR", "2023", "KPI_PeopleVol"): {
+            "disaggregated_by_disability": True,
+            "washington_group_compliant": True,
+        },
+    }
+    assignment_rows = [{"period_name": "2023", "iso3": "SYR", "assignment_entity_status_id": 484}]
+    form_item_rows = [{"bank_id": 7, "item_id": 916}]
+    indicator_bank_rows = [{"id": 7, "fdrs_kpi_code": "KPI_PeopleVol"}]
+    rows = build_ready_to_import_from_new_pipeline(
+        fdrs_data,
+        {},
+        assignment_rows,
+        form_item_rows,
+        indicator_bank_rows,
+        disability_by_key=disability_by_key,
+    )
+    assert len(rows) == 1
+    assert rows[0]["value"] == "4160"
+    disagg = json.loads(rows[0]["disagg_data"])
+    assert disagg["mode"] == "total"
+    assert disagg["values"]["total"] == "4160"
     assert disagg["values"]["disability"] == {
         "disaggregated_by_disability": True,
         "washington_group_compliant": True,

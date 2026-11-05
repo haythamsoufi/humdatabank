@@ -514,7 +514,21 @@ class AssignmentEntityStatus(db.Model):
         if self.reopened_after_close:
             return False
         assigned_form = self.assigned_form
-        return bool(assigned_form and assigned_form.is_effectively_closed)
+        if assigned_form and assigned_form.is_effectively_closed:
+            return True
+        return self.is_project_closed()
+
+    def is_project_closed(self) -> bool:
+        """True for project assignments whose project is no longer Open/Active (Closed, Archived, ...).
+
+        Shared round slots stay open for other projects, so closure is applied per entity and
+        follows the same rules as a closed round (read-only until reopened_after_close).
+        """
+        if self.entity_type != 'project':
+            return False
+        from app.models.projects import Project
+        project = db.session.get(Project, self.entity_id)
+        return bool(project and not project.is_open)
 
     __table_args__ = (
         db.UniqueConstraint('assigned_form_id', 'entity_type', 'entity_id', name='_assigned_entity_uc'),

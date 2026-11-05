@@ -74,7 +74,8 @@ def upsert_project(
     if organization_name is not None:
         proj.organization_name = organization_name
     if status is not None:
-        proj.status = status or "Open"
+        raw_status = (status or "").strip()
+        proj.status = raw_status.capitalize() if raw_status else "Open"
     if funding_modality is not None:
         proj.funding_modality = funding_modality
     if categories is not None:

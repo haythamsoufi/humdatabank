@@ -225,7 +225,8 @@ class TestRouteCapabilityGuard:
                    if r.capability in SCOPABLE_CAPABILITY_CODES and not r.scope_aware]
         assert set(unaware) <= {
             "/api/v1/nskeydata",
-            "/api/v1/upr", "/api/v1/upr/data", "/api/v1/upr/master", "/api/v1/upr/submissions",
+            "/api/v1/upr", "/api/v1/upr/data", "/api/v1/upr/master", "/api/v1/upr/overall",
+            "/api/v1/upr/submissions",
         }
 
     def test_personal_data_routes_require_a_pii_capability(self, app):

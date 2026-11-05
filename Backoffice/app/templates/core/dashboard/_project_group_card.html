@@ -5,7 +5,8 @@
 {% set active_period = active_af.period_name if active_af else '' %}
 {% set nav_cycles = item.cycles %}
 {% set nav_project_id = item.project_id %}
-{% set is_overdue = active_cycle.type == 'assigned' and active_cycle.date_info and active_cycle.date_info.date() < current_date
+{% set project_closed = item.project_closed|default(false) %}
+{% set is_overdue = not project_closed and active_cycle.type == 'assigned' and active_cycle.date_info and active_cycle.date_info.date() < current_date
     and active_cycle.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review', 'cancelled'] %}
 <div class="dashboard-assignment-card dashboard-project-group-card p-4 rounded-lg shadow-md flex flex-col justify-between relative transition-all duration-200 ease-out hover:shadow-xl {% if not is_overdue %}hover:-translate-y-0.5{% endif %} motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-md {% if is_overdue %}dashboard-assignment-card--overdue{% endif %} bg-gray-50 border {% if is_overdue %}border-2 border-red-500 ring-2 ring-red-300{% else %}border-gray-300 hover:border-gray-400 hover:bg-white{% endif %}"
      data-project-dashboard-card>
@@ -25,8 +26,8 @@
         </p>
 
         <div class="relative mt-1">
-            {% with item=active_cycle, dashboard_project_cycle=true, project_cycle_nav_cycles=nav_cycles, project_cycle_nav_id=nav_project_id, project_cycle_nav_active_idx=active_idx %}
-            {% set is_overdue = item.type == 'assigned' and item.date_info and item.date_info.date() < current_date
+            {% with item=active_cycle, dashboard_project_cycle=true, project_cycle_nav_cycles=nav_cycles, project_cycle_nav_id=nav_project_id, project_cycle_nav_active_idx=active_idx, dashboard_project_closed=project_closed, dashboard_project_status=item.project_status %}
+            {% set is_overdue = not dashboard_project_closed and item.type == 'assigned' and item.date_info and item.date_info.date() < current_date
                 and item.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review', 'cancelled'] %}
             {% include "core/dashboard/_assignment_card_body.html" %}
             {% endwith %}

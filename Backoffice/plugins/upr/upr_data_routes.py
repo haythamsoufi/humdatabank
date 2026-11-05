@@ -28,6 +28,7 @@ from app.utils.rate_limiting import api_rate_limit
 from plugins.upr import bp
 from plugins.upr.api_cache import get_or_build_upr_payload
 from plugins.upr.ns_key_data import NS_KEY_COLUMNS, load_ns_key_rows
+from plugins.upr.overall_data import OVERALL_COLUMNS, build_overall_data
 from plugins.upr.upr_data import (
     FACT_COLUMNS,
     MASTER_COLUMNS,
@@ -105,6 +106,45 @@ API_ENDPOINTS = [
                 "name": "section",
                 "type": "text",
                 "placeholder": "Funding",
+                "description": "Limit facts to one Section value. Omit to return every section.",
+            },
+        ],
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/overall",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "FDRS (template 21) and Unified Reporting (template 33) merged into one extract, "
+            "with the same columns as /api/v1/upr/data except Source is renamed Data source and Country Value is replaced by FDRS Value and UPR Value (what each source reported; Value is the final figure). "
+            "Indicators are matched by Indicator Bank id per country and year. "
+            "FDRS takes priority; where FDRS has no figure, Unified Reporting is used "
+            "(annual report first, then mid-year). Data source is FDRS or Unified Reporting. "
+            "Only approved assignments are read. "
+            "Filters: iso3, year, section. Returns the complete filtered extract; this endpoint is not paginated."
+        ),
+        "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": [
+            {
+                "name": "iso3",
+                "type": "select",
+                "option_source": "country_iso3",
+                "description": "Filter by ISO 3166-1 alpha-3 (alias: country_iso3)",
+            },
+            {
+                "name": "year",
+                "type": "number",
+                "placeholder": "2024",
+                "description": "Calendar year. Omit for every year.",
+            },
+            {
+                "name": "section",
+                "type": "text",
+                "placeholder": "NS Data",
                 "description": "Limit facts to one Section value. Omit to return every section.",
             },
         ],
@@ -255,6 +295,7 @@ _TEMPLATE_FILTERS = frozenset(TEMPLATE_KIND.values())
 
 _COLUMNS_BY_PATH = {
     "/api/v1/upr/data": {"data": list(FACT_COLUMNS), "submissions": list(SUBMISSION_COLUMNS)},
+    "/api/v1/upr/overall": {"data": list(OVERALL_COLUMNS)},
     "/api/v1/upr/submissions": {"data": list(SUBMISSION_COLUMNS)},
     "/api/v1/upr/master": {"data": list(MASTER_COLUMNS)},
     "/api/v1/nskeydata": {"data": list(NS_KEY_COLUMNS)},
@@ -435,6 +476,45 @@ def get_upr_data():
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
 
+@bp.route("/api/v1/upr/overall", methods=["GET"])
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+def get_upr_overall():
+    """FDRS and Unified Reporting merged; FDRS wins where both reported an indicator."""
+    try:
+        iso3 = (request.args.get("iso3") or request.args.get("country_iso3") or "").strip().upper() or None
+        if iso3 and (len(iso3) != 3 or not iso3.isalpha()):
+            return api_error("iso3 must be a 3-letter country code", 400)
+        year_raw = (request.args.get("year") or "").strip()
+        if year_raw and (not year_raw.isdigit() or len(year_raw) != 4):
+            return api_error("year must be a 4-digit calendar year", 400)
+        year = int(year_raw) if year_raw else None
+        section = (request.args.get("section") or "").strip().lower() or None
+
+        payload, cache_hit = get_or_build_upr_payload(
+            "overall",
+            {"iso3": iso3, "year": year, "section": section},
+            lambda: build_overall_data(iso3=iso3, year=year, section=section),
+        )
+        rows = payload["data"]
+        return _extract_response(
+            {
+                "data": rows,
+                "meta": {
+                    "total": len(rows),
+                    "columns": list(OVERALL_COLUMNS),
+                    "priority": (
+                        "Per country, year and indicator: FDRS, then Unified Reporting "
+                        "annual report, then Unified Reporting mid-year. Approved assignments only."
+                    ),
+                    "data_sources": ["FDRS", "Unified Reporting"],
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
 @bp.route("/api/v1/upr/submissions", methods=["GET"])
 @require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
 def get_upr_submissions():
@@ -592,3 +672,4 @@ def get_ns_key_data():
         )
     except Exception as error:
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+

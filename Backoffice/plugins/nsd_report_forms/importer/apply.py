@@ -292,6 +292,9 @@ class Run:
             assigned_form_id=af.id, entity_type=ENTITY_TYPE, entity_id=proj.project.id
         ).first()
         aes = nsd_schedule.ensure_project_aes(proj.project, af, due=due, active=proj.active)
+        if not proj.active:
+            # Closed/Archived project: follow the closed-assignment rules (read-only until reopened).
+            aes.reopened_after_close = False
         if existed_aes is None:
             self.stats['entities_created'] += 1
         return aes
@@ -360,7 +363,7 @@ class Run:
         proj = SimpleNamespace(
             reference=ref,
             country_id=country_id,
-            active=(p['status'] or 'Open') in ('Open', 'Active'),
+            active=(p['status'] or 'Open').strip().capitalize() in ('Open', 'Active'),
             p=p,
             project=project,
         )

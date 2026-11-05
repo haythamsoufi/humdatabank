@@ -849,8 +849,8 @@ def dashboard():
                     # round remains closed (reopened_after_close=True).
                     try:
                         aes = item['item_object']
-                        af = aes.assigned_form if aes else None
-                        if af and af.is_effectively_closed and not (aes and aes.reopened_after_close):
+                        # Covers closed rounds and closed/archived projects (reopened_after_close aware)
+                        if aes and aes.is_round_closed_for_entity():
                             past_assignments.append(item)
                             continue
                     except (AttributeError, TypeError):

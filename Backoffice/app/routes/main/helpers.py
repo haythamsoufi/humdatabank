@@ -2080,12 +2080,13 @@ def group_dashboard_project_assignments(items, current_date):
             "project_id": pid,
             "project_reference": proj.reference if proj else f"#{pid}",
             "project_title": (proj.title or "") if proj else "",
+            "project_status": (proj.status or "") if proj else "",
+            "project_closed": bool(proj and not proj.is_open),
             "cycles": cycle_items,
             "active_cycle_index": active,
             "is_public": False,
-            "any_overdue": any(
-                dashboard_assignment_is_overdue(c, current_date) for c in cycle_items
-            ),
+            "any_overdue": (not (proj and not proj.is_open))
+            and any(dashboard_assignment_is_overdue(c, current_date) for c in cycle_items),
         }
 
     seen = set()

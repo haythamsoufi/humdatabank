@@ -132,7 +132,7 @@ class Project(db.Model):
 
     @property
     def is_open(self) -> bool:
-        return (self.status or "") in ("Open", "Active")
+        return (self.status or "").strip().capitalize() in ("Open", "Active")
 
     @property
     def entity_type(self) -> str:

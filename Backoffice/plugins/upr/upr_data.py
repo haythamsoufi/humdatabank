@@ -2095,6 +2095,7 @@ def _dynamic_facts(
     by_submission: dict[int, dict[str, Any]],
     *,
     master: bool = False,
+    tag_bank_id: bool = False,
 ) -> list[dict[str, Any]]:
     report_ids = [place["submission_id"] for place in places if place.get("template") == "report"]
     if not report_ids:
@@ -2153,20 +2154,24 @@ def _dynamic_facts(
                 )
             )
             continue
-        facts.extend(
-            dynamic_facts(
-                place,
-                indicator=row[7] or "",
-                area=row[8],
-                value=row[3],
-                disagg=row[4],
-                data_not_available=bool(row[5]),
-                not_applicable=bool(row[6]),
-                section_name=section_names.get(int(row[1])),
-                appeal_code=appeal,
-                slot=slot,
-            )
+        built = dynamic_facts(
+            place,
+            indicator=row[7] or "",
+            area=row[8],
+            value=row[3],
+            disagg=row[4],
+            data_not_available=bool(row[5]),
+            not_applicable=bool(row[6]),
+            section_name=section_names.get(int(row[1])),
+            appeal_code=appeal,
+            slot=slot,
         )
+        if tag_bank_id and row[9] is not None:
+            # Country-level "Other indicators" only. Emergency rows belong to one appeal.
+            for fact in built:
+                if fact.get("Section") == "Other indicators":
+                    fact["_bank_id"] = int(row[9])
+        facts.extend(built)
     return facts
 
 

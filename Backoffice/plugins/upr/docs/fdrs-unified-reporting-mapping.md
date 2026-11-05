@@ -15,11 +15,13 @@ Generated from the local dev database on 2026-11-05. Indicator Bank ids are stab
 7. Everything FDRS does not collect (emergency appeal indicators, bilateral support, funding sources, comments) is passed through from Unified Reporting unchanged; no matching is applied.
 8. Year: FDRS period `2024` and Unified Reporting `2024` / `Jan-Jun 2024` all mean calendar year 2024. Mid-year only covers January to June, so it is the last choice.
 
+9. **Planning and PNS data** are included the way `/api/v1/upr/data` builds them, with no FDRS matching (FDRS has no plans): Unified Plan (template 24) is `Data source` = `Unified Planning`, PNS reports (23) are `PNS Reporting`, PNS plans (22) are `PNS Planning` (including the PNS rows merged into the host plan). Approved submissions only. `Year` and `Round` follow `/upr/data` (a plan round such as P27 has horizon years in `Year`).
+
 ## Output columns
 
-Same as `/api/v1/upr/data` `data`, with `Source` renamed to `Data source` and `Country Value` replaced by `FDRS Value` and `UPR Value`:
+Column order:
 
-`Round, ISO3, Country, NS, Region, Section, SectionB, Data source, Entity, Attribute, SP/EF, Applicable/Data not available, Indicator, Value, ValueNum, FDRS Value, UPR Value, PNS Value, PNS reported, Year, EA Code, submission_id`
+`submission_id, ISO3, Year, Round, Data source, Region, Country, NS, Section, SectionB, Entity, Attribute, SP/EF, EA Code, Applicable/Data not available, Indicator, Value, ValueNum, FDRS Value, UPR Value, PNS Value, PNS reported`
 
 - `Value` / `ValueNum`: the final figure, from the winning source (`Data source`).
 - `FDRS Value`: what FDRS reported for the same cell (same indicator and attribute); blank if none.
@@ -34,7 +36,8 @@ Query parameters: `iso3` (alias `country_iso3`), `year`, `section`.
 | Group | Indicators | Result |
 |---|---:|---|
 | In **both** FDRS (21) and Unified Reporting (33) | 21 | FDRS wins, Unified Reporting fills gaps |
-| **FDRS only** (not in template 33 form) | 9 | `FDRS`; see note on 3 of them below |
+| **FDRS only** (not in template 33 form), excluding funding | 6 | `FDRS`; 3 of them can also come from "Other indicators" |
+| **NS funding** (733) and expenditure (734) | 2 | See section B2 |
 | **Unified Reporting only**, fixed form items | 24 | `Unified Reporting` |
 | **Unified Reporting only**, country-level "Other indicators" (dynamic) | 165 | `Unified Reporting` |
 
@@ -87,15 +90,32 @@ FDRS 2025 is still being approved (77 of 192 approved), which is why Unified Rep
 | 726 | Number of volunteer deaths on duty | `935` Number of volunteer deaths on duty | National Society Volunteers | yes, 5 approved rows (matched, FDRS first) | Core indicators |
 | 728 | Number of paid staff covered by accident insurance | `927` Number of paid staff covered by accident insurance | National Society Staff | no | Core indicators |
 | 729 | Number of staff deaths on duty | `936` Number of staff deaths on duty | National Society Staff | no | Core indicators |
-| 733 | Total income of the National Society | `1530` Funding (CHF) | National Society Financial Data | no | Funding / Funding |
 | 765 | Number of people reached - Cash Transfer Programming | `949` Number of people reached - Cash Transfer Programming | By thematic areas | yes, 16 approved rows (matched, FDRS first) | Core indicators |
-| 1131 | Total income of the National Society. (reporting currency) | `939` Funding | National Society Financial Data | no | Funding / Funding (reporting currency) |
-| 1132 | Total expenditure of the National Society. (reporting currency) | `941` Expenditure | National Society Financial Data | no | Funding / Expenditure (reporting currency) |
 
 Notes:
 
-- **733 / 1131 / 1132 (total income)**: FDRS reports total NS income as a single figure. Unified Reporting's `Funding` is a matrix by funding source (IFRC Secretariat, PNSs, ...), a different measure, so it is not merged and the two coexist. Only **734 Expenditure (CHF)** is the same indicator in both.
+- National Society funding and expenditure (bank ids 733, 734, and the reporting-currency twins 1131, 1132) are in the next section.
 - **725, 726, 765**: not fixed items in template 33, but some countries report them as country-level "Other indicators" (dynamic). Those rows are matched with FDRS on the bank id, FDRS first.
+
+## B2. National Society funding and expenditure
+
+| Output row | FDRS (template 21) | Unified Reporting (template 33) | Matching |
+|---|---|---|---|
+| `Funding (CHF)`, Attribute `Total`, Indicator ID 733 | item `1530` Funding (CHF), bank 733 | **sum of the rows** of matrix item `1403` (National Society Funding CHF) | One figure per country and year; FDRS first |
+| `Funding (CHF)`, Attribute `Funding Source`, Entity `IFRC Secretariat`, Indicator ID 733 | item `943` Income Sources, row `IFRC` | item `1403`, row `IFRC Secretariat` | Matched; FDRS first |
+| `Funding (CHF)`, Entity `PNS` / `Other sources` | none | item `1403`, rows `PNSs` / `HNS other sources` | Unified Reporting only |
+| `Funding (CHF)`, Entity `Home Government`, `Foreign Government`, `Individuals`, `Corporations`, `Foundations`, `UN Agencies & other Multilateral Agencies`, `Pooled funds`, `Non-governmental organizations`, `Service income`, `Income generating activity`, `Other National Society`, `ICRC`, `Other` | item `943`, same-named rows | none | FDRS only |
+| `Expenditure`, Attribute `Total`, Indicator ID 734 | item `1531` Expenditure (CHF), bank 734 | item `1404` Expenditure (CHF), bank 734 | Same indicator; FDRS first |
+| (not carried) | items `939` Funding and `941` Expenditure, reporting currency (banks 1131, 1132) | none | Left out; the CHF items are used |
+
+How this was checked on the local DB:
+
+- Item `1404` has the same value as FDRS `1531` for every country compared (for example Turkey 2024: 816,317,034 in both).
+- Item `1403` stores one number per row (`IFRC Secretariat_ns_fun`, `PNSs_ns_fun`, `HNS other sources_ns_fun`) and no total. The total is the sum of the rows. It is close to FDRS total income but not identical (Turkey 2024: 830,129,400 vs 829,791,126), which is why `UPR Value` can differ from `FDRS Value` on the same row.
+- FDRS `943` row values add up to FDRS `1530` (for example country 168 in 2024: 2,370,187 in both). FDRS `939` equals `1530` in every approved record that has `943` data, so `943` is treated as CHF.
+- The existing `/api/v1/upr/data` does not currently return the item `1403` rows: its matrix parser splits `IFRC Secretariat_ns_fun` at the last underscore, giving column `fun`, which it does not recognise. `/api/v1/upr/overall` reads these keys itself. `/upr/data` is unchanged.
+- Item `1404` is also read as a plain number here. In `/upr/data` it is classed as a funding matrix and yields no rows.
+- The `Optional breakdown by SP/EF` rows (item `1405`) are Unified Reporting only and keep the indicator names `Funding` / `Expenditure`.
 
 ## C. Unified Reporting only (fixed form items)
 
@@ -310,8 +330,8 @@ Dynamic rows tied to an emergency appeal (`Emergency N` sections, one per appeal
 |---|---|---|
 | 21 | Key Documents (Annual Report, Strategic Plan, Audited/Unaudited Financial Statement) | Documents, not data |
 | 21 | Reporting currency, Financial reporting start/end date, Sex of president, Sex of Secretary General | Questions with no Unified Reporting counterpart |
-| 21 | `Income Sources` matrix (943) | No Indicator Bank id. Unified Reporting `Funding` matrix (1403) is a different layout (funding by source, with IFRC Secretariat and PNS columns) |
 | 21 | `National Societies to which / from which support was given` matrices (919, 929) | Network support between National Societies. Unified Reporting `Received Support` (1407) is bilateral support by SP/EF area, so the two are not merged |
-| 33 | Funding matrix (1403), SP/EF breakdown (1405), Received Support (1407), Emergency appeals, Comments | Unified Reporting only; passed through |
+| 33 | SP/EF breakdown (1405), Received Support (1407), Emergency appeals, Comments | Unified Reporting only; passed through |
+
 
 

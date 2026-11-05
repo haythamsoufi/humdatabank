@@ -123,6 +123,7 @@ API_ENDPOINTS = [
             "Indicators are matched by Indicator Bank id per country and year. "
             "FDRS takes priority; where FDRS has no figure, Unified Reporting is used "
             "(annual report first, then mid-year). Data source is FDRS or Unified Reporting. "
+            "Unified Plan, PNS reporting and PNS plan data (templates 24, 23, 22) are included as in /api/v1/upr/data, with Data source Unified Planning, PNS Reporting or PNS Planning. "
             "Only approved assignments are read. "
             "Filters: iso3, year, section. Returns the complete filtered extract; this endpoint is not paginated."
         ),
@@ -419,10 +420,10 @@ def _extract_response(body, *, cache_hit: bool):
     return response
 
 
-@bp.route("/api/v1/upr", methods=["GET"])
+@bp.route("/api/v1/upr", methods=["GET"], strict_slashes=False)
 @require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
 def get_upr_docs():
-    """Query parameters and response columns for the UPR extracts."""
+    """Query parameters and response columns for the UPR extracts (not the data itself)."""
     return json_response(upr_api_documentation())
 
 
@@ -672,4 +673,5 @@ def get_ns_key_data():
         )
     except Exception as error:
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
 

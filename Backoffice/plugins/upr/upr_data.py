@@ -2167,8 +2167,9 @@ def _dynamic_facts(
             slot=slot,
         )
         if tag_bank_id and row[9] is not None:
-            # Country-level "Other indicators" only. Emergency rows belong to one appeal.
             for fact in built:
+                fact["_indicator_id"] = int(row[9])
+                # Only country-level "Other indicators" can match FDRS. Emergency rows belong to one appeal.
                 if fact.get("Section") == "Other indicators":
                     fact["_bank_id"] = int(row[9])
         facts.extend(built)

@@ -7,10 +7,11 @@ from plugins.upr.overall_data import (
     SOURCE_FDRS,
     SOURCE_UNIFIED_REPORTING,
     _finish,
+    _planning_data_source,
     fdrs_role,
     merge_facts,
 )
-from plugins.upr.upr_data import FACT_COLUMNS, ItemView
+from plugins.upr.upr_data import ItemView
 
 FDRS, ANNUAL, MIDYEAR = 0, 1, 2
 
@@ -48,13 +49,34 @@ def _merged(tagged):
 KEY = (1, 2024, 724)
 
 
-def test_columns_rename_source_only():
+def test_columns_follow_requested_order():
+    assert list(OVERALL_COLUMNS) == [
+        "submission_id",
+        "ISO3",
+        "Year",
+        "Round",
+        "Data source",
+        "Region",
+        "Country",
+        "NS",
+        "Section",
+        "SectionB",
+        "Entity",
+        "Attribute",
+        "SP/EF",
+        "EA Code",
+        "Applicable/Data not available",
+        "Indicator",
+        "Value",
+        "ValueNum",
+        "FDRS Value",
+        "UPR Value",
+        "PNS Value",
+        "PNS reported",
+    ]
     assert "Source" not in OVERALL_COLUMNS
     assert "Country Value" not in OVERALL_COLUMNS
-    expected = []
-    for column in FACT_COLUMNS:
-        expected.extend({"Source": ["Data source"], "Country Value": ["FDRS Value", "UPR Value"]}.get(column, [column]))
-    assert list(OVERALL_COLUMNS) == expected
+    assert "Indicator ID" not in OVERALL_COLUMNS
 
 
 def test_fdrs_wins_when_both_reported():
@@ -127,6 +149,9 @@ def test_fdrs_role_only_carries_bank_indicators():
     assert fdrs_role(_item(bank_id=724)) == "ns_data"
     assert fdrs_role(_item(bank_id=618, bank_name="Number of people reached")) == "core"
     assert fdrs_role(_item(bank_id=733)) == "fdrs_funding"
+    assert fdrs_role(_item(bank_id=1131)) == "skip"
+    assert fdrs_role(_item(bank_id=1132)) == "skip"
+    assert fdrs_role(_item(id=943, item_type="matrix", bank_id=None, label="Income Sources")) == "fdrs_income_sources"
     assert fdrs_role(_item(bank_id=734, bank_name="Total expenditure of the National Society.")) == "expenditure"
     assert fdrs_role(_item(item_type="question", bank_id=None)) == "skip"
     assert fdrs_role(_item(item_type="matrix", bank_id=None)) == "skip"
@@ -160,3 +185,10 @@ def test_loser_value_matches_by_attribute():
 def test_unkeyed_rows_fill_their_own_source_column():
     row = merge_facts([(None, ANNUAL, _fact(5))])[0][0]
     assert (row["FDRS Value"], row["UPR Value"]) == (None, 5)
+
+
+def test_planning_and_pns_rows_get_their_own_data_source():
+    assert _planning_data_source({"Round": "P27", "Source": "Country Data"}) == "Unified Planning"
+    assert _planning_data_source({"Round": "P26", "Source": "PNS Data"}) == "PNS Planning"
+    assert _planning_data_source({"Round": "MYR26", "Source": "PNS Data"}) == "PNS Reporting"
+

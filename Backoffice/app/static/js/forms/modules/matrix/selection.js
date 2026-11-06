@@ -33,6 +33,7 @@ import { debugLog, debugWarn } from '../debug.js';
 import {
     __setMatrixNumericCellDisplay,
     __syncWholeNumberViolationHighlight,
+    __parseMatrixNumericValue,
 } from './formatting.js';
 import { _t } from './shared.js';
 
@@ -163,6 +164,30 @@ function __ensureSelectionStyles() {
   color: #1d4ed8;
   outline: none;
 }
+.matrix-selection-stats {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 112;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 12px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.14);
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #374151;
+  pointer-events: auto;
+}
+.matrix-selection-stats > span { cursor: pointer; border-radius: 4px; padding: 0 2px; }
+.matrix-selection-stats > span:hover { background: #dbeafe; }
+.matrix-selection-stats > span[data-copied="1"] { background: #bbf7d0; }
+.matrix-selection-stats[hidden] { display: none !important; }
+.matrix-selection-stats b { font-weight: 600; color: #111827; }
 .matrix-selection-menu button:disabled {
   color: #9ca3af;
   cursor: not-allowed;
@@ -299,7 +324,7 @@ export const matrixSelectionMixin = {
         document.addEventListener('mousedown', (e) => {
             if (!this._matrixSelection) return;
             const hit = __eventElement(e.target);
-            if (hit && typeof hit.closest === 'function' && hit.closest(MENU_SELECTOR)) return;
+            if (hit && typeof hit.closest === 'function' && hit.closest(`${MENU_SELECTOR}, .matrix-selection-stats`)) return;
             if (!this._matrixSelectableInput(e.target)) {
                 this._clearMatrixSelection();
             }
@@ -582,11 +607,85 @@ export const matrixSelectionMixin = {
     _syncMatrixSelectionChrome() {
         const chrome = this._ensureMatrixSelectionChrome();
         if (!chrome) return;
+        this._updateMatrixSelectionStats();
         if (!this._matrixSelectionIsRange()) {
             chrome.hidden = true;
             return;
         }
         this._positionMatrixSelectionChrome();
+    },
+
+    /** Excel-style status readout (Count, Sum, Average, Min, Max) at the bottom left. */
+    _updateMatrixSelectionStats() {
+        if (typeof document === 'undefined') return;
+        let bar = document.getElementById('matrix-selection-stats');
+        const sel = this._matrixSelection;
+        if (!sel || !this._matrixSelectionIsRange(sel)) {
+            if (bar) bar.hidden = true;
+            return;
+        }
+        const { container } = sel;
+        const { minR, maxR, minC, maxC } = this._matrixSelectionBounds(sel);
+        let count = 0;
+        let numCount = 0;
+        let sum = 0;
+        let min = Infinity;
+        let max = -Infinity;
+        for (let r = minR; r <= maxR; r++) {
+            for (let c = minC; c <= maxC; c++) {
+                const input = this._matrixCellInputAt(container, r, c);
+                if (!input || input.type === 'checkbox') continue;
+                const raw = input.value;
+                if (raw == null || String(raw).trim() === '') continue;
+                count++;
+                const num = __parseMatrixNumericValue(raw);
+                if (num == null) continue;
+                numCount++;
+                sum += num;
+                if (num < min) min = num;
+                if (num > max) max = num;
+            }
+        }
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'matrix-selection-stats';
+            bar.className = 'matrix-selection-stats';
+            bar.setAttribute('role', 'status');
+            bar.title = _t('Click a value to copy it');
+            // Keep the range selected and the cell focused while using the bar.
+            bar.addEventListener('mousedown', (e) => e.preventDefault());
+            bar.addEventListener('click', (e) => {
+                const item = e.target.closest ? e.target.closest('span[data-copy]') : null;
+                if (!item) return;
+                __writeClipboardText(item.dataset.copy).then(() => {
+                    item.dataset.copied = '1';
+                    setTimeout(() => { delete item.dataset.copied; }, 700);
+                }).catch(() => {});
+            });
+            (document.body || document.documentElement).appendChild(bar);
+        }
+        const fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
+        const items = [[_t('Count'), fmt.format(count), count]];
+        if (numCount > 0) {
+            items.push(
+                [_t('Numerical Count'), fmt.format(numCount), numCount],
+                [_t('Sum'), fmt.format(sum), sum],
+                [_t('Average'), fmt.format(sum / numCount), sum / numCount],
+                [_t('Min'), fmt.format(min), min],
+                [_t('Max'), fmt.format(max), max],
+            );
+        }
+        bar.textContent = '';
+        items.forEach(([label, value, rawValue]) => {
+            const span = document.createElement('span');
+            span.dataset.copy = String(Math.round(rawValue * 1e10) / 1e10);
+            span.append(`${label}: `);
+            const b = document.createElement('b');
+            b.textContent = value;
+            span.appendChild(b);
+            bar.appendChild(span);
+        });
+        bar.hidden = false;
     },
 
     /**

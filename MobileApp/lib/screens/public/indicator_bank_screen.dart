@@ -12,10 +12,8 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
-import '../../widgets/countries_widget.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
-import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/shimmer_list_placeholder.dart';
 import '../../widgets/error_state.dart';
@@ -171,25 +169,6 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
     }
   }
 
-  void _showCountriesSheet(BuildContext context, ThemeData theme) {
-    final localizations = AppLocalizations.of(context)!;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (bottomSheetContext) {
-        return NativeModalSheetScaffold(
-          theme: theme,
-          title: localizations.countries,
-          closeTooltip: localizations.close,
-          maxHeightFraction: 0.9,
-          onClose: () => Navigator.pop(bottomSheetContext),
-          child: const CountriesWidget(),
-        );
-      },
-    );
-  }
-
   bool _isStandaloneScreen(BuildContext context) {
     // Check if this screen is navigated to directly (not as a tab in MainNavigationScreen)
     // When used as a tab, it's embedded in MainNavigationScreen (route name is dashboard or null)
@@ -289,7 +268,6 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
           ),
           drawer: AppNavigationDrawer(
             activeScreen: ActiveDrawerScreen.indicatorBank,
-            onShowCountriesSheet: () => _showCountriesSheet(context, theme),
           ),
           body: ColoredBox(
             color: theme.scaffoldBackgroundColor,

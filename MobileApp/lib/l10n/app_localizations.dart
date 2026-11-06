@@ -1091,6 +1091,7 @@ class AppLocalizations {
       'country_detail_top_sectors': 'Top sectors',
       'country_detail_documents': 'Documents',
       'country_detail_all_types': 'All types',
+      'country_detail_load_more': 'Load more',
       'country_detail_no_trend': 'No trend data for this indicator',
       'country_detail_no_documents': 'No public documents available',
       'country_detail_not_found': 'Country not found',
@@ -8744,6 +8745,7 @@ class AppLocalizations {
   String get countryDetailTopSectors => translate('country_detail_top_sectors');
   String get countryDetailDocuments => translate('country_detail_documents');
   String get countryDetailAllTypes => translate('country_detail_all_types');
+  String get countryDetailLoadMore => translate('country_detail_load_more');
   String get countryDetailNoTrend => translate('country_detail_no_trend');
   String get countryDetailNoDocuments => translate('country_detail_no_documents');
   String get countryDetailNotFound => translate('country_detail_not_found');

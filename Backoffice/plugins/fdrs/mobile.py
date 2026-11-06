@@ -460,7 +460,8 @@ def country_profile(iso3):
                 'year': entry.get('year'),
                 'period': entry.get('YearText'),
                 'document_type': entry.get('document_type'),
-                'language': entry.get('LangCode'),
+                'language': entry.get('language') or entry.get('LangCode'),
+                'language_code': entry.get('LangCode'),
                 'uploaded_at': entry.get('ModifiedAt'),
             })
 

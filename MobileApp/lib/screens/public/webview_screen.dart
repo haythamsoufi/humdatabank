@@ -25,7 +25,6 @@ import '../../utils/url_helper.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_bar.dart';
 import '../../theme/grouped_sheet_style.dart';
-import '../../widgets/countries_widget.dart';
 import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../services/webview_service.dart';
@@ -1337,7 +1336,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 onTap: () {
                   Navigator.pop(bottomSheetContext);
                   Navigator.of(context).pop();
-                  _showCountriesSheet(context, theme);
+                  Navigator.of(context).pushNamed(AppRoutes.countries);
                 },
               ),
               Padding(
@@ -1389,25 +1388,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
               const SizedBox(height: 16),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  void _showCountriesSheet(BuildContext context, ThemeData theme) {
-    final loc = AppLocalizations.of(context)!;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (bottomSheetContext) {
-        return NativeModalSheetScaffold(
-          theme: theme,
-          title: loc.countries,
-          closeTooltip: loc.close,
-          maxHeightFraction: 0.9,
-          onClose: () => Navigator.pop(bottomSheetContext),
-          child: const CountriesWidget(),
         );
       },
     );

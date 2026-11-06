@@ -15,8 +15,6 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
-import '../../widgets/countries_widget.dart';
-import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/disaggregation/disagg_chart_panel.dart';
 import '../../widgets/disaggregation/disagg_filter_sheet.dart';
 import '../../widgets/disaggregation/disagg_summary_cards.dart';
@@ -194,25 +192,6 @@ class _DisaggregationAnalysisScreenState
     return Navigator.of(context).canPop();
   }
 
-  void _showCountriesSheet(BuildContext context, ThemeData theme) {
-    final loc = AppLocalizations.of(context)!;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return NativeModalSheetScaffold(
-          theme: theme,
-          title: loc.countries,
-          closeTooltip: loc.close,
-          maxHeightFraction: 0.9,
-          onClose: () => Navigator.pop(sheetContext),
-          child: const CountriesWidget(),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -245,7 +224,6 @@ class _DisaggregationAnalysisScreenState
       ),
       drawer: AppNavigationDrawer(
         activeScreen: ActiveDrawerScreen.home,
-        onShowCountriesSheet: () => _showCountriesSheet(context, theme),
       ),
       body: RefreshIndicator(
         onRefresh: _bootstrap,

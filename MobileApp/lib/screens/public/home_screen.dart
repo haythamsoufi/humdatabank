@@ -10,13 +10,11 @@ import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
-import '../../widgets/countries_widget.dart';
 import '../../widgets/home_landing/landing_ai_entry_card.dart';
 import '../../widgets/home_landing/fdrs_world_map.dart';
 import '../../widgets/home_landing/landing_get_started_section.dart';
 import '../../widgets/home_landing/landing_hero_sliver.dart';
 import '../../widgets/home_landing/landing_quick_prompts.dart';
-import '../../widgets/sheets/native_modal_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -162,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen>
         icon: Icons.public_rounded,
         title: l10n.countries,
         subtitle: l10n.homeLandingShortcutCountriesSubtitle,
-        onTap: () => _showCountriesSheet(context, Theme.of(context), l10n),
+        onTap: () => Navigator.of(context).pushNamed(AppRoutes.countries),
       ),
       LandingShortcutItem(
         icon: Icons.analytics_rounded,
@@ -220,8 +218,6 @@ class _HomeScreenState extends State<HomeScreen>
                 drawer: AppNavigationDrawer(
                   activeScreen: ActiveDrawerScreen.home,
                   onHomeSelected: reload,
-                  onShowCountriesSheet: () =>
-                      _showCountriesSheet(context, theme, localizations),
                 ),
                 body: Stack(
                   fit: StackFit.expand,
@@ -348,27 +344,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _showCountriesSheet(
-    BuildContext context,
-    ThemeData theme,
-    AppLocalizations localizations,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (BuildContext bottomSheetContext) {
-        return NativeModalSheetScaffold(
-          theme: theme,
-          title: localizations.countries,
-          closeTooltip: localizations.close,
-          maxHeightFraction: 0.9,
-          onClose: () => Navigator.pop(bottomSheetContext),
-          child: const CountriesWidget(),
-        );
-      },
-    );
-  }
 }
 
 /// Semi-transparent scrim for chat focus mode: dims the given region and

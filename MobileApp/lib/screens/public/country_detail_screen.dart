@@ -38,6 +38,8 @@ class CountryDetailScreen extends StatefulWidget {
   State<CountryDetailScreen> createState() => _CountryDetailScreenState();
 }
 
+const _initialDocumentYears = 3;
+
 class _CountryDetailScreenState extends State<CountryDetailScreen> {
   final ApiService _apiService = sl<ApiService>();
   final PageController _coverController = PageController();
@@ -50,6 +52,7 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
 
   String? _selectedKey;
   String? _documentType;
+  bool _showAllDocumentYears = false;
   int _coverIndex = 0;
 
   @override
@@ -534,6 +537,7 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
       AppLocalizations loc, CountryProfile profile) {
     final bySector = <String, List<CountryIndicator>>{};
     for (final indicator in profile.indicators) {
+      if (indicator.unit?.trim().toLowerCase() != 'people') continue;
       final sector = indicator.sector;
       if (sector == null || sector.isEmpty) continue;
       bySector.putIfAbsent(sector, () => []).add(indicator);
@@ -626,6 +630,12 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
         if (b == null) return -1;
         return b.compareTo(a);
       });
+    final datedYears = groupYears.where((y) => y != null).toList();
+    final hasMoreYears = datedYears.length > _initialDocumentYears ||
+        (datedYears.isNotEmpty && groupYears.contains(null));
+    final visibleYears = _showAllDocumentYears || !hasMoreYears
+        ? groupYears
+        : datedYears.take(_initialDocumentYears).toList();
 
     return [
       _sectionTitle(theme, loc.countryDetailDocuments),
@@ -670,7 +680,7 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
               ),
             ),
           ),
-        for (final year in groupYears) ...[
+        for (final year in visibleYears) ...[
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 4),
             child: Text(
@@ -683,30 +693,33 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
           ),
           for (final doc in byYear[year]!) _buildDocumentRow(context, theme, doc),
         ],
+        if (hasMoreYears && !_showAllDocumentYears)
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _showAllDocumentYears = true),
+              child: Text(
+                loc.countryDetailLoadMore,
+                style: TextStyle(
+                  color: Color(AppConstants.ifrcRed),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
       ],
     ];
   }
 
   Widget _buildDocumentRow(
       BuildContext context, ThemeData theme, CountryDocument doc) {
-    final meta = [
-      if (doc.documentType != null && doc.documentType!.isNotEmpty)
-        doc.documentType!,
-      if (doc.language != null && doc.language!.isNotEmpty)
-        doc.language!.toUpperCase(),
-    ].join(' · ');
+    final language = doc.language;
 
     return Column(
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           onTap: () => _openDocument(doc),
-          leading: Icon(
-            doc.isPdf
-                ? Icons.picture_as_pdf_rounded
-                : Icons.description_rounded,
-            color: Color(AppConstants.ifrcRed),
-          ),
+          leading: _buildDocumentThumbnail(context, doc),
           title: Text(
             doc.title,
             maxLines: 2,
@@ -714,10 +727,10 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
             style: theme.textTheme.bodyMedium
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
-          subtitle: meta.isEmpty
+          subtitle: language == null || language.isEmpty
               ? null
               : Text(
-                  meta,
+                  language,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall
@@ -728,6 +741,35 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
         ),
         Divider(height: 1, color: context.dividerColor),
       ],
+    );
+  }
+
+  Widget _buildDocumentThumbnail(BuildContext context, CountryDocument doc) {
+    const width = 48.0;
+    const height = 64.0;
+    final fallback = Container(
+      width: width,
+      height: height,
+      alignment: Alignment.center,
+      color: Color(AppConstants.ifrcRed).withValues(alpha: 0.08),
+      child: Icon(
+        doc.isPdf ? Icons.picture_as_pdf_rounded : Icons.description_rounded,
+        color: Color(AppConstants.ifrcRed),
+      ),
+    );
+    final thumbnail = doc.thumbnail;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: thumbnail == null || thumbnail.isEmpty
+          ? fallback
+          : CachedNetworkImage(
+              imageUrl: thumbnail,
+              width: width,
+              height: height,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => fallback,
+              errorWidget: (_, __, ___) => fallback,
+            ),
     );
   }
 

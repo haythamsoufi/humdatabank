@@ -65,6 +65,8 @@ dependencies:
 
   # UI
   cached_network_image: ^3.3.0
+  # Sector logos uploaded in the Backoffice are often SVG, which Image/CachedNetworkImage cannot decode
+  flutter_svg: ^2.2.0
   fl_chart: ">=0.70.2 <2.0.0"
   font_awesome_flutter: ">=10.9.0 <11.0.0"
   # In-app PDF viewer — iOS uses PDFKit (no CocoaPod needed); Android uses PdfRenderer

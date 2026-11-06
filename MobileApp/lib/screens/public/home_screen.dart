@@ -160,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen>
         icon: Icons.public_rounded,
         title: l10n.countries,
         subtitle: l10n.homeLandingShortcutCountriesSubtitle,
-        onTap: () => Navigator.of(context).pushNamed(AppRoutes.countries),
+        onTap: () => NavigationHelper.openCountries(context),
       ),
       LandingShortcutItem(
         icon: Icons.analytics_rounded,

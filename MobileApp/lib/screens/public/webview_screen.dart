@@ -19,6 +19,7 @@ import '../../services/offline_api_recorder.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../config/routes.dart';
+import '../../utils/navigation_helper.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../utils/url_helper.dart';
@@ -1336,7 +1337,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 onTap: () {
                   Navigator.pop(bottomSheetContext);
                   Navigator.of(context).pop();
-                  Navigator.of(context).pushNamed(AppRoutes.countries);
+                  NavigationHelper.openCountries(context);
                 },
               ),
               Padding(

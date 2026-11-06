@@ -216,7 +216,13 @@ class AppNavigationDrawer extends StatelessWidget {
                   ModernDrawerTile(
                     icon: Icons.public_rounded,
                     title: localizations.countries,
-                    onTap: () => _closeAndNavigate(context, AppRoutes.countries),
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (_isNested) {
+                        Navigator.of(context).pop();
+                      }
+                      NavigationHelper.openCountries(context);
+                    },
                   ),
                   ModernDrawerSectionTitle(
                     label: localizations.analysis.toUpperCase(),

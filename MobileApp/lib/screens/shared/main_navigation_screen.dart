@@ -15,6 +15,7 @@ import 'dashboard_screen.dart';
 import 'settings_screen.dart';
 import 'ai_chat_screen.dart';
 import '../public/home_screen.dart';
+import '../public/countries_screen.dart';
 import '../public/indicator_bank_screen.dart';
 import '../public/resources_screen.dart';
 import '../public/disaggregation_analysis_screen.dart';
@@ -79,6 +80,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         return const ResourcesScreen();
       case TabIds.indicators:
         return const IndicatorBankScreen();
+      case TabIds.countries:
+        return const CountriesScreen();
       default:
         return const SizedBox.shrink();
     }

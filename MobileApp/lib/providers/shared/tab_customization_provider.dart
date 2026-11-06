@@ -21,6 +21,7 @@ class TabIds {
   static const resources = 'resources';
   static const indicators = 'indicators';
   static const unifiedPlanning = 'unified_planning';
+  static const countries = 'countries';
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,12 @@ final List<TabDefinition> allTabDefinitions = [
     icon: Icons.assignment_outlined,
     activeIcon: Icons.assignment,
     getLabel: (l) => l.resourcesUnifiedPlanningSectionTitle,
+  ),
+  TabDefinition(
+    id: TabIds.countries,
+    icon: Icons.public_outlined,
+    activeIcon: Icons.public,
+    getLabel: (l) => l.countries,
   ),
 ];
 
@@ -209,7 +216,7 @@ class TabCustomizationProvider extends ChangeNotifier {
     required bool isFocalPoint,
     required bool chatbotEnabled,
   }) {
-    final ids = <String>{TabIds.home};
+    final ids = <String>{TabIds.home, TabIds.countries};
     if (isAdmin) {
       ids.addAll([
         TabIds.notifications, TabIds.dashboard, TabIds.admin,
@@ -350,9 +357,16 @@ class TabCustomizationProvider extends ChangeNotifier {
 
     final custom = _customOrder[rk];
     final hidden = _hiddenTabs[rk] ?? {};
+    final defaults = defaultTabIdsForRole(
+      isAdmin: isAdmin,
+      isAuthenticated: isAuthenticated,
+      isFocalPoint: isFocalPoint,
+      chatbotEnabled: chatbotEnabled,
+    ).toSet();
+    final hasCustom = custom != null && custom.isNotEmpty;
 
     List<String> ordered;
-    if (custom != null && custom.isNotEmpty) {
+    if (hasCustom) {
       ordered = custom.where(available.contains).toList();
       for (final id in available) {
         if (!ordered.contains(id)) ordered.add(id);
@@ -373,7 +387,13 @@ class TabCustomizationProvider extends ChangeNotifier {
         .where((id) => tabDefinitionMap.containsKey(id))
         .map((id) {
       final def = tabDefinitionMap[id]!;
-      return (tab: def, visible: def.isRequired || !hidden.contains(id));
+      // Tabs the user has never seen (opt-in, or added after they last
+      // customised) are on the bar only when they are role defaults.
+      final seen = hasCustom && custom.contains(id);
+      final visible = seen
+          ? !hidden.contains(id)
+          : defaults.contains(id) && !hidden.contains(id);
+      return (tab: def, visible: def.isRequired || visible);
     }).toList();
   }
 

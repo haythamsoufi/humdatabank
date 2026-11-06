@@ -457,6 +457,28 @@ def inform_class(score: float) -> str:
     return "low"
 
 
+_INFORM_CLASS_LABELS = {
+    "very_low": "Very Low",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "very_high": "Very High",
+}
+
+
+def inform_class_label(value: Any) -> str | None:
+    """Human-readable INFORM class for master/API export (e.g. very_high → Very High)."""
+    if value is None or value == "":
+        return None
+    key = str(value).strip().lower().replace("-", "_").replace(" ", "_")
+    while "__" in key:
+        key = key.replace("__", "_")
+    if key in _INFORM_CLASS_LABELS:
+        return _INFORM_CLASS_LABELS[key]
+    text = str(value).strip()
+    return text.replace("_", " ").title() if "_" in text else text
+
+
 def _coverage_points(
     figures: list[dict[str, Any]],
     countries: dict[str, Any],

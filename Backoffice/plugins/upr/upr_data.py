@@ -126,9 +126,9 @@ _SHEET_INDICATOR_IDS = {
 }
 
 MASTER_COLUMNS = (
+    "Round",
     "ISO3",
     "Country",
-    "Round",
     "Year",
     "Source",
     "Data status",
@@ -362,6 +362,14 @@ def horizon_year(period_name: str | None, label: str | None, item_id: int | None
     if offset is not None:
         return years[min(offset, len(years) - 1)]
     return years[0]
+
+
+def _matrix_row_year(row_key: Any) -> int | None:
+    """Calendar year when a reach matrix uses years as row headers (e.g. 2027 × SP1)."""
+    text = str(row_key or "").strip()
+    if re.fullmatch(r"20\d{2}", text):
+        return int(text)
+    return None
 
 
 def ea_code_from_text(text: str | None) -> str | None:
@@ -1152,19 +1160,29 @@ def _reach_facts(
     emergencies: bool,
     emergency_index: dict[tuple[int, str], int],
 ) -> list[dict[str, Any]]:
-    year = horizon_year(place.get("period_name"), item.label, item.id)
+    default_year = horizon_year(place.get("period_name"), item.label, item.id)
     submission_id = place.get("submission_id")
     rows = []
     for row_key, col, number in _iter_matrix_numbers(cells):
-        entity, ns_name = _named_row(row_key, ns_by_id)
-        label = row_key if not row_key.isdigit() else (ns_name or row_key)
-        if emergencies:
-            # Same layout as plan funding: SP/EF holds EA1..EAn; Attribute is the matrix column.
-            attribute = spef_label(col) or col or "Total"
-            spef = _emergency_attribute(emergency_index, submission_id, label)
-        else:
+        row_year = None if emergencies else _matrix_row_year(row_key)
+        if row_year is not None:
+            # Longer-term reach matrix: rows are calendar years, columns are SP/EF.
+            entity, ns_name = "HNS", None
+            label = str(row_key)
             attribute = col or None
             spef = spef_label(col)
+            year = row_year
+        else:
+            entity, ns_name = _named_row(row_key, ns_by_id)
+            label = row_key if not row_key.isdigit() else (ns_name or row_key)
+            if emergencies:
+                # Same layout as plan funding: SP/EF holds EA1..EAn; Attribute is the matrix column.
+                attribute = spef_label(col) or col or "Total"
+                spef = _emergency_attribute(emergency_index, submission_id, label)
+            else:
+                attribute = col or None
+                spef = spef_label(col)
+            year = default_year
         fact = blank_fact(place)
         fact.update(
             {
@@ -1694,17 +1712,21 @@ def _master_reach_rows(
     emergencies: bool,
     emergency_index: dict[tuple[int, str], int],
 ) -> list[dict[str, Any]]:
-    year = horizon_year(place.get("period_name"), item.label, item.id)
+    default_year = horizon_year(place.get("period_name"), item.label, item.id)
     rows = []
     for row_key, col, number in _iter_matrix_numbers(cells):
-        _entity, ns_name = _named_row(row_key, {})
+        row_year = None if emergencies else _matrix_row_year(row_key)
+        _entity, ns_name = (None, None) if row_year is not None else _named_row(row_key, {})
         label = row_key if not str(row_key).isdigit() else (ns_name or row_key)
         if emergencies:
             area = _emergency_attribute(emergency_index, place.get("submission_id"), label)
             ea_code = ea_code_from_text(label)
+            year = default_year
         else:
             area = spef_label(col) or (col or "Total")
             ea_code = None
+            # Prefer the year encoded on the matrix row (Longer term programmes: 2027×SP1).
+            year = row_year if row_year is not None else default_year
         row = blank_master(place)
         row.update(
             {
@@ -2086,12 +2108,23 @@ def build_upr_master(
     iso3: str | None = None,
     section: str | None = None,
     scope: dict[str, Any] | None = None,
-) -> dict[str, list[dict[str, Any]]]:
-    """Rows shaped like the UPR Master workbook sheet ``UPR Data``.
+    layout: str = "long",
+) -> dict[str, Any]:
+    """UPR master extract.
 
-    One row per country, round, section, and area. Sex/age breakdowns are
-    collapsed to the total. IFRC system snapshots are not part of that sheet.
+    ``layout="long"`` (default): planning only — identity columns plus Attribute / Value,
+    where Attribute already names the measure (e.g. ``HNS 2027 SP1``) for Excel pivots.
+
+    ``layout="wide"``: planning only — one row per country and round with those measures
+    as columns.
+
+    ``layout="detail"``: UPR Data sheet rows (Section, Area, Entity, …) for any template.
     """
+    excel = layout in {"long", "wide"}
+    if excel:
+        if template and template != "plan":
+            raise ValueError(f"{layout} layout covers planning only; use layout=detail for other templates")
+        template = "plan"
     template_ids = _template_ids(template)
     places = _load_places(template_ids, iso3=iso3, round_code=round_code, scope=scope)
     extra_places = _supplementary_pns_plan_places(places)
@@ -2141,14 +2174,29 @@ def build_upr_master(
     _fill_funding_ea_codes(rows, emergency_index, area_key="Area")
     rows = _merge_master_pns_plan_funding(rows, all_places, extra_places, hosts={p["iso3"] for p in places})
     rows.extend(_dynamic_facts(places, by_submission, master=True))
-    if section:
+    if section and not excel:
         wanted = section.strip().lower()
         rows = [row for row in rows if str(row.get("Section") or "").strip().lower() == wanted]
     if iso3:
         code = iso3.strip().upper()
         rows = [row for row in rows if str(row.get("ISO3") or "").upper() == code]
     rows = finish_master_rows(rows, status_by_submission={})
-    return {"data": rows}
+    if excel:
+        from plugins.upr.master_wide import build_master_context, melt_master_long, pivot_master_wide
+
+        # Only countries with a country plan assignment get a row. A PNS's own plan rows
+        # (ISO3 = the PNS's home country, e.g. Austria) are kept only as PNS attributes of
+        # the host countries they name.
+        hosts = {p["iso3"] for p in places if p.get("iso3")}
+        rows = [row for row in rows if row.get("ISO3") in hosts]
+        region_by_iso = {p["iso3"]: p.get("region") for p in places if p.get("iso3")}
+        context = build_master_context({str(p.get("round") or "") for p in places if p.get("round")})
+        if layout == "wide":
+            columns, out_rows = pivot_master_wide(rows, region_by_iso=region_by_iso, context=context)
+        else:
+            columns, out_rows = melt_master_long(rows, region_by_iso=region_by_iso, context=context)
+        return {"data": out_rows, "columns": columns}
+    return {"data": rows, "columns": list(MASTER_COLUMNS)}
 
 
 def _template_ids(template: str | None) -> set[int]:

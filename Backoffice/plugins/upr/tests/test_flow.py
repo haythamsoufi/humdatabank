@@ -151,6 +151,15 @@ def test_midyear_expenditure_keeps_country_the_annual_report_omits():
     assert spent == 8718
 
 
+def test_inform_class_label_for_master_export():
+    from plugins.upr.flow import inform_class_label
+
+    assert inform_class_label("very_high") == "Very High"
+    assert inform_class_label("High") == "High"
+    assert inform_class_label("very low") == "Very Low"
+    assert inform_class_label(None) is None
+
+
 def test_coverage_point_uses_inform_class_and_funding_met():
     from plugins.upr.flow import _coverage_points, inform_class
 

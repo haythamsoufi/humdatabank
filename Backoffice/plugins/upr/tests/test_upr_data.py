@@ -571,6 +571,40 @@ def test_master_plan_funding_and_reach_emergency():
     assert reach[0]["ValueNum"] == 10
 
 
+def test_master_longer_term_reach_uses_year_rows():
+    """Longer-term reach matrix is year × SP; do not collapse all years into Y0."""
+    place = {**_PLACE, "template": "plan", "round": "P27", "period_name": "2027"}
+    rows = master_rows_for_item(
+        _item(
+            template_id=PLAN_TEMPLATE_ID,
+            item_type="matrix",
+            id=954,
+            label="Longer term programmes",
+            bank_id=None,
+            bank_name=None,
+            bank_area=None,
+        ),
+        "reach",
+        place,
+        value=None,
+        disagg={
+            "mode": "matrix",
+            "values": {
+                "2027_SP1": 810000,
+                "2028_SP1": 815000,
+                "2029_SP1": 950000,
+                "2027_SP2": 830000,
+            },
+        },
+    )
+    by_key = {(r["Year"], r["Area"]): r["ValueNum"] for r in rows}
+    assert by_key[(2027, "SP1")] == 810000
+    assert by_key[(2028, "SP1")] == 815000
+    assert by_key[(2029, "SP1")] == 950000
+    assert by_key[(2027, "SP2")] == 830000
+    assert sum(v for (year, area), v in by_key.items() if year == 2027 and area == "SP1") == 810000
+
+
 def test_comment_is_a_fact_row():
     row = comment_fact(
         _PLACE,

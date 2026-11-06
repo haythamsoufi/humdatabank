@@ -174,20 +174,33 @@ API_ENDPOINTS = [
         "rate_limited": True,
         "featured": True,
         "description": (
-            "UPR Data sheet from UPR Master.xlsx: one flat row per country, round, section, and area. "
-            "Columns match the workbook (ISO3, Round, Section, Area, Attribute, indicatorId, ValueNum, "
-            "Country Value, PNS Value, EA Code). "
-            "Filters: template (report|plan|pns), round, iso3, section. "
+            "Default (layout=long): planning extract for Excel — Round, ISO3, Region, Country, NS, "
+            "Part of Bundle, Data status, Attribute order, Attribute, Value. Attribute already names "
+            "the measure (Volunteers from nskeydata, Total Population, INFORM…, Reach 2027 SP1, "
+            "HNS 2027 SP1, IFRC 2027 EAs SPRM/OPS, IFRC 2027 New Total, Danish Red Cross 2027, "
+            "Total FR 2027, 2027 New Total, …). Secondary snapshots and multilateral/EAs SPRM/OPS "
+            "are managed under UPR plugin settings. Rows are sorted by Round, Attribute order, Country. "
+            "layout=wide is the same measures as columns. layout=detail is the UPR Data sheet. "
+            "Filters: round, iso3, layout; detail also supports template and section. "
             "Returns the complete filtered extract; this endpoint is not paginated."
         ),
         "consumers": "Power BI, Backoffice session",
         "paginated": False,
         "query_params": _UPR_QUERY_PARAMS + [
             {
+                "name": "layout",
+                "type": "select",
+                "options": ["long", "wide", "detail"],
+                "description": (
+                    "long (default): Round/Country/… + Attribute + Value for Excel pivot. "
+                    "wide: one row per country and round. detail: UPR Data sheet columns."
+                ),
+            },
+            {
                 "name": "section",
                 "type": "text",
                 "placeholder": "Section name",
-                "description": "Limit rows to one Section value. Omit to return every section.",
+                "description": "Limit rows to one Section value (layout=detail only). Omit to return every section.",
             },
         ],
     },
@@ -562,6 +575,23 @@ def get_upr_submissions():
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
 
+def _secondary_summary_table() -> list[dict]:
+    """One row per secondary reference source (population, INFORM, HDI, …)."""
+    from plugins.upr.secondary.registry import list_sources
+
+    keys = ("id", "label", "source", "edition", "status", "row_count", "updated_at")
+    out = []
+    for item in list_sources():
+        row = {key: item.get(key) for key in keys}
+        rounds = item.get("rounds")
+        if rounds is not None:
+            row["rounds"] = [
+                {k: r.get(k) for k in ("round", "year", "row_count", "updated_at")} for r in rounds
+            ]
+        out.append(row)
+    return out
+
+
 @bp.route("/api/v1/upr/master", methods=["GET"])
 @require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
 def get_upr_master():
@@ -574,11 +604,15 @@ def get_upr_master():
         round_code = _round_param()
         scope, iso3 = _request_scope()
         section = (request.args.get("section") or "").strip().lower() or None
+        layout = (request.args.get("layout") or "long").strip().lower()
+        if layout not in {"wide", "long", "detail"}:
+            return api_error("layout must be long, wide, or detail", 400)
         params = {
             "template": template,
             "round": round_code,
             "iso3": iso3,
             "section": section,
+            "layout": layout,
         }
         if scope:
             params["scope"] = scope
@@ -591,15 +625,17 @@ def get_upr_master():
                 iso3=iso3,
                 section=section,
                 scope=scope,
+                layout=layout,
             ),
         )
         rows = payload["data"]
         return _extract_response(
             {
                 "data": rows,
+                "secondary_summary": _secondary_summary_table(),
                 "meta": {
                     "total": len(rows),
-                    "columns": list(MASTER_COLUMNS),
+                    "columns": payload.get("columns") or list(MASTER_COLUMNS),
                 },
             },
             cache_hit=cache_hit,

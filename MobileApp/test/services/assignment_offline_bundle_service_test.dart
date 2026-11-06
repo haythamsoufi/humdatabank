@@ -87,6 +87,21 @@ void main() {
   Directory pkgDir([int template = 7]) =>
       Directory(p.join(tmp.path, 'user_1', 'template_$template'));
 
+  Map<String, dynamic> entry(String key, String body) => {
+    'k': key,
+    's': 200,
+    't': 'application/json',
+    'b': body,
+  };
+
+  Future<Map> readJsonMap(String name) async {
+    final f = File(p.join(pkgDir().path, name));
+    return f.existsSync() ? jsonDecode(await f.readAsString()) as Map : {};
+  }
+
+  Future<Map> sharedApi() => readJsonMap('offline_api_cache.json');
+  Future<Map> pageApi(int id) => readJsonMap('page_${id}_api.json');
+
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('offline_bundle_test');
     adapter = FakeAdapter(routes());
@@ -277,14 +292,17 @@ void main() {
         {'k': 'GET /a', 's': 200, 't': 'application/json', 'b': '{"a":1}'},
       ]);
       await savePackage(svc, 5, staticVersion: 'v2');
-      final cache =
-          jsonDecode(
-                await File(
-                  p.join(pkgDir().path, 'offline_api_cache.json'),
-                ).readAsString(),
-              )
-              as Map;
-      expect(cache.keys, contains('GET /a'));
+      expect(await pageApi(5), contains('GET /a'));
+    });
+
+    test('rebuilding keeps the other entities\' data', () async {
+      await savePackage(svc, 5);
+      await svc.savePage(
+        req(6, record: (_) async => [entry('GET /eo?iso=B', 'b')]),
+      );
+      await savePackage(svc, 5, staticVersion: 'v2');
+      expect(await pageApi(6), contains('GET /eo?iso=B'));
+      expect(await svc.hasOfflineForm(6), isTrue);
     });
 
     test('many assets are downloaded in parallel and all arrive', () async {
@@ -589,36 +607,125 @@ void main() {
   });
 
   group('API cache', () {
-    test(
-      'responses seen on one assignment serve every assignment of the template',
-      () async {
-        await savePackage(svc, 5);
-        await svc.savePage(req(6));
+    test('a response seen live is stored for that assignment only', () async {
+      await savePackage(svc, 5);
+      await svc.savePage(req(6));
 
-        final ok = await svc.mergeApiCache(6, [
-          {'k': 'GET /a', 's': 200, 't': 'application/json', 'b': '{"a":1}'},
-          {'k': 'GET /b', 's': 200, 't': 'application/json', 'b': '{"b":1}'},
-        ]);
-        await svc.mergeApiCache(5, [
-          {'k': 'GET /a', 's': 200, 't': 'application/json', 'b': '{"a":2}'},
-        ]);
+      final ok = await svc.mergeApiCache(6, [
+        entry('GET /a', '{"a":1}'),
+        entry('GET /b', '{"b":1}'),
+      ]);
+      await svc.mergeApiCache(6, [entry('GET /a', '{"a":2}')]);
 
-        expect(ok, isTrue);
-        expect(
-          (await svc.readIndex()).packages['template_7']!.apiEntryCount,
-          2,
-        );
-        final cache =
-            jsonDecode(
-                  await File(
-                    p.join(pkgDir().path, 'offline_api_cache.json'),
-                  ).readAsString(),
-                )
-                as Map;
-        expect(cache['GET /a']['b'], '{"a":2}');
-        expect(cache['GET /b']['b'], '{"b":1}');
-      },
-    );
+      expect(ok, isTrue);
+      final own = await pageApi(6);
+      expect(own['GET /a']['b'], '{"a":2}');
+      expect(own['GET /b']['b'], '{"b":1}');
+      expect(await pageApi(5), isEmpty);
+      expect(await sharedApi(), isEmpty);
+    });
+
+    test('responses the template shares are not stored per entity', () async {
+      await savePackage(
+        svc,
+        5,
+        record: (_) async => [
+          entry('GET /api/forms/lookup-lists/x/options', '{"o":[1]}'),
+        ],
+      );
+      await svc.savePage(
+        req(
+          6,
+          record: (_) async => [
+            entry('GET /api/forms/lookup-lists/x/options', '{"o":[1]}'),
+          ],
+        ),
+      );
+
+      expect(await pageApi(6), isEmpty);
+      expect(
+        await sharedApi(),
+        contains('GET /api/forms/lookup-lists/x/options'),
+      );
+    });
+
+    test('saving another entity\'s page records its own data', () async {
+      await savePackage(
+        svc,
+        5,
+        record: (_) async => [
+          entry(
+            'GET /admin/plugins/emergency_operations/api/operations?iso=AA',
+            '{"r":["a"]}',
+          ),
+          entry('GET /api/forms/lookup-lists/x/options', '{"o":[1]}'),
+        ],
+      );
+
+      await svc.savePage(
+        req(
+          6,
+          record: (_) async => [
+            entry(
+              'GET /admin/plugins/emergency_operations/api/operations?iso=BB',
+              '{"r":["b"]}',
+            ),
+            entry('GET /api/forms/lookup-lists/x/options', '{"o":[1]}'),
+          ],
+        ),
+      );
+
+      final own = await pageApi(6);
+      expect(own.keys, [
+        'GET /admin/plugins/emergency_operations/api/operations?iso=BB',
+      ]);
+      final shared = await sharedApi();
+      expect(
+        shared.keys,
+        contains(
+          'GET /admin/plugins/emergency_operations/api/operations?iso=AA',
+        ),
+      );
+      expect(
+        shared.keys,
+        isNot(
+          contains(
+            'GET /admin/plugins/emergency_operations/api/operations?iso=BB',
+          ),
+        ),
+      );
+    });
+
+    test('a page loads the shared data and then its own', () async {
+      await savePackage(svc, 5);
+      await svc.savePage(req(6));
+
+      final html = await pageHtml(svc, 6);
+      expect(html, contains('src="offline_api_cache.js"'));
+      expect(html, contains('src="page_6_api.js"'));
+      expect(
+        html.indexOf('offline_api_cache.js'),
+        lessThan(html.indexOf('page_6_api.js')),
+      );
+      expect(File(p.join(pkgDir().path, 'page_6_api.js')).existsSync(), isTrue);
+    });
+
+    test('an entity\'s data is removed with its page', () async {
+      await savePackage(svc, 5);
+      await svc.savePage(req(6, record: (_) async => [entry('GET /x', '{}')]));
+
+      await svc.pruneBundles(closedAssignmentIds: {6});
+
+      expect(
+        File(p.join(pkgDir().path, 'page_6_api.json')).existsSync(),
+        isFalse,
+      );
+      expect(
+        File(p.join(pkgDir().path, 'page_6_api.js')).existsSync(),
+        isFalse,
+      );
+      expect(File(p.join(pkgDir().path, 'page_5.html')).existsSync(), isTrue);
+    });
 
     test('ignores responses for assignments without a saved page', () async {
       expect(

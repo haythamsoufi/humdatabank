@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import '../models/shared/assignment.dart';
 import '../models/shared/dashboard_data.dart';
@@ -6,6 +7,7 @@ import '../models/shared/entity.dart';
 import '../models/shared/focal_point_contact.dart';
 import '../services/api_service.dart';
 import '../services/error_handler.dart';
+import '../services/offline/entity_dashboard_store.dart';
 import '../services/storage_service.dart';
 import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
@@ -18,6 +20,7 @@ class DashboardRepository {
   final ApiService _api = sl<ApiService>();
   final StorageService _storage = StorageService();
   final ErrorHandler _errorHandler = ErrorHandler();
+  final EntityDashboardStore _entityStore = EntityDashboardStore();
 
   /// Load dashboard data from API.
   /// Optionally accepts entity selection to pass as query parameter.
@@ -293,10 +296,84 @@ class DashboardRepository {
         );
       }
 
+      final entity = data.selectedEntity;
+      if (entity != null) {
+        await _entityStore.save(EntityDashboardSnapshot.fromData(data, entity));
+      }
+
       DebugLogger.logDashboard('Saved dashboard to cache');
     } catch (e) {
       DebugLogger.logWarn('DASHBOARD', 'Error saving to cache: $e');
     }
+  }
+
+  /// The last dashboard saved for [entity], so it can be shown without a
+  /// connection. Null when that entity was never loaded or downloaded.
+  Future<EntityDashboardSnapshot?> loadEntitySnapshot(Entity entity) =>
+      _entityStore.read(entity);
+
+  /// Downloads the assignments of every entity of the given form templates in
+  /// one request and keeps them as those entities' offline dashboards.
+  ///
+  /// Returns the entities that have assignments of those templates (empty when
+  /// the request fails). Selecting any of them later needs no connection, and
+  /// their forms can be saved without visiting each entity first.
+  Future<List<EntityDashboardSnapshot>> syncOfflineEntityDashboards({
+    required Set<int> templateIds,
+    int limit = 50,
+  }) async {
+    if (templateIds.isEmpty) return const [];
+    final ids = (templateIds.toList()..sort()).join(',');
+    final endpoint =
+        '${AppConfig.mobileUserDashboardEndpoint}/offline-entities'
+        '?template_ids=$ids&limit=$limit';
+    final response =
+        await _errorHandler.executeWithErrorHandling<http.Response>(
+      apiCall: () => _api.get(endpoint),
+      context: 'Offline entity dashboards',
+      defaultValue: null,
+      maxRetries: 1,
+      handleAuthErrors: true,
+    );
+    if (response == null || response.statusCode != 200) {
+      DebugLogger.logWarn(
+        'DASHBOARD',
+        'Offline entity dashboards failed: status=${response?.statusCode}',
+      );
+      return const [];
+    }
+    final List<EntityDashboardSnapshot> snapshots;
+    try {
+      snapshots = parseOfflineEntityDashboards(response.body);
+    } catch (e) {
+      DebugLogger.logWarn('DASHBOARD', 'Unreadable offline dashboards: $e');
+      return const [];
+    }
+    for (final snapshot in snapshots) {
+      await _entityStore.mergeTemplates(snapshot, templateIds);
+    }
+    return snapshots;
+  }
+
+  /// Parses the `offline-entities` response (with or without the mobile envelope).
+  @visibleForTesting
+  static List<EntityDashboardSnapshot> parseOfflineEntityDashboards(
+    String body,
+  ) {
+    final json = jsonDecode(body);
+    if (json is! Map) throw const FormatException('Invalid response format');
+    var root = Map<String, dynamic>.from(json);
+    final inner = root['data'];
+    if (inner is Map && inner.containsKey('entities')) {
+      root = Map<String, dynamic>.from(inner);
+    }
+    return [
+      for (final item in (root['entities'] as List? ?? const []))
+        if (item is Map && item['entity'] is Map)
+          EntityDashboardSnapshot.fromServerJson(
+            Map<String, dynamic>.from(item),
+          ),
+    ];
   }
 
   /// Load entities from cache.
@@ -314,6 +391,12 @@ class DashboardRepository {
       DebugLogger.logWarn('DASHBOARD', 'Error loading entities from cache: $e');
     }
     return [];
+  }
+
+  /// Forgets the saved assignments but keeps the entity list, so the entity
+  /// picker still works while another entity's dashboard loads.
+  Future<void> clearAssignmentsCache() async {
+    await _storage.remove(AppConfig.cachedDashboardKey);
   }
 
   /// Clear dashboard cache.

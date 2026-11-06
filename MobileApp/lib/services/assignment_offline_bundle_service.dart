@@ -161,12 +161,17 @@ Future<R> _inBackground<A, R>(
 }
 
 String _renderPage(
-  ({String html, Map<String, String> assets, String message}) input,
+  ({String html, Map<String, String> assets, String message, int assignmentId})
+  input,
 ) {
   var html = OfflineAssetScanner.rewriteHtmlAssetRefs(input.html, input.assets);
   html = OfflineAssetScanner.demoteHtmlRootStaticPaths(html);
   html = OfflineAssetScanner.stripStaticUrlCacheQuery(html);
-  return OfflineAssetScanner.injectOfflineHead(html, input.message);
+  return OfflineAssetScanner.injectOfflineHead(
+    html,
+    input.message,
+    assignmentId: input.assignmentId,
+  );
 }
 
 class _FetchedPage {
@@ -214,6 +219,7 @@ class AssignmentOfflineBundleService {
   static const int _maxAssetBytes = 12 * 1024 * 1024;
   static const int _maxApiEntryBytes = 4 * 1024 * 1024;
   static const int _maxApiCacheBytes = 20 * 1024 * 1024;
+  static const int _maxPageApiCacheBytes = 8 * 1024 * 1024;
   static const Duration _recordingTimeout = Duration(seconds: 60);
 
   AssignmentOfflineBundleService._internal()
@@ -290,7 +296,10 @@ class AssignmentOfflineBundleService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool(_autoDownloadPrefKey) ?? false;
     } catch (e) {
-      DebugLogger.logWarn('OFFLINE_BUNDLE', 'Could not read auto-download setting: $e');
+      DebugLogger.logWarn(
+        'OFFLINE_BUNDLE',
+        'Could not read auto-download setting: $e',
+      );
       return false;
     }
   }
@@ -355,7 +364,7 @@ class AssignmentOfflineBundleService {
   Future<int> pruneBundles({
     Set<int> closedAssignmentIds = const {},
     Duration maxAge = const Duration(days: 90),
-    int maxPages = 80,
+    int maxPages = 200,
     DateTime? now,
   }) async {
     final index = await _store.readIndex();
@@ -381,8 +390,9 @@ class AssignmentOfflineBundleService {
 
   Map<String, dynamic> _mergeApiEntries(
     Map<String, dynamic> existing,
-    List<Map<String, dynamic>> incoming,
-  ) {
+    List<Map<String, dynamic>> incoming, {
+    int maxBytes = _maxApiCacheBytes,
+  }) {
     final out = Map<String, dynamic>.from(existing);
     final now = DateTime.now().toUtc().toIso8601String();
     for (final e in incoming) {
@@ -401,7 +411,7 @@ class AssignmentOfflineBundleService {
       0,
       (sum, v) => sum + ((v as Map)['b'] as String).length,
     );
-    if (total > _maxApiCacheBytes) {
+    if (total > maxBytes) {
       final byAge = out.entries.toList()
         ..sort(
           (a, b) => ((a.value as Map)['at'] as String).compareTo(
@@ -409,7 +419,7 @@ class AssignmentOfflineBundleService {
           ),
         );
       for (final entry in byAge) {
-        if (total <= _maxApiCacheBytes) break;
+        if (total <= maxBytes) break;
         total -= ((entry.value as Map)['b'] as String).length;
         out.remove(entry.key);
       }
@@ -436,10 +446,62 @@ class AssignmentOfflineBundleService {
       ) ??
       <String, dynamic>{};
 
+  Future<void> _writePageApiCache(
+    Directory dir,
+    int assignmentId,
+    Map<String, dynamic> entries,
+  ) async {
+    final json = jsonEncode(entries);
+    await File(
+      p.join(dir.path, OfflineFormStore.pageApiJsonName(assignmentId)),
+    ).writeAsString(json);
+    await File(
+      p.join(dir.path, OfflineFormStore.pageApiScriptName(assignmentId)),
+    ).writeAsString(
+      'window.__IFRC_OFFLINE_API__='
+      'Object.assign(window.__IFRC_OFFLINE_API__||{},$json);',
+    );
+  }
+
+  Future<Map<String, dynamic>> _readPageApiCache(
+    Directory dir,
+    int assignmentId,
+  ) async =>
+      await _store.readJson(
+        File(p.join(dir.path, OfflineFormStore.pageApiJsonName(assignmentId))),
+      ) ??
+      <String, dynamic>{};
+
+  /// Combines an assignment's saved entity-specific responses with new ones.
+  ///
+  /// Responses the template already shares (same request, same body) are not
+  /// stored again, so the data every entity has in common exists once per
+  /// template. Anything else (another country's emergencies, list conditions
+  /// resolved for this entity ...) belongs to the assignment's own file.
+  Map<String, dynamic> _layerEntityEntries(
+    Map<String, dynamic> shared,
+    Map<String, dynamic> saved,
+    List<Map<String, dynamic>> incoming,
+  ) {
+    final page = Map<String, dynamic>.from(saved);
+    final specific = <Map<String, dynamic>>[];
+    for (final e in incoming) {
+      final key = e['k']?.toString();
+      if (key == null || key.isEmpty) continue;
+      final hit = shared[key];
+      if (hit is Map && hit['b'] == e['b']?.toString()) {
+        page.remove(key);
+      } else {
+        specific.add(e);
+      }
+    }
+    return _mergeApiEntries(page, specific, maxBytes: _maxPageApiCacheBytes);
+  }
+
   /// Adds API responses seen while a saved form was open online (lookup lists,
-  /// plugin data, resolved variables ...) to its template's package, so every
-  /// assignment of the template can use them offline. Returns false when the
-  /// assignment has no saved page.
+  /// plugin data, resolved variables ...) to that assignment's own saved data.
+  /// Responses identical to the template's shared data are skipped. Returns
+  /// false when the assignment has no saved page.
   Future<bool> mergeApiCache(
     int assignmentId,
     List<Map<String, dynamic>> entries,
@@ -451,17 +513,39 @@ class AssignmentOfflineBundleService {
     final key = p.basename(dir.path);
     return _locks.run(key, () async {
       if (!await dir.exists()) return false;
-      final merged = _mergeApiEntries(await _readApiCache(dir), entries);
-      await _writeApiCache(dir, merged);
-      final meta = await _store.readPackageMeta(key);
-      if (meta != null) {
-        await _store.writePackageMeta(
-          dir,
-          meta.copyWith(apiEntryCount: merged.length),
-        );
-      }
+      final merged = _layerEntityEntries(
+        await _readApiCache(dir),
+        await _readPageApiCache(dir, assignmentId),
+        entries,
+      );
+      await _writePageApiCache(dir, assignmentId, merged);
       return true;
     });
+  }
+
+  /// Loads the form the way a user would and returns the API responses it
+  /// requested. Never fails the save: the page and files are worth saving even
+  /// when this data could not be captured.
+  Future<List<Map<String, dynamic>>> _recordApi(
+    OfflineFormRequest request,
+    String formUrl,
+  ) async {
+    final recorder = request.recordApiResponses;
+    if (recorder == null) return const [];
+    final id = request.assignmentId;
+    try {
+      final recorded = await recorder(formUrl).timeout(_recordingTimeout);
+      _trace(id, 'recorder entries=${recorded.length}');
+      return recorded;
+    } catch (e, st) {
+      if (e is DioException && CancelToken.isCancel(e)) rethrow;
+      _trace(id, 'recorder failed ${_describeError(e)}');
+      DebugLogger.logWarn(
+        'OFFLINE_BUNDLE',
+        'Could not record form API data for assignment $id: $e\n$st',
+      );
+      return const [];
+    }
   }
 
   // ---------------------------------------------------------------- saving
@@ -753,6 +837,7 @@ class AssignmentOfflineBundleService {
       html: page.html,
       assets: pageAssets,
       message: request.submitBlockedMessage,
+      assignmentId: request.assignmentId,
     ), weight: page.html.length);
     final id = request.assignmentId;
     final htmlFile = File(p.join(dir.path, OfflineFormStore.pageHtmlName(id)));
@@ -803,25 +888,17 @@ class AssignmentOfflineBundleService {
       );
       await _rewriteSaved(dir, outcome.savedPaths, assets, id);
 
-      var apiEntries = <String, dynamic>{};
       final previousCache = await _readApiCache(finalDir);
-      final recorder = request.recordApiResponses;
-      List<Map<String, dynamic>> recorded = const [];
-      if (recorder != null) {
-        try {
-          recorded = await recorder(page.resolved).timeout(_recordingTimeout);
-          _trace(id, 'recorder entries=${recorded.length}');
-        } catch (e, st) {
-          if (e is DioException && CancelToken.isCancel(e)) rethrow;
-          _trace(id, 'recorder failed ${_describeError(e)}');
-          DebugLogger.logWarn(
-            'OFFLINE_BUNDLE',
-            'Could not record form API data for assignment $id: $e\n$st',
-          );
-        }
-      }
-      apiEntries = _mergeApiEntries(previousCache, recorded);
+      final recorded = await _recordApi(request, page.resolved);
+      final apiEntries = _mergeApiEntries(previousCache, recorded);
       await _writeApiCache(dir, apiEntries);
+      // What was just recorded now lives in the shared data; keep only the
+      // assignment's older responses that the recording did not refresh.
+      final ownEntries = await _readPageApiCache(finalDir, id);
+      for (final e in recorded) {
+        ownEntries.remove(e['k']?.toString());
+      }
+      await _writePageApiCache(dir, id, ownEntries);
       await _store.writeAssets(dir, assets);
 
       await _writePage(
@@ -890,8 +967,8 @@ class AssignmentOfflineBundleService {
     await for (final f in from.list(followLinks: false)) {
       if (f is! File) continue;
       final name = p.basename(f.path);
-      final m = RegExp(r'^page_(\d+)\.(html|json)$').firstMatch(name);
-      if (m == null || int.parse(m.group(1)!) == except) continue;
+      final owner = OfflineFormStore.assignmentIdOfPageFile(name);
+      if (owner == null || owner == except) continue;
       try {
         await f.copy(p.join(to.path, name));
       } catch (_) {}
@@ -944,6 +1021,7 @@ class AssignmentOfflineBundleService {
       dir: dir,
       assets: assets,
     );
+    final recorded = await _recordApi(request, page.resolved);
     if (outcome.savedPaths.isNotEmpty) {
       await _rewriteSaved(dir, outcome.savedPaths, assets, id);
       await _store.writeAssets(dir, assets);
@@ -958,6 +1036,15 @@ class AssignmentOfflineBundleService {
     if (epoch != _epoch || !await dir.exists()) {
       throw AssignmentOfflineBundleException('Offline storage was cleared.');
     }
+    await _writePageApiCache(
+      dir,
+      id,
+      _layerEntityEntries(
+        await _readApiCache(dir),
+        await _readPageApiCache(dir, id),
+        recorded,
+      ),
+    );
     await _writePage(
       dir: dir,
       request: request,

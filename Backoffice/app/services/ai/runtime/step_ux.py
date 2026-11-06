@@ -232,11 +232,110 @@ def format_tool_args_detail(tool_name: str, tool_args: Dict[str, Any]) -> str:
     return ", ".join(parts) if parts else ""
 
 
+TOOL_NARRATION_INSTRUCTION = (
+    "PROGRESS NARRATION: Whenever you call tools, first write ONE short sentence "
+    "(at most ~25 words) in the user's language and in the first person that says what you are "
+    "about to look up and why, for example \"I'll pull Syria's yearly volunteer counts to see how "
+    "the trend has moved.\" Plain text only: no markdown, lists, tool names, parameter names or JSON. "
+    "Base it on the user's actual question. Never write this sentence together with the final answer."
+)
+
+_MAX_NARRATION_CHARS = 240
+
+
+def clean_tool_narration(text: Optional[str]) -> str:
+    """
+    Normalize a model-written "what I'm about to do" sentence for the progress panel.
+
+    Returns "" when the text is empty or looks like tool arguments / structured output
+    rather than prose, so callers fall back to the templated tool step.
+    """
+    if not isinstance(text, str):
+        return ""
+    t = " ".join(text.split())
+    if not t:
+        return ""
+    if t[0] in "{[" or "```" in t or "_progress_callback" in t:
+        return ""
+    t = t.replace("**", "").replace("`", "").lstrip("#-*> ").strip()
+    if len(t) < 8:
+        return ""
+    if len(t) > _MAX_NARRATION_CHARS:
+        cut = t[:_MAX_NARRATION_CHARS]
+        sentence_end = max(cut.rfind(". "), cut.rfind("? "), cut.rfind("! "))
+        t = cut[: sentence_end + 1] if sentence_end >= 60 else cut.rstrip() + "…"
+    return t
+
+
+def emit_tool_start_step(
+    on_step_callback: Optional[Any],
+    tool_name: str,
+    tool_args: Dict[str, Any],
+    thought: Optional[str] = None,
+    thought_open: bool = False,
+) -> bool:
+    """
+    Announce a tool call in the progress panel.
+
+    With a model-written ``thought`` the thought becomes the step headline and the concrete
+    action ("Reading … for Syria…") is listed beneath it, so the panel reads as reasoning
+    followed by what was actually done. Further tool calls from the same model turn
+    (``thought_open``) are appended under that headline. Without a thought the legacy
+    one-step-per-tool behaviour is kept.
+
+    Returns True when a thought headline is open for subsequent tool calls in this turn.
+    """
+    if not callable(on_step_callback):
+        return thought_open
+    action = step_display_message(tool_name, tool_args)
+    narration = clean_tool_narration(thought)
+    try:
+        if narration:
+            on_step_callback(narration, detail=action)
+            return True
+        if thought_open:
+            on_step_callback(None, detail=action)
+            return True
+        try:
+            detail = format_tool_args_detail(tool_name, tool_args)
+        except Exception as e:
+            logger.debug("format_tool_args_detail failed: %s", e)
+            detail = ""
+        try:
+            on_step_callback(action, detail=detail if detail else None)
+        except TypeError:
+            on_step_callback(action)
+    except Exception as e:
+        logger.debug("emit_tool_start_step failed: %s", e)
+    return False
+
+
 def plan_step_message(plan: Optional[Any], query: Optional[str] = None) -> str:
     """User-facing main line for the planning step."""
     if plan is None:
-        return _("This needs multiple steps — starting…")
+        return _("Deciding what to look up…")
     return _("I know how to answer this — fetching data…")
+
+
+_SOURCE_FAMILY_LABELS = {
+    "indicator_bank": lambda: _("Indicator Bank"),
+    "documents": lambda: _("reports and plans"),
+    "databank_values": lambda: _("reported databank values"),
+}
+
+
+def format_evidence_plan_for_step(evidence_plan: Optional[Any]) -> str:
+    """Detail line for the routing step: which sources the pre-flight plan decided to check."""
+    if evidence_plan is None:
+        return ""
+    families = [f for f in (getattr(evidence_plan, "source_families", None) or []) if f in _SOURCE_FAMILY_LABELS]
+    if not families:
+        return ""
+    labels = ", ".join(_SOURCE_FAMILY_LABELS[f]() for f in families)
+    rationale = clean_tool_narration(getattr(evidence_plan, "rationale", "") or "")
+    if rationale:
+        return _("Checking %(sources)s — %(why)s", sources=labels, why=rationale)
+    return _("Checking %(sources)s", sources=labels)
 
 
 def format_plan_for_step(plan: Optional[Any], query: Optional[str] = None) -> str:
@@ -355,6 +454,26 @@ def format_tool_result_summary(tool_name: str, tool_result: Optional[Dict[str, A
         if count <= 0:
             return _("No indicators matched these filters.")
         return _("Found %(count)d indicators · reviewing…", count=count)
+
+    if tool_name in ("get_indicator_timeseries", "get_upr_kpi_timeseries"):
+        data = payload if isinstance(payload, dict) else {}
+        series = data.get("series") if isinstance(data.get("series"), list) else []
+        years = sorted(
+            {int(p["year"]) for p in series if isinstance(p, dict) and str(p.get("year") or "").isdigit()}
+        )
+        if years:
+            if len(years) == 1:
+                return _("Found data for %(year)d · reviewing…", year=years[0])
+            return _(
+                "Found %(count)d yearly values (%(first)d–%(last)d) · reviewing…",
+                count=len(years),
+                first=years[0],
+                last=years[-1],
+            )
+        if series:
+            return _("Found %(count)d data points · reviewing…", count=len(series))
+        if data.get("count") == 0 or "series" in data:
+            return _("No data available for this selection.")
 
     if tool_name in ("get_indicator_value", "get_upr_kpi_value", "get_indicator_timeseries", "get_upr_kpi_timeseries"):
         if payload:

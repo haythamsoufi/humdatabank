@@ -9,7 +9,13 @@ reads oddly for a template create/edit action next to "Working on your form…"
 (the executor's form-builder fast-path-skip step — see AgentExecutor.execute).
 """
 
-from app.services.ai.runtime.step_ux import plan_step_message, step_display_message
+from app.services.ai.runtime.step_ux import (
+    clean_tool_narration,
+    emit_tool_start_step,
+    format_tool_result_summary,
+    plan_step_message,
+    step_display_message,
+)
 
 
 class TestStepDisplayMessageFormBuilderTools:
@@ -50,7 +56,7 @@ class TestPlanStepMessage:
         # This is the generic (non form-builder) "no fast-path plan" message — the
         # form-builder panel's own executor branch bypasses this function entirely
         # and emits "Working on your form…" directly (see AgentExecutor.execute).
-        assert plan_step_message(None) == "This needs multiple steps — starting…"
+        assert plan_step_message(None) == "Deciding what to look up…"
 
     def test_plan_present_returns_fast_path_message(self):
         class _FakePlan:
@@ -58,3 +64,68 @@ class TestPlanStepMessage:
             tool_args = {}
 
         assert plan_step_message(_FakePlan()) == "I know how to answer this — fetching data…"
+
+
+class TestCleanToolNarration:
+    def test_plain_sentence_is_kept(self):
+        text = "I'll pull Syria's yearly volunteer counts to see the trend."
+        assert clean_tool_narration(text) == text
+
+    def test_empty_and_non_string(self):
+        assert clean_tool_narration(None) == ""
+        assert clean_tool_narration("   ") == ""
+
+    def test_structured_output_is_rejected(self):
+        assert clean_tool_narration('{"query": "volunteers"}') == ""
+        assert clean_tool_narration("```json\n{}\n```") == ""
+
+    def test_markdown_is_stripped_and_whitespace_collapsed(self):
+        assert clean_tool_narration("**Checking**  the\n`Indicator Bank` now") == "Checking the Indicator Bank now"
+
+    def test_long_text_is_truncated(self):
+        out = clean_tool_narration("word " * 200)
+        assert len(out) <= 241
+        assert out.endswith("…")
+
+
+class TestEmitToolStartStep:
+    def _collector(self):
+        calls = []
+
+        def cb(message=None, detail=None):
+            calls.append((message, detail))
+
+        return calls, cb
+
+    def test_thought_becomes_headline_with_action_detail(self):
+        calls, cb = self._collector()
+        args = {"country_identifier": "Syria", "indicator_name": "Volunteers"}
+        opened = emit_tool_start_step(cb, "get_indicator_timeseries", args, thought="I'll pull the yearly volunteer counts.")
+        assert opened is True
+        assert calls == [("I'll pull the yearly volunteer counts.", "Reading Volunteers over time for Syria…")]
+
+    def test_follow_up_tool_in_same_turn_is_detail_only(self):
+        calls, cb = self._collector()
+        opened = emit_tool_start_step(cb, "get_country_information", {"country_identifier": "Syria"}, thought_open=True)
+        assert opened is True
+        assert calls == [(None, "Looking up information for Syria…")]
+
+    def test_without_thought_keeps_one_step_per_tool(self):
+        calls, cb = self._collector()
+        opened = emit_tool_start_step(cb, "get_country_information", {"country_identifier": "Syria"})
+        assert opened is False
+        assert calls[0][0] == "Looking up information for Syria…"
+
+
+class TestTimeseriesResultSummary:
+    def test_reports_year_range(self):
+        result = {
+            "success": True,
+            "result": {"series": [{"year": 2019, "value": 1}, {"year": 2021, "value": 2}, {"year": 2023, "value": 3}]},
+        }
+        summary = format_tool_result_summary("get_indicator_timeseries", result)
+        assert summary == "Found 3 yearly values (2019–2023) · reviewing…"
+
+    def test_empty_series(self):
+        result = {"success": True, "result": {"series": [], "count": 0}}
+        assert format_tool_result_summary("get_indicator_timeseries", result) == "No data available for this selection."

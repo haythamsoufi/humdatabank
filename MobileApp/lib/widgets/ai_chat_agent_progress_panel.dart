@@ -78,6 +78,8 @@ class _AiChatAgentProgressPanelState extends State<AiChatAgentProgressPanel> {
                         child: Text(
                           AiChatAgentProgressCopy.stepMessage(loc, current.message),
                           key: ValueKey<String>(current.message),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                           style: textStyle,
                         ),
                       ),

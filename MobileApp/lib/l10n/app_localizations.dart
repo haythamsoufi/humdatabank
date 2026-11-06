@@ -37,6 +37,7 @@ class AppLocalizations {
       'reset_to_default': 'Reset to Default',
       'tab_always_shown': 'Always shown',
       'minimum_tabs_warning': 'You must keep at least 2 tabs visible.',
+      'maximum_tabs_warning': 'You can show at most 5 tabs.',
       'access_denied': 'Access Denied',
       'general': 'General',
       'document_management': 'Document Management',
@@ -1341,6 +1342,7 @@ class AppLocalizations {
       'reset_to_default': 'Restablecer',
       'tab_always_shown': 'Siempre visible',
       'minimum_tabs_warning': 'Debe mantener al menos 2 pestañas visibles.',
+      'maximum_tabs_warning': 'Puede mostrar como máximo 5 pestañas.',
       'access_denied': 'Acceso Denegado',
       'general': 'General',
       'document_management': 'Gestión de Documentos',
@@ -2376,6 +2378,7 @@ class AppLocalizations {
       'reset_to_default': 'Réinitialiser',
       'tab_always_shown': 'Toujours affiché',
       'minimum_tabs_warning': 'Vous devez garder au moins 2 onglets visibles.',
+      'maximum_tabs_warning': 'Vous pouvez afficher au maximum 5 onglets.',
       'access_denied': 'Accès Refusé',
       'general': 'Général',
       'document_management': 'Gestion des Documents',
@@ -3416,6 +3419,7 @@ class AppLocalizations {
       'reset_to_default': 'إعادة تعيين',
       'tab_always_shown': 'يظهر دائماً',
       'minimum_tabs_warning': 'يجب الاحتفاظ بعلامتي تبويب مرئيتين على الأقل.',
+      'maximum_tabs_warning': 'يمكنك عرض 5 علامات تبويب كحد أقصى.',
       'access_denied': 'تم رفض الوصول',
       'general': 'عام',
       'document_management': 'إدارة المستندات',
@@ -4413,6 +4417,7 @@ class AppLocalizations {
       'reset_to_default': 'डिफ़ॉल्ट पर रीसेट',
       'tab_always_shown': 'हमेशा दिखाया गया',
       'minimum_tabs_warning': 'कम से कम 2 टैब दिखाई देने चाहिए।',
+      'maximum_tabs_warning': 'आप अधिकतम 5 टैब दिखा सकते हैं।',
       'access_denied': 'पहुंच अस्वीकृत',
       'general': 'सामान्य',
       'document_management': 'दस्तावेज़ प्रबंधन',
@@ -5439,6 +5444,7 @@ class AppLocalizations {
       'reset_to_default': 'Сбросить',
       'tab_always_shown': 'Всегда отображается',
       'minimum_tabs_warning': 'Должно быть видно не менее 2 вкладок.',
+      'maximum_tabs_warning': 'Можно показать не более 5 вкладок.',
       'access_denied': 'Доступ Запрещен',
       'general': 'Общее',
       'document_management': 'Управление Документами',
@@ -6471,6 +6477,7 @@ class AppLocalizations {
       'reset_to_default': '重置为默认',
       'tab_always_shown': '始终显示',
       'minimum_tabs_warning': '至少需要保留2个可见标签。',
+      'maximum_tabs_warning': '最多可显示 5 个标签。',
       'access_denied': '访问被拒绝',
       'general': '常规',
       'document_management': '文档管理',
@@ -7453,6 +7460,7 @@ class AppLocalizations {
   String get resetToDefault => translate('reset_to_default');
   String get tabAlwaysShown => translate('tab_always_shown');
   String get minimumTabsWarning => translate('minimum_tabs_warning');
+  String get maximumTabsWarning => translate('maximum_tabs_warning');
   String get accessDenied => translate('access_denied');
   String get general => translate('general');
   String get documentManagement => translate('document_management');

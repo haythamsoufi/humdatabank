@@ -104,6 +104,17 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
       );
       return;
     }
+    if (!tab.visible &&
+        _visibleCount >= TabCustomizationProvider.maxVisibleTabs) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text(AppLocalizations.of(context)!.maximumTabsWarning),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     setState(() => tab.visible = !tab.visible);
   }
 

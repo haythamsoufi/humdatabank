@@ -128,6 +128,8 @@ final Map<String, TabDefinition> tabDefinitionMap = {
 class TabCustomizationProvider extends ChangeNotifier {
   static String get _prefsKeyPrefix => AppConfig.tabCustomizationKeyPrefix;
   static const int minVisibleTabs = 2;
+  /// Material / HIG bottom bars stay readable at about five items.
+  static const int maxVisibleTabs = 5;
 
   final StorageService _storage = sl<StorageService>();
   final Map<String, List<String>> _customOrder = {};
@@ -155,10 +157,10 @@ class TabCustomizationProvider extends ChangeNotifier {
     required bool isFocalPoint,
     required bool chatbotEnabled,
   }) {
+    // Keep defaults within [maxVisibleTabs] so the bar is usable out of the box.
     if (isAdmin) {
       return [
         TabIds.notifications,
-        TabIds.dashboard,
         TabIds.home,
         TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
@@ -168,32 +170,26 @@ class TabCustomizationProvider extends ChangeNotifier {
     if (isAuthenticated && isFocalPoint) {
       return [
         TabIds.notifications,
-        TabIds.dashboard,
         TabIds.home,
         TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
-        TabIds.analysis,
         TabIds.settings,
       ];
     }
     if (isAuthenticated) {
       return [
         TabIds.resources,
-        TabIds.dashboard,
         TabIds.home,
         TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
-        TabIds.analysis,
         TabIds.settings,
       ];
     }
     return [
       TabIds.resources,
-      TabIds.indicators,
       TabIds.home,
-      TabIds.unifiedPlanning,
+      TabIds.indicators,
       if (chatbotEnabled) TabIds.aiChat,
-      TabIds.analysis,
       TabIds.settings,
     ];
   }
@@ -329,6 +325,19 @@ class TabCustomizationProvider extends ChangeNotifier {
       ordered.insert(0, TabIds.home);
     }
 
+    // Cap the bar so it never exceeds [maxVisibleTabs]. Prefer keeping
+    // required / role-critical tabs; drop other tabs from the end.
+    while (ordered.length > maxVisibleTabs) {
+      final dropAt = ordered.lastIndexWhere(
+        (id) =>
+            id != TabIds.home &&
+            !(tabDefinitionMap[id]?.isRequired ?? false) &&
+            !roleRequired.contains(id),
+      );
+      if (dropAt < 0) break;
+      ordered.removeAt(dropAt);
+    }
+
     return ordered
         .where((id) => tabDefinitionMap.containsKey(id))
         .map((id) => tabDefinitionMap[id]!)
@@ -383,7 +392,13 @@ class TabCustomizationProvider extends ChangeNotifier {
       }
     }
 
-    return ordered
+    final roleRequired = requiredTabIdsForRole(
+      isAdmin: isAdmin,
+      isAuthenticated: isAuthenticated,
+      isFocalPoint: isFocalPoint,
+    );
+
+    final items = ordered
         .where((id) => tabDefinitionMap.containsKey(id))
         .map((id) {
       final def = tabDefinitionMap[id]!;
@@ -395,6 +410,20 @@ class TabCustomizationProvider extends ChangeNotifier {
           : defaults.contains(id) && !hidden.contains(id);
       return (tab: def, visible: def.isRequired || visible);
     }).toList();
+
+    // Match the bar cap so the dialog never shows more than max as on.
+    var visibleCount = items.where((e) => e.visible).length;
+    if (visibleCount > maxVisibleTabs) {
+      for (var i = items.length - 1; i >= 0 && visibleCount > maxVisibleTabs; i--) {
+        final e = items[i];
+        if (!e.visible) continue;
+        if (e.tab.isRequired || roleRequired.contains(e.tab.id)) continue;
+        items[i] = (tab: e.tab, visible: false);
+        visibleCount--;
+      }
+    }
+
+    return items;
   }
 
   /// Index of [tabId] within the current visible tabs, or -1 if absent.

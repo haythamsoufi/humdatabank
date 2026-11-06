@@ -129,7 +129,7 @@ class TabCustomizationProvider extends ChangeNotifier {
   static String get _prefsKeyPrefix => AppConfig.tabCustomizationKeyPrefix;
   static const int minVisibleTabs = 2;
   /// Material / HIG bottom bars stay readable at about five items.
-  static const int maxVisibleTabs = 5;
+  static const int maxVisibleTabs = 8;
 
   final StorageService _storage = sl<StorageService>();
   final Map<String, List<String>> _customOrder = {};
@@ -157,10 +157,11 @@ class TabCustomizationProvider extends ChangeNotifier {
     required bool isFocalPoint,
     required bool chatbotEnabled,
   }) {
-    // Keep defaults within [maxVisibleTabs] so the bar is usable out of the box.
+    // Keep defaults within [maxVisibleTabs].
     if (isAdmin) {
       return [
         TabIds.notifications,
+        TabIds.dashboard,
         TabIds.home,
         TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
@@ -170,26 +171,32 @@ class TabCustomizationProvider extends ChangeNotifier {
     if (isAuthenticated && isFocalPoint) {
       return [
         TabIds.notifications,
+        TabIds.dashboard,
         TabIds.home,
         TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
+        TabIds.analysis,
         TabIds.settings,
       ];
     }
     if (isAuthenticated) {
       return [
         TabIds.resources,
+        TabIds.dashboard,
         TabIds.home,
         TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
+        TabIds.analysis,
         TabIds.settings,
       ];
     }
     return [
       TabIds.resources,
-      TabIds.home,
       TabIds.indicators,
+      TabIds.home,
+      TabIds.unifiedPlanning,
       if (chatbotEnabled) TabIds.aiChat,
+      TabIds.analysis,
       TabIds.settings,
     ];
   }

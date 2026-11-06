@@ -3,13 +3,53 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
-from app.models.enums import AssignmentEntityStatusValue, EntityType
+from app.models.enums import AssignmentEntityStatusValue, AssignmentScope, EntityType
 from app.models.projects import Project
 from app.utils.datetime_helpers import utcnow
+
+# Separator in period_name for project_cycle assignments: "<reference> · Y1Q2"
+CYCLE_PERIOD_SEP = " · "
+
+
+def cycle_period_name(reference: str, slot: str) -> str:
+    """Unique AssignedForm.period_name for one project report cycle."""
+    ref = (reference or "").strip()
+    label = (slot or "").strip()
+    if not ref or not label:
+        raise ValueError("reference and slot are required for a project cycle period name")
+    name = f"{ref}{CYCLE_PERIOD_SEP}{label}"
+    if len(name) > 100:
+        # Keep the slot; trim the reference so the unique key still fits.
+        keep = 100 - len(CYCLE_PERIOD_SEP) - len(label)
+        name = f"{ref[:keep]}{CYCLE_PERIOD_SEP}{label}"
+    return name
+
+
+def parse_cycle_slot(period_name: str) -> Optional[str]:
+    """Return the slot label (Y1Q2 / Final) from a cycle or legacy shared period_name."""
+    import re
+
+    raw = (period_name or "").strip()
+    if not raw:
+        return None
+    if CYCLE_PERIOD_SEP in raw:
+        return raw.rsplit(CYCLE_PERIOD_SEP, 1)[-1].strip() or None
+    # Shared-slot legacy (bare Y1Q2 / Final) or "ref - Y1Q2" / "ref Y1Q2"
+    if raw == "Final" or re.match(r"^Y\d+Q\d+$", raw):
+        return raw
+    if " - " in raw:
+        tail = raw.rsplit(" - ", 1)[-1].strip()
+        if tail == "Final" or re.match(r"^Y\d+Q\d+$", tail):
+            return tail
+    if " " in raw:
+        tail = raw.rsplit(" ", 1)[-1].strip()
+        if tail == "Final" or re.match(r"^Y\d+Q\d+$", tail):
+            return tail
+    return None
 
 
 def upsert_project(
@@ -40,9 +80,12 @@ def upsert_project(
     if not ref:
         raise ValueError("project reference is required")
     proj = Project.query.filter_by(reference=ref).first()
+    previous_open = None
     if proj is None:
         proj = Project(reference=ref, country_id=int(country_id))
         db.session.add(proj)
+    else:
+        previous_open = proj.is_open
 
     def _date(v):
         if v is None or v == "":
@@ -104,7 +147,26 @@ def upsert_project(
         proj.plan_data = plan_data
     proj.updated_at = utcnow()
     db.session.flush()
+
+    if previous_open is not None and previous_open != proj.is_open:
+        sync_project_cycle_closure(proj)
     return proj
+
+
+def sync_cycle_names_for_project(project: Project) -> int:
+    """Rewrite period_name / custom_name on cycle assignments after a reference change."""
+    touched = 0
+    for af in list_project_cycle_assignments(project):
+        slot = parse_cycle_slot(af.period_name)
+        if not slot:
+            continue
+        new_period = cycle_period_name(project.reference, slot)
+        new_custom = f"{project.reference}{CYCLE_PERIOD_SEP}{slot}"
+        if af.period_name != new_period or af.custom_name != new_custom:
+            af.period_name = new_period
+            af.custom_name = new_custom
+            touched += 1
+    return touched
 
 
 def ensure_project_on_assignment(
@@ -133,6 +195,103 @@ def ensure_project_on_assignment(
     elif due_date is not None:
         aes.due_date = due_date
     return aes
+
+
+def ensure_project_cycle_assignment(
+    project: Project,
+    template_id: int,
+    slot: str,
+    *,
+    period_start=None,
+    period_end=None,
+    due_date=None,
+    is_active: Optional[bool] = None,
+) -> Tuple[AssignedForm, AssignmentEntityStatus]:
+    """Get-or-create a per-project report assignment and its single AES.
+
+    ``slot`` is the relative period label (``Y1Q2``, ``Final``, …).
+    """
+    period = cycle_period_name(project.reference, slot)
+    af = AssignedForm.query.filter_by(
+        template_id=int(template_id),
+        period_name=period,
+    ).first()
+    if af is None:
+        # Also match by project_id + slot in case the reference was renamed mid-flight
+        candidates = AssignedForm.query.filter_by(
+            project_id=project.id,
+            scope=AssignmentScope.project_cycle.value,
+            template_id=int(template_id),
+        ).all()
+        for cand in candidates:
+            if parse_cycle_slot(cand.period_name) == slot:
+                af = cand
+                af.period_name = period
+                break
+    created = af is None
+    if af is None:
+        af = AssignedForm(
+            template_id=int(template_id),
+            period_name=period,
+            scope=AssignmentScope.project_cycle.value,
+            project_id=project.id,
+            custom_name=f"{project.reference}{CYCLE_PERIOD_SEP}{slot}",
+            is_active=True if is_active is None else bool(is_active),
+            is_closed=not project.is_open,
+        )
+        db.session.add(af)
+        db.session.flush()
+    else:
+        af.scope = AssignmentScope.project_cycle.value
+        af.project_id = project.id
+        af.custom_name = af.custom_name or f"{project.reference}{CYCLE_PERIOD_SEP}{slot}"
+        if is_active is not None:
+            af.is_active = bool(is_active)
+        # Closing the project closes all cycles; do not reopen admin-closed cycles on import.
+        if not project.is_open:
+            af.is_closed = True
+
+    if period_start is not None:
+        af.period_start = period_start.date() if isinstance(period_start, dt.datetime) else period_start
+    if period_end is not None:
+        af.period_end = period_end.date() if isinstance(period_end, dt.datetime) else period_end
+
+    aes = ensure_project_on_assignment(af, project, due_date=due_date)
+    if created:
+        af  # noqa: B018 — clarity for callers checking identity
+    return af, aes
+
+
+def sync_project_cycle_closure(project: Project) -> int:
+    """Mirror project open/closed onto its project_cycle assignments. Returns rows touched."""
+    cycles = AssignedForm.query.filter_by(
+        project_id=project.id,
+        scope=AssignmentScope.project_cycle.value,
+    ).all()
+    want_closed = not project.is_open
+    touched = 0
+    for af in cycles:
+        if af.is_closed != want_closed:
+            af.is_closed = want_closed
+            touched += 1
+        if want_closed:
+            # Closing a project also clears per-entity reopen flags
+            for aes in AssignmentEntityStatus.query.filter_by(assigned_form_id=af.id).all():
+                aes.reopened_after_close = False
+        else:
+            af.is_active = True
+    return touched
+
+
+def list_project_cycle_assignments(project: Project) -> List[AssignedForm]:
+    return (
+        AssignedForm.query.filter_by(
+            project_id=project.id,
+            scope=AssignmentScope.project_cycle.value,
+        )
+        .order_by(AssignedForm.period_name.asc())
+        .all()
+    )
 
 
 def get_projects_for_country(country_id: int) -> List[Project]:

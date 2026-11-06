@@ -358,14 +358,20 @@ def _get_ownership_metrics() -> Dict[str, Any]:
         FormTemplate.owned_by.is_(None)
     ).count()
 
-    # Assignment data owner gaps
-    total_active_assignments = AssignedForm.query.filter(AssignedForm.operational_clause()).count()
-    assignments_without_data_owner = AssignedForm.query.filter(
-        AssignedForm.data_owner_id.is_(None)
+    # Assignment data owner gaps (campaign rounds only)
+    from app.services.assignments.access_service import campaign_only
+
+    total_active_assignments = campaign_only(
+        AssignedForm.query.filter(AssignedForm.operational_clause())
     ).count()
-    active_assignments_without_data_owner = AssignedForm.query.filter(
-        AssignedForm.operational_clause(),
-        AssignedForm.data_owner_id.is_(None),
+    assignments_without_data_owner = campaign_only(
+        AssignedForm.query.filter(AssignedForm.data_owner_id.is_(None))
+    ).count()
+    active_assignments_without_data_owner = campaign_only(
+        AssignedForm.query.filter(
+            AssignedForm.operational_clause(),
+            AssignedForm.data_owner_id.is_(None),
+        )
     ).count()
     active_assignments_no_owner_list = [
         {
@@ -373,9 +379,11 @@ def _get_ownership_metrics() -> Dict[str, Any]:
             "period_name": a.period_name,
             "template_name": a.template.name if a.template else "Unknown",
         }
-        for a in AssignedForm.query.filter(
-            AssignedForm.operational_clause(),
-            AssignedForm.data_owner_id.is_(None),
+        for a in campaign_only(
+            AssignedForm.query.filter(
+                AssignedForm.operational_clause(),
+                AssignedForm.data_owner_id.is_(None),
+            )
         ).limit(30).all()
     ]
 

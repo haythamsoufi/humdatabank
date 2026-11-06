@@ -303,8 +303,14 @@ def get_periods():
 
         periods_set = set()
 
+        from app.models.enums import AssignmentScope
+
         # Get periods from assigned forms - use database-level distinct to avoid loading all records
-        assigned_query = db.session.query(AssignedForm.period_name).distinct()
+        assigned_query = (
+            db.session.query(AssignedForm.period_name)
+            .filter(AssignedForm.scope == AssignmentScope.campaign.value)
+            .distinct()
+        )
         if template_id:
             assigned_query = assigned_query.filter(AssignedForm.template_id == template_id)
         if country_id:
@@ -319,8 +325,11 @@ def get_periods():
                 periods_set.add(period_name)
 
         # Get periods from public submissions - use database-level distinct
-        public_query = db.session.query(AssignedForm.period_name).distinct().join(
-            PublicSubmission, AssignedForm.id == PublicSubmission.assigned_form_id
+        public_query = (
+            db.session.query(AssignedForm.period_name)
+            .filter(AssignedForm.scope == AssignmentScope.campaign.value)
+            .distinct()
+            .join(PublicSubmission, AssignedForm.id == PublicSubmission.assigned_form_id)
         )
         if template_id:
             public_query = public_query.filter(AssignedForm.template_id == template_id)

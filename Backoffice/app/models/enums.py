@@ -461,6 +461,16 @@ class FormItemType(enum.Enum):
     document_field = 'document_field'
 
 
+class AssignmentScope(str, enum.Enum):
+    """How an AssignedForm is used.
+
+    ``campaign`` — classic multi-entity reporting round (FDRS, UPR, …).
+    ``project_cycle`` — one project report (hidden from Manage Assignments).
+    """
+    campaign = 'campaign'
+    project_cycle = 'project_cycle'
+
+
 class EntityType(str, enum.Enum):
     """Types of organizational entities that can be assigned users and templates."""
     country = 'country'

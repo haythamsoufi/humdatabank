@@ -213,8 +213,10 @@ def backfill_assigned_forms_missing_period(
         "skipped_already_linked": 0,
     }
 
+    from app.services.assignments.access_service import campaign_only
+
     query = (
-        AssignedForm.query.filter(AssignedForm.period_name.isnot(None))
+        campaign_only(AssignedForm.query.filter(AssignedForm.period_name.isnot(None)))
         .order_by(AssignedForm.id)
         .yield_per(batch_size)
     )
@@ -250,6 +252,8 @@ def resync_all_reporting_periods(
     batch_size: int = 500,
 ) -> dict[str, int]:
     """Re-link every assigned_form to the reporting_period catalog by period_name."""
+    from app.services.assignments.access_service import campaign_only
+
     stats = {
         "assigned_examined": 0,
         "assigned_linked": 0,
@@ -257,7 +261,7 @@ def resync_all_reporting_periods(
     }
 
     for assigned_form in (
-        AssignedForm.query.filter(AssignedForm.period_name.isnot(None))
+        campaign_only(AssignedForm.query.filter(AssignedForm.period_name.isnot(None)))
         .order_by(AssignedForm.id)
         .yield_per(batch_size)
     ):

@@ -14,7 +14,12 @@ from app.models import Country
 from app.models.projects import Project
 from app.routes.admin.shared import permission_required
 from app.services.organization.authorization_service import AuthorizationService
-from app.services.projects.service import upsert_project
+from app.services.projects.service import (
+    ensure_project_cycle_assignment,
+    sync_cycle_names_for_project,
+    sync_project_cycle_closure,
+    upsert_project,
+)
 from app.utils.api_responses import json_bad_request, json_ok
 from app.utils.datetime_helpers import utcnow
 from app.utils.request_utils import is_json_request
@@ -324,6 +329,7 @@ def project_edit(project_id):
                 flash(msg, "warning")
             else:
                 try:
+                    old_reference = project.reference
                     project.reference = form.reference.data.strip()
                     upsert_project(
                         reference=project.reference,
@@ -345,6 +351,9 @@ def project_edit(project_id):
                         manager_name=form.manager_name.data,
                         manager_email=form.manager_email.data,
                     )
+                    if old_reference != project.reference:
+                        sync_cycle_names_for_project(project)
+                    sync_project_cycle_closure(project)
                     db.session.commit()
                     if _wants_json_post():
                         return json_ok(message=_("Project saved."))
@@ -416,3 +425,90 @@ def project_delete(project_id):
             return json_bad_request(_("Could not delete the project."))
         flash(_("Could not delete the project."), "danger")
     return redirect(url_for("project_management.project_list"))
+
+
+@bp.route("/<int:project_id>/cycles", methods=["POST"])
+@permission_required("admin.assignments.edit")
+def project_add_cycle(project_id):
+    """Add a report cycle (Y1Q1… / Final) for this project."""
+    project = Project.query.get_or_404(project_id)
+    payload = request.get_json(silent=True) if request.is_json else None
+    slot = ((payload or {}).get("slot") if payload else None) or request.form.get("slot") or ""
+    slot = str(slot).strip()
+    from plugins.nsd_report_forms.constants import (
+        FINAL_SLOT,
+        FINAL_TEMPLATE_KEY,
+        QUARTER_TEMPLATE_KEY,
+        parse_quarter_slot,
+    )
+    from plugins.nsd_report_forms import schedule as nsd_schedule
+    from plugins.nsd_report_forms.importer import restrictions
+
+    if slot != FINAL_SLOT and not parse_quarter_slot(slot):
+        flash(_("Choose a valid cycle (Y1Q1…Y3Q4 or Final)."), "warning")
+        return redirect(url_for("project_management.project_detail", project_id=project.id))
+    try:
+        nsd_schedule.ensure_cbf_templates_ready()
+        key = FINAL_TEMPLATE_KEY if slot == FINAL_SLOT else QUARTER_TEMPLATE_KEY
+        tpl_id = nsd_schedule._template_id(key)
+        if tpl_id is None:
+            flash(_("NSD report templates are not published yet."), "danger")
+            return redirect(url_for("project_management.project_detail", project_id=project.id))
+        due_raw = (request.form.get("due_date") or (payload or {}).get("due_date") or "").strip()
+        due = None
+        if due_raw:
+            from datetime import date, datetime
+            try:
+                due = datetime.combine(date.fromisoformat(due_raw[:10]), datetime.min.time())
+            except ValueError:
+                due = None
+        af, _aes = ensure_project_cycle_assignment(project, tpl_id, slot, due_date=due)
+        restrictions.sync_nsd_audience_on_assignment(
+            af.id, allow_focal=(slot == FINAL_SLOT), allow_pm=True
+        )
+        db.session.commit()
+        flash(_("Added report cycle %(slot)s.", slot=slot), "success")
+    except Exception as e:
+        request_transaction_rollback()
+        current_app.logger.error("Add project cycle failed: %s", e, exc_info=True)
+        flash(_("Could not add the report cycle."), "danger")
+    return redirect(url_for("project_management.project_detail", project_id=project.id))
+
+
+@bp.route("/<int:project_id>/cycles/<int:assignment_id>/close", methods=["POST"])
+@permission_required("admin.assignments.edit")
+def project_cycle_close(project_id, assignment_id):
+    project = Project.query.get_or_404(project_id)
+    from app.models import AssignedForm
+    from app.models.enums import AssignmentScope
+
+    af = AssignedForm.query.filter_by(
+        id=assignment_id,
+        project_id=project.id,
+        scope=AssignmentScope.project_cycle.value,
+    ).first_or_404()
+    af.is_closed = True
+    db.session.commit()
+    flash(_("Closed cycle %(name)s.", name=af.custom_name or af.period_name), "success")
+    return redirect(url_for("project_management.project_detail", project_id=project.id))
+
+
+@bp.route("/<int:project_id>/cycles/<int:assignment_id>/reopen", methods=["POST"])
+@permission_required("admin.assignments.edit")
+def project_cycle_reopen(project_id, assignment_id):
+    project = Project.query.get_or_404(project_id)
+    from app.models import AssignedForm, AssignmentEntityStatus
+    from app.models.enums import AssignmentScope
+
+    af = AssignedForm.query.filter_by(
+        id=assignment_id,
+        project_id=project.id,
+        scope=AssignmentScope.project_cycle.value,
+    ).first_or_404()
+    af.is_closed = False
+    af.is_active = True
+    for aes in AssignmentEntityStatus.query.filter_by(assigned_form_id=af.id).all():
+        aes.reopened_after_close = True
+    db.session.commit()
+    flash(_("Reopened cycle %(name)s.", name=af.custom_name or af.period_name), "success")
+    return redirect(url_for("project_management.project_detail", project_id=project.id))

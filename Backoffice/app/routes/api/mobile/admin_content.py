@@ -132,10 +132,12 @@ def list_assignments():
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
 
-    from app.services.assignments.access_service import apply_assignment_access
+    from app.services.assignments.access_service import apply_assignment_access, campaign_only
 
-    paginated = apply_assignment_access(
-        AssignedForm.query, current_user, AssignedForm.id
+    paginated = campaign_only(
+        apply_assignment_access(
+            AssignedForm.query, current_user, AssignedForm.id
+        )
     ).options(
         db.joinedload(AssignedForm.template),
     ).order_by(AssignedForm.period_name.desc()).paginate(page=page, per_page=per_page, error_out=False)

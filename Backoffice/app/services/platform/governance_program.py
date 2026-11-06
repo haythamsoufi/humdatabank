@@ -653,11 +653,15 @@ def _reporting_gaps():
 
 def _public_links_without_expiry():
     try:
+        from app.services.assignments.access_service import campaign_only
+
         rows = (
-            AssignedForm.query.filter(
-                AssignedForm.is_public_active.is_(True),
-                AssignedForm.unique_token.isnot(None),
-                AssignedForm.expiry_date.is_(None),
+            campaign_only(
+                AssignedForm.query.filter(
+                    AssignedForm.is_public_active.is_(True),
+                    AssignedForm.unique_token.isnot(None),
+                    AssignedForm.expiry_date.is_(None),
+                )
             )
             .order_by(AssignedForm.id.asc())
             .limit(EVIDENCE_LIMIT)
@@ -672,10 +676,12 @@ def _public_links_without_expiry():
                 "href": _href("assignment_management.edit_assignment", assignment_id=row.id),
             })
         # Count may exceed the sample. A second query keeps the issue total honest.
-        count = AssignedForm.query.filter(
-            AssignedForm.is_public_active.is_(True),
-            AssignedForm.unique_token.isnot(None),
-            AssignedForm.expiry_date.is_(None),
+        count = campaign_only(
+            AssignedForm.query.filter(
+                AssignedForm.is_public_active.is_(True),
+                AssignedForm.unique_token.isnot(None),
+                AssignedForm.expiry_date.is_(None),
+            )
         ).count()
         return samples, count, False
     except Exception as exc:

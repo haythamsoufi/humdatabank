@@ -70,6 +70,7 @@ from app.models.assignments import (
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.assignments.access_service import (
     apply_assignment_access,
+    campaign_only,
     set_assignment_allowed_roles,
     user_can_access_assigned_form,
 )
@@ -300,7 +301,9 @@ def _copy_source_assignment_label(assignment):
 def _copy_source_assignment_groups():
     """Assignments whose template can still be selected on the create form."""
     rows = (
-        apply_assignment_access(AssignedForm.query, current_user, AssignedForm.id)
+        campaign_only(
+            apply_assignment_access(AssignedForm.query, current_user, AssignedForm.id)
+        )
         .options(joinedload(AssignedForm.template).joinedload(FormTemplate.published_version))
         .join(FormTemplate, AssignedForm.template_id == FormTemplate.id)
         .filter(FormTemplate.published_version_id.isnot(None))
@@ -675,8 +678,10 @@ class EditAssignmentDetailsForm(FlaskForm):
 @bp.route("/assignments", methods=["GET"])
 @permission_required('admin.assignments.view')
 def manage_assignments():
-    assignments = apply_assignment_access(
-        AssignedForm.query, current_user, AssignedForm.id
+    assignments = campaign_only(
+        apply_assignment_access(
+            AssignedForm.query, current_user, AssignedForm.id
+        )
     ).options(
         db.joinedload(AssignedForm.template),
     ).order_by(AssignedForm.assigned_at.desc(), AssignedForm.id.desc()).all()
@@ -767,8 +772,10 @@ def api_search_submission_review_recipients():
 @permission_required('admin.assignments.view')
 def assignments_gantt():
     """Display assignments in a Gantt chart timeline view grouped by template."""
-    assignments = apply_assignment_access(
-        AssignedForm.query, current_user, AssignedForm.id
+    assignments = campaign_only(
+        apply_assignment_access(
+            AssignedForm.query, current_user, AssignedForm.id
+        )
     ).options(
         db.joinedload(AssignedForm.template),
     ).order_by(AssignedForm.assigned_at.asc()).all()

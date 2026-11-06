@@ -319,6 +319,16 @@ def apply_assignment_access(query, user, assigned_form_id_column):
     return query if clause is None else query.filter(clause)
 
 
+def campaign_only(query):
+    """Exclude per-project report cycles from campaign assignment lists and counts.
+
+    Project-cycle rows are managed from Admin → Projects, not Manage Assignments.
+    """
+    from app.models.enums import AssignmentScope
+
+    return query.filter(AssignedForm.scope == AssignmentScope.campaign.value)
+
+
 def set_assignment_allowed_roles(assignment: AssignedForm, role_ids: Iterable[int]) -> bool:
     """Replace the access groups an assignment is restricted to. Returns True when it changed.
 

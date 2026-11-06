@@ -130,12 +130,12 @@ class NsdReportFormsPlugin(BasePlugin):
 
     @property
     def version(self) -> str:
-        return "0.17.0"
+        return "0.18.0"
 
     @property
     def description(self) -> str:
         return (
-            "NSD funds monitoring: project registry, shared report slots (Y1Q1…Final), "
+            "NSD funds monitoring: project registry, per-project report cycles (Y1Q1…Final), "
             "MOMO-style overview and traffic lights, Outcomes/Outputs field, and master Excel import."
         )
 

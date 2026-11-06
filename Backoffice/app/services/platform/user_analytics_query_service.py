@@ -375,7 +375,9 @@ def get_admin_dashboard_stats() -> Dict[str, Any]:
 
     assignment_count = 0
     with suppress(Exception):
-        assignment_count = AssignedForm.query.count()
+        from app.services.assignments.access_service import campaign_only
+
+        assignment_count = campaign_only(AssignedForm.query).count()
 
     public_submission_count = 0
     with suppress(Exception):

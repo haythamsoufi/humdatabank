@@ -126,8 +126,29 @@
   </div>
 
   <div class="bg-white shadow-md border border-gray-200 rounded-sm">
-    <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-lg font-semibold text-gray-900">{{ _('Implementation monitoring') }}</h2>
+      {% if can_edit %}
+      <form method="post" action="{{ url_for('project_management.project_add_cycle', project_id=project.id) }}" class="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+          <label for="cycle-slot" class="block text-xs font-semibold text-gray-500 uppercase">{{ _('Add cycle') }}</label>
+          <select id="cycle-slot" name="slot" class="mt-1 border border-gray-300 rounded-sm text-sm px-2 py-1.5">
+            {% for y in range(1, 4) %}
+              {% for q in range(1, 5) %}
+              <option value="Y{{ y }}Q{{ q }}">Y{{ y }}Q{{ q }}</option>
+              {% endfor %}
+            {% endfor %}
+            <option value="Final">{{ _('Final') }}</option>
+          </select>
+        </div>
+        <div>
+          <label for="cycle-due" class="block text-xs font-semibold text-gray-500 uppercase">{{ _('Due date') }}</label>
+          <input id="cycle-due" type="date" name="due_date" class="mt-1 border border-gray-300 rounded-sm text-sm px-2 py-1.5">
+        </div>
+        <button type="submit" class="professional-action-btn professional-action-btn-blue text-sm">{{ _('Add') }}</button>
+      </form>
+      {% endif %}
     </div>
     <div class="overflow-x-auto">
       {% if p.reports %}
@@ -143,6 +164,9 @@
             <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Overall') }}</th>
             <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Spending rate') }}</th>
             <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Activities') }}</th>
+            {% if can_edit %}
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Cycle') }}</th>
+            {% endif %}
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -204,6 +228,25 @@
                 {% endif %}
               {% else %}—{% endif %}
             </td>
+            {% if can_edit %}
+            <td class="px-3 py-3 whitespace-nowrap">
+              {% if report.assignment_id %}
+                {% if report.closed %}
+                <form method="post" action="{{ url_for('project_management.project_cycle_reopen', project_id=project.id, assignment_id=report.assignment_id) }}" class="inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="text-xs font-semibold text-blue-700 hover:underline">{{ _('Reopen') }}</button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('project_management.project_cycle_close', project_id=project.id, assignment_id=report.assignment_id) }}" class="inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="text-xs font-semibold text-amber-700 hover:underline">{{ _('Close') }}</button>
+                </form>
+                {% endif %}
+              {% else %}
+                <span class="text-gray-400">—</span>
+              {% endif %}
+            </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>

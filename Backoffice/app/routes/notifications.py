@@ -1218,7 +1218,10 @@ def api_admin_assignments():
     """List assignments for attachment dropdown (admin only). Returns id and label (template name - period)."""
     try:
         from app.models import AssignedForm
-        assignments = AssignedForm.query.order_by(AssignedForm.period_name.desc(), AssignedForm.assigned_at.desc()).all()
+        from app.services.assignments.access_service import campaign_only
+        assignments = campaign_only(AssignedForm.query).order_by(
+            AssignedForm.period_name.desc(), AssignedForm.assigned_at.desc()
+        ).all()
         from app.utils.form_localization import get_localized_template_name, get_translation_key
         translation_key = get_translation_key()
         result = []
@@ -2132,8 +2135,9 @@ def api_admin_get_assignments():
     """Get list of assignments (AssignedForm) for bulk selection (admin only)"""
     try:
         from app.models.assignments import AssignedForm
+        from app.services.assignments.access_service import campaign_only
 
-        assignments = AssignedForm.query.order_by(AssignedForm.assigned_at.desc()).all()
+        assignments = campaign_only(AssignedForm.query).order_by(AssignedForm.assigned_at.desc()).all()
 
         assignments_data = []
         for assignment in assignments:

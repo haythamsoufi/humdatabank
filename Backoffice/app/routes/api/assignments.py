@@ -85,8 +85,10 @@ def get_assigned_forms():
             assignment_id = request.args.get('assigned_form_id', type=int)
         period_name = request.args.get('period_name', default='', type=str).strip()
 
-        # Build base query
-        query = AssignedForm.query
+        # Build base query (campaign rounds only — project cycles live under Projects)
+        from app.services.assignments.access_service import campaign_only
+
+        query = campaign_only(AssignedForm.query)
 
         key_scope = get_api_key_data_scope() if api_key_record is not None else None
         key_country_ids = None

@@ -310,10 +310,15 @@ def mobile_periods():
     try:
         periods_set = set()
 
+        from app.models.enums import AssignmentScope
+
         assigned_query = (
             db.session.query(AssignedForm.period_name)
             .distinct()
-            .filter(AssignedForm.template_id == template_id)
+            .filter(
+                AssignedForm.template_id == template_id,
+                AssignedForm.scope == AssignmentScope.campaign.value,
+            )
         )
         if country_id:
             from app.models.assignments import AssignmentEntityStatus
@@ -329,7 +334,10 @@ def mobile_periods():
             db.session.query(AssignedForm.period_name)
             .distinct()
             .join(PublicSubmission, AssignedForm.id == PublicSubmission.assigned_form_id)
-            .filter(AssignedForm.template_id == template_id)
+            .filter(
+                AssignedForm.template_id == template_id,
+                AssignedForm.scope == AssignmentScope.campaign.value,
+            )
         )
         if country_id:
             public_query = public_query.filter(PublicSubmission.country_id == country_id)

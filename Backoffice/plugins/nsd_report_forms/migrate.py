@@ -1,9 +1,8 @@
 """Migrate legacy NSD assignments (reference-in-period_name + country AES) to core Project.
 
 1. Upsert core ``project`` from profile assignments.
-2. Ensure shared slot AssignedForms (Y1Q1…Final).
-3. Remap each legacy report AES onto the matching shared slot with entity_type=project,
-   keeping the same AES id (and thus FormData).
+2. Remap each legacy report AES onto a per-project cycle assignment
+   (``scope=project_cycle``), keeping the same AES id (and thus FormData).
 
 Safe to re-run: skips AES already on ``project``.
 """
@@ -11,16 +10,17 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from app import db
-from app.models import AssignedForm, AssignmentEntityStatus, FormData, FormItem, FormTemplate, FormTemplateVersion
+from app.models import AssignedForm, AssignmentEntityStatus, FormTemplate, FormTemplateVersion
 from app.models.projects import Project
 
 from plugins.nsd_report_forms.constants import ENTITY_TYPE, FINAL_SLOT
 from plugins.nsd_report_forms.importer import layout
 from plugins.nsd_report_forms.overview import data as overview_data
 from plugins.nsd_report_forms import schedule as nsd_schedule
+from plugins.nsd_report_forms.migrate_slots import migrate_shared_slots_to_project_cycles
 
 log = logging.getLogger(__name__)
 
@@ -84,8 +84,11 @@ def _parse_legacy_period(period_name: str) -> Optional[Tuple[str, str]]:
 
 
 def remap_report_aes(*, dry_run: bool = False) -> Dict[str, int]:
-    """Move legacy country AES onto shared slots with entity_type=project."""
-    slots = nsd_schedule.ensure_shared_slots()
+    """Move legacy country AES onto per-project cycle assignments with entity_type=project."""
+    try:
+        nsd_schedule.ensure_cbf_templates_ready()
+    except RuntimeError:
+        pass
     projects = {p.reference: p for p in Project.query.all()}
     tpl_ids = set()
     for key in ('CBF quarter', 'CBF final report'):
@@ -114,12 +117,6 @@ def remap_report_aes(*, dry_run: bool = False) -> Dict[str, int]:
         af = aes.assigned_form
         parsed = _parse_legacy_period(af.period_name if af else '')
         if not parsed:
-            # Might already be a shared slot with country entity — remap by period_name alone
-            period = (af.period_name or '').strip() if af else ''
-            if period == FINAL_SLOT or re.match(r'^Y\d+Q\d+$', period):
-                # Shared slot but wrong entity — need project id from country + ... can't disambiguate
-                stats['skipped_no_project'] += 1
-                continue
             stats['skipped_no_slot'] += 1
             continue
         ref, slot = parsed
@@ -127,27 +124,25 @@ def remap_report_aes(*, dry_run: bool = False) -> Dict[str, int]:
         if project is None:
             stats['skipped_no_project'] += 1
             continue
-        target_af = slots.get(slot)
-        if target_af is None:
-            stats['skipped_no_slot'] += 1
-            continue
-        # Conflict if another AES already owns (target_af, nsd_project, project.id)
-        conflict = AssignmentEntityStatus.query.filter_by(
-            assigned_form_id=target_af.id,
-            entity_type=ENTITY_TYPE,
-            entity_id=project.id,
-        ).first()
-        if conflict and conflict.id != aes.id:
-            stats['skipped_conflict'] += 1
-            log.warning(
-                'NSD migrate: conflict AES %s vs %s for %s on %s',
-                aes.id, conflict.id, ref, slot,
-            )
-            continue
         if dry_run:
             stats['remapped'] += 1
             continue
-        aes.assigned_form_id = target_af.id
+        target_aes = nsd_schedule.ensure_project_aes(
+            project, slot, due=aes.due_date, template_id=af.template_id
+        )
+        target_af = target_aes.assigned_form
+        if target_aes.id != aes.id:
+            from plugins.nsd_report_forms.migrate_slots import _aes_has_data
+            if _aes_has_data(target_aes.id):
+                stats['skipped_conflict'] += 1
+                log.warning(
+                    'NSD migrate: conflict AES %s vs %s for %s on %s',
+                    aes.id, target_aes.id, ref, slot,
+                )
+                continue
+            db.session.delete(target_aes)
+            db.session.flush()
+            aes.assigned_form_id = target_af.id
         aes.entity_type = ENTITY_TYPE
         aes.entity_id = project.id
         stats['remapped'] += 1
@@ -158,7 +153,7 @@ def remap_report_aes(*, dry_run: bool = False) -> Dict[str, int]:
         legacy_afs = (
             AssignedForm.query
             .filter(AssignedForm.template_id.in_(tpl_ids))
-            .filter(~AssignedForm.period_name.in_(list(slots.keys())))
+            .filter(AssignedForm.scope != 'project_cycle')
             .all()
         )
         for af in legacy_afs:
@@ -170,14 +165,25 @@ def remap_report_aes(*, dry_run: bool = False) -> Dict[str, int]:
 
 
 def run_migration(*, dry_run: bool = False) -> dict:
-    """Full dual-read cutover helper.
+    """Full cutover helper: profiles → projects, legacy AES → project cycles, shared slots → cycles.
 
-    ``dry_run`` still builds projects in the session for remap analysis, then rolls back.
+    ``dry_run`` still builds projects in the session for remap analysis, then rolls back slot writes.
     """
     project_stats = backfill_projects_from_profiles()
     if dry_run:
-        # backfill commits; for dry-run remap we only simulate AES changes
         remap_stats = remap_report_aes(dry_run=True)
-        return {'projects': project_stats, 'remap': remap_stats, 'dry_run': True}
+        slot_stats = migrate_shared_slots_to_project_cycles(dry_run=True)
+        return {
+            'projects': project_stats,
+            'remap': remap_stats,
+            'slots': slot_stats,
+            'dry_run': True,
+        }
     remap_stats = remap_report_aes(dry_run=False)
-    return {'projects': project_stats, 'remap': remap_stats, 'dry_run': False}
+    slot_stats = migrate_shared_slots_to_project_cycles(dry_run=False)
+    return {
+        'projects': project_stats,
+        'remap': remap_stats,
+        'slots': slot_stats,
+        'dry_run': False,
+    }

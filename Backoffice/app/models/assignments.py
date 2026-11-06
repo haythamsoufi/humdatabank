@@ -130,6 +130,11 @@ class AssignedForm(db.Model):
     period_end = Column(Date, nullable=True)
     assigned_at = Column(DateTime, default=utcnow)
 
+    # campaign (default) = multi-entity round; project_cycle = one project report
+    scope = Column(String(20), nullable=False, default='campaign', server_default='campaign')
+    # Owning project when scope=project_cycle (NULL for campaign assignments)
+    project_id = Column(Integer, ForeignKey('project.id', ondelete='CASCADE'), nullable=True)
+
     # Admin pause toggle (independent of closed lifecycle state)
     is_active = Column(Boolean, default=True, nullable=False)
     # Reporting cycle ended (UI/workflow label); does not block viewing the form
@@ -192,6 +197,7 @@ class AssignedForm(db.Model):
     )
     activated_by_user = relationship('User', foreign_keys=[activated_by_user_id])
     deactivated_by_user = relationship('User', foreign_keys=[deactivated_by_user_id])
+    project = relationship('Project', foreign_keys=[project_id], backref='cycle_assignments')
     # Access Groups (RbacRole.kind == 'group') allowed to see and work on this
     # assignment. Empty means no audience limit. Permission roles stored here
     # are ignored by the access check and dropped the next time this is saved.
@@ -227,7 +233,13 @@ class AssignedForm(db.Model):
         db.Index('ix_assigned_form_activated_by', 'activated_by_user_id'),
         db.Index('ix_assigned_form_deactivated_by', 'deactivated_by_user_id'),
         db.Index('ix_assigned_form_custom_name', 'custom_name'),
+        db.Index('ix_assigned_form_scope', 'scope'),
+        db.Index('ix_assigned_form_project', 'project_id'),
     )
+
+    @property
+    def is_project_cycle(self) -> bool:
+        return (self.scope or 'campaign') == 'project_cycle'
 
     @property
     def is_role_restricted(self) -> bool:
@@ -519,12 +531,16 @@ class AssignmentEntityStatus(db.Model):
         return self.is_project_closed()
 
     def is_project_closed(self) -> bool:
-        """True for project assignments whose project is no longer Open/Active (Closed, Archived, ...).
+        """True when a project-entity AES is still on a live project that is closed.
 
-        Shared round slots stay open for other projects, so closure is applied per entity and
-        follows the same rules as a closed round (read-only until reopened_after_close).
+        Prefer closing the parent ``AssignedForm`` (``scope=project_cycle``) instead.
+        Kept as a safety net for any leftover shared-slot AES rows.
         """
         if self.entity_type != 'project':
+            return False
+        assigned_form = self.assigned_form
+        if assigned_form is not None and getattr(assigned_form, 'is_project_cycle', False):
+            # Per-project cycle assignments carry is_closed themselves.
             return False
         from app.models.projects import Project
         project = db.session.get(Project, self.entity_id)

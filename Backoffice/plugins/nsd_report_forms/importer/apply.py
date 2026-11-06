@@ -1,7 +1,8 @@
-"""Apply a parsed NSD master workbook onto core Project + shared CBF report slots.
+"""Apply a parsed NSD master workbook onto core Project + per-project CBF cycles.
 
-Projects are stored in core ``project``. Each report is an AES on a *shared* slot
-assignment (period ``Y1Q2`` / ``Final``) with ``entity_type=project``.
+Projects are stored in core ``project``. Each report is an AES on a *per-project*
+``AssignedForm`` (``scope=project_cycle``, period ``<ref> · Y1Q2`` / ``Final``)
+with ``entity_type=project``.
 
 analyze() reads only. run() writes, one project per transaction, so one bad project
 never blocks the others.
@@ -186,12 +187,6 @@ def analyze(book: Book) -> dict:
         existing = {
             r for (r,) in db.session.query(Project.reference).filter(Project.reference.in_(refs)).all()
         }
-        # Also count legacy profile assignments as "existing" during dual-read migration
-        profile_tpl = lk.templates.get('profile')
-        if profile_tpl:
-            names = {layout.period_name(r, layout.PROFILE_PERIOD): r for r in refs}
-            existing |= {names[n] for (n,) in db.session.query(AssignedForm.period_name).filter(
-                AssignedForm.template_id == profile_tpl['tpl'].id, AssignedForm.period_name.in_(list(names))).all()}
     unmatched_ns = sorted({p['ns_name'] for p in projects if lk.match_ns(p['ns_name'], p['country_iso3']) is None})
     emails = {p[k].strip().casefold() for p in projects for k in ('ns_focal_email', 'ifrc_pm_email') if p.get(k)}
     unknown_emails = sorted(e for e in emails if e not in lk.user_ids)
@@ -233,7 +228,6 @@ class Run:
         self.stats = defaultdict(int)
         self.roles = {}
         self.messages: List[str] = []
-        self._slots: Optional[Dict[str, AssignedForm]] = None
         self.logframes = defaultdict(list)
         for r in book.rows['Logframe']:
             self.logframes[r['reference']].append(r)
@@ -268,33 +262,30 @@ class Run:
         self.stats['values'] += 1
 
     def get_assignment(self, key: str, suffix: str, due: Optional[dt.datetime], proj: SimpleNamespace):
-        """AES on a shared slot assignment (period = Y1Q2 / Final), entity = the NSD project.
+        """AES on a per-project cycle assignment (period = ``<ref> · Y1Q2`` / Final).
 
         Profile key is no longer written as an assignment; project identity lives in core ``project``.
         """
         if key == 'profile':
             raise TemplateProblem('NSD project profiles are stored in the core project registry, not as assignments')
         slot = FINAL_SLOT if key == 'CBF final report' or suffix == layout.FINAL_PERIOD else suffix
-        if self._slots is None:
-            self._slots = nsd_schedule.ensure_shared_slots()
-        af = self._slots.get(slot)
-        if af is None:
-            existed_af = AssignedForm.query.filter_by(
-                template_id=self.lk.templates[key]['tpl'].id, period_name=slot
+        tpl_id = self.lk.templates[key]['tpl'].id
+        from app.services.projects.service import cycle_period_name
+
+        period = cycle_period_name(proj.project.reference, slot)
+        existed_af = AssignedForm.query.filter_by(template_id=tpl_id, period_name=period).first()
+        existed_aes = None
+        if existed_af is not None:
+            existed_aes = AssignmentEntityStatus.query.filter_by(
+                assigned_form_id=existed_af.id, entity_type=ENTITY_TYPE, entity_id=proj.project.id
             ).first()
-            af = nsd_schedule._get_or_create_slot(
-                self.lk.templates[key]['tpl'].id, slot, is_active=True
-            )
-            self._slots[slot] = af
-            if existed_af is None:
-                self.stats['assignments_created'] += 1
-        existed_aes = AssignmentEntityStatus.query.filter_by(
-            assigned_form_id=af.id, entity_type=ENTITY_TYPE, entity_id=proj.project.id
-        ).first()
-        aes = nsd_schedule.ensure_project_aes(proj.project, af, due=due, active=proj.active)
+        aes = nsd_schedule.ensure_project_aes(
+            proj.project, slot, due=due, active=proj.active, template_id=tpl_id
+        )
         if not proj.active:
-            # Closed/Archived project: follow the closed-assignment rules (read-only until reopened).
             aes.reopened_after_close = False
+        if existed_af is None:
+            self.stats['assignments_created'] += 1
         if existed_aes is None:
             self.stats['entities_created'] += 1
         return aes
@@ -561,10 +552,10 @@ def run(book: Book, user_id: int, overwrite_reports: bool, progress, cancelled) 
     r = Run(book, user_id, overwrite_reports, progress, cancelled)
     if r.lk.problems:
         return {'stats': {}, 'messages': r.lk.problems, 'failed': len(book.rows['Projects']), 'cancelled': False}
-    r.note('NSD reports use shared slots (Y1Q1…Final) with entity_type=project. '
+    r.note('NSD reports use per-project cycle assignments (scope=project_cycle) with entity_type=project. '
            'Country access for contact emails still opens those project reports.')
     try:
-        r._slots = nsd_schedule.ensure_shared_slots()
+        nsd_schedule.ensure_cbf_templates_ready()
         db.session.flush()
     except RuntimeError as exc:
         return {'stats': {}, 'messages': [str(exc)], 'failed': len(book.rows['Projects']), 'cancelled': False}

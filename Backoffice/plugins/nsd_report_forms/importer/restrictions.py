@@ -243,11 +243,11 @@ def sync_nsd_audience_on_assignment(
     allow_focal: bool,
     allow_pm: bool = True,
 ) -> None:
-    """Set NSD Access Group audience for a shared slot.
+    """Set NSD Access Group audience for a project-cycle assignment.
 
     Only the two NSD groups are managed; any other audience groups are left alone.
-    - Final slots: Focal Points + PMs
-    - Quarter slots: PMs only
+    - Final cycles: Focal Points + PMs
+    - Quarter cycles: PMs only
     """
     from app.models.assignments import assigned_form_allowed_role
     from app.utils.datetime_helpers import utcnow

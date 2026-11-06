@@ -5,7 +5,7 @@ from app.models.enums import EntityType
 # AES / EntityService type — core project entity
 ENTITY_TYPE = EntityType.project.value
 
-# Shared AssignedForm.period_name slots for CBF relative clocks
+# Relative CBF clock labels (stored as "<reference> · Y1Q2" on project_cycle assignments)
 FINAL_SLOT = "Final"
 PROFILE_SLOT = "Project"  # legacy profile period suffix
 

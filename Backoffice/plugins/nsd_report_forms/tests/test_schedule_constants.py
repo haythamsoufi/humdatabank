@@ -1,5 +1,6 @@
-"""Unit tests for NSD shared-slot helpers (no DB)."""
+"""Unit tests for NSD cycle helpers (no DB)."""
 
+from app.services.projects.service import CYCLE_PERIOD_SEP, cycle_period_name, parse_cycle_slot
 from plugins.nsd_report_forms.constants import (
     ENTITY_TYPE,
     FINAL_SLOT,
@@ -32,3 +33,18 @@ def test_slot_for_schedule_row():
     assert slot_for_schedule_row("CBF quarter", "Y1Q3") == ("CBF quarter", "Y1Q3")
     assert slot_for_schedule_row("CBF final report", "Y2Q4") == ("CBF final report", FINAL_SLOT)
     assert slot_for_schedule_row("CBF quarter", "bad") is None
+
+
+def test_cycle_period_name():
+    assert cycle_period_name("CBF-2025-014", "Y1Q2") == f"CBF-2025-014{CYCLE_PERIOD_SEP}Y1Q2"
+    assert cycle_period_name("CBF-2025-014", "Final") == f"CBF-2025-014{CYCLE_PERIOD_SEP}Final"
+
+
+def test_parse_cycle_slot():
+    assert parse_cycle_slot(f"CBF-2025-014{CYCLE_PERIOD_SEP}Y1Q2") == "Y1Q2"
+    assert parse_cycle_slot(f"CBF-2025-014{CYCLE_PERIOD_SEP}Final") == "Final"
+    assert parse_cycle_slot("Y1Q2") == "Y1Q2"
+    assert parse_cycle_slot("Final") == "Final"
+    assert parse_cycle_slot("CBF-2025-014 Y1Q2") == "Y1Q2"
+    assert parse_cycle_slot("CBF-2025-014 - Final") == "Final"
+    assert parse_cycle_slot("") is None

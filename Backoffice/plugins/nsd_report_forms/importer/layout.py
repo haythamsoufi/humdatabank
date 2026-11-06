@@ -134,5 +134,5 @@ FINAL_PERIOD = 'Final'
 
 
 def period_name(reference: str, suffix: str) -> str:
-    """Legacy period name (``<reference> Y1Q2``). New imports use shared slots only (see schedule.py)."""
+    """Legacy period name (``<reference> Y1Q2``). New imports use per-project cycles (see schedule.py)."""
     return f'{reference} {suffix}'

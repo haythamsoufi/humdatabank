@@ -1,8 +1,9 @@
 """Read-only data layer for the NSD admin project overview.
 
 Projects come from the core ``project`` table. Reports are AES rows with
-``entity_type=project`` on shared slot assignments (period ``Y1Q2`` / ``Final``).
-During migration, legacy profile assignments are still readable as a fallback.
+``entity_type=project`` on per-project cycle assignments
+(``scope=project_cycle``, period ``<ref> · Y1Q2`` / ``Final``).
+Legacy shared-slot and profile assignments remain readable during migration.
 """
 import calendar
 import datetime as dt
@@ -240,15 +241,18 @@ def _like_escape(text: str) -> str:
 
 
 def _report_rows_modern(ctx: Ctx, project_ids: Dict[str, int], with_answers: bool = True) -> Dict[str, List[dict]]:
-    """Reports keyed by reference using entity_type=project AES on shared slots."""
+    """Reports keyed by reference using entity_type=project AES on per-project cycles."""
     if not project_ids:
         return {}
+    from app.services.projects.service import parse_cycle_slot
+
     tpl_ids = {ctx.tpl[QUARTER]: QUARTER, ctx.tpl[FINAL]: FINAL}
     tpl_ids.pop(None, None)
     if not tpl_ids:
         return {}
     id_to_ref = {pid: ref for ref, pid in project_ids.items()}
     q = (db.session.query(AssignedForm.template_id, AssignedForm.period_name, AssignedForm.is_active,
+                          AssignedForm.is_closed, AssignedForm.id,
                           AssignmentEntityStatus.id, AssignmentEntityStatus.entity_id, AssignmentEntityStatus.status,
                           AssignmentEntityStatus.due_date, AssignmentEntityStatus.completion_rate,
                           AssignmentEntityStatus.submitted_at, AssignmentEntityStatus.status_timestamp)
@@ -262,14 +266,17 @@ def _report_rows_modern(ctx: Ctx, project_ids: Dict[str, int], with_answers: boo
         .filter(Project.id.in_(list(id_to_ref.keys()))).all()
     }
     reports: Dict[int, dict] = {}
-    for tpl_id, period_name, active, aes_id, project_id, status, due, comp, submitted_at, status_ts in q.all():
+    for (tpl_id, period_name, active, closed, af_id, aes_id, project_id, status, due, comp,
+         submitted_at, status_ts) in q.all():
         ref = id_to_ref.get(project_id)
         if not ref:
             continue
-        period = period_name if period_name != FINAL_SLOT else FINAL_SLOT
+        period = parse_cycle_slot(period_name) or period_name
         reports[aes_id] = {
-            'aes_id': aes_id, 'reference': ref, 'period': period, 'kind': tpl_ids[tpl_id],
-            'active': bool(active), 'status': status_value(status), 'due': due,
+            'aes_id': aes_id, 'assignment_id': af_id, 'reference': ref, 'period': period,
+            'kind': tpl_ids[tpl_id],
+            'active': bool(active), 'closed': bool(closed),
+            'status': status_value(status), 'due': due,
             'completion': float(comp) if comp is not None else None,
             'submitted_at': submitted_at or status_ts,
             'country_id': country_by_ref.get(ref), 'project_id': project_id,

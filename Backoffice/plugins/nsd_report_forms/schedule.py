@@ -1,21 +1,22 @@
-"""NSD CBF schedule: shared relative slots (Y1Q1…Final) on core Project AES rows."""
+"""NSD CBF schedule: per-project report cycles on core Project AES rows."""
 from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from app import db
-from app.models import AssignedForm, FormTemplate, FormTemplateVersion
+from app.models import FormTemplate, FormTemplateVersion
 from app.models.projects import Project
-from app.services.projects.service import ensure_project_on_assignment, upsert_project
-from app.utils.datetime_helpers import utcnow
+from app.services.projects.service import (
+    ensure_project_cycle_assignment,
+    upsert_project,
+)
 
 from plugins.nsd_report_forms.constants import (
     FINAL_SLOT,
     FINAL_TEMPLATE_KEY,
     QUARTER_TEMPLATE_KEY,
-    all_quarter_slots,
     parse_quarter_slot,
 )
 from plugins.nsd_report_forms.importer import layout
@@ -34,13 +35,11 @@ def _template_id(key: str) -> Optional[int]:
     return int(row[0]) if row else None
 
 
-def ensure_shared_slots(max_years: int = 3) -> Dict[str, AssignedForm]:
-    """Create/find shared AssignedForms for all quarter slots + Final. Keyed by period_name."""
+def ensure_cbf_templates_ready() -> Tuple[int, int]:
+    """Ensure published CBF quarter + final templates exist. Returns (quarter_id, final_id)."""
     from plugins.nsd_report_forms.ensure_templates import ensure_cbf_report_templates
 
     ensure_cbf_report_templates(commit=True)
-
-    out: Dict[str, AssignedForm] = {}
     q_tpl = _template_id(QUARTER_TEMPLATE_KEY)
     f_tpl = _template_id(FINAL_TEMPLATE_KEY)
     if q_tpl is None or f_tpl is None:
@@ -52,46 +51,7 @@ def ensure_shared_slots(max_years: int = 3) -> Dict[str, AssignedForm]:
         raise RuntimeError(
             "NSD report templates are not published: " + ", ".join(missing)
         )
-
-    for slot in all_quarter_slots(max_years):
-        out[slot] = _get_or_create_slot(q_tpl, slot, is_active=True)
-    out[FINAL_SLOT] = _get_or_create_slot(f_tpl, FINAL_SLOT, is_active=True)
-    return out
-
-
-def _get_or_create_slot(template_id: int, period_name: str, is_active: bool) -> AssignedForm:
-    af = AssignedForm.query.filter_by(template_id=template_id, period_name=period_name).first()
-    if af is None:
-        af = AssignedForm(
-            template_id=template_id,
-            period_name=period_name,
-            is_active=is_active,
-            custom_name=f"NSD CBF — {period_name}",
-        )
-        db.session.add(af)
-        db.session.flush()
-        log.info("NSD schedule: created shared slot %s (template %s)", period_name, template_id)
-    _ensure_slot_nsd_audience(af)
-    return af
-
-
-def _ensure_slot_nsd_audience(af: AssignedForm) -> None:
-    """Restrict shared NSD slots by Access Group.
-
-    - Final: NSD Focal Points + NSD PMs
-    - Quarters (Y1Q1…): NSD PMs only
-    """
-    try:
-        from plugins.nsd_report_forms.importer import restrictions
-
-        is_final = (af.period_name or "").strip() == FINAL_SLOT
-        restrictions.sync_nsd_audience_on_assignment(
-            af.id,
-            allow_focal=is_final,
-            allow_pm=True,
-        )
-    except Exception as exc:
-        log.warning("NSD schedule: could not sync Access Groups on slot %s: %s", af.period_name, exc)
+    return q_tpl, f_tpl
 
 
 def slot_for_schedule_row(report_type: str, period: str) -> Optional[Tuple[str, str]]:
@@ -105,31 +65,56 @@ def slot_for_schedule_row(report_type: str, period: str) -> Optional[Tuple[str, 
     return None
 
 
-def ensure_project_aes(project: Project, slot_af: AssignedForm, *, due=None, active=None):
-    """AES for this project on the shared slot (core helper)."""
-    aes = ensure_project_on_assignment(slot_af, project, due_date=due)
+def _sync_audience(af, slot: str) -> None:
+    """Apply NSD Access Group audience on a per-project cycle assignment."""
+    try:
+        from plugins.nsd_report_forms.importer import restrictions
+
+        is_final = (slot or "").strip() == FINAL_SLOT
+        restrictions.sync_nsd_audience_on_assignment(
+            af.id,
+            allow_focal=is_final,
+            allow_pm=True,
+        )
+    except Exception as exc:
+        log.warning(
+            "NSD schedule: could not sync Access Groups on %s: %s",
+            af.period_name,
+            exc,
+        )
+
+
+def ensure_project_aes(project: Project, slot: str, *, due=None, active=None, template_id=None):
+    """AES for this project on its own cycle assignment for ``slot`` (Y1Q2 / Final)."""
+    if template_id is None:
+        key = FINAL_TEMPLATE_KEY if slot == FINAL_SLOT else QUARTER_TEMPLATE_KEY
+        template_id = _template_id(key)
+        if template_id is None:
+            raise RuntimeError(f"NSD template missing for slot {slot}")
     want_active = project.is_open if active is None else active
-    if want_active and not slot_af.is_active:
-        slot_af.is_active = True
+    af, aes = ensure_project_cycle_assignment(
+        project,
+        int(template_id),
+        slot,
+        due_date=due,
+        is_active=want_active,
+    )
+    _sync_audience(af, slot)
     return aes
 
 
-def apply_schedule(project: Project, schedule_rows: List[dict], *, slots=None):
-    slots = slots or ensure_shared_slots()
+def apply_schedule(project: Project, schedule_rows: List[dict]):
+    """Create per-project cycle assignments for each scheduled report row."""
+    ensure_cbf_templates_ready()
     created = []
     for row in schedule_rows:
         mapped = slot_for_schedule_row(row.get("report_type") or "", row.get("period") or "")
         if not mapped:
             continue
-        _, slot_name = mapped
-        af = slots.get(slot_name)
-        if af is None:
-            key = QUARTER_TEMPLATE_KEY if slot_name != FINAL_SLOT else FINAL_TEMPLATE_KEY
-            tpl_id = _template_id(key)
-            if tpl_id is None:
-                continue
-            af = _get_or_create_slot(tpl_id, slot_name, is_active=True)
-            slots[slot_name] = af
+        key, slot_name = mapped
+        tpl_id = _template_id(key)
+        if tpl_id is None:
+            continue
         due = None
         raw_due = row.get("deadline") or ""
         if raw_due:
@@ -140,7 +125,7 @@ def apply_schedule(project: Project, schedule_rows: List[dict], *, slots=None):
                     due = dt.datetime.combine(dt.date.fromisoformat(str(raw_due)[:10]), dt.time.min)
                 except ValueError:
                     due = None
-        created.append(ensure_project_aes(project, af, due=due))
+        created.append(ensure_project_aes(project, slot_name, due=due, template_id=tpl_id))
     return created
 
 
@@ -167,3 +152,11 @@ def upsert_project_from_import(p: dict, country_id: int, logframe=None) -> Proje
         manager_email=p.get("ifrc_pm_email"),
         plan_data=logframe,
     )
+
+
+# Backwards-compatible aliases (callers that still expect shared slots)
+def ensure_shared_slots(max_years: int = 3):
+    """Deprecated: templates only. Returns empty dict — cycles are per-project now."""
+    ensure_cbf_templates_ready()
+    log.info("NSD schedule: ensure_shared_slots is a no-op; use per-project cycles")
+    return {}

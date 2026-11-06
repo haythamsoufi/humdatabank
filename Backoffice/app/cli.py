@@ -64,6 +64,17 @@ def register_commands(app):
         click.echo(f"projects: {result['projects']}")
         click.echo(f"remap: {result['remap']}")
 
+    @app.cli.command("nsd-migrate-slots")
+    @click.option("--dry-run", is_flag=True, help="Count remaps without writing them.")
+    @with_appcontext
+    def nsd_migrate_slots(dry_run):
+        """Repoint shared NSD CBF slots onto per-project cycle assignments."""
+        from plugins.nsd_report_forms.migrate_slots import run_slot_migration
+
+        result = run_slot_migration(dry_run=dry_run)
+        click.echo(f"dry_run={result['dry_run']}")
+        click.echo(f"slots: {result['slots']}")
+
     # AI regression testing
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)

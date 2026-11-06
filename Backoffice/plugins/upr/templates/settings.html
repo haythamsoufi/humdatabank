@@ -1,10 +1,15 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% block title %}UPR Plugin Settings{% endblock %}
 
+{% set active_tab = request.args.get('tab') or 'overview' %}
+{% if active_tab not in ['overview', 'secondary'] %}{% set active_tab = 'overview' %}{% endif %}
+
 {% block content %}
-<div class="container mx-auto px-4 py-6">
+<div class="container mx-auto px-4 py-6" id="upr-settings"
+     data-active-tab="{{ active_tab }}">
     {{ page_header(
         title="UPR Plugin Settings",
         icon='fas fa-chart-pie',
@@ -15,60 +20,517 @@
         ]
     ) }}
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {% include "plugins/_plugin_info_card.html" %}
+    <div class="bg-white shadow-md border border-gray-200 mt-6">
+        {% call scroll_tab_bar(inner_id='upr-settings-tabs', border_bottom=True, wrapper_class='min-w-0 w-full', aria_label='UPR settings sections') %}
+            <button type="button" role="tab" id="tab-overview"
+                    data-tab="overview"
+                    aria-controls="panel-overview"
+                    aria-selected="{{ 'true' if active_tab == 'overview' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(active_tab == 'overview') }}">
+                <i class="fas fa-sliders-h mr-1.5"></i>Overview
+            </button>
+            <button type="button" role="tab" id="tab-secondary"
+                    data-tab="secondary"
+                    aria-controls="panel-secondary"
+                    aria-selected="{{ 'true' if active_tab == 'secondary' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(active_tab == 'secondary') }}">
+                <i class="fas fa-globe mr-1.5"></i>Secondary data
+                {% set ready_count = (settings.secondary_sources or [])|selectattr('status', 'equalto', 'ready')|list|length %}
+                {% if ready_count %}
+                <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">{{ ready_count }}</span>
+                {% endif %}
+            </button>
+        {% endcall %}
 
-        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-700 mb-4">
-                <i class="fas fa-cogs text-gray-600 mr-2"></i>
-                Tools
-            </h3>
+        <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview"
+             class="settings-panel p-4 sm:p-6{% if active_tab != 'overview' %} hidden{% endif %}">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {% include "plugins/_plugin_info_card.html" %}
 
-            <div class="space-y-3">
-                <a href="{{ url_for('data_exploration.explore_data', tab='upr') }}"
-                   class="flex items-center w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg">
-                    <i class="fas fa-chart-pie mr-2"></i>
-                    Data Explorer
-                </a>
-                <a href="{{ url_for('upr.upr_tools') }}"
-                   class="flex items-center w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg">
-                    <i class="fas fa-sync-alt mr-2"></i>
-                    Data Sync &amp; Imputation
-                </a>
-                <a href="{{ url_for('upr.upr_tools') }}#excel-import"
-                   class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
-                    <i class="fas fa-file-excel mr-2"></i>
-                    Excel Import
-                </a>
-                <a href="{{ url_for('upr.upr_tools') }}#guidance"
-                   class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
-                    <i class="fas fa-book mr-2"></i>
-                    Guidance
-                </a>
+                <div class="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-cogs text-gray-500 mr-2"></i>
+                        Tools
+                    </h3>
+                    <div class="space-y-2">
+                        <a href="{{ url_for('data_exploration.explore_data', tab='upr') }}"
+                           class="flex items-center w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-chart-pie mr-2"></i>
+                            Data Explorer
+                        </a>
+                        <a href="{{ url_for('upr.upr_tools') }}"
+                           class="flex items-center w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-sync-alt mr-2"></i>
+                            Data Sync &amp; Imputation
+                        </a>
+                        <a href="{{ url_for('upr.upr_tools') }}#excel-import"
+                           class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300 text-sm">
+                            <i class="fas fa-file-excel mr-2"></i>
+                            Excel Import
+                        </a>
+                        <a href="{{ url_for('upr.upr_tools') }}#guidance"
+                           class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300 text-sm">
+                            <i class="fas fa-book mr-2"></i>
+                            Guidance
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-gray-50 p-5 rounded-lg border border-gray-200">
+                <h3 class="text-base font-semibold text-gray-800 mb-3">
+                    <i class="fas fa-fingerprint text-green-600 mr-2"></i>
+                    Template IDs
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div class="flex justify-between gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                        <span class="text-gray-600">Data source</span>
+                        <span class="font-medium text-gray-900 text-right">{{ settings.data_source }}</span>
+                    </div>
+                    <div class="flex justify-between gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                        <span class="text-gray-600">Planning template</span>
+                        <span class="font-medium text-gray-900">{{ settings.planning_template_id }}</span>
+                    </div>
+                    <div class="flex justify-between gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                        <span class="text-gray-600">Reporting template</span>
+                        <span class="font-medium text-gray-900">{{ settings.reporting_template_id }}</span>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mt-6">
-        <h3 class="text-lg font-semibold text-gray-700 mb-4">
-            <i class="fas fa-sliders-h text-green-600 mr-2"></i>
-            Template IDs
-        </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <span class="text-gray-600">Data source</span>
-                <span class="font-medium text-gray-900">{{ settings.data_source }}</span>
-            </div>
-            <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <span class="text-gray-600">Planning template</span>
-                <span class="font-medium text-gray-900">{{ settings.planning_template_id }}</span>
-            </div>
-            <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <span class="text-gray-600">Reporting template</span>
-                <span class="font-medium text-gray-900">{{ settings.reporting_template_id }}</span>
-            </div>
+        <div id="panel-secondary" role="tabpanel" aria-labelledby="tab-secondary"
+             class="settings-panel p-4 sm:p-6{% if active_tab != 'secondary' %} hidden{% endif %}">
+            {% include "plugins/upr/admin/_upr_secondary_panel.html" %}
         </div>
     </div>
 </div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  const root = document.getElementById("upr-settings");
+  if (!root) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
+
+  function setTab(name, { push } = { push: true }) {
+    const id = name === "secondary" ? "secondary" : "overview";
+    if (window.AdminUnderlineTabs && typeof window.AdminUnderlineTabs.activateStripTab === "function") {
+      window.AdminUnderlineTabs.activateStripTab("#upr-settings-tabs", id, {
+        panelSelector: "#upr-settings .settings-panel",
+        panelIdPrefix: "panel-",
+      });
+    } else {
+      document.querySelectorAll("#upr-settings-tabs [role='tab']").forEach((tab) => {
+        const active = tab.getAttribute("data-tab") === id;
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      document.querySelectorAll("#upr-settings .settings-panel").forEach((panel) => {
+        panel.classList.toggle("hidden", panel.id !== "panel-" + id);
+      });
+    }
+    if (push) {
+      try {
+        const url = new URL(window.location.href);
+        if (id === "overview") url.searchParams.delete("tab");
+        else url.searchParams.set("tab", id);
+        history.replaceState(null, "", url);
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  document.querySelectorAll("#upr-settings-tabs [role='tab']").forEach((tab) => {
+    tab.addEventListener("click", () => setTab(tab.getAttribute("data-tab")));
+  });
+
+  if (location.hash === "#secondary" || location.hash === "#upr-secondary") {
+    setTab("secondary", { push: true });
+  }
+
+  function reloadSecondary() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "secondary");
+    window.location.href = url.toString();
+  }
+
+  async function postForm(url, formData) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: csrf ? { "X-CSRFToken": csrf } : {},
+      body: formData,
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || body.error || res.statusText);
+    return body;
+  }
+
+  function setBusy(el, busy) {
+    if (!el) return;
+    el.disabled = busy;
+    el.classList.toggle("opacity-60", busy);
+    el.classList.toggle("pointer-events-none", busy);
+  }
+
+  const uploadModal = document.getElementById("upr-secondary-upload-modal");
+  const uploadForm = document.getElementById("upr-secondary-upload-form");
+  const uploadSourceId = document.getElementById("upr-upload-source-id");
+  const uploadSourceLabel = document.getElementById("upr-upload-source-label");
+  const uploadRoundField = document.getElementById("upr-upload-round-field");
+  const uploadRoundInput = document.getElementById("upr-upload-round");
+  const uploadStatus = document.getElementById("upr-upload-status");
+  const uploadFile = document.getElementById("upr-upload-file");
+  const uploadFieldsRequired = document.getElementById("upr-upload-fields-required");
+  const uploadFieldsOptional = document.getElementById("upr-upload-fields-optional");
+  const uploadFieldsNotes = document.getElementById("upr-upload-fields-notes");
+
+  const UPLOAD_FIELD_HELP = {
+    income_groups: {
+      required: "iso3, income_group",
+      optional: "Aliases accepted: income, group, value",
+      notes: "Prefer Refresh (World Bank API). Upload is for overrides. Example: Lower middle income.",
+    },
+    inform_risk: {
+      required: "iso3, plus score and/or risk_class",
+      optional: "Aliases: risk / inform_risk (score); class / inform_risk_class (label)",
+      notes: "Official DRMCK Excel also works via Refresh. Upload is for overrides.",
+    },
+    inform_severity: {
+      required: "iso3, inform_severity_category (or severity / category / value)",
+      optional: "",
+      notes: "One row per country (or highest severity is kept if duplicates). Refresh pulls the latest release.",
+    },
+    inform_climate: {
+      required: "iso3, inform_climate_change_risk (or climate / risk / value)",
+      optional: "",
+      notes: "Numeric score or category label. Refresh pulls the DRMCK Climate Change Excel.",
+    },
+    hdi: {
+      required: "iso3",
+      optional: "hdi_score (or hdi / score / value), hdi_rank (or rank), hdi_tier (or tier)",
+      notes: "Prefer Refresh (UNDP HDR CSV). Upload override: include score and/or rank and/or tier.",
+    },
+    multilateral: {
+      required: "iso3 + ns  — or —  Geographical focus + Donor name",
+      optional: "Donor type (kept when National Society), Year (P27 keeps 2026–2028), pns, national_society",
+      notes: "GO pledges Excel works: filters to National Society donors and maps country names to ISO3. Set Round (e.g. P27).",
+    },
+    eas_sprm_ops: {
+      required: "iso3 + value  — or —  Geographical focus + Amount (CHF)",
+      optional: "Aliases for value: amount, amount_chf, eas, sprm; Year window same as multilateral",
+      notes: "CHF amounts; multiple rows for the same country are summed. Set Round in this dialog (e.g. P27).",
+    },
+  };
+
+  function setUploadFieldHelp(sourceId) {
+    const help = UPLOAD_FIELD_HELP[sourceId] || {
+      required: "iso3 plus the source value column(s)",
+      optional: "",
+      notes: "First sheet / header row is used. Column names are matched case-insensitively.",
+    };
+    if (uploadFieldsRequired) {
+      uploadFieldsRequired.innerHTML = `<span class="font-medium">Required:</span> <code class="text-xs bg-white/80 px-1 py-0.5 rounded border border-indigo-100">${help.required}</code>`;
+    }
+    if (uploadFieldsOptional) {
+      uploadFieldsOptional.textContent = help.optional ? `Also accepted: ${help.optional}` : "";
+      uploadFieldsOptional.classList.toggle("hidden", !help.optional);
+    }
+    if (uploadFieldsNotes) {
+      uploadFieldsNotes.textContent = help.notes || "";
+      uploadFieldsNotes.classList.toggle("hidden", !help.notes);
+    }
+  }
+
+  function openUploadModal({ sourceId, label, needsRound }) {
+    if (!uploadModal || !uploadForm) return;
+    uploadForm.reset();
+    if (uploadSourceId) uploadSourceId.value = sourceId || "";
+    if (uploadSourceLabel) uploadSourceLabel.textContent = label || sourceId || "this source";
+    if (uploadStatus) uploadStatus.textContent = "";
+    setUploadFieldHelp(sourceId);
+    const showRound = needsRound === "1" || needsRound === true;
+    if (uploadRoundField) uploadRoundField.classList.toggle("hidden", !showRound);
+    if (uploadRoundInput) {
+      uploadRoundInput.required = showRound;
+      uploadRoundInput.value = "";
+    }
+    if (uploadFile) uploadFile.value = "";
+    uploadModal.classList.remove("hidden");
+    if (showRound && uploadRoundInput) uploadRoundInput.focus();
+    else if (uploadFile) uploadFile.focus();
+  }
+
+  function closeUploadModal() {
+    if (uploadModal) uploadModal.classList.add("hidden");
+  }
+
+  const previewModal = document.getElementById("upr-secondary-preview-modal");
+  const previewTitle = document.getElementById("upr-preview-title");
+  const previewMeta = document.getElementById("upr-preview-meta");
+  const previewStatus = document.getElementById("upr-preview-status");
+  const previewRoundWrap = document.getElementById("upr-preview-round-wrap");
+  const previewRound = document.getElementById("upr-preview-round");
+  const previewTableWrap = document.getElementById("upr-preview-table-wrap");
+  const previewThead = document.getElementById("upr-preview-thead");
+  const previewTbody = document.getElementById("upr-preview-tbody");
+  let previewSourceId = "";
+
+  function closePreviewModal() {
+    if (previewModal) previewModal.classList.add("hidden");
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderPreview(payload) {
+    if (!payload) return;
+    if (previewTitle) previewTitle.textContent = payload.label || payload.id || "Preview";
+    const bits = [];
+    if (payload.note) bits.push(payload.note);
+    if (payload.total != null) {
+      bits.push(
+        payload.truncated
+          ? `Showing ${payload.rows.length} of ${payload.total} rows`
+          : `${payload.total} row${payload.total === 1 ? "" : "s"}`
+      );
+    }
+    if (payload.updated_at) bits.push(`Updated ${payload.updated_at}`);
+    if (previewMeta) previewMeta.textContent = bits.join(" · ");
+    if (previewRoundWrap && previewRound) {
+      const rounds = payload.rounds || [];
+      const showRound = rounds.length > 0;
+      previewRoundWrap.classList.toggle("hidden", !showRound);
+      if (showRound) {
+        previewRound.innerHTML = rounds
+          .map((item) => {
+            const code = item.round || item;
+            const selected = code === payload.round ? " selected" : "";
+            const count = item.row_count != null ? ` (${item.row_count})` : "";
+            return `<option value="${escapeHtml(code)}"${selected}>${escapeHtml(code)}${escapeHtml(count)}</option>`;
+          })
+          .join("");
+      }
+    }
+    const columns = payload.columns || [];
+    const rows = payload.rows || [];
+    if (previewThead) {
+      previewThead.innerHTML =
+        "<tr>" +
+        columns
+          .map(
+            (col) =>
+              `<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap">${escapeHtml(col)}</th>`
+          )
+          .join("") +
+        "</tr>";
+    }
+    if (previewTbody) {
+      if (!rows.length) {
+        previewTbody.innerHTML = `<tr><td colspan="${Math.max(columns.length, 1)}" class="px-3 py-6 text-center text-gray-500">No rows stored for this source.</td></tr>`;
+      } else {
+        previewTbody.innerHTML = rows
+          .map((row) => {
+            return (
+              "<tr>" +
+              columns
+                .map((col) => {
+                  const value = row[col];
+                  const text = value == null || value === "" ? "—" : value;
+                  return `<td class="px-3 py-1.5 text-gray-800 whitespace-nowrap max-w-[18rem] truncate" title="${escapeHtml(text)}">${escapeHtml(text)}</td>`;
+                })
+                .join("") +
+              "</tr>"
+            );
+          })
+          .join("");
+      }
+    }
+    if (previewTableWrap) previewTableWrap.classList.remove("hidden");
+    if (previewStatus) {
+      previewStatus.textContent = rows.length ? "" : payload.note || "No rows stored for this source.";
+      previewStatus.classList.toggle("hidden", !!rows.length);
+    }
+  }
+
+  async function loadPreview(sourceId, roundCode) {
+    previewSourceId = sourceId || previewSourceId;
+    if (!previewSourceId) return;
+    if (previewStatus) {
+      previewStatus.classList.remove("hidden");
+      previewStatus.textContent = "Loading…";
+    }
+    if (previewTableWrap) previewTableWrap.classList.add("hidden");
+    const url = new URL(
+      `{{ url_for('upr.secondary_preview', source_id='__ID__') }}`.replace("__ID__", previewSourceId),
+      window.location.origin
+    );
+    if (roundCode) url.searchParams.set("round", roundCode);
+    url.searchParams.set("limit", "100");
+    const res = await fetch(url.toString(), {
+      headers: csrf ? { "X-CSRFToken": csrf } : {},
+      credentials: "same-origin",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || body.error || res.statusText);
+    renderPreview(body.preview || body);
+  }
+
+  async function openPreviewModal({ sourceId, label, needsRound, defaultRound }) {
+    if (!previewModal) return;
+    previewSourceId = sourceId || "";
+    if (previewTitle) previewTitle.textContent = label || sourceId || "Preview";
+    if (previewMeta) previewMeta.textContent = "";
+    if (previewRoundWrap) {
+      const show = needsRound === "1" || needsRound === true;
+      previewRoundWrap.classList.toggle("hidden", !show);
+    }
+    previewModal.classList.remove("hidden");
+    try {
+      await loadPreview(sourceId, defaultRound || "");
+    } catch (err) {
+      if (previewStatus) {
+        previewStatus.classList.remove("hidden");
+        previewStatus.textContent = err.message || String(err);
+      }
+    }
+  }
+
+  if (uploadModal && window.ModalUtils && typeof window.ModalUtils.makeModal === "function") {
+    window.ModalUtils.makeModal(uploadModal, { closeSelector: ".close-modal" });
+  } else if (uploadModal) {
+    uploadModal.querySelectorAll(".close-modal").forEach((btn) => {
+      btn.addEventListener("click", closeUploadModal);
+    });
+    uploadModal.addEventListener("click", (event) => {
+      if (event.target === uploadModal) closeUploadModal();
+    });
+  }
+
+  if (previewModal && window.ModalUtils && typeof window.ModalUtils.makeModal === "function") {
+    window.ModalUtils.makeModal(previewModal, { closeSelector: ".close-modal" });
+  } else if (previewModal) {
+    previewModal.querySelectorAll(".close-modal").forEach((btn) => {
+      btn.addEventListener("click", closePreviewModal);
+    });
+    previewModal.addEventListener("click", (event) => {
+      if (event.target === previewModal) closePreviewModal();
+    });
+  }
+
+  if (previewRound) {
+    previewRound.addEventListener("change", async () => {
+      try {
+        await loadPreview(previewSourceId, previewRound.value);
+      } catch (err) {
+        if (previewStatus) {
+          previewStatus.classList.remove("hidden");
+          previewStatus.textContent = err.message || String(err);
+        }
+      }
+    });
+  }
+
+  root.addEventListener("click", async (event) => {
+    const btn = event.target.closest("[data-secondary-action]");
+    if (!btn) return;
+    event.preventDefault();
+    const action = btn.getAttribute("data-secondary-action");
+    const sourceId = btn.getAttribute("data-source-id");
+
+    if (action === "open-upload") {
+      openUploadModal({
+        sourceId,
+        label: btn.getAttribute("data-source-label"),
+        needsRound: btn.getAttribute("data-needs-round"),
+      });
+      return;
+    }
+
+    if (action === "open-preview") {
+      openPreviewModal({
+        sourceId,
+        label: btn.getAttribute("data-source-label"),
+        needsRound: btn.getAttribute("data-needs-round"),
+        defaultRound: btn.getAttribute("data-default-round"),
+      });
+      return;
+    }
+
+    if (action === "toggle-rounds") {
+      const panel = document.querySelector(`[data-rounds-panel="${sourceId}"]`);
+      if (!panel) return;
+      const open = panel.classList.toggle("hidden") === false;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      const icon = btn.querySelector("[data-expand-icon]");
+      if (icon) icon.classList.toggle("rotate-90", open);
+      return;
+    }
+
+    setBusy(btn, true);
+    const statusEl = btn.closest("[data-source-card]")?.querySelector("[data-action-status]");
+    if (statusEl) statusEl.textContent = "Working…";
+    try {
+      if (action === "refresh") {
+        await postForm(`{{ url_for('upr.secondary_refresh', source_id='__ID__') }}`.replace("__ID__", sourceId), new FormData());
+      } else if (action === "delete-round") {
+        const kind = btn.getAttribute("data-kind");
+        const round = btn.getAttribute("data-round");
+        const res = await fetch(
+          `{{ url_for('upr.secondary_delete_round', kind='__K__', round_code='__R__') }}`
+            .replace("__K__", kind)
+            .replace("__R__", encodeURIComponent(round)),
+          { method: "DELETE", headers: csrf ? { "X-CSRFToken": csrf } : {}, credentials: "same-origin" }
+        );
+        if (!res.ok) throw new Error("Delete failed");
+      } else {
+        setBusy(btn, false);
+        return;
+      }
+      reloadSecondary();
+    } catch (err) {
+      if (statusEl) statusEl.textContent = "";
+      alert(err.message || String(err));
+      setBusy(btn, false);
+    }
+  });
+
+  if (uploadForm) {
+    uploadForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const sourceId = uploadSourceId?.value;
+      if (!sourceId) return;
+      const needsRound = uploadRoundField && !uploadRoundField.classList.contains("hidden");
+      const round = (uploadRoundInput?.value || "").trim();
+      if (needsRound && !round) {
+        if (uploadStatus) uploadStatus.textContent = "Round is required.";
+        uploadRoundInput?.focus();
+        return;
+      }
+      if (!uploadFile?.files?.length) {
+        if (uploadStatus) uploadStatus.textContent = "Choose a file.";
+        return;
+      }
+      const fd = new FormData(uploadForm);
+      if (needsRound) fd.set("round", round.toUpperCase());
+      else fd.delete("round");
+      fd.delete("source_id");
+      const submit = uploadForm.querySelector("button[type=submit]");
+      setBusy(submit, true);
+      if (uploadStatus) uploadStatus.textContent = "Uploading…";
+      try {
+        await postForm(`{{ url_for('upr.secondary_upload', source_id='__ID__') }}`.replace("__ID__", sourceId), fd);
+        reloadSecondary();
+      } catch (err) {
+        if (uploadStatus) uploadStatus.textContent = "";
+        alert(err.message || String(err));
+        setBusy(submit, false);
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}

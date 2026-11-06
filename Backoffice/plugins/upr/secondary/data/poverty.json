@@ -1,0 +1,650 @@
+{
+  "by_iso3": {
+    "AFG": {
+      "value": 0.471,
+      "year": 2019
+    },
+    "AGO": {
+      "value": 0.323,
+      "year": 2018
+    },
+    "ALB": {
+      "value": 0.197,
+      "year": 2022
+    },
+    "ARG": {
+      "value": 0.282,
+      "year": 2025
+    },
+    "ARM": {
+      "value": 0.217,
+      "year": 2024
+    },
+    "AUT": {
+      "value": 0.148,
+      "year": 2021
+    },
+    "AZE": {
+      "value": 0.06,
+      "year": 2012
+    },
+    "BDI": {
+      "value": 0.51,
+      "year": 2020
+    },
+    "BEL": {
+      "value": 0.123,
+      "year": 2022
+    },
+    "BEN": {
+      "value": 0.362,
+      "year": 2021
+    },
+    "BFA": {
+      "value": 0.432,
+      "year": 2021
+    },
+    "BGD": {
+      "value": 0.187,
+      "year": 2022
+    },
+    "BGR": {
+      "value": 0.212,
+      "year": 2024
+    },
+    "BIH": {
+      "value": 0.169,
+      "year": 2015
+    },
+    "BLR": {
+      "value": 0.035,
+      "year": 2024
+    },
+    "BLZ": {
+      "value": 0.52,
+      "year": 2018
+    },
+    "BOL": {
+      "value": 0.447,
+      "year": 2025
+    },
+    "BRB": {
+      "value": 0.257,
+      "year": 2016
+    },
+    "BTN": {
+      "value": 0.124,
+      "year": 2022
+    },
+    "BWA": {
+      "value": 0.161,
+      "year": 2015
+    },
+    "CAF": {
+      "value": 0.688,
+      "year": 2021
+    },
+    "CHE": {
+      "value": 0.158,
+      "year": 2021
+    },
+    "CHL": {
+      "value": 0.065,
+      "year": 2022
+    },
+    "CHN": {
+      "value": 0.0,
+      "year": 2020
+    },
+    "CIV": {
+      "value": 0.375,
+      "year": 2021
+    },
+    "CMR": {
+      "value": 0.377,
+      "year": 2021
+    },
+    "COD": {
+      "value": 0.562,
+      "year": 2020
+    },
+    "COG": {
+      "value": 0.409,
+      "year": 2011
+    },
+    "COL": {
+      "value": 0.318,
+      "year": 2024
+    },
+    "COM": {
+      "value": 0.461,
+      "year": 2024
+    },
+    "CPV": {
+      "value": 0.248,
+      "year": 2023
+    },
+    "CRI": {
+      "value": 0.171,
+      "year": 2025
+    },
+    "CYP": {
+      "value": 0.139,
+      "year": 2021
+    },
+    "CZE": {
+      "value": 0.102,
+      "year": 2021
+    },
+    "DEU": {
+      "value": 0.148,
+      "year": 2021
+    },
+    "DJI": {
+      "value": 0.211,
+      "year": 2017
+    },
+    "DNK": {
+      "value": 0.124,
+      "year": 2021
+    },
+    "DOM": {
+      "value": 0.173,
+      "year": 2025
+    },
+    "DZA": {
+      "value": 0.055,
+      "year": 2011
+    },
+    "ECU": {
+      "value": 0.214,
+      "year": 2025
+    },
+    "EGY": {
+      "value": 0.335,
+      "year": 2021
+    },
+    "ESP": {
+      "value": 0.202,
+      "year": 2022
+    },
+    "EST": {
+      "value": 0.225,
+      "year": 2022
+    },
+    "ETH": {
+      "value": 0.331,
+      "year": 2021
+    },
+    "FIN": {
+      "value": 0.122,
+      "year": 2022
+    },
+    "FJI": {
+      "value": 0.241,
+      "year": 2019
+    },
+    "FRA": {
+      "value": 0.156,
+      "year": 2021
+    },
+    "FSM": {
+      "value": 0.412,
+      "year": 2013
+    },
+    "GAB": {
+      "value": 0.334,
+      "year": 2017
+    },
+    "GBR": {
+      "value": 0.186,
+      "year": 2017
+    },
+    "GEO": {
+      "value": 0.094,
+      "year": 2024
+    },
+    "GHA": {
+      "value": 0.234,
+      "year": 2016
+    },
+    "GIN": {
+      "value": 0.437,
+      "year": 2018
+    },
+    "GMB": {
+      "value": 0.534,
+      "year": 2020
+    },
+    "GNB": {
+      "value": 0.505,
+      "year": 2021
+    },
+    "GNQ": {
+      "value": 0.507,
+      "year": 2022
+    },
+    "GRC": {
+      "value": 0.188,
+      "year": 2021
+    },
+    "GRD": {
+      "value": 0.25,
+      "year": 2018
+    },
+    "GTM": {
+      "value": 0.56,
+      "year": 2023
+    },
+    "HND": {
+      "value": 0.601,
+      "year": 2025
+    },
+    "HRV": {
+      "value": 0.203,
+      "year": 2024
+    },
+    "HTI": {
+      "value": 0.585,
+      "year": 2012
+    },
+    "HUN": {
+      "value": 0.121,
+      "year": 2021
+    },
+    "IDN": {
+      "value": 0.085,
+      "year": 2025
+    },
+    "IND": {
+      "value": 0.219,
+      "year": 2011
+    },
+    "IRL": {
+      "value": 0.14,
+      "year": 2021
+    },
+    "IRQ": {
+      "value": 0.175,
+      "year": 2023
+    },
+    "ISL": {
+      "value": 0.088,
+      "year": 2017
+    },
+    "ITA": {
+      "value": 0.201,
+      "year": 2021
+    },
+    "JAM": {
+      "value": 0.078,
+      "year": 2024
+    },
+    "JOR": {
+      "value": 0.157,
+      "year": 2018
+    },
+    "KAZ": {
+      "value": 0.05,
+      "year": 2024
+    },
+    "KEN": {
+      "value": 0.398,
+      "year": 2022
+    },
+    "KGZ": {
+      "value": 0.24,
+      "year": 2025
+    },
+    "KHM": {
+      "value": 0.177,
+      "year": 2012
+    },
+    "KIR": {
+      "value": 0.055,
+      "year": 2023
+    },
+    "LAO": {
+      "value": 0.15,
+      "year": 2024
+    },
+    "LBN": {
+      "value": 0.274,
+      "year": 2012
+    },
+    "LBR": {
+      "value": 0.509,
+      "year": 2016
+    },
+    "LCA": {
+      "value": 0.25,
+      "year": 2015
+    },
+    "LKA": {
+      "value": 0.143,
+      "year": 2019
+    },
+    "LSO": {
+      "value": 0.497,
+      "year": 2017
+    },
+    "LTU": {
+      "value": 0.209,
+      "year": 2021
+    },
+    "LUX": {
+      "value": 0.173,
+      "year": 2021
+    },
+    "LVA": {
+      "value": 0.225,
+      "year": 2022
+    },
+    "MAR": {
+      "value": 0.039,
+      "year": 2022
+    },
+    "MDA": {
+      "value": 0.336,
+      "year": 2024
+    },
+    "MDG": {
+      "value": 0.752,
+      "year": 2021
+    },
+    "MDV": {
+      "value": 0.054,
+      "year": 2019
+    },
+    "MEX": {
+      "value": 0.296,
+      "year": 2024
+    },
+    "MHL": {
+      "value": 0.072,
+      "year": 2019
+    },
+    "MKD": {
+      "value": 0.219,
+      "year": 2023
+    },
+    "MLI": {
+      "value": 0.455,
+      "year": 2021
+    },
+    "MLT": {
+      "value": 0.167,
+      "year": 2021
+    },
+    "MMR": {
+      "value": 0.248,
+      "year": 2017
+    },
+    "MNE": {
+      "value": 0.2,
+      "year": 2023
+    },
+    "MNG": {
+      "value": 0.271,
+      "year": 2022
+    },
+    "MOZ": {
+      "value": 0.65,
+      "year": 2022
+    },
+    "MRT": {
+      "value": 0.318,
+      "year": 2019
+    },
+    "MUS": {
+      "value": 0.084,
+      "year": 2023
+    },
+    "MWI": {
+      "value": 0.473,
+      "year": 2024
+    },
+    "MYS": {
+      "value": 0.051,
+      "year": 2023
+    },
+    "NAM": {
+      "value": 0.174,
+      "year": 2015
+    },
+    "NER": {
+      "value": 0.412,
+      "year": 2021
+    },
+    "NGA": {
+      "value": 0.562,
+      "year": 2022
+    },
+    "NIC": {
+      "value": 0.249,
+      "year": 2016
+    },
+    "NLD": {
+      "value": 0.145,
+      "year": 2021
+    },
+    "NOR": {
+      "value": 0.122,
+      "year": 2021
+    },
+    "NPL": {
+      "value": 0.203,
+      "year": 2022
+    },
+    "PAK": {
+      "value": 0.289,
+      "year": 2024
+    },
+    "PAN": {
+      "value": 0.217,
+      "year": 2023
+    },
+    "PER": {
+      "value": 0.257,
+      "year": 2025
+    },
+    "PHL": {
+      "value": 0.097,
+      "year": 2025
+    },
+    "PLW": {
+      "value": 0.249,
+      "year": 2006
+    },
+    "PNG": {
+      "value": 0.399,
+      "year": 2009
+    },
+    "POL": {
+      "value": 0.135,
+      "year": 2025
+    },
+    "PRT": {
+      "value": 0.164,
+      "year": 2021
+    },
+    "PRY": {
+      "value": 0.16,
+      "year": 2025
+    },
+    "PSE": {
+      "value": 0.328,
+      "year": 2023
+    },
+    "ROU": {
+      "value": 0.184,
+      "year": 2024
+    },
+    "RUS": {
+      "value": 0.072,
+      "year": 2024
+    },
+    "RWA": {
+      "value": 0.274,
+      "year": 2023
+    },
+    "SDN": {
+      "value": 0.465,
+      "year": 2009
+    },
+    "SEN": {
+      "value": 0.375,
+      "year": 2021
+    },
+    "SLB": {
+      "value": 0.127,
+      "year": 2012
+    },
+    "SLE": {
+      "value": 0.568,
+      "year": 2018
+    },
+    "SLV": {
+      "value": 0.272,
+      "year": 2023
+    },
+    "SOM": {
+      "value": 0.554,
+      "year": 2022
+    },
+    "SRB": {
+      "value": 0.197,
+      "year": 2023
+    },
+    "SSD": {
+      "value": 0.823,
+      "year": 2016
+    },
+    "STP": {
+      "value": 0.555,
+      "year": 2017
+    },
+    "SUR": {
+      "value": 0.176,
+      "year": 2022
+    },
+    "SVK": {
+      "value": 0.137,
+      "year": 2021
+    },
+    "SVN": {
+      "value": 0.127,
+      "year": 2022
+    },
+    "SWE": {
+      "value": 0.161,
+      "year": 2022
+    },
+    "SWZ": {
+      "value": 0.535,
+      "year": 2023
+    },
+    "SYC": {
+      "value": 0.253,
+      "year": 2018
+    },
+    "SYR": {
+      "value": 0.352,
+      "year": 2006
+    },
+    "TCD": {
+      "value": 0.448,
+      "year": 2022
+    },
+    "TGO": {
+      "value": 0.438,
+      "year": 2021
+    },
+    "THA": {
+      "value": 0.054,
+      "year": 2022
+    },
+    "TJK": {
+      "value": 0.198,
+      "year": 2024
+    },
+    "TLS": {
+      "value": 0.418,
+      "year": 2014
+    },
+    "TON": {
+      "value": 0.206,
+      "year": 2021
+    },
+    "TUN": {
+      "value": 0.166,
+      "year": 2021
+    },
+    "TUR": {
+      "value": 0.13,
+      "year": 2024
+    },
+    "TUV": {
+      "value": 0.263,
+      "year": 2010
+    },
+    "TZA": {
+      "value": 0.264,
+      "year": 2018
+    },
+    "UGA": {
+      "value": 0.161,
+      "year": 2023
+    },
+    "UKR": {
+      "value": 0.232,
+      "year": 2020
+    },
+    "URY": {
+      "value": 0.173,
+      "year": 2024
+    },
+    "UZB": {
+      "value": 0.058,
+      "year": 2025
+    },
+    "VEN": {
+      "value": 0.331,
+      "year": 2015
+    },
+    "VNM": {
+      "value": 0.042,
+      "year": 2022
+    },
+    "VUT": {
+      "value": 0.159,
+      "year": 2019
+    },
+    "WSM": {
+      "value": 0.219,
+      "year": 2018
+    },
+    "XKX": {
+      "value": 0.176,
+      "year": 2015
+    },
+    "YEM": {
+      "value": 0.486,
+      "year": 2014
+    },
+    "ZAF": {
+      "value": 0.379,
+      "year": 2022
+    },
+    "ZMB": {
+      "value": 0.6,
+      "year": 2022
+    },
+    "ZWE": {
+      "value": 0.383,
+      "year": 2019
+    }
+  },
+  "indicator": "SI.POV.NAHC",
+  "updated_at": "2026-11-06T16:15:38Z"
+}

@@ -1,0 +1,1156 @@
+{
+  "round": "P27",
+  "rows": [
+    {
+      "iso3": "AFG",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "AFG",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "AFG",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "AFG",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "AFG",
+      "ns": "Singapore Red Cross Society"
+    },
+    {
+      "iso3": "AFG",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "AFG",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "AFG",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "Belgium, Red Cross EU Office, Brussels"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "Danish Red Cross"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "French Red Cross"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "Luxembourg Red Cross"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "BEL",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "BGD",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "BGD",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "BGD",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "BGD",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "BIH",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Andorran Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Austrian Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Danish Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "French Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Icelandic Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Netherlands Red Cross Silent Emergency Fund"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Swedish Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "CHE",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "CHN",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "CMR",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "COL",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "COL",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "COL",
+      "ns": "The Republic of Korea National Red Cross"
+    },
+    {
+      "iso3": "DJI",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "DJI",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "DOM",
+      "ns": "Bulgarian Red Cross"
+    },
+    {
+      "iso3": "DOM",
+      "ns": "French Red Cross"
+    },
+    {
+      "iso3": "DOM",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "DOM",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "DOM",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "DOM",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "DOM",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "EGY",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "EGY",
+      "ns": "Austrian Red Cross"
+    },
+    {
+      "iso3": "EGY",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "ETH",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "FJI",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "FJI",
+      "ns": "French Red Cross"
+    },
+    {
+      "iso3": "FJI",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "FJI",
+      "ns": "New Zealand Red Cross"
+    },
+    {
+      "iso3": "GIN",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "Austrian Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "Bulgarian Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "Danish Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "New Zealand Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "HUN",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "IDN",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "IDN",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "IDN",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Danish Red Cross"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Red Cross Society of China"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Thai Red Cross Society"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "IRN",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "JOR",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "JOR",
+      "ns": "Danish Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Danish Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Swedish Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "KEN",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "KGZ",
+      "ns": "Red Crescent Society of Tajikistan"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Icelandic Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "New Zealand Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Thai Red Cross Society"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "LBN",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "LKA",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "LKA",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "LKA",
+      "ns": "Maldives Red Crescent"
+    },
+    {
+      "iso3": "LKA",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "LKA",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "LKA",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "LKA",
+      "ns": "The Republic of Korea National Red Cross"
+    },
+    {
+      "iso3": "MAR",
+      "ns": "Austrian Red Cross"
+    },
+    {
+      "iso3": "MAR",
+      "ns": "Morocco"
+    },
+    {
+      "iso3": "MAR",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "MDA",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "MDA",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "Luxembourg Red Cross"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "MDG",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "MMR",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "MMR",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "MMR",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "MMR",
+      "ns": "The Republic of Korea National Red Cross"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Swedish Red Cross"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "MOZ",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Malaysia, Asia Pacific Regional Office, Kuala Lumpur"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Swedish Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "MYS",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "NGA",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "NGA",
+      "ns": "Nigeria, Cluster delegation for Nigeria, Benin, Ghana and Togo"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Belgian Red Cross (Flanders)"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Bulgarian Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Cambodian Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Macau Red Cross, Branch of Red Cross Society of China"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Malaysian Red Crescent Society"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "New Zealand Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Singapore Red Cross Society"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Slovenian Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Thai Red Cross Society"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "The Philippine National Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "The Republic of Korea National Red Cross"
+    },
+    {
+      "iso3": "NPL",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "PAK",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "PAK",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "PAK",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "Bulgarian Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "German Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "Italian Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "Swedish Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "PAN",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "PER",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "PER",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "PER",
+      "ns": "New Zealand Red Cross"
+    },
+    {
+      "iso3": "PER",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "PER",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "PER",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "PER",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "PHL",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "PHL",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "PHL",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "PHL",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "PHL",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "PHL",
+      "ns": "The Republic of Korea National Red Cross"
+    },
+    {
+      "iso3": "PNG",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "PSE",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "RUS",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "SDN",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "SDN",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "SDN",
+      "ns": "Qatar Red Crescent"
+    },
+    {
+      "iso3": "SDN",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "SDN",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "SEN",
+      "ns": "Portuguese Red Cross"
+    },
+    {
+      "iso3": "SOM",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "SOM",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "SOM",
+      "ns": "Icelandic Red Cross"
+    },
+    {
+      "iso3": "SOM",
+      "ns": "Red Cross of Monaco"
+    },
+    {
+      "iso3": "SOM",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "SSD",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "SYR",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "SYR",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "SYR",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "SYR",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "THA",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "THA",
+      "ns": "Myanmar Red Cross Society"
+    },
+    {
+      "iso3": "TJK",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "TLS",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "Panama, Americas Regional Office, Panama"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "TTO",
+      "ns": "Turkish Red Crescent Society"
+    },
+    {
+      "iso3": "UGA",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "UGA",
+      "ns": "South Sudan, Cluster delegation for South Sudan, Tanzania and Uganda"
+    },
+    {
+      "iso3": "UGA",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "UGA",
+      "ns": "The Uganda Red Cross Society"
+    },
+    {
+      "iso3": "UKR",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "UKR",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "UKR",
+      "ns": "Vietnam Red Cross"
+    },
+    {
+      "iso3": "USA",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "USA",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "American Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Andorran Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Argentine Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Australian Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "British Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Bulgarian Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Czech Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Finnish Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "French Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Guatemalan Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Hong Kong Red Cross, Branch of the Red Cross Society of China"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "New Zealand Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Norwegian Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Paraguayan Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Portuguese Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Singapore Red Cross Society"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Slovenian Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Spanish Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Swedish Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Swiss Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Thai Red Cross Society"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "The Canadian Red Cross Society"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "The Netherlands Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "The Republic of Korea National Red Cross"
+    },
+    {
+      "iso3": "VEN",
+      "ns": "Uruguayan Red Cross"
+    },
+    {
+      "iso3": "YEM",
+      "ns": "Japanese Red Cross Society"
+    },
+    {
+      "iso3": "YEM",
+      "ns": "Saudi Red Crescent Authority"
+    },
+    {
+      "iso3": "YEM",
+      "ns": "The Netherlands Red Cross"
+    }
+  ],
+  "source_file": "Multilateral support.xlsx",
+  "stats": {
+    "kept_pairs": 283,
+    "skipped_donor_type": 5041,
+    "skipped_year": 4404,
+    "unresolved_countries": [
+      "Solomon Island",
+      "Democratic Republic of Congo",
+      "Democratic People Republic of Korea"
+    ],
+    "uploaded_rows": 9951,
+    "year_window": [
+      2026,
+      2027,
+      2028
+    ]
+  },
+  "updated_at": "2026-11-06T17:48:44Z",
+  "year": 2027
+}

@@ -1,0 +1,262 @@
+{# Secondary reference data — table + upload dialogs #}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% set sources = settings.secondary_sources or [] %}
+
+{% set HINTS = {
+  'population': 'World Bank SP.POP.TOTL (latest year)',
+  'poverty': 'World Bank SI.POV.NAHC (latest year)',
+  'income_groups': 'World Bank income groups (upload optional)',
+  'inform_risk': 'Auto-fetch latest DRMCK Excel (upload optional)',
+  'inform_severity': 'Auto-fetch latest DRMCK/HDX Excel (upload optional)',
+  'inform_climate': 'Auto-fetch DRMCK Climate Change Excel (upload optional)',
+  'hdi': 'UNDP HDR HDI (upload optional)',
+  'multilateral': 'Per round — iso3+ns, or GO pledges Excel (Geographical focus + Donor name)',
+  'eas_sprm_ops': 'Per round — iso3+value, or Geographical focus + Amount (CHF)',
+} %}
+
+{% macro status_pill(status) -%}
+  {% if status == 'ready' %}
+  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">
+    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Ready
+  </span>
+  {% else %}
+  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 ring-1 ring-gray-500/10">
+    <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>{{ status or 'empty' }}
+  </span>
+  {% endif %}
+{%- endmacro %}
+
+<div id="upr-secondary" class="space-y-4">
+    <div>
+        <h2 class="text-lg font-semibold text-gray-900">Secondary data for planning master</h2>
+        <p class="text-sm text-gray-500 mt-1 max-w-3xl">
+            Snapshots used by <code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded">/api/v1/upr/master</code>
+            (population, INFORM, HDI, multilateral, EAs SPRM/OPS). Refresh APIs or upload CSV/XLSX.
+        </p>
+    </div>
+
+    <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="w-8 px-2 py-3"></th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Source</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Type</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+                    <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Rows</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Last updated</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Edition</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 bg-white">
+                {% for src in sources %}
+                {% set src_id = src.id %}
+                {% set hint = HINTS.get(src_id, '') %}
+                {% set is_round = src.kind == 'round_file' %}
+                {% set rounds = src.rounds or [] %}
+                {% set can_refresh = src_id in ['population', 'poverty', 'income_groups', 'hdi', 'inform_risk', 'inform_severity', 'inform_climate'] %}
+                {% set can_upload = src_id not in ['population', 'poverty'] %}
+                <tr class="align-middle" data-source-card="{{ src_id }}"{% if is_round %} data-round-source="{{ src_id }}"{% endif %}>
+                    <td class="px-2 py-3 text-center">
+                        {% if is_round %}
+                        <button type="button"
+                                class="inline-flex items-center justify-center w-7 h-7 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                                data-secondary-action="toggle-rounds"
+                                data-source-id="{{ src_id }}"
+                                aria-expanded="false"
+                                aria-controls="rounds-{{ src_id }}"
+                                title="Show uploaded rounds">
+                            <i class="fas fa-chevron-right text-xs transition-transform" data-expand-icon></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="font-medium text-gray-900">{{ src.label }}</div>
+                        {% if hint %}<div class="text-xs text-gray-500 mt-0.5">{{ hint }}</div>{% endif %}
+                        {% if is_round %}
+                        <div class="text-xs text-gray-500 mt-1">
+                            {{ rounds|length }} round{% if rounds|length != 1 %}s{% endif %} uploaded
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
+                        {% if src_id in ['population', 'poverty', 'income_groups'] %}API
+                        {% elif src_id == 'hdi' %}HDR CSV
+                        {% elif src_id in ['inform_risk', 'inform_severity', 'inform_climate'] %}Excel fetch
+                        {% elif is_round %}Per round
+                        {% else %}File{% endif %}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">{{ status_pill(src.status) }}</td>
+                    <td class="px-4 py-3 text-right font-medium text-gray-900 tabular-nums">{{ src.row_count or 0 }}</td>
+                    <td class="px-4 py-3 text-gray-700 break-all max-w-[12rem]">{{ src.updated_at or "—" }}</td>
+                    <td class="px-4 py-3 text-gray-700 truncate max-w-[8rem]" title="{{ src.edition or '' }}">{{ src.edition or "—" }}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            {% if can_refresh %}
+                            <button type="button"
+                                    class="inline-flex items-center justify-center w-8 h-8 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-md"
+                                    data-secondary-action="refresh" data-source-id="{{ src_id }}"
+                                    title="Refresh" aria-label="Refresh">
+                                <i class="fas fa-sync-alt" aria-hidden="true"></i>
+                            </button>
+                            {% endif %}
+                            <button type="button"
+                                    class="inline-flex items-center justify-center w-8 h-8 text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md"
+                                    data-secondary-action="open-preview"
+                                    data-source-id="{{ src_id }}"
+                                    data-source-label="{{ src.label }}"
+                                    data-needs-round="{{ '1' if is_round else '0' }}"
+                                    data-default-round="{{ (rounds[0].round if rounds else '') }}"
+                                    title="Preview" aria-label="Preview">
+                                <i class="fas fa-table" aria-hidden="true"></i>
+                            </button>
+                            {% if can_upload %}
+                            <button type="button"
+                                    class="inline-flex items-center justify-center w-8 h-8 text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md"
+                                    data-secondary-action="open-upload"
+                                    data-source-id="{{ src_id }}"
+                                    data-source-label="{{ src.label }}"
+                                    data-needs-round="{{ '1' if is_round else '0' }}"
+                                    title="Upload" aria-label="Upload">
+                                <i class="fas fa-upload" aria-hidden="true"></i>
+                            </button>
+                            {% endif %}
+                            <span class="text-xs text-gray-400" data-action-status></span>
+                        </div>
+                    </td>
+                </tr>
+                {% if is_round %}
+                <tr id="rounds-{{ src_id }}" class="hidden bg-gray-50/80" data-rounds-panel="{{ src_id }}">
+                    <td colspan="8" class="px-4 py-3">
+                        {% if rounds %}
+                        <div class="overflow-hidden border border-gray-200 rounded-md bg-white">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Round</th>
+                                        <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Rows</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Updated</th>
+                                        <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    {% for round in rounds %}
+                                    <tr>
+                                        <td class="px-3 py-2 font-medium text-gray-900">{{ round.round }}</td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-gray-800">{{ round.row_count or 0 }}</td>
+                                        <td class="px-3 py-2 text-gray-600 break-all">{{ round.updated_at or "—" }}</td>
+                                        <td class="px-3 py-2">
+                                            <div class="flex items-center justify-end gap-1.5">
+                                                <button type="button"
+                                                        class="inline-flex items-center justify-center w-8 h-8 text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md"
+                                                        data-secondary-action="open-preview"
+                                                        data-source-id="{{ src_id }}"
+                                                        data-source-label="{{ src.label }}"
+                                                        data-needs-round="1"
+                                                        data-default-round="{{ round.round }}"
+                                                        title="Preview" aria-label="Preview">
+                                                    <i class="fas fa-table" aria-hidden="true"></i>
+                                                </button>
+                                                <button type="button"
+                                                        class="inline-flex items-center justify-center w-8 h-8 text-sm bg-white border border-gray-300 hover:bg-red-50 text-red-600 rounded-md"
+                                                        data-secondary-action="delete-round"
+                                                        data-kind="{{ src_id }}"
+                                                        data-round="{{ round.round }}"
+                                                        title="Delete" aria-label="Delete">
+                                                    <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-gray-500 px-1">No rounds uploaded yet. Use Upload to add one.</p>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% else %}
+                <tr>
+                    <td colspan="8" class="px-4 py-8 text-center text-gray-500">No secondary sources configured.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% call modal_shell('upr-secondary-upload-modal', 'Upload secondary data', aria_label='Upload secondary data', max_width='max-w-lg') %}
+        <form id="upr-secondary-upload-form" class="space-y-4" data-secondary-upload>
+            <p class="text-sm text-gray-600">
+                Upload a CSV or Excel file for
+                <span id="upr-upload-source-label" class="font-medium text-gray-900">this source</span>.
+            </p>
+            <input type="hidden" id="upr-upload-source-id" name="source_id" value="">
+
+            <div id="upr-upload-fields-help" class="rounded-md border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-sm text-gray-700 space-y-1.5">
+                <p class="font-medium text-indigo-900">Expected columns</p>
+                <p id="upr-upload-fields-required" class="text-gray-800"></p>
+                <p id="upr-upload-fields-optional" class="text-xs text-gray-600"></p>
+                <p id="upr-upload-fields-notes" class="text-xs text-gray-500"></p>
+            </div>
+
+            <div id="upr-upload-round-field" class="hidden">
+                <label for="upr-upload-round" class="block text-sm font-medium text-gray-700 mb-1">Round</label>
+                <input type="text" id="upr-upload-round" name="round" placeholder="P27"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                       autocomplete="off">
+                <p class="mt-1 text-xs text-gray-500">Required for per-round sources (e.g. P27). Replaces any existing file for that round.</p>
+            </div>
+
+            <div>
+                <label for="upr-upload-file" class="block text-sm font-medium text-gray-700 mb-1">File</label>
+                <input type="file" id="upr-upload-file" name="file" accept=".csv,.xlsx,.xls" required
+                       class="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
+            </div>
+
+            <p id="upr-upload-status" class="text-xs text-gray-400 min-h-[1rem]"></p>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" class="close-modal px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-indigo-600 hover:bg-indigo-700 text-white">
+                    <i class="fas fa-upload"></i> Upload
+                </button>
+            </div>
+        </form>
+    {% endcall %}
+
+    {% call modal_shell('upr-secondary-preview-modal', 'Secondary data preview', aria_label='Secondary data preview', max_width='max-w-5xl') %}
+        <div class="space-y-3" data-secondary-preview>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 id="upr-preview-title" class="text-base font-semibold text-gray-900">Preview</h3>
+                    <p id="upr-preview-meta" class="text-xs text-gray-500 mt-0.5"></p>
+                </div>
+                <div id="upr-preview-round-wrap" class="hidden">
+                    <label for="upr-preview-round" class="block text-xs font-medium text-gray-600 mb-1">Round</label>
+                    <select id="upr-preview-round"
+                            class="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </select>
+                </div>
+            </div>
+            <p id="upr-preview-status" class="text-sm text-gray-500">Loading…</p>
+            <div id="upr-preview-table-wrap" class="hidden overflow-auto border border-gray-200 rounded-md max-h-[28rem]">
+                <table class="min-w-full text-sm">
+                    <thead id="upr-preview-thead" class="bg-gray-50 sticky top-0"></thead>
+                    <tbody id="upr-preview-tbody" class="divide-y divide-gray-100 bg-white"></tbody>
+                </table>
+            </div>
+            <div class="flex justify-end pt-1">
+                <button type="button" class="close-modal px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Close
+                </button>
+            </div>
+        </div>
+    {% endcall %}
+</div>

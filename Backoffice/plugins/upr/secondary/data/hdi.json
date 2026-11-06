@@ -1,0 +1,978 @@
+{
+  "by_iso3": {
+    "AFG": {
+      "rank": 181,
+      "score": 0.496,
+      "tier": "Low"
+    },
+    "AGO": {
+      "rank": 148,
+      "score": 0.616,
+      "tier": "Medium"
+    },
+    "ALB": {
+      "rank": 71,
+      "score": 0.81,
+      "tier": "Very High"
+    },
+    "AND": {
+      "rank": 32,
+      "score": 0.913,
+      "tier": "Very High"
+    },
+    "ARE": {
+      "rank": 15,
+      "score": 0.94,
+      "tier": "Very High"
+    },
+    "ARG": {
+      "rank": 47,
+      "score": 0.865,
+      "tier": "Very High"
+    },
+    "ARM": {
+      "rank": 69,
+      "score": 0.811,
+      "tier": "Very High"
+    },
+    "ATG": {
+      "rank": 53,
+      "score": 0.851,
+      "tier": "Very High"
+    },
+    "AUS": {
+      "rank": 7,
+      "score": 0.958,
+      "tier": "Very High"
+    },
+    "AUT": {
+      "rank": 22,
+      "score": 0.93,
+      "tier": "Very High"
+    },
+    "AZE": {
+      "rank": 81,
+      "score": 0.789,
+      "tier": "High"
+    },
+    "BDI": {
+      "rank": 187,
+      "score": 0.439,
+      "tier": "Low"
+    },
+    "BEL": {
+      "rank": 10,
+      "score": 0.951,
+      "tier": "Very High"
+    },
+    "BEN": {
+      "rank": 173,
+      "score": 0.515,
+      "tier": "Low"
+    },
+    "BFA": {
+      "rank": 186,
+      "score": 0.459,
+      "tier": "Low"
+    },
+    "BGD": {
+      "rank": 130,
+      "score": 0.685,
+      "tier": "Medium"
+    },
+    "BGR": {
+      "rank": 55,
+      "score": 0.845,
+      "tier": "Very High"
+    },
+    "BHR": {
+      "rank": 38,
+      "score": 0.899,
+      "tier": "Very High"
+    },
+    "BHS": {
+      "rank": 66,
+      "score": 0.82,
+      "tier": "Very High"
+    },
+    "BIH": {
+      "rank": 74,
+      "score": 0.804,
+      "tier": "Very High"
+    },
+    "BLR": {
+      "rank": 65,
+      "score": 0.824,
+      "tier": "Very High"
+    },
+    "BLZ": {
+      "rank": 115,
+      "score": 0.721,
+      "tier": "High"
+    },
+    "BOL": {
+      "rank": 108,
+      "score": 0.733,
+      "tier": "High"
+    },
+    "BRA": {
+      "rank": 84,
+      "score": 0.786,
+      "tier": "High"
+    },
+    "BRB": {
+      "rank": 69,
+      "score": 0.811,
+      "tier": "Very High"
+    },
+    "BRN": {
+      "rank": 60,
+      "score": 0.837,
+      "tier": "Very High"
+    },
+    "BTN": {
+      "rank": 125,
+      "score": 0.698,
+      "tier": "Medium"
+    },
+    "BWA": {
+      "rank": 111,
+      "score": 0.731,
+      "tier": "High"
+    },
+    "CAF": {
+      "rank": 191,
+      "score": 0.414,
+      "tier": "Low"
+    },
+    "CAN": {
+      "rank": 16,
+      "score": 0.939,
+      "tier": "Very High"
+    },
+    "CHE": {
+      "rank": 2,
+      "score": 0.97,
+      "tier": "Very High"
+    },
+    "CHL": {
+      "rank": 45,
+      "score": 0.878,
+      "tier": "Very High"
+    },
+    "CHN": {
+      "rank": 78,
+      "score": 0.797,
+      "tier": "High"
+    },
+    "CIV": {
+      "rank": 157,
+      "score": 0.582,
+      "tier": "Medium"
+    },
+    "CMR": {
+      "rank": 155,
+      "score": 0.588,
+      "tier": "Medium"
+    },
+    "COD": {
+      "rank": 171,
+      "score": 0.522,
+      "tier": "Low"
+    },
+    "COG": {
+      "rank": 138,
+      "score": 0.649,
+      "tier": "Medium"
+    },
+    "COL": {
+      "rank": 83,
+      "score": 0.788,
+      "tier": "High"
+    },
+    "COM": {
+      "rank": 152,
+      "score": 0.603,
+      "tier": "Medium"
+    },
+    "CPV": {
+      "rank": 135,
+      "score": 0.668,
+      "tier": "Medium"
+    },
+    "CRI": {
+      "rank": 62,
+      "score": 0.833,
+      "tier": "Very High"
+    },
+    "CUB": {
+      "rank": 97,
+      "score": 0.762,
+      "tier": "High"
+    },
+    "CYP": {
+      "rank": 32,
+      "score": 0.913,
+      "tier": "Very High"
+    },
+    "CZE": {
+      "rank": 29,
+      "score": 0.915,
+      "tier": "Very High"
+    },
+    "DEU": {
+      "rank": 5,
+      "score": 0.959,
+      "tier": "Very High"
+    },
+    "DJI": {
+      "rank": 175,
+      "score": 0.513,
+      "tier": "Low"
+    },
+    "DMA": {
+      "rank": 98,
+      "score": 0.761,
+      "tier": "High"
+    },
+    "DNK": {
+      "rank": 4,
+      "score": 0.962,
+      "tier": "Very High"
+    },
+    "DOM": {
+      "rank": 89,
+      "score": 0.776,
+      "tier": "High"
+    },
+    "DZA": {
+      "rank": 96,
+      "score": 0.763,
+      "tier": "High"
+    },
+    "ECU": {
+      "rank": 88,
+      "score": 0.777,
+      "tier": "High"
+    },
+    "EGY": {
+      "rank": 100,
+      "score": 0.754,
+      "tier": "High"
+    },
+    "ERI": {
+      "rank": 178,
+      "score": 0.503,
+      "tier": "Low"
+    },
+    "ESP": {
+      "rank": 28,
+      "score": 0.918,
+      "tier": "Very High"
+    },
+    "EST": {
+      "rank": 36,
+      "score": 0.905,
+      "tier": "Very High"
+    },
+    "ETH": {
+      "rank": 180,
+      "score": 0.497,
+      "tier": "Low"
+    },
+    "FIN": {
+      "rank": 12,
+      "score": 0.948,
+      "tier": "Very High"
+    },
+    "FJI": {
+      "rank": 111,
+      "score": 0.731,
+      "tier": "High"
+    },
+    "FRA": {
+      "rank": 26,
+      "score": 0.92,
+      "tier": "Very High"
+    },
+    "FSM": {
+      "rank": 149,
+      "score": 0.615,
+      "tier": "Medium"
+    },
+    "GAB": {
+      "rank": 108,
+      "score": 0.733,
+      "tier": "High"
+    },
+    "GBR": {
+      "rank": 13,
+      "score": 0.946,
+      "tier": "Very High"
+    },
+    "GEO": {
+      "rank": 57,
+      "score": 0.844,
+      "tier": "Very High"
+    },
+    "GHA": {
+      "rank": 143,
+      "score": 0.628,
+      "tier": "Medium"
+    },
+    "GIN": {
+      "rank": 179,
+      "score": 0.5,
+      "tier": "Low"
+    },
+    "GMB": {
+      "rank": 170,
+      "score": 0.524,
+      "tier": "Low"
+    },
+    "GNB": {
+      "rank": 174,
+      "score": 0.514,
+      "tier": "Low"
+    },
+    "GNQ": {
+      "rank": 133,
+      "score": 0.674,
+      "tier": "Medium"
+    },
+    "GRC": {
+      "rank": 34,
+      "score": 0.908,
+      "tier": "Very High"
+    },
+    "GRD": {
+      "rank": 80,
+      "score": 0.791,
+      "tier": "High"
+    },
+    "GTM": {
+      "rank": 137,
+      "score": 0.662,
+      "tier": "Medium"
+    },
+    "GUY": {
+      "rank": 89,
+      "score": 0.776,
+      "tier": "High"
+    },
+    "HKG": {
+      "rank": 8,
+      "score": 0.955,
+      "tier": "Very High"
+    },
+    "HND": {
+      "rank": 139,
+      "score": 0.645,
+      "tier": "Medium"
+    },
+    "HRV": {
+      "rank": 41,
+      "score": 0.889,
+      "tier": "Very High"
+    },
+    "HTI": {
+      "rank": 166,
+      "score": 0.554,
+      "tier": "Medium"
+    },
+    "HUN": {
+      "rank": 46,
+      "score": 0.87,
+      "tier": "Very High"
+    },
+    "IDN": {
+      "rank": 113,
+      "score": 0.728,
+      "tier": "High"
+    },
+    "IND": {
+      "rank": 130,
+      "score": 0.685,
+      "tier": "Medium"
+    },
+    "IRL": {
+      "rank": 11,
+      "score": 0.949,
+      "tier": "Very High"
+    },
+    "IRN": {
+      "rank": 75,
+      "score": 0.799,
+      "tier": "High"
+    },
+    "IRQ": {
+      "rank": 126,
+      "score": 0.695,
+      "tier": "Medium"
+    },
+    "ISL": {
+      "rank": 1,
+      "score": 0.972,
+      "tier": "Very High"
+    },
+    "ISR": {
+      "rank": 27,
+      "score": 0.919,
+      "tier": "Very High"
+    },
+    "ITA": {
+      "rank": 29,
+      "score": 0.915,
+      "tier": "Very High"
+    },
+    "JAM": {
+      "rank": 117,
+      "score": 0.72,
+      "tier": "High"
+    },
+    "JOR": {
+      "rank": 100,
+      "score": 0.754,
+      "tier": "High"
+    },
+    "JPN": {
+      "rank": 23,
+      "score": 0.925,
+      "tier": "Very High"
+    },
+    "KAZ": {
+      "rank": 60,
+      "score": 0.837,
+      "tier": "Very High"
+    },
+    "KEN": {
+      "rank": 143,
+      "score": 0.628,
+      "tier": "Medium"
+    },
+    "KGZ": {
+      "rank": 117,
+      "score": 0.72,
+      "tier": "High"
+    },
+    "KHM": {
+      "rank": 151,
+      "score": 0.606,
+      "tier": "Medium"
+    },
+    "KIR": {
+      "rank": 140,
+      "score": 0.644,
+      "tier": "Medium"
+    },
+    "KNA": {
+      "rank": 58,
+      "score": 0.84,
+      "tier": "Very High"
+    },
+    "KOR": {
+      "rank": 20,
+      "score": 0.937,
+      "tier": "Very High"
+    },
+    "KWT": {
+      "rank": 52,
+      "score": 0.852,
+      "tier": "Very High"
+    },
+    "LAO": {
+      "rank": 147,
+      "score": 0.617,
+      "tier": "Medium"
+    },
+    "LBN": {
+      "rank": 102,
+      "score": 0.752,
+      "tier": "High"
+    },
+    "LBR": {
+      "rank": 177,
+      "score": 0.51,
+      "tier": "Low"
+    },
+    "LBY": {
+      "rank": 115,
+      "score": 0.721,
+      "tier": "High"
+    },
+    "LCA": {
+      "rank": 103,
+      "score": 0.748,
+      "tier": "High"
+    },
+    "LIE": {
+      "rank": 17,
+      "score": 0.938,
+      "tier": "Very High"
+    },
+    "LKA": {
+      "rank": 89,
+      "score": 0.776,
+      "tier": "High"
+    },
+    "LSO": {
+      "rank": 167,
+      "score": 0.55,
+      "tier": "Medium"
+    },
+    "LTU": {
+      "rank": 39,
+      "score": 0.895,
+      "tier": "Very High"
+    },
+    "LUX": {
+      "rank": 25,
+      "score": 0.922,
+      "tier": "Very High"
+    },
+    "LVA": {
+      "rank": 41,
+      "score": 0.889,
+      "tier": "Very High"
+    },
+    "MAR": {
+      "rank": 120,
+      "score": 0.71,
+      "tier": "High"
+    },
+    "MCO": {
+      "tier": "Other Countries or Territories"
+    },
+    "MDA": {
+      "rank": 86,
+      "score": 0.785,
+      "tier": "High"
+    },
+    "MDG": {
+      "rank": 183,
+      "score": 0.487,
+      "tier": "Low"
+    },
+    "MDV": {
+      "rank": 93,
+      "score": 0.766,
+      "tier": "High"
+    },
+    "MEX": {
+      "rank": 81,
+      "score": 0.789,
+      "tier": "High"
+    },
+    "MHL": {
+      "rank": 108,
+      "score": 0.733,
+      "tier": "High"
+    },
+    "MKD": {
+      "rank": 68,
+      "score": 0.815,
+      "tier": "Very High"
+    },
+    "MLI": {
+      "rank": 188,
+      "score": 0.419,
+      "tier": "Low"
+    },
+    "MLT": {
+      "rank": 24,
+      "score": 0.924,
+      "tier": "Very High"
+    },
+    "MMR": {
+      "rank": 150,
+      "score": 0.609,
+      "tier": "Medium"
+    },
+    "MNE": {
+      "rank": 48,
+      "score": 0.862,
+      "tier": "Very High"
+    },
+    "MNG": {
+      "rank": 104,
+      "score": 0.747,
+      "tier": "High"
+    },
+    "MOZ": {
+      "rank": 182,
+      "score": 0.493,
+      "tier": "Low"
+    },
+    "MRT": {
+      "rank": 163,
+      "score": 0.563,
+      "tier": "Medium"
+    },
+    "MUS": {
+      "rank": 73,
+      "score": 0.806,
+      "tier": "Very High"
+    },
+    "MWI": {
+      "rank": 172,
+      "score": 0.517,
+      "tier": "Low"
+    },
+    "MYS": {
+      "rank": 67,
+      "score": 0.819,
+      "tier": "Very High"
+    },
+    "NAM": {
+      "rank": 136,
+      "score": 0.665,
+      "tier": "Medium"
+    },
+    "NER": {
+      "rank": 188,
+      "score": 0.419,
+      "tier": "Low"
+    },
+    "NGA": {
+      "rank": 164,
+      "score": 0.56,
+      "tier": "Medium"
+    },
+    "NIC": {
+      "rank": 123,
+      "score": 0.706,
+      "tier": "High"
+    },
+    "NLD": {
+      "rank": 8,
+      "score": 0.955,
+      "tier": "Very High"
+    },
+    "NOR": {
+      "rank": 2,
+      "score": 0.97,
+      "tier": "Very High"
+    },
+    "NPL": {
+      "rank": 145,
+      "score": 0.622,
+      "tier": "Medium"
+    },
+    "NRU": {
+      "rank": 124,
+      "score": 0.703,
+      "tier": "High"
+    },
+    "NZL": {
+      "rank": 17,
+      "score": 0.938,
+      "tier": "Very High"
+    },
+    "OMN": {
+      "rank": 50,
+      "score": 0.858,
+      "tier": "Very High"
+    },
+    "PAK": {
+      "rank": 168,
+      "score": 0.544,
+      "tier": "Low"
+    },
+    "PAN": {
+      "rank": 59,
+      "score": 0.839,
+      "tier": "Very High"
+    },
+    "PER": {
+      "rank": 79,
+      "score": 0.794,
+      "tier": "High"
+    },
+    "PHL": {
+      "rank": 117,
+      "score": 0.72,
+      "tier": "High"
+    },
+    "PLW": {
+      "rank": 84,
+      "score": 0.786,
+      "tier": "High"
+    },
+    "PNG": {
+      "rank": 160,
+      "score": 0.576,
+      "tier": "Medium"
+    },
+    "POL": {
+      "rank": 35,
+      "score": 0.906,
+      "tier": "Very High"
+    },
+    "PRK": {
+      "tier": "Other Countries or Territories"
+    },
+    "PRT": {
+      "rank": 40,
+      "score": 0.89,
+      "tier": "Very High"
+    },
+    "PRY": {
+      "rank": 99,
+      "score": 0.756,
+      "tier": "High"
+    },
+    "PSE": {
+      "rank": 133,
+      "score": 0.674,
+      "tier": "Medium"
+    },
+    "QAT": {
+      "rank": 43,
+      "score": 0.886,
+      "tier": "Very High"
+    },
+    "ROU": {
+      "rank": 55,
+      "score": 0.845,
+      "tier": "Very High"
+    },
+    "RUS": {
+      "rank": 64,
+      "score": 0.832,
+      "tier": "Very High"
+    },
+    "RWA": {
+      "rank": 159,
+      "score": 0.578,
+      "tier": "Medium"
+    },
+    "SAU": {
+      "rank": 37,
+      "score": 0.9,
+      "tier": "Very High"
+    },
+    "SDN": {
+      "rank": 176,
+      "score": 0.511,
+      "tier": "Low"
+    },
+    "SEN": {
+      "rank": 169,
+      "score": 0.53,
+      "tier": "Low"
+    },
+    "SGP": {
+      "rank": 13,
+      "score": 0.946,
+      "tier": "Very High"
+    },
+    "SLB": {
+      "rank": 156,
+      "score": 0.584,
+      "tier": "Medium"
+    },
+    "SLE": {
+      "rank": 185,
+      "score": 0.467,
+      "tier": "Low"
+    },
+    "SLV": {
+      "rank": 132,
+      "score": 0.678,
+      "tier": "Medium"
+    },
+    "SMR": {
+      "rank": 29,
+      "score": 0.915,
+      "tier": "Very High"
+    },
+    "SOM": {
+      "rank": 192,
+      "score": 0.404,
+      "tier": "Low"
+    },
+    "SRB": {
+      "rank": 62,
+      "score": 0.833,
+      "tier": "Very High"
+    },
+    "SSD": {
+      "rank": 193,
+      "score": 0.388,
+      "tier": "Low"
+    },
+    "STP": {
+      "rank": 141,
+      "score": 0.637,
+      "tier": "Medium"
+    },
+    "SUR": {
+      "rank": 114,
+      "score": 0.722,
+      "tier": "High"
+    },
+    "SVK": {
+      "rank": 44,
+      "score": 0.88,
+      "tier": "Very High"
+    },
+    "SVN": {
+      "rank": 21,
+      "score": 0.931,
+      "tier": "Very High"
+    },
+    "SWE": {
+      "rank": 5,
+      "score": 0.959,
+      "tier": "Very High"
+    },
+    "SWZ": {
+      "rank": 126,
+      "score": 0.695,
+      "tier": "Medium"
+    },
+    "SYC": {
+      "rank": 54,
+      "score": 0.848,
+      "tier": "Very High"
+    },
+    "SYR": {
+      "rank": 162,
+      "score": 0.564,
+      "tier": "Medium"
+    },
+    "TCD": {
+      "rank": 190,
+      "score": 0.416,
+      "tier": "Low"
+    },
+    "TGO": {
+      "rank": 161,
+      "score": 0.571,
+      "tier": "Medium"
+    },
+    "THA": {
+      "rank": 76,
+      "score": 0.798,
+      "tier": "High"
+    },
+    "TJK": {
+      "rank": 128,
+      "score": 0.691,
+      "tier": "Medium"
+    },
+    "TKM": {
+      "rank": 95,
+      "score": 0.764,
+      "tier": "High"
+    },
+    "TLS": {
+      "rank": 142,
+      "score": 0.634,
+      "tier": "Medium"
+    },
+    "TON": {
+      "rank": 92,
+      "score": 0.769,
+      "tier": "High"
+    },
+    "TTO": {
+      "rank": 72,
+      "score": 0.807,
+      "tier": "Very High"
+    },
+    "TUN": {
+      "rank": 105,
+      "score": 0.746,
+      "tier": "High"
+    },
+    "TUR": {
+      "rank": 51,
+      "score": 0.853,
+      "tier": "Very High"
+    },
+    "TUV": {
+      "rank": 129,
+      "score": 0.689,
+      "tier": "Medium"
+    },
+    "TZA": {
+      "rank": 165,
+      "score": 0.555,
+      "tier": "Medium"
+    },
+    "UGA": {
+      "rank": 157,
+      "score": 0.582,
+      "tier": "Medium"
+    },
+    "UKR": {
+      "rank": 87,
+      "score": 0.779,
+      "tier": "High"
+    },
+    "URY": {
+      "rank": 48,
+      "score": 0.862,
+      "tier": "Very High"
+    },
+    "USA": {
+      "rank": 17,
+      "score": 0.938,
+      "tier": "Very High"
+    },
+    "UZB": {
+      "rank": 107,
+      "score": 0.74,
+      "tier": "High"
+    },
+    "VCT": {
+      "rank": 76,
+      "score": 0.798,
+      "tier": "High"
+    },
+    "VEN": {
+      "rank": 121,
+      "score": 0.709,
+      "tier": "High"
+    },
+    "VNM": {
+      "rank": 93,
+      "score": 0.766,
+      "tier": "High"
+    },
+    "VUT": {
+      "rank": 146,
+      "score": 0.621,
+      "tier": "Medium"
+    },
+    "WSM": {
+      "rank": 122,
+      "score": 0.708,
+      "tier": "High"
+    },
+    "YEM": {
+      "rank": 184,
+      "score": 0.47,
+      "tier": "Low"
+    },
+    "ZAF": {
+      "rank": 106,
+      "score": 0.741,
+      "tier": "High"
+    },
+    "ZMB": {
+      "rank": 154,
+      "score": 0.595,
+      "tier": "Medium"
+    },
+    "ZWE": {
+      "rank": 153,
+      "score": 0.598,
+      "tier": "Medium"
+    }
+  },
+  "source": "UNDP HDR composite indices CSV",
+  "updated_at": "2026-11-06T17:50:03Z",
+  "year": 2023
+}

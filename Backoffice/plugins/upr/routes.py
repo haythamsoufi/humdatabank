@@ -255,11 +255,20 @@ def _aes_or_404(aes_id: int) -> AssignmentEntityStatus:
 
 def upr_settings_status() -> dict:
     from plugins.upr.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+    from plugins.upr.secondary.registry import list_sources
+
+    try:
+        secondary_sources = list_sources()
+    except Exception:
+        current_app.logger.exception("UPR secondary settings status failed")
+        secondary_sources = []
 
     return {
         "planning_template_id": PLAN_TEMPLATE_ID,
         "reporting_template_id": REPORT_TEMPLATE_ID,
         "data_source": "GO-API / Excel",
+        "secondary_sources": secondary_sources,
+        "secondary_by_id": {item.get("id"): item for item in secondary_sources if item.get("id")},
     }
 
 
@@ -274,6 +283,115 @@ def settings_page():
         settings=upr_settings_status(),
         plugin_info=settings_plugin_info("upr"),
     )
+
+
+@bp.route("/admin/plugins/upr/secondary/status", methods=["GET"])
+@login_required
+@permission_required("admin.plugins.manage")
+def secondary_status():
+    return json_ok(settings=upr_settings_status())
+
+
+@bp.route("/admin/plugins/upr/secondary/refresh/<source_id>", methods=["POST"])
+@login_required
+@permission_required("admin.plugins.manage")
+def secondary_refresh(source_id: str):
+    from plugins.upr.secondary import imports as imp
+
+    try:
+        if source_id == "population":
+            result = imp.refresh_population()
+        elif source_id == "poverty":
+            result = imp.refresh_poverty()
+        elif source_id == "income_groups":
+            result = imp.refresh_income_groups()
+        elif source_id == "hdi":
+            result = imp.refresh_hdi()
+        elif source_id == "inform_risk":
+            result = imp.refresh_inform_risk()
+        elif source_id == "inform_severity":
+            result = imp.refresh_inform_severity()
+        elif source_id == "inform_climate":
+            result = imp.refresh_inform_climate()
+        else:
+            return json_bad_request(f"Source {source_id} is not refreshable; upload a file instead.")
+        return json_ok(result=result, settings=upr_settings_status())
+    except Exception as error:
+        current_app.logger.exception("UPR secondary refresh failed for %s", source_id)
+        return json_bad_request(str(error))
+
+
+@bp.route("/admin/plugins/upr/secondary/upload/<source_id>", methods=["POST"])
+@login_required
+@permission_required("admin.plugins.manage")
+def secondary_upload(source_id: str):
+    from plugins.upr.secondary import imports as imp
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return json_bad_request("Choose a CSV or Excel file.")
+    raw = upload.read()
+    round_code = (request.form.get("round") or "").strip().upper()
+    year_raw = (request.form.get("year") or "").strip()
+    year = int(year_raw) if year_raw.isdigit() else None
+    try:
+        if source_id == "income_groups":
+            result = imp.import_income_groups(upload.filename, raw)
+        elif source_id == "inform_risk":
+            result = imp.import_inform_risk(upload.filename, raw, edition=request.form.get("edition"))
+        elif source_id == "inform_severity":
+            result = imp.import_inform_severity(upload.filename, raw)
+        elif source_id == "inform_climate":
+            result = imp.import_inform_climate(upload.filename, raw)
+        elif source_id == "hdi":
+            result = imp.import_hdi(upload.filename, raw)
+        elif source_id == "multilateral":
+            if not round_code:
+                return json_bad_request("Round is required (e.g. P27).")
+            result = imp.import_multilateral(round_code, upload.filename, raw, year=year)
+        elif source_id == "eas_sprm_ops":
+            if not round_code:
+                return json_bad_request("Round is required (e.g. P27).")
+            result = imp.import_eas_sprm_ops(round_code, upload.filename, raw, year=year)
+        else:
+            return json_bad_request(f"Upload is not supported for {source_id}.")
+        return json_ok(result=result, settings=upr_settings_status())
+    except Exception as error:
+        current_app.logger.exception("UPR secondary upload failed for %s", source_id)
+        return json_bad_request(str(error))
+
+
+@bp.route("/admin/plugins/upr/secondary/round/<kind>/<round_code>", methods=["DELETE"])
+@login_required
+@permission_required("admin.plugins.manage")
+def secondary_delete_round(kind: str, round_code: str):
+    from plugins.upr.secondary import imports as imp
+
+    if kind not in {"multilateral", "eas_sprm_ops"}:
+        return json_bad_request("kind must be multilateral or eas_sprm_ops")
+    deleted = imp.delete_round_snapshot(kind, round_code)
+    return json_ok(deleted=deleted, settings=upr_settings_status())
+
+
+@bp.route("/admin/plugins/upr/secondary/preview/<source_id>", methods=["GET"])
+@login_required
+@permission_required("admin.plugins.manage")
+def secondary_preview(source_id: str):
+    from plugins.upr.secondary.preview import preview_source
+
+    round_code = (request.args.get("round") or "").strip().upper() or None
+    try:
+        limit = int(request.args.get("limit") or 100)
+    except (TypeError, ValueError):
+        limit = 100
+    try:
+        payload = preview_source(source_id, round_code=round_code, limit=limit)
+    except ValueError as error:
+        return json_bad_request(str(error))
+    except Exception as error:
+        current_app.logger.exception("UPR secondary preview failed for %s", source_id)
+        return json_bad_request(str(error))
+    return json_ok(preview=payload)
 
 
 @bp.route("/admin/upr-tools", methods=["GET"])

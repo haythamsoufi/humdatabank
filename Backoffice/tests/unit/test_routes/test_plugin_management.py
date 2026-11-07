@@ -43,6 +43,7 @@ def _make_plugin_manager(**kwargs):
     pm.plugins = kwargs.get("plugins_by_id", {})
     pm.plugin_directories = kwargs.get("plugin_directories", [])
     pm.is_first_party.return_value = kwargs.get("first_party", False)
+    pm.is_bundled.return_value = kwargs.get("first_party", False)
     pm.get_dependents.return_value = kwargs.get("dependents", [])
     pm.lifecycle_block_reason.return_value = kwargs.get("block_reason", None)
     return pm
@@ -812,6 +813,27 @@ class TestServePluginStatic:
         with patch.object(app, "plugin_manager", pm):
             resp = logged_in_client.get("/plugins/static/my_plugin/style.css")
         _assert_status(resp, 200, 302, 404)
+
+    def test_inactive_plugin_assets_are_not_served(self, logged_in_client, db_session, app, tmp_path):
+        static_dir = tmp_path / "my_plugin"
+        static_dir.mkdir()
+        (static_dir / "style.css").write_text("body { color: red; }")
+        pm = _make_plugin_manager(static_dirs={"my_plugin": str(static_dir)})
+        pm.is_plugin_active.return_value = False
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.get("/plugins/static/my_plugin/style.css")
+        assert resp.status_code == 404
+
+    def test_active_plugin_assets_are_served(self, logged_in_client, db_session, app, tmp_path):
+        static_dir = tmp_path / "my_plugin"
+        static_dir.mkdir()
+        (static_dir / "style.css").write_text("body { color: red; }")
+        pm = _make_plugin_manager(static_dirs={"my_plugin": str(static_dir)})
+        pm.is_plugin_active.return_value = True
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.get("/plugins/static/my_plugin/style.css")
+        assert resp.status_code == 200
+        assert resp.mimetype == "text/css"
 
     def test_serve_js_file(self, logged_in_client, db_session, app, tmp_path):
         static_dir = tmp_path / "my_plugin"

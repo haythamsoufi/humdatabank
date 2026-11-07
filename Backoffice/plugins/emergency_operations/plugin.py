@@ -1,5 +1,5 @@
 from app.plugins.base import BasePlugin, BaseFieldType
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from flask import current_app
 from plugins.metadata import FirstPartyPluginMetadata
 
@@ -78,6 +78,10 @@ class EmergencyOperationsFieldType(BaseFieldType):
                 'data-operations-count', 'data-eo1', 'data-eo2', 'data-eo3'
             ]
         }
+
+    def normalize_value(self, data: Dict[str, Any], config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """The field only displays loaded operations; nothing is stored."""
+        return None
 
     def validate_config(self, config: Dict[str, Any]) -> bool:
         try:

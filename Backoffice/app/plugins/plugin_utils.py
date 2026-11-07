@@ -8,6 +8,7 @@ This module provides common functionality that plugins can use to reduce code du
 import copy
 import hashlib
 import logging
+import re
 import threading
 import traceback
 import sys
@@ -30,29 +31,76 @@ PLUGIN_MANAGE_PERMISSION = 'admin.plugins.manage'
 REDACTED_SECRET = '********'
 
 
+_SECRET_KEY_NAME_RE = re.compile(
+    r"(api[_-]?key|secret|token|password|passwd|credential|private[_-]?key)", re.IGNORECASE
+)
+
+
+def _is_secret_key(name: Any) -> bool:
+    return isinstance(name, str) and bool(_SECRET_KEY_NAME_RE.search(name))
+
+
 def redact_secrets(config: Dict[str, Any], secret_paths) -> Dict[str, Any]:
-    """Copy of ``config`` with each non-empty secret (a tuple key path) replaced by ``REDACTED_SECRET``."""
+    """Copy of ``config`` with every non-empty secret replaced by ``REDACTED_SECRET``.
+
+    A value is a secret when its key path is listed in ``secret_paths`` (tuples of keys) or
+    when a string value sits under a key whose name looks like a credential
+    (``*_api_key``, ``*_token``, ``*secret*``, ``*password*``...). The name rule is a safety net
+    for fields a plugin forgot to declare.
+    """
     redacted = copy.deepcopy(config)
-    for path in secret_paths:
-        node = redacted
-        for key in path[:-1]:
-            node = node.get(key) if isinstance(node, dict) else None
-        if isinstance(node, dict) and node.get(path[-1]):
-            node[path[-1]] = REDACTED_SECRET
+    declared = {tuple(path) for path in secret_paths}
+
+    def walk(node: Any, path: tuple) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            here = path + (key,)
+            if isinstance(value, dict):
+                walk(value, here)
+            elif value and (here in declared or (isinstance(value, str) and _is_secret_key(key))):
+                node[key] = REDACTED_SECRET
+
+    walk(redacted, ())
     return redacted
 
 
 def restore_secrets(new_config: Dict[str, Any], current_config: Dict[str, Any], secret_paths) -> Dict[str, Any]:
     """Replace ``REDACTED_SECRET`` placeholders in ``new_config`` with the stored values."""
     restored = copy.deepcopy(new_config)
-    for path in secret_paths:
-        node, stored = restored, current_config
-        for key in path[:-1]:
-            node = node.get(key) if isinstance(node, dict) else None
-            stored = stored.get(key) if isinstance(stored, dict) else None
-        if isinstance(node, dict) and node.get(path[-1]) == REDACTED_SECRET:
-            node[path[-1]] = stored.get(path[-1], '') if isinstance(stored, dict) else ''
+
+    def walk(node: Any, stored: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            stored_value = stored.get(key) if isinstance(stored, dict) else None
+            if isinstance(value, dict):
+                walk(value, stored_value)
+            elif value == REDACTED_SECRET:
+                node[key] = stored_value if stored_value is not None else ''
+
+    walk(restored, current_config)
     return restored
+
+
+_SECRET_QUERY_PARAM_RE = re.compile(
+    r"([?&](?:[\w.-]*(?:key|token|secret|password|passwd|signature|sig|auth|credential)[\w.-]*))=([^&\s\"'#)]*)",
+    re.IGNORECASE,
+)
+
+
+def scrub_secrets_in_text(text: Any) -> str:
+    """Mask credential-looking query-string values (``?key=...``, ``&access_token=...``) in free text."""
+    return _SECRET_QUERY_PARAM_RE.sub(r"\1=***", str(text))
+
+
+def safe_request_error(exc: BaseException) -> str:
+    """Log-safe description of an HTTP client error.
+
+    ``requests`` / ``urllib3`` exceptions embed the full request URL, which
+    carries API keys passed as query parameters.
+    """
+    return f"{type(exc).__name__}: {scrub_secrets_in_text(exc)}"
 
 
 def _plugin_config_payload():

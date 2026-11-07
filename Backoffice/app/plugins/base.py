@@ -120,6 +120,12 @@ class SeedRole:
     permission_codes: list[str] = field(default_factory=list)
 
 
+_CLIENT_METADATA_KEYS = (
+    '_schema_version', '_plugin_type', '_processed_at',
+    'data_not_available', 'not_applicable', 'metadata',
+)
+
+
 class BaseFieldType(ABC):
     """Base class for custom field types that can be used in forms."""
 
@@ -193,6 +199,22 @@ class BaseFieldType(ABC):
             'js': [],
             'css': []
         }
+
+    def normalize_value(self, data: Dict[str, Any], config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Reduce a submitted JSON value to what should be stored.
+
+        Called by core for every entry of this field type before size limits and
+        schema checks. Return ``None`` to store nothing (a display-only field).
+        The default drops client-side bookkeeping keys.
+        """
+        cleaned = dict(data)
+        for key in _CLIENT_METADATA_KEYS:
+            cleaned.pop(key, None)
+        return cleaned
+
+    def validate_value(self, data: Dict[str, Any], config: Dict[str, Any]) -> Optional[str]:
+        """Return an error message when the normalized value must be rejected, else ``None``."""
+        return None
 
     def get_validation_rules(self) -> List[str]:
         """List of validation rule types this field supports"""
@@ -427,6 +449,15 @@ class BasePlugin(ABC):
 
     def get_required_plugins(self) -> List[str]:
         """``plugin_id`` values of other plugins this plugin cannot work without."""
+        return []
+
+    def get_optional_plugins(self) -> List[str]:
+        """``plugin_id`` values of plugins this one imports code or data from but can run without.
+
+        Unlike ``get_required_plugins`` this never blocks activation or deactivation. The
+        management page warns when one of them is inactive, and the manager checks at load time
+        that the declared edges stay acyclic.
+        """
         return []
 
     def install(self) -> bool:

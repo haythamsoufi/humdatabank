@@ -81,6 +81,9 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
     def plugin_id(self) -> str:
         return "ifrc"
 
+    def get_optional_plugins(self) -> list[str]:
+        return ["upr"]
+
     @property
     def display_name(self) -> str:
         return "IFRC"

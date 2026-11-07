@@ -1120,3 +1120,35 @@ class TestCacheViewerScope:
             for n in range(plugin_utils._PLUGIN_CACHE_MAX_ENTRIES + 20):
                 compute(n)
         assert len(plugin_utils._plugin_cache) <= plugin_utils._PLUGIN_CACHE_MAX_ENTRIES
+
+
+@pytest.mark.unit
+class TestSecretSafetyNets:
+    def test_undeclared_credential_keys_are_masked_and_restored(self):
+        from app.plugins.plugin_utils import REDACTED_SECRET, redact_secrets, restore_secrets
+
+        stored = {"global_settings": {"service_token": "abc", "zoom": 4}, "api_keys": {"mapbox": "pk.1"}}
+        shown = redact_secrets(stored, [("api_keys", "mapbox")])
+        assert shown["global_settings"]["service_token"] == REDACTED_SECRET
+        assert shown["global_settings"]["zoom"] == 4
+        assert shown["api_keys"]["mapbox"] == REDACTED_SECRET
+
+        saved = restore_secrets(shown, stored, [("api_keys", "mapbox")])
+        assert saved == stored
+
+    def test_empty_secrets_stay_empty(self):
+        from app.plugins.plugin_utils import redact_secrets
+
+        assert redact_secrets({"api_key": ""}, [])["api_key"] == ""
+
+    def test_scrub_secrets_in_text_masks_query_credentials(self):
+        from app.plugins.plugin_utils import safe_request_error, scrub_secrets_in_text
+
+        text = "Max retries exceeded with url: /geocode/json?address=Paris&key=AIzaSECRET&language=fr (Caused by X)"
+        scrubbed = scrub_secrets_in_text(text)
+        assert "AIzaSECRET" not in scrubbed
+        assert "address=Paris" in scrubbed and "language=fr" in scrubbed
+
+        err = safe_request_error(RuntimeError("403 for url: https://x/y?api_key=SECRET&q=1"))
+        assert err.startswith("RuntimeError: ")
+        assert "SECRET" not in err and "q=1" in err

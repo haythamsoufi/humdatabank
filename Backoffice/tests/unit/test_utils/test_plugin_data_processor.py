@@ -149,22 +149,28 @@ class TestGetPluginConfig:
 @pytest.mark.unit
 class TestExtractEssentialPluginData:
     def test_interactive_map_extracts_markers(self):
+        from plugins.interactive_map.plugin import InteractiveMapFieldType
+
         proc = _make_processor()
         data = {'markers': [{'lat': 1, 'lng': 2}], 'metadata': 'strip me'}
-        result = proc._extract_essential_plugin_data(data, 'interactive_map')
+        result = proc._extract_essential_plugin_data(data, InteractiveMapFieldType(), {})
         assert result == {'markers': [{'lat': 1, 'lng': 2}]}
 
     def test_interactive_map_empty_markers(self):
+        from plugins.interactive_map.plugin import InteractiveMapFieldType
+
         proc = _make_processor()
-        result = proc._extract_essential_plugin_data({}, 'interactive_map')
+        result = proc._extract_essential_plugin_data({}, InteractiveMapFieldType(), {})
         assert result == {'markers': []}
 
     def test_emergency_operations_returns_none(self):
+        from plugins.emergency_operations.plugin import EmergencyOperationsFieldType
+
         proc = _make_processor()
-        result = proc._extract_essential_plugin_data({'ops': [1, 2]}, 'emergency_operations')
+        result = proc._extract_essential_plugin_data({'ops': [1, 2]}, EmergencyOperationsFieldType(), {})
         assert result is None
 
-    def test_other_plugin_strips_metadata_fields(self):
+    def test_unknown_field_type_strips_metadata_fields(self):
         proc = _make_processor()
         data = {
             'value': 42,
@@ -175,7 +181,7 @@ class TestExtractEssentialPluginData:
             'not_applicable': False,
             'metadata': {},
         }
-        result = proc._extract_essential_plugin_data(data, 'custom_plugin')
+        result = proc._extract_essential_plugin_data(data, None, {})
         assert 'value' in result
         assert '_schema_version' not in result
         assert '_plugin_type' not in result
@@ -183,8 +189,28 @@ class TestExtractEssentialPluginData:
 
     def test_non_dict_data_returned_as_is(self):
         proc = _make_processor()
-        result = proc._extract_essential_plugin_data([1, 2, 3], 'some_plugin')
+        result = proc._extract_essential_plugin_data([1, 2, 3], None, {})
         assert result == [1, 2, 3]
+
+    def test_field_type_validate_value_can_reject(self):
+        proc = _make_processor()
+        field_type = MagicMock()
+        field_type.normalize_value.side_effect = lambda data, config: dict(data)
+        field_type.validate_value.return_value = "rows must be a list"
+        ok, val, err = proc._process_generic_plugin_data({'rows': 1}, 'custom', {}, field_type)
+        assert ok is False
+        assert err == "rows must be a list"
+
+    def test_oversized_raw_value_is_rejected_before_parsing(self):
+        from app.utils.plugin_data_processor import MAX_RAW_PLUGIN_VALUE_BYTES
+
+        proc = _make_processor()
+        with patch.object(proc, '_get_plugin_type_for_field', return_value='custom'):
+            ok, val, err = proc.process_plugin_field_data(
+                'field_value[1]', 'x' * (MAX_RAW_PLUGIN_VALUE_BYTES + 1), 1
+            )
+        assert ok is False
+        assert 'size limit' in err.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -201,8 +227,12 @@ class TestProcessGenericPluginData:
         assert parsed == {'key': 'x'}
 
     def test_emergency_operations_returns_none_value(self):
+        from plugins.emergency_operations.plugin import EmergencyOperationsFieldType
+
         proc = _make_processor()
-        ok, val, err = proc._process_generic_plugin_data({}, 'emergency_operations', {})
+        ok, val, err = proc._process_generic_plugin_data(
+            {}, 'emergency_operations', {}, EmergencyOperationsFieldType()
+        )
         assert ok is True
         assert val is None
 
@@ -301,7 +331,12 @@ class TestProcessPluginFieldData:
 
     def test_empty_data_for_emergency_ops_returns_none(self, app):
         with app.app_context():
+            from plugins.emergency_operations.plugin import EmergencyOperationsFieldType
+
             proc = _make_processor()
+            manager = MagicMock()
+            manager.get_field_type_any.return_value = EmergencyOperationsFieldType()
+            proc.initialize(manager)
             with patch.object(proc, '_get_plugin_type_for_field', return_value='emergency_operations'), \
                  patch.object(proc, '_get_plugin_config', return_value={}):
                 ok, val, err = proc.process_plugin_field_data('field_value[1]', '', 1)

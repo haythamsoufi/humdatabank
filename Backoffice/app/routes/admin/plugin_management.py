@@ -242,8 +242,8 @@ def _run_lifecycle(action: str, plugin_name: str, past_tense: str):
             return json_bad_request(reason)
     try:
         success = getattr(plugin_manager, f'{action}_plugin')(plugin_name)
-    except PluginLifecycleError:
-        return json_bad_request(f'Plugin {plugin_name} cannot be {action}d right now')
+    except PluginLifecycleError as exc:
+        return json_bad_request(str(exc))
 
     if success:
         return json_ok(success=True, message=f'Plugin {plugin_name} {past_tense} successfully')
@@ -352,7 +352,7 @@ def get_plugin_cleanup_info(plugin_name):
         return json_ok(
             success=True,
             cleanup_info=cleanup_info,
-            first_party=plugin_manager.is_first_party(plugin_name),
+            first_party=plugin_manager.is_bundled(plugin_name),
             dependents=plugin_manager.get_dependents(plugin_name),
         )
     except Exception as e:
@@ -461,7 +461,7 @@ def _install_plugin_archive(zip_data: bytes, expected_name: Optional[str]) -> Tu
         return None, f'Plugin name mismatch. Expected {expected_name}, got {plugin_id}'
 
     plugin_manager = current_app.plugin_manager
-    if plugin_id in plugin_manager.plugins or plugin_manager.is_first_party(plugin_id):
+    if plugin_id in plugin_manager.plugins or plugin_manager.is_bundled(plugin_id):
         return None, f'Plugin {plugin_id} is already installed. Uninstall it before uploading a new version.'
 
     plugins_root = Path(plugin_manager.plugin_directories[-1]).resolve()
@@ -660,6 +660,9 @@ def serve_plugin_static(plugin_name, filename):
                 status=404,
                 mimetype='text/plain'
             )
+
+        if current_app.config.get('PLUGIN_STATIC_REQUIRE_ACTIVE', True) and not plugin_manager.is_plugin_active(plugin_name):
+            return current_app.response_class("Not found", status=404, mimetype='text/plain')
 
         static_dir = Path(static_dir).resolve()
         joined = safe_join(str(static_dir), filename)

@@ -40,6 +40,9 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     def plugin_id(self) -> str:
         return "fdrs"
 
+    def get_optional_plugins(self) -> list[str]:
+        return ["upr"]
+
     @property
     def display_name(self) -> str:
         return "FDRS"

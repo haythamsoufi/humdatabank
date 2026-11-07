@@ -81,14 +81,8 @@ class TestCleanupSessions:
         # Should redirect to admin dashboard
         assert "dashboard" in resp.headers["Location"] or resp.status_code == 302
 
-    def test_cleans_up_expired_sessions_and_redirects(self, logged_in_client, db_session):
-        """When expired sessions exist, mark them ended and redirect."""
-        expired = _make_mock_session()
-        expired.session_end = None
-
-        mock_query = MagicMock()
-        mock_query.filter.return_value.all.return_value = [expired]
-
+    def test_cleanup_delegates_to_scheduled_cleanup_and_redirects(self, logged_in_client, db_session):
+        """The manual action runs the same routine as the scheduler (full row closure)."""
         mock_inspect = MagicMock()
         mock_inspect.has_table.return_value = True
 
@@ -96,22 +90,16 @@ class TestCleanupSessions:
             "app.routes.admin.utilities.sessions.inspect",
             return_value=mock_inspect,
         ), patch(
-            "app.routes.admin.utilities.sessions.UserSessionLog.query",
-            mock_query,
-        ), patch(
-            "app.routes.admin.utilities.sessions.db.session.flush"
-        ):
+            "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
+            return_value=3,
+        ) as mock_cleanup:
             resp = logged_in_client.post("/admin/utilities/sessions/cleanup")
 
         assert resp.status_code == 302
-        assert expired.session_end is not None
-        assert expired.ended_by == "timeout"
+        mock_cleanup.assert_called_once_with()
 
     def test_redirects_when_no_expired_sessions(self, logged_in_client, db_session):
-        """When table exists but no expired sessions, still redirect to dashboard."""
-        mock_query = MagicMock()
-        mock_query.filter.return_value.all.return_value = []
-
+        """When table exists but nothing is stale, still redirect to dashboard."""
         mock_inspect = MagicMock()
         mock_inspect.has_table.return_value = True
 
@@ -119,10 +107,8 @@ class TestCleanupSessions:
             "app.routes.admin.utilities.sessions.inspect",
             return_value=mock_inspect,
         ), patch(
-            "app.routes.admin.utilities.sessions.UserSessionLog.query",
-            mock_query,
-        ), patch(
-            "app.routes.admin.utilities.sessions.db.session.flush"
+            "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
+            return_value=0,
         ):
             resp = logged_in_client.post("/admin/utilities/sessions/cleanup")
 
@@ -146,13 +132,7 @@ class TestCleanupSessions:
         # handle_view_exception redirects to admin_dashboard
         assert resp.status_code == 302
 
-    def test_multiple_expired_sessions_all_marked_ended(self, logged_in_client, db_session):
-        """All expired sessions get session_end / ended_by set."""
-        sessions = [_make_mock_session() for _ in range(3)]
-
-        mock_query = MagicMock()
-        mock_query.filter.return_value.all.return_value = sessions
-
+    def test_cleanup_failure_is_handled(self, logged_in_client, db_session):
         mock_inspect = MagicMock()
         mock_inspect.has_table.return_value = True
 
@@ -160,17 +140,12 @@ class TestCleanupSessions:
             "app.routes.admin.utilities.sessions.inspect",
             return_value=mock_inspect,
         ), patch(
-            "app.routes.admin.utilities.sessions.UserSessionLog.query",
-            mock_query,
-        ), patch(
-            "app.routes.admin.utilities.sessions.db.session.flush"
+            "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
+            side_effect=RuntimeError("boom"),
         ):
             resp = logged_in_client.post("/admin/utilities/sessions/cleanup")
 
         assert resp.status_code == 302
-        for s in sessions:
-            assert s.session_end is not None
-            assert s.ended_by == "timeout"
 
 
 # ---------------------------------------------------------------------------

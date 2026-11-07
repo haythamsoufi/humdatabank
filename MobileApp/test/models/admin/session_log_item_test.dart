@@ -45,6 +45,27 @@ void main() {
       expect(item.userEmail, 'bob@example.org');
     });
 
+    test('parses second-resolution durations for sub-minute sessions', () {
+      final item = SessionLogItem.fromJson({
+        'session_id': 's-short',
+        'duration_minutes': 0,
+        'active_duration_minutes': 0,
+        'duration_seconds': 42,
+        'active_duration_seconds': '17',
+      });
+
+      expect(item.durationMinutes, 0);
+      expect(item.durationSeconds, 42);
+      expect(item.activeDurationSeconds, 17);
+    });
+
+    test('second-resolution durations default to null when absent', () {
+      final item = SessionLogItem.fromJson({'session_id': 's-legacy'});
+
+      expect(item.durationSeconds, isNull);
+      expect(item.activeDurationSeconds, isNull);
+    });
+
     test('parses minimal data with defaults', () {
       final item = SessionLogItem.fromJson(<String, dynamic>{});
 

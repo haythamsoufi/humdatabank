@@ -26,6 +26,8 @@ from app.utils.activity_logging_skip import (
 from app.utils.datetime_helpers import ensure_utc, utcnow
 from app.utils.sql_utils import escape_like_wildcards
 
+SESSION_END_GRACE_SECONDS = 5
+
 
 def _session_audit_scope(session_log: UserSessionLog) -> dict[str, Any] | None:
     """Window and identifiers for audit-trail-aligned counts, or None to use actions_performed."""
@@ -34,9 +36,15 @@ def _session_audit_scope(session_log: UserSessionLog) -> dict[str, Any] | None:
         return None
 
     session_start_for_filter = ensure_utc(session_log.session_start)
-    session_end_for_filter = (
-        ensure_utc(session_log.session_end) if session_log.session_end else utcnow()
-    )
+    if session_log.session_end:
+        # Idle timeouts end a session at ``last_activity``, and the activity row that
+        # produced that bump is stamped a few milliseconds later; without a grace
+        # period the session's final activity would fall outside its own window.
+        session_end_for_filter = (
+            ensure_utc(session_log.session_end) + timedelta(seconds=SESSION_END_GRACE_SECONDS)
+        )
+    else:
+        session_end_for_filter = utcnow()
     if session_end_for_filter < session_start_for_filter:
         session_end_for_filter = utcnow()
 

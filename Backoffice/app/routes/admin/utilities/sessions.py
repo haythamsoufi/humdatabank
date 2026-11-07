@@ -1,12 +1,10 @@
-from app.utils.datetime_helpers import utcnow
 from flask import flash, redirect, url_for, render_template
 from flask_babel import _
 from app import db
 from app.models import UserSessionLog
 from app.routes.admin.shared import permission_required
 from app.utils.error_handling import handle_view_exception
-from sqlalchemy import and_, inspect
-from datetime import timedelta
+from sqlalchemy import inspect
 
 from app.routes.admin.utilities import bp
 
@@ -17,23 +15,15 @@ from app.routes.admin.utilities import bp
 def cleanup_sessions():
     """Cleanup expired sessions"""
     try:
-        timeout_threshold = utcnow() - timedelta(hours=2)
-
         if inspect(db.engine).has_table(UserSessionLog.__tablename__):
-            expired_sessions = UserSessionLog.query.filter(
-                and_(
-                    UserSessionLog.last_activity < timeout_threshold,
-                    UserSessionLog.session_end.is_(None)
-                )
-            ).all()
+            # Same routine as the scheduled job: closes rows completely (is_active,
+            # session_end, ended_by, duration) using the configured timeouts. The
+            # previous inline version stamped only session_end/ended_by, leaving rows
+            # that were "Active" yet already ended, with no duration.
+            from app.services.platform.user_analytics_service import cleanup_inactive_sessions
 
-            for session in expired_sessions:
-                session.session_end = utcnow()
-                session.ended_by = 'timeout'
-
-            db.session.flush()
-
-            flash(_("Cleaned up %(count)d expired sessions.", count=len(expired_sessions)), "success")
+            count = cleanup_inactive_sessions()
+            flash(_("Cleaned up %(count)d expired sessions.", count=count), "success")
         else:
             flash(_("Session tracking is not configured."), "warning")
 
@@ -51,7 +41,7 @@ def show_all_sessions():
 
         if inspect(db.engine).has_table(UserSessionLog.__tablename__):
             active_sessions = UserSessionLog.query.filter(
-                UserSessionLog.session_end.is_(None)
+                UserSessionLog.is_active.is_(True)
             ).order_by(UserSessionLog.last_activity.desc()).all()
 
             for session in active_sessions:

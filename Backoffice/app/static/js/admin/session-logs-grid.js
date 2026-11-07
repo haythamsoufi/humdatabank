@@ -10,6 +10,44 @@
             : (s == null ? '' : String(s));
     };
 
+    /**
+     * Duration label from whole seconds (preferred) or legacy whole minutes.
+     * Anything under a minute reads "< 1 min" rather than "0 min".
+     */
+    function formatDuration(seconds, minutes, t) {
+        var secs = seconds;
+        if ((secs === null || secs === undefined) && minutes !== null && minutes !== undefined) {
+            secs = minutes * 60;
+        }
+        if (secs === null || secs === undefined) {
+            return null;
+        }
+        var totalMinutes = Math.floor(Math.max(0, secs) / 60);
+        var minLabel = t.minutesShort || 'min';
+        if (totalMinutes < 1) {
+            return t.lessThanMinute || ('< 1 ' + minLabel);
+        }
+        var hours = Math.floor(totalMinutes / 60);
+        var mins = totalMinutes % 60;
+        if (hours < 1) {
+            return totalMinutes + ' ' + minLabel;
+        }
+        var hourLabel = t.hoursShort || 'h';
+        return mins === 0
+            ? hours + ' ' + hourLabel
+            : hours + ' ' + hourLabel + ' ' + mins + ' ' + minLabel;
+    }
+
+    function durationSecondsComparator(field) {
+        return function(valueA, valueB, nodeA, nodeB) {
+            var a = nodeA && nodeA.data ? nodeA.data[field] : null;
+            var b = nodeB && nodeB.data ? nodeB.data[field] : null;
+            a = a === null || a === undefined ? -1 : a;
+            b = b === null || b === undefined ? -1 : b;
+            return a - b;
+        };
+    }
+
     function mapRow(item) {
         return (typeof AnalyticsGridCommon !== 'undefined' && AnalyticsGridCommon.mapAnalyticsUserRow)
             ? AnalyticsGridCommon.mapAnalyticsUserRow(item)
@@ -287,13 +325,15 @@
                 minWidth: 100,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
+                comparator: durationSecondsComparator('duration_seconds'),
                 cellRenderer: function(params) {
-                    var v = params.data && params.data.duration_minutes;
-                    if (v === null || v === undefined) {
+                    var label = params.data && formatDuration(
+                        params.data.duration_seconds, params.data.duration_minutes, t);
+                    if (label === null || label === undefined) {
                         return '<span class="text-sm text-gray-400">-</span>';
                     }
                     return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">' +
-                        esc(v) + ' ' + (t.minutesShort || 'min') + '</span>';
+                        esc(label) + '</span>';
                 }
             },
             {
@@ -303,13 +343,15 @@
                 minWidth: 100,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
+                comparator: durationSecondsComparator('active_duration_seconds'),
                 cellRenderer: function(params) {
-                    var v = params.data && params.data.active_duration_minutes;
-                    if (v === null || v === undefined) {
+                    var label = params.data && formatDuration(
+                        params.data.active_duration_seconds, params.data.active_duration_minutes, t);
+                    if (label === null || label === undefined) {
                         return '<span class="text-sm text-gray-400">-</span>';
                     }
                     return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">' +
-                        esc(v) + ' ' + (t.minutesShort || 'min') + '</span>';
+                        esc(label) + '</span>';
                 }
             },
             {

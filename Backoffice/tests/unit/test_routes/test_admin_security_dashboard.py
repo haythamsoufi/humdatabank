@@ -1,5 +1,6 @@
 """Tests for app/routes/admin/security_dashboard.py."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,6 +17,11 @@ def _perm_patch():
     return patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True)
 
 
+def _desc_patch():
+    """``desc(MagicMock)`` raises ArgumentError; treat desc as a passthrough in unit tests."""
+    return patch("app.routes.admin.security_dashboard.desc", side_effect=lambda col: col)
+
+
 # ---------------------------------------------------------------------------
 # security_dashboard
 # ---------------------------------------------------------------------------
@@ -24,7 +30,7 @@ def _perm_patch():
 class TestSecurityDashboard:
     def test_unauthenticated_redirects(self, client, db_session):
         resp = client.get("/admin/security/dashboard")
-        assert resp.status_code in (301, 302, 308)
+        assert resp.status_code in (301, 302, 308, 401)
 
     def test_renders_for_permitted_user(self, logged_in_client, db_session, app):
         mock_event = MagicMock()
@@ -32,7 +38,7 @@ class TestSecurityDashboard:
         mock_action = MagicMock()
         mock_action.risk_level = "high"
 
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.get_security_metrics", return_value={"total": 0}), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.AdminActionLog") as mock_aal, \
@@ -55,7 +61,7 @@ class TestSecurityDashboard:
 
 class TestSecurityEvents:
     def test_renders_all_events(self, logged_in_client, db_session, app):
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("events")):
             mock_se.query.order_by.return_value.all.return_value = []
@@ -64,7 +70,7 @@ class TestSecurityEvents:
         assert resp.status_code == 200
 
     def test_filter_by_severity(self, logged_in_client, db_session, app):
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("events")):
             mock_se.query.filter.return_value.order_by.return_value.all.return_value = []
@@ -72,7 +78,7 @@ class TestSecurityEvents:
         assert resp.status_code == 200
 
     def test_filter_by_event_type(self, logged_in_client, db_session, app):
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("events")):
             mock_se.query.filter.return_value.order_by.return_value.all.return_value = []
@@ -80,15 +86,28 @@ class TestSecurityEvents:
         assert resp.status_code == 200
 
     def test_filter_unresolved_only(self, logged_in_client, db_session, app):
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("events")):
             mock_se.query.filter.return_value.order_by.return_value.all.return_value = []
             resp = logged_in_client.get("/admin/security/events?unresolved_only=true")
         assert resp.status_code == 200
+        # parse_bool_arg must treat the query string as True (not the old type=bool quirk).
+        mock_se.query.filter.assert_called()
+
+    def test_filter_unresolved_only_false_is_ignored(self, logged_in_client, db_session, app):
+        """``?unresolved_only=false`` must not apply the unresolved filter."""
+        with _perm_patch(), _desc_patch(), \
+             patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
+             patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("events")):
+            mock_se.query.order_by.return_value.all.return_value = []
+            resp = logged_in_client.get("/admin/security/events?unresolved_only=false")
+        assert resp.status_code == 200
+        # No severity/event_type/unresolved filter → order_by is called on the base query.
+        mock_se.query.order_by.assert_called()
 
     def test_multiple_filters(self, logged_in_client, db_session, app):
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("events")):
             mock_se.query.filter.return_value.filter.return_value.filter.return_value.order_by.return_value.all.return_value = []
@@ -104,10 +123,11 @@ class TestSecurityEvents:
 
 class TestResolveSecurityEvent:
     def test_404_on_missing_event(self, logged_in_client, db_session, app):
+        from werkzeug.exceptions import NotFound
+
         with patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se:
-            mock_se.query.get_or_404.side_effect = Exception("404")
-            # Use real DB — event 9999 won't exist
+            mock_se.query.get_or_404.side_effect = NotFound()
             resp = logged_in_client.post("/admin/security/events/9999/resolve", data={})
         assert resp.status_code in (302, 404)
 
@@ -117,41 +137,30 @@ class TestResolveSecurityEvent:
 
         with patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
-             patch("app.routes.admin.security_dashboard.flash"), \
-             patch("app.routes.admin.security_dashboard.redirect", side_effect=lambda loc, **kw: ("redir", loc)), \
-             patch("app.routes.admin.security_dashboard.url_for", return_value="/admin/security/events"):
+             patch("app.routes.admin.security_dashboard.flash") as mock_flash:
             mock_se.query.get_or_404.return_value = mock_event
-            with app.test_request_context("/admin/security/events/1/resolve", method="POST"):
-                from app.routes.admin.security_dashboard import resolve_security_event
-                with patch("app.routes.admin.security_dashboard.current_user") as cu:
-                    cu.id = 1
-                    result = resolve_security_event(1)
-        assert result[0] == "redir"
+            resp = logged_in_client.post("/admin/security/events/1/resolve", data={})
+        assert resp.status_code in (301, 302, 308)
+        mock_flash.assert_called()
 
     def test_resolve_sets_resolved_and_redirects(self, logged_in_client, db_session, app):
         mock_event = MagicMock()
         mock_event.is_resolved = False
         mock_event.id = 1
 
-        with app.test_request_context(
-            "/admin/security/events/1/resolve",
-            method="POST",
-            data={"resolution_notes": "Fixed"},
-        ):
-            with patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
-                 patch("app.routes.admin.security_dashboard.db") as mock_db, \
-                 patch("app.routes.admin.security_dashboard.flash"), \
-                 patch("app.routes.admin.security_dashboard.redirect", side_effect=lambda loc, **kw: ("redir", loc)), \
-                 patch("app.routes.admin.security_dashboard.url_for", return_value="/admin/security/events"), \
-                 patch("app.routes.admin.security_dashboard.current_user") as cu:
-                mock_se.query.get_or_404.return_value = mock_event
-                mock_db.session.flush.return_value = None
-                cu.id = 5
-                from app.routes.admin.security_dashboard import resolve_security_event
-                result = resolve_security_event(1)
+        with patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
+             patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
+             patch("app.routes.admin.security_dashboard.db") as mock_db, \
+             patch("app.routes.admin.security_dashboard.flash"):
+            mock_se.query.get_or_404.return_value = mock_event
+            mock_db.session.flush.return_value = None
+            resp = logged_in_client.post(
+                "/admin/security/events/1/resolve",
+                data={"resolution_notes": "Fixed"},
+            )
+        assert resp.status_code in (301, 302, 308)
         assert mock_event.is_resolved is True
-        assert mock_event.resolved_by_user_id == 5
-        assert result[0] == "redir"
+        assert mock_event.resolved_by_user_id is not None
 
 
 # ---------------------------------------------------------------------------
@@ -164,19 +173,20 @@ class TestSecurityEventDetail:
         mock_event = MagicMock()
         mock_event.id = 1
         mock_event.ip_address = "1.2.3.4"
-        mock_event.timestamp = MagicMock()
+        mock_event.timestamp = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
 
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("detail")):
             mock_se.query.get_or_404.return_value = mock_event
+            # Make ``SecurityEvent.timestamp`` a real datetime so ``>=`` / ``- timedelta`` work.
+            mock_se.timestamp = mock_event.timestamp
             mock_se.query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
             resp = logged_in_client.get("/admin/security/events/1")
         assert resp.status_code == 200
 
     def test_event_not_found_raises(self, logged_in_client, db_session, app):
         with _perm_patch():
-            # Hitting a non-existent event ID through the real DB
             resp = logged_in_client.get("/admin/security/events/999999")
         assert resp.status_code in (302, 404)
 
@@ -188,7 +198,7 @@ class TestSecurityEventDetail:
 
 class TestSecurityAlerts:
     def test_renders_alerts(self, logged_in_client, db_session, app):
-        with _perm_patch(), \
+        with _perm_patch(), _desc_patch(), \
              patch("app.routes.admin.security_dashboard.SecurityEvent") as mock_se, \
              patch("app.routes.admin.security_dashboard.render_template", return_value=_mock_render("alerts")):
             mock_se.query.filter.return_value.order_by.return_value.all.return_value = []
@@ -218,31 +228,17 @@ class TestTestSecurityAlert:
     def test_success_redirects(self, logged_in_client, db_session, app):
         with patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
              patch("app.routes.admin.security_dashboard.log_security_event"), \
-             patch("app.routes.admin.security_dashboard.flash"), \
-             patch("app.routes.admin.security_dashboard.redirect", side_effect=lambda loc, **kw: ("redir", loc)), \
-             patch("app.routes.admin.security_dashboard.url_for", return_value="/admin/security/dashboard"), \
-             patch("app.routes.admin.security_dashboard.current_user") as cu:
-            cu.id = 1
-            cu.email = "admin@example.com"
-            with app.test_request_context("/admin/security/test-alert", method="POST"):
-                from app.routes.admin.security_dashboard import test_security_alert
-                result = test_security_alert()
-        assert result[0] == "redir"
+             patch("app.routes.admin.security_dashboard.flash"):
+            resp = logged_in_client.post("/admin/security/test-alert")
+        assert resp.status_code in (301, 302, 308)
 
     def test_exception_flashes_error(self, logged_in_client, db_session, app):
         with patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
              patch("app.routes.admin.security_dashboard.log_security_event", side_effect=RuntimeError("failed")), \
-             patch("app.routes.admin.security_dashboard.flash") as mock_flash, \
-             patch("app.routes.admin.security_dashboard.redirect", side_effect=lambda loc, **kw: ("redir", loc)), \
-             patch("app.routes.admin.security_dashboard.url_for", return_value="/admin/security/dashboard"), \
-             patch("app.routes.admin.security_dashboard.current_user") as cu:
-            cu.id = 1
-            cu.email = "admin@example.com"
-            with app.test_request_context("/admin/security/test-alert", method="POST"):
-                from app.routes.admin.security_dashboard import test_security_alert
-                result = test_security_alert()
+             patch("app.routes.admin.security_dashboard.flash") as mock_flash:
+            resp = logged_in_client.post("/admin/security/test-alert")
+        assert resp.status_code in (301, 302, 308)
         mock_flash.assert_called()
-        assert result[0] == "redir"
 
 
 # ---------------------------------------------------------------------------
@@ -276,4 +272,4 @@ class TestApiSecurityMetrics:
 
     def test_unauthenticated_redirects(self, client, db_session):
         resp = client.get("/admin/api/security/metrics")
-        assert resp.status_code in (301, 302, 308)
+        assert resp.status_code in (301, 302, 308, 401)

@@ -910,6 +910,8 @@ class Config:
     SESSION_INACTIVITY_TIMEOUT = timedelta(
         minutes=int(os.environ.get('SESSION_INACTIVITY_TIMEOUT_MINUTES', 120))
     )
+    # How often (minutes) the job that closes idle / over-long session rows runs.
+    SESSION_CLEANUP_INTERVAL_MINUTES = int(os.environ.get('SESSION_CLEANUP_INTERVAL_MINUTES', 15))
     # Azure/OAuth: reuse an active session from the same device when duplicate callbacks arrive within this window
     OAUTH_LOGIN_DEDUP_SECONDS = int(os.environ.get('OAUTH_LOGIN_DEDUP_SECONDS', 90))
 

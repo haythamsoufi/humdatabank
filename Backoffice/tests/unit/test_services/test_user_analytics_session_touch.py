@@ -17,6 +17,7 @@ class _FakeSessionLog:
         self.forms_submitted = 0
         self.files_uploaded = 0
         self.page_view_path_counts = {}
+        self.last_activity = None
 
 
 @pytest.mark.unit
@@ -26,6 +27,7 @@ def test_touch_types_do_not_increment_actions_performed():
 
     mock_model = MagicMock()
     mock_model.query.filter_by.return_value.first.return_value = fake
+    mock_model.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake
 
     with patch('app.services.platform.user_analytics_service.UserSessionLog', mock_model):
         for _ in range(15):

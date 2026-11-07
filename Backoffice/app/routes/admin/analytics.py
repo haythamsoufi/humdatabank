@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 from flask_login import current_user
 from app import db
 from app.routes.admin.shared import admin_permission_required, permission_required
-from app.utils.request_utils import is_json_request
+from app.utils.request_utils import is_json_request, parse_bool_arg
 from app.models import (
     UserLoginLog, UserActivityLog, UserSessionLog, AdminActionLog,
     SecurityEvent, User, Country
@@ -29,7 +29,7 @@ from app.services.platform.user_analytics_service import (
     log_admin_action,
     aggregate_page_view_path_histogram,
     format_page_path_histogram_csv,
-    effective_session_active_duration_minutes,
+    effective_session_active_duration_seconds,
 )
 from app.services.platform.product_analytics_service import get_product_analytics
 from app.middleware.activity_middleware import track_admin_action
@@ -43,6 +43,7 @@ from app.services.audit.details_service import (
 from app.services.audit.trail_session_query import (
     AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES,
     AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
+    SESSION_END_GRACE_SECONDS,
     apply_audit_trail_user_activity_noise_filters,
     count_audit_visible_entries_for_session,
 )
@@ -237,7 +238,7 @@ def login_logs():
     user_filter = request.args.get('user')
     event_type = request.args.get('event_type')
     ip_filter = request.args.get('ip')
-    suspicious_only = request.args.get('suspicious_only', type=bool)
+    suspicious_only = parse_bool_arg(request.args.get('suspicious_only'))
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
 
@@ -326,7 +327,7 @@ def activity_logs():
 def session_logs():
     """View user session logs (data loaded via /admin/api/analytics/session-logs + AG Grid)."""
     user_filter = request.args.get('user')
-    active_only = request.args.get('active_only', type=bool)
+    active_only = parse_bool_arg(request.args.get('active_only'))
     min_duration = request.args.get('min_duration', type=int)
     session_id_filter = (request.args.get('session_id') or '').strip() or None
 
@@ -351,7 +352,7 @@ def admin_actions():
     admin_filter = request.args.get('admin')
     action_type = request.args.get('action_type')
     risk_level = request.args.getlist('risk_level')  # Changed to getlist for multi-select
-    requires_review = request.args.get('requires_review', type=bool)
+    requires_review = parse_bool_arg(request.args.get('requires_review'))
 
     # Build query
     query = AdminActionLog.query.join(User)
@@ -407,7 +408,7 @@ def security_events():
     # Filters
     severity = request.args.get('severity')
     event_type = request.args.get('event_type')
-    unresolved_only = request.args.get('unresolved_only', type=bool)
+    unresolved_only = parse_bool_arg(request.args.get('unresolved_only'))
 
     # Build query
     query = SecurityEvent.query
@@ -534,11 +535,14 @@ def user_analytics(user_id):
         )
     ).all()
 
-    total_active_time_minutes = 0
+    # Sum seconds, then convert: adding per-session whole minutes would drop the
+    # sub-minute remainder of every session (a day of 40-second visits totalled 0m).
+    total_active_time_seconds = 0
     for _s in period_sessions_for_active_total:
-        m = effective_session_active_duration_minutes(_s)
-        if m is not None:
-            total_active_time_minutes += m
+        secs = effective_session_active_duration_seconds(_s)
+        if secs is not None:
+            total_active_time_seconds += secs
+    total_active_time_minutes = total_active_time_seconds // 60
 
     total_page_views_row = db.session.query(
         func.coalesce(func.sum(UserSessionLog.page_views), 0)
@@ -589,6 +593,7 @@ def user_analytics(user_id):
         recent_sessions=recent_sessions,
         total_sessions_count=total_sessions_count,
         total_active_time_minutes=total_active_time_minutes,
+        total_active_time_seconds=total_active_time_seconds,
         total_page_views=total_page_views,
         recent_logins=recent_logins,
         recent_activities=recent_activities,
@@ -807,7 +812,7 @@ def audit_trail():
     description_filter = request.args.get('description')
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
-    requires_review = request.args.get('requires_review', type=bool)
+    requires_review = parse_bool_arg(request.args.get('requires_review'))
 
     session_id_param = (request.args.get('session_id') or '').strip()
     session_row = None
@@ -832,7 +837,9 @@ def audit_trail():
             filters_session_id = str(session_row.id)
             session_start_for_filter = ensure_utc(session_row.session_start)
             session_end_for_filter = (
-                ensure_utc(session_row.session_end) if session_row.session_end else utcnow()
+                ensure_utc(session_row.session_end) + timedelta(seconds=SESSION_END_GRACE_SECONDS)
+                if session_row.session_end
+                else utcnow()
             )
             if session_end_for_filter < session_start_for_filter:
                 session_end_for_filter = utcnow()

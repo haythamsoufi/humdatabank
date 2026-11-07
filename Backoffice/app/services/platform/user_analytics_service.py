@@ -13,10 +13,10 @@ import csv
 from flask import request, session, current_app, has_request_context, g
 from flask_babel import gettext as _
 from flask_login import current_user
-from sqlalchemy import and_, or_, cast, func, inspect, text, Integer
+from sqlalchemy import DateTime, and_, case, or_, cast, func, inspect, literal, text, Integer
 from app import db
 from app.utils.client_ip import _strip_ip_port, get_client_ip  # noqa: F401 — canonical implementation, re-exported
-from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.datetime_helpers import utcnow, ensure_utc, naive_utc
 from app.utils.transactions import atomic, request_transaction_rollback
 from app.models import (
     UserLoginLog, UserActivityLog, UserSessionLog,
@@ -39,6 +39,22 @@ from app.utils.page_view_paths import (
 # These must not increment actions_performed (that counter is for form saves,
 # submits, file uploads, and other meaningful actions — not per-request pings).
 _SESSION_LOG_TOUCH_ONLY_TYPES = frozenset({'action', 'heartbeat'})
+
+# Touch-only updates (every mobile API call, device heartbeats, deferred session
+# touches) only refresh ``last_activity``. Each one is an UPDATE on the session row,
+# which holds a row lock until the request transaction commits, so parallel requests
+# of one session queue behind each other. Skip the write when the stored value is
+# already this fresh; it costs at most this many seconds of precision.
+SESSION_TOUCH_MIN_INTERVAL_SECONDS = 10
+
+# ``ended_by`` values meaning "the user stopped interacting and the session timed
+# out". The session effectively ended at ``last_activity``, not whenever the
+# cleanup job or the returning user's next request noticed it.
+IDLE_ENDED_BY = frozenset({
+    'timeout',
+    'inactivity_timeout',
+    'timeout_and_max_duration',
+})
 
 # Legitimate native HTTP stacks (mobile apps, not web crawlers). These often omit
 # Mozilla/WebKit tokens; treat as non-bot before keyword/heuristic checks.
@@ -329,10 +345,19 @@ def log_logout(user, session_duration_minutes=None):
 
     Args:
         user (User): User object
-        session_duration_minutes (int): Duration of the session in minutes
+        session_duration_minutes (int): Fallback duration when no session row is
+            found. When the ``UserSessionLog`` row exists its own timestamps win,
+            because the cookie ``session_start`` is reset by deduplicated SSO
+            callbacks and would under-report.
     """
     try:
         client_info = get_client_info()
+
+        ended_session = end_user_session(session.get('session_id'), 'logout')
+        if ended_session is not None:
+            row_minutes = effective_session_duration_minutes(ended_session)
+            if row_minutes is not None:
+                session_duration_minutes = row_minutes
 
         logout_log = UserLoginLog(
             user_id=user.id,
@@ -347,9 +372,6 @@ def log_logout(user, session_duration_minutes=None):
         )
 
         db.session.add(logout_log)
-
-        # End session log
-        end_user_session(session.get('session_id'), 'logout')
 
         _commit_or_flush()
 
@@ -518,6 +540,57 @@ def increment_session_page_views_without_activity_log_deferred(
         )
 
 
+def _load_session_log(session_id: str, *, lock: bool = False):
+    """Fetch the session row; ``lock`` takes a row lock so counters can't be lost."""
+    query = UserSessionLog.query.filter_by(session_id=session_id)
+    if lock:
+        query = query.with_for_update()
+    return query.first()
+
+
+def _apply_session_activity(
+    session_log,
+    normalized_activity_type: str,
+    page_view_path_key: Optional[str] = None,
+) -> None:
+    """
+    Bump ``last_activity`` and the counter that matches ``normalized_activity_type``.
+
+    Touch-only types refresh ``last_activity`` at most once per
+    ``SESSION_TOUCH_MIN_INTERVAL_SECONDS`` and never change a counter.
+    """
+    now = utcnow()
+
+    if normalized_activity_type in _SESSION_LOG_TOUCH_ONLY_TYPES:
+        last_seen = ensure_utc(session_log.last_activity)
+        if (
+            last_seen is not None
+            and 0 <= (now - last_seen).total_seconds() < SESSION_TOUCH_MIN_INTERVAL_SECONDS
+        ):
+            return
+        session_log.last_activity = now
+        return
+
+    session_log.last_activity = now
+
+    if normalized_activity_type == 'page_view':
+        session_log.page_views = (session_log.page_views or 0) + 1
+        merge_page_view_path_count(session_log, page_view_path_key or "/")
+    elif normalized_activity_type in [
+        'form_submitted',
+        'form_saved',
+        'form_sent_for_review',
+        'data_save',
+    ]:
+        session_log.forms_submitted += 1
+        session_log.actions_performed += 1
+    elif normalized_activity_type == 'file_uploaded':
+        session_log.files_uploaded += 1
+        session_log.actions_performed += 1
+    else:
+        session_log.actions_performed += 1
+
+
 def _update_session_activity_explicit(
     session_id: Optional[str],
     activity_type: str,
@@ -530,7 +603,9 @@ def _update_session_activity_explicit(
     if not session_id:
         return
     try:
-        session_log = UserSessionLog.query.filter_by(session_id=session_id).first()
+        normalized_activity_type = normalize_activity_type(activity_type)
+        counts = normalized_activity_type not in _SESSION_LOG_TOUCH_ONLY_TYPES
+        session_log = _load_session_log(session_id, lock=counts)
         if not session_log:
             return
 
@@ -541,29 +616,7 @@ def _update_session_activity_explicit(
         if not session_log.is_active:
             return
 
-        session_log.last_activity = utcnow()
-
-        normalized_activity_type = normalize_activity_type(activity_type)
-
-        if normalized_activity_type in _SESSION_LOG_TOUCH_ONLY_TYPES:
-            return
-
-        if normalized_activity_type == 'page_view':
-            session_log.page_views += 1
-            merge_page_view_path_count(session_log, page_view_path_key or "/")
-        elif normalized_activity_type in [
-            'form_submitted',
-            'form_saved',
-            'form_sent_for_review',
-            'data_save',
-        ]:
-            session_log.forms_submitted += 1
-            session_log.actions_performed += 1
-        elif normalized_activity_type == 'file_uploaded':
-            session_log.files_uploaded += 1
-            session_log.actions_performed += 1
-        else:
-            session_log.actions_performed += 1
+        _apply_session_activity(session_log, normalized_activity_type, page_view_path_key)
     except Exception as e:
         current_app.logger.error(f"Error updating session activity (explicit): {str(e)}")
 
@@ -727,44 +780,60 @@ def update_session_activity(activity_type, page_view_path_key: Optional[str] = N
         page_view_path_key: Canonical path key when activity_type is page_view
     """
     try:
-        # Check if the session is in a failed state and rollback if needed
-        if db.session.is_active and db.session.dirty:
-            _rollback_transaction("update_session_activity_dirty_state")
+        # A session left in a failed state by an earlier error must be rolled back
+        # before it can be queried. Pending changes on a healthy session belong to
+        # the view and are left alone.
+        if not db.session.is_active:
+            _rollback_transaction("update_session_activity_inactive_state")
 
         session_id = session.get('session_id')
         if not session_id:
             return
 
         normalized_activity_type = normalize_activity_type(activity_type)
-        session_log = UserSessionLog.query.filter_by(session_id=session_id).first()
+        counts = normalized_activity_type not in _SESSION_LOG_TOUCH_ONLY_TYPES
+        session_log = _load_session_log(session_id, lock=counts)
         if session_log:
-            session_log.last_activity = utcnow()
-
-            if normalized_activity_type in _SESSION_LOG_TOUCH_ONLY_TYPES:
-                return
-
-            if normalized_activity_type == 'page_view':
-                session_log.page_views += 1
-                merge_page_view_path_count(
-                    session_log, page_view_path_key or "/"
-                )
-            elif normalized_activity_type in [
-                'form_submitted',
-                'form_saved',
-                'form_sent_for_review',
-                'data_save',
-            ]:
-                session_log.forms_submitted += 1
-                session_log.actions_performed += 1
-            elif normalized_activity_type == 'file_uploaded':
-                session_log.files_uploaded += 1
-                session_log.actions_performed += 1
-            else:
-                session_log.actions_performed += 1
+            _apply_session_activity(session_log, normalized_activity_type, page_view_path_key)
 
     except Exception as e:
         current_app.logger.error(f"Error updating session activity: {str(e)}")
         _rollback_transaction("update_session_activity_error")
+
+
+def _resolve_session_end(session_log, ended_by: str, now):
+    """
+    When a session should be recorded as having ended.
+
+    A session that was idle longer than the inactivity timeout (or is being closed
+    because it timed out) ended at ``last_activity``. Using "now" instead would add
+    the idle gap, plus however long the cleanup job took to notice it, to the
+    reported session length.
+    """
+    start = ensure_utc(session_log.session_start)
+    last_seen = ensure_utc(session_log.last_activity)
+    if last_seen is None or (start is not None and last_seen < start) or last_seen > now:
+        return now
+    if ended_by in IDLE_ENDED_BY:
+        return last_seen
+    try:
+        from config import Config
+        if now - last_seen > Config.SESSION_INACTIVITY_TIMEOUT:
+            return last_seen
+    except Exception:
+        pass
+    return now
+
+
+def _close_session_log(session_log, ended_by: str, now, session_end=None) -> None:
+    """Mark ``session_log`` ended and store the whole-minute duration."""
+    end_at = session_end or _resolve_session_end(session_log, ended_by, now)
+    session_log.session_end = end_at
+    session_log.is_active = False
+    session_log.ended_by = ended_by
+    session_log.duration_minutes = max(
+        0, int((end_at - ensure_utc(session_log.session_start)).total_seconds() // 60)
+    )
 
 
 def end_user_session(session_id, ended_by='logout'):
@@ -774,26 +843,22 @@ def end_user_session(session_id, ended_by='logout'):
     Args:
         session_id (str): Session ID to end
         ended_by (str): How the session ended ('logout', 'timeout', 'system')
+
+    Returns:
+        The ended ``UserSessionLog`` row, or ``None`` when nothing was ended.
     """
     try:
         if not session_id:
-            return
+            return None
 
         session_log = UserSessionLog.query.filter_by(session_id=session_id).first()
         if session_log and session_log.is_active:
-            session_log.session_end = utcnow()
-            session_log.is_active = False
-            session_log.ended_by = ended_by
-
-            # Calculate duration
-            # Ensure both datetimes are timezone-aware to avoid subtraction errors
-            session_end_aware = ensure_utc(session_log.session_end)
-            session_start_aware = ensure_utc(session_log.session_start)
-            duration = session_end_aware - session_start_aware
-            session_log.duration_minutes = int(duration.total_seconds() / 60)
+            _close_session_log(session_log, ended_by, utcnow())
+            return session_log
 
     except Exception as e:
         current_app.logger.error(f"Error ending user session: {str(e)}")
+    return None
 
 
 def end_other_active_sessions_for_device(user_id, ip_address, browser, device_type, ended_by='reauthenticated'):
@@ -804,7 +869,7 @@ def end_other_active_sessions_for_device(user_id, ip_address, browser, device_ty
     so re-authenticating from the same browser/device (a stale tab, a second
     profile, a fresh SSO round-trip after the old one went idle, etc.) used to
     leave the old row dangling as is_active=True -- sometimes for hours, until the
-    hourly `cleanup_inactive_sessions` inactivity sweep caught it -- even though the
+    scheduled `cleanup_inactive_sessions` inactivity sweep caught it -- even though the
     new login has clearly superseded it. Call this right before creating the new
     session row on every login path.
 
@@ -834,11 +899,7 @@ def end_other_active_sessions_for_device(user_id, ip_address, browser, device_ty
 
         now = utcnow()
         for session_log in candidates:
-            session_log.session_end = now
-            session_log.is_active = False
-            session_log.ended_by = ended_by
-            session_start_aware = ensure_utc(session_log.session_start)
-            session_log.duration_minutes = int((now - session_start_aware).total_seconds() / 60)
+            _close_session_log(session_log, ended_by, now)
 
         return len(candidates)
 
@@ -848,19 +909,37 @@ def end_other_active_sessions_for_device(user_id, ip_address, browser, device_ty
         return 0
 
 
-def effective_session_duration_minutes(session_log):
+def _effective_session_end(session_log):
     """
-    Wall-clock session length in minutes (login to session close).
+    Timestamp the session is considered to have ended at, or ``None`` when open.
 
-    When ``session_end`` is set, duration is always derived from
-    ``session_end - session_start`` (UTC-normalized) so the value matches the
-    timestamps shown in the UI. This includes idle time after the last request
-    until the session is ended (timeout, logout, or cleanup). Stored
-    ``duration_minutes`` can be wrong (e.g. legacy naive/aware subtraction or bad
-    writes) and is only used as a fallback when ``session_end`` is missing.
+    Rows closed by the idle timeout before this logic existed stored the cleanup
+    time as ``session_end``; clamping to ``last_activity`` corrects them on read
+    without a data migration.
+    """
+    if session_log.session_end is None:
+        return None
+    end = ensure_utc(session_log.session_end)
+    if getattr(session_log, 'ended_by', None) in IDLE_ENDED_BY:
+        last_seen = ensure_utc(session_log.last_activity) if session_log.last_activity else None
+        start = ensure_utc(session_log.session_start)
+        if last_seen is not None and start <= last_seen < end:
+            return last_seen
+    return end
+
+
+def effective_session_duration_seconds(session_log):
+    """
+    Wall-clock session length in whole seconds (login to session close).
+
+    When the session is closed the value is derived from its timestamps (UTC-normalized),
+    so it matches what the UI shows. Sessions closed by the idle timeout end at their
+    last activity (see ``_effective_session_end``); other endings (logout, admin
+    force-logout, re-login) end when they happened. Open sessions measure up to now.
+    Stored ``duration_minutes`` is only a fallback for rows without ``session_end``.
 
     For time until the last recorded activity only, use
-    ``effective_session_active_duration_minutes``.
+    ``effective_session_active_duration_seconds``.
     """
     if session_log is None:
         return None
@@ -868,27 +947,25 @@ def effective_session_duration_minutes(session_log):
         return None
     session_start_aware = ensure_utc(session_log.session_start)
 
-    if session_log.session_end is not None:
-        session_end_aware = ensure_utc(session_log.session_end)
-        delta = session_end_aware - session_start_aware
-        return max(0, int(delta.total_seconds() / 60))
+    session_end_aware = _effective_session_end(session_log)
+    if session_end_aware is not None:
+        return max(0, int((session_end_aware - session_start_aware).total_seconds()))
 
     if getattr(session_log, 'is_active', False):
-        delta = utcnow() - session_start_aware
-        return max(0, int(delta.total_seconds() / 60))
+        return max(0, int((utcnow() - session_start_aware).total_seconds()))
 
     if session_log.duration_minutes is not None:
-        return session_log.duration_minutes
+        return session_log.duration_minutes * 60
     return None
 
 
-def effective_session_active_duration_minutes(session_log):
+def effective_session_active_duration_seconds(session_log):
     """
-    Minutes from ``session_start`` to ``last_activity`` (UTC-normalized).
+    Seconds from ``session_start`` to ``last_activity`` (UTC-normalized).
 
     Represents how long the user was generating activity before the last bump;
     it does not include idle time after ``last_activity`` until the session row
-    is closed (unlike ``effective_session_duration_minutes``).
+    is closed (unlike ``effective_session_duration_seconds``).
     """
     if session_log is None or session_log.session_start is None:
         return None
@@ -896,39 +973,93 @@ def effective_session_active_duration_minutes(session_log):
     if session_log.last_activity is None:
         return 0
     last_aware = ensure_utc(session_log.last_activity)
-    delta = last_aware - session_start_aware
-    return max(0, int(delta.total_seconds() / 60))
+    return max(0, int((last_aware - session_start_aware).total_seconds()))
 
 
-def user_session_log_active_duration_minutes_sql():
+def effective_session_duration_minutes(session_log):
+    """Whole minutes of ``effective_session_duration_seconds`` (rounded down)."""
+    seconds = effective_session_duration_seconds(session_log)
+    return None if seconds is None else seconds // 60
+
+
+def effective_session_active_duration_minutes(session_log):
+    """Whole minutes of ``effective_session_active_duration_seconds`` (rounded down)."""
+    seconds = effective_session_active_duration_seconds(session_log)
+    return None if seconds is None else seconds // 60
+
+
+def format_session_duration(seconds):
     """
-    SQL expression for whole minutes between ``session_start`` and ``last_activity``.
+    Human label for a session duration, localized through Flask-Babel.
 
-    Used for ``min_duration`` filtering alongside ``duration_minutes``. Returns
-    ``None`` when the dialect is not supported (filter omits the active branch).
+    Anything under a minute reads "< 1 min" instead of "0 min" so a real (very
+    short) session is not mistaken for a missing or zero-length one.
     """
+    if seconds is None:
+        return ''
+    total_minutes = max(0, int(seconds)) // 60
+    if total_minutes < 1:
+        return _('< 1 min')
+    hours, minutes = divmod(total_minutes, 60)
+    if hours < 1:
+        return _('%(minutes)d min', minutes=minutes)
+    if minutes == 0:
+        return _('%(hours)d h', hours=hours)
+    return _('%(hours)d h %(minutes)d min', hours=hours, minutes=minutes)
+
+
+def _epoch_seconds_between_sql(end, start):
+    """SQL expression for ``end - start`` in seconds, or ``None`` for unsupported dialects."""
     dialect = db.engine.dialect.name
-    start = UserSessionLog.session_start
-    last = UserSessionLog.last_activity
     if dialect == 'postgresql':
-        return func.coalesce(
-            func.cast(
-                func.floor(func.extract('epoch', last - start) / 60.0),
-                Integer,
-            ),
-            0,
-        )
+        return func.extract('epoch', end - start)
     if dialect == 'sqlite':
-        return func.coalesce(
-            func.cast(
-                (func.julianday(last) - func.julianday(start)) * (24 * 60),
-                Integer,
-            ),
-            0,
-        )
-    if dialect in ('mysql', 'mariadb'):
-        return func.coalesce(func.timestampdiff(text('MINUTE'), start, last), 0)
+        return (func.julianday(end) - func.julianday(start)) * 86400.0
     return None
+
+
+def user_session_log_wall_seconds_sql():
+    """
+    SQL twin of ``effective_session_duration_seconds`` (whole seconds, never negative).
+
+    Closed sessions end at ``session_end`` (idle endings at ``last_activity``), open
+    sessions at the current time. Rows with neither fall back to ``duration_minutes``.
+    Returns ``None`` when the dialect is not supported.
+    """
+    start = UserSessionLog.session_start
+    now_naive = literal(naive_utc(utcnow()), type_=DateTime)
+    idle_clamped = and_(
+        UserSessionLog.ended_by.in_(tuple(IDLE_ENDED_BY)),
+        UserSessionLog.last_activity.isnot(None),
+        UserSessionLog.last_activity >= start,
+        UserSessionLog.last_activity < UserSessionLog.session_end,
+    )
+    end = case(
+        (idle_clamped, UserSessionLog.last_activity),
+        (UserSessionLog.session_end.isnot(None), UserSessionLog.session_end),
+        (UserSessionLog.is_active.is_(True), now_naive),
+        else_=None,
+    )
+    diff = _epoch_seconds_between_sql(end, start)
+    if diff is None:
+        return None
+    return func.coalesce(
+        case((diff < 0, 0), else_=diff),
+        func.coalesce(UserSessionLog.duration_minutes, 0) * 60,
+    )
+
+
+def user_session_log_active_duration_seconds_sql():
+    """
+    SQL twin of ``effective_session_active_duration_seconds``.
+
+    Used for ``min_duration`` filtering. Returns ``None`` when the dialect is
+    not supported (the filter omits the active branch).
+    """
+    diff = _epoch_seconds_between_sql(UserSessionLog.last_activity, UserSessionLog.session_start)
+    if diff is None:
+        return None
+    return func.coalesce(case((diff < 0, 0), else_=diff), 0)
 
 
 # Per-process cache of revoked session IDs (positives only). The authoritative,
@@ -1658,15 +1789,26 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
         # A single UPDATE per group replaces the previous pattern of loading all sessions into
         # Python and issuing N individual UPDATE statements — O(1) round-trips instead of O(N).
         #
-        # duration_minutes is computed in SQL so we never need to hydrate ORM objects.
-        duration_minutes_expr = cast(
-            func.extract('epoch', func.now() - UserSessionLog.session_start) / 60,
-            Integer,
-        )
-        common_fields = {
+        # Sessions closed for inactivity end at their last activity: the user left then, and
+        # stamping "now" would add the idle gap to the reported length. A session that is still
+        # active but over the maximum lifetime really does end now. Durations are whole minutes
+        # rounded down (FLOOR), matching ``end_user_session`` — a plain CAST would round.
+        def _minutes_between(end_expr):
+            return cast(
+                func.floor(func.extract('epoch', end_expr - UserSessionLog.session_start) / 60),
+                Integer,
+            )
+
+        idle_fields = {
+            'session_end': UserSessionLog.last_activity,
+            'is_active': False,
+            'duration_minutes': _minutes_between(UserSessionLog.last_activity),
+        }
+        now_naive = naive_utc(now)
+        expired_fields = {
             'session_end': now,
             'is_active': False,
-            'duration_minutes': duration_minutes_expr,
+            'duration_minutes': _minutes_between(literal(now_naive, type_=DateTime)),
         }
 
         count_both = UserSessionLog.query.filter(
@@ -1676,7 +1818,7 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
                 UserSessionLog.session_start < max_duration_cutoff,
             )
         ).update(
-            {**common_fields, 'ended_by': 'timeout_and_max_duration'},
+            {**idle_fields, 'ended_by': 'timeout_and_max_duration'},
             synchronize_session=False,
         )
 
@@ -1687,7 +1829,7 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
                 UserSessionLog.session_start >= max_duration_cutoff,
             )
         ).update(
-            {**common_fields, 'ended_by': 'inactivity_timeout'},
+            {**idle_fields, 'ended_by': 'inactivity_timeout'},
             synchronize_session=False,
         )
 
@@ -1698,7 +1840,7 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
                 UserSessionLog.session_start < max_duration_cutoff,
             )
         ).update(
-            {**common_fields, 'ended_by': 'max_duration_exceeded'},
+            {**expired_fields, 'ended_by': 'max_duration_exceeded'},
             synchronize_session=False,
         )
 
@@ -1734,9 +1876,25 @@ def get_active_sessions_count():
         return 0
 
 
+SESSION_DURATION_BUCKETS = (
+    ('< 1 min', 60),
+    ('1-15 min', 15 * 60),
+    ('15-30 min', 30 * 60),
+    ('30-60 min', 60 * 60),
+    ('1-2 hours', 120 * 60),
+    ('2-4 hours', 240 * 60),
+)
+SESSION_DURATION_OVERFLOW_BUCKET = '4+ hours'
+
+
 def get_session_analytics(days=30):
     """
     Get session analytics for the past N days.
+
+    Durations come from ``effective_session_duration_seconds`` so sub-minute
+    sessions count as what they are (not as ``0``) and idle-timeout sessions end
+    at their last activity. Only closed sessions contribute to average and
+    distribution.
 
     Args:
         days (int): Number of days to analyze
@@ -1756,57 +1914,47 @@ def get_session_analytics(days=30):
                 'total_sessions': 0,
                 'active_sessions': 0,
                 'average_duration': 0,
+                'average_duration_seconds': 0,
                 'total_page_views': 0,
                 'sessions_by_day': [],
                 'duration_distribution': {}
             }
 
-        # Calculate metrics
         total_sessions = len(sessions)
         active_sessions = len([s for s in sessions if s.is_active])
 
-        # Average duration (only for completed sessions)
-        completed_sessions = [s for s in sessions if s.duration_minutes is not None]
-        avg_duration = sum(s.duration_minutes for s in completed_sessions) / len(completed_sessions) if completed_sessions else 0
+        completed_seconds = [
+            secs
+            for secs in (
+                effective_session_duration_seconds(s) for s in sessions if not s.is_active
+            )
+            if secs is not None
+        ]
+        avg_seconds = sum(completed_seconds) / len(completed_seconds) if completed_seconds else 0
 
-        # Total page views
         total_page_views = sum(s.page_views or 0 for s in sessions)
 
-        # Sessions by day
         sessions_by_day = {}
         for session in sessions:
             day = session.session_start.date()
             sessions_by_day[day] = sessions_by_day.get(day, 0) + 1
 
-        # Duration distribution
-        duration_ranges = {
-            '0-15 min': 0,
-            '15-30 min': 0,
-            '30-60 min': 0,
-            '1-2 hours': 0,
-            '2-4 hours': 0,
-            '4+ hours': 0
-        }
+        duration_ranges = {label: 0 for label, _limit in SESSION_DURATION_BUCKETS}
+        duration_ranges[SESSION_DURATION_OVERFLOW_BUCKET] = 0
 
-        for session in completed_sessions:
-            duration = session.duration_minutes
-            if duration <= 15:
-                duration_ranges['0-15 min'] += 1
-            elif duration <= 30:
-                duration_ranges['15-30 min'] += 1
-            elif duration <= 60:
-                duration_ranges['30-60 min'] += 1
-            elif duration <= 120:
-                duration_ranges['1-2 hours'] += 1
-            elif duration <= 240:
-                duration_ranges['2-4 hours'] += 1
+        for seconds in completed_seconds:
+            for label, limit in SESSION_DURATION_BUCKETS:
+                if seconds < limit:
+                    duration_ranges[label] += 1
+                    break
             else:
-                duration_ranges['4+ hours'] += 1
+                duration_ranges[SESSION_DURATION_OVERFLOW_BUCKET] += 1
 
         return {
             'total_sessions': total_sessions,
             'active_sessions': active_sessions,
-            'average_duration': round(avg_duration, 1),
+            'average_duration': round(avg_seconds / 60, 1),
+            'average_duration_seconds': int(avg_seconds),
             'total_page_views': total_page_views,
             'sessions_by_day': sorted(sessions_by_day.items()),
             'duration_distribution': duration_ranges

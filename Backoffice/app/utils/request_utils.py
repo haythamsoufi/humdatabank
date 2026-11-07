@@ -188,6 +188,17 @@ def get_request_list(data, key):
     return val if isinstance(val, list) else [val]
 
 
+_TRUE_ARG_VALUES = frozenset({"1", "true", "yes", "on", "y", "t"})
+
+
+def parse_bool_arg(value) -> bool:
+    """
+    Query-string boolean. ``request.args.get(name, type=bool)`` treats any non-empty
+    string as true, so ``?active_only=false`` or ``=0`` would still enable the filter.
+    """
+    return str(value or "").strip().lower() in _TRUE_ARG_VALUES
+
+
 def get_request_int(data, key, default=None):
     """Read a single integer field, coercing duplicate JSON values to the last non-empty entry."""
     src = data if data is not None else request.form

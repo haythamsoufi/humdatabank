@@ -39,13 +39,17 @@ from app.services.platform.user_analytics_service import (
     add_session_to_blacklist,
     bot_user_agent_explanation,
     effective_session_active_duration_minutes,
+    effective_session_active_duration_seconds,
     effective_session_duration_minutes,
+    effective_session_duration_seconds,
     end_user_session,
     session_log_device_icon_classes,
-    user_session_log_active_duration_minutes_sql,
+    user_session_log_active_duration_seconds_sql,
+    user_session_log_wall_seconds_sql,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import iso_utc, utcnow
 from app.utils.page_view_paths import distinct_page_view_path_count
+from app.utils.request_utils import parse_bool_arg
 from app.utils.sql_utils import safe_ilike_pattern
 
 
@@ -151,7 +155,7 @@ def serialize_login_log(log: UserLoginLog, *, variant: str = 'admin') -> Dict[st
 
     item: Dict[str, Any] = {
         'id': log.id,
-        'timestamp': log.timestamp.isoformat(),
+        'timestamp': iso_utc(log.timestamp),
         'event_type': log.event_type,
         'email_attempted': log.email_attempted,
         'user': user_payload,
@@ -236,18 +240,27 @@ def build_session_logs_query(filters: SessionLogsFilters) -> Query:
 
     min_duration = filters.min_duration
     if min_duration is not None and min_duration > 0:
-        cutoff = utcnow() - timedelta(minutes=min_duration)
-        active_min_sql = user_session_log_active_duration_minutes_sql()
-        min_parts = [
-            UserSessionLog.duration_minutes >= min_duration,
-            and_(
-                UserSessionLog.is_active == True,  # noqa: E712
-                UserSessionLog.session_start.isnot(None),
-                UserSessionLog.session_start <= cutoff,
-            ),
-        ]
-        if active_min_sql is not None:
-            min_parts.append(active_min_sql >= min_duration)
+        # Same two measures the list shows: session length OR active time. Both are
+        # computed from timestamps (not the whole-minute ``duration_minutes`` column)
+        # so the filter agrees with the displayed values, including legacy idle rows.
+        min_seconds = min_duration * 60
+        wall_sql = user_session_log_wall_seconds_sql()
+        active_sql = user_session_log_active_duration_seconds_sql()
+        min_parts = []
+        if wall_sql is not None:
+            min_parts.append(wall_sql >= min_seconds)
+        else:
+            cutoff = utcnow() - timedelta(minutes=min_duration)
+            min_parts.extend([
+                UserSessionLog.duration_minutes >= min_duration,
+                and_(
+                    UserSessionLog.is_active == True,  # noqa: E712
+                    UserSessionLog.session_start.isnot(None),
+                    UserSessionLog.session_start <= cutoff,
+                ),
+            ])
+        if active_sql is not None:
+            min_parts.append(active_sql >= min_seconds)
         query = query.filter(or_(*min_parts))
 
     return query.order_by(desc(UserSessionLog.is_active), desc(UserSessionLog.session_start))
@@ -274,11 +287,13 @@ def serialize_session_log_list_item(
 
     item: Dict[str, Any] = {
         'session_id': session_log.session_id,
-        'session_start': session_log.session_start.isoformat() if session_log.session_start else None,
-        'session_end': session_log.session_end.isoformat() if session_log.session_end else None,
-        'last_activity': session_log.last_activity.isoformat() if session_log.last_activity else None,
+        'session_start': iso_utc(session_log.session_start),
+        'session_end': iso_utc(session_log.session_end),
+        'last_activity': iso_utc(session_log.last_activity),
         'duration_minutes': effective_session_duration_minutes(session_log),
         'active_duration_minutes': effective_session_active_duration_minutes(session_log),
+        'duration_seconds': effective_session_duration_seconds(session_log),
+        'active_duration_seconds': effective_session_active_duration_seconds(session_log),
         'page_views': page_views,
         'distinct_page_view_paths': distinct_paths,
         'activity_count': activity_count,
@@ -701,7 +716,7 @@ def login_logs_filters_from_request_args(args) -> LoginLogsFilters:
         user=args.get('user'),
         event_type=args.get('event_type'),
         ip=args.get('ip'),
-        suspicious_only=args.get('suspicious_only', type=bool),
+        suspicious_only=parse_bool_arg(args.get('suspicious_only')),
         date_from=args.get('date_from'),
         date_to=args.get('date_to'),
     )
@@ -710,7 +725,7 @@ def login_logs_filters_from_request_args(args) -> LoginLogsFilters:
 def session_logs_filters_from_request_args(args) -> SessionLogsFilters:
     return SessionLogsFilters(
         user=args.get('user'),
-        active_only=args.get('active_only', type=bool),
+        active_only=parse_bool_arg(args.get('active_only')),
         min_duration=args.get('min_duration', type=int),
         session_id=args.get('session_id'),
     )

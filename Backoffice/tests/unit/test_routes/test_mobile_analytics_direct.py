@@ -49,6 +49,22 @@ class TestIsDuplicate:
         _recent_screen_views[5555] = ('HomeScreen', '/home', time.time() - _DEDUP_WINDOW_SECONDS - 1)
         assert _is_duplicate(5555, 'HomeScreen', '/home') is False
 
+    def test_same_user_other_session_is_not_duplicate(self, app):
+        from app.routes.api.mobile.analytics import _is_duplicate, _recent_screen_views
+        _recent_screen_views.clear()
+        _recent_screen_views[(1, 'sess-a')] = ('HomeScreen', '/home', time.time())
+        assert _is_duplicate((1, 'sess-a'), 'HomeScreen', '/home') is True
+        assert _is_duplicate((1, 'sess-b'), 'HomeScreen', '/home') is False
+
+    def test_cache_is_pruned_when_full(self, app):
+        from app.routes.api.mobile import analytics as mod
+        mod._recent_screen_views.clear()
+        old = time.time() - mod._DEDUP_WINDOW_SECONDS - 5
+        for i in range(mod._DEDUP_CACHE_MAX_ENTRIES):
+            mod._recent_screen_views[(i, 's')] = ('A', '/a', old)
+        mod._prune_recent_screen_views(time.time())
+        assert len(mod._recent_screen_views) == 0
+
 
 class TestScreenView:
     def test_missing_screen_name_returns_400(self, app, db_session):

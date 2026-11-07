@@ -200,7 +200,8 @@ List<ReachChoice> buildReachChoices(
   return choices;
 }
 
-/// Chips for the headline indicators; People reached opens sub chips grouped by sector.
+/// Chips for the headline indicators. People reached opens a second row of
+/// sector chips, and the selected sector opens a third row with its indicators.
 class KeyIndicatorSelector extends StatelessWidget {
   const KeyIndicatorSelector({
     super.key,
@@ -233,15 +234,33 @@ class KeyIndicatorSelector extends StatelessWidget {
         fontWeight: FontWeight.w600,
         fontSize: fontSize,
       ),
-      onSelected: (_) => onTap(),
+      onSelected: (_) {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+    );
+  }
+
+  Widget _row(List<Widget> chips) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: chips.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, i) => chips[i],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final reachSelected = reachChoices.any((c) => c.key == selectedKey);
+    ReachChoice? selectedChoice;
+    for (final choice in reachChoices) {
+      if (choice.key == selectedKey) selectedChoice = choice;
+    }
+    final reachSelected = selectedChoice != null;
     final topKeys = [
       for (final key in keyIndicatorOrder)
         if (key == peopleReachedGroup
@@ -258,54 +277,47 @@ class KeyIndicatorSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: topKeys.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              final key = topKeys[i];
-              final isGroup = key == peopleReachedGroup;
-              return _chip(
+        _row([
+          for (final key in topKeys)
+            _chip(
+              context,
+              label: keyIndicatorLabel(key, loc),
+              selected:
+                  key == peopleReachedGroup ? reachSelected : key == selectedKey,
+              onTap: () {
+                if (key != peopleReachedGroup) return onSelected(key);
+                if (!reachSelected) onSelected(reachChoices.first.key);
+              },
+            ),
+        ]),
+        if (selectedChoice != null) ...[
+          const SizedBox(height: 4),
+          _row([
+            for (final entry in sections.entries)
+              _chip(
                 context,
-                label: keyIndicatorLabel(key, loc),
-                selected: isGroup ? reachSelected : key == selectedKey,
+                label: entry.key,
+                selected: entry.key == selectedChoice.section,
+                fontSize: 12,
                 onTap: () {
-                  if (!isGroup) return onSelected(key);
-                  if (!reachSelected) onSelected(reachChoices.first.key);
+                  if (entry.key != selectedChoice!.section) {
+                    onSelected(entry.value.first.key);
+                  }
                 },
-              );
-            },
-          ),
-        ),
-        if (reachSelected)
-          for (final entry in sections.entries) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 4),
-              child: Text(
-                entry.key,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: context.navyTextColor,
-                ),
               ),
-            ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final choice in entry.value)
-                  _chip(
-                    context,
-                    label: choice.label,
-                    selected: choice.key == selectedKey,
-                    fontSize: 12,
-                    onTap: () => onSelected(choice.key),
-                  ),
-              ],
-            ),
-          ],
+          ]),
+          const SizedBox(height: 4),
+          _row([
+            for (final choice in sections[selectedChoice.section]!)
+              _chip(
+                context,
+                label: choice.label,
+                selected: choice.key == selectedKey,
+                fontSize: 12,
+                onTap: () => onSelected(choice.key),
+              ),
+          ]),
+        ],
       ],
     );
   }

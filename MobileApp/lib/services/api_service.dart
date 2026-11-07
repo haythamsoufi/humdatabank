@@ -776,6 +776,7 @@ class ApiService {
     Map<String, String>? additionalHeaders,
     bool queueOnOffline = true,
     bool retryable = true,
+    Duration? timeout,
   }) async {
     if (includeAuth && !skipExpiredGuard) await _guardSessionExpiry();
 
@@ -837,7 +838,7 @@ class ApiService {
             backoffMultiplier: 1.0,
           );
 
-    final requestTimeout = ApiTimeouts.receive;
+    final requestTimeout = timeout ?? ApiTimeouts.receive;
     var usedLiveNetwork = false;
     final client = http.Client();
     usedLiveNetwork = true;

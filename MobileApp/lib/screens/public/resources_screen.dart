@@ -165,7 +165,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
               ),
             ],
           ),
-          drawer: AppNavigationDrawer(
+          drawer: const AppNavigationDrawer(
             activeScreen: ActiveDrawerScreen.resources,
           ),
           body: Column(

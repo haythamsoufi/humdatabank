@@ -222,7 +222,7 @@ class _DisaggregationAnalysisScreenState
           ),
         ],
       ),
-      drawer: AppNavigationDrawer(
+      drawer: const AppNavigationDrawer(
         activeScreen: ActiveDrawerScreen.home,
       ),
       body: RefreshIndicator(

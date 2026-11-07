@@ -820,15 +820,38 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
         ),
       },
       onLinkTap: (url, attributes, element) {
-        _handleLinkTap(context, url);
+        _handleLinkTap(context, url, linkText: element?.text);
       },
     );
   }
 
-  /// True if [url] is a document download/source link from the AI (backend path).
-  bool _isDocumentSourceUrl(String url) {
-    final path = url.split('?').first.split('#').first.trim();
-    return path.startsWith('/api/ai/documents/') && path.contains('/download');
+  /// Backend path for an AI document download link, or null if [url] is not one.
+  ///
+  /// Accepts relative `/api/ai/documents/<id>/download` hrefs and absolute URLs
+  /// on the configured backoffice host (e.g. after the HTML layer absolutizes them).
+  String? _aiDocumentDownloadPath(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return null;
+
+    String path;
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+      path = trimmed.split('?').first.split('#').first;
+    } else {
+      final uri = Uri.tryParse(trimmed);
+      if (uri == null) return null;
+      final scheme = uri.scheme.toLowerCase();
+      if (scheme != 'http' && scheme != 'https') return null;
+      final backendHost = Uri.tryParse(AppConfig.baseApiUrl)?.host.toLowerCase();
+      if (backendHost == null || uri.host.toLowerCase() != backendHost) {
+        return null;
+      }
+      path = uri.path;
+    }
+
+    if (path.startsWith('/api/ai/documents/') && path.contains('/download')) {
+      return path;
+    }
+    return null;
   }
 
   bool _isAllowedInternalRoute(String route) {
@@ -854,23 +877,33 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
     return false;
   }
 
-  Future<void> _handleLinkTap(BuildContext context, String? url) async {
+  Future<void> _handleLinkTap(
+    BuildContext context,
+    String? url, {
+    String? linkText,
+  }) async {
     if (url == null || url.trim().isEmpty) return;
     final trimmed = url.trim();
+
+    // AI document citations: open the in-app PDF viewer (auth attached there).
+    final docPath = _aiDocumentDownloadPath(trimmed);
+    if (docPath != null) {
+      if (!context.mounted) return;
+      final loc = AppLocalizations.of(context)!;
+      final title = (linkText ?? '').trim();
+      await Navigator.of(context).pushNamed(
+        AppRoutes.pdfViewer,
+        arguments: <String, String>{
+          'url': '${AppConfig.baseApiUrl}$docPath',
+          'title': title.isNotEmpty ? title : loc.document,
+        },
+      );
+      return;
+    }
 
     // Internal route (app screens)
     if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
       final path = trimmed.split('?').first.split('#').first;
-
-      // Document source links: open full backend URL so user can view/download (ChatGPT-style sources)
-      if (_isDocumentSourceUrl(path)) {
-        final fullUrl = '${AppConfig.baseApiUrl}$path';
-        final uri = Uri.tryParse(fullUrl);
-        if (uri != null && await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-        return;
-      }
 
       // Map web paths to mobile app routes
       final route = _mapWebRouteToMobile(path);

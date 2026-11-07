@@ -52,8 +52,12 @@ class AiChatAgentProgressCopy {
 
   static String detailLine(AppLocalizations loc, String raw) {
     final t = raw.trim();
-    if (t == AiChatProvider.aiAgentStepDoneSentinel) {
-      return loc.aiAgentStepDone;
+    // Completed-step placeholders are noise; the checkmark already shows completion.
+    if (t == AiChatProvider.aiAgentStepDoneSentinel ||
+        t == 'Done.' ||
+        t == 'Done' ||
+        t == loc.aiAgentStepDone.trim()) {
+      return '';
     }
     if (t == 'Thinking what to do next.' ||
         t == 'Thinking about what to do next.') {

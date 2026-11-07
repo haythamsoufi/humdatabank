@@ -659,7 +659,7 @@ class OfflineFormStore {
 
   Future<void> deletePackage(String key) async {
     final dir = await packageDir(key);
-    if (await dir.exists()) await dir.delete(recursive: true);
+    await _deleteDirIfPresent(dir);
   }
 
   /// Removes every package of [templateId] and the solo package of
@@ -673,11 +673,23 @@ class OfflineFormStore {
           meta?.templateId == templateId ||
           (alsoAssignmentId != null && key == 'solo_$alsoAssignmentId');
       if (matches) {
-        await dir.delete(recursive: true);
+        await _deleteDirIfPresent(dir);
         removed = true;
       }
     }
     return removed;
+  }
+
+  /// Best-effort recursive delete. Treats a missing path as success so concurrent
+  /// cleanup (controller spread / reconcile vs explicit remove) cannot throw.
+  Future<void> _deleteDirIfPresent(Directory dir) async {
+    try {
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+    } on PathNotFoundException {
+      // Already gone.
+    }
   }
 
   Future<void> deleteAll() async {

@@ -52,7 +52,9 @@ class AiChatHttpException implements Exception {
     }
     if (parts.isNotEmpty) return parts.join(' — ');
     if (statusCode == 401) return 'Your session has expired. Please sign in again.';
-    if (statusCode == 403) return 'You do not have access to the AI assistant.';
+    if (statusCode == 403) {
+      return 'The request was rejected by the server (HTTP 403). Please try again.';
+    }
     if (statusCode >= 500) {
       return 'The assistant is temporarily unavailable. Please try again later.';
     }

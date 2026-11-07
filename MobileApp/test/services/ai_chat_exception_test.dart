@@ -13,6 +13,13 @@ void main() {
       expect(e.chatErrorType, 'forbidden');
     });
 
+    test('403 without a backend message does not claim the user lacks access', () {
+      final e = AiChatHttpException.fromResponse(403, '<html>403 Forbidden</html>');
+      expect(e.chatErrorType, 'forbidden');
+      expect(e.message, isNot(contains('do not have access')));
+      expect(e.message, contains('403'));
+    });
+
     test('maps 401 to auth_required', () {
       final e = AiChatHttpException.fromResponse(401, '{"message":"Auth required"}');
       expect(e.chatErrorType, 'auth_required');

@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
 import '../utils/sse_event_parser.dart';
+import '../utils/waf_json_body.dart';
 import 'ai_chat_exception.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
@@ -97,7 +98,7 @@ class AiChatService {
         headers['Authorization'] = 'Bearer $token';
       }
 
-      final body = _buildChatRequestBody(
+      final body = wrapWafJsonBody(_buildChatRequestBody(
         message: message,
         conversationId: conversationId,
         clientMessageId: clientMessageId,
@@ -106,7 +107,7 @@ class AiChatService {
         conversationHistory: conversationHistory,
         sources: sources,
         branchFromEdit: branchFromEdit,
-      );
+      ));
 
       final resp = await _api.post(
         AppConfig.aiV2ChatEndpoint,
@@ -215,7 +216,7 @@ class AiChatService {
 
     controller.onCancel = release;
 
-    final Map<String, dynamic> body = {
+    final Map<String, dynamic> body = wrapWafJsonBody({
       ..._buildChatRequestBody(
         message: message,
         conversationId: conversationId,
@@ -227,7 +228,7 @@ class AiChatService {
         branchFromEdit: branchFromEdit,
       ),
       'keep_running_on_disconnect': true,
-    };
+    });
 
     Future<ApiStreamedPost> openWith(String? token) {
       return _api.openStreamingPost(

@@ -658,9 +658,10 @@ class _RegionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final red = Color(AppConstants.ifrcRed);
-    final foreground = selected ? Colors.white : context.textColor;
+    final onSelected = theme.colorScheme.onSecondary;
+    final foreground = selected ? onSelected : context.textColor;
     final badgeColor = selected
-        ? Colors.white.withValues(alpha: 0.22)
+        ? onSelected.withValues(alpha: 0.22)
         : context.navyBackgroundColor(opacity: 0.08);
 
     return Semantics(
@@ -733,9 +734,11 @@ class _RegionSidebarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final foreground = selected ? Colors.white : context.textColor;
-    final secondary =
-        selected ? Colors.white.withValues(alpha: 0.85) : context.textSecondaryColor;
+    final onSelected = theme.colorScheme.onSecondary;
+    final foreground = selected ? onSelected : context.textColor;
+    final secondary = selected
+        ? onSelected.withValues(alpha: 0.85)
+        : context.textSecondaryColor;
 
     return Semantics(
       button: true,

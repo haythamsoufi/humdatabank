@@ -126,7 +126,8 @@ class AiChatProvider with ChangeNotifier {
   }
 
   static const _preparingQueryLabel = 'Preparing query…';
-  /// [AiChatAgentProgressCopy] maps this to a localized "Done." in the UI.
+  /// Former completed-step detail marker. Kept so older inflight snapshots still
+  /// round-trip; the UI hides it (checkmark already signals completion).
   static const aiAgentStepDoneSentinel = '__AI_STEP_DONE__';
   static final RegExp _progressTickRe = RegExp(r'^(.+?):\s*(\d+)\s*/\s*(\d+)\s*$');
 
@@ -434,11 +435,11 @@ class AiChatProvider with ChangeNotifier {
     if (index < 0 || index >= _agentSteps.length) return;
     final step = _agentSteps[index];
     if (step.detailLines.isNotEmpty) return;
+    // Only backfill the rewritten-query detail for "Preparing query…"; do not
+    // invent a "Done." line — completed steps already show a checkmark.
     if (step.message.trim() == _preparingQueryLabel && _lastPreparingQueryDetail != null) {
       _agentSteps[index] = step.copyWith(detailLines: [_lastPreparingQueryDetail!]);
       _lastPreparingQueryDetail = null;
-    } else {
-      _agentSteps[index] = step.copyWith(detailLines: const [aiAgentStepDoneSentinel]);
     }
   }
 

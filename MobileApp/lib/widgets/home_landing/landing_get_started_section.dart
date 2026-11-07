@@ -53,7 +53,10 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
   late Future<GlobalOverviewDataset> _datasetFuture;
   List<String> _periodOptions = [];
   String? _selectedPeriod;
-  int _indicatorBankId = FdrsConstants.indicatorVolunteers;
+  FdrsIndicatorSelection _indicator = const FdrsIndicatorSelection.bank(
+    FdrsConstants.indicatorVolunteers,
+  );
+  List<ReachSector> _reachSectors = [];
   FdrsMapVisualMode _mapVisualMode = FdrsMapVisualMode.bubble;
 
   @override
@@ -64,6 +67,22 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
       WorldGeoJsonCache.instance.ensureLoaded(),
     ]);
     _datasetFuture = _loadPeriodsThenData();
+    _loadReachSectors();
+  }
+
+  Future<void> _loadReachSectors() async {
+    final sectors = await _service.listReachSectors(locale: widget.locale);
+    if (!mounted) return;
+    setState(() {
+      _reachSectors = sectors;
+      if (_indicator.isReach &&
+          !sectors.any((s) => s.key == _indicator.sectorKey)) {
+        _indicator = const FdrsIndicatorSelection.bank(
+          FdrsConstants.indicatorVolunteers,
+        );
+        _datasetFuture = _loadDataOnly();
+      }
+    });
   }
 
   @override
@@ -73,6 +92,7 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
       setState(() {
         _datasetFuture = _loadPeriodsThenData();
       });
+      _loadReachSectors();
     }
   }
 
@@ -89,7 +109,7 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
       }
     });
     return _service.loadOverview(
-      indicatorBankId: _indicatorBankId,
+      indicator: _indicator,
       locale: widget.locale,
       periodName: _selectedPeriod,
     );
@@ -97,16 +117,16 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
 
   Future<GlobalOverviewDataset> _loadDataOnly() {
     return _service.loadOverview(
-      indicatorBankId: _indicatorBankId,
+      indicator: _indicator,
       locale: widget.locale,
       periodName: _selectedPeriod,
     );
   }
 
-  void _selectIndicator(int id) {
-    if (id == _indicatorBankId) return;
+  void _selectIndicator(FdrsIndicatorSelection selection) {
+    if (selection == _indicator) return;
     setState(() {
-      _indicatorBankId = id;
+      _indicator = selection;
       _datasetFuture = _loadDataOnly();
     });
   }
@@ -154,9 +174,10 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
             ),
           ),
           const SizedBox(height: 14),
-          FdrsIndicatorScrollBar(
+          FdrsIndicatorPicker(
             l10n: l10n,
-            indicatorBankId: _indicatorBankId,
+            selection: _indicator,
+            reachSectors: _reachSectors,
             onSelect: _selectIndicator,
           ),
           const SizedBox(height: 14),
@@ -242,12 +263,13 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
                     onMapVisualModeChanged: (mode) {
                       setState(() => _mapVisualMode = mode);
                     },
-                    indicatorBankId: _indicatorBankId,
+                    indicator: _indicator,
+                    reachSectors: _reachSectors,
                     selectedPeriod: _selectedPeriod,
                     periodOptions: _periodOptions,
                     onApplyFullscreenSnapshot: (snapshot) {
                       setState(() {
-                        _indicatorBankId = snapshot.indicatorBankId;
+                        _indicator = snapshot.indicator;
                         _selectedPeriod = snapshot.selectedPeriod;
                         _mapVisualMode = snapshot.visualMode;
                         _datasetFuture = _loadDataOnly();
@@ -255,10 +277,10 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
                     },
                     reloadDataset:
                         ({
-                          required int indicatorBankId,
+                          required FdrsIndicatorSelection indicator,
                           required String? periodName,
                         }) => _service.loadOverview(
-                          indicatorBankId: indicatorBankId,
+                          indicator: indicator,
                           locale: widget.locale,
                           periodName: periodName,
                         ),
@@ -573,7 +595,8 @@ class _OverviewBody extends StatelessWidget {
     required this.data,
     required this.mapVisualMode,
     required this.onMapVisualModeChanged,
-    required this.indicatorBankId,
+    required this.indicator,
+    required this.reachSectors,
     required this.selectedPeriod,
     required this.periodOptions,
     required this.onApplyFullscreenSnapshot,
@@ -586,12 +609,13 @@ class _OverviewBody extends StatelessWidget {
   final GlobalOverviewDataset data;
   final FdrsMapVisualMode mapVisualMode;
   final ValueChanged<FdrsMapVisualMode> onMapVisualModeChanged;
-  final int indicatorBankId;
+  final FdrsIndicatorSelection indicator;
+  final List<ReachSector> reachSectors;
   final String? selectedPeriod;
   final List<String> periodOptions;
   final ValueChanged<FdrsMapSessionSnapshot> onApplyFullscreenSnapshot;
   final Future<GlobalOverviewDataset> Function({
-    required int indicatorBankId,
+    required FdrsIndicatorSelection indicator,
     required String? periodName,
   })
   reloadDataset;
@@ -666,7 +690,7 @@ class _OverviewBody extends StatelessWidget {
       borderColor: border,
     );
 
-    final indicatorLabel = fdrsIndicatorTitle(l10n, indicatorBankId);
+    final indicatorLabel = fdrsSelectionTitle(l10n, indicator);
     final frame = theme.colorScheme.outlineVariant.withValues(
       alpha: isDark ? 0.55 : 0.4,
     );
@@ -674,6 +698,13 @@ class _OverviewBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        FdrsGlobalTotalCard(
+          l10n: l10n,
+          locale: locale,
+          indicatorLabel: indicatorLabel,
+          data: data,
+        ),
+        const SizedBox(height: 12),
         FdrsMapModeToggle(
           l10n: l10n,
           mode: mapVisualMode,
@@ -709,7 +740,7 @@ class _OverviewBody extends StatelessWidget {
                         data: data,
                         iso2: iso2,
                         indicatorLabel: indicatorLabel,
-                        indicatorBankId: indicatorBankId,
+                        indicator: indicator,
                         periodOptions: periodOptions,
                       );
                     },
@@ -737,7 +768,8 @@ class _OverviewBody extends StatelessWidget {
                                     theme: theme,
                                     locale: locale,
                                     initialDataset: data,
-                                    indicatorBankId: indicatorBankId,
+                                    indicator: indicator,
+                                    reachSectors: reachSectors,
                                     selectedPeriod: selectedPeriod,
                                     periodOptions: periodOptions,
                                     visualMode: mapVisualMode,

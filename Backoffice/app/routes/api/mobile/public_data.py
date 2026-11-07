@@ -3,7 +3,7 @@
 
 Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
-    indicator-suggestions, data/periods, data/fdrs-overview, data/country-profile/<iso3>,
+    indicator-suggestions, data/periods, data/fdrs-overview, data/fdrs-reach-indicators, data/country-profile/<iso3>,
     data/region-profile/<slug>,
     data/disaggregation-overview
     (global/regional for anonymous; country breakdown for authenticated org users), data/resources,
@@ -351,6 +351,15 @@ def mobile_periods():
 def mobile_fdrs_overview():
     """Pre-aggregated FDRS indicator totals per country (mobile-optimised)."""
     from plugins.fdrs.mobile import fdrs_overview as _impl
+
+    return _impl()
+
+
+@mobile_bp.route('/data/fdrs-reach-indicators', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def mobile_fdrs_reach_indicators():
+    """People-reached indicators grouped by sector (home map chips)."""
+    from plugins.fdrs.mobile import reach_indicators as _impl
 
     return _impl()
 

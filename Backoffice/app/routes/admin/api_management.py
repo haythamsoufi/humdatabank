@@ -738,8 +738,15 @@ MOBILE_ENDPOINT_REGISTRY = [
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/fdrs-overview', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': True,
      'description': (
-         'FDRS aggregated totals per country (GET). Required query: indicator_bank_id. '
+         'FDRS aggregated totals per country (GET). Required query: indicator_bank_id or kpi_code. '
          'Optional: template_id, period_name, locale. Path has no <id> segment — ID is only in the query string.'
+     ),
+     'flutter': 'GlobalOverviewDataService'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/fdrs-reach-indicators', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'People-reached indicators (FDRS KPI codes) grouped by sector, for the home map chips. '
+         'Optional query: template_id, locale.'
      ),
      'flutter': 'GlobalOverviewDataService'},
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/country-profile/<iso3>', 'methods': ['GET'],

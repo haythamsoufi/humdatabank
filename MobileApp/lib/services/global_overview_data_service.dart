@@ -8,6 +8,65 @@ import '../config/fdrs_constants.dart';
 import 'api_service.dart';
 import '../di/service_locator.dart';
 
+/// Which indicator the home map shows: a headline indicator bank row, or a
+/// people-reached indicator identified by FDRS KPI code (stable across
+/// environments, unlike bank ids) within a sector.
+class FdrsIndicatorSelection {
+  const FdrsIndicatorSelection.bank(int this.bankId)
+      : kpiCode = null,
+        sectorKey = null,
+        label = null;
+
+  const FdrsIndicatorSelection.reach({
+    required String this.kpiCode,
+    required String this.sectorKey,
+    required String this.label,
+  }) : bankId = null;
+
+  final int? bankId;
+  final String? kpiCode;
+  final String? sectorKey;
+  final String? label;
+
+  bool get isReach => kpiCode != null;
+
+  Map<String, String> get queryParams => isReach
+      ? {'kpi_code': kpiCode!}
+      : {'indicator_bank_id': '$bankId'};
+
+  @override
+  bool operator ==(Object other) =>
+      other is FdrsIndicatorSelection &&
+      other.bankId == bankId &&
+      other.kpiCode == kpiCode;
+
+  @override
+  int get hashCode => Object.hash(bankId, kpiCode);
+}
+
+class ReachIndicator {
+  const ReachIndicator({required this.kpiCode, required this.name});
+
+  final String kpiCode;
+  final String name;
+}
+
+/// A main sector with the people-reached indicators reported under it.
+class ReachSector {
+  const ReachSector({
+    required this.key,
+    required this.name,
+    required this.indicators,
+  });
+
+  /// Sector id from the server, or `other` for indicators without a sector.
+  final String key;
+
+  /// Null when the indicators carry no sector; the UI supplies a fallback label.
+  final String? name;
+  final List<ReachIndicator> indicators;
+}
+
 /// Aggregated FDRS indicator values per country for the native home map/chart.
 class GlobalOverviewDataset {
   GlobalOverviewDataset({
@@ -80,6 +139,26 @@ class GlobalOverviewDataService {
         .toList();
   }
 
+  /// People-reached indicators grouped by sector (public endpoint). Empty when
+  /// the request fails so the home chips simply hide the People reached group.
+  Future<List<ReachSector>> listReachSectors({required String locale}) async {
+    try {
+      final resp = await _api.get(
+        AppConfig.mobileFdrsReachIndicatorsEndpoint,
+        queryParams: {
+          'template_id': '${FdrsConstants.templateId}',
+          'locale': locale,
+        },
+        includeAuth: false,
+        useCache: false,
+      );
+      if (resp.statusCode != 200) return [];
+      return parseReachSectors(jsonDecode(resp.body));
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Loads totals per country for one indicator and [periodName].
   ///
   /// When [periodName] is null or empty, uses the first period from
@@ -92,7 +171,7 @@ class GlobalOverviewDataService {
   /// Both the period lookup and the overview fetch use public endpoints —
   /// no authentication required.
   Future<GlobalOverviewDataset> loadOverview({
-    required int indicatorBankId,
+    required FdrsIndicatorSelection indicator,
     required String locale,
     String? periodName,
   }) async {
@@ -113,7 +192,7 @@ class GlobalOverviewDataService {
     final resolvedPeriod = period;
 
     final qp = <String, String>{
-      'indicator_bank_id': '$indicatorBankId',
+      ...indicator.queryParams,
       'template_id': '${FdrsConstants.templateId}',
       'locale': locale,
     };
@@ -172,10 +251,10 @@ class GlobalOverviewDataService {
     );
   }
 
-  /// Loads [indicatorBankId] for [countryId] across each period in [periods]
+  /// Loads [indicator] for [countryId] across each period in [periods]
   /// (parallel requests). [periods] should be ordered oldest → newest for charts.
   Future<List<({String period, double? value})>> loadCountryIndicatorSeries({
-    required int indicatorBankId,
+    required FdrsIndicatorSelection indicator,
     required String locale,
     required int countryId,
     required List<String> periods,
@@ -183,7 +262,7 @@ class GlobalOverviewDataService {
     if (periods.isEmpty) return [];
     final futures = periods.map(
       (p) => loadOverview(
-        indicatorBankId: indicatorBankId,
+        indicator: indicator,
         locale: locale,
         periodName: p,
       ),
@@ -194,6 +273,41 @@ class GlobalOverviewDataService {
       return (period: periods[i], value: v);
     });
   }
+}
+
+/// Parses the `fdrs-reach-indicators` response body into sectors that have indicators.
+List<ReachSector> parseReachSectors(Object? body) {
+  if (body is! Map<String, dynamic>) return [];
+  final data = body['data'];
+  if (data is! Map<String, dynamic>) return [];
+  final raw = data['sectors'];
+  if (raw is! List<dynamic>) return [];
+  final sectors = <ReachSector>[];
+  for (final entry in raw) {
+    if (entry is! Map<String, dynamic>) continue;
+    final indicators = <ReachIndicator>[];
+    final rawIndicators = entry['indicators'];
+    if (rawIndicators is List<dynamic>) {
+      for (final item in rawIndicators) {
+        if (item is! Map<String, dynamic>) continue;
+        final code = item['kpi_code']?.toString() ?? '';
+        if (code.isEmpty) continue;
+        indicators.add(
+          ReachIndicator(kpiCode: code, name: item['name']?.toString() ?? code),
+        );
+      }
+    }
+    if (indicators.isEmpty) continue;
+    final name = entry['name']?.toString();
+    sectors.add(
+      ReachSector(
+        key: entry['id']?.toString() ?? 'other',
+        name: name == null || name.isEmpty ? null : name,
+        indicators: indicators,
+      ),
+    );
+  }
+  return sectors;
 }
 
 class OverviewLoadException implements Exception {

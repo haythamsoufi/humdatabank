@@ -260,6 +260,8 @@ class AppLocalizations {
       'home_landing_global_indicator_income': 'Income',
       'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'Top countries',
+      'home_landing_global_total_title': 'Global total',
+      'home_landing_global_total_countries': '%s countries reporting',
       'home_landing_global_load_error':
           'Could not load map data. Check your connection and try again.',
       'home_landing_global_empty':
@@ -7711,6 +7713,10 @@ class AppLocalizations {
       translate('home_landing_global_indicator_expenditure');
   String get homeLandingGlobalTopCountries =>
       translate('home_landing_global_top_countries');
+  String get homeLandingGlobalTotalTitle =>
+      translate('home_landing_global_total_title');
+  String homeLandingGlobalTotalCountries(int count) =>
+      translate('home_landing_global_total_countries').replaceAll('%s', '$count');
   String get homeLandingGlobalLoadError =>
       translate('home_landing_global_load_error');
   String get homeLandingGlobalEmpty => translate('home_landing_global_empty');

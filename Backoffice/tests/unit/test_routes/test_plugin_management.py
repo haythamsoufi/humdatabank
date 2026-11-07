@@ -1139,3 +1139,14 @@ class TestLifecycleAudit:
         ):
             resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
         assert resp.status_code == 200
+
+
+class TestManagementPageMarkup:
+    def test_page_renders_with_translated_strings_and_no_stub_card(self, logged_in_sm_client, db_session, app):
+        resp = logged_in_sm_client.get("/admin/plugins/")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="inactive-plugins-count"' in html
+        assert "custom-fields-count" not in html
+        assert '"details_homepage": "Homepage"' in html  # no translation in the default locale
+        assert '"error_failed_activate"' in html and '"error_failed_deactivate"' in html

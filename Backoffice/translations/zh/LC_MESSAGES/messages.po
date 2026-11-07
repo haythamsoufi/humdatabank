@@ -29128,10 +29128,6 @@ msgstr ""
 msgid "This matrix is imputed"
 msgstr ""
 
-#: app/services/ai/runtime/step_ux.py:238
-msgid "This needs multiple steps — starting…"
-msgstr ""
-
 #: app/templates/tours/tours.html:63
 msgid ""
 "This notice indicates that some fields have prefilled values (shown in "
@@ -35222,3 +35218,40 @@ msgstr ""
 #~ "User-type classification is not available yet. Technical RBAC roles are not "
 #~ "used here."
 #~ msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+msgid "Deciding what to look up…"
+msgstr "正在确定要查找的内容…"
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reports and plans"
+msgstr "报告和计划"
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reported databank values"
+msgstr "已报告的数据库数值"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s — %(why)s"
+msgstr "正在查阅：%(sources)s — %(why)s"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s"
+msgstr "正在查阅：%(sources)s"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found data for %(year)d · reviewing…"
+msgstr "已找到 %(year)d 年的数据 · 正在审阅…"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d yearly values (%(first)d–%(last)d) · reviewing…"
+msgstr "已找到 %(count)d 个年度数值（%(first)d–%(last)d）· 正在审阅…"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d data points · reviewing…"
+msgstr "已找到 %(count)d 个数据点 · 正在审阅…"

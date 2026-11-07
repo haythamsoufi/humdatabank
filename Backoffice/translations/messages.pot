@@ -29110,10 +29110,6 @@ msgstr ""
 msgid "This matrix is imputed"
 msgstr ""
 
-#: app/services/ai/runtime/step_ux.py:238
-msgid "This needs multiple steps — starting…"
-msgstr ""
-
 #: app/templates/tours/tours.html:63
 msgid ""
 "This notice indicates that some fields have prefilled values (shown in "
@@ -34616,3 +34612,39 @@ msgstr ""
 msgid "✓"
 msgstr ""
 
+#: app/services/ai/runtime/step_ux.py
+msgid "Deciding what to look up…"
+msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reports and plans"
+msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reported databank values"
+msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s — %(why)s"
+msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s"
+msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found data for %(year)d · reviewing…"
+msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d yearly values (%(first)d–%(last)d) · reviewing…"
+msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d data points · reviewing…"
+msgstr ""

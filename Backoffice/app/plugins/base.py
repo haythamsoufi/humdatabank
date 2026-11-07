@@ -362,17 +362,18 @@ class BasePlugin(ABC):
     def get_additional_blueprints(self) -> List[Blueprint]:
         """Extra blueprints beyond get_blueprint(), for plugins that own more than one
         URL namespace (e.g. a dedicated wizard blueprint plus a legacy-redirect
-        blueprint). Registered the same way as get_blueprint() — for admin-feature
-        plugins, always on and not activation-gated.
+        blueprint). Registered the same way as get_blueprint(): registered at start and
+        answered with 404 while the plugin is inactive.
         """
         return []
 
     def get_admin_menu_items(self) -> List[Dict[str, Any]]:
-        """Return admin menu items if this plugin provides admin functionality"""
+        """Legacy hook, only reported in installation info and not rendered anywhere.
+        Use get_nav_items() to add a sidebar link."""
         return []
 
     def get_models(self) -> List[Any]:
-        """Return database models if this plugin provides any"""
+        """Informational only (installation info); the manager does not register models."""
         return []
 
     def get_lookup_lists(self) -> List[Dict[str, Any]]:
@@ -380,7 +381,7 @@ class BasePlugin(ABC):
         return []
 
     def get_migrations(self) -> List[str]:
-        """Return migration files if this plugin provides any"""
+        """Informational only (installation info); migrations live in the core Alembic tree."""
         return []
 
     def get_data_explorer_tab(self) -> Optional[DataExplorerTabConfig]:

@@ -321,39 +321,6 @@ class BasePluginRoutes:
                 )
 
 
-def validate_plugin_config(config: Dict[str, Any], schema: Dict[str, Any]) -> bool:
-    """Validate plugin configuration against a schema."""
-    try:
-        # Basic validation - can be extended with jsonschema for more complex validation
-        for field_name, field_schema in schema.items():
-            if field_schema.get('required', False) and field_name not in config:
-                raise PluginConfigError(f"Required field '{field_name}' missing from configuration")
-
-            if field_name in config:
-                value = config[field_name]
-                expected_type = field_schema.get('type')
-
-                if expected_type and not isinstance(value, expected_type):
-                    raise PluginConfigError(f"Field '{field_name}' must be of type {expected_type.__name__}")
-
-                # Check min/max values for numbers
-                if isinstance(value, (int, float)):
-                    min_val = field_schema.get('min')
-                    max_val = field_schema.get('max')
-
-                    if min_val is not None and value < min_val:
-                        raise PluginConfigError(f"Field '{field_name}' must be >= {min_val}")
-
-                    if max_val is not None and value > max_val:
-                        raise PluginConfigError(f"Field '{field_name}' must be <= {max_val}")
-
-        return True
-    except PluginConfigError:
-        raise
-    except Exception as e:
-        raise PluginConfigError("Configuration validation failed.")
-
-
 def safe_json_loads(json_string: str, default: Any = None) -> Any:
     """Safely parse JSON string with fallback."""
     try:
@@ -405,47 +372,6 @@ def measure_performance(plugin_name: str, operation_name: str):
                 raise
         return wrapper
     return decorator
-
-
-class PluginMetrics:
-    """Simple metrics collection for plugins."""
-
-    def __init__(self, plugin_name: str):
-        self.plugin_name = plugin_name
-        self.metrics = {}
-        self.logger = get_plugin_logger(plugin_name)
-
-    def increment_counter(self, metric_name: str, value: int = 1):
-        """Increment a counter metric."""
-        if metric_name not in self.metrics:
-            self.metrics[metric_name] = {'type': 'counter', 'value': 0}
-        self.metrics[metric_name]['value'] += value
-
-    def record_timing(self, metric_name: str, duration: float):
-        """Record timing metric."""
-        if metric_name not in self.metrics:
-            self.metrics[metric_name] = {'type': 'timing', 'values': []}
-        self.metrics[metric_name]['values'].append(duration)
-
-        # Keep only last 100 values to prevent memory issues
-        if len(self.metrics[metric_name]['values']) > 100:
-            self.metrics[metric_name]['values'] = self.metrics[metric_name]['values'][-100:]
-
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get all collected metrics."""
-        processed_metrics = {}
-        for name, data in self.metrics.items():
-            if data['type'] == 'counter':
-                processed_metrics[name] = data['value']
-            elif data['type'] == 'timing' and data['values']:
-                values = data['values']
-                processed_metrics[name] = {
-                    'count': len(values),
-                    'avg': sum(values) / len(values),
-                    'min': min(values),
-                    'max': max(values)
-                }
-        return processed_metrics
 
 
 # Global plugin cache storage: cache_key -> (result, stored_at)

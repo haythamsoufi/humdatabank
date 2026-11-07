@@ -642,6 +642,7 @@ class TestEndUserSession:
             fake_session = MagicMock()
             fake_session.is_active = True
             fake_session.session_start = datetime.now(timezone.utc) - timedelta(minutes=15)
+            fake_session.last_activity = None
             fake_session.session_end = None
 
             with patch(
@@ -703,6 +704,7 @@ class TestEndOtherActiveSessionsForDevice:
         with app.app_context():
             fake_session = MagicMock()
             fake_session.session_start = datetime.now(timezone.utc) - timedelta(hours=2)
+            fake_session.last_activity = None
 
             with patch(
                 "app.services.platform.user_analytics_service.UserSessionLog"
@@ -722,6 +724,7 @@ class TestEndOtherActiveSessionsForDevice:
         with app.app_context():
             fake_session = MagicMock()
             fake_session.session_start = datetime.now(timezone.utc)
+            fake_session.last_activity = None
 
             with patch(
                 "app.services.platform.user_analytics_service.UserSessionLog"
@@ -809,6 +812,7 @@ class TestUpdateSessionActivity:
             session["session_id"] = "sess-pv"
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake_sl
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake_sl
                 with patch("app.services.platform.user_analytics_service.merge_page_view_path_count"):
                     with patch("app.services.platform.user_analytics_service.db"):
                         with patch("app.services.platform.user_analytics_service._rollback_transaction"):
@@ -822,6 +826,7 @@ class TestUpdateSessionActivity:
             session["session_id"] = "sess-form"
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake_sl
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake_sl
                 with patch("app.services.platform.user_analytics_service.db"):
                     with patch("app.services.platform.user_analytics_service._rollback_transaction"):
                         _svc.update_session_activity("form_submitted")
@@ -835,6 +840,7 @@ class TestUpdateSessionActivity:
             session["session_id"] = "sess-file"
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake_sl
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake_sl
                 with patch("app.services.platform.user_analytics_service.db"):
                     with patch("app.services.platform.user_analytics_service._rollback_transaction"):
                         _svc.update_session_activity("file_uploaded")
@@ -848,6 +854,7 @@ class TestUpdateSessionActivity:
             session["session_id"] = "sess-other"
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake_sl
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake_sl
                 with patch("app.services.platform.user_analytics_service.db"):
                     with patch("app.services.platform.user_analytics_service._rollback_transaction"):
                         _svc.update_session_activity("custom_event")
@@ -860,6 +867,7 @@ class TestUpdateSessionActivity:
             session["session_id"] = "sess-touch"
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake_sl
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake_sl
                 with patch("app.services.platform.user_analytics_service.db"):
                     with patch("app.services.platform.user_analytics_service._rollback_transaction"):
                         _svc.update_session_activity("action")
@@ -903,6 +911,7 @@ class TestUpdateSessionActivityExplicit:
             fake.is_active = False
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake
                 _svc._update_session_activity_explicit("sid", "page_view")
             assert fake.page_views == fake.page_views  # not changed (no assert on call)
 
@@ -914,6 +923,7 @@ class TestUpdateSessionActivityExplicit:
             fake.actions_performed = 0
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake
                 _svc._update_session_activity_explicit("sid", "form_saved")
             assert fake.forms_submitted == 1
             assert fake.actions_performed == 1
@@ -926,6 +936,7 @@ class TestUpdateSessionActivityExplicit:
             fake.actions_performed = 0
             with patch("app.services.platform.user_analytics_service.UserSessionLog") as MockSL:
                 MockSL.query.filter_by.return_value.first.return_value = fake
+                MockSL.query.filter_by.return_value.with_for_update.return_value.first.return_value = fake
                 _svc._update_session_activity_explicit("sid", "data_save")
             assert fake.forms_submitted == 1
 
@@ -2003,6 +2014,7 @@ class TestGetSessionAnalytics:
         s = MagicMock()
         s.is_active = is_active
         s.duration_minutes = duration_minutes
+        s.session_end = None
         s.page_views = page_views
         start = datetime.now(timezone.utc) - timedelta(days=start_offset_days)
         s.session_start = start
@@ -2032,13 +2044,14 @@ class TestGetSessionAnalytics:
 
     def test_duration_distribution_buckets(self, app):
         with app.app_context():
-            durations = [5, 20, 45, 90, 150, 300]
+            durations = [0, 5, 20, 45, 90, 150, 300]
             sessions = [self._fake_session(duration_minutes=d) for d in durations]
             with patch("app.services.platform.user_analytics_service.UserSessionLog.query") as mock_query:
                 mock_query.filter.return_value.all.return_value = sessions
                 result = _svc.get_session_analytics(days=30)
                 dd = result["duration_distribution"]
-                assert dd["0-15 min"] == 1
+                assert dd["< 1 min"] == 1
+                assert dd["1-15 min"] == 1
                 assert dd["15-30 min"] == 1
                 assert dd["30-60 min"] == 1
                 assert dd["1-2 hours"] == 1
@@ -2181,34 +2194,28 @@ class TestCleanupInactiveSessions:
 
 
 # ===========================================================================
-# user_session_log_active_duration_minutes_sql
+# user_session_log_*_seconds_sql
 # ===========================================================================
 
-class TestUserSessionLogActiveDurationMinutesSql:
-    def test_sqlite_returns_expression(self, app):
+class TestUserSessionLogSecondsSql:
+    @pytest.mark.parametrize("dialect", ["sqlite", "postgresql"])
+    @pytest.mark.parametrize("builder", [
+        "user_session_log_wall_seconds_sql",
+        "user_session_log_active_duration_seconds_sql",
+    ])
+    def test_supported_dialects_return_expression(self, app, dialect, builder):
         with app.app_context():
             with patch("app.services.platform.user_analytics_service.db") as mock_db:
-                mock_db.engine.dialect.name = "sqlite"
-                result = _svc.user_session_log_active_duration_minutes_sql()
-                assert result is not None
+                mock_db.engine.dialect.name = dialect
+                assert getattr(_svc, builder)() is not None
 
-    def test_postgresql_returns_expression(self, app):
+    @pytest.mark.parametrize("builder", [
+        "user_session_log_wall_seconds_sql",
+        "user_session_log_active_duration_seconds_sql",
+    ])
+    @pytest.mark.parametrize("dialect", ["mysql", "oracle"])
+    def test_unsupported_dialect_returns_none(self, app, dialect, builder):
         with app.app_context():
             with patch("app.services.platform.user_analytics_service.db") as mock_db:
-                mock_db.engine.dialect.name = "postgresql"
-                result = _svc.user_session_log_active_duration_minutes_sql()
-                assert result is not None
-
-    def test_mysql_returns_expression(self, app):
-        with app.app_context():
-            with patch("app.services.platform.user_analytics_service.db") as mock_db:
-                mock_db.engine.dialect.name = "mysql"
-                result = _svc.user_session_log_active_duration_minutes_sql()
-                assert result is not None
-
-    def test_unsupported_dialect_returns_none(self, app):
-        with app.app_context():
-            with patch("app.services.platform.user_analytics_service.db") as mock_db:
-                mock_db.engine.dialect.name = "oracle"
-                result = _svc.user_session_log_active_duration_minutes_sql()
-                assert result is None
+                mock_db.engine.dialect.name = dialect
+                assert getattr(_svc, builder)() is None

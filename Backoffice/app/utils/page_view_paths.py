@@ -14,8 +14,16 @@ if TYPE_CHECKING:
     pass
 
 PAGE_VIEW_PATH_MAX_KEYS = 50
+# Extra distinct keys allowed once the cap is reached, but only for ID-templated
+# keys (``/forms/assignment/:id``). Without it a session that opens 50+ different
+# records pushes every later page into the opaque ``_other`` bucket.
+PAGE_VIEW_PATH_TEMPLATE_RESERVE = 25
 PAGE_VIEW_PATH_KEY_MAX_LEN = 500
 _OTHER_PATH_BUCKET = "_other"
+_ID_PLACEHOLDER = ":id"
+_ID_SEGMENT_RE = re.compile(
+    r"^(?:\d+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{24,})$"
+)
 
 
 def normalize_path_key(raw: str) -> str:
@@ -25,6 +33,14 @@ def normalize_path_key(raw: str) -> str:
     if s != "/" and s.endswith("/"):
         s = s.rstrip("/")
     return s or "/"
+
+
+def template_path_key(key: str) -> str:
+    """Replace numeric / UUID / long-hex path segments with ``:id``."""
+    if not key or key == "/":
+        return key or "/"
+    segments = key.split("/")
+    return "/".join(_ID_PLACEHOLDER if _ID_SEGMENT_RE.match(seg) else seg for seg in segments)
 
 
 def page_view_path_key_from_request(req: Any) -> str:
@@ -58,6 +74,11 @@ def mobile_page_view_path_key(
 def merge_page_view_path_count(session_log: Any, path_key: str) -> None:
     """
     Increment histogram on ``UserSessionLog.page_view_path_counts`` with a distinct-key cap.
+
+    Resolved paths are kept verbatim until ``PAGE_VIEW_PATH_MAX_KEYS`` distinct keys
+    exist. After that, a key containing record IDs is folded into its ``:id`` template
+    (up to ``PAGE_VIEW_PATH_TEMPLATE_RESERVE`` extra keys); anything else goes to
+    the ``_other`` bucket.
     """
     key = normalize_path_key(path_key) if path_key else "/"
     data: dict[str, int]
@@ -74,7 +95,16 @@ def merge_page_view_path_count(session_log: Any, path_key: str) -> None:
         if distinct_non_other < PAGE_VIEW_PATH_MAX_KEYS:
             data[key] = 1
         else:
-            data[_OTHER_PATH_BUCKET] = data.get(_OTHER_PATH_BUCKET, 0) + 1
+            templated = template_path_key(key)
+            if templated != key and templated in data:
+                data[templated] += 1
+            elif (
+                templated != key
+                and distinct_non_other < PAGE_VIEW_PATH_MAX_KEYS + PAGE_VIEW_PATH_TEMPLATE_RESERVE
+            ):
+                data[templated] = 1
+            else:
+                data[_OTHER_PATH_BUCKET] = data.get(_OTHER_PATH_BUCKET, 0) + 1
 
     session_log.page_view_path_counts = data
 

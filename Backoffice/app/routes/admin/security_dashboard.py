@@ -1,6 +1,7 @@
 # Security Dashboard Routes
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import current_user
+from app.utils.request_utils import parse_bool_arg
 from app.routes.admin.shared import admin_required, permission_required
 from app.services.security.monitoring import get_security_metrics, log_security_event
 from app.models import SecurityEvent, AdminActionLog
@@ -41,7 +42,7 @@ def security_events():
     # Filters
     severity = request.args.get('severity')
     event_type = request.args.get('event_type')
-    unresolved_only = request.args.get('unresolved_only', type=bool)
+    unresolved_only = parse_bool_arg(request.args.get('unresolved_only'))
 
     # Build query
     query = SecurityEvent.query

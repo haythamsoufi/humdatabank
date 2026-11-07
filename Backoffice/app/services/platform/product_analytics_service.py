@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from sqlalchemy import distinct, func
+from sqlalchemy import case, distinct, func
 
 from app import db
 from app.models import (
@@ -24,6 +24,7 @@ from app.models import (
     UserSessionLog,
 )
 from app.models.rbac import RbacRole, RbacUserRole
+from app.services.platform.user_analytics_service import user_session_log_wall_seconds_sql
 from app.utils.datetime_helpers import utcnow
 
 
@@ -525,6 +526,16 @@ def get_product_analytics(days: int = 30) -> Dict[str, Any]:
         else:
             freq_buckets[2]["count"] += 1
 
+    # Average length of closed sessions from timestamps (idle timeouts end at the last
+    # activity); the stored whole-minute column rounds every sub-minute session to 0.
+    wall_seconds = user_session_log_wall_seconds_sql()
+    if wall_seconds is not None:
+        avg_session_minutes = (
+            func.avg(case((UserSessionLog.is_active.is_(False), wall_seconds))) / 60.0
+        )
+    else:
+        avg_session_minutes = func.avg(UserSessionLog.duration_minutes)
+
     session_stats = (
         db.session.query(
             func.count(UserSessionLog.id),
@@ -532,7 +543,7 @@ def get_product_analytics(days: int = 30) -> Dict[str, Any]:
             func.coalesce(func.sum(UserSessionLog.actions_performed), 0),
             func.coalesce(func.sum(UserSessionLog.forms_submitted), 0),
             func.coalesce(func.sum(UserSessionLog.files_uploaded), 0),
-            func.avg(UserSessionLog.duration_minutes),
+            avg_session_minutes,
         )
         .filter(UserSessionLog.session_start >= mau_since)
         .one()

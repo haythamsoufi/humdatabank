@@ -52,6 +52,18 @@ def ensure_utc(dt):
     return dt.astimezone(timezone.utc)
 
 
+def iso_utc(dt: Optional[datetime]) -> Optional[str]:
+    """ISO-8601 string with an explicit UTC offset, or None.
+
+    ``timestamp without time zone`` columns load back naive, and ``isoformat()``
+    on a naive value has no offset. Clients such as the Flutter app then parse it
+    as *local* time and show it shifted by their UTC offset. Always serialise
+    stored UTC timestamps for API payloads through this helper.
+    """
+    aware = ensure_utc(dt)
+    return aware.isoformat() if aware is not None else None
+
+
 def naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
     """UTC wall clock with tzinfo removed.
 

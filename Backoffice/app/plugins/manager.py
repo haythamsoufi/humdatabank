@@ -14,6 +14,7 @@ from .base import (
     BaseFieldType,
     CspOverride,
     DataExplorerTabConfig,
+    AiToolSet,
     NationalSocietyGridColumn,
     NavItem,
     PluginDocsSource,
@@ -1611,6 +1612,31 @@ class PluginManager:
             cached = sorted(tabs, key=lambda tab: tab.priority)
             self._data_explorer_tabs_cache = cached
         return list(cached)
+
+    def get_list_option_count(self, list_id: str, form_item: Any, aes: Any) -> Optional[int]:
+        """First definite option count a loaded plugin gives for one of its lookup lists."""
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                count = plugin.get_list_option_count(list_id, form_item, aes)
+            except Exception as exc:
+                self.logger.warning("get_list_option_count failed for plugin %s: %s", plugin_id, exc)
+                continue
+            if count is not None:
+                return count
+        return None
+
+    def get_ai_tool_sets(self) -> List[AiToolSet]:
+        """AI tool sets of every loaded plugin. Availability per request is up to each set."""
+        sets: List[AiToolSet] = []
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                tool_set = plugin.get_ai_tools()
+            except Exception as exc:
+                self.logger.warning("get_ai_tools failed for plugin %s: %s", plugin_id, exc)
+                continue
+            if tool_set is not None:
+                sets.append(tool_set)
+        return sets
 
     def get_nav_items(self, section: Optional[str] = None) -> List[NavItem]:
         """Sidebar links contributed by active plugins, ordered by priority then label."""

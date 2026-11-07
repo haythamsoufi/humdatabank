@@ -107,24 +107,32 @@ def _extract_indicator_search_phrase(query: str) -> str:
     return q
 
 
-def _decision_tool_names() -> frozenset:
-    """Names of the IFRC Decision Maker tools. Empty when the plugin cannot be imported."""
+def _plugin_tool_sets() -> list:
     try:
-        from plugins.ifrc.decisions.ai_tools import DECISION_TOOL_NAMES
-
-        return DECISION_TOOL_NAMES
-    except Exception:
-        return frozenset()
-
-
-def _decision_tool_specs() -> List[Dict[str, Any]]:
-    """Decision Maker tool specs, only for a user who may use the module and while the plugin is active."""
-    try:
-        from plugins.ifrc.decisions.ai_tools import DECISION_TOOL_SPECS, tools_available
-
-        return list(DECISION_TOOL_SPECS) if tools_available() else []
+        manager = getattr(current_app, "plugin_manager", None)
+        return manager.get_ai_tool_sets() if manager is not None else []
     except Exception:
         return []
+
+
+def _plugin_tool_names() -> frozenset:
+    """Names of the AI tools contributed by loaded plugins (Decision Maker today)."""
+    names: set = set()
+    for tool_set in _plugin_tool_sets():
+        names |= tool_set.names
+    return frozenset(names)
+
+
+def _plugin_tool_specs() -> List[Dict[str, Any]]:
+    """Plugin tool specs offered to this request (the plugin decides: active, user may use it)."""
+    specs: List[Dict[str, Any]] = []
+    for tool_set in _plugin_tool_sets():
+        try:
+            if tool_set.is_available():
+                specs.extend(tool_set.specs)
+        except Exception:
+            continue
+    return specs
 
 
 def openapi_function_name(tool_def: Dict[str, Any]) -> Optional[str]:
@@ -253,7 +261,7 @@ def tool_wrapper(func: Callable) -> Callable:
                     "get_country_information", "get_template_details",
                     "get_user_assignments", "get_assignment_indicator_values",
                     "get_form_field_value", "get_form_field_values_for_all_countries",
-                } | set(_decision_tool_names())
+                } | set(_plugin_tool_names())
                 upr_tools = UPR_KPI_TOOL_NAMES
                 # Inside the form-builder panel, indicator resolution must keep working
                 # regardless of the user's source toggles.
@@ -861,9 +869,11 @@ class AIToolsRegistry:
 
     def _decision_tool(self, name: str, **kwargs: Any) -> Dict[str, Any]:
         kwargs.pop("_progress_callback", None)
-        from plugins.ifrc.decisions.ai_tools import TOOL_FUNCTIONS
-
-        return TOOL_FUNCTIONS[name](**kwargs)
+        for tool_set in _plugin_tool_sets():
+            function = tool_set.functions.get(name)
+            if function is not None:
+                return function(**kwargs)
+        raise KeyError(f"No plugin provides the AI tool {name!r}")
 
     @tool_wrapper
     def list_decisions(self, **kwargs: Any) -> Dict[str, Any]:
@@ -2364,7 +2374,7 @@ class AIToolsRegistry:
             },
         ]
         tool_defs.extend(UPR_TOOL_SPECS)
-        tool_defs.extend(_decision_tool_specs())
+        tool_defs.extend(_plugin_tool_specs())
         tool_defs = _filter_indicator_bank_mgmt_tools(tool_defs)
 
         # Form-builder assistant: when panel context is active, NEVER expose the full catalog.
@@ -2414,7 +2424,7 @@ class AIToolsRegistry:
             )
 
         if sources_norm.get("historical"):
-            allowed.update(_decision_tool_names())
+            allowed.update(_plugin_tool_names())
 
         allowed.update(ib_mgmt_allowed)
         # NOTE: form-builder tool gating (including the "search_indicator_bank stays

@@ -37,43 +37,8 @@ def register_commands(app):
     from app.cli_commands.rbac import register_rbac_commands
     register_rbac_commands(app)
 
-    from app.cli_commands.fdrs_societies import register_fdrs_society_commands
-    register_fdrs_society_commands(app)
-
-    @app.cli.command("fdrs-public-export")
-    @with_appcontext
-    def fdrs_public_export():
-        """Rebuild the daily public FDRS CSV and Excel snapshot now."""
-        from plugins.fdrs.services.fdrs_public_export_cache import build_public_export_snapshot
-
-        summary = build_public_export_snapshot()
-        click.echo(
-            f"Snapshot {summary['snapshot_date']}: {summary['row_count']} rows, "
-            f"{len(summary['societies'])} societies."
-        )
-
-    @app.cli.command("nsd-migrate-projects")
-    @click.option("--dry-run", is_flag=True, help="Simulate AES remaps without writing them.")
-    @with_appcontext
-    def nsd_migrate_projects(dry_run):
-        """Backfill core projects and remap legacy NSD report AES onto shared slots."""
-        from plugins.nsd_report_forms.migrate import run_migration
-
-        result = run_migration(dry_run=dry_run)
-        click.echo(f"dry_run={result['dry_run']}")
-        click.echo(f"projects: {result['projects']}")
-        click.echo(f"remap: {result['remap']}")
-
-    @app.cli.command("nsd-migrate-slots")
-    @click.option("--dry-run", is_flag=True, help="Count remaps without writing them.")
-    @with_appcontext
-    def nsd_migrate_slots(dry_run):
-        """Repoint shared NSD CBF slots onto per-project cycle assignments."""
-        from plugins.nsd_report_forms.migrate_slots import run_slot_migration
-
-        result = run_slot_migration(dry_run=dry_run)
-        click.echo(f"dry_run={result['dry_run']}")
-        click.echo(f"slots: {result['slots']}")
+    from app.plugins.cli_discovery import register_plugin_cli_commands
+    register_plugin_cli_commands(app)
 
     # AI regression testing
     from app.cli_commands.ai_regression import ai_regression_cli

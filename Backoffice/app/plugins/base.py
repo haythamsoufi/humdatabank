@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from flask import Blueprint
 
@@ -136,6 +136,25 @@ class NavItem:
     icon: str = "fas fa-puzzle-piece"
     permission: Optional[str] = None
     priority: int = 100
+
+
+@dataclass(frozen=True)
+class AiToolSet:
+    """AI assistant tools a plugin contributes.
+
+    ``specs`` are OpenAI-style tool definitions, ``functions`` maps tool name to the callable
+    that runs it, and ``is_available`` decides per request whether the specs are offered
+    (plugin active, user allowed, ...). The core registry still owns the method that the
+    agent loop invokes for each name and forwards the call to ``functions``.
+    """
+
+    specs: Sequence[Dict[str, Any]]
+    functions: Dict[str, Callable[..., Dict[str, Any]]]
+    is_available: Callable[[], bool] = lambda: True
+
+    @property
+    def names(self) -> frozenset:
+        return frozenset(spec["function"]["name"] for spec in self.specs)
 
 
 @dataclass(frozen=True)
@@ -426,6 +445,16 @@ class BasePlugin(ABC):
     def get_csp_overrides(self) -> List[CspOverride]:
         """CSP overrides for plugin-served HTML assets."""
         return []
+
+    def get_list_option_count(self, list_id: str, form_item: Any, aes: Any) -> Optional[int]:
+        """Number of options in a plugin-owned lookup list for one assignment, or None when it
+        cannot be proven. Used so the completion rate can drop matrices whose list is certainly
+        empty; answer None when unsure."""
+        return None
+
+    def get_ai_tools(self) -> Optional[AiToolSet]:
+        """Tools for the AI assistant (see AiToolSet), or None."""
+        return None
 
     def get_nav_items(self) -> List[NavItem]:
         """Sidebar links for the admin navigation (active plugins only)."""

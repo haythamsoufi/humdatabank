@@ -17,7 +17,7 @@ Implemented in the FDRS plugin:
 | Routes (`/api/lastpublishedyear`, `/api/entities/ns[/<doncode>]`, `/api/data`, `/api/dataimputed`, `/api/KpiImputedValue`, `/api/globalvalidationdata`, `/api/kpivalue`) | `Backoffice/plugins/fdrs/public_compat_routes.py` |
 | Code translation, published-snapshot query, response trees | `Backoffice/plugins/fdrs/services/fdrs_public_adapter.py` |
 | Society reference | `national_societies.fdrs_don_code` and zone columns (`flask fdrs-societies import`) |
-| Seeding | `flask fdrs-societies import` / `link` (`app/cli_commands/fdrs_societies.py`) |
+| Seeding | `flask fdrs-societies import` / `link` (`plugins/fdrs/cli_societies.py`) |
 | `apiKey` query alias | `query_api_key_value()` in `app/services/security/api_authentication.py` |
 | `/csv/export` and `/csv/exportns` (`excel=1` for `.xlsx`) | Published snapshot, one row per society, year and KPI code. The workbook adds an Indicators sheet |
 | `GET /api/documents` | Publications (`resource_type = publication`, subcategory → `EveryoneCounts` / `Analysis` / `FrontendVideo`) and, with `ns`, public approved submitted documents |

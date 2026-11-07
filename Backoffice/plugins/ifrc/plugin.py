@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.plugins.base import (
+    AiToolSet,
     BasePlugin,
     CspOverride,
     DataExplorerTabConfig,
@@ -159,6 +160,11 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
                 aspect_ratio="16:9",
             ),
         ]
+
+    def get_ai_tools(self) -> AiToolSet:
+        from plugins.ifrc.decisions.ai_tools import DECISION_TOOL_SPECS, TOOL_FUNCTIONS, tools_available
+
+        return AiToolSet(specs=DECISION_TOOL_SPECS, functions=TOOL_FUNCTIONS, is_available=tools_available)
 
     def get_nav_items(self) -> list[NavItem]:
         return [

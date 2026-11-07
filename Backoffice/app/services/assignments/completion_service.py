@@ -350,72 +350,14 @@ def matrix_has_manual_rows(form_item) -> bool:
     return False
 
 
-_eo_option_count_cache: dict[tuple, tuple[float, int | None]] = {}
-_eo_option_count_cache_lock = threading.Lock()
-_EO_OPTION_COUNT_CACHE_TTL = 60.0
-_EO_OPTION_COUNT_CACHE_MAX = 500
+def _plugin_list_option_count(list_id: str, form_item, aes) -> int | None:
+    """Ask loaded plugins (BasePlugin.get_list_option_count) for a plugin-owned list."""
+    from flask import current_app
 
-
-def _emergency_operations_cache_is_warm() -> bool:
-    """True only when the EmOps file cache is populated with actual GO data.
-
-    A cache file that exists but has an empty ``results`` list (e.g. from a
-    failed or incomplete refresh) is *not* considered warm — filtering from an
-    empty global list would yield 0 for every country and incorrectly exclude
-    all list-backed matrices from the completion denominator.
-    """
-    try:
-        from plugins.emergency_operations.data_store import get_data_store
-        cached = get_data_store().load_cached()
-        return isinstance(cached, dict) and bool(cached.get('results'))
-    except Exception:
-        return False
-
-
-def emergency_operations_option_count(form_item, aes) -> int | None:
-    """Country-filtered GO appeal count, or None when the count cannot be proven.
-
-    Returns None (do not exclude the item) when the country is unknown, the
-    EmOps cache is cold, or the lookup fails — an empty list must be certain
-    before we drop the matrix from the completion denominator.
-    """
-    from plugins.emergency_operations.section_binding import (
-        _assignment_period_for_aes,
-        _country_iso_for_aes,
-        _filters_hash,
-        _normalize_emops_config,
-    )
-
-    iso = _country_iso_for_aes(aes)
-    if not iso or not _emergency_operations_cache_is_warm():
+    manager = getattr(current_app, 'plugin_manager', None)
+    if manager is None:
         return None
-
-    mc = _form_item_matrix_config(form_item)
-    raw_cfg = mc.get('plugin_config') if isinstance(mc.get('plugin_config'), dict) else {}
-    period = _assignment_period_for_aes(aes)
-    cache_key = (iso, _filters_hash(iso, raw_cfg, period))
-    now = time.time()
-    with _eo_option_count_cache_lock:
-        cached = _eo_option_count_cache.get(cache_key)
-    if cached and cached[0] > now:
-        return cached[1]
-
-    try:
-        from plugins.emergency_operations.routes import get_emergency_operations_data
-        ops = get_emergency_operations_data(
-            country_iso=iso,
-            config=_normalize_emops_config(raw_cfg, period),
-        )
-        count = len(ops or [])
-    except Exception:
-        count = None
-
-    with _eo_option_count_cache_lock:
-        if cache_key not in _eo_option_count_cache and len(_eo_option_count_cache) >= _EO_OPTION_COUNT_CACHE_MAX:
-            oldest = next(iter(_eo_option_count_cache))
-            _eo_option_count_cache.pop(oldest, None)
-        _eo_option_count_cache[cache_key] = (now + _EO_OPTION_COUNT_CACHE_TTL, count)
-    return count
+    return manager.get_list_option_count(list_id, form_item, aes)
 
 
 def resolved_list_option_count(form_item, aes) -> int | None:
@@ -423,8 +365,6 @@ def resolved_list_option_count(form_item, aes) -> int | None:
     list_id = _matrix_lookup_list_id(form_item)
     if not list_id:
         return None
-    if list_id == 'emergency_operations':
-        return emergency_operations_option_count(form_item, aes)
     if list_id == 'country_map':
         from app.models.core import Country
         return int(Country.query.count() or 0)
@@ -434,6 +374,8 @@ def resolved_list_option_count(form_item, aes) -> int | None:
     if list_id == 'indicator_bank':
         from app.models.indicator_bank import IndicatorBank
         return int(IndicatorBank.query.count() or 0)
+    if not list_id.isdigit():
+        return _plugin_list_option_count(list_id, form_item, aes)
     if list_id.isdigit():
         mc = _form_item_matrix_config(form_item)
         filters = getattr(form_item, 'list_filters_json', None)

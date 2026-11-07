@@ -13,7 +13,6 @@ from app.services.assignments.completion_service import (
     _published_filters_single,
     completion_rate_percent,
     disagg_payload_has_reported_value,
-    emergency_operations_option_count,
     form_data_entry_is_filled,
     matrix_entry_is_filled,
     matrix_has_manual_rows,
@@ -681,49 +680,51 @@ def test_matrix_has_manual_rows_detects_static_hybrid_rows():
 
 
 def test_emergency_operations_option_count_unknown_when_cache_cold():
+    from plugins.emergency_operations.option_count import option_count
+
     item = _list_backed_matrix_item()
     with patch(
-        'app.services.assignments.completion_service._emergency_operations_cache_is_warm',
+        'plugins.emergency_operations.option_count.cache_is_warm',
         return_value=False,
     ), patch(
         'plugins.emergency_operations.section_binding._country_iso_for_aes',
         return_value='BGR',
     ):
-        assert emergency_operations_option_count(item, SimpleNamespace()) is None
+        assert option_count(item, SimpleNamespace()) is None
 
 
 def test_emergency_operations_cache_is_warm_requires_nonempty_results():
-    from app.services.assignments.completion_service import _emergency_operations_cache_is_warm
+    from plugins.emergency_operations.option_count import cache_is_warm
 
     # Missing file → cold
     with patch(
         'plugins.emergency_operations.data_store.get_data_store',
     ) as mock_store:
         mock_store.return_value.load_cached.return_value = None
-        assert _emergency_operations_cache_is_warm() is False
+        assert cache_is_warm() is False
 
     # File exists but results=[] → cold (cannot distinguish from a failed refresh)
     with patch(
         'plugins.emergency_operations.data_store.get_data_store',
     ) as mock_store:
         mock_store.return_value.load_cached.return_value = {'results': [], 'fetched_at': '2026-01-01T00:00:00Z'}
-        assert _emergency_operations_cache_is_warm() is False
+        assert cache_is_warm() is False
 
     # File exists with actual results → warm
     with patch(
         'plugins.emergency_operations.data_store.get_data_store',
     ) as mock_store:
         mock_store.return_value.load_cached.return_value = {'results': [{'code': 'MDRBG001'}]}
-        assert _emergency_operations_cache_is_warm() is True
+        assert cache_is_warm() is True
 
 
 def test_emergency_operations_option_count_zero_when_cache_warm_and_empty():
-    from app.services.assignments import completion_service as completion_mod
+    from plugins.emergency_operations import option_count as eo_option_count
 
     item = _list_backed_matrix_item()
-    completion_mod._eo_option_count_cache.clear()
+    eo_option_count._cache.clear()
     with patch(
-        'app.services.assignments.completion_service._emergency_operations_cache_is_warm',
+        'plugins.emergency_operations.option_count.cache_is_warm',
         return_value=True,
     ), patch(
         'plugins.emergency_operations.section_binding._country_iso_for_aes',
@@ -735,17 +736,17 @@ def test_emergency_operations_option_count_zero_when_cache_warm_and_empty():
         'plugins.emergency_operations.routes.get_emergency_operations_data',
         return_value=[],
     ):
-        assert emergency_operations_option_count(item, SimpleNamespace()) == 0
+        assert eo_option_count.option_count(item, SimpleNamespace()) == 0
 
 
-def test_resolved_list_option_count_delegates_to_emergency_operations():
+def test_resolved_list_option_count_delegates_plugin_lists_to_plugin_manager(app):
     item = _list_backed_matrix_item()
-    with patch(
-        'app.services.assignments.completion_service.emergency_operations_option_count',
-        return_value=0,
-    ) as eo_count:
+    manager = MagicMock()
+    manager.get_list_option_count.return_value = 0
+    with app.app_context(), patch.object(app, 'plugin_manager', manager):
         assert resolved_list_option_count(item, SimpleNamespace()) == 0
-    eo_count.assert_called_once()
+    manager.get_list_option_count.assert_called_once()
+    assert manager.get_list_option_count.call_args.args[0] == 'emergency_operations'
 
 
 def test_empty_option_list_ids_excludes_empty_list_library_matrix():

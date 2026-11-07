@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +16,7 @@ import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/network_logo_image.dart';
 import '../../widgets/shimmer_list_placeholder.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/async/async_body.dart';
@@ -897,21 +897,15 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                     children: [
                                       const SizedBox(height: 4),
                                       if (sector.logoUrl != null)
-                                        CachedNetworkImage(
-                                          imageUrl: sector.logoUrl!,
-                                          width: 48,
-                                          height: 48,
-                                          fit: BoxFit.contain,
-                                          memCacheWidth: 96,
-                                          memCacheHeight: 96,
-                                          errorWidget: (context, url, error) {
-                                            return Text(
-                                              _getSectorIcon(sector.name),
-                                              style: const TextStyle(
-                                                fontSize: 36,
-                                              ),
-                                            );
-                                          },
+                                        NetworkLogoImage(
+                                          url: sector.logoUrl!,
+                                          size: 48,
+                                          fallback: Text(
+                                            _getSectorIcon(sector.name),
+                                            style: const TextStyle(
+                                              fontSize: 36,
+                                            ),
+                                          ),
                                         )
                                       else
                                         Text(

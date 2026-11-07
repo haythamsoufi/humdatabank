@@ -43,9 +43,11 @@ from app.services.ai.planning.payload_inference import (
     build_payload_from_tool_result as _build_payload_from_tool_result,
 )
 from app.services.ai.runtime.step_ux import (
+    TOOL_NARRATION_INSTRUCTION as _TOOL_NARRATION_INSTRUCTION,
     emit_tool_result_step_detail as _emit_tool_result_step_detail,
+    emit_tool_start_step as _emit_tool_start_step,
+    format_evidence_plan_for_step as _format_evidence_plan_for_step,
     format_plan_for_step as _format_plan_for_step,
-    format_tool_args_detail as _format_tool_args_detail,
     plan_step_message as _plan_step_message,
     step_display_message as _step_display_message,
 )
@@ -1167,6 +1169,8 @@ class AIAgentExecutor:
                     if callable(on_step_callback):
                         try:
                             plan_detail = _format_plan_for_step(plan, query=query)
+                            if not plan_detail:
+                                plan_detail = _format_evidence_plan_for_step(evidence_plan)
                             on_step_callback(_plan_step_message(plan, query=query), plan_detail or None)
                         except TypeError:
                             on_step_callback(_plan_step_message(plan, query=query))
@@ -1609,6 +1613,11 @@ class AIAgentExecutor:
             original_message=original_message,
             evidence_plan=evidence_plan,
         )
+        if on_step_callback and messages and isinstance(messages[0], dict) and messages[0].get("role") == "system":
+            messages[0] = {
+                **messages[0],
+                "content": f"{messages[0].get('content') or ''}\n\n{_TOOL_NARRATION_INSTRUCTION}",
+            }
         tools = self.tools_registry.get_tool_definitions_openai()
 
         steps = []
@@ -1880,6 +1889,9 @@ class AIAgentExecutor:
                 # Execute tool calls
                 messages.append(message)
 
+                turn_thought = getattr(message, "content", None)
+                thought_open = False
+
                 for tool_call in message.tool_calls:
                     tool_name = tool_call.function.name
                     try:
@@ -2138,16 +2150,15 @@ class AIAgentExecutor:
 
                     if not cache_hit:
                         if on_step_callback:
-                            try:
-                                detail = _format_tool_args_detail(tool_name, tool_args)
-                                on_step_callback(
-                                    _step_display_message(tool_name, tool_args),
-                                    detail=detail if detail else None,
-                                )
-                            except TypeError:
-                                on_step_callback(_step_display_message(tool_name, tool_args))
-                            except Exception as e:
-                                logger.debug("Tool step callback failed: %s", e)
+                            thought_open = _emit_tool_start_step(
+                                on_step_callback,
+                                tool_name,
+                                tool_args,
+                                thought=turn_thought,
+                                thought_open=thought_open,
+                            )
+                            if thought_open:
+                                turn_thought = None
 
                         # Execute tool (pass progress callback so long-running tools emit sub-steps as detail only)
                         try:
@@ -2780,16 +2791,12 @@ class AIAgentExecutor:
 
                     if not cache_hit:
                         if on_step_callback:
-                            try:
-                                detail = _format_tool_args_detail(tool_name, tool_args)
-                                on_step_callback(
-                                    _step_display_message(tool_name, tool_args),
-                                    detail=detail if detail else None,
-                                )
-                            except TypeError:
-                                on_step_callback(_step_display_message(tool_name, tool_args))
-                            except Exception as e:
-                                logger.debug("Tool step callback failed: %s", e)
+                            _emit_tool_start_step(
+                                on_step_callback,
+                                tool_name,
+                                tool_args,
+                                thought=parsed.get('thought') if isinstance(parsed, dict) else None,
+                            )
 
                         exec_kwargs = dict(tool_args)
                         if on_step_callback:

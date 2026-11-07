@@ -151,6 +151,19 @@ class NavigationHelper {
     }
   }
 
+  /// Opens Countries: switches to its bottom-bar tab when the user has added
+  /// it there, otherwise pushes the full-screen [AppRoutes.countries] route.
+  static void openCountries(BuildContext context) {
+    final page = _resolveTabIndex(context, TabIds.countries, fallback: -1);
+    if (page < 0) {
+      Navigator.of(context).pushNamed(AppRoutes.countries);
+    } else if (_animateToTab != null && !Navigator.of(context).canPop()) {
+      _animateToTab!(page);
+    } else {
+      navigateToMainTab(context, page);
+    }
+  }
+
   /// Pops until [AppRoutes.dashboard] (or first route), then navigates to the
   /// AI chat tab if [navIndex] matches the AI chat slot and chatbot is enabled.
   static void popToMainThenOpenAiIfNeeded(BuildContext context, int navIndex) {

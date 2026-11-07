@@ -4,6 +4,7 @@ import '../../models/shared/focal_point_contact.dart';
 import '../../models/shared/dashboard_data.dart';
 import '../../models/shared/entity.dart';
 import '../../repositories/dashboard_repository.dart';
+import '../../services/offline/entity_dashboard_store.dart';
 import '../../utils/debug_logger.dart';
 
 /// Provider for dashboard state management.
@@ -221,8 +222,12 @@ class DashboardProvider with ChangeNotifier {
 
   /// Select an entity and update backend.
   /// Updates UI immediately and syncs with backend.
-  /// Clears cache and reloads dashboard with assignments for the new entity.
-  Future<void> selectEntity(Entity entity) async {
+  ///
+  /// The entity's last known dashboard (including the assignments saved for
+  /// offline use) is shown right away, so selecting an entity works without a
+  /// connection and never needs a download. With a connection the dashboard is
+  /// then refreshed from the server; pass `online: false` to skip that request.
+  Future<void> selectEntity(Entity entity, {bool online = true}) async {
     DebugLogger.logDashboard('Selecting entity: ${entity.selectionKey}');
 
     // Store previous entity to detect changes
@@ -237,20 +242,38 @@ class DashboardProvider with ChangeNotifier {
     // Notify listeners immediately so UI updates right away
     notifyListeners();
 
-    // Clear cache when entity changes to ensure fresh data for new entity
-    // But preserve the selected entity we just set
     if (entityChanged) {
-      DebugLogger.logDashboard('Entity changed - clearing cache');
-      _clearCachePreservingEntity();
+      final snapshot = await _repository.loadEntitySnapshot(entity);
+      if (snapshot != null) {
+        DebugLogger.logDashboard(
+          'Entity changed - showing saved dashboard for ${entity.selectionKey}',
+        );
+        _applyEntitySnapshot(snapshot);
+        await _repository.saveDashboardToCache(
+          snapshot.toDashboardData(entities: _entities),
+        );
+      } else {
+        DebugLogger.logDashboard('Entity changed - clearing assignments');
+        await _clearAssignmentsPreservingEntities();
+      }
+    }
+
+    // Update local storage for persistence
+    await _repository.updateSelectedEntityStorage(entity);
+
+    if (!online) {
+      _isLoading = false;
+      _error = _currentAssignments.isEmpty && _pastAssignments.isEmpty
+          ? 'Unable to load dashboard. Please check your connection and try again.'
+          : null;
+      notifyListeners();
+      return;
     }
 
     // Set loading state while reloading
     _isLoading = true;
     _error = null;
     notifyListeners();
-
-    // Update local storage for persistence
-    await _repository.updateSelectedEntityStorage(entity);
 
     // Reload dashboard to get updated data for selected entity
     // Pass the entity directly to the API via query parameters
@@ -261,6 +284,25 @@ class DashboardProvider with ChangeNotifier {
         'After reload: selected entity is ${_selectedEntity?.selectionKey ?? "null"}, '
         'current assignments: ${_currentAssignments.length}, '
         'past assignments: ${_pastAssignments.length}');
+  }
+
+  void _applyEntitySnapshot(EntityDashboardSnapshot snapshot) {
+    _currentAssignments = snapshot.currentAssignments
+        .where((a) => !_isCancelled(a))
+        .toList();
+    _pastAssignments = [
+      ...snapshot.pastAssignments,
+      ...snapshot.currentAssignments.where(_isCancelled),
+    ];
+    _nsFocalPoints = snapshot.nsFocalPoints;
+    _orgFocalPoints = snapshot.orgFocalPoints;
+    _fdsMembers = snapshot.fdsMembers;
+    notifyListeners();
+  }
+
+  static bool _isCancelled(Assignment a) {
+    final s = a.status.toLowerCase().trim();
+    return s == 'cancelled' || s == 'canceled';
   }
 
   /// Load selected entity from storage.
@@ -288,19 +330,15 @@ class DashboardProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Clear cache but preserve the currently selected entity.
-  /// Used when entity changes to ensure fresh data while keeping selection.
-  void _clearCachePreservingEntity() {
-    final preservedEntity = _selectedEntity;
-    _repository.clearCache();
+  /// Drops the assignments (not the entity list or the selection) so another
+  /// entity never shows the previous one's data while it loads.
+  Future<void> _clearAssignmentsPreservingEntities() async {
+    await _repository.clearAssignmentsCache();
     _currentAssignments = [];
     _pastAssignments = [];
-    _entities = [];
     _nsFocalPoints = [];
     _orgFocalPoints = [];
     _fdsMembers = [];
-    // Restore the preserved entity
-    _selectedEntity = preservedEntity;
     notifyListeners();
   }
 

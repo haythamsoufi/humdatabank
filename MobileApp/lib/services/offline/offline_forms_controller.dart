@@ -8,12 +8,14 @@ import '../../config/app_config.dart';
 import '../../config/routes.dart';
 import '../../di/service_locator.dart';
 import '../../models/shared/assignment.dart';
+import '../../repositories/dashboard_repository.dart';
 import '../../utils/debug_logger.dart';
 import '../assignment_offline_bundle_service.dart';
 import '../client_diagnostics_service.dart';
 import '../connectivity_service.dart';
 import '../offline_api_recorder.dart';
 import '../storage_service.dart';
+import 'entity_dashboard_store.dart';
 
 enum OfflineJobKind {
   /// The template's shared files plus one page (large).
@@ -44,7 +46,8 @@ class OfflineJob {
 ///
 /// * A page is refreshed whenever its template package is current but the
 ///   page is missing or outdated. This is one small request, so it runs on
-///   every dashboard change and never needs the user to ask.
+///   every dashboard change and never needs the user to ask. [eligible] spans
+///   every entity the user can select, not just the one on screen.
 /// * A package (large) is only (re)built when [allowPackageWork] is set, and
 ///   then for a template that was saved before but is outdated, or for any
 ///   template when [autoDownload] is on. One job covers all assignments of a
@@ -124,6 +127,8 @@ class OfflineFormsController extends ChangeNotifier {
     Future<List<Map<String, dynamic>>> Function(String url, String language)?
     recordApi,
     Future<bool> Function()? isUnmetered,
+    Future<List<EntityDashboardSnapshot>> Function(Set<int> templateIds)?
+    loadOtherEntities,
     Duration? pageTimeout,
     Duration? packageTimeout,
   }) : _service = service ?? AssignmentOfflineBundleService(),
@@ -138,7 +143,12 @@ class OfflineFormsController extends ChangeNotifier {
            )),
        _isUnmetered =
            isUnmetered ?? (() => ConnectivityService().isOnUnmeteredNetwork()),
-       _pageTimeout = pageTimeout ?? const Duration(seconds: 90),
+       _loadOtherEntities =
+           loadOtherEntities ??
+           ((templateIds) => DashboardRepository().syncOfflineEntityDashboards(
+             templateIds: templateIds,
+           )),
+       _pageTimeout = pageTimeout ?? const Duration(minutes: 3),
        _packageTimeout = packageTimeout ?? const Duration(minutes: 8) {
     AssignmentOfflineBundleService.savedCopiesChanged.addListener(
       _onStorageChanged,
@@ -155,6 +165,8 @@ class OfflineFormsController extends ChangeNotifier {
     Future<List<Map<String, dynamic>>> Function(String url, String language)?
     recordApi,
     Future<bool> Function()? isUnmetered,
+    Future<List<EntityDashboardSnapshot>> Function(Set<int> templateIds)?
+    loadOtherEntities,
     Duration? pageTimeout,
     Duration? packageTimeout,
   }) => OfflineFormsController._(
@@ -162,16 +174,23 @@ class OfflineFormsController extends ChangeNotifier {
     readSessionCookie: readSessionCookie ?? () async => null,
     recordApi: recordApi ?? (_, _) async => const [],
     isUnmetered: isUnmetered ?? () async => true,
+    loadOtherEntities: loadOtherEntities ?? (_) async => const [],
     pageTimeout: pageTimeout,
     packageTimeout: packageTimeout,
   );
 
   static const Duration _retryAfterFailure = Duration(minutes: 10);
+  static const Duration _siblingSyncEvery = Duration(minutes: 20);
+  static const Duration _siblingSyncTimeout = Duration(seconds: 60);
+  static const Duration _userRequestWindow = Duration(hours: 1);
+  static const String _siblingFailureKey = 'entity-dashboards';
 
   final AssignmentOfflineBundleService _service;
   final Future<String?> Function() _readSessionCookie;
   final Future<List<Map<String, dynamic>>> Function(String, String) _recordApi;
   final Future<bool> Function() _isUnmetered;
+  final Future<List<EntityDashboardSnapshot>> Function(Set<int>)
+  _loadOtherEntities;
   final Duration _pageTimeout;
   final Duration _packageTimeout;
 
@@ -184,6 +203,7 @@ class OfflineFormsController extends ChangeNotifier {
   final ListQueue<_QueuedJob> _queue = ListQueue();
   final Set<String> _running = {};
   bool _pumping = false;
+  int _refreshSeq = 0;
   bool _progressed = false;
   int _generation = 0;
 
@@ -191,10 +211,22 @@ class OfflineFormsController extends ChangeNotifier {
   List<Assignment> _lastEligible = const [];
   OfflineFormsEnvironment? _lastEnv;
 
+  /// Assignments of the user's *other* entities that use a saved template.
+  /// A template is downloaded once for every entity, so these get their pages
+  /// (and entity-specific data) saved too, without visiting each entity.
+  List<Assignment> _otherEntities = const [];
+  Set<int> _closedOtherEntityIds = const {};
+  bool Function(Assignment)? _otherEntityEligible;
+  String? _otherEntitiesSignature;
+  DateTime? _otherEntitiesSyncedAt;
+  bool _syncingOtherEntities = false;
+  bool _resyncOtherEntities = false;
+  DateTime? _userRequestedAt;
+
   /// Completes once no background work is running (for tests).
   @visibleForTesting
   Future<void> get idle async {
-    while (_pumping || _running.isNotEmpty) {
+    while (_pumping || _running.isNotEmpty || _syncingOtherEntities) {
       await Future<void>.delayed(const Duration(milliseconds: 5));
     }
   }
@@ -204,7 +236,10 @@ class OfflineFormsController extends ChangeNotifier {
     _queue.clear();
     unawaited(
       refresh(_all, language: _lastEnv?.language ?? '').catchError((Object e) {
-        DebugLogger.logWarn('OFFLINE_BUNDLE', 'Refresh after storage change failed: $e');
+        DebugLogger.logWarn(
+          'OFFLINE_BUNDLE',
+          'Refresh after storage change failed: $e',
+        );
       }),
     );
   }
@@ -229,13 +264,15 @@ class OfflineFormsController extends ChangeNotifier {
   }) {
     _all = all.toList();
     _statuses = {
-      for (final a in _all) a.id: evaluateOfflineForm(a, _index, language: language),
+      for (final a in _all)
+        a.id: evaluateOfflineForm(a, _index, language: language),
     };
     _pending
       ..clear()
       ..addAll([
         for (final a in eligible)
-          if (statusFor(a.id).needsPage && !_recentlyFailed('page:${a.id}')) a.id,
+          if (statusFor(a.id).needsPage && !_recentlyFailed('page:${a.id}'))
+            a.id,
       ]);
     notifyListeners();
   }
@@ -257,7 +294,10 @@ class OfflineFormsController extends ChangeNotifier {
     required String language,
   }) async {
     final list = assignments.toList();
+    final seq = ++_refreshSeq;
     final index = await _service.readIndex();
+    // A newer refresh read the disk after this one; its result is the current one.
+    if (seq != _refreshSeq) return;
     final statuses = {
       for (final a in list)
         a.id: evaluateOfflineForm(a, index, language: language),
@@ -282,20 +322,27 @@ class OfflineFormsController extends ChangeNotifier {
     _all = const [];
     _lastEligible = const [];
     _lastEnv = null;
+    _otherEntities = const [];
+    _closedOtherEntityIds = const {};
+    _otherEntitiesSignature = null;
+    _otherEntitiesSyncedAt = null;
+    _userRequestedAt = null;
     notifyListeners();
   }
 
   /// Refreshes states and queues the background work the plan calls for.
   ///
-  /// Selecting another entity only ever adds pages (one small request each):
-  /// a template that is saved and current is never downloaded again. Package
-  /// downloads happen for templates that were saved before but are outdated
-  /// (or for every template when auto-download is on), on Wi-Fi only.
+  /// A template is saved once for all entities: its package is downloaded
+  /// once, and the pages (with their entity-specific data) of every entity's
+  /// assignments follow in the background. Selecting another entity therefore
+  /// never needs a download. [otherEntityEligible] decides which assignments of
+  /// the other entities qualify (the same rule as [eligible]).
   Future<void> reconcile({
     required Iterable<Assignment> all,
     required Iterable<Assignment> eligible,
     required OfflineFormsEnvironment env,
     bool clearFailures = false,
+    bool Function(Assignment)? otherEntityEligible,
   }) async {
     final generation = _generation;
     try {
@@ -304,6 +351,7 @@ class OfflineFormsController extends ChangeNotifier {
       if (clearFailures) _failedAt.clear();
       _lastEligible = eligible.toList();
       _lastEnv = env;
+      _otherEntityEligible = otherEntityEligible ?? _otherEntityEligible;
       if (!env.online) {
         _queue.clear();
         return;
@@ -317,15 +365,118 @@ class OfflineFormsController extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(_pump());
+    if (env.online) {
+      unawaited(_syncOtherEntitiesAndPlan(force: clearFailures));
+    }
+  }
+
+  bool get _userRecentlyRequested {
+    final at = _userRequestedAt;
+    return at != null && DateTime.now().difference(at) < _userRequestWindow;
+  }
+
+  /// Templates whose other entities should be saved: those on the device, plus
+  /// every template on screen when auto-download is on.
+  Future<Set<int>> _templatesToSpread() async {
+    final autoDownload = await _service.isAutoDownloadEnabled();
+    return {
+      ..._index.templateIds,
+      if (autoDownload)
+        for (final a in _all)
+          if (a.templateId != null) a.templateId!,
+    };
+  }
+
+  /// Fetches the assignments of every other entity for the saved templates
+  /// (one request) and queues their pages. Throttled; [force] skips that.
+  Future<void> _syncOtherEntitiesAndPlan({bool force = false}) async {
+    final env = _lastEnv;
+    if (env == null || !env.online) return;
+    if (_syncingOtherEntities) {
+      if (force) _resyncOtherEntities = true;
+      return;
+    }
+    final generation = _generation;
+    _syncingOtherEntities = true;
+    try {
+      final templates = await _templatesToSpread();
+      if (generation != _generation) return;
+      if (templates.isEmpty) {
+        _otherEntities = const [];
+        _closedOtherEntityIds = const {};
+        return;
+      }
+      final signature = (templates.toList()..sort()).join(',');
+      final syncedAt = _otherEntitiesSyncedAt;
+      final fresh =
+          signature == _otherEntitiesSignature &&
+          syncedAt != null &&
+          DateTime.now().difference(syncedAt) < _siblingSyncEvery;
+      if (!force && (fresh || _recentlyFailed(_siblingFailureKey))) {
+        return;
+      }
+      final List<EntityDashboardSnapshot> snapshots;
+      try {
+        snapshots = await _loadOtherEntities(
+          templates,
+        ).timeout(_siblingSyncTimeout);
+      } catch (e) {
+        _failedAt[_siblingFailureKey] = DateTime.now();
+        DebugLogger.logWarn('OFFLINE_BUNDLE', 'Entity sync failed: $e');
+        return;
+      }
+      if (generation != _generation) return;
+      _failedAt.remove(_siblingFailureKey);
+      final eligible = _otherEntityEligible ?? (Assignment a) => true;
+      _otherEntities = [
+        for (final snapshot in snapshots)
+          for (final a in snapshot.currentAssignments)
+            if (a.templateId != null &&
+                templates.contains(a.templateId) &&
+                !a.isEffectivelyClosed &&
+                eligible(a))
+              a,
+      ];
+      _closedOtherEntityIds = {
+        for (final snapshot in snapshots)
+          for (final a in snapshot.allAssignments)
+            if (a.isEffectivelyClosed) a.id,
+      };
+      _otherEntitiesSignature = signature;
+      _otherEntitiesSyncedAt = DateTime.now();
+      await _enqueuePlan();
+    } finally {
+      _syncingOtherEntities = false;
+    }
+    notifyListeners();
+    unawaited(_pump());
+    if (_resyncOtherEntities) {
+      _resyncOtherEntities = false;
+      await _syncOtherEntitiesAndPlan(force: true);
+    }
   }
 
   Future<void> _enqueuePlan() async {
     final env = _lastEnv;
-    if (env == null) return;
+    if (env == null || !env.online) {
+      _queue.clear();
+      return;
+    }
     final autoDownload = await _service.isAutoDownloadEnabled();
-    final allowPackages = await _isUnmetered();
+    final unmetered = await _isUnmetered();
+    final allowPackages = unmetered;
+    // Saving the other entities' pages loads each form once to capture its
+    // entity-specific data, so on mobile data it only runs for a template the
+    // user asked to download.
+    final knownIds = {for (final a in _lastEligible) a.id};
+    final others = unmetered || _userRecentlyRequested
+        ? [
+            for (final a in _otherEntities)
+              if (!knownIds.contains(a.id)) a,
+          ]
+        : const <Assignment>[];
     final plan = planOfflineJobs(
-      eligible: _lastEligible,
+      eligible: [..._lastEligible, ...others],
       index: _index,
       language: env.language,
       autoDownload: autoDownload,
@@ -343,9 +494,9 @@ class OfflineFormsController extends ChangeNotifier {
     final generation = _generation;
     var passes = 0;
     try {
-      while (generation == _generation && passes++ < 4) {
+      while (generation == _generation && passes++ < 8) {
         while (_queue.isNotEmpty && generation == _generation) {
-            final next = _queue.removeFirst();
+          final next = _queue.removeFirst();
           await _run(next, explicit: false);
         }
         if (!_progressed || generation != _generation) break;
@@ -469,14 +620,24 @@ class OfflineFormsController extends ChangeNotifier {
         ? OfflineJobKind.page
         : OfflineJobKind.package;
     final future =
-        _run(
-          _QueuedJob(OfflineJob(kind, assignment), env),
-          explicit: true,
-        ).whenComplete(() {
-          _explicit.remove(assignment.id);
-        });
+        _run(_QueuedJob(OfflineJob(kind, assignment), env), explicit: true)
+            .then((result) {
+              if (result.ok) _spreadToOtherEntities(env);
+              return result;
+            })
+            .whenComplete(() {
+              _explicit.remove(assignment.id);
+            });
     _explicit[assignment.id] = future;
     return future;
+  }
+
+  /// The user downloaded a template: save it for the other entities too, even
+  /// on mobile data, without making the download they asked for wait.
+  void _spreadToOtherEntities(OfflineFormsEnvironment env) {
+    _userRequestedAt = DateTime.now();
+    _lastEnv ??= env;
+    unawaited(_syncOtherEntitiesAndPlan(force: true));
   }
 
   /// Removes the saved template of [assignment] (package and all pages).
@@ -502,6 +663,7 @@ class OfflineFormsController extends ChangeNotifier {
         closedAssignmentIds: {
           ...past.map((a) => a.id),
           ...current.where((a) => a.isEffectivelyClosed).map((a) => a.id),
+          ..._closedOtherEntityIds,
         },
       );
     } catch (e) {

@@ -29199,10 +29199,6 @@ msgstr ""
 msgid "This matrix is imputed"
 msgstr ""
 
-#: app/services/ai/runtime/step_ux.py:238
-msgid "This needs multiple steps — starting…"
-msgstr ""
-
 #: app/templates/tours/tours.html:63
 msgid ""
 "This notice indicates that some fields have prefilled values (shown in "
@@ -37276,3 +37272,40 @@ msgstr ""
 #~ "User-type classification is not available yet. Technical RBAC roles are not "
 #~ "used here."
 #~ msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+msgid "Deciding what to look up…"
+msgstr "तय कर रहा हूँ कि क्या खोजना है…"
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reports and plans"
+msgstr "रिपोर्ट और योजनाएँ"
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reported databank values"
+msgstr "डेटाबैंक में दर्ज किए गए मान"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s — %(why)s"
+msgstr "देख रहा हूँ: %(sources)s — %(why)s"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s"
+msgstr "देख रहा हूँ: %(sources)s"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found data for %(year)d · reviewing…"
+msgstr "%(year)d के लिए डेटा मिला · समीक्षा जारी…"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d yearly values (%(first)d–%(last)d) · reviewing…"
+msgstr "%(count)d वार्षिक मान मिले (%(first)d–%(last)d) · समीक्षा जारी…"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d data points · reviewing…"
+msgstr "%(count)d डेटा बिंदु मिले · समीक्षा जारी…"

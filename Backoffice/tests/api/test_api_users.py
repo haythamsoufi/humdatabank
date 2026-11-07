@@ -17,6 +17,7 @@ from tests.factories import (
 )
 from tests.helpers import login_session, get_csrf_headers
 from app.models.core import UserEntityPermission
+from app.models import AssignmentEntityStatus
 from app.models.enums import EntityType
 
 
@@ -614,3 +615,125 @@ class TestGetDashboard:
                 "form_definition_updated_at",
             ):
                 assert field in asgn, f"Missing field in assignment: {field}"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/dashboard/offline-entities
+# ---------------------------------------------------------------------------
+
+@pytest.mark.api
+@pytest.mark.integration
+class TestGetDashboardOfflineEntities:
+    """Every selectable entity's assignments in one call (offline template download)."""
+
+    def _two_country_user(self, db_session, app):
+        from tests.factories import (
+            create_focal_point_with_country,
+            create_test_assignment_entity_status,
+            create_test_template,
+        )
+        from tests.factories import _grant_entity_permission
+
+        with app.app_context():
+            user, country_a, aes_a = create_focal_point_with_country(db_session)
+            template_id = aes_a.assigned_form.template_id
+            country_b = create_test_country(db_session)
+            _grant_entity_permission(db_session, user, EntityType.country.value, country_b.id)
+            aes_b = AssignmentEntityStatus(
+                assigned_form_id=aes_a.assigned_form_id,
+                entity_type=EntityType.country.value,
+                entity_id=country_b.id,
+                status="in_progress",
+            )
+            db_session.add(aes_b)
+            db_session.flush()
+            other_template = create_test_template(db_session)
+            aes_other = create_test_assignment_entity_status(
+                db_session, country=country_b, template=other_template, commit=False,
+            )
+            db_session.commit()
+            return {
+                "user_id": int(user.id),
+                "template_id": int(template_id),
+                "other_template_id": int(other_template.id),
+                "country_ids": (int(country_a.id), int(country_b.id)),
+                "aes_ids": (int(aes_a.id), int(aes_b.id), int(aes_other.id)),
+            }
+
+    def test_requires_login(self, client):
+        resp = client.get("/api/v1/dashboard/offline-entities")
+        assert resp.status_code in (401, 302, 403)
+
+    def test_returns_assignments_of_all_entities(self, client, db_session, app):
+        ctx = self._two_country_user(db_session, app)
+        login_session(client, ctx["user_id"])
+
+        resp = client.get(f"/api/v1/dashboard/offline-entities?template_ids={ctx['template_id']}")
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["truncated"] is False
+        by_country = {
+            item["entity"]["entity_id"]: item
+            for item in data["entities"]
+            if item["entity"]["entity_type"] == "country"
+        }
+        assert set(by_country) == set(ctx["country_ids"])
+        for country_id, aes_id in zip(ctx["country_ids"], ctx["aes_ids"][:2]):
+            ids = {a["id"] for a in by_country[country_id]["current_assignments"]}
+            assert ids == {aes_id}
+            assert all(
+                a["template_id"] == ctx["template_id"]
+                for a in by_country[country_id]["current_assignments"]
+            )
+
+    def test_without_template_filter_returns_every_assignment(self, client, db_session, app):
+        ctx = self._two_country_user(db_session, app)
+        login_session(client, ctx["user_id"])
+
+        data = client.get("/api/v1/dashboard/offline-entities").get_json()
+
+        ids = {
+            a["id"]
+            for item in data["entities"]
+            for a in item["current_assignments"] + item["past_assignments"]
+        }
+        assert set(ctx["aes_ids"]) <= ids
+
+    def test_entities_without_matching_assignments_are_left_out(self, client, db_session, app):
+        ctx = self._two_country_user(db_session, app)
+        login_session(client, ctx["user_id"])
+
+        data = client.get(
+            f"/api/v1/dashboard/offline-entities?template_ids={ctx['other_template_id']}"
+        ).get_json()
+
+        assert [item["entity"]["entity_id"] for item in data["entities"]] == [ctx["country_ids"][1]]
+
+    def test_limit_truncates_and_flags_it(self, client, db_session, app):
+        ctx = self._two_country_user(db_session, app)
+        login_session(client, ctx["user_id"])
+
+        data = client.get(
+            f"/api/v1/dashboard/offline-entities?template_ids={ctx['template_id']}&limit=1"
+        ).get_json()
+
+        assert len(data["entities"]) == 1
+        assert data["truncated"] is True
+
+    def test_does_not_change_the_selected_entity(self, client, db_session, app):
+        ctx = self._two_country_user(db_session, app)
+        login_session(client, ctx["user_id"])
+
+        client.get(f"/api/v1/dashboard/offline-entities?template_ids={ctx['template_id']}")
+
+        with client.session_transaction() as sess:
+            assert "selected_entity_id" not in sess
+
+    def test_ignores_malformed_template_ids(self, client, db_session, app):
+        ctx = self._two_country_user(db_session, app)
+        login_session(client, ctx["user_id"])
+
+        resp = client.get("/api/v1/dashboard/offline-entities?template_ids=abc,,x1")
+
+        assert resp.status_code == 200

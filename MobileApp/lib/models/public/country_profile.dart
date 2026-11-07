@@ -153,7 +153,10 @@ class CountryDocument {
   final String? thumbnail;
   final int? year;
   final String? documentType;
+
+  /// Display name (e.g. "English"); falls back to the ISO code when the server sends only that.
   final String? language;
+  final String? languageCode;
 
   const CountryDocument({
     required this.title,
@@ -163,10 +166,13 @@ class CountryDocument {
     this.year,
     this.documentType,
     this.language,
+    this.languageCode,
   });
 
   factory CountryDocument.fromJson(Map<String, dynamic> json) {
     final filename = json['filename']?.toString();
+    final languageCode = json['language_code']?.toString();
+    final rawLanguage = json['language']?.toString();
     return CountryDocument(
       title: json['title']?.toString() ?? filename ?? '',
       filename: filename,
@@ -174,7 +180,8 @@ class CountryDocument {
       thumbnail: json['thumbnail']?.toString(),
       year: (json['year'] as num?)?.toInt(),
       documentType: json['document_type']?.toString(),
-      language: json['language']?.toString(),
+      language: _languageDisplayName(rawLanguage),
+      languageCode: languageCode ?? rawLanguage,
     );
   }
 
@@ -188,6 +195,24 @@ class CountryDocument {
         name.endsWith('.webp') ||
         name.endsWith('.gif');
   }
+}
+
+const _languageNames = {
+  'en': 'English',
+  'fr': 'French',
+  'es': 'Spanish',
+  'ar': 'Arabic',
+  'ru': 'Russian',
+  'zh': 'Chinese',
+  'hi': 'Hindi',
+  'pt': 'Portuguese',
+  'de': 'German',
+};
+
+String? _languageDisplayName(String? raw) {
+  final value = raw?.trim();
+  if (value == null || value.isEmpty) return null;
+  return _languageNames[value.toLowerCase()] ?? value;
 }
 
 List<String> _stringList(Object? raw) =>

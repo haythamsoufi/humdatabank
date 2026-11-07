@@ -663,6 +663,145 @@ class TestMobileRegionProfile:
         assert [c['iso3'] for c in entry['top_countries']] == ['RG1', 'RG2']
 
 
+def _seed_public_reach_indicator(db_session, template, section, *, kpi_code, name, sector_id=None):
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app.models import IndicatorBank
+    from tests.factories import create_test_item
+
+    indicator = IndicatorBank(
+        name=name, type="number", unit="people", archived=False, fdrs_kpi_code=kpi_code,
+        sector={"primary": sector_id} if sector_id else None,
+    )
+    db_session.add(indicator)
+    db_session.commit()
+    item = create_test_item(db_session, section, template, label=name, indicator_bank_id=indicator.id)
+    item.set_privacy("public")
+    flag_modified(item, "config")
+    db_session.commit()
+    return indicator, item
+
+
+class TestMobileFdrsKpiOverview:
+    def test_requires_bank_id_or_kpi_code(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_fdrs_overview
+
+        with app.test_request_context('/api/mobile/v1/data/fdrs-overview', method='GET'):
+            resp = mobile_fdrs_overview()
+
+        _, status = _parse(resp)
+        assert status == 400
+
+    def test_unknown_kpi_code_returns_400(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_fdrs_overview
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/fdrs-overview?kpi_code=KPI_Nope', method='GET'
+        ):
+            resp = mobile_fdrs_overview()
+
+        _, status = _parse(resp)
+        assert status == 400
+
+    def test_kpi_code_uses_larger_value_of_duplicate_banks(self, app, db_session):
+        from app.models import FormData
+        from app.routes.api.mobile.public_data import mobile_fdrs_overview
+        from tests.factories import (
+            create_test_assignment_entity_status,
+            create_test_country,
+            create_test_section,
+            create_test_template,
+        )
+
+        template = create_test_template(db_session, name="Kpi overview template")
+        section = create_test_section(db_session, template)
+        country = create_test_country(db_session, name="Kpiland", iso3="KPL")
+        _, item_a = _seed_public_reach_indicator(
+            db_session, template, section, kpi_code="KPI_ReachH", name="Health A"
+        )
+        _, item_b = _seed_public_reach_indicator(
+            db_session, template, section, kpi_code="KPI_ReachH", name="Health B"
+        )
+        aes = create_test_assignment_entity_status(
+            db_session, country=country, template=template, period_name="2024",
+        )
+        for item, value in ((item_a, 40), (item_b, 25)):
+            db_session.add(FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=item.id,
+                published_value=str(value),
+                published_numeric_value=value,
+            ))
+        db_session.commit()
+
+        with app.test_request_context(
+            f'/api/mobile/v1/data/fdrs-overview?kpi_code=KPI_ReachH&template_id={template.id}&period_name=2024',
+            method='GET',
+        ):
+            resp = mobile_fdrs_overview()
+
+        body, status = _parse(resp)
+        assert status == 200
+        data = body.get_json()['data']
+        assert data['by_country'] == {str(country.id): 40}
+        assert data['global_total'] == 40
+
+
+class TestMobileFdrsReachIndicators:
+    def test_groups_public_indicators_by_sector(self, app, db_session):
+        from app.models import Sector
+        from app.routes.api.mobile.public_data import mobile_fdrs_reach_indicators
+        from tests.factories import create_test_section, create_test_template
+
+        template = create_test_template(db_session, name="Reach sectors template")
+        section = create_test_section(db_session, template)
+        health = Sector(name="Reach Health", display_order=1)
+        shelter = Sector(name="Reach Shelter", display_order=2)
+        db_session.add_all([health, shelter])
+        db_session.commit()
+        _seed_public_reach_indicator(
+            db_session, template, section, kpi_code="KPI_ReachS", name="Shelter reach", sector_id=shelter.id
+        )
+        _seed_public_reach_indicator(
+            db_session, template, section, kpi_code="KPI_ReachHPM", name="Mental health reach", sector_id=health.id
+        )
+        _seed_public_reach_indicator(
+            db_session, template, section, kpi_code="KPI_ReachH", name="Health reach", sector_id=health.id
+        )
+
+        with app.test_request_context(
+            f'/api/mobile/v1/data/fdrs-reach-indicators?template_id={template.id}', method='GET'
+        ):
+            resp = mobile_fdrs_reach_indicators()
+
+        body, status = _parse(resp)
+        assert status == 200
+        sectors = body.get_json()['data']['sectors']
+        assert [s['name'] for s in sectors] == ["Reach Health", "Reach Shelter"]
+        assert [i['kpi_code'] for i in sectors[0]['indicators']] == ["KPI_ReachH", "KPI_ReachHPM"]
+        assert [i['kpi_code'] for i in sectors[1]['indicators']] == ["KPI_ReachS"]
+
+    def test_skips_indicators_without_public_items(self, app, db_session):
+        from app.models import IndicatorBank
+        from app.routes.api.mobile.public_data import mobile_fdrs_reach_indicators
+        from tests.factories import create_test_template
+
+        template = create_test_template(db_session, name="Reach private template")
+        db_session.add(IndicatorBank(
+            name="Hidden reach", type="number", unit="people", archived=False, fdrs_kpi_code="KPI_ReachL",
+        ))
+        db_session.commit()
+
+        with app.test_request_context(
+            f'/api/mobile/v1/data/fdrs-reach-indicators?template_id={template.id}', method='GET'
+        ):
+            resp = mobile_fdrs_reach_indicators()
+
+        body, status = _parse(resp)
+        assert status == 200
+        assert body.get_json()['data']['sectors'] == []
+
+
 # ---------------------------------------------------------------------------
 # public_resources
 # ---------------------------------------------------------------------------

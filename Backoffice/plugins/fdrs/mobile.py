@@ -15,100 +15,121 @@ from app.utils.mobile_responses import (
 )
 
 
+def _country_totals(indicator_bank_id, template_id, period_name) -> dict[int, float]:
+    """Published numeric totals per country for one indicator bank row (public items only)."""
+    from app.models import FormData, AssignedForm, PublicSubmission
+    from app.models.assignments import AssignmentEntityStatus
+    from plugins.fdrs.published_facts import (
+        public_form_item_ids,
+        published_numeric,
+        published_snapshot_clause,
+    )
+
+    form_item_ids = public_form_item_ids(
+        indicator_bank_id=indicator_bank_id,
+        template_id=template_id,
+    )
+    if not form_item_ids:
+        return {}
+
+    aes_q = (
+        db.session.query(
+            AssignmentEntityStatus.entity_id,
+            FormData.published_numeric_value,
+            FormData.published_value,
+        )
+        .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
+        .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
+        .filter(
+            FormData.form_item_id.in_(form_item_ids),
+            AssignmentEntityStatus.entity_type == 'country',
+            published_snapshot_clause(),
+        )
+    )
+    aes_q = aes_q.filter(AssignedForm.template_id == template_id)
+    if period_name:
+        aes_q = aes_q.filter(AssignedForm.period_name == period_name)
+
+    pub_q = (
+        db.session.query(
+            PublicSubmission.country_id,
+            FormData.published_numeric_value,
+            FormData.published_value,
+        )
+        .join(FormData, FormData.public_submission_id == PublicSubmission.id)
+        .join(AssignedForm, AssignedForm.id == PublicSubmission.assigned_form_id)
+        .filter(
+            FormData.form_item_id.in_(form_item_ids),
+            PublicSubmission.country_id.isnot(None),
+            AssignedForm.template_id == template_id,
+            published_snapshot_clause(),
+        )
+    )
+    if period_name:
+        pub_q = pub_q.filter(AssignedForm.period_name == period_name)
+
+    by_country: dict[int, float] = {}
+    for country_id, numeric, value in list(aes_q.all()) + list(pub_q.all()):
+        if not country_id:
+            continue
+        n = published_numeric(numeric, value)
+        if n is None or n <= 0:
+            continue
+        by_country[country_id] = by_country.get(country_id, 0) + n
+    return by_country
+
+
 def fdrs_overview():
     """Pre-aggregated FDRS indicator totals per country.
 
     Mobile-optimised replacement for the paginated /api/v1/data pattern:
     sums the published snapshot (never the live editable value) server-side and
     returns a compact envelope so the Flutter client never has to fetch and
-    iterate tens of thousands of rows. Only privacy=public form items are included.
+    iterate tens of thousands of rows. Only privacy=public items are included.
 
     Query params:
-      - indicator_bank_id (required): IndicatorBank PK to aggregate
+      - indicator_bank_id: IndicatorBank PK to aggregate
+      - kpi_code: FDRS KPI code (e.g. KPI_ReachH) to aggregate instead of one bank id;
+        every bank row carrying the code contributes its larger value per country so
+        duplicate rows are not double counted. Bank ids differ between environments,
+        so the people-reached chips use this.
       - template_id (optional, default 21 — FDRS): scope to a specific form template
       - period_name (optional): scope to a specific reporting period
       - locale (optional, default 'en'): language code for country names
+
+    One of indicator_bank_id or kpi_code is required.
     """
     from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 
     indicator_bank_id = request.args.get('indicator_bank_id', type=int)
+    kpi_code = (request.args.get('kpi_code', type=str) or '').strip() or None
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     period_name = request.args.get('period_name', type=str) or None
     locale = request.args.get('locale', 'en')
 
-    if not indicator_bank_id:
-        return mobile_bad_request('indicator_bank_id is required')
+    if not indicator_bank_id and not kpi_code:
+        return mobile_bad_request('indicator_bank_id or kpi_code is required')
 
     try:
-        from app.models import FormData, Country, AssignedForm, PublicSubmission
-        from app.models.assignments import AssignmentEntityStatus
-        from plugins.fdrs.published_facts import (
-            public_form_item_ids,
-            published_numeric,
-            published_snapshot_clause,
-        )
-        # Public map: privacy=public items only, and only the published snapshot.
-        form_item_ids = public_form_item_ids(
-            indicator_bank_id=indicator_bank_id,
-            template_id=template_id,
-        )
-        if not form_item_ids:
-            return mobile_ok(data={
-                'period_name': period_name,
-                'by_country': {},
-                'country_names': {},
-                'country_iso2': {},
-            })
+        from app.models import Country, IndicatorBank
 
-        # ── Assigned-form rows ──────────────────────────────────────────────
-        aes_q = (
-            db.session.query(
-                AssignmentEntityStatus.entity_id,
-                FormData.published_numeric_value,
-                FormData.published_value,
-            )
-            .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
-            .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
-            .filter(
-                FormData.form_item_id.in_(form_item_ids),
-                AssignmentEntityStatus.entity_type == 'country',
-                published_snapshot_clause(),
-            )
-        )
-        aes_q = aes_q.filter(AssignedForm.template_id == template_id)
-        if period_name:
-            aes_q = aes_q.filter(AssignedForm.period_name == period_name)
+        if kpi_code:
+            if kpi_code not in _KEY_KPI_CODES:
+                return mobile_bad_request('Unknown kpi_code')
+            bank_ids = [
+                row.id
+                for row in IndicatorBank.query.filter(IndicatorBank.fdrs_kpi_code == kpi_code)
+                .with_entities(IndicatorBank.id)
+                .all()
+            ]
+        else:
+            bank_ids = [indicator_bank_id]
 
-        # ── Public-submission rows ──────────────────────────────────────────
-        pub_q = (
-            db.session.query(
-                PublicSubmission.country_id,
-                FormData.published_numeric_value,
-                FormData.published_value,
-            )
-            .join(FormData, FormData.public_submission_id == PublicSubmission.id)
-            .join(AssignedForm, AssignedForm.id == PublicSubmission.assigned_form_id)
-            .filter(
-                FormData.form_item_id.in_(form_item_ids),
-                PublicSubmission.country_id.isnot(None),
-                AssignedForm.template_id == template_id,
-                published_snapshot_clause(),
-            )
-        )
-        if period_name:
-            pub_q = pub_q.filter(AssignedForm.period_name == period_name)
-
-        # ── Aggregate by country ────────────────────────────────────────────
         by_country: dict[int, float] = {}
-        for country_id, numeric, value in list(aes_q.all()) + list(pub_q.all()):
-            if not country_id:
-                continue
-            n = published_numeric(numeric, value)
-            if n is None or n <= 0:
-                continue
-            by_country[country_id] = by_country.get(country_id, 0) + n
+        for bank_id in bank_ids:
+            for country_id, total in _country_totals(bank_id, template_id, period_name).items():
+                by_country[country_id] = max(by_country.get(country_id, 0), total)
 
-        # ── Country metadata ────────────────────────────────────────────────
         country_ids = list(by_country.keys())
         countries = Country.query.filter(Country.id.in_(country_ids)).all() if country_ids else []
 
@@ -130,6 +151,7 @@ def fdrs_overview():
             'by_country': {str(k): v for k, v in by_country.items()},
             'country_names': country_names,
             'country_iso2': country_iso2,
+            'global_total': sum(by_country.values()),
         })
     except Exception as e:
         current_app.logger.error('mobile_fdrs_overview: %s', e, exc_info=True)
@@ -460,7 +482,8 @@ def country_profile(iso3):
                 'year': entry.get('year'),
                 'period': entry.get('YearText'),
                 'document_type': entry.get('document_type'),
-                'language': entry.get('LangCode'),
+                'language': entry.get('language') or entry.get('LangCode'),
+                'language_code': entry.get('LangCode'),
                 'uploaded_at': entry.get('ModifiedAt'),
             })
 
@@ -572,3 +595,69 @@ def region_profile(slug):
     except Exception as e:
         current_app.logger.error('mobile_region_profile: %s', e, exc_info=True)
         return mobile_server_error('Failed to load region profile.')
+
+
+def reach_indicators():
+    """People-reached indicators grouped by sector, for the home map chips.
+
+    Only indicators with at least one privacy=public form item in the template are listed.
+    Sectors follow ``Sector.display_order`` (unsectored indicators last), indicators keep the
+    order of ``_PEOPLE_REACHED_KPIS`` and are identified by FDRS KPI code, which is stable across environments.
+
+    Query params:
+      - template_id (optional, default 21 — FDRS)
+      - locale (optional, default 'en'): localized sector and indicator names
+    """
+    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+
+    template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
+    locale = (request.args.get('locale', 'en') or 'en').strip().lower()
+
+    try:
+        from app.models import IndicatorBank
+
+        banks = (
+            IndicatorBank.query
+            .filter(IndicatorBank.fdrs_kpi_code.in_(_PEOPLE_REACHED_KPIS))
+            .order_by(IndicatorBank.id)
+            .all()
+        )
+        code_by_id = {b.id: b.fdrs_kpi_code for b in banks}
+        public_bank_ids = set(_public_item_indicators(template_id, code_by_id).values())
+
+        primary_bank: dict[str, object] = {}
+        for bank in banks:
+            if bank.id in public_bank_ids:
+                primary_bank.setdefault(bank.fdrs_kpi_code, bank)
+
+        from app.models import Sector
+
+        sector_names = _sector_names(list(primary_bank.values()), locale)
+        sector_order = {
+            s.id: (s.display_order or 0)
+            for s in Sector.query.filter(Sector.id.in_(list(sector_names))).all()
+        } if sector_names else {}
+        sectors: dict[object, dict] = {}
+        for code in _PEOPLE_REACHED_KPIS:
+            bank = primary_bank.get(code)
+            if bank is None:
+                continue
+            primary = bank.sector.get('primary') if isinstance(bank.sector, dict) else None
+            sector = sectors.setdefault(primary, {
+                'id': str(primary) if primary is not None else None,
+                'name': sector_names.get(primary),
+                'indicators': [],
+            })
+            sector['indicators'].append({
+                'kpi_code': code,
+                'name': _localized_text(bank.name_translations, bank.name, locale),
+            })
+
+        ordered = sorted(
+            sectors,
+            key=lambda primary: (primary not in sector_order, sector_order.get(primary, 0)),
+        )
+        return mobile_ok(data={'sectors': [sectors[primary] for primary in ordered]})
+    except Exception as e:
+        current_app.logger.error('mobile_reach_indicators: %s', e, exc_info=True)
+        return mobile_server_error('Failed to load people reached indicators.')

@@ -227,6 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         env: _offlineEnvironment(),
         clearFailures: clearFailures,
+        otherEntityEligible: (a) => _shouldShowEnterDataButton(role, a),
       );
     } catch (e) {
       DebugLogger.logWarn('OFFLINE_BUNDLE', 'Reconcile failed: $e');

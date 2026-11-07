@@ -37,6 +37,7 @@ class AppLocalizations {
       'reset_to_default': 'Reset to Default',
       'tab_always_shown': 'Always shown',
       'minimum_tabs_warning': 'You must keep at least 2 tabs visible.',
+      'maximum_tabs_warning': 'You can show at most 8 tabs.',
       'access_denied': 'Access Denied',
       'general': 'General',
       'document_management': 'Document Management',
@@ -260,6 +261,8 @@ class AppLocalizations {
       'home_landing_global_indicator_income': 'Income',
       'home_landing_global_indicator_expenditure': 'Expenditure',
       'home_landing_global_top_countries': 'Top countries',
+      'home_landing_global_total_title': 'Global total',
+      'home_landing_global_total_countries': '%s countries reporting',
       'home_landing_global_load_error':
           'Could not load map data. Check your connection and try again.',
       'home_landing_global_empty':
@@ -1091,6 +1094,7 @@ class AppLocalizations {
       'country_detail_top_sectors': 'Top sectors',
       'country_detail_documents': 'Documents',
       'country_detail_all_types': 'All types',
+      'country_detail_load_more': 'Load more',
       'country_detail_no_trend': 'No trend data for this indicator',
       'country_detail_no_documents': 'No public documents available',
       'country_detail_not_found': 'Country not found',
@@ -1340,6 +1344,7 @@ class AppLocalizations {
       'reset_to_default': 'Restablecer',
       'tab_always_shown': 'Siempre visible',
       'minimum_tabs_warning': 'Debe mantener al menos 2 pestañas visibles.',
+      'maximum_tabs_warning': 'Puede mostrar como máximo 8 pestañas.',
       'access_denied': 'Acceso Denegado',
       'general': 'General',
       'document_management': 'Gestión de Documentos',
@@ -2375,6 +2380,7 @@ class AppLocalizations {
       'reset_to_default': 'Réinitialiser',
       'tab_always_shown': 'Toujours affiché',
       'minimum_tabs_warning': 'Vous devez garder au moins 2 onglets visibles.',
+      'maximum_tabs_warning': 'Vous pouvez afficher au maximum 8 onglets.',
       'access_denied': 'Accès Refusé',
       'general': 'Général',
       'document_management': 'Gestion des Documents',
@@ -3415,6 +3421,7 @@ class AppLocalizations {
       'reset_to_default': 'إعادة تعيين',
       'tab_always_shown': 'يظهر دائماً',
       'minimum_tabs_warning': 'يجب الاحتفاظ بعلامتي تبويب مرئيتين على الأقل.',
+      'maximum_tabs_warning': 'يمكنك عرض 8 علامات تبويب كحد أقصى.',
       'access_denied': 'تم رفض الوصول',
       'general': 'عام',
       'document_management': 'إدارة المستندات',
@@ -4412,6 +4419,7 @@ class AppLocalizations {
       'reset_to_default': 'डिफ़ॉल्ट पर रीसेट',
       'tab_always_shown': 'हमेशा दिखाया गया',
       'minimum_tabs_warning': 'कम से कम 2 टैब दिखाई देने चाहिए।',
+      'maximum_tabs_warning': 'आप अधिकतम 8 टैब दिखा सकते हैं।',
       'access_denied': 'पहुंच अस्वीकृत',
       'general': 'सामान्य',
       'document_management': 'दस्तावेज़ प्रबंधन',
@@ -5438,6 +5446,7 @@ class AppLocalizations {
       'reset_to_default': 'Сбросить',
       'tab_always_shown': 'Всегда отображается',
       'minimum_tabs_warning': 'Должно быть видно не менее 2 вкладок.',
+      'maximum_tabs_warning': 'Можно показать не более 8 вкладок.',
       'access_denied': 'Доступ Запрещен',
       'general': 'Общее',
       'document_management': 'Управление Документами',
@@ -6470,6 +6479,7 @@ class AppLocalizations {
       'reset_to_default': '重置为默认',
       'tab_always_shown': '始终显示',
       'minimum_tabs_warning': '至少需要保留2个可见标签。',
+      'maximum_tabs_warning': '最多可显示 8 个标签。',
       'access_denied': '访问被拒绝',
       'general': '常规',
       'document_management': '文档管理',
@@ -7452,6 +7462,7 @@ class AppLocalizations {
   String get resetToDefault => translate('reset_to_default');
   String get tabAlwaysShown => translate('tab_always_shown');
   String get minimumTabsWarning => translate('minimum_tabs_warning');
+  String get maximumTabsWarning => translate('maximum_tabs_warning');
   String get accessDenied => translate('access_denied');
   String get general => translate('general');
   String get documentManagement => translate('document_management');
@@ -7711,6 +7722,10 @@ class AppLocalizations {
       translate('home_landing_global_indicator_expenditure');
   String get homeLandingGlobalTopCountries =>
       translate('home_landing_global_top_countries');
+  String get homeLandingGlobalTotalTitle =>
+      translate('home_landing_global_total_title');
+  String homeLandingGlobalTotalCountries(int count) =>
+      translate('home_landing_global_total_countries').replaceAll('%s', '$count');
   String get homeLandingGlobalLoadError =>
       translate('home_landing_global_load_error');
   String get homeLandingGlobalEmpty => translate('home_landing_global_empty');
@@ -8744,6 +8759,7 @@ class AppLocalizations {
   String get countryDetailTopSectors => translate('country_detail_top_sectors');
   String get countryDetailDocuments => translate('country_detail_documents');
   String get countryDetailAllTypes => translate('country_detail_all_types');
+  String get countryDetailLoadMore => translate('country_detail_load_more');
   String get countryDetailNoTrend => translate('country_detail_no_trend');
   String get countryDetailNoDocuments => translate('country_detail_no_documents');
   String get countryDetailNotFound => translate('country_detail_not_found');

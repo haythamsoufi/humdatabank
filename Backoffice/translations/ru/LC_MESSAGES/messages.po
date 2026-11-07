@@ -30515,10 +30515,6 @@ msgstr ""
 msgid "This matrix is imputed"
 msgstr "Эта матрица вчисляется"
 
-#: app/services/ai/runtime/step_ux.py:238
-msgid "This needs multiple steps — starting…"
-msgstr "Это требует нескольких шагов — начала..."
-
 #: app/templates/tours/tours.html:63
 msgid ""
 "This notice indicates that some fields have prefilled values (shown in "
@@ -36652,3 +36648,40 @@ msgstr "✓"
 #~ "User-type classification is not available yet. Technical RBAC roles are not "
 #~ "used here."
 #~ msgstr ""
+
+#: app/services/ai/runtime/step_ux.py
+msgid "Deciding what to look up…"
+msgstr "Определяю, что нужно найти…"
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reports and plans"
+msgstr "отчёты и планы"
+
+#: app/services/ai/runtime/step_ux.py
+msgid "reported databank values"
+msgstr "данные, внесённые в банк данных"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s — %(why)s"
+msgstr "Проверяю: %(sources)s — %(why)s"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Checking %(sources)s"
+msgstr "Проверяю: %(sources)s"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found data for %(year)d · reviewing…"
+msgstr "Найдены данные за %(year)d · анализирую…"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d yearly values (%(first)d–%(last)d) · reviewing…"
+msgstr "Найдено годовых значений: %(count)d (%(first)d–%(last)d) · анализирую…"
+
+#: app/services/ai/runtime/step_ux.py
+#, python-format
+msgid "Found %(count)d data points · reviewing…"
+msgstr "Найдено точек данных: %(count)d · анализирую…"

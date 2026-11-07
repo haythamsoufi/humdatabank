@@ -86,12 +86,12 @@ class _FdrsEmbeddedMapPointerNotifierState
 /// Returned from fullscreen so the home section can stay in sync.
 class FdrsMapSessionSnapshot {
   const FdrsMapSessionSnapshot({
-    required this.indicatorBankId,
+    required this.indicator,
     required this.selectedPeriod,
     required this.visualMode,
   });
 
-  final int indicatorBankId;
+  final FdrsIndicatorSelection indicator;
   final String? selectedPeriod;
   final FdrsMapVisualMode visualMode;
 }
@@ -119,6 +119,25 @@ String fdrsIndicatorTitle(AppLocalizations l10n, int indicatorBankId) {
     default:
       return '';
   }
+}
+
+/// Title of the map indicator: the people-reached indicator name, or the headline label.
+String fdrsSelectionTitle(
+  AppLocalizations l10n,
+  FdrsIndicatorSelection selection,
+) {
+  if (selection.isReach) {
+    return selection.label ?? l10n.homeLandingGlobalIndicatorPeopleReached;
+  }
+  return fdrsIndicatorTitle(l10n, selection.bankId ?? 0);
+}
+
+/// Short chip label for a people-reached indicator (English short names when available).
+String fdrsReachIndicatorLabel(AppLocalizations l10n, ReachIndicator indicator) {
+  if (l10n.locale.languageCode == 'en') {
+    return l10n.reachIndicatorShortLabel(indicator.kpiCode) ?? indicator.name;
+  }
+  return indicator.name;
 }
 
 String formatFdrsOverviewValue(double v, String locale) {
@@ -230,7 +249,7 @@ void showFdrsCountryInsightSheet({
   required GlobalOverviewDataset data,
   required String iso2,
   required String indicatorLabel,
-  required int indicatorBankId,
+  required FdrsIndicatorSelection indicator,
   required List<String> periodOptions,
 }) {
   final theme = Theme.of(context);
@@ -270,7 +289,7 @@ void showFdrsCountryInsightSheet({
                 l10n: l10n,
                 locale: locale,
                 theme: theme,
-                indicatorBankId: indicatorBankId,
+                indicator: indicator,
                 periodOptions: periodOptions,
                 countryId: countryId,
               ),
@@ -286,7 +305,7 @@ class _FdrsCountryTrendLoader extends StatefulWidget {
     required this.l10n,
     required this.locale,
     required this.theme,
-    required this.indicatorBankId,
+    required this.indicator,
     required this.periodOptions,
     required this.countryId,
   });
@@ -294,7 +313,7 @@ class _FdrsCountryTrendLoader extends StatefulWidget {
   final AppLocalizations l10n;
   final String locale;
   final ThemeData theme;
-  final int indicatorBankId;
+  final FdrsIndicatorSelection indicator;
   final List<String> periodOptions;
   final int countryId;
 
@@ -321,7 +340,7 @@ class _FdrsCountryTrendLoaderState extends State<_FdrsCountryTrendLoader> {
     if (periods.isEmpty) return [];
     final chrono = periods.reversed.toList();
     return _service.loadCountryIndicatorSeries(
-      indicatorBankId: widget.indicatorBankId,
+      indicator: widget.indicator,
       locale: widget.locale,
       countryId: widget.countryId,
       periods: chrono,
@@ -733,19 +752,22 @@ class FdrsMapModeToggle extends StatelessWidget {
   }
 }
 
-/// Horizontally scrollable key-indicator picker (matches website indicator set).
-class FdrsIndicatorScrollBar extends StatelessWidget {
-  const FdrsIndicatorScrollBar({
+/// Key-indicator picker (matches website indicator set). People reached opens a
+/// second row of main sectors; a sector opens a third row with its indicators.
+class FdrsIndicatorPicker extends StatelessWidget {
+  const FdrsIndicatorPicker({
     super.key,
     required this.l10n,
-    required this.indicatorBankId,
+    required this.selection,
+    required this.reachSectors,
     required this.onSelect,
     this.compact = false,
   });
 
   final AppLocalizations l10n;
-  final int indicatorBankId;
-  final ValueChanged<int> onSelect;
+  final FdrsIndicatorSelection selection;
+  final List<ReachSector> reachSectors;
+  final ValueChanged<FdrsIndicatorSelection> onSelect;
   final bool compact;
 
   static const List<int> _ids = [
@@ -760,28 +782,242 @@ class FdrsIndicatorScrollBar extends StatelessWidget {
     FdrsConstants.indicatorExpenditure,
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  FdrsIndicatorSelection _reachSelection(
+    ReachSector sector,
+    ReachIndicator indicator,
+  ) {
+    return FdrsIndicatorSelection.reach(
+      kpiCode: indicator.kpiCode,
+      sectorKey: sector.key,
+      label: fdrsReachIndicatorLabel(l10n, indicator),
+    );
+  }
 
+  ReachSector? _selectedSector() {
+    if (!selection.isReach) return null;
+    for (final sector in reachSectors) {
+      if (sector.key == selection.sectorKey) return sector;
+    }
+    return null;
+  }
+
+  Widget _row(List<Widget> chips) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (var i = 0; i < _ids.length; i++) ...[
+          for (var i = 0; i < chips.length; i++) ...[
             if (i > 0) const SizedBox(width: 8),
-            _IndicatorChip(
-              label: fdrsIndicatorTitle(l10n, _ids[i]),
-              selected: indicatorBankId == _ids[i],
-              accent: cs.secondary,
-              compact: compact,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onSelect(_ids[i]);
-              },
-            ),
+            chips[i],
           ],
         ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final selectedSector = _selectedSector();
+
+    final topChips = <Widget>[];
+    for (final id in _ids) {
+      final isReachChip = id == FdrsConstants.indicatorPeopleReached;
+      if (isReachChip && reachSectors.isEmpty) continue;
+      topChips.add(
+        _IndicatorChip(
+          label: fdrsIndicatorTitle(l10n, id),
+          selected: isReachChip ? selection.isReach : selection.bankId == id,
+          accent: cs.secondary,
+          compact: compact,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            if (!isReachChip) return onSelect(FdrsIndicatorSelection.bank(id));
+            if (selection.isReach) return;
+            final first = reachSectors.first;
+            onSelect(_reachSelection(first, first.indicators.first));
+          },
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _row(topChips),
+        if (selection.isReach && selectedSector != null) ...[
+          const SizedBox(height: 8),
+          _row([
+            for (final sector in reachSectors)
+              _IndicatorChip(
+                label: sector.name ??
+                    l10n.homeLandingGlobalIndicatorPeopleReached,
+                selected: sector.key == selectedSector.key,
+                accent: cs.secondary,
+                compact: true,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  if (sector.key == selectedSector.key) return;
+                  onSelect(_reachSelection(sector, sector.indicators.first));
+                },
+              ),
+          ]),
+          const SizedBox(height: 8),
+          _row([
+            for (final indicator in selectedSector.indicators)
+              _IndicatorChip(
+                label: fdrsReachIndicatorLabel(l10n, indicator),
+                selected: indicator.kpiCode == selection.kpiCode,
+                accent: cs.secondary,
+                compact: true,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onSelect(_reachSelection(selectedSector, indicator));
+                },
+              ),
+          ]),
+        ],
+      ],
+    );
+  }
+}
+
+/// Card with the worldwide total of the selected indicator (sum over reporting countries).
+class FdrsGlobalTotalCard extends StatelessWidget {
+  const FdrsGlobalTotalCard({
+    super.key,
+    required this.l10n,
+    required this.locale,
+    required this.indicatorLabel,
+    required this.data,
+    this.compact = false,
+  });
+
+  final AppLocalizations l10n;
+  final String locale;
+  final String indicatorLabel;
+  final GlobalOverviewDataset data;
+
+  /// Single-line pill used over the fullscreen map.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = Color(AppConstants.ifrcRed);
+    final total = data.globalTotal;
+    final value = formatFdrsOverviewValue(total, locale);
+
+    if (compact) {
+      return Material(
+        color: cs.surface.withValues(alpha: 0.94),
+        surfaceTintColor: Colors.transparent,
+        elevation: 1,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  '${l10n.homeLandingGlobalTotalTitle} · $indicatorLabel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                value,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final fullValue = NumberFormat.decimalPattern(locale).format(total.round());
+    final period = data.periodName;
+    final caption = [
+      l10n.homeLandingGlobalTotalCountries(data.byCountryId.length),
+      if (period != null && period.isNotEmpty) period,
+    ].join(' · ');
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isDark ? cs.surfaceContainerHigh : GroupedDashboardPalette.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.45 : 0.6),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.homeLandingGlobalTotalTitle,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    indicatorLabel,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                  ),
+                ),
+                Text(
+                  fullValue,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -921,7 +1157,8 @@ class FdrsWorldMapFullscreenPage extends StatefulWidget {
     required this.theme,
     required this.locale,
     required this.initialDataset,
-    required this.indicatorBankId,
+    required this.indicator,
+    required this.reachSectors,
     required this.selectedPeriod,
     required this.periodOptions,
     required this.visualMode,
@@ -932,12 +1169,13 @@ class FdrsWorldMapFullscreenPage extends StatefulWidget {
   final ThemeData theme;
   final String locale;
   final GlobalOverviewDataset initialDataset;
-  final int indicatorBankId;
+  final FdrsIndicatorSelection indicator;
+  final List<ReachSector> reachSectors;
   final String? selectedPeriod;
   final List<String> periodOptions;
   final FdrsMapVisualMode visualMode;
   final Future<GlobalOverviewDataset> Function({
-    required int indicatorBankId,
+    required FdrsIndicatorSelection indicator,
     required String? periodName,
   })
   reloadDataset;
@@ -949,7 +1187,7 @@ class FdrsWorldMapFullscreenPage extends StatefulWidget {
 
 class _FdrsWorldMapFullscreenPageState
     extends State<FdrsWorldMapFullscreenPage> {
-  late int _indicatorBankId;
+  late FdrsIndicatorSelection _indicator;
   late String? _selectedPeriod;
   late FdrsMapVisualMode _visualMode;
   late Future<GlobalOverviewDataset> _datasetFuture;
@@ -958,31 +1196,31 @@ class _FdrsWorldMapFullscreenPageState
   @override
   void initState() {
     super.initState();
-    _indicatorBankId = widget.indicatorBankId;
+    _indicator = widget.indicator;
     _selectedPeriod = widget.selectedPeriod;
     _visualMode = widget.visualMode;
     _datasetFuture = Future.value(widget.initialDataset);
   }
 
   FdrsMapSessionSnapshot _snapshot() => FdrsMapSessionSnapshot(
-    indicatorBankId: _indicatorBankId,
+    indicator: _indicator,
     selectedPeriod: _selectedPeriod,
     visualMode: _visualMode,
   );
 
   Future<void> _reload() {
     final f = widget.reloadDataset(
-      indicatorBankId: _indicatorBankId,
+      indicator: _indicator,
       periodName: _selectedPeriod,
     );
     setState(() => _datasetFuture = f);
     return f;
   }
 
-  void _selectIndicator(int id) {
-    if (id == _indicatorBankId) return;
+  void _selectIndicator(FdrsIndicatorSelection selection) {
+    if (selection == _indicator) return;
     setState(() {
-      _indicatorBankId = id;
+      _indicator = selection;
     });
     _reload();
   }
@@ -1014,7 +1252,9 @@ class _FdrsWorldMapFullscreenPageState
           maxHeightFraction: 0.88,
           bodyExpands: false,
           onClose: () => Navigator.of(sheetContext).pop(),
-          child: ListView(
+          child: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setSheetState) {
+              return ListView(
             shrinkWrap: true,
             physics: const ClampingScrollPhysics(),
             padding: EdgeInsets.fromLTRB(20, 4, 20, sheetBottomPad),
@@ -1022,17 +1262,21 @@ class _FdrsWorldMapFullscreenPageState
               FdrsMapModeToggle(
                 l10n: l10n,
                 mode: _visualMode,
-                onChanged: (m) => setState(() => _visualMode = m),
+                onChanged: (m) {
+                  setState(() => _visualMode = m);
+                  setSheetState(() {});
+                },
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 44,
-                child: FdrsIndicatorScrollBar(
-                  l10n: l10n,
-                  indicatorBankId: _indicatorBankId,
-                  onSelect: _selectIndicator,
-                  compact: true,
-                ),
+              FdrsIndicatorPicker(
+                l10n: l10n,
+                selection: _indicator,
+                reachSectors: widget.reachSectors,
+                onSelect: (selection) {
+                  _selectIndicator(selection);
+                  setSheetState(() {});
+                },
+                compact: true,
               ),
               if (widget.periodOptions.isNotEmpty) ...[
                 const SizedBox(height: 16),
@@ -1041,7 +1285,10 @@ class _FdrsWorldMapFullscreenPageState
                     l10n: l10n,
                     periods: widget.periodOptions,
                     value: _selectedPeriod,
-                    onChanged: _onPeriodChanged,
+                    onChanged: (value) {
+                      _onPeriodChanged(value);
+                      setSheetState(() {});
+                    },
                     compact: false,
                   )
                 else
@@ -1057,6 +1304,8 @@ class _FdrsWorldMapFullscreenPageState
                   ),
               ],
             ],
+              );
+            },
           ),
         );
       },
@@ -1211,7 +1460,7 @@ class _FdrsWorldMapFullscreenPageState
               );
 
               final initialFit = _cameraFitForDataset(data);
-              final indicatorLabel = fdrsIndicatorTitle(l10n, _indicatorBankId);
+              final indicatorLabel = fdrsSelectionTitle(l10n, _indicator);
               final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
 
               return Stack(
@@ -1235,10 +1484,25 @@ class _FdrsWorldMapFullscreenPageState
                         data: data,
                         iso2: iso2,
                         indicatorLabel: indicatorLabel,
-                        indicatorBankId: _indicatorBankId,
+                        indicator: _indicator,
                         periodOptions: widget.periodOptions,
                       );
                     },
+                  ),
+                  PositionedDirectional(
+                    top: 12,
+                    start: 12,
+                    end: 12,
+                    child: Align(
+                      alignment: AlignmentDirectional.topStart,
+                      child: FdrsGlobalTotalCard(
+                        l10n: l10n,
+                        locale: widget.locale,
+                        indicatorLabel: indicatorLabel,
+                        data: data,
+                        compact: true,
+                      ),
+                    ),
                   ),
                   PositionedDirectional(
                     bottom: 24 + safeBottom,

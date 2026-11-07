@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,11 +11,10 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
-import '../../widgets/countries_widget.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
-import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/network_logo_image.dart';
 import '../../widgets/shimmer_list_placeholder.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/async/async_body.dart';
@@ -171,25 +169,6 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
     }
   }
 
-  void _showCountriesSheet(BuildContext context, ThemeData theme) {
-    final localizations = AppLocalizations.of(context)!;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (bottomSheetContext) {
-        return NativeModalSheetScaffold(
-          theme: theme,
-          title: localizations.countries,
-          closeTooltip: localizations.close,
-          maxHeightFraction: 0.9,
-          onClose: () => Navigator.pop(bottomSheetContext),
-          child: const CountriesWidget(),
-        );
-      },
-    );
-  }
-
   bool _isStandaloneScreen(BuildContext context) {
     // Check if this screen is navigated to directly (not as a tab in MainNavigationScreen)
     // When used as a tab, it's embedded in MainNavigationScreen (route name is dashboard or null)
@@ -289,7 +268,6 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
           ),
           drawer: AppNavigationDrawer(
             activeScreen: ActiveDrawerScreen.indicatorBank,
-            onShowCountriesSheet: () => _showCountriesSheet(context, theme),
           ),
           body: ColoredBox(
             color: theme.scaffoldBackgroundColor,
@@ -897,21 +875,15 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                                     children: [
                                       const SizedBox(height: 4),
                                       if (sector.logoUrl != null)
-                                        CachedNetworkImage(
-                                          imageUrl: sector.logoUrl!,
-                                          width: 48,
-                                          height: 48,
-                                          fit: BoxFit.contain,
-                                          memCacheWidth: 96,
-                                          memCacheHeight: 96,
-                                          errorWidget: (context, url, error) {
-                                            return Text(
-                                              _getSectorIcon(sector.name),
-                                              style: const TextStyle(
-                                                fontSize: 36,
-                                              ),
-                                            );
-                                          },
+                                        NetworkLogoImage(
+                                          url: sector.logoUrl!,
+                                          size: 48,
+                                          fallback: Text(
+                                            _getSectorIcon(sector.name),
+                                            style: const TextStyle(
+                                              fontSize: 36,
+                                            ),
+                                          ),
                                         )
                                       else
                                         Text(

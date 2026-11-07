@@ -745,6 +745,40 @@ class TestMobileFdrsKpiOverview:
         data = body.get_json()['data']
         assert data['by_country'] == {str(country.id): 40}
         assert data['global_total'] == 40
+        assert data['global_rolling_mean'] is None
+
+    def test_volunteers_return_website_rolling_mean(self, app, db_session):
+        from unittest.mock import patch
+
+        from app.routes.api.mobile.public_data import mobile_fdrs_overview
+        from tests.factories import create_test_section, create_test_template
+
+        template = create_test_template(db_session, name="Volunteer overview template")
+        section = create_test_section(db_session, template)
+        indicator, _ = _seed_public_reach_indicator(
+            db_session, template, section, kpi_code="KPI_PeopleVol", name="Volunteers"
+        )
+        rows = [{"ZoneCode": "S1", "IntValue": 120}, {"ZoneCode": "", "IntValue": 1234}]
+
+        with patch(
+            'plugins.fdrs.services.fdrs_public_adapter.build_global_validation', return_value=rows
+        ) as build:
+            for query in (
+                f'indicator_bank_id={indicator.id}',
+                'kpi_code=KPI_PeopleVol',
+            ):
+                with app.test_request_context(
+                    f'/api/mobile/v1/data/fdrs-overview?{query}&template_id={template.id}&period_name=2024',
+                    method='GET',
+                ):
+                    resp = mobile_fdrs_overview()
+
+                body, status = _parse(resp)
+                assert status == 200
+                assert body.get_json()['data']['global_rolling_mean'] == {
+                    'value': 1234, 'year_from': 2022, 'year_to': 2024,
+                }
+        build.assert_called_with(2024)
 
 
 class TestMobileFdrsReachIndicators:

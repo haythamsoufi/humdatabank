@@ -263,6 +263,8 @@ class AppLocalizations {
       'home_landing_global_top_countries': 'Top countries',
       'home_landing_global_total_title': 'Global total',
       'home_landing_global_total_countries': '%s countries reporting',
+      'home_landing_global_total_rolling_label': '%s–%s average',
+      'home_landing_global_total_actual': 'Total reported: %s',
       'home_landing_global_load_error':
           'Could not load map data. Check your connection and try again.',
       'home_landing_global_empty':
@@ -7727,6 +7729,12 @@ class AppLocalizations {
       translate('home_landing_global_top_countries');
   String get homeLandingGlobalTotalTitle =>
       translate('home_landing_global_total_title');
+  String homeLandingGlobalTotalRollingLabel(int yearFrom, int yearTo) =>
+      translate('home_landing_global_total_rolling_label')
+          .replaceFirst('%s', '$yearFrom')
+          .replaceFirst('%s', '$yearTo');
+  String homeLandingGlobalTotalActual(String value) =>
+      translate('home_landing_global_total_actual').replaceAll('%s', value);
   String homeLandingGlobalTotalCountries(int count) =>
       translate('home_landing_global_total_countries').replaceAll('%s', '$count');
   String get homeLandingGlobalLoadError =>

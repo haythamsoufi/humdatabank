@@ -908,7 +908,9 @@ class FdrsGlobalTotalCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final accent = Color(AppConstants.ifrcRed);
     final total = data.globalTotal;
-    final value = formatFdrsOverviewValue(total, locale);
+    final rolling = data.rollingMean;
+    final headline = rolling?.value ?? total;
+    final value = formatFdrsOverviewValue(headline, locale);
 
     if (compact) {
       return Material(
@@ -945,12 +947,24 @@ class FdrsGlobalTotalCard extends StatelessWidget {
       );
     }
 
-    final fullValue = NumberFormat.decimalPattern(locale).format(total.round());
+    final fullValue = NumberFormat.decimalPattern(
+      locale,
+    ).format(headline.round());
     final period = data.periodName;
     final caption = [
       l10n.homeLandingGlobalTotalCountries(data.byCountryId.length),
       if (period != null && period.isNotEmpty) period,
+      if (rolling != null)
+        l10n.homeLandingGlobalTotalRollingLabel(
+          rolling.yearFrom,
+          rolling.yearTo,
+        ),
     ].join(' · ');
+    final totalNote = rolling == null
+        ? null
+        : l10n.homeLandingGlobalTotalActual(
+            NumberFormat.decimalPattern(locale).format(total.round()),
+          );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -988,7 +1002,7 @@ class FdrsGlobalTotalCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     caption,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: cs.onSurfaceVariant,
@@ -1014,6 +1028,14 @@ class FdrsGlobalTotalCard extends StatelessWidget {
                     color: cs.onSurfaceVariant,
                   ),
                 ),
+                if (totalNote != null)
+                  Text(
+                    totalNote,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 10,
+                    ),
+                  ),
               ],
             ),
           ],

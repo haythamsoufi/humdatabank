@@ -70,4 +70,31 @@ void main() {
       expect(parseReachSectors({'data': []}), isEmpty);
     });
   });
+
+  group('GlobalRollingMean.fromJson', () {
+    test('parses the volunteers headline', () {
+      final mean = GlobalRollingMean.fromJson({
+        'value': 1234,
+        'year_from': 2022,
+        'year_to': 2024,
+      });
+
+      expect(mean, isNotNull);
+      expect(mean!.value, 1234);
+      expect(mean.yearFrom, 2022);
+      expect(mean.yearTo, 2024);
+    });
+
+    test('returns null when absent or empty', () {
+      expect(GlobalRollingMean.fromJson(null), isNull);
+      expect(
+        GlobalRollingMean.fromJson({
+          'value': 0,
+          'year_from': 2022,
+          'year_to': 2024,
+        }),
+        isNull,
+      );
+    });
+  });
 }

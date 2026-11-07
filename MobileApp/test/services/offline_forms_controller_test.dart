@@ -435,7 +435,13 @@ void main() {
         ],
       );
       await c.save(assignment(5), env);
-      await service.removePackage((await service.listPackages()).single);
+      // Save kicks off a background spread to other entities; wait so remove
+      // does not race that work on the same package directory.
+      await c.idle;
+      final packages = await service.listPackages();
+      if (packages.isNotEmpty) {
+        await service.removePackage(packages.single);
+      }
 
       await service.savePackageAndPage(
         const OfflineFormRequest(

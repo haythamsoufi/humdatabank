@@ -1886,9 +1886,10 @@ def api_delete_discussion_comment(comment_id):
 def api_session_keepalive():
     """Refresh session activity for users actively editing an entry form.
 
-    Intentionally NOT listed in SKIP_ACTIVITY_ENDPOINTS so every successful
-    call resets ``session['last_activity']`` and restarts the inactivity
-    clock (default 2 hours).  The client sends this only when genuine user
+    Listed in SKIP_ACTIVITY_ENDPOINTS (no audit row, no automatic hooks), so the
+    handler itself resets ``session['last_activity']`` and the session log's
+    ``last_activity`` and restarts the inactivity clock (default 2 hours).  The
+    client sends this only when genuine user
     interaction (keystrokes / clicks) was detected, so silent background tabs
     let the clock expire naturally.
 
@@ -1898,9 +1899,16 @@ def api_session_keepalive():
     try:
         # The endpoint is in SKIP_ACTIVITY_ENDPOINTS so the before_request hook
         # does NOT call update_session_activity().  Update last_activity here
-        # directly so the session inactivity clock is still reset.
+        # directly (cookie and session log) so the inactivity clock is still reset.
         from app.i18n import update_session_activity
+        from app.services.platform.user_analytics_service import (
+            update_session_activity as touch_session_log,
+        )
         update_session_activity()
+        # The cookie clock alone is not enough: the hourly/periodic cleanup closes any
+        # session row whose ``last_activity`` is older than the inactivity timeout, and a
+        # closed row invalidates the cookie on the next request. Touch the row too.
+        touch_session_log('action')
 
         from flask_wtf import csrf as _csrf_module
         token = _csrf_module.generate_csrf()

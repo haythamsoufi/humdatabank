@@ -4,7 +4,7 @@ Session Timeout Middleware
 Handles session timeout checking and user logout for inactive sessions.
 """
 
-from flask import session, redirect, url_for, request
+from flask import current_app, session, redirect, url_for, request
 from flask_login import logout_user, current_user
 from app.utils.request_utils import is_static_asset_request, is_json_request
 from app.utils.api_responses import json_auth_required
@@ -18,6 +18,8 @@ from app.services.platform.user_analytics_service import (
     is_session_blacklisted,
 )
 from contextlib import suppress
+from app import db
+from app.utils.transactions import safe_rollback
 
 
 def _session_auth_failure_response():
@@ -39,6 +41,22 @@ def check_session_timeout():
             if now_utc - last_activity > Config.SESSION_INACTIVITY_TIMEOUT:
                 return True
     return False
+
+
+def _persist_session_end():
+    """
+    Commit the ended-session row now.
+
+    The failure response below is a 401 for JSON/API callers, and the request
+    transaction middleware rolls back on any status >= 400. Without this the row
+    would stay ``is_active`` until the next cleanup run even though the cookie is
+    already gone.
+    """
+    try:
+        db.session.commit()
+    except Exception as exc:
+        current_app.logger.warning("Could not persist timed-out session end: %s", exc)
+        safe_rollback(reason="session_timeout_persist")
 
 
 def handle_session_timeout():
@@ -80,6 +98,7 @@ def handle_session_timeout():
         # End the user session
         _sid = session.get('session_id')
         end_user_session(_sid, 'timeout')
+        _persist_session_end()
         # Log out the user
         logout_user()
         # Remove the session from the blacklist since we're handling it

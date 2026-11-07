@@ -12,13 +12,32 @@ from app.utils.mobile_responses import mobile_ok, mobile_bad_request
 from app.utils.rate_limiting import mobile_rate_limit
 from app.routes.api.mobile import mobile_bp
 
-# Per-user dedup cache: user_id -> (screen_name, route_path, timestamp)
-_recent_screen_views: dict[int, tuple[str, str, float]] = {}
+# Per-process dedup cache: key -> (screen_name, route_path, timestamp).
+# The key is (user_id, session_id) so two devices of one user do not suppress each
+# other's page views; entries older than the window are pruned once the cache grows.
+_recent_screen_views: dict = {}
 _DEDUP_WINDOW_SECONDS = 2.0
+_DEDUP_CACHE_MAX_ENTRIES = 2000
 
 
-def _is_duplicate(user_id: int, screen_name: str, route_path: str | None) -> bool:
-    """Return True if this screen was already logged within the dedup window."""
+def _prune_recent_screen_views(now: float) -> None:
+    if len(_recent_screen_views) < _DEDUP_CACHE_MAX_ENTRIES:
+        return
+    stale = [
+        key for key, (_s, _r, ts) in _recent_screen_views.items()
+        if now - ts >= _DEDUP_WINDOW_SECONDS
+    ]
+    for key in stale:
+        _recent_screen_views.pop(key, None)
+    if len(_recent_screen_views) >= _DEDUP_CACHE_MAX_ENTRIES:
+        _recent_screen_views.clear()
+
+
+def _is_duplicate(user_id, screen_name: str, route_path: str | None) -> bool:
+    """Return True if this screen was already logged within the dedup window.
+
+    ``user_id`` is any hashable cache key (the route passes ``(user_id, session_id)``).
+    """
     entry = _recent_screen_views.get(user_id)
     if entry is None:
         return False
@@ -47,11 +66,6 @@ def screen_view():
     route_key = (route_path or "").strip()
 
     user_id = current_user.id
-    if _is_duplicate(user_id, screen_name, route_path):
-        return mobile_ok()
-
-    _recent_screen_views[user_id] = (screen_name, route_key, time.time())
-
     session_id = (
         flask_session.get('session_id')
         or getattr(g, '_mobile_jwt_sid', None)
@@ -70,6 +84,14 @@ def screen_view():
         )
         if row:
             session_id = row.session_id
+
+    cache_key = (user_id, session_id)
+    if _is_duplicate(cache_key, screen_name, route_path):
+        return mobile_ok()
+
+    now = time.time()
+    _prune_recent_screen_views(now)
+    _recent_screen_views[cache_key] = (screen_name, route_key, now)
 
     try:
         from app.utils.page_view_paths import mobile_page_view_path_key

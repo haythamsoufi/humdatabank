@@ -620,6 +620,24 @@ def register_template_context(app, config_class):
         from app.services.platform.user_analytics_service import effective_session_active_duration_minutes
         return effective_session_active_duration_minutes(session_log)
 
+    @app.template_filter('session_effective_duration_seconds')
+    def session_effective_duration_seconds_filter(session_log):
+        """Wall-clock session length in seconds (idle timeouts end at last activity)."""
+        from app.services.platform.user_analytics_service import effective_session_duration_seconds
+        return effective_session_duration_seconds(session_log)
+
+    @app.template_filter('session_effective_active_duration_seconds')
+    def session_effective_active_duration_seconds_filter(session_log):
+        """Seconds from session start to last activity."""
+        from app.services.platform.user_analytics_service import effective_session_active_duration_seconds
+        return effective_session_active_duration_seconds(session_log)
+
+    @app.template_filter('session_duration_label')
+    def session_duration_label_filter(seconds):
+        """Localized label for a duration in seconds; sub-minute reads "< 1 min"."""
+        from app.services.platform.user_analytics_service import format_session_duration
+        return format_session_duration(seconds)
+
     @app.template_filter('session_device_icon')
     def session_device_icon_filter(session_log):
         """Font Awesome classes for device/OS icon in session lists."""

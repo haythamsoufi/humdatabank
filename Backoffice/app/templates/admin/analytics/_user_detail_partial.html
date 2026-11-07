@@ -85,6 +85,8 @@
                 <p class="text-2xl font-bold text-teal-600 tabular-nums">{{ hours }}h{% if mins %} {{ mins }}m{% endif %}</p>
             {% elif ttm > 0 %}
                 <p class="text-2xl font-bold text-teal-600 tabular-nums">{{ ttm }}m</p>
+            {% elif total_active_time_seconds is defined and total_active_time_seconds > 0 %}
+                <p class="text-2xl font-bold text-teal-600 tabular-nums">{{ _('< 1 min') }}</p>
             {% else %}
                 <p class="text-2xl font-bold text-teal-600 tabular-nums">—</p>
             {% endif %}
@@ -157,17 +159,17 @@
                                 {{ session.session_start|datetime_local('datetime', 'text-sm text-gray-900') }}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
-                                {% set wall = session|session_effective_duration_minutes %}
+                                {% set wall = session|session_effective_duration_seconds %}
                                 {% if wall is not none %}
-                                <span class="text-sm text-gray-900">{{ wall }} min</span>
+                                <span class="text-sm text-gray-900">{{ wall|session_duration_label }}</span>
                                 {% else %}
                                 <span class="text-sm text-gray-500">—</span>
                                 {% endif %}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
-                                {% set act = session|session_effective_active_duration_minutes %}
+                                {% set act = session|session_effective_active_duration_seconds %}
                                 {% if act is not none %}
-                                <span class="text-sm text-gray-900">{{ act }} min</span>
+                                <span class="text-sm text-gray-900">{{ act|session_duration_label }}</span>
                                 {% else %}
                                 <span class="text-sm text-gray-500">—</span>
                                 {% endif %}

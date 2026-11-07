@@ -25,6 +25,16 @@ python -m flask show-all-sessions
 
 **Session timeout:** Inactive sessions are automatically invalidated after 2 hours (configurable in `config.py`). Cleanup removes the DB rows for already-expired sessions.
 
+### How session length is measured (`UserSessionLog`)
+
+- **Source of truth:** `session_start`, `session_end` and `last_activity` (UTC). The UI and analytics compute length in **seconds** from these; `duration_minutes` is only the stored whole-minute floor kept for legacy rows and SQL filters.
+- **Wall length** = login to close. **Active time** = login to `last_activity` (excludes idle tail).
+- **Idle endings** (`ended_by` = `timeout`, `inactivity_timeout`, `timeout_and_max_duration`): the session ends at `last_activity`, not when the cleanup job noticed (`max_duration_exceeded` ends at cleanup time). Rows written before this change are corrected on read.
+- **Sessions under one minute** are shown as `< 1 min` (web grid, user detail, mobile *Session logs* screen) instead of `0 min`. The session-logs API returns `duration_seconds` / `active_duration_seconds` next to the minute fields; timestamps are ISO-8601 with an explicit `+00:00` offset.
+- **Cleanup job:** runs every `SESSION_CLEANUP_INTERVAL_MINUTES` (default 15) and also from *Admin → Utilities → Sessions → cleanup*; both use `cleanup_inactive_sessions`.
+- **Keepalive / touches:** the form keepalive, mobile device heartbeat and per-request JWT touches refresh `last_activity` (at most every 10 s per session) without inflating `actions_performed`.
+- **Paths:** `page_view_path_counts` keeps up to 50 resolved paths, then folds record IDs into `:id` templates (25 extra keys) before using `_other`.
+
 ---
 
 ## 2. Session Security

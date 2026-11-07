@@ -315,9 +315,18 @@ def init_scheduler(app, is_reloader):
                         replace_existing=True
                     )
 
+                    # Every 15 minutes (not hourly): a row stays "Active" in the session
+                    # list until this runs, so hourly left idle sessions showing as live
+                    # for up to the inactivity timeout plus an hour.
+                    try:
+                        session_cleanup_interval = max(1, int(
+                            app.config.get('SESSION_CLEANUP_INTERVAL_MINUTES', 15)
+                        ))
+                    except (TypeError, ValueError):
+                        session_cleanup_interval = 15
                     scheduler.add_job(
                         func=lambda: _run_scheduled_job(app, 'cleanup_sessions', _cleanup_sessions),
-                        trigger="interval", minutes=60,
+                        trigger="interval", minutes=session_cleanup_interval,
                         id='cleanup_inactive_sessions', name='Cleanup inactive user sessions',
                         replace_existing=True
                     )

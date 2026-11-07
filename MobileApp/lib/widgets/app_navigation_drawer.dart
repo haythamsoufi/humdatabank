@@ -21,13 +21,12 @@ enum ActiveDrawerScreen { home, indicatorBank, resources }
 /// Shared navigation drawer used across top-level screens.
 ///
 /// Reads [AuthProvider] and [LanguageProvider] from the widget tree so callers
-/// only need to supply the active screen and two callbacks.
+/// only need to supply the active screen and an optional callback.
 class AppNavigationDrawer extends StatelessWidget {
   const AppNavigationDrawer({
     super.key,
     required this.activeScreen,
     this.onHomeSelected,
-    required this.onShowCountriesSheet,
   });
 
   final ActiveDrawerScreen activeScreen;
@@ -35,9 +34,6 @@ class AppNavigationDrawer extends StatelessWidget {
   /// Called when the Home tile is tapped while already on the home screen
   /// (e.g. scroll-to-top / reload).
   final VoidCallback? onHomeSelected;
-
-  /// Called when the Countries tile is tapped (after the drawer is closed).
-  final VoidCallback onShowCountriesSheet;
 
   bool get _isNested => activeScreen != ActiveDrawerScreen.home;
 
@@ -222,7 +218,10 @@ class AppNavigationDrawer extends StatelessWidget {
                     title: localizations.countries,
                     onTap: () {
                       Navigator.pop(context);
-                      onShowCountriesSheet();
+                      if (_isNested) {
+                        Navigator.of(context).pop();
+                      }
+                      NavigationHelper.openCountries(context);
                     },
                   ),
                   ModernDrawerSectionTitle(

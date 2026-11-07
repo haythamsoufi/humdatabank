@@ -21,6 +21,7 @@ class TabIds {
   static const resources = 'resources';
   static const indicators = 'indicators';
   static const unifiedPlanning = 'unified_planning';
+  static const countries = 'countries';
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,12 @@ final List<TabDefinition> allTabDefinitions = [
     activeIcon: Icons.assignment,
     getLabel: (l) => l.resourcesUnifiedPlanningSectionTitle,
   ),
+  TabDefinition(
+    id: TabIds.countries,
+    icon: Icons.public_outlined,
+    activeIcon: Icons.public,
+    getLabel: (l) => l.countries,
+  ),
 ];
 
 final Map<String, TabDefinition> tabDefinitionMap = {
@@ -121,6 +128,8 @@ final Map<String, TabDefinition> tabDefinitionMap = {
 class TabCustomizationProvider extends ChangeNotifier {
   static String get _prefsKeyPrefix => AppConfig.tabCustomizationKeyPrefix;
   static const int minVisibleTabs = 2;
+  /// Material / HIG bottom bars stay readable at about five items.
+  static const int maxVisibleTabs = 8;
 
   final StorageService _storage = sl<StorageService>();
   final Map<String, List<String>> _customOrder = {};
@@ -148,6 +157,7 @@ class TabCustomizationProvider extends ChangeNotifier {
     required bool isFocalPoint,
     required bool chatbotEnabled,
   }) {
+    // Keep defaults within [maxVisibleTabs].
     if (isAdmin) {
       return [
         TabIds.notifications,
@@ -209,7 +219,7 @@ class TabCustomizationProvider extends ChangeNotifier {
     required bool isFocalPoint,
     required bool chatbotEnabled,
   }) {
-    final ids = <String>{TabIds.home};
+    final ids = <String>{TabIds.home, TabIds.countries};
     if (isAdmin) {
       ids.addAll([
         TabIds.notifications, TabIds.dashboard, TabIds.admin,
@@ -322,6 +332,19 @@ class TabCustomizationProvider extends ChangeNotifier {
       ordered.insert(0, TabIds.home);
     }
 
+    // Cap the bar so it never exceeds [maxVisibleTabs]. Prefer keeping
+    // required / role-critical tabs; drop other tabs from the end.
+    while (ordered.length > maxVisibleTabs) {
+      final dropAt = ordered.lastIndexWhere(
+        (id) =>
+            id != TabIds.home &&
+            !(tabDefinitionMap[id]?.isRequired ?? false) &&
+            !roleRequired.contains(id),
+      );
+      if (dropAt < 0) break;
+      ordered.removeAt(dropAt);
+    }
+
     return ordered
         .where((id) => tabDefinitionMap.containsKey(id))
         .map((id) => tabDefinitionMap[id]!)
@@ -350,9 +373,16 @@ class TabCustomizationProvider extends ChangeNotifier {
 
     final custom = _customOrder[rk];
     final hidden = _hiddenTabs[rk] ?? {};
+    final defaults = defaultTabIdsForRole(
+      isAdmin: isAdmin,
+      isAuthenticated: isAuthenticated,
+      isFocalPoint: isFocalPoint,
+      chatbotEnabled: chatbotEnabled,
+    ).toSet();
+    final hasCustom = custom != null && custom.isNotEmpty;
 
     List<String> ordered;
-    if (custom != null && custom.isNotEmpty) {
+    if (hasCustom) {
       ordered = custom.where(available.contains).toList();
       for (final id in available) {
         if (!ordered.contains(id)) ordered.add(id);
@@ -369,12 +399,38 @@ class TabCustomizationProvider extends ChangeNotifier {
       }
     }
 
-    return ordered
+    final roleRequired = requiredTabIdsForRole(
+      isAdmin: isAdmin,
+      isAuthenticated: isAuthenticated,
+      isFocalPoint: isFocalPoint,
+    );
+
+    final items = ordered
         .where((id) => tabDefinitionMap.containsKey(id))
         .map((id) {
       final def = tabDefinitionMap[id]!;
-      return (tab: def, visible: def.isRequired || !hidden.contains(id));
+      // Tabs the user has never seen (opt-in, or added after they last
+      // customised) are on the bar only when they are role defaults.
+      final seen = hasCustom && custom.contains(id);
+      final visible = seen
+          ? !hidden.contains(id)
+          : defaults.contains(id) && !hidden.contains(id);
+      return (tab: def, visible: def.isRequired || visible);
     }).toList();
+
+    // Match the bar cap so the dialog never shows more than max as on.
+    var visibleCount = items.where((e) => e.visible).length;
+    if (visibleCount > maxVisibleTabs) {
+      for (var i = items.length - 1; i >= 0 && visibleCount > maxVisibleTabs; i--) {
+        final e = items[i];
+        if (!e.visible) continue;
+        if (e.tab.isRequired || roleRequired.contains(e.tab.id)) continue;
+        items[i] = (tab: e.tab, visible: false);
+        visibleCount--;
+      }
+    }
+
+    return items;
   }
 
   /// Index of [tabId] within the current visible tabs, or -1 if absent.

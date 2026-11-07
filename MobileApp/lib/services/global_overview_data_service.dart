@@ -67,6 +67,32 @@ class ReachSector {
   final List<ReachIndicator> indicators;
 }
 
+/// Rolling-mean headline returned with the volunteers overview.
+class GlobalRollingMean {
+  const GlobalRollingMean({
+    required this.value,
+    required this.yearFrom,
+    required this.yearTo,
+  });
+
+  final double value;
+  final int yearFrom;
+  final int yearTo;
+
+  static GlobalRollingMean? fromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final value = json['value'];
+    final from = json['year_from'];
+    final to = json['year_to'];
+    if (value is! num || from is! num || to is! num || value <= 0) return null;
+    return GlobalRollingMean(
+      value: value.toDouble(),
+      yearFrom: from.toInt(),
+      yearTo: to.toInt(),
+    );
+  }
+}
+
 /// Aggregated FDRS indicator values per country for the native home map/chart.
 class GlobalOverviewDataset {
   GlobalOverviewDataset({
@@ -74,12 +100,16 @@ class GlobalOverviewDataset {
     required this.byCountryId,
     required this.countryNames,
     required this.countryIso2,
+    this.rollingMean,
   });
 
   final String? periodName;
   final Map<int, double> byCountryId;
   final Map<int, String> countryNames;
   final Map<int, String> countryIso2;
+
+  /// Website volunteer headline (3-year rolling mean). Null for other indicators.
+  final GlobalRollingMean? rollingMean;
 
   double get globalTotal =>
       byCountryId.values.fold<double>(0, (a, b) => a + b);
@@ -248,6 +278,7 @@ class GlobalOverviewDataService {
       byCountryId: byCountry,
       countryNames: countryNames,
       countryIso2: countryIso2,
+      rollingMean: GlobalRollingMean.fromJson(data['global_rolling_mean']),
     );
   }
 

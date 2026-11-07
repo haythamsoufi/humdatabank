@@ -79,6 +79,41 @@ def _country_totals(indicator_bank_id, template_id, period_name) -> dict[int, fl
     return by_country
 
 
+def _volunteer_rolling_mean(bank_ids, kpi_code, period_name) -> dict | None:
+    """Website volunteer headline (3-year rolling mean) when the indicator is volunteers.
+
+    Reuses the public adapter so the app and the website show the same figure. ``None``
+    for any other indicator, an unparseable period, or when nothing could be computed.
+    """
+    from app.models import IndicatorBank
+    from app.services.data_quality.helpers import parse_period_year
+    from plugins.fdrs.services.fdrs_public_adapter import (
+        VOLUNTEER_BANK_CODE,
+        build_global_validation,
+        last_published_year,
+    )
+
+    if kpi_code != VOLUNTEER_BANK_CODE:
+        is_volunteers = (
+            kpi_code is None
+            and bool(bank_ids)
+            and IndicatorBank.query.filter(
+                IndicatorBank.id.in_(list(bank_ids)),
+                IndicatorBank.fdrs_kpi_code == VOLUNTEER_BANK_CODE,
+            ).first() is not None
+        )
+        if not is_volunteers:
+            return None
+
+    year = parse_period_year(period_name) if period_name else last_published_year()
+    if year is None:
+        return None
+    world = next((r for r in build_global_validation(year) if r['ZoneCode'] == ''), None)
+    if not world or not world['IntValue']:
+        return None
+    return {'value': world['IntValue'], 'year_from': year - 2, 'year_to': year}
+
+
 def fdrs_overview():
     """Pre-aggregated FDRS indicator totals per country.
 
@@ -93,6 +128,8 @@ def fdrs_overview():
         every bank row carrying the code contributes its larger value per country so
         duplicate rows are not double counted. Bank ids differ between environments,
         so the people-reached chips use this.
+      Volunteers also return ``global_rolling_mean`` (the website's 3-year rolling mean
+      headline, ``{value, year_from, year_to}``); it is null for every other indicator.
       - template_id (optional, default 21 — FDRS): scope to a specific form template
       - period_name (optional): scope to a specific reporting period
       - locale (optional, default 'en'): language code for country names
@@ -146,12 +183,19 @@ def fdrs_overview():
             if iso:
                 country_iso2[str(c.id)] = iso.upper()
 
+        rolling_mean = None
+        try:
+            rolling_mean = _volunteer_rolling_mean(bank_ids, kpi_code, period_name)
+        except Exception as e:
+            current_app.logger.warning('mobile_fdrs_overview rolling mean: %s', e, exc_info=True)
+
         return mobile_ok(data={
             'period_name': period_name,
             'by_country': {str(k): v for k, v in by_country.items()},
             'country_names': country_names,
             'country_iso2': country_iso2,
             'global_total': sum(by_country.values()),
+            'global_rolling_mean': rolling_mean,
         })
     except Exception as e:
         current_app.logger.error('mobile_fdrs_overview: %s', e, exc_info=True)

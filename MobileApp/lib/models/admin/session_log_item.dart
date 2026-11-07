@@ -7,6 +7,8 @@ class SessionLogItem {
     this.lastActivityIso,
     this.durationMinutes,
     this.activeDurationMinutes,
+    this.durationSeconds,
+    this.activeDurationSeconds,
     required this.pageViews,
     this.distinctPageViewPaths = 0,
     this.pageViewPathCounts = const {},
@@ -28,6 +30,10 @@ class SessionLogItem {
   final int? durationMinutes;
   /// Minutes from session start to last activity (excludes idle after last activity).
   final int? activeDurationMinutes;
+  /// Whole seconds of session length; lets the UI tell "< 1 min" from "0 min".
+  final int? durationSeconds;
+  /// Whole seconds from session start to last activity.
+  final int? activeDurationSeconds;
   final int pageViews;
   /// Number of distinct canonical path keys in [pageViewPathCounts] (from API).
   final int distinctPageViewPaths;
@@ -53,6 +59,8 @@ class SessionLogItem {
     }
     final dm = json['duration_minutes'];
     final am = json['active_duration_minutes'];
+    final ds = json['duration_seconds'];
+    final as_ = json['active_duration_seconds'];
     return SessionLogItem(
       sessionId: json['session_id']?.toString() ?? '',
       sessionStartIso: json['session_start']?.toString(),
@@ -64,6 +72,12 @@ class SessionLogItem {
       activeDurationMinutes: am == null
           ? null
           : (am is int ? am : int.tryParse('$am')),
+      durationSeconds: ds == null
+          ? null
+          : (ds is int ? ds : int.tryParse('$ds')),
+      activeDurationSeconds: as_ == null
+          ? null
+          : (as_ is int ? as_ : int.tryParse('$as_')),
       pageViews: json['page_views'] is int
           ? json['page_views'] as int
           : int.tryParse('${json['page_views'] ?? 0}') ?? 0,

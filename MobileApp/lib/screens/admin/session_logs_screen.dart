@@ -18,12 +18,12 @@ import '../../config/routes.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../widgets/loading_indicator.dart';
 
-/// Whole minutes from [a] to [b] (truncated toward zero); null if either is null.
-int? _sessionMinutesBetween(DateTime? a, DateTime? b) {
+/// Whole seconds from [a] to [b] (never negative); null if either is null.
+int? _sessionSecondsBetween(DateTime? a, DateTime? b) {
   if (a == null || b == null) return null;
   final d = b.difference(a);
   if (d.isNegative) return 0;
-  return d.inMinutes;
+  return d.inSeconds;
 }
 
 /// User session list (aligned with web `/admin/analytics/sessions`).
@@ -565,16 +565,20 @@ class _SessionTileState extends State<_SessionTile>
     final lastStr = lastAct != null
         ? widget.dateFmt.format(lastAct.toLocal())
         : loc.sessionLogsNoActivity;
-    final activeMinutes = widget.log.activeDurationMinutes ??
-        _sessionMinutesBetween(start, lastAct);
-    final activeStr = activeMinutes != null
-        ? loc.sessionLogsMinutes(activeMinutes)
+    final activeSeconds = widget.log.activeDurationSeconds ??
+        (widget.log.activeDurationMinutes != null
+            ? widget.log.activeDurationMinutes! * 60
+            : _sessionSecondsBetween(start, lastAct));
+    final activeStr = activeSeconds != null
+        ? loc.sessionLogsDurationLabel(activeSeconds)
         : '—';
 
-    final wallMinutes = widget.log.durationMinutes ??
-        _sessionMinutesBetween(start, end);
-    final sessionLengthStr = wallMinutes != null
-        ? loc.sessionLogsMinutes(wallMinutes)
+    final wallSeconds = widget.log.durationSeconds ??
+        (widget.log.durationMinutes != null
+            ? widget.log.durationMinutes! * 60
+            : _sessionSecondsBetween(start, end));
+    final sessionLengthStr = wallSeconds != null
+        ? loc.sessionLogsDurationLabel(wallSeconds)
         : '—';
 
     final cardSurface = elevatedListCardSurfaceColor(Theme.of(context));

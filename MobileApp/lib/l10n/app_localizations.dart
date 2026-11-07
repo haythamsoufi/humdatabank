@@ -116,6 +116,7 @@ class AppLocalizations {
       'session_logs_session_length': 'Session length',
       'session_logs_active_time': 'Active time',
       'session_logs_minutes': '%s min',
+      'session_logs_less_than_minute': '< 1 min',
       'session_logs_page_views': 'Page views',
       'session_logs_path_breakdown_title': 'Page views by path',
       'session_logs_path_breakdown_open': 'View path breakdown',
@@ -1430,6 +1431,7 @@ class AppLocalizations {
       'session_logs_session_length': 'Duración de sesión',
       'session_logs_active_time': 'Tiempo activo',
       'session_logs_minutes': '%s min',
+      'session_logs_less_than_minute': '< 1 min',
       'session_logs_page_views': 'Vistas de página',
       'session_logs_path_breakdown_title': 'Vistas por ruta',
       'session_logs_path_breakdown_open': 'Ver desglose de rutas',
@@ -2467,6 +2469,7 @@ class AppLocalizations {
       'session_logs_session_length': 'Durée de session',
       'session_logs_active_time': 'Temps actif',
       'session_logs_minutes': '%s min',
+      'session_logs_less_than_minute': '< 1 min',
       'session_logs_page_views': 'Pages vues',
       'session_logs_path_breakdown_title': 'Pages vues par chemin',
       'session_logs_path_breakdown_open': 'Voir le détail des chemins',
@@ -3505,6 +3508,7 @@ class AppLocalizations {
       'session_logs_session_length': 'طول الجلسة',
       'session_logs_active_time': 'وقت النشاط',
       'session_logs_minutes': '%s د',
+      'session_logs_less_than_minute': 'أقل من دقيقة',
       'session_logs_page_views': 'مشاهدات الصفحات',
       'session_logs_path_breakdown_title': 'مشاهدات الصفحات حسب المسار',
       'session_logs_path_breakdown_open': 'عرض تفصيل المسارات',
@@ -4504,6 +4508,7 @@ class AppLocalizations {
       'session_logs_session_length': 'सत्र की लंबाई',
       'session_logs_active_time': 'सक्रिय समय',
       'session_logs_minutes': '%s मि',
+      'session_logs_less_than_minute': '1 मि से कम',
       'session_logs_page_views': 'पृष्ठ दृश्य',
       'session_logs_path_breakdown_title': 'पथ के अनुसार पृष्ठ दृश्य',
       'session_logs_path_breakdown_open': 'पथ विवरण देखें',
@@ -5532,6 +5537,7 @@ class AppLocalizations {
       'session_logs_session_length': 'Длина сессии',
       'session_logs_active_time': 'Активное время',
       'session_logs_minutes': '%s мин',
+      'session_logs_less_than_minute': '< 1 мин',
       'session_logs_page_views': 'Просмотры',
       'session_logs_path_breakdown_title': 'Просмотры по путям',
       'session_logs_path_breakdown_open': 'Разбивка по путям',
@@ -6557,6 +6563,7 @@ class AppLocalizations {
       'session_logs_session_length': '会话时长',
       'session_logs_active_time': '活跃时长',
       'session_logs_minutes': '%s 分钟',
+      'session_logs_less_than_minute': '不足 1 分钟',
       'session_logs_page_views': '页面浏览',
       'session_logs_path_breakdown_title': '按路径的页面浏览',
       'session_logs_path_breakdown_open': '查看路径明细',
@@ -7589,6 +7596,14 @@ class AppLocalizations {
 
   String sessionLogsMinutes(int m) =>
       translate('session_logs_minutes').replaceAll('%s', '$m');
+
+  String get sessionLogsLessThanMinute =>
+      translate('session_logs_less_than_minute');
+
+  /// Session length label: sub-minute durations read "< 1 min" instead of "0 min".
+  String sessionLogsDurationLabel(int seconds) => seconds < 60
+      ? sessionLogsLessThanMinute
+      : sessionLogsMinutes(seconds ~/ 60);
 
   String get usersDirectoryReadOnly => translate('users_directory_read_only');
   String get formDataManagement => translate('form_data_management');

@@ -767,8 +767,8 @@ class _CountryDetailScreenState extends State<CountryDetailScreen> {
               width: width,
               height: height,
               fit: BoxFit.cover,
-              placeholder: (_, __) => fallback,
-              errorWidget: (_, __, ___) => fallback,
+              placeholder: (_, _) => fallback,
+              errorWidget: (_, _, _) => fallback,
             ),
     );
   }

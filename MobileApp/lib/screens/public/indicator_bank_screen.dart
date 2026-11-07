@@ -266,7 +266,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
               ),
             ],
           ),
-          drawer: AppNavigationDrawer(
+          drawer: const AppNavigationDrawer(
             activeScreen: ActiveDrawerScreen.indicatorBank,
           ),
           body: ColoredBox(

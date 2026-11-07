@@ -1,7 +1,10 @@
 {# Shared admin sidebar navigation categories (desktop sidebar + mobile admin menu). #}
 {% from "components/_svg_icons.html" import svg_icon %}
 {% set can_access_dashboard = is_system_manager or has_permission('assignment.view') %}
-{% set can_access_decisions = is_plugin_active('ifrc') and (is_system_manager or has_permission('decisions.view')) %}
+{% set plugin_analytics = namespace(items=[]) %}
+{% for item in plugin_nav_items('analytics-monitoring') %}
+{% if is_system_manager or not item.permission or has_permission(item.permission) %}{% set plugin_analytics.items = plugin_analytics.items + [item] %}{% endif %}
+{% endfor %}
 {% set can_access_general = can_access_dashboard or is_system_manager or has_permission('admin.analytics.view') or has_permission('admin.documents.manage') or has_permission('admin.translations.manage') or has_permission('admin.plugins.manage') or has_permission('admin.settings.manage') or has_permission('admin.communication.manage') or has_permission('admin.docs.view') %}
 {% if can_access_general %}
 <div class="space-y-2" data-category="general">
@@ -204,7 +207,7 @@
 {% set has_security_item = is_system_manager or has_permission('admin.security.view') %}
 {% set has_governance_item = is_system_manager or has_permission('admin.governance.view') %}
 {% set has_api_item = is_system_manager or has_permission('admin.api.manage') %}
-{% if has_analytics_item or has_audit_item or has_security_item or has_governance_item or has_api_item or can_access_decisions %}
+{% if has_analytics_item or has_audit_item or has_security_item or has_governance_item or has_api_item or plugin_analytics.items %}
 <div class="space-y-2 mt-4" data-category="analytics-monitoring">
     <div class="collapsable-category-title">
          <h3 class="sidebar-section-title">{{ _('Analytics & Monitoring') }}</h3>
@@ -247,13 +250,13 @@
             <span class="sidebar-text">{{ _('System Monitoring') }}</span>
         </a>
          {% endif %}
-         {# Decision Maker (IFRC plugin) - requires decisions.view #}
-         {% if can_access_decisions %}
-         <a href="{{ url_for('decisions.page_catalogue') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Decision Maker')|forceescape }}">
-            <i class="fas fa-clipboard-check sidebar-icon w-6 h-6 mr-3 text-center"></i>
-            <span class="sidebar-text">{{ _('Decision Maker') }}</span>
+         {# Links contributed by active plugins (BasePlugin.get_nav_items) #}
+         {% for item in plugin_analytics.items %}
+         <a href="{{ url_for(item.endpoint) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _(item.label)|forceescape }}">
+            <i class="{{ item.icon }} sidebar-icon w-6 h-6 mr-3 text-center"></i>
+            <span class="sidebar-text">{{ _(item.label) }}</span>
         </a>
-         {% endif %}
+         {% endfor %}
     </div>
 </div>
 {% endif %}

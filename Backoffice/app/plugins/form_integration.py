@@ -623,6 +623,23 @@ class FormIntegration:
             current_app.logger.debug("Plugin field validation failed: %s", e, exc_info=True)
             return False, ["Validation failed."]
 
+    def log_invalid_field_config(self, field_type: str, config: Dict[str, Any]) -> bool:
+        """Log (never raise) when a form builder save carries a config the field type rejects.
+
+        Existing production forms may hold configs that predate stricter
+        validators, so saving is not blocked; the warning makes bad configs visible.
+        """
+        try:
+            is_valid, errors = self.validate_custom_field_config(field_type, config)
+        except Exception as exc:
+            current_app.logger.debug("Plugin config validation unavailable for %s: %s", field_type, exc)
+            return True
+        if not is_valid:
+            current_app.logger.warning(
+                "Plugin field %s saved with a config its validator rejects: %s", field_type, "; ".join(errors)
+            )
+        return is_valid
+
     def get_custom_field_data_storage_config(self, field_type: str) -> Dict[str, Any]:
         """Get data storage configuration for a custom field type."""
         field_type_config = self.plugin_manager.get_field_type_config(field_type)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from unittest.mock import patch
 
 import pytest
 
@@ -94,3 +95,49 @@ def test_legacy_file_import_on_first_access(app, tmp_path):
         assert row.data["api"]["base_url"] == "https://example.test"
         PluginData.query.filter_by(plugin_id="legacy_plugin").delete()
         db.session.commit()
+
+
+@pytest.mark.unit
+def test_reads_without_a_row_serve_defaults_and_do_not_insert(app):
+    with app.app_context():
+        db.create_all()
+        PluginData.query.filter_by(plugin_id="no_row_plugin").delete()
+        db.session.commit()
+        cfg = DbPluginConfig("no_row_plugin", {"a": {"b": 1}})
+        assert cfg.get_setting("a", "b") == 1
+        assert PluginData.query.filter_by(plugin_id="no_row_plugin").count() == 0
+
+
+@pytest.mark.unit
+def test_writes_merge_into_the_stored_row_instead_of_overwriting_it(app):
+    with app.app_context():
+        db.create_all()
+        PluginData.query.filter_by(plugin_id="merge_plugin").delete()
+        db.session.commit()
+        stale_reader = DbPluginConfig("merge_plugin", {"s": {"x": 0, "y": 0}})
+        stale_reader.get_setting("s", "x")
+        # Simulate a document snapshot taken before another worker's write.
+        stale_snapshot = dict(stale_reader.config)
+
+        writer = DbPluginConfig("merge_plugin", {"s": {"x": 0, "y": 0}})
+        assert writer.set_setting("s", "x", 1)
+
+        stale_reader.config = stale_snapshot
+        assert stale_reader.set_setting("s", "y", 2)
+        row = PluginData.query.filter_by(plugin_id="merge_plugin").one()
+        assert row.data["s"] == {"x": 1, "y": 2}
+        PluginData.query.filter_by(plugin_id="merge_plugin").delete()
+        db.session.commit()
+
+
+@pytest.mark.unit
+def test_reads_inside_one_context_hit_the_database_once(app):
+    with app.app_context():
+        db.create_all()
+        cfg = DbPluginConfig("memo_plugin", {"a": {"b": 1}})
+        with patch("app.plugins.db_config.PluginData") as model:
+            model.query.filter_by.return_value.first.return_value = None
+            cfg.get_setting("a", "b")
+            cfg.get_setting("a", "b")
+            cfg.get_section("a")
+        assert model.query.filter_by.call_count == 1

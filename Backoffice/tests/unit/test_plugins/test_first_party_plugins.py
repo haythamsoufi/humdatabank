@@ -43,3 +43,45 @@ def test_ifrc_does_not_expose_editable_settings_by_accident():
     from plugins.ifrc.plugin import IfrcPlugin
 
     assert IfrcPlugin().update_settings({"a": 1}) is False
+
+
+@pytest.mark.unit
+def test_every_bundled_plugin_folder_is_registered_as_first_party():
+    """A plugin folder shipped in the repo must never be uninstallable from the UI."""
+    from pathlib import Path
+
+    from plugins.metadata import BUNDLED_PLUGIN_IDS
+
+    plugins_root = Path(__file__).resolve().parents[3] / "plugins"
+    shipped = {
+        p.name
+        for p in plugins_root.iterdir()
+        if p.is_dir() and (p / "plugin.py").exists() and not p.name.startswith((".", "_"))
+    }
+    assert shipped, "expected bundled plugins under Backoffice/plugins"
+    assert shipped <= set(BUNDLED_PLUGIN_IDS), (
+        f"add {sorted(shipped - set(BUNDLED_PLUGIN_IDS))} to BUNDLED_PLUGIN_IDS"
+    )
+
+
+@pytest.mark.unit
+def test_bundled_plugin_manifest_versions_match_code():
+    """plugin.json and plugin.py must report the same version."""
+    import importlib
+    import json
+    from pathlib import Path
+
+    from plugins.metadata import BUNDLED_PLUGIN_IDS
+
+    plugins_root = Path(__file__).resolve().parents[3] / "plugins"
+    for plugin_id in BUNDLED_PLUGIN_IDS:
+        manifest_path = plugins_root / plugin_id / "plugin.json"
+        if not manifest_path.exists():
+            continue
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        module = importlib.import_module(f"plugins.{plugin_id}.plugin")
+        cls = next(
+            c for n, c in vars(module).items()
+            if n.endswith("Plugin") and isinstance(c, type) and c.__module__ == module.__name__
+        )
+        assert manifest.get("version") == cls().version, plugin_id

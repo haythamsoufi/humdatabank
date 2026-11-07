@@ -669,6 +669,10 @@ def _create_plugin_form_item(template, section, form_data, item_type, default_or
                 current_app.logger.warning(f"Invalid plugin config JSON for {item_type}: {plugin_config_raw}")
                 plugin_config = {}
 
+        form_integration = getattr(current_app, 'form_integration', None)
+        if form_integration is not None and plugin_config:
+            form_integration.log_invalid_field_config(plugin_type, plugin_config)
+
         # Get label - check if it's meaningful (not empty/whitespace)
         label_value = form_data.get('label', '').strip() if form_data.get('label') else ''
         if not label_value:

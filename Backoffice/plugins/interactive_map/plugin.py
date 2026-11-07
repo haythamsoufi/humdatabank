@@ -193,6 +193,10 @@ class InteractiveMapFieldType(BaseFieldType):
         """Compute marker-only change list for activity logging."""
         return compute_marker_changes_for_activity(old_value, new_value, field_name, form_item_id)
 
+    def normalize_value(self, data: Dict[str, Any], config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Only the marker list is persisted."""
+        return {'markers': data.get('markers', [])}
+
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """Validate plugin configuration using JSON schema."""
         try:
@@ -260,6 +264,9 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def plugin_id(self) -> str:
         return "interactive_map"
+
+    def get_optional_plugins(self) -> list[str]:
+        return ["upr"]
 
     @property
     def display_name(self) -> str:

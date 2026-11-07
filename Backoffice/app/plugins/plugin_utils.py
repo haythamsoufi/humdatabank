@@ -8,6 +8,7 @@ This module provides common functionality that plugins can use to reduce code du
 import copy
 import hashlib
 import logging
+import re
 import threading
 import traceback
 import sys
@@ -30,29 +31,76 @@ PLUGIN_MANAGE_PERMISSION = 'admin.plugins.manage'
 REDACTED_SECRET = '********'
 
 
+_SECRET_KEY_NAME_RE = re.compile(
+    r"(api[_-]?key|secret|token|password|passwd|credential|private[_-]?key)", re.IGNORECASE
+)
+
+
+def _is_secret_key(name: Any) -> bool:
+    return isinstance(name, str) and bool(_SECRET_KEY_NAME_RE.search(name))
+
+
 def redact_secrets(config: Dict[str, Any], secret_paths) -> Dict[str, Any]:
-    """Copy of ``config`` with each non-empty secret (a tuple key path) replaced by ``REDACTED_SECRET``."""
+    """Copy of ``config`` with every non-empty secret replaced by ``REDACTED_SECRET``.
+
+    A value is a secret when its key path is listed in ``secret_paths`` (tuples of keys) or
+    when a string value sits under a key whose name looks like a credential
+    (``*_api_key``, ``*_token``, ``*secret*``, ``*password*``...). The name rule is a safety net
+    for fields a plugin forgot to declare.
+    """
     redacted = copy.deepcopy(config)
-    for path in secret_paths:
-        node = redacted
-        for key in path[:-1]:
-            node = node.get(key) if isinstance(node, dict) else None
-        if isinstance(node, dict) and node.get(path[-1]):
-            node[path[-1]] = REDACTED_SECRET
+    declared = {tuple(path) for path in secret_paths}
+
+    def walk(node: Any, path: tuple) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            here = path + (key,)
+            if isinstance(value, dict):
+                walk(value, here)
+            elif value and (here in declared or (isinstance(value, str) and _is_secret_key(key))):
+                node[key] = REDACTED_SECRET
+
+    walk(redacted, ())
     return redacted
 
 
 def restore_secrets(new_config: Dict[str, Any], current_config: Dict[str, Any], secret_paths) -> Dict[str, Any]:
     """Replace ``REDACTED_SECRET`` placeholders in ``new_config`` with the stored values."""
     restored = copy.deepcopy(new_config)
-    for path in secret_paths:
-        node, stored = restored, current_config
-        for key in path[:-1]:
-            node = node.get(key) if isinstance(node, dict) else None
-            stored = stored.get(key) if isinstance(stored, dict) else None
-        if isinstance(node, dict) and node.get(path[-1]) == REDACTED_SECRET:
-            node[path[-1]] = stored.get(path[-1], '') if isinstance(stored, dict) else ''
+
+    def walk(node: Any, stored: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            stored_value = stored.get(key) if isinstance(stored, dict) else None
+            if isinstance(value, dict):
+                walk(value, stored_value)
+            elif value == REDACTED_SECRET:
+                node[key] = stored_value if stored_value is not None else ''
+
+    walk(restored, current_config)
     return restored
+
+
+_SECRET_QUERY_PARAM_RE = re.compile(
+    r"([?&](?:[\w.-]*(?:key|token|secret|password|passwd|signature|sig|auth|credential)[\w.-]*))=([^&\s\"'#)]*)",
+    re.IGNORECASE,
+)
+
+
+def scrub_secrets_in_text(text: Any) -> str:
+    """Mask credential-looking query-string values (``?key=...``, ``&access_token=...``) in free text."""
+    return _SECRET_QUERY_PARAM_RE.sub(r"\1=***", str(text))
+
+
+def safe_request_error(exc: BaseException) -> str:
+    """Log-safe description of an HTTP client error.
+
+    ``requests`` / ``urllib3`` exceptions embed the full request URL, which
+    carries API keys passed as query parameters.
+    """
+    return f"{type(exc).__name__}: {scrub_secrets_in_text(exc)}"
 
 
 def _plugin_config_payload():
@@ -273,39 +321,6 @@ class BasePluginRoutes:
                 )
 
 
-def validate_plugin_config(config: Dict[str, Any], schema: Dict[str, Any]) -> bool:
-    """Validate plugin configuration against a schema."""
-    try:
-        # Basic validation - can be extended with jsonschema for more complex validation
-        for field_name, field_schema in schema.items():
-            if field_schema.get('required', False) and field_name not in config:
-                raise PluginConfigError(f"Required field '{field_name}' missing from configuration")
-
-            if field_name in config:
-                value = config[field_name]
-                expected_type = field_schema.get('type')
-
-                if expected_type and not isinstance(value, expected_type):
-                    raise PluginConfigError(f"Field '{field_name}' must be of type {expected_type.__name__}")
-
-                # Check min/max values for numbers
-                if isinstance(value, (int, float)):
-                    min_val = field_schema.get('min')
-                    max_val = field_schema.get('max')
-
-                    if min_val is not None and value < min_val:
-                        raise PluginConfigError(f"Field '{field_name}' must be >= {min_val}")
-
-                    if max_val is not None and value > max_val:
-                        raise PluginConfigError(f"Field '{field_name}' must be <= {max_val}")
-
-        return True
-    except PluginConfigError:
-        raise
-    except Exception as e:
-        raise PluginConfigError("Configuration validation failed.")
-
-
 def safe_json_loads(json_string: str, default: Any = None) -> Any:
     """Safely parse JSON string with fallback."""
     try:
@@ -357,47 +372,6 @@ def measure_performance(plugin_name: str, operation_name: str):
                 raise
         return wrapper
     return decorator
-
-
-class PluginMetrics:
-    """Simple metrics collection for plugins."""
-
-    def __init__(self, plugin_name: str):
-        self.plugin_name = plugin_name
-        self.metrics = {}
-        self.logger = get_plugin_logger(plugin_name)
-
-    def increment_counter(self, metric_name: str, value: int = 1):
-        """Increment a counter metric."""
-        if metric_name not in self.metrics:
-            self.metrics[metric_name] = {'type': 'counter', 'value': 0}
-        self.metrics[metric_name]['value'] += value
-
-    def record_timing(self, metric_name: str, duration: float):
-        """Record timing metric."""
-        if metric_name not in self.metrics:
-            self.metrics[metric_name] = {'type': 'timing', 'values': []}
-        self.metrics[metric_name]['values'].append(duration)
-
-        # Keep only last 100 values to prevent memory issues
-        if len(self.metrics[metric_name]['values']) > 100:
-            self.metrics[metric_name]['values'] = self.metrics[metric_name]['values'][-100:]
-
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get all collected metrics."""
-        processed_metrics = {}
-        for name, data in self.metrics.items():
-            if data['type'] == 'counter':
-                processed_metrics[name] = data['value']
-            elif data['type'] == 'timing' and data['values']:
-                values = data['values']
-                processed_metrics[name] = {
-                    'count': len(values),
-                    'avg': sum(values) / len(values),
-                    'min': min(values),
-                    'max': max(values)
-                }
-        return processed_metrics
 
 
 # Global plugin cache storage: cache_key -> (result, stored_at)

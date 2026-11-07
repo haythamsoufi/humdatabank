@@ -15,6 +15,7 @@ from .base import (
     CspOverride,
     DataExplorerTabConfig,
     NationalSocietyGridColumn,
+    NavItem,
     PluginDocsSource,
 )
 import shutil
@@ -65,6 +66,29 @@ _RESERVED_NS_FIELDS = frozenset({
 })
 
 
+def lint_csp_policy(policy: str) -> List[str]:
+    """Reasons a plugin-supplied CSP policy is looser than the app's own policy would allow.
+
+    Plugins may relax CSP for embeds and viewers; they may not introduce script
+    evaluation or a blanket script/default source.
+    """
+    problems: List[str] = []
+    directives = {}
+    for part in (policy or "").split(";"):
+        tokens = part.split()
+        if tokens:
+            directives[tokens[0].lower()] = [t.lower() for t in tokens[1:]]
+    for name in ("script-src", "script-src-elem", "default-src"):
+        sources = directives.get(name, [])
+        if "'unsafe-eval'" in sources:
+            problems.append(f"{name} allows 'unsafe-eval'")
+        if "*" in sources and name != "default-src":
+            problems.append(f"{name} allows any origin")
+    if "object-src" not in directives and "default-src" not in directives:
+        problems.append("neither object-src nor default-src is set")
+    return problems
+
+
 class PluginLifecycleError(Exception):
     """A plugin lifecycle action was refused; the message is safe to show to admins."""
 
@@ -111,6 +135,10 @@ class PluginManager:
         self._discovery_cache_file = Path(app.instance_path) / 'plugin_discovery_cache.json'
         self._state_update_lock = threading.RLock()
         self._state_updated_at = None
+        self._last_sync_check = 0.0
+        self._csp_index: Optional[Dict[str, List[CspOverride]]] = None
+        self._data_explorer_tabs_cache: Optional[List[DataExplorerTabConfig]] = None
+        self._nav_items_cache: Optional[List[NavItem]] = None
         self._loaded_plugin_modules = {}  # Cache for loaded modules
 
         # Load plugin states on initialization (DB; default inactive)
@@ -237,14 +265,17 @@ class PluginManager:
         removed = previous - self.active_plugins
         for plugin_id in sorted(removed):
             plugin = self.plugins.get(plugin_id)
-            unregister = getattr(plugin, "unregister_validation_packs", None)
-            if callable(unregister):
+            for hook_name in ("unregister_validation_packs", "unregister_section_binding"):
+                unregister = getattr(plugin, hook_name, None)
+                if not callable(unregister):
+                    continue
                 try:
                     unregister()
                 except Exception as exc:
                     self.logger.error(
-                        "Plugin %s failed to unregister validation packs: %s",
+                        "Plugin %s failed in %s: %s",
                         plugin_id,
+                        hook_name,
                         exc,
                     )
         self._extract_field_types()
@@ -274,6 +305,24 @@ class PluginManager:
                 self._apply_activation_side_effects(previous)
                 return True
         return False
+
+    def sync_activation_state_throttled(self) -> bool:
+        """:meth:`sync_activation_state`, but hits the database at most once per TTL window.
+
+        Used on the request path, where checking the lifecycle row on every
+        request (and every ``is_plugin_active`` template call) is wasted work.
+        Another worker's change is adopted within ``PLUGIN_ACTIVATION_SYNC_TTL_SECONDS``
+        (default 2). A TTL of 0 checks on every call.
+        """
+        try:
+            ttl = float(self.app.config.get('PLUGIN_ACTIVATION_SYNC_TTL_SECONDS', 2.0))
+        except (TypeError, ValueError):
+            ttl = 2.0
+        now = time.monotonic()
+        if ttl > 0 and (now - self._last_sync_check) < ttl:
+            return False
+        self._last_sync_check = now
+        return self.sync_activation_state()
 
     def sync_state_from_disk(self) -> bool:
         """Backward-compatible alias for :meth:`sync_activation_state`."""
@@ -463,7 +512,7 @@ class PluginManager:
                 )
 
             self.plugins[plugin_id] = plugin
-            self._track_plugin_installation(plugin, 'installed')
+            self._track_plugin_installation(plugin, 'installed', detailed=False)
             return plugin_id
         except Exception as e:
             self.logger.error(f"Failed to load plugin from {plugin_path}: {e}", exc_info=True)
@@ -495,6 +544,42 @@ class PluginManager:
             self.logger.warning("get_required_plugins failed for plugin %s: %s", plugin_id, exc)
             return []
 
+    def get_optional_plugins(self, plugin_id: str) -> List[str]:
+        plugin = self.plugins.get(plugin_id)
+        if plugin is None:
+            return []
+        try:
+            return [str(pid) for pid in (plugin.get_optional_plugins() or [])]
+        except Exception as exc:
+            self.logger.warning("get_optional_plugins failed for plugin %s: %s", plugin_id, exc)
+            return []
+
+    def get_inactive_optional_plugins(self, plugin_id: str) -> List[str]:
+        """Optional plugins of ``plugin_id`` that are missing or inactive."""
+        return [pid for pid in self.get_optional_plugins(plugin_id) if pid not in self.active_plugins]
+
+    def find_dependency_cycles(self) -> List[List[str]]:
+        """Cycles among *required* plugin edges (optional edges may be mutual)."""
+        graph = {pid: [d for d in self.get_required_plugins(pid) if d in self.plugins] for pid in self.plugins}
+        cycles: List[List[str]] = []
+        state: Dict[str, int] = {}
+
+        def visit(node: str, stack: List[str]) -> None:
+            state[node] = 1
+            stack.append(node)
+            for nxt in graph.get(node, []):
+                if state.get(nxt) == 1:
+                    cycles.append(stack[stack.index(nxt):] + [nxt])
+                elif state.get(nxt) is None:
+                    visit(nxt, stack)
+            stack.pop()
+            state[node] = 2
+
+        for pid in sorted(graph):
+            if state.get(pid) is None:
+                visit(pid, [])
+        return cycles
+
     def get_missing_dependencies(self, plugin_id: str) -> List[str]:
         return [pid for pid in self.get_required_plugins(plugin_id) if pid not in self.plugins]
 
@@ -506,6 +591,8 @@ class PluginManager:
         )
 
     def _check_plugin_dependencies(self) -> None:
+        for cycle in self.find_dependency_cycles():
+            self.logger.error("Plugin dependency cycle: %s", " -> ".join(cycle))
         for plugin_id in self.plugins:
             missing = self.get_missing_dependencies(plugin_id)
             if missing:
@@ -581,10 +668,15 @@ class PluginManager:
         """Activation is always DB-gated; retained for API compatibility (always False)."""
         return False
 
-    def is_first_party(self, plugin_id: str) -> bool:
-        from plugins.metadata import FIRST_PARTY_PLUGIN_IDS
+    def is_bundled(self, plugin_id: str) -> bool:
+        """True for plugins shipped in the application image (never uninstallable)."""
+        from plugins.metadata import BUNDLED_PLUGIN_IDS
 
-        return plugin_id in FIRST_PARTY_PLUGIN_IDS
+        return plugin_id in BUNDLED_PLUGIN_IDS
+
+    def is_first_party(self, plugin_id: str) -> bool:
+        """Backward-compatible alias of :meth:`is_bundled` (the uninstall guard's notion of first party)."""
+        return self.is_bundled(plugin_id)
 
     def _load_plugin(self, plugin_path: str) -> Optional[BasePlugin]:
         """Load a single plugin from a directory."""
@@ -738,10 +830,14 @@ class PluginManager:
 
         return DynamicPlugin
 
-    def _track_plugin_installation(self, plugin: BasePlugin, action: str):
-        """Track plugin installation and status changes."""
+    def _track_plugin_installation(self, plugin: BasePlugin, action: str, *, detailed: bool = True):
+        """Track plugin installation and status changes.
+
+        ``detailed=False`` skips the cleanup/resource probes (disk walks and DB
+        counts for some plugins). Boot uses it so every worker start stays cheap;
+        :meth:`get_plugin_info` computes both live for the admin page anyway.
+        """
         try:
-            # Only track if we have an app context or can create one
             installation_info = {
                 'plugin_id': plugin.plugin_id,
                 'display_name': plugin.display_name,
@@ -750,6 +846,12 @@ class PluginManager:
                 'timestamp': utcnow().isoformat(),
                 'status': 'active' if action == 'installed' else action
             }
+
+            if not detailed:
+                installation_info['cleanup_info'] = {}
+                installation_info['resource_usage'] = {}
+                self.plugin_installations[plugin.plugin_id] = installation_info
+                return
 
             # Try to get plugin info within a valid Flask application context
             # Some plugin methods may rely on current_app
@@ -775,16 +877,22 @@ class PluginManager:
             self.logger.warning(f"Could not track plugin installation for {getattr(plugin, 'plugin_id', 'unknown')}: {e}")
 
     def _extract_field_types(self):
-        """Extract field types from all active plugins (deterministic order, first plugin wins)."""
-        self.field_types.clear()
-        self.field_type_to_plugin_id.clear()
+        """Extract field types from all active plugins (deterministic order, first plugin wins).
+
+        The registries are built aside and swapped in by reference so concurrent
+        requests never see a half-filled (or empty) field type map. The same
+        moment invalidates the per-hook caches, since every activation change
+        and reload funnels through here.
+        """
+        field_types: Dict[str, BaseFieldType] = {}
+        field_type_to_plugin_id: Dict[str, str] = {}
 
         for plugin_id in sorted(self.active_plugins):
             plugin = self.plugins.get(plugin_id)
             if plugin is None:
                 continue
             for field_type in plugin.get_field_types():
-                existing = self.field_type_to_plugin_id.get(field_type.type_name)
+                existing = field_type_to_plugin_id.get(field_type.type_name)
                 if existing is not None:
                     self.logger.error(
                         "Field type '%s' from plugin %s ignored: already provided by plugin %s",
@@ -793,8 +901,18 @@ class PluginManager:
                         existing,
                     )
                     continue
-                self.field_types[field_type.type_name] = field_type
-                self.field_type_to_plugin_id[field_type.type_name] = plugin_id
+                field_types[field_type.type_name] = field_type
+                field_type_to_plugin_id[field_type.type_name] = plugin_id
+
+        self.field_types = field_types
+        self.field_type_to_plugin_id = field_type_to_plugin_id
+        self._invalidate_hook_caches()
+
+    def _invalidate_hook_caches(self) -> None:
+        """Drop aggregated plugin hook results; they are rebuilt on next use."""
+        self._csp_index = None
+        self._data_explorer_tabs_cache = None
+        self._nav_items_cache = None
 
     def register_blueprints(self):
         """Register blueprints of form-field plugins (not admin-feature plugins).
@@ -845,10 +963,12 @@ class PluginManager:
         def _reject_inactive_plugin_routes():
             from flask import abort, request
 
-            self.sync_activation_state()
             blueprint = request.blueprint
             if not blueprint or blueprint not in self.blueprint_plugin_ids:
+                if request.endpoint not in ('static', 'plugin_static.serve_plugin_static'):
+                    self.sync_activation_state_throttled()
                 return None
+            self.sync_activation_state_throttled()
             if self.blueprint_plugin_ids[blueprint] not in self.active_plugins:
                 abort(404)
             return None
@@ -899,11 +1019,14 @@ class PluginManager:
         info['is_active'] = plugin_name in self.active_plugins
         info['status'] = self.get_plugin_status(plugin_name)
         info['always_on'] = self.is_always_on(plugin_name)
-        info['first_party'] = self.is_first_party(plugin_name)
+        info['first_party'] = self.is_bundled(plugin_name)
+        info['bundled'] = info['first_party']
         info['has_settings'] = self._has_settings_page(plugin_name)
         info['requires'] = self.get_required_plugins(plugin_name)
         info['missing_dependencies'] = self.get_missing_dependencies(plugin_name)
         info['dependents'] = self.get_dependents(plugin_name)
+        info['optional_plugins'] = self.get_optional_plugins(plugin_name)
+        info['inactive_optional_plugins'] = self.get_inactive_optional_plugins(plugin_name)
 
         # Add field type information
         field_types = []
@@ -979,7 +1102,7 @@ class PluginManager:
             if inactive:
                 return f"{plugin_name} requires plugin(s) that are not active: {', '.join(inactive)}."
         elif action == 'uninstall':
-            if self.is_first_party(plugin_name):
+            if self.is_bundled(plugin_name):
                 return (
                     f"{plugin_name} is bundled with the application and cannot be uninstalled; "
                     "deactivate it instead."
@@ -1178,14 +1301,17 @@ class PluginManager:
         return None
 
     def reload_plugins(self) -> bool:
-        """Reload every plugin from disk, keeping the current activation state."""
+        """Reload every plugin from disk, keeping the current activation state.
+
+        Activation state, directories and field types stay readable while the
+        plugins are re-imported; only the plugin map is rebuilt. When the reload
+        fails the previous registry is restored.
+        """
+        previous_plugins = self.plugins
         try:
             current_active = set(self.active_plugins)
 
-            self.plugins.clear()
-            self.active_plugins.clear()
-            self.field_types.clear()
-            self.field_type_to_plugin_id.clear()
+            self.plugins = {}
             self._loaded_plugin_modules.clear()
             self._discovery_cache.clear()
             self._raw_active_tokens = sorted(current_active)
@@ -1197,6 +1323,9 @@ class PluginManager:
             return True
 
         except Exception as e:
+            self.plugins = previous_plugins
+            self.active_plugins = set(current_active) if 'current_active' in locals() else self.active_plugins
+            self._extract_field_types()
             self.logger.error(f"Error reloading plugins: {e}", exc_info=True)
             return False
 
@@ -1224,6 +1353,23 @@ class PluginManager:
     def get_field_type(self, field_type_name: str) -> Optional[BaseFieldType]:
         """Get a specific field type by name."""
         return self.field_types.get(field_type_name)
+
+    def get_field_type_any(self, field_type_name: str) -> Optional[BaseFieldType]:
+        """Field type by name from any loaded plugin, active or not (first plugin wins)."""
+        active = self.field_types.get(field_type_name)
+        if active is not None:
+            return active
+        for plugin_id in sorted(self.plugins):
+            plugin = self.plugins[plugin_id]
+            try:
+                candidates = plugin.get_field_types()
+            except Exception as exc:
+                self.logger.warning("get_field_types failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for field_type in candidates:
+                if field_type.type_name == field_type_name:
+                    return field_type
+        return None
 
     def get_field_type_config(self, field_type_name: str) -> Optional[Dict[str, Any]]:
         """Get configuration for a specific field type."""
@@ -1399,9 +1545,14 @@ class PluginManager:
         def plugin_entry_form_assets(template_id=None):
             return self.entry_form_assets(template_id)
 
+        @self.app.template_global('plugin_nav_items')
+        def plugin_nav_items(section: str):
+            self.sync_activation_state_throttled()
+            return self.get_nav_items(section)
+
         @self.app.template_global('is_plugin_active')
         def is_plugin_active(plugin_id: str) -> bool:
-            self.sync_activation_state()
+            self.sync_activation_state_throttled()
             return self.is_plugin_active(plugin_id)
 
     def list_embed_visuals(self) -> list[dict[str, str]]:
@@ -1443,19 +1594,37 @@ class PluginManager:
         return offered
 
     def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
-        tabs: List[DataExplorerTabConfig] = []
-        for plugin in self._integrating_plugins().values():
-            try:
-                contributed = plugin.get_data_explorer_tabs() or []
-            except Exception as exc:
-                self.logger.warning(
-                    "get_data_explorer_tabs failed for plugin %s: %s",
-                    getattr(plugin, "plugin_id", plugin),
-                    exc,
-                )
-                continue
-            tabs.extend(contributed)
-        return sorted(tabs, key=lambda tab: tab.priority)
+        cached = self._data_explorer_tabs_cache
+        if cached is None:
+            tabs: List[DataExplorerTabConfig] = []
+            for plugin in self._integrating_plugins().values():
+                try:
+                    contributed = plugin.get_data_explorer_tabs() or []
+                except Exception as exc:
+                    self.logger.warning(
+                        "get_data_explorer_tabs failed for plugin %s: %s",
+                        getattr(plugin, "plugin_id", plugin),
+                        exc,
+                    )
+                    continue
+                tabs.extend(contributed)
+            cached = sorted(tabs, key=lambda tab: tab.priority)
+            self._data_explorer_tabs_cache = cached
+        return list(cached)
+
+    def get_nav_items(self, section: Optional[str] = None) -> List[NavItem]:
+        """Sidebar links contributed by active plugins, ordered by priority then label."""
+        cached = self._nav_items_cache
+        if cached is None:
+            items: List[NavItem] = []
+            for plugin_id, plugin in self._integrating_plugins().items():
+                try:
+                    items.extend(plugin.get_nav_items() or [])
+                except Exception as exc:
+                    self.logger.warning("get_nav_items failed for plugin %s: %s", plugin_id, exc)
+            cached = sorted(items, key=lambda item: (item.priority, str(item.label)))
+            self._nav_items_cache = cached
+        return [item for item in cached if section is None or item.section == section]
 
     def get_documentation_sources(self) -> List[PluginDocsSource]:
         """Collect plugin documentation sources for the in-app docs UI."""
@@ -1586,13 +1755,31 @@ class PluginManager:
                 )
         return roles
 
+    def _build_csp_index(self) -> Dict[str, List[CspOverride]]:
+        index: Dict[str, List[CspOverride]] = {}
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                overrides = plugin.get_csp_overrides() or []
+            except Exception as exc:
+                self.logger.warning("get_csp_overrides failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for override in overrides:
+                for problem in lint_csp_policy(override.policy):
+                    self.logger.warning(
+                        "CSP override for %s from plugin %s: %s", override.endpoint, plugin_id, problem
+                    )
+                index.setdefault(override.endpoint, []).append(override)
+        return index
+
     def get_csp_override(self, endpoint: Optional[str], path: str) -> Optional[CspOverride]:
         if not endpoint:
             return None
-        for plugin in self._integrating_plugins().values():
-            for override in plugin.get_csp_overrides():
-                if override.endpoint == endpoint and override.path_predicate(path):
-                    return override
+        index = self._csp_index
+        if index is None:
+            index = self._csp_index = self._build_csp_index()
+        for override in index.get(endpoint, ()):
+            if override.path_predicate(path):
+                return override
         return None
 
     def get_panel_render_context(

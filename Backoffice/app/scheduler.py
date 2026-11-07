@@ -126,6 +126,37 @@ def _plugin_is_active(app, plugin_id: str) -> bool:
     return manager.is_plugin_active(plugin_id)
 
 
+def _register_plugin_jobs(app, scheduler) -> None:
+    """Add the jobs plugins declare through ``BasePlugin.get_scheduled_jobs``.
+
+    Every loaded plugin's jobs are scheduled; ``_run_scheduled_job`` skips a run
+    while the plugin is inactive, so activation changes need no rescheduling.
+    """
+    manager = getattr(app, "plugin_manager", None)
+    if manager is None:
+        return
+    for plugin_id, plugin in sorted(manager.plugins.items()):
+        try:
+            jobs = plugin.get_scheduled_jobs() or []
+        except Exception as exc:
+            app.logger.warning("Plugin %s scheduled jobs unavailable: %s", plugin_id, exc)
+            continue
+        for job in jobs:
+            try:
+                scheduler.add_job(
+                    func=lambda job=job, plugin_id=plugin_id: _run_scheduled_job(
+                        app, job.job_id, job.func, plugin_id=plugin_id
+                    ),
+                    trigger=job.trigger,
+                    id=job.job_id,
+                    name=job.name,
+                    replace_existing=True,
+                    **job.trigger_args,
+                )
+            except Exception as exc:
+                app.logger.warning("Could not schedule %s for plugin %s: %s", job.job_id, plugin_id, exc)
+
+
 def _run_scheduled_job(app, label: str, fn, plugin_id: str | None = None) -> None:
     """Execute fn inside an app context with standardised error handling and duration logging.
 
@@ -218,7 +249,6 @@ def init_scheduler(app, is_reloader):
                         return
 
                     from apscheduler.schedulers.background import BackgroundScheduler
-                    from apscheduler.triggers.cron import CronTrigger
                     try:
                         misfire_grace_seconds = int(app.config.get('SCHEDULER_MISFIRE_GRACE_SECONDS', 30))
                     except (TypeError, ValueError):
@@ -265,17 +295,6 @@ def init_scheduler(app, is_reloader):
                         if processed > 0:
                             app.logger.info("Processed %d scheduled notification(s)", processed)
 
-                    def _refresh_fdrs_public_export():
-                        from plugins.fdrs.services.fdrs_public_export_cache import build_public_export_snapshot
-
-                        summary = build_public_export_snapshot()
-                        app.logger.info(
-                            "FDRS public export snapshot %s rows=%s societies=%s",
-                            summary.get("snapshot_date"),
-                            summary.get("row_count"),
-                            len(summary.get("societies") or []),
-                        )
-
                     def _cleanup_stale_websockets():
                         # Purely in-memory — no DB connection needed.
                         # Own try/except so APScheduler never loses the job on error.
@@ -298,15 +317,7 @@ def init_scheduler(app, is_reloader):
                         replace_existing=True
                     )
 
-                    scheduler.add_job(
-                        func=lambda: _run_scheduled_job(
-                            app, 'fdrs_public_export_snapshot', _refresh_fdrs_public_export, plugin_id='fdrs'
-                        ),
-                        trigger=CronTrigger(hour=4, minute=15, timezone="UTC"),
-                        id='fdrs_public_export_snapshot',
-                        name='Rebuild the public FDRS CSV and Excel snapshot',
-                        replace_existing=True,
-                    )
+                    _register_plugin_jobs(app, scheduler)
 
                     scheduler.add_job(
                         func=lambda: _run_scheduled_job(app, 'purge_ai_trace_content', _purge_ai_trace_content),

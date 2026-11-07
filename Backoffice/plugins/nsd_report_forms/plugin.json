@@ -2,7 +2,7 @@
   "plugin_id": "nsd_report_forms",
   "name": "nsd_report_forms",
   "display_name": "NSD Report Forms",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "NSD funds monitoring (CBF): project registry, shared report slots, master import, overview, PM page, API and KPI badges.",
   "author": "IFRC NSD data team",
   "license": "MIT"

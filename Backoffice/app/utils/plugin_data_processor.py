@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Any, Optional, Tuple
 from flask import current_app
 
+from app.plugins.base import _CLIENT_METADATA_KEYS
 from app.utils.schema_validation import (
     validate_plugin_data,
     sanitize_plugin_data,
@@ -12,6 +13,10 @@ from app.utils.schema_validation import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Hard ceiling for any plugin field value, checked before it is parsed. Field types
+# declare tighter limits through get_data_storage_config()['max_size'].
+MAX_RAW_PLUGIN_VALUE_BYTES = 4 * 1024 * 1024
 
 class PluginDataProcessor:
     """Handles processing and validation of plugin field data during form submissions."""
@@ -45,6 +50,9 @@ class PluginDataProcessor:
 
             logger.info(f"Processing plugin field {field_name} of type {plugin_type}")
 
+            if isinstance(field_value, str) and len(field_value.encode('utf-8')) > MAX_RAW_PLUGIN_VALUE_BYTES:
+                return False, field_value, "Plugin data exceeds size limit."
+
             # Parse the field value
             try:
                 data = json.loads(field_value) if field_value else {}
@@ -52,8 +60,10 @@ class PluginDataProcessor:
                 # Not JSON data, return as-is for text fields
                 return True, field_value, None
 
-            # For emergency operations, if we get empty data, don't save anything
-            if plugin_type == 'emergency_operations' and not data:
+            field_type = self._resolve_field_type(plugin_type)
+
+            # Display-only field types (normalize_value -> None) never store anything.
+            if not data and field_type is not None and field_type.normalize_value({}, {}) is None:
                 return True, None, None
 
             # Get plugin configuration for validation
@@ -63,7 +73,7 @@ class PluginDataProcessor:
                 return True, field_value, None
 
             # Generic plugin data processing for all plugins
-            return self._process_generic_plugin_data(data, plugin_type, plugin_config)
+            return self._process_generic_plugin_data(data, plugin_type, plugin_config, field_type)
 
         except Exception as e:
             logger.error(f"Error processing plugin field {field_name}: {e}", exc_info=True)
@@ -107,15 +117,36 @@ class PluginDataProcessor:
             return {}
 
 
-    def _process_generic_plugin_data(self, data: Dict[str, Any], plugin_type: str, config: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
-        """Process generic plugin field data and extract only essential data for storage."""
+    def _resolve_field_type(self, plugin_type: str):
+        """Field type instance for ``plugin_type``, including field types of inactive plugins."""
+        manager = self.plugin_manager
+        if manager is None:
+            return None
         try:
-            # Extract only essential data based on plugin type
-            essential_data = self._extract_essential_plugin_data(data, plugin_type)
+            return manager.get_field_type_any(plugin_type)
+        except Exception as exc:
+            logger.warning(f"Could not resolve field type {plugin_type}: {exc}")
+            return None
 
-            # If essential_data is None, this plugin doesn't save data
+    def _process_generic_plugin_data(
+        self,
+        data: Dict[str, Any],
+        plugin_type: str,
+        config: Dict[str, Any],
+        field_type=None,
+    ) -> Tuple[bool, str, Optional[str]]:
+        """Normalize, validate and size-check plugin field data before storage."""
+        try:
+            essential_data = self._extract_essential_plugin_data(data, field_type, config)
+
+            # If essential_data is None, this field type does not store data
             if essential_data is None:
                 return True, None, None
+
+            if isinstance(essential_data, dict) and field_type is not None:
+                error = field_type.validate_value(essential_data, config)
+                if error:
+                    return False, json.dumps(essential_data), error
 
             # Get data storage configuration from plugin
             if self.plugin_manager:
@@ -152,31 +183,16 @@ class PluginDataProcessor:
             logger.error(f"Error processing {plugin_type} plugin data: {e}", exc_info=True)
             return False, json.dumps(data), "Plugin data processing failed."
 
-    def _extract_essential_plugin_data(self, data: Dict[str, Any], plugin_type: str) -> Dict[str, Any]:
-        """Extract only the essential data that should be saved to disagg_data based on plugin type."""
+    def _extract_essential_plugin_data(self, data: Any, field_type, config: Dict[str, Any]) -> Any:
+        """Ask the field type what to store; fall back to dropping client metadata keys."""
         if not isinstance(data, dict):
             return data
-
-        if plugin_type == 'interactive_map':
-            # For interactive_map, only save the markers array
-            return {
-                'markers': data.get('markers', [])
-            }
-        elif plugin_type == 'emergency_operations':
-            # For emergency_operations, the plugin doesn't actually save data
-            # It only displays loaded operations, so we return None to prevent saving
-            return None
-        else:
-            # For other plugins, return the data as-is but without metadata
-            # Remove common metadata fields that shouldn't be stored
-            essential_data = data.copy()
-            metadata_fields = [
-                '_schema_version', '_plugin_type', '_processed_at',
-                'data_not_available', 'not_applicable', 'metadata'
-            ]
-            for field in metadata_fields:
-                essential_data.pop(field, None)
-            return essential_data
+        if field_type is not None:
+            return field_type.normalize_value(data, config)
+        cleaned = dict(data)
+        for key in _CLIENT_METADATA_KEYS:
+            cleaned.pop(key, None)
+        return cleaned
 
 # Global processor instance
 plugin_data_processor = PluginDataProcessor()

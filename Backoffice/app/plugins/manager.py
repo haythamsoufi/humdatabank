@@ -1625,6 +1625,18 @@ class PluginManager:
                 return count
         return None
 
+    def materialize_document(self, document: Any) -> tuple[bool, Optional[str]]:
+        """Let loaded plugins fetch a missing document file; the first one that claims it wins."""
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                outcome = plugin.materialize_document(document)
+            except Exception as exc:
+                self.logger.warning("materialize_document failed for plugin %s: %s", plugin_id, exc)
+                continue
+            if outcome and (outcome[0] or outcome[1]):
+                return outcome
+        return False, None
+
     def get_ai_tool_sets(self) -> List[AiToolSet]:
         """AI tool sets of every loaded plugin. Availability per request is up to each set."""
         sets: List[AiToolSet] = []

@@ -57,6 +57,11 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     def get_optional_plugins(self) -> list[str]:
         return ["upr"]
 
+    def materialize_document(self, document):
+        from plugins.fdrs.services import fdrs_document_fetch_service as fetch
+
+        return fetch.try_materialize_public_fdrs_document(document)
+
     def get_scheduled_jobs(self) -> list[ScheduledJob]:
         return [
             ScheduledJob(

@@ -452,6 +452,14 @@ class BasePlugin(ABC):
         empty; answer None when unsure."""
         return None
 
+    def materialize_document(self, document: Any) -> tuple[bool, Optional[str]]:
+        """Fetch the file of an imported document that has no local copy yet.
+
+        Return ``(True, None)`` when the file is now stored, ``(False, message)`` to refuse with a
+        user-facing reason, and ``(False, None)`` when the document is not this plugin's concern.
+        """
+        return False, None
+
     def get_ai_tools(self) -> Optional[AiToolSet]:
         """Tools for the AI assistant (see AiToolSet), or None."""
         return None

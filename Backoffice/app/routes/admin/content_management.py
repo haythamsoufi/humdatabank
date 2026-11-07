@@ -1648,11 +1648,10 @@ def download_document(doc_id):
             and storage.submitted_source_exists(document.storage_path)
         )
         if not has_local_file:
-            from plugins.fdrs.services.fdrs_document_fetch_service import (
-                try_materialize_public_fdrs_document,
+            manager = getattr(current_app, "plugin_manager", None)
+            materialized, user_msg = (
+                manager.materialize_document(document) if manager is not None else (False, None)
             )
-
-            materialized, user_msg = try_materialize_public_fdrs_document(document)
             has_local_file = materialized or bool(
                 document.storage_path
                 and storage.submitted_source_exists(document.storage_path)

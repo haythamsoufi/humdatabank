@@ -72,6 +72,12 @@ def _read_payload() -> Dict[str, Any]:
     try:
         row = _row_query().first()
     except Exception as exc:
+        # A failed SELECT leaves the session aborted until rollback; without it
+        # the next write in this request raises InFailedSqlTransaction.
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         logger.warning("Failed to read end-date overrides: %s", exc)
         return _empty_payload()
     if row is None or not isinstance(row.data, dict):

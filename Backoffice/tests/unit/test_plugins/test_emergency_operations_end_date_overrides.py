@@ -12,51 +12,49 @@ from plugins.emergency_operations.end_date_overrides import (
 from plugins.emergency_operations.routes import _snapshot_preview_row
 
 
-def test_upsert_apply_and_sync_status(app):
-    with app.app_context():
-        entry, err = upsert_override("mdraf019", "2026-12-31", note="ERP pending")
-        assert err is None
-        assert entry["code"] == "MDRAF019"
-        assert entry["end_date"] == "2026-12-31"
-        assert get_overrides_map()["MDRAF019"]["note"] == "ERP pending"
+def test_upsert_apply_and_sync_status(app, db_session):
+    entry, err = upsert_override("mdraf019", "2026-12-31", note="ERP pending")
+    assert err is None
+    assert entry["code"] == "MDRAF019"
+    assert entry["end_date"] == "2026-12-31"
+    assert get_overrides_map()["MDRAF019"]["note"] == "ERP pending"
 
-        raw = [
-            {"code": "MDRAF019", "name": "Flood", "end_date": "2025-06-01T00:00:00Z"},
-            {"code": "MDRXX001", "name": "Other", "end_date": "2025-01-01"},
-        ]
-        applied = apply_end_date_overrides(raw)
-        assert applied[0]["end_date"] == "2026-12-31"
-        assert applied[0]["source_end_date"] == "2025-06-01"
-        assert applied[0]["end_date_overridden"] is True
-        assert applied[1]["end_date"] == "2025-01-01"
-        assert "end_date_overridden" not in applied[1]
-        # Original cache row untouched
-        assert raw[0]["end_date"] == "2025-06-01T00:00:00Z"
+    raw = [
+        {"code": "MDRAF019", "name": "Flood", "end_date": "2025-06-01T00:00:00Z"},
+        {"code": "MDRXX001", "name": "Other", "end_date": "2025-01-01"},
+    ]
+    applied = apply_end_date_overrides(raw)
+    assert applied[0]["end_date"] == "2026-12-31"
+    assert applied[0]["source_end_date"] == "2025-06-01"
+    assert applied[0]["end_date_overridden"] is True
+    assert applied[1]["end_date"] == "2025-01-01"
+    assert "end_date_overridden" not in applied[1]
+    # Original cache row untouched
+    assert raw[0]["end_date"] == "2025-06-01T00:00:00Z"
 
-        source_map = source_end_dates_from_cache(raw)
-        rows = list_overrides_with_source(source_map)
-        assert len(rows) == 1
-        assert rows[0]["sync_status"] == "pending"
-        assert rows[0]["can_remove"] is False
+    source_map = source_end_dates_from_cache(raw)
+    rows = list_overrides_with_source(source_map)
+    assert len(rows) == 1
+    assert rows[0]["sync_status"] == "pending"
+    assert rows[0]["can_remove"] is False
 
-        # Source catches up to the tentative date
-        source_map["MDRAF019"] = "2026-12-31"
-        rows = list_overrides_with_source(source_map)
-        assert rows[0]["sync_status"] == "matched"
-        assert rows[0]["can_remove"] is True
+    # Source catches up to the tentative date
+    source_map["MDRAF019"] = "2026-12-31"
+    rows = list_overrides_with_source(source_map)
+    assert rows[0]["sync_status"] == "matched"
+    assert rows[0]["can_remove"] is True
 
-        ok, err = delete_override("MDRAF019")
-        assert ok and err is None
-        assert get_overrides_map() == {}
+    ok, err = delete_override("MDRAF019")
+    assert ok and err is None
+    assert get_overrides_map() == {}
 
 
-def test_source_ahead_allows_remove(app):
-    with app.app_context():
-        upsert_override("MDRKE001", "2026-01-01")
-        rows = list_overrides_with_source({"MDRKE001": "2026-06-01"})
-        assert rows[0]["sync_status"] == "source_ahead"
-        assert rows[0]["can_remove"] is True
-        delete_override("MDRKE001")
+def test_source_ahead_allows_remove(app, db_session):
+    upsert_override("MDRKE001", "2026-01-01")
+    rows = list_overrides_with_source({"MDRKE001": "2026-06-01"})
+    assert rows[0]["sync_status"] == "source_ahead"
+    assert rows[0]["can_remove"] is True
+    delete_override("MDRKE001")
 
 
 def test_snapshot_preview_row_marks_override():
@@ -75,19 +73,34 @@ def test_snapshot_preview_row_marks_override():
     assert row["end_date_overridden"] is True
 
 
-def test_invalid_code_rejected(app):
-    with app.app_context():
-        entry, err = upsert_override("", "2026-01-01")
-        assert entry is None
-        assert err
+def test_invalid_code_rejected(app, db_session):
+    entry, err = upsert_override("", "2026-01-01")
+    assert entry is None
+    assert err
 
-        entry, err = upsert_override("BAD CODE!", "2026-01-01")
-        assert entry is None
+    entry, err = upsert_override("BAD CODE!", "2026-01-01")
+    assert entry is None
 
-        entry, err = upsert_override("OKCODE", "not-a-date")
-        assert entry is None
+    entry, err = upsert_override("OKCODE", "not-a-date")
+    assert entry is None
 
 
 def test_plugin_data_id_is_dedicated():
     assert PLUGIN_DATA_ID == "emergency_operations_end_date_overrides"
     assert PLUGIN_DATA_ID != "emergency_operations"
+
+
+def test_failed_read_rolls_back_so_a_later_write_can_succeed(app, db_session, monkeypatch):
+    """A swallowed read error must not leave the session aborted for the next save."""
+    from unittest.mock import patch
+
+    from app.extensions import db
+    from plugins.emergency_operations import end_date_overrides as mod
+
+    # Poison the session the same way a missing table would: fail a SELECT, leave it aborted.
+    with patch.object(mod, "_row_query", side_effect=RuntimeError("simulated read failure")):
+        assert mod.get_overrides_map() == {}
+    # Without the rollback fix, the next statement raises InFailedSqlTransaction.
+    assert db.session.execute(db.text("SELECT 1")).scalar() == 1
+    entry, err = upsert_override("MDRXX999", "2026-03-01")
+    assert err is None and entry["code"] == "MDRXX999"

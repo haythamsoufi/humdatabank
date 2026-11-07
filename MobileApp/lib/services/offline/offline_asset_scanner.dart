@@ -553,9 +553,14 @@ class OfflineAssetScanner {
   }
 
   /// Adds the offline runtime (API replay, online-only actions, static URL stub).
-  static String injectOfflineHead(String html, String submitBlockedMessage) {
+  static String injectOfflineHead(
+    String html,
+    String submitBlockedMessage, {
+    int? assignmentId,
+  }) {
     final patch = buildOfflineHeadPatch(
       submitBlockedMessage: submitBlockedMessage,
+      assignmentId: assignmentId,
     );
     final lower = html.toLowerCase();
     final idx = lower.indexOf('</head>');

@@ -4,7 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hum_databank_app/models/shared/assignment.dart';
+import 'package:hum_databank_app/models/shared/entity.dart';
 import 'package:hum_databank_app/services/assignment_offline_bundle_service.dart';
+import 'package:hum_databank_app/services/offline/entity_dashboard_store.dart';
 import 'package:hum_databank_app/services/offline/offline_forms_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -47,9 +49,13 @@ void main() {
   OfflineFormsController buildController({
     Duration? pageTimeout,
     Duration? packageTimeout,
+    Future<List<EntityDashboardSnapshot>> Function(Set<int>)? loadOtherEntities,
+    Future<List<Map<String, dynamic>>> Function(String, String)? recordApi,
   }) => OfflineFormsController.forTesting(
     service: service,
     isUnmetered: () async => unmetered,
+    loadOtherEntities: loadOtherEntities,
+    recordApi: recordApi,
     pageTimeout: pageTimeout,
     packageTimeout: packageTimeout,
   );
@@ -60,7 +66,7 @@ void main() {
     tmp = await Directory.systemTemp.createTemp('offline_controller_test');
     adapter = FakeAdapter({
       ...routes(),
-      '/forms/assignment/7': (status: 200, body: html),
+      for (final id in [7, 8, 9, 11]) '/forms/assignment/$id': (status: 200, body: html),
     });
     service = AssignmentOfflineBundleService.forTesting(
       dio: Dio(BaseOptions(validateStatus: (c) => c != null && c < 500))
@@ -72,6 +78,7 @@ void main() {
   });
 
   tearDown(() async {
+    await controller.idle;
     if (await tmp.exists()) await tmp.delete(recursive: true);
   });
 
@@ -266,6 +273,7 @@ void main() {
       'an outdated template is rebuilt on Wi-Fi but not on mobile data',
       () async {
         await controller.save(assignment(5), env);
+        await controller.idle;
         final all = [assignment(5, staticVersion: 'v2')];
         adapter.requested.clear();
 
@@ -335,6 +343,230 @@ void main() {
       expect(controller.statusFor(5).available, isFalse);
       expect(controller.statusFor(6).available, isFalse);
       expect(await service.listPackages(), isEmpty);
+    });
+  });
+
+  group('OfflineFormsController other entities', () {
+    EntityDashboardSnapshot entityWith(int entityId, List<Assignment> current) =>
+        EntityDashboardSnapshot(
+          entity: Entity(
+            entityType: 'country',
+            entityId: entityId,
+            name: 'Entity $entityId',
+          ),
+          currentAssignments: current,
+        );
+
+    Map<String, dynamic> emergencies(String url) => {
+      'k': 'GET /admin/plugins/emergency_operations/api/operations?for=$url',
+      's': 200,
+      't': 'application/json',
+      'b': '{"url":"$url"}',
+    };
+
+    test(
+      'downloading a template saves every entity\'s page and data once',
+      () async {
+        final asked = <Set<int>>[];
+        final c = buildController(
+          loadOtherEntities: (templates) async {
+            asked.add(templates);
+            return [
+              entityWith(2, [assignment(8)]),
+              entityWith(3, [assignment(9), assignment(11, templateId: 99)]),
+            ];
+          },
+          recordApi: (url, _) async => [emergencies(url)],
+        );
+
+        final result = await c.save(assignment(5), env);
+        await c.idle;
+
+        expect(result.ok, isTrue);
+        expect(asked, [
+          {7},
+        ]);
+        expect(await service.hasOfflineForm(8), isTrue);
+        expect(await service.hasOfflineForm(9), isTrue);
+        expect(await service.hasOfflineForm(11), isFalse);
+        expect(
+          adapter.requested.where((p) => p == '/static/js/app.js'),
+          hasLength(1),
+        );
+        final own = File(
+          '${tmp.path}/user_1/template_7/page_9_api.json',
+        ).readAsStringSync();
+        expect(own, contains('emergency_operations'));
+      },
+    );
+
+    test(
+      'other entities are saved without any of them being opened',
+      () async {
+        await service.savePackageAndPage(
+          const OfflineFormRequest(
+            assignmentId: 5,
+            formPath: '/forms/assignment/5',
+            language: 'en',
+            templateId: 7,
+            staticVersion: 'v1',
+            dataVersion: '2026-01-01T00:00:00+00:00',
+            formDefinitionUpdatedAtIso: '2026-01-01T00:00:00.000Z',
+          ),
+        );
+        final c = buildController(
+          loadOtherEntities: (_) async => [
+            entityWith(2, [assignment(8)]),
+          ],
+        );
+        final own = [assignment(5)];
+
+        await c.reconcile(all: own, eligible: own, env: env);
+        await c.idle;
+
+        expect(await service.hasOfflineForm(8), isTrue);
+      },
+    );
+
+    test('only assignments the user may open are saved', () async {
+      final c = buildController(
+        loadOtherEntities: (_) async => [
+          entityWith(2, [assignment(8), assignment(9)]),
+        ],
+      );
+      await c.save(assignment(5), env);
+      await service.removePackage((await service.listPackages()).single);
+
+      await service.savePackageAndPage(
+        const OfflineFormRequest(
+          assignmentId: 5,
+          formPath: '/forms/assignment/5',
+          language: 'en',
+          templateId: 7,
+          staticVersion: 'v1',
+          dataVersion: '2026-01-01T00:00:00+00:00',
+          formDefinitionUpdatedAtIso: '2026-01-01T00:00:00.000Z',
+        ),
+      );
+      final own = [assignment(5)];
+      await c.reconcile(
+        all: own,
+        eligible: own,
+        env: env,
+        clearFailures: true,
+        otherEntityEligible: (a) => a.id != 9,
+      );
+      await c.idle;
+
+      expect(await service.hasOfflineForm(8), isTrue);
+      expect(await service.hasOfflineForm(9), isFalse);
+    });
+
+    test('nothing is asked of the server while no template is saved', () async {
+      var calls = 0;
+      final c = buildController(
+        loadOtherEntities: (_) async {
+          calls++;
+          return const [];
+        },
+      );
+      final all = [assignment(5)];
+
+      await c.reconcile(all: all, eligible: all, env: env);
+      await c.idle;
+
+      expect(calls, 0);
+    });
+
+    test('the entity list is not requested again on every change', () async {
+      var calls = 0;
+      final c = buildController(
+        loadOtherEntities: (_) async {
+          calls++;
+          return [
+            entityWith(2, [assignment(8)]),
+          ];
+        },
+      );
+      await c.save(assignment(5), env);
+      await c.idle;
+      expect(calls, 1);
+      final all = [assignment(5)];
+
+      await c.reconcile(all: all, eligible: all, env: env);
+      await c.idle;
+      await c.reconcile(all: all, eligible: all, env: env);
+      await c.idle;
+
+      expect(calls, 1);
+
+      await c.reconcile(all: all, eligible: all, env: env, clearFailures: true);
+      await c.idle;
+      expect(calls, 2);
+    });
+
+    test('a failing entity request leaves the entity\'s own copy intact', () async {
+      final c = buildController(
+        loadOtherEntities: (_) async => throw StateError('offline'),
+      );
+
+      final result = await c.save(assignment(5), env);
+      await c.idle;
+
+      expect(result.ok, isTrue);
+      expect(await service.hasOfflineForm(5), isTrue);
+    });
+
+    test(
+      'on mobile data other entities wait unless the user asked for the template',
+      () async {
+        await service.savePackageAndPage(
+          const OfflineFormRequest(
+            assignmentId: 5,
+            formPath: '/forms/assignment/5',
+            language: 'en',
+            templateId: 7,
+            staticVersion: 'v1',
+            dataVersion: '2026-01-01T00:00:00+00:00',
+            formDefinitionUpdatedAtIso: '2026-01-01T00:00:00.000Z',
+          ),
+        );
+        final c = buildController(
+          loadOtherEntities: (_) async => [
+            entityWith(2, [assignment(8)]),
+          ],
+        );
+        final own = [assignment(5)];
+        unmetered = false;
+
+        await c.reconcile(all: own, eligible: own, env: env);
+        await c.idle;
+        expect(await service.hasOfflineForm(8), isFalse);
+
+        final result = await c.save(assignment(5, dataVersion: 'new'), env);
+        await c.idle;
+        expect(result.ok, isTrue);
+        expect(await service.hasOfflineForm(8), isTrue);
+      },
+    );
+
+    test('selecting another entity later needs nothing from the server', () async {
+      final c = buildController(
+        loadOtherEntities: (_) async => [
+          entityWith(2, [assignment(8)]),
+        ],
+      );
+      await c.save(assignment(5), env);
+      await c.idle;
+      adapter.requested.clear();
+
+      final other = [assignment(8)];
+      await c.reconcile(all: other, eligible: other, env: env);
+      await c.idle;
+
+      expect(adapter.requested, isEmpty);
+      expect(c.statusFor(8).available, isTrue);
+      expect(c.statusFor(8).pageCurrent, isTrue);
     });
   });
 }

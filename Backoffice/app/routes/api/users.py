@@ -479,6 +479,468 @@ def _assignment_data_version(aes, last_activity_at):
     return max(stamps).isoformat() if stamps else None
 
 
+def _collect_user_entities(user):
+    """Entities the user can select on the dashboard.
+
+    Returns ``(user_entities, entities_json, allowed_entity_types)``.
+    """
+    user_entities = []
+
+    entity_permissions = UserEntityPermission.query.filter_by(user_id=user.id).all()
+    if entity_permissions:
+        pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+        prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
+        for perm in entity_permissions:
+            entity = prefetched.get((perm.entity_type, perm.entity_id))
+            if entity:
+                user_entities.append({
+                    'entity_type': perm.entity_type,
+                    'entity_id': perm.entity_id,
+                    'entity': entity
+                })
+    else:
+        # Fallback: resolve entities for users who don't yet have explicit entity permissions
+        all_entities = EntityService.get_entities_for_user(user)
+        for entity in all_entities:
+            entity_type = None
+            if isinstance(entity, Country):
+                entity_type = EntityType.country.value
+            else:
+                for et, model_class in EntityService.ENTITY_MODEL_MAP.items():
+                    if isinstance(entity, model_class):
+                        entity_type = et
+                        break
+            if entity_type:
+                entity_id = getattr(entity, 'id', None)
+                if entity_id:
+                    user_entities.append({
+                        'entity_type': entity_type,
+                        'entity_id': entity_id,
+                        'entity': entity
+                    })
+
+    enabled_entity_groups = get_enabled_entity_groups()
+    allowed_entity_types = get_allowed_entity_type_codes(enabled_entity_groups)
+    if allowed_entity_types:
+        user_entities = [
+            entity for entity in user_entities
+            if entity['entity_type'] in allowed_entity_types
+        ]
+    else:
+        user_entities = []
+
+    # Format entities for JSON response
+    entity_pairs = [(e['entity_type'], e['entity_id']) for e in user_entities]
+    plain_names = EntityService.batch_entity_names(
+        entity_pairs, include_hierarchy=False, localized=True,
+    )
+    hierarchy_names = EntityService.batch_entity_names(
+        entity_pairs, include_hierarchy=True, localized=True,
+    )
+
+    entities_json = []
+    for e in user_entities:
+        pair = (e['entity_type'], e['entity_id'])
+        entity_name = plain_names.get(pair) or ''
+        display_name = hierarchy_names.get(pair) or entity_name or ''
+        entities_json.append({
+            'entity_type': e['entity_type'],
+            'entity_id': e['entity_id'],
+            'name': entity_name,
+            'display_name': display_name,
+        })
+    return user_entities, entities_json, allowed_entity_types
+
+
+def _build_entity_assignments(selected_entity_type, selected_entity_id, only_template_ids=None):
+    """Current and past assignments of one entity, in the dashboard payload shape.
+
+    ``only_template_ids`` limits the result to assignments of those form templates.
+    """
+    current_assignments = []
+    past_assignments = []
+    static_version = deploy_asset_version(current_app)
+
+    # Query AssignmentEntityStatus for the selected entity (parity with main.dashboard)
+    AF = aliased(AssignedForm)
+    # Active assignments only, plus closed ones (inactive non-closed forms are hidden on web)
+    assignments_query = (
+        apply_assignment_access(
+            AssignmentEntityStatus.query
+            .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id),
+            current_user,
+            AssignmentEntityStatus.assigned_form_id,
+        )
+        .options(
+            joinedload(AssignmentEntityStatus.assigned_form)
+            .joinedload(AssignedForm.template)
+            .joinedload(FormTemplate.published_version),
+            joinedload(AssignmentEntityStatus.submitted_by_user),
+            joinedload(AssignmentEntityStatus.approved_by_user),
+        )
+        .filter(
+            AssignmentEntityStatus.entity_type == selected_entity_type,
+            AssignmentEntityStatus.entity_id == selected_entity_id,
+            AF.is_active == True,
+        )
+    )
+    if only_template_ids:
+        assignments_query = assignments_query.filter(AF.template_id.in_(only_template_ids))
+    assigned_forms_statuses = (
+        assignments_query
+        .order_by(
+            AssignmentEntityStatus.due_date.asc().nulls_last(),
+            AF.assigned_at.desc()
+        )
+        .all()
+    )
+    if not assigned_forms_statuses:
+        return current_assignments, past_assignments
+
+    plugin_manager = getattr(current_app, 'plugin_manager', None)
+    badges_by_aes = plugin_manager.get_assignment_badges(assigned_forms_statuses) if plugin_manager else {}
+
+    # Pre-compute item counts
+    template_ids = {
+        aes.assigned_form.template.id
+        for aes in assigned_forms_statuses
+        if aes.assigned_form and aes.assigned_form.template
+    }
+
+    aes_ids = [aes.id for aes in assigned_forms_statuses]
+    completion_prefetch = AssignmentCompletionService.prefetch(template_ids, aes_ids)
+
+    last_modified_user_by_assignment = {}
+    last_activity_at_by_assignment = {}
+    contributors_by_assignment = {}
+    public_count_by_assigned_form = {}
+    if aes_ids:
+        subq = (
+            db.session.query(
+                EntityActivityLog.assignment_id.label('aid'),
+                func.max(EntityActivityLog.timestamp).label('max_ts'),
+            )
+            .filter(
+                EntityActivityLog.entity_type == selected_entity_type,
+                EntityActivityLog.entity_id == selected_entity_id,
+                EntityActivityLog.assignment_id.in_(aes_ids),
+                EntityActivityLog.activity_type.notin_(
+                    DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+                ),
+            )
+            .group_by(EntityActivityLog.assignment_id)
+        ).subquery()
+
+        aid_uid_rows = (
+            db.session.query(subq.c.aid, EntityActivityLog.user_id, subq.c.max_ts)
+            .join(
+                EntityActivityLog,
+                and_(
+                    EntityActivityLog.assignment_id == subq.c.aid,
+                    EntityActivityLog.timestamp == subq.c.max_ts,
+                    EntityActivityLog.entity_type == selected_entity_type,
+                    EntityActivityLog.entity_id == selected_entity_id,
+                ),
+            )
+            .all()
+        )
+        last_activity_at_by_assignment = {
+            aid: max_ts for aid, _, max_ts in aid_uid_rows if max_ts is not None
+        }
+        lm_user_ids = {uid for _, uid, _ in aid_uid_rows if uid is not None}
+        lm_user_map = {}
+        if lm_user_ids:
+            lm_user_map = {
+                u.id: u for u in User.query.filter(User.id.in_(lm_user_ids)).all()
+            }
+        last_modified_user_by_assignment = {
+            aid: lm_user_map.get(uid)
+            for aid, uid, _ in aid_uid_rows
+            if uid is not None
+        }
+
+        contrib_rows = (
+            db.session.query(
+                EntityActivityLog.assignment_id.label('aid'),
+                EntityActivityLog.user_id.label('uid'),
+                func.max(EntityActivityLog.timestamp).label('last_ts'),
+            )
+            .filter(
+                EntityActivityLog.entity_type == selected_entity_type,
+                EntityActivityLog.entity_id == selected_entity_id,
+                EntityActivityLog.assignment_id.in_(aes_ids),
+                EntityActivityLog.user_id.isnot(None),
+                EntityActivityLog.activity_type.notin_(
+                    DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+                ),
+            )
+            .group_by(EntityActivityLog.assignment_id, EntityActivityLog.user_id)
+            .all()
+        )
+        contrib_user_ids = {uid for _, uid, _ in contrib_rows if uid is not None}
+        contrib_user_map = {}
+        if contrib_user_ids:
+            contrib_user_map = {
+                u.id: u for u in User.query.filter(User.id.in_(contrib_user_ids)).all()
+            }
+        tmp_contrib = {}
+        for aid, uid, last_ts in contrib_rows:
+            user = contrib_user_map.get(uid)
+            if not user:
+                continue
+            tmp_contrib.setdefault(aid, []).append((last_ts, user))
+        for aid, items in tmp_contrib.items():
+            items.sort(key=lambda x: utc_sort_key(x[0]), reverse=True)
+            contributors_by_assignment[aid] = [u for _, u in items]
+
+        entity_country = EntityService.get_country_for_entity(
+            selected_entity_type, selected_entity_id
+        )
+        if entity_country:
+            af_ids = list(
+                {
+                    aes.assigned_form_id
+                    for aes in assigned_forms_statuses
+                    if aes.assigned_form_id
+                }
+            )
+            if af_ids:
+                pub_rows = (
+                    db.session.query(
+                        PublicSubmission.assigned_form_id,
+                        func.count(PublicSubmission.id),
+                        func.max(PublicSubmission.submitted_at),
+                    )
+                    .filter(
+                        PublicSubmission.country_id == entity_country.id,
+                        PublicSubmission.assigned_form_id.in_(af_ids),
+                    )
+                    .group_by(PublicSubmission.assigned_form_id)
+                    .all()
+                )
+                public_count_by_assigned_form = {
+                    af_id: (int(cnt or 0), latest_at)
+                    for af_id, cnt, latest_at in pub_rows
+                }
+
+    # Process assignments
+    two_months_ago = utcnow() - timedelta(days=PAST_ASSIGNMENT_DAYS)
+    one_year_ago = utcnow() - timedelta(days=365)
+
+    for aes in assigned_forms_statuses:
+        assigned_form = aes.assigned_form
+        template = assigned_form.template if assigned_form and assigned_form.template else None
+        template_id = template.id if template else None
+
+        completion_metrics = completion_prefetch.metrics_for(aes.id, template_id)
+        completion_rate = completion_metrics.completion_rate
+        filled_items = completion_metrics.filled_items
+        total_possible_items = completion_metrics.total_items
+
+        # Get localized template name
+        localized_template_name = get_localized_template_name(template) if template else None
+        period_name = assigned_form.period_name if assigned_form and assigned_form.period_name else 'Assignment'
+        effectively_closed = bool(
+            assigned_form and getattr(assigned_form, "is_effectively_closed", False)
+        )
+
+        last_user = last_modified_user_by_assignment.get(aes.id)
+        contributors = contributors_by_assignment.get(aes.id, [])
+        if (not contributors) and last_user:
+            contributors = [last_user]
+        contributor_names = []
+        seen_uids = set()
+        for u in contributors:
+            if u is None or u.id in seen_uids:
+                continue
+            seen_uids.add(u.id)
+            label = (u.name or u.email or '').strip()
+            if label:
+                contributor_names.append(label)
+
+        last_modified_user_name = None
+        if last_user:
+            last_modified_user_name = (
+                (last_user.name or '').strip()
+                or (last_user.email or '').strip()
+                or None
+            )
+
+        submitted_by_user_name = None
+        if aes.submitted_by_user:
+            submitted_by_user_name = (
+                (aes.submitted_by_user.name or '').strip()
+                or (aes.submitted_by_user.email or '').strip()
+                or None
+            )
+        approved_by_user_name = None
+        if aes.approved_by_user:
+            approved_by_user_name = (
+                (aes.approved_by_user.name or '').strip()
+                or (aes.approved_by_user.email or '').strip()
+                or None
+            )
+
+        pub_count = 0
+        pub_latest_at = None
+        if assigned_form:
+            pub_count, pub_latest_at = public_count_by_assigned_form.get(
+                assigned_form.id, (0, None)
+            )
+        is_public_accessible = bool(
+            assigned_form and assigned_form.is_public_accessible()
+        )
+
+        template_id = assigned_form.template_id if assigned_form else None
+        form_definition_updated_at = None
+        if assigned_form and assigned_form.template:
+            pv = assigned_form.template.published_version
+            if pv is not None and getattr(pv, "updated_at", None):
+                form_definition_updated_at = pv.updated_at.isoformat()
+
+        assignment_data = {
+            'badges': [{'label': b.label, 'value': b.value, 'tone': b.tone} for b in badges_by_aes.get(aes.id, [])],
+            'id': aes.id,
+            'name': f"{period_name} - {localized_template_name if localized_template_name else 'Template Missing'}",
+            'status': aes.status,
+            'due_date': aes.due_date.isoformat() if aes.due_date else None,
+            'status_timestamp': aes.status_timestamp.isoformat()
+            if aes.status_timestamp
+            else None,
+            'completion_rate': round(completion_rate, 1),
+            'template_name': localized_template_name,
+            'period_name': period_name,
+            'is_effectively_closed': effectively_closed,
+            'assigned_at': assigned_form.assigned_at.isoformat()
+            if assigned_form and assigned_form.assigned_at
+            else None,
+            'last_modified_user_name': last_modified_user_name,
+            'contributor_names': contributor_names,
+            'submitted_by_user_name': submitted_by_user_name,
+            'submitted_at': aes.submitted_at.isoformat() if aes.submitted_at else None,
+            'approved_by_user_name': approved_by_user_name,
+            'is_public': is_public_accessible,
+            'public_submission_count': pub_count if pub_count else None,
+            'latest_public_submission_at': pub_latest_at.isoformat()
+            if pub_latest_at
+            else None,
+            'form_definition_updated_at': form_definition_updated_at,
+            'template_id': template_id,
+            'static_version': static_version,
+            'data_version': _assignment_data_version(
+                aes, last_activity_at_by_assignment.get(aes.id)
+            ),
+        }
+
+        # Categorize as current or past (same rules as main.dashboard)
+        # Closed -> past; Approved older than 2 months -> past;
+        # Pending/In Progress older than 1 year -> past; other statuses -> current
+        if effectively_closed:
+            past_assignments.append(assignment_data)
+            continue
+
+        status_val = aes.status.value if hasattr(aes.status, 'value') else aes.status
+        if status_val in ('requires_revision', 'sent_for_review', 'submitted'):
+            current_assignments.append(assignment_data)
+        elif status_val in ('approved', 'pending', 'in_progress'):
+            status_ts_utc = (
+                ensure_utc(aes.status_timestamp) if aes.status_timestamp else None
+            )
+            if status_ts_utc is None and assigned_form and assigned_form.assigned_at:
+                status_ts_utc = ensure_utc(assigned_form.assigned_at)
+            if aes.status == 'approved':
+                if status_ts_utc and status_ts_utc < two_months_ago:
+                    past_assignments.append(assignment_data)
+                else:
+                    current_assignments.append(assignment_data)
+            else:
+                if status_ts_utc and status_ts_utc < one_year_ago:
+                    past_assignments.append(assignment_data)
+                else:
+                    current_assignments.append(assignment_data)
+        else:
+            current_assignments.append(assignment_data)
+    return current_assignments, past_assignments
+
+
+def _entity_contacts(entity_type, entity_id):
+    """Focal points and FDS members of the country an entity belongs to."""
+    entity_country = EntityService.get_country_for_entity(entity_type, entity_id)
+    if entity_country is None:
+        return [], [], []
+    ns_focal_points, org_focal_points = get_focal_points_for_country(entity_country.id)
+    return ns_focal_points, org_focal_points, get_fds_members_for_country(entity_country.id)
+
+
+OFFLINE_ENTITY_DASHBOARDS_DEFAULT_LIMIT = 60
+OFFLINE_ENTITY_DASHBOARDS_MAX_LIMIT = 100
+
+
+def _parse_id_list(raw):
+    ids = []
+    for part in str(raw or '').split(','):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    return sorted(set(ids))
+
+
+@api_bp.route('/dashboard/offline-entities', methods=['GET'])
+@login_required
+def get_dashboard_offline_entities():
+    """Dashboard slices of every entity the user can select, for offline use.
+
+    The dashboard returns the assignments of one entity at a time. The mobile app
+    downloads a form template once and uses it for every entity, so it needs the
+    assignments (and contacts) of all entities of that template in a single call
+    instead of one dashboard request per entity. Nothing here changes the selected
+    entity of the session.
+
+    Query parameters:
+        template_ids: comma-separated form template ids; only assignments of these
+            templates are returned and entities without any are left out.
+        limit: maximum number of entities returned (default 60, at most 100).
+
+    Returns ``{"entities": [{"entity": {...}, "current_assignments": [...],
+    "past_assignments": [...], "ns_focal_points": [...], "org_focal_points": [...],
+    "fds_members": [...]}], "truncated": bool}``.
+    """
+    try:
+        template_ids = _parse_id_list(request.args.get('template_ids'))
+        limit = request.args.get('limit', default=OFFLINE_ENTITY_DASHBOARDS_DEFAULT_LIMIT, type=int)
+        limit = max(1, min(limit or OFFLINE_ENTITY_DASHBOARDS_DEFAULT_LIMIT, OFFLINE_ENTITY_DASHBOARDS_MAX_LIMIT))
+
+        _, entities_json, _ = _collect_user_entities(current_user)
+
+        results = []
+        truncated = False
+        for entity in entities_json:
+            current_assignments, past_assignments = _build_entity_assignments(
+                entity['entity_type'], entity['entity_id'], only_template_ids=template_ids or None,
+            )
+            if template_ids and not (current_assignments or past_assignments):
+                continue
+            if len(results) >= limit:
+                truncated = True
+                break
+            ns_focal_points, org_focal_points, fds_members = _entity_contacts(
+                entity['entity_type'], entity['entity_id']
+            )
+            results.append({
+                'entity': entity,
+                'current_assignments': current_assignments,
+                'past_assignments': past_assignments,
+                'ns_focal_points': ns_focal_points,
+                'org_focal_points': org_focal_points,
+                'fds_members': fds_members,
+            })
+
+        return json_response({'entities': results, 'truncated': truncated})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching offline entity dashboards: {e}", exc_info=True)
+        return api_error('Could not fetch offline entity dashboards', 500)
+
+
 @api_bp.route('/dashboard', methods=['GET'])
 @login_required
 def get_dashboard():
@@ -539,72 +1001,7 @@ def get_dashboard():
     try:
         user = current_user
 
-        # Get user entities (all entity types user has access to)
-        user_entities = []
-
-        entity_permissions = UserEntityPermission.query.filter_by(user_id=user.id).all()
-        if entity_permissions:
-            pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
-            prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
-            for perm in entity_permissions:
-                entity = prefetched.get((perm.entity_type, perm.entity_id))
-                if entity:
-                    user_entities.append({
-                        'entity_type': perm.entity_type,
-                        'entity_id': perm.entity_id,
-                        'entity': entity
-                    })
-        else:
-            # Fallback: resolve entities for users who don't yet have explicit entity permissions
-            all_entities = EntityService.get_entities_for_user(user)
-            for entity in all_entities:
-                entity_type = None
-                if isinstance(entity, Country):
-                    entity_type = EntityType.country.value
-                else:
-                    for et, model_class in EntityService.ENTITY_MODEL_MAP.items():
-                        if isinstance(entity, model_class):
-                            entity_type = et
-                            break
-                if entity_type:
-                    entity_id = getattr(entity, 'id', None)
-                    if entity_id:
-                        user_entities.append({
-                            'entity_type': entity_type,
-                            'entity_id': entity_id,
-                            'entity': entity
-                        })
-
-        enabled_entity_groups = get_enabled_entity_groups()
-        allowed_entity_types = get_allowed_entity_type_codes(enabled_entity_groups)
-        if allowed_entity_types:
-            user_entities = [
-                entity for entity in user_entities
-                if entity['entity_type'] in allowed_entity_types
-            ]
-        else:
-            user_entities = []
-
-        # Format entities for JSON response
-        entity_pairs = [(e['entity_type'], e['entity_id']) for e in user_entities]
-        plain_names = EntityService.batch_entity_names(
-            entity_pairs, include_hierarchy=False, localized=True,
-        )
-        hierarchy_names = EntityService.batch_entity_names(
-            entity_pairs, include_hierarchy=True, localized=True,
-        )
-
-        entities_json = []
-        for e in user_entities:
-            pair = (e['entity_type'], e['entity_id'])
-            entity_name = plain_names.get(pair) or ''
-            display_name = hierarchy_names.get(pair) or entity_name or ''
-            entities_json.append({
-                'entity_type': e['entity_type'],
-                'entity_id': e['entity_id'],
-                'name': entity_name,
-                'display_name': display_name,
-            })
+        user_entities, entities_json, allowed_entity_types = _collect_user_entities(user)
 
         entities_by_pair = {
             (item['entity_type'], item['entity_id']): item for item in entities_json
@@ -687,318 +1084,16 @@ def get_dashboard():
         # Get assignments for selected entity
         current_assignments = []
         past_assignments = []
-        static_version = deploy_asset_version(current_app)
-
         if selected_entity:
-            selected_entity_type = selected_entity['entity_type']
-            selected_entity_id = selected_entity['entity_id']
-
-            # Query AssignmentEntityStatus for the selected entity (parity with main.dashboard)
-            AF = aliased(AssignedForm)
-            # Active assignments only, plus closed ones (inactive non-closed forms are hidden on web)
-            assigned_forms_statuses = (
-                apply_assignment_access(
-                    AssignmentEntityStatus.query
-                    .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id),
-                    current_user,
-                    AssignmentEntityStatus.assigned_form_id,
-                )
-                .options(
-                    joinedload(AssignmentEntityStatus.assigned_form)
-                    .joinedload(AssignedForm.template)
-                    .joinedload(FormTemplate.published_version),
-                    joinedload(AssignmentEntityStatus.submitted_by_user),
-                    joinedload(AssignmentEntityStatus.approved_by_user),
-                )
-                .filter(
-                    AssignmentEntityStatus.entity_type == selected_entity_type,
-                    AssignmentEntityStatus.entity_id == selected_entity_id,
-                    AF.is_active == True,
-                )
-                .order_by(
-                    AssignmentEntityStatus.due_date.asc().nulls_last(),
-                    AF.assigned_at.desc()
-                )
-                .all()
+            current_assignments, past_assignments = _build_entity_assignments(
+                selected_entity['entity_type'], selected_entity['entity_id']
             )
 
-            plugin_manager = getattr(current_app, 'plugin_manager', None)
-            badges_by_aes = plugin_manager.get_assignment_badges(assigned_forms_statuses) if plugin_manager else {}
-
-            # Pre-compute item counts
-            template_ids = {
-                aes.assigned_form.template.id
-                for aes in assigned_forms_statuses
-                if aes.assigned_form and aes.assigned_form.template
-            }
-
-            aes_ids = [aes.id for aes in assigned_forms_statuses]
-            completion_prefetch = AssignmentCompletionService.prefetch(template_ids, aes_ids)
-
-            last_modified_user_by_assignment = {}
-            last_activity_at_by_assignment = {}
-            contributors_by_assignment = {}
-            public_count_by_assigned_form = {}
-            if aes_ids:
-                subq = (
-                    db.session.query(
-                        EntityActivityLog.assignment_id.label('aid'),
-                        func.max(EntityActivityLog.timestamp).label('max_ts'),
-                    )
-                    .filter(
-                        EntityActivityLog.entity_type == selected_entity_type,
-                        EntityActivityLog.entity_id == selected_entity_id,
-                        EntityActivityLog.assignment_id.in_(aes_ids),
-                        EntityActivityLog.activity_type.notin_(
-                            DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
-                        ),
-                    )
-                    .group_by(EntityActivityLog.assignment_id)
-                ).subquery()
-
-                aid_uid_rows = (
-                    db.session.query(subq.c.aid, EntityActivityLog.user_id, subq.c.max_ts)
-                    .join(
-                        EntityActivityLog,
-                        and_(
-                            EntityActivityLog.assignment_id == subq.c.aid,
-                            EntityActivityLog.timestamp == subq.c.max_ts,
-                            EntityActivityLog.entity_type == selected_entity_type,
-                            EntityActivityLog.entity_id == selected_entity_id,
-                        ),
-                    )
-                    .all()
-                )
-                last_activity_at_by_assignment = {
-                    aid: max_ts for aid, _, max_ts in aid_uid_rows if max_ts is not None
-                }
-                lm_user_ids = {uid for _, uid, _ in aid_uid_rows if uid is not None}
-                lm_user_map = {}
-                if lm_user_ids:
-                    lm_user_map = {
-                        u.id: u for u in User.query.filter(User.id.in_(lm_user_ids)).all()
-                    }
-                last_modified_user_by_assignment = {
-                    aid: lm_user_map.get(uid)
-                    for aid, uid, _ in aid_uid_rows
-                    if uid is not None
-                }
-
-                contrib_rows = (
-                    db.session.query(
-                        EntityActivityLog.assignment_id.label('aid'),
-                        EntityActivityLog.user_id.label('uid'),
-                        func.max(EntityActivityLog.timestamp).label('last_ts'),
-                    )
-                    .filter(
-                        EntityActivityLog.entity_type == selected_entity_type,
-                        EntityActivityLog.entity_id == selected_entity_id,
-                        EntityActivityLog.assignment_id.in_(aes_ids),
-                        EntityActivityLog.user_id.isnot(None),
-                        EntityActivityLog.activity_type.notin_(
-                            DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
-                        ),
-                    )
-                    .group_by(EntityActivityLog.assignment_id, EntityActivityLog.user_id)
-                    .all()
-                )
-                contrib_user_ids = {uid for _, uid, _ in contrib_rows if uid is not None}
-                contrib_user_map = {}
-                if contrib_user_ids:
-                    contrib_user_map = {
-                        u.id: u for u in User.query.filter(User.id.in_(contrib_user_ids)).all()
-                    }
-                tmp_contrib = {}
-                for aid, uid, last_ts in contrib_rows:
-                    user = contrib_user_map.get(uid)
-                    if not user:
-                        continue
-                    tmp_contrib.setdefault(aid, []).append((last_ts, user))
-                for aid, items in tmp_contrib.items():
-                    items.sort(key=lambda x: utc_sort_key(x[0]), reverse=True)
-                    contributors_by_assignment[aid] = [u for _, u in items]
-
-                entity_country = EntityService.get_country_for_entity(
-                    selected_entity_type, selected_entity_id
-                )
-                if entity_country:
-                    af_ids = list(
-                        {
-                            aes.assigned_form_id
-                            for aes in assigned_forms_statuses
-                            if aes.assigned_form_id
-                        }
-                    )
-                    if af_ids:
-                        pub_rows = (
-                            db.session.query(
-                                PublicSubmission.assigned_form_id,
-                                func.count(PublicSubmission.id),
-                                func.max(PublicSubmission.submitted_at),
-                            )
-                            .filter(
-                                PublicSubmission.country_id == entity_country.id,
-                                PublicSubmission.assigned_form_id.in_(af_ids),
-                            )
-                            .group_by(PublicSubmission.assigned_form_id)
-                            .all()
-                        )
-                        public_count_by_assigned_form = {
-                            af_id: (int(cnt or 0), latest_at)
-                            for af_id, cnt, latest_at in pub_rows
-                        }
-
-            # Process assignments
-            two_months_ago = utcnow() - timedelta(days=PAST_ASSIGNMENT_DAYS)
-            one_year_ago = utcnow() - timedelta(days=365)
-
-            for aes in assigned_forms_statuses:
-                assigned_form = aes.assigned_form
-                template = assigned_form.template if assigned_form and assigned_form.template else None
-                template_id = template.id if template else None
-
-                completion_metrics = completion_prefetch.metrics_for(aes.id, template_id)
-                completion_rate = completion_metrics.completion_rate
-                filled_items = completion_metrics.filled_items
-                total_possible_items = completion_metrics.total_items
-
-                # Get localized template name
-                localized_template_name = get_localized_template_name(template) if template else None
-                period_name = assigned_form.period_name if assigned_form and assigned_form.period_name else 'Assignment'
-                effectively_closed = bool(
-                    assigned_form and getattr(assigned_form, "is_effectively_closed", False)
-                )
-
-                last_user = last_modified_user_by_assignment.get(aes.id)
-                contributors = contributors_by_assignment.get(aes.id, [])
-                if (not contributors) and last_user:
-                    contributors = [last_user]
-                contributor_names = []
-                seen_uids = set()
-                for u in contributors:
-                    if u is None or u.id in seen_uids:
-                        continue
-                    seen_uids.add(u.id)
-                    label = (u.name or u.email or '').strip()
-                    if label:
-                        contributor_names.append(label)
-
-                last_modified_user_name = None
-                if last_user:
-                    last_modified_user_name = (
-                        (last_user.name or '').strip()
-                        or (last_user.email or '').strip()
-                        or None
-                    )
-
-                submitted_by_user_name = None
-                if aes.submitted_by_user:
-                    submitted_by_user_name = (
-                        (aes.submitted_by_user.name or '').strip()
-                        or (aes.submitted_by_user.email or '').strip()
-                        or None
-                    )
-                approved_by_user_name = None
-                if aes.approved_by_user:
-                    approved_by_user_name = (
-                        (aes.approved_by_user.name or '').strip()
-                        or (aes.approved_by_user.email or '').strip()
-                        or None
-                    )
-
-                pub_count = 0
-                pub_latest_at = None
-                if assigned_form:
-                    pub_count, pub_latest_at = public_count_by_assigned_form.get(
-                        assigned_form.id, (0, None)
-                    )
-                is_public_accessible = bool(
-                    assigned_form and assigned_form.is_public_accessible()
-                )
-
-                template_id = assigned_form.template_id if assigned_form else None
-                form_definition_updated_at = None
-                if assigned_form and assigned_form.template:
-                    pv = assigned_form.template.published_version
-                    if pv is not None and getattr(pv, "updated_at", None):
-                        form_definition_updated_at = pv.updated_at.isoformat()
-
-                assignment_data = {
-                    'badges': [{'label': b.label, 'value': b.value, 'tone': b.tone} for b in badges_by_aes.get(aes.id, [])],
-                    'id': aes.id,
-                    'name': f"{period_name} - {localized_template_name if localized_template_name else 'Template Missing'}",
-                    'status': aes.status,
-                    'due_date': aes.due_date.isoformat() if aes.due_date else None,
-                    'status_timestamp': aes.status_timestamp.isoformat()
-                    if aes.status_timestamp
-                    else None,
-                    'completion_rate': round(completion_rate, 1),
-                    'template_name': localized_template_name,
-                    'period_name': period_name,
-                    'is_effectively_closed': effectively_closed,
-                    'assigned_at': assigned_form.assigned_at.isoformat()
-                    if assigned_form and assigned_form.assigned_at
-                    else None,
-                    'last_modified_user_name': last_modified_user_name,
-                    'contributor_names': contributor_names,
-                    'submitted_by_user_name': submitted_by_user_name,
-                    'submitted_at': aes.submitted_at.isoformat() if aes.submitted_at else None,
-                    'approved_by_user_name': approved_by_user_name,
-                    'is_public': is_public_accessible,
-                    'public_submission_count': pub_count if pub_count else None,
-                    'latest_public_submission_at': pub_latest_at.isoformat()
-                    if pub_latest_at
-                    else None,
-                    'form_definition_updated_at': form_definition_updated_at,
-                    'template_id': template_id,
-                    'static_version': static_version,
-                    'data_version': _assignment_data_version(
-                        aes, last_activity_at_by_assignment.get(aes.id)
-                    ),
-                }
-
-                # Categorize as current or past (same rules as main.dashboard)
-                # Closed -> past; Approved older than 2 months -> past;
-                # Pending/In Progress older than 1 year -> past; other statuses -> current
-                if effectively_closed:
-                    past_assignments.append(assignment_data)
-                    continue
-
-                status_val = aes.status.value if hasattr(aes.status, 'value') else aes.status
-                if status_val in ('requires_revision', 'sent_for_review', 'submitted'):
-                    current_assignments.append(assignment_data)
-                elif status_val in ('approved', 'pending', 'in_progress'):
-                    status_ts_utc = (
-                        ensure_utc(aes.status_timestamp) if aes.status_timestamp else None
-                    )
-                    if status_ts_utc is None and assigned_form and assigned_form.assigned_at:
-                        status_ts_utc = ensure_utc(assigned_form.assigned_at)
-                    if aes.status == 'approved':
-                        if status_ts_utc and status_ts_utc < two_months_ago:
-                            past_assignments.append(assignment_data)
-                        else:
-                            current_assignments.append(assignment_data)
-                    else:
-                        if status_ts_utc and status_ts_utc < one_year_ago:
-                            past_assignments.append(assignment_data)
-                        else:
-                            current_assignments.append(assignment_data)
-                else:
-                    current_assignments.append(assignment_data)
-
-        ns_focal_points = []
-        org_focal_points = []
-        fds_members = []
+        ns_focal_points, org_focal_points, fds_members = ([], [], [])
         if selected_entity:
-            entity_country = EntityService.get_country_for_entity(
-                selected_entity['entity_type'],
-                selected_entity['entity_id'],
+            ns_focal_points, org_focal_points, fds_members = _entity_contacts(
+                selected_entity['entity_type'], selected_entity['entity_id']
             )
-            if entity_country is not None:
-                ns_focal_points, org_focal_points = get_focal_points_for_country(
-                    entity_country.id,
-                )
-                fds_members = get_fds_members_for_country(entity_country.id)
 
         return json_response({
             'current_assignments': current_assignments,

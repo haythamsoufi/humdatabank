@@ -5,6 +5,7 @@ import '../models/shared/entity.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/grouped_sheet_style.dart';
 import '../utils/ios_constants.dart';
+import '../utils/network_availability.dart';
 import 'app_fade_in_up.dart';
 
 class EntityListItem {
@@ -242,12 +243,16 @@ class _EntitySelectorBottomSheetState
                               onTap: () {
                                 final entityToSelect = entity;
                                 final providerToUse = widget.provider;
+                                final online = !shouldDeferRemoteFetch;
 
                                 Navigator.of(context).pop();
 
                                 WidgetsBinding.instance
                                     .addPostFrameCallback((_) {
-                                  providerToUse.selectEntity(entityToSelect);
+                                  providerToUse.selectEntity(
+                                    entityToSelect,
+                                    online: online,
+                                  );
                                 });
                               },
                             ),

@@ -125,10 +125,19 @@ $kOfflineApiKeyJs
 /// worker and static URL helper, and keeps server-only actions from running while
 /// the form is opened from disk. Saving stays available (drafts are kept on the
 /// device); submitting is only possible online, where the server validates it.
-String buildOfflineHeadPatch({required String submitBlockedMessage}) {
+///
+/// The template's shared API data loads first; the assignment's own entity-specific
+/// responses (`page_<id>_api.js`) are layered on top of it.
+String buildOfflineHeadPatch({
+  required String submitBlockedMessage,
+  int? assignmentId,
+}) {
   final message = jsonEncode(submitBlockedMessage);
+  final entityScript = assignmentId == null
+      ? ''
+      : '\n<script src="page_${assignmentId}_api.js"></script>';
   return '''
-<script src="offline_api_cache.js"></script>
+<script src="offline_api_cache.js"></script>$entityScript
 <style>
 .approve-assignment-form, .reopen-assignment-form,
 a[href*="/export_pdf"], a[href*="/export_excel"], a[href*="/validation_summary"],

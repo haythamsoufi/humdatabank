@@ -811,6 +811,11 @@ MOBILE_ENDPOINT_REGISTRY = [
      'auth': 'user',
      'description': 'User-scoped dashboard data (entities, assignments)',
      'flutter': 'DashboardRepository'},
+    {'group': 'User', 'path': '/api/mobile/v1/user/dashboard/offline-entities', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'Assignments and contacts of every entity the user can select (optionally only of '
+                    'given template_ids) so downloaded form templates work offline for all entities',
+     'flutter': 'DashboardRepository'},
 
     # ── TEMPLATES ─────────────────────────────────────────────────────────────
     {'group': 'Templates', 'path': '/api/mobile/v1/templates/<template_id>/structure', 'methods': ['GET'],

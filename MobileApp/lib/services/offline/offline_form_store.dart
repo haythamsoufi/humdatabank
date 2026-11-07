@@ -378,6 +378,7 @@ OfflineFormStatus evaluateOfflineForm(
 ///     static/ plugins/static/ saved scripts, styles, fonts, images
 ///     page_<assignment>.html  one server-rendered page per assignment
 ///     page_<assignment>.json
+///     page_<assignment>_api.json/.js  that entity's own API data
 /// ```
 ///
 /// Pages sit next to the shared files so that their relative `static/...`
@@ -396,6 +397,9 @@ class OfflineFormStore {
   static const String apiCacheScriptFile = 'offline_api_cache.js';
 
   static final RegExp _pageFileName = RegExp(r'^page_(\d+)\.json$');
+  static final RegExp _pageAnyFile = RegExp(
+    r'^page_(\d+)(?:_api)?\.(?:html|json|js)$',
+  );
 
   final Directory? _baseDirOverride;
   final String? _scopeOverride;
@@ -406,6 +410,28 @@ class OfflineFormStore {
 
   static String pageHtmlName(int assignmentId) => 'page_$assignmentId.html';
   static String pageMetaName(int assignmentId) => 'page_$assignmentId.json';
+
+  /// Entity-specific API responses of one assignment (emergency operations of
+  /// its country, resolved list conditions, ...). The template's shared
+  /// responses live in [apiCacheJsonFile] instead.
+  static String pageApiJsonName(int assignmentId) =>
+      'page_${assignmentId}_api.json';
+  static String pageApiScriptName(int assignmentId) =>
+      'page_${assignmentId}_api.js';
+
+  /// Every file that belongs to one assignment's page.
+  static List<String> pageFileNames(int assignmentId) => [
+    pageHtmlName(assignmentId),
+    pageMetaName(assignmentId),
+    pageApiJsonName(assignmentId),
+    pageApiScriptName(assignmentId),
+  ];
+
+  /// Assignment id of a file written by [pageFileNames], or null.
+  static int? assignmentIdOfPageFile(String fileName) {
+    final m = _pageAnyFile.firstMatch(fileName);
+    return m == null ? null : int.parse(m.group(1)!);
+  }
 
   Future<Directory> _baseDir() async {
     final override = _baseDirOverride;
@@ -483,6 +509,15 @@ class OfflineFormStore {
         DebugLogger.logWarn('OFFLINE_STORE', 'Housekeeping failed: $e');
       }
     }
+    return dir;
+  }
+
+  /// Where each entity's dashboard (its assignments) is kept, so selecting an
+  /// entity works without a connection. Lives beside the packages and is
+  /// removed with them.
+  Future<Directory> entityDashboardsDir() async {
+    final dir = Directory(p.join((await root()).path, 'dashboards'));
+    if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
   }
 
@@ -655,10 +690,7 @@ class OfflineFormStore {
 
   Future<void> deletePage(OfflinePageMeta page) async {
     final dir = await packageDir(page.packageKey);
-    for (final name in [
-      pageHtmlName(page.assignmentId),
-      pageMetaName(page.assignmentId),
-    ]) {
+    for (final name in pageFileNames(page.assignmentId)) {
       final f = File(p.join(dir.path, name));
       if (await f.exists()) await f.delete();
     }
@@ -670,7 +702,7 @@ class OfflineFormStore {
   Future<int> prune({
     Set<int> closedAssignmentIds = const {},
     Duration maxAge = const Duration(days: 90),
-    int maxPages = 80,
+    int maxPages = 200,
     DateTime? now,
   }) async {
     final clock = (now ?? DateTime.now()).toUtc();

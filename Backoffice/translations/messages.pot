@@ -34518,6 +34518,29 @@ msgstr ""
 msgid "min"
 msgstr ""
 
+#: app/services/platform/user_analytics_service.py
+msgid "< 1 min"
+msgstr ""
+
+#: app/services/platform/user_analytics_service.py
+#, python-format
+msgid "%(minutes)d min"
+msgstr ""
+
+#: app/services/platform/user_analytics_service.py
+#, python-format
+msgid "%(hours)d h"
+msgstr ""
+
+#: app/services/platform/user_analytics_service.py
+#, python-format
+msgid "%(hours)d h %(minutes)d min"
+msgstr ""
+
+#: app/templates/admin/analytics/sessions.html
+msgid "h"
+msgstr ""
+
 #: app/templates/components/auto_translate_modal_js.html:29
 msgid "minutes"
 msgstr ""

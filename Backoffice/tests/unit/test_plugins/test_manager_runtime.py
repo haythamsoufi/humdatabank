@@ -215,3 +215,43 @@ class TestCspLint:
             for plugin_id, plugin in pm.plugins.items():
                 for override in plugin.get_csp_overrides():
                     assert lint_csp_policy(override.policy) == [], (plugin_id, override.endpoint)
+
+
+@pytest.mark.unit
+class TestNavItems:
+    def test_only_active_plugins_contribute_and_cache_follows_activation(self, manager):
+        from app.plugins.base import NavItem
+
+        pm, d = manager
+        _write_plugin(d, "a_plugin")
+        _load(pm)
+        plugin = pm.plugins["a_plugin"]
+        plugin.get_nav_items = lambda: [NavItem("Zeta", "x.zeta", priority=5), NavItem("Alpha", "x.alpha", priority=5)]
+
+        pm.active_plugins.discard("a_plugin")
+        pm._invalidate_hook_caches()
+        assert pm.get_nav_items("analytics-monitoring") == []
+
+        pm.active_plugins.add("a_plugin")
+        pm._invalidate_hook_caches()
+        assert [i.label for i in pm.get_nav_items("analytics-monitoring")] == ["Alpha", "Zeta"]
+        assert pm.get_nav_items("other-section") == []
+
+    def test_failing_plugin_is_skipped(self, manager):
+        pm, d = manager
+        _write_plugin(d, "a_plugin")
+        _load(pm)
+        pm.active_plugins.add("a_plugin")
+
+        def boom():
+            raise RuntimeError("nope")
+
+        pm.plugins["a_plugin"].get_nav_items = boom
+        pm._invalidate_hook_caches()
+        assert pm.get_nav_items() == []
+
+    def test_ifrc_declares_decision_maker_link(self):
+        from plugins.ifrc.plugin import IfrcPlugin
+
+        items = IfrcPlugin().get_nav_items()
+        assert [(i.endpoint, i.permission) for i in items] == [("decisions.page_catalogue", "decisions.view")]

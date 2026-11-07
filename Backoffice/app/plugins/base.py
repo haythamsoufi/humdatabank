@@ -120,6 +120,42 @@ class SeedRole:
     permission_codes: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class NavItem:
+    """Sidebar link a plugin contributes. Shown only while the plugin is active.
+
+    ``section`` is the ``data-category`` of the sidebar block that hosts the link
+    (``"analytics-monitoring"`` today). ``permission`` is checked with
+    ``has_permission`` and bypassed for system managers; ``None`` means any signed-in
+    user. ``label`` is passed through gettext when rendered.
+    """
+
+    label: str
+    endpoint: str
+    section: str = "analytics-monitoring"
+    icon: str = "fas fa-puzzle-piece"
+    permission: Optional[str] = None
+    priority: int = 100
+
+
+@dataclass(frozen=True)
+class ScheduledJob:
+    """Background job a plugin contributes to the core scheduler.
+
+    ``func`` takes no arguments and runs inside an application context. The
+    scheduler skips a run while the owning plugin is inactive, so plugins do not
+    need their own activation checks. ``trigger_args`` are the APScheduler
+    arguments for ``trigger`` (``"cron"`` or ``"interval"``), for example
+    ``{"hour": 4, "minute": 15, "timezone": "UTC"}``.
+    """
+
+    job_id: str
+    name: str
+    func: Callable[[], None]
+    trigger: str
+    trigger_args: Dict[str, Any] = field(default_factory=dict)
+
+
 _CLIENT_METADATA_KEYS = (
     '_schema_version', '_plugin_type', '_processed_at',
     'data_not_available', 'not_applicable', 'metadata',
@@ -388,6 +424,14 @@ class BasePlugin(ABC):
 
     def get_csp_overrides(self) -> List[CspOverride]:
         """CSP overrides for plugin-served HTML assets."""
+        return []
+
+    def get_nav_items(self) -> List[NavItem]:
+        """Sidebar links for the admin navigation (active plugins only)."""
+        return []
+
+    def get_scheduled_jobs(self) -> List[ScheduledJob]:
+        """Periodic background jobs for the core scheduler (run only while the plugin is active)."""
         return []
 
     def get_embed_visuals(self) -> List[EmbedVisual]:

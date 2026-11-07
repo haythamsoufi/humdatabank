@@ -15,6 +15,7 @@ from .base import (
     CspOverride,
     DataExplorerTabConfig,
     NationalSocietyGridColumn,
+    NavItem,
     PluginDocsSource,
 )
 import shutil
@@ -137,6 +138,7 @@ class PluginManager:
         self._last_sync_check = 0.0
         self._csp_index: Optional[Dict[str, List[CspOverride]]] = None
         self._data_explorer_tabs_cache: Optional[List[DataExplorerTabConfig]] = None
+        self._nav_items_cache: Optional[List[NavItem]] = None
         self._loaded_plugin_modules = {}  # Cache for loaded modules
 
         # Load plugin states on initialization (DB; default inactive)
@@ -910,6 +912,7 @@ class PluginManager:
         """Drop aggregated plugin hook results; they are rebuilt on next use."""
         self._csp_index = None
         self._data_explorer_tabs_cache = None
+        self._nav_items_cache = None
 
     def register_blueprints(self):
         """Register blueprints of form-field plugins (not admin-feature plugins).
@@ -1542,6 +1545,11 @@ class PluginManager:
         def plugin_entry_form_assets(template_id=None):
             return self.entry_form_assets(template_id)
 
+        @self.app.template_global('plugin_nav_items')
+        def plugin_nav_items(section: str):
+            self.sync_activation_state_throttled()
+            return self.get_nav_items(section)
+
         @self.app.template_global('is_plugin_active')
         def is_plugin_active(plugin_id: str) -> bool:
             self.sync_activation_state_throttled()
@@ -1603,6 +1611,20 @@ class PluginManager:
             cached = sorted(tabs, key=lambda tab: tab.priority)
             self._data_explorer_tabs_cache = cached
         return list(cached)
+
+    def get_nav_items(self, section: Optional[str] = None) -> List[NavItem]:
+        """Sidebar links contributed by active plugins, ordered by priority then label."""
+        cached = self._nav_items_cache
+        if cached is None:
+            items: List[NavItem] = []
+            for plugin_id, plugin in self._integrating_plugins().items():
+                try:
+                    items.extend(plugin.get_nav_items() or [])
+                except Exception as exc:
+                    self.logger.warning("get_nav_items failed for plugin %s: %s", plugin_id, exc)
+            cached = sorted(items, key=lambda item: (item.priority, str(item.label)))
+            self._nav_items_cache = cached
+        return [item for item in cached if section is None or item.section == section]
 
     def get_documentation_sources(self) -> List[PluginDocsSource]:
         """Collect plugin documentation sources for the in-app docs UI."""

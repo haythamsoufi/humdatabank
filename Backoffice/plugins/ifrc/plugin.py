@@ -9,6 +9,7 @@ from app.plugins.base import (
     CspOverride,
     DataExplorerTabConfig,
     EmbedVisual,
+    NavItem,
     SeedPermission,
     SeedRole,
 )
@@ -157,6 +158,18 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
                 category="analysis",
                 aspect_ratio="16:9",
             ),
+        ]
+
+    def get_nav_items(self) -> list[NavItem]:
+        return [
+            NavItem(
+                label="Decision Maker",
+                endpoint="decisions.page_catalogue",
+                section="analytics-monitoring",
+                icon="fas fa-clipboard-check",
+                permission="decisions.view",
+                priority=100,
+            )
         ]
 
     def get_data_explorer_tabs(self) -> list[DataExplorerTabConfig]:

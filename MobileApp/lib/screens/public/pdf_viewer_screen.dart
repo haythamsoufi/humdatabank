@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../config/app_config.dart';
+import '../../services/jwt_token_service.dart';
 import '../../services/local_pdf_thumbnail_generator.dart';
 import '../../services/unified_planning_pdf_thumbnail_cache.dart';
 import '../../utils/constants.dart';
@@ -99,6 +101,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         final sourceUrl = widget.url!;
         DebugLogger.logApi('PDF download: GET $sourceUrl');
         final request = http.Request('GET', Uri.parse(sourceUrl));
+        // AI / authenticated document endpoints require the mobile JWT; public
+        // resource URLs stay unauthenticated.
+        final authHeaders = await _authHeadersForBackendUrl(sourceUrl);
+        if (authHeaders.isNotEmpty) {
+          request.headers.addAll(authHeaders);
+        }
         final streamed = await client.send(request);
 
         DebugLogger.logApi('PDF response: HTTP ${streamed.statusCode}');
@@ -172,6 +180,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         'PDF_VIEWER',
         'Local unified-planning thumbnail: $e\n$st',
       );
+    }
+  }
+
+  /// Bearer token when [url] targets this app's backoffice host.
+  Future<Map<String, String>> _authHeadersForBackendUrl(String url) async {
+    try {
+      final target = Uri.parse(url);
+      final backend = Uri.parse(AppConfig.baseApiUrl);
+      if (target.host.toLowerCase() != backend.host.toLowerCase()) {
+        return const {};
+      }
+      final token = await JwtTokenService().getAccessToken();
+      if (token == null || token.isEmpty) return const {};
+      return {'Authorization': 'Bearer $token'};
+    } catch (_) {
+      return const {};
     }
   }
 

@@ -1495,6 +1495,7 @@
       menubar: false,
       branding: false,
       promotion: false,
+      license_key: 'gpl',
       /* fullpage was removed in TinyMCE 6; we split head/body in JS. */
       plugins: 'image link lists table visualblocks',
       /* forecolor / backcolor: free core toolbar; image: URL/alt in dialog (upload needs a custom images_upload_url handler). */

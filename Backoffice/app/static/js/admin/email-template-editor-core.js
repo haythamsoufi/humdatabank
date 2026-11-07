@@ -434,6 +434,7 @@
                 menubar: false,
                 branding: false,
                 promotion: false,
+                license_key: 'gpl',
                 plugins: 'image link lists table visualblocks',
                 toolbar: 'undo redo | blocks | bold italic underline | forecolor backcolor | alignleft aligncenter alignright | bullist numlist outdent indent | link image table | emailvarmode | removeformat',
                 table_toolbar: 'tableprops tabledelete | tablecellprops tablerowprops | tablemergecells tablesplitcells | tablecellvalign | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablecellbackgroundcolor | tablecellborderwidth tablecellborderstyle',

@@ -233,6 +233,26 @@ def get_plugin_info(plugin_name):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+_AUDIT_RISK = {'install': 'medium', 'activate': 'medium', 'deactivate': 'medium', 'uninstall': 'high', 'upload': 'high'}
+
+
+def _audit_plugin_action(action: str, plugin_id: str, **details) -> None:
+    """Record a plugin lifecycle change in the admin audit trail. Never raises."""
+    try:
+        from app.services.platform.user_analytics_service import log_admin_action
+
+        log_admin_action(
+            f'plugin_{action}',
+            f'Plugin {plugin_id}: {action}',
+            target_type='plugin',
+            target_description=plugin_id,
+            new_values={'plugin_id': plugin_id, **details},
+            risk_level=_AUDIT_RISK.get(action, 'medium'),
+        )
+    except Exception as exc:  # pragma: no cover - auditing must not break the action
+        current_app.logger.warning('Could not audit plugin %s of %s: %s', action, plugin_id, exc)
+
+
 def _run_lifecycle(action: str, plugin_name: str, past_tense: str):
     """Run a manager lifecycle action, turning refusals into 400s with a readable reason."""
     plugin_manager = current_app.plugin_manager
@@ -246,6 +266,7 @@ def _run_lifecycle(action: str, plugin_name: str, past_tense: str):
         return json_bad_request(str(exc))
 
     if success:
+        _audit_plugin_action(action, plugin_name)
         return json_ok(success=True, message=f'Plugin {plugin_name} {past_tense} successfully')
     return json_bad_request(f'Failed to {action} plugin {plugin_name}')
 
@@ -559,6 +580,7 @@ def _handle_plugin_upload(expected_name: Optional[str], field_name: str):
     if rejection:
         return json_bad_request(rejection)
 
+    _audit_plugin_action('upload', plugin_id, size_bytes=file_size, filename=plugin_file.filename)
     return json_ok(
         success=True,
         plugin_id=plugin_id,

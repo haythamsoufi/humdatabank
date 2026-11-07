@@ -1109,3 +1109,33 @@ class TestSettingsRequireSupport:
             resp = logged_in_client.post("/admin/api/plugins/x/settings", json={"a": 1})
         assert resp.status_code == 400
         plugin.update_settings.assert_not_called()
+
+
+class TestLifecycleAudit:
+    def test_successful_uninstall_is_audited(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager(uninstall_result=True)
+        with patch.object(app, "plugin_manager", pm), patch(
+            "app.services.platform.user_analytics_service.log_admin_action"
+        ) as audit:
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
+        assert resp.status_code == 200
+        args, kwargs = audit.call_args
+        assert args[0] == "plugin_uninstall"
+        assert kwargs["risk_level"] == "high"
+        assert kwargs["target_description"] == "my_plugin"
+
+    def test_failed_action_is_not_audited(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager(uninstall_result=False)
+        with patch.object(app, "plugin_manager", pm), patch(
+            "app.services.platform.user_analytics_service.log_admin_action"
+        ) as audit:
+            logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
+        audit.assert_not_called()
+
+    def test_audit_failure_does_not_break_the_action(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager(uninstall_result=True)
+        with patch.object(app, "plugin_manager", pm), patch(
+            "app.services.platform.user_analytics_service.log_admin_action", side_effect=RuntimeError("db")
+        ):
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
+        assert resp.status_code == 200

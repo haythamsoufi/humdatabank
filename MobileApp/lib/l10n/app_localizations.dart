@@ -1089,6 +1089,9 @@ class AppLocalizations {
       'countries_search_hint': 'Search countries…',
       'countries_no_results': 'No countries found',
       'countries_no_available': 'No countries available',
+      'countries_loading': 'Loading countries…',
+      'countries_regions': 'Regions',
+      'countries_count': '%s countries',
       'country_detail_key_figures': 'Key figures',
       'country_detail_key_indicators': 'Key indicators',
       'country_detail_top_sectors': 'Top sectors',
@@ -8753,6 +8756,10 @@ class AppLocalizations {
   String get countriesSearchHint => translate('countries_search_hint');
   String get countriesNoResults => translate('countries_no_results');
   String get countriesNoAvailable => translate('countries_no_available');
+  String get countriesLoading => translate('countries_loading');
+  String get countriesRegions => translate('countries_regions');
+  String countriesCount(int count) =>
+      translate('countries_count').replaceAll('%s', '$count');
   String get countryDetailKeyFigures => translate('country_detail_key_figures');
   String get countryDetailKeyIndicators =>
       translate('country_detail_key_indicators');

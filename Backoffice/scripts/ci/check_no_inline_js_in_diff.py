@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 # browsers and is not a CSP risk. Sibling tests already work around this guard
 # with DOMParser; skip the whole tests tree instead of playing whack-a-mole.
 _TEST_PATH_MARKERS = ("/tests/",)
+# Third-party bundles copied verbatim by scripts/assets/vendor-*.cjs. We do not author
+# these files, so regenerating them must not trip the guard. Other files under
+# static/libs/ are first-party and remain scanned.
+_VENDORED_PATH_MARKERS = ("/static/libs/tinymce/",)
 _TEST_SUFFIXES = (".test.js", ".spec.js", ".test.ts", ".spec.ts")
 # Gettext catalogs are prose, never executed or served as markup. Regenerating them
 # re-emits unchanged entries (line references move), so entries that merely describe
@@ -23,7 +27,7 @@ def should_scan_file(path: str | None) -> bool:
     if not path or path == "/dev/null":
         return False
     posix = f"/{path.replace(chr(92), '/')}"
-    if any(marker in posix for marker in _TEST_PATH_MARKERS):
+    if any(marker in posix for marker in _TEST_PATH_MARKERS + _VENDORED_PATH_MARKERS):
         return False
     return not posix.endswith(_TEST_SUFFIXES + _CATALOG_SUFFIXES)
 

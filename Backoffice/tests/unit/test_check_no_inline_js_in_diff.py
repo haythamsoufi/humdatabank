@@ -15,6 +15,11 @@ def test_still_scans_production_js_and_templates():
     assert should_scan_file("Backoffice/app/templates/forms/entry.html") is True
 
 
+def test_skips_vendored_tinymce_but_not_first_party_libs():
+    assert should_scan_file("Backoffice/app/static/libs/tinymce/themes/silver/theme.js") is False
+    assert should_scan_file("Backoffice/app/static/libs/user-hover-profile.js") is True
+
+
 def test_skips_gettext_catalogs():
     assert should_scan_file("Backoffice/translations/es/LC_MESSAGES/messages.po") is False
     assert should_scan_file("Backoffice/translations/messages.pot") is False

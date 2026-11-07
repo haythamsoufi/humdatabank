@@ -200,6 +200,8 @@ class TestSessionLogsQuery:
 class TestDashboardStats:
     def test_get_admin_dashboard_stats(self, app):
         with app.app_context():
+            campaign_q = MagicMock()
+            campaign_q.count.return_value = 2
             with patch('app.services.platform.user_analytics_query_service.get_platform_stats', return_value={
                 'total_users': 10,
                 'total_countries': 5,
@@ -207,7 +209,8 @@ class TestDashboardStats:
                 'total_indicators': 20,
             }), patch.object(query_svc, 'has_table', return_value=False), \
                  patch('app.services.platform.user_analytics_query_service.AssignedForm') as MockAF, \
-                 patch('app.services.platform.user_analytics_query_service.PublicSubmission') as MockPS:
+                 patch('app.services.platform.user_analytics_query_service.PublicSubmission') as MockPS, \
+                 patch('app.services.assignments.access_service.campaign_only', return_value=campaign_q):
                 MockAF.query.count.return_value = 2
                 MockPS.query.count.return_value = 4
                 MockPS.query.filter.return_value.count.return_value = 1

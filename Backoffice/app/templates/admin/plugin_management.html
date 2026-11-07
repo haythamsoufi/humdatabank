@@ -65,8 +65,8 @@
 
         <div class="bg-white p-4 shadow-md border border-gray-200">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-exclamation-triangle text-yellow-600 text-xl leading-none"></i>
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-code text-purple-600 text-xl leading-none"></i>
                 </div>
                 <div class="ml-3">
                     <p class="text-sm font-medium text-gray-600">{{ _('Field Types') }}</p>
@@ -77,12 +77,12 @@
 
         <div class="bg-white p-4 shadow-md border border-gray-200">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-code text-purple-600 text-xl leading-none"></i>
+                <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-pause-circle text-yellow-600 text-xl leading-none"></i>
                 </div>
                 <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">{{ _('Custom Fields') }}</p>
-                    <p class="text-2xl font-bold text-gray-900" id="custom-fields-count">--</p>
+                    <p class="text-sm font-medium text-gray-600">{{ _('Inactive Plugins') }}</p>
+                    <p class="text-2xl font-bold text-gray-900" id="inactive-plugins-count">--</p>
                 </div>
             </div>
         </div>
@@ -236,7 +236,16 @@
   "details_description": {{ _('Description') | tojson }},
   "details_version": {{ _('Version') | tojson }},
   "details_author": {{ _('Author') | tojson }},
-  "details_homepage": "Homepage",
+  "details_homepage": {{ _('Homepage') | tojson }},
+  "details_relationships": {{ _('Related plugins') | tojson }},
+  "details_requires": {{ _('Requires:') | tojson }},
+  "details_optional": {{ _('Works best with:') | tojson }},
+  "details_required_by": {{ _('Required by:') | tojson }},
+  "notice_bundled": {{ _('Bundled with the application') | tojson }},
+  "notice_optional_inactive": {{ _('Some features need inactive plugins:') | tojson }},
+  "error_failed_activate": {{ _('Failed to activate plugin') | tojson }},
+  "error_failed_deactivate": {{ _('Failed to deactivate plugin') | tojson }},
+  "uninstall_files_deleted": {{ _("The plugin's files are deleted from the server. Bundled plugins cannot be uninstalled.") | tojson }},
   "details_license": {{ _('License') | tojson }},
   "details_not_specified": {{ _('Not specified') | tojson }},
   "details_field_types": {{ _('Field Types') | tojson }},

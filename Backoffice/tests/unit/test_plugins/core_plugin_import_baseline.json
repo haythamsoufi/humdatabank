@@ -1,0 +1,121 @@
+{
+  "app/models/__init__.py": {
+    "fdrs": 1
+  },
+  "app/plugins/manager.py": {
+    "metadata": 1
+  },
+  "app/routes/admin/ai_management.py": {
+    "fdrs": 1,
+    "upr": 1
+  },
+  "app/routes/admin/data_sync_imputation.py": {
+    "fdrs": 5,
+    "upr": 1
+  },
+  "app/routes/admin/project_management.py": {
+    "nsd_report_forms": 4
+  },
+  "app/routes/admin/validation_dashboard.py": {
+    "upr": 5
+  },
+  "app/routes/ai_documents/helpers.py": {
+    "upr": 1
+  },
+  "app/routes/ai_documents/ifrc.py": {
+    "upr": 1
+  },
+  "app/routes/ai_documents/qa.py": {
+    "upr": 1
+  },
+  "app/routes/api/mobile/public_data.py": {
+    "fdrs": 5,
+    "upr": 2
+  },
+  "app/routes/excel.py": {
+    "fdrs": 1,
+    "upr": 1
+  },
+  "app/services/ai/agent/executor.py": {
+    "upr": 4
+  },
+  "app/services/ai/chat/fastpaths/__init__.py": {
+    "upr": 1
+  },
+  "app/services/ai/documents/chunking.py": {
+    "upr": 1
+  },
+  "app/services/ai/documents/country_detection.py": {
+    "upr": 1
+  },
+  "app/services/ai/documents/ingest.py": {
+    "fdrs": 1
+  },
+  "app/services/ai/documents/metadata.py": {
+    "upr": 1
+  },
+  "app/services/ai/documents/processor.py": {
+    "upr": 1
+  },
+  "app/services/ai/planning/payload_inference.py": {
+    "upr": 2
+  },
+  "app/services/ai/planning/query_planner.py": {
+    "upr": 3
+  },
+  "app/services/ai/policies/prompt_policy.py": {
+    "upr": 2
+  },
+  "app/services/ai/policies/response_policy.py": {
+    "upr": 1
+  },
+  "app/services/ai/runtime/step_ux.py": {
+    "upr": 1
+  },
+  "app/services/ai/tools/__init__.py": {
+    "upr": 1
+  },
+  "app/services/ai/tools/_query_utils.py": {
+    "upr": 1
+  },
+  "app/services/ai/tools/_utils.py": {
+    "upr": 1
+  },
+  "app/services/ai/tools/registry.py": {
+    "upr": 5
+  },
+  "app/services/ai/validation/assignment_review.py": {
+    "upr": 2
+  },
+  "app/services/ai/validation/formdata_validation.py": {
+    "upr": 3
+  },
+  "app/services/ai/validation/ui_payload.py": {
+    "upr": 1
+  },
+  "app/services/data_quality/methodologies/__init__.py": {
+    "fdrs": 1
+  },
+  "app/services/data_retrieval/form_helpers.py": {
+    "fdrs": 1
+  },
+  "app/services/forms/data_service.py": {
+    "fdrs": 1
+  },
+  "app/services/imports/assignment_excel_access.py": {
+    "fdrs": 1,
+    "upr": 1
+  },
+  "app/services/public/document_service.py": {
+    "upr": 2
+  },
+  "app/services/validation/dashboard_service.py": {
+    "upr": 2
+  },
+  "app/services/validation/pack_registry.py": {
+    "fdrs": 1
+  },
+  "app/services/validation/registry_service.py": {
+    "fdrs": 2
+  }
+}

@@ -10,11 +10,23 @@ PLUGIN_AUTHOR = "Haytham Alsoufi"
 PLUGIN_HOMEPAGE = "https://github.com/haythamsoufi"
 PLUGIN_LICENSE = "MIT"
 
-# Plugins that cannot be uninstalled from the UI (tracked product code).
-# Other folders under Backoffice/plugins/ may still ship in the image but are
-# activation-gated and uninstallable like uploaded plugins.
+# Plugins whose author metadata is stamped by FirstPartyPluginMetadata.
 FIRST_PARTY_PLUGIN_IDS = (
     "interactive_map",
+)
+
+# Plugins that ship in the application image. Core code imports their modules
+# directly (models, Excel routes, scheduler, AI tools), so deleting a bundled
+# plugin directory would stop the app from booting. They can be deactivated but
+# never uninstalled. tests/unit/test_plugins/test_first_party_plugins.py fails if
+# a plugin folder under Backoffice/plugins/ is missing from this tuple.
+BUNDLED_PLUGIN_IDS = (
+    "emergency_operations",
+    "fdrs",
+    "ifrc",
+    "interactive_map",
+    "nsd_report_forms",
+    "upr",
 )
 
 

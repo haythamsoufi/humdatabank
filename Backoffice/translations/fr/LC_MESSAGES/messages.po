@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-07 01:42+0000\n"
+"POT-Creation-Date: 2026-11-07 18:57+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: fr <LL@li.org>\n"
@@ -316,7 +316,7 @@ msgstr ""
 msgid "%(n)s published template(s) have no owner."
 msgstr "Les modèles publiés par %(n)s n’ont pas de propriétaire."
 
-#: app/templates/components/_sidebar_nav_categories.html:87
+#: app/templates/components/_sidebar_nav_categories.html:90
 #, python-format
 msgid "%(num)d pending access request"
 msgstr "%(num)d demande d’accès en attente"
@@ -816,14 +816,14 @@ msgstr "Assistant IA"
 msgid "AI Beta Access"
 msgstr "Accès bêta IA"
 
-#: app/templates/components/_sidebar_nav_categories.html:270
-#: app/templates/components/_sidebar_nav_categories.html:272
+#: app/templates/components/_sidebar_nav_categories.html:273
+#: app/templates/components/_sidebar_nav_categories.html:275
 msgid "AI Dashboard"
 msgstr "Tableau de bord IA"
 
 #: app/templates/admin/ai/knowledge_base.html:11
 #: app/templates/admin/ai/knowledge_base.html:23
-#: app/templates/components/_sidebar_nav_categories.html:274
+#: app/templates/components/_sidebar_nav_categories.html:277
 msgid "AI Knowledge Base"
 msgstr "Base de connaissances en IA"
 
@@ -857,7 +857,7 @@ msgstr "Session IA — resolve_ai_identity()"
 #: app/templates/admin/ai/review_queue.html:14
 #: app/templates/admin/ai/trace_compare.html:13
 #: app/templates/admin/ai/trace_detail.html:19
-#: app/templates/components/_sidebar_nav_categories.html:266
+#: app/templates/components/_sidebar_nav_categories.html:269
 msgid "AI System"
 msgstr "Système IA"
 
@@ -1038,8 +1038,8 @@ msgstr "Clé API :"
 #: app/templates/admin/api_management.html:195
 #: app/templates/admin/api_management.html:199
 #: app/templates/admin/communication/center.html:526
-#: app/templates/components/_sidebar_nav_categories.html:239
-#: app/templates/components/_sidebar_nav_categories.html:241
+#: app/templates/components/_sidebar_nav_categories.html:242
+#: app/templates/components/_sidebar_nav_categories.html:244
 msgid "API Management"
 msgstr "Gestion de l'API"
 
@@ -2100,7 +2100,7 @@ msgstr "Ajout à l’équipe nationale"
 msgid "Adding drag highlight"
 msgstr "Ajout de la surlignure de traînée"
 
-#: app/templates/admin/plugin_management.html:250
+#: app/templates/admin/plugin_management.html:259
 msgid "Additional Warnings:"
 msgstr "Additional Warnings:"
 
@@ -2259,8 +2259,8 @@ msgid "Admin Actions"
 msgstr "Actions administratives"
 
 #: app/templates/admin/communication/center.html:513
-#: app/templates/components/_sidebar_nav_categories.html:21
-#: app/templates/components/_sidebar_nav_categories.html:23
+#: app/templates/components/_sidebar_nav_categories.html:24
+#: app/templates/components/_sidebar_nav_categories.html:26
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:144
 msgid "Admin Dashboard"
 msgstr "Tableau de bord d'administration"
@@ -2339,11 +2339,11 @@ msgstr ""
 msgid "Admins"
 msgstr "Administrateurs"
 
-#: plugins/fdrs/plugin.py:162
+#: plugins/fdrs/plugin.py:195
 msgid "Admission date"
 msgstr ""
 
-#: plugins/fdrs/plugin.py:174
+#: plugins/fdrs/plugin.py:207
 msgid "Admission date note"
 msgstr ""
 
@@ -3078,7 +3078,7 @@ msgstr ""
 msgid "Analytics"
 msgstr "Voir les analyses"
 
-#: app/templates/components/_sidebar_nav_categories.html:210
+#: app/templates/components/_sidebar_nav_categories.html:213
 msgid "Analytics & Monitoring"
 msgstr "Analyses et surveillance"
 
@@ -4232,8 +4232,8 @@ msgstr ""
 #: app/templates/admin/analytics/dashboard.html:426
 #: app/templates/admin/analytics/import_change_log.html:12
 #: app/templates/admin/communication/center.html:525
-#: app/templates/components/_sidebar_nav_categories.html:221
-#: app/templates/components/_sidebar_nav_categories.html:223
+#: app/templates/components/_sidebar_nav_categories.html:224
+#: app/templates/components/_sidebar_nav_categories.html:226
 #: app/templates/forms/form_builder/form_builder.html:38
 #: app/templates/forms/form_builder/form_builder.html:507
 msgid "Audit Trail"
@@ -4797,11 +4797,11 @@ msgstr ""
 msgid "Bilateral Funding Sent (CHF)"
 msgstr ""
 
-#: plugins/upr/analysis_labels.py:32 plugins/upr/plugin.py:245
+#: plugins/upr/analysis_labels.py:32 plugins/upr/plugin.py:248
 msgid "Bilateral funding"
 msgstr ""
 
-#: plugins/upr/plugin.py:256
+#: plugins/upr/plugin.py:259
 msgid "Bilateral funding coverage by INFORM risk"
 msgstr ""
 
@@ -5007,6 +5007,10 @@ msgstr ""
 #: plugins/upr/templates/upr/tab_panel.html:526
 #, python-brace-format
 msgid "Bundle · {count}"
+msgstr ""
+
+#: app/templates/admin/plugin_management.html:244
+msgid "Bundled with the application"
 msgstr ""
 
 #: app/templates/admin/communication/_insights.html:102
@@ -6583,8 +6587,8 @@ msgstr "Communication"
 #: app/templates/admin/communication/center.html:17
 #: app/templates/admin/communication/center.html:21
 #: app/templates/admin/communication/registry.html:16
-#: app/templates/components/_sidebar_nav_categories.html:56
-#: app/templates/components/_sidebar_nav_categories.html:58
+#: app/templates/components/_sidebar_nav_categories.html:59
+#: app/templates/components/_sidebar_nav_categories.html:61
 msgid "Communication Center"
 msgstr "Centre de communication"
 
@@ -6832,7 +6836,7 @@ msgstr "Confiance en elle :"
 msgid "Configurable"
 msgstr "Configurable"
 
-#: app/templates/admin/plugin_management.html:248
+#: app/templates/admin/plugin_management.html:257
 msgid "Configuration Keys:"
 msgstr "Configuration Keys:"
 
@@ -6982,7 +6986,7 @@ msgstr "Conflit"
 msgid "Connection lost. Please keep this window open and try again."
 msgstr "Connexion perdue. Veuillez garder cette fenêtre ouverte et réessayer."
 
-#: app/templates/admin/plugin_management.html:252
+#: app/templates/admin/plugin_management.html:261
 msgid "Consider backing up your data before proceeding."
 msgstr "Consider backing up your data before proceeding."
 
@@ -8215,7 +8219,7 @@ msgid "Ctrl+click or Shift+click to select multiple"
 msgstr "Ctrl+clic ou Majus+clic pour sélectionner plusieurs"
 
 #: app/templates/admin/templates/data_sync_imputation.html:187
-#: plugins/fdrs/plugin.py:159
+#: plugins/fdrs/plugin.py:192
 msgid "Currency"
 msgstr "Monnaie"
 
@@ -8296,10 +8300,6 @@ msgstr "En ce moment, vous modifiez ce formulaire :"
 msgid "Custom"
 msgstr "Coutumes"
 
-#: app/templates/admin/plugin_management.html:84
-msgid "Custom Fields"
-msgstr "Custom Fields"
-
 #: app/templates/forms/form_builder/partials/_item_modal.html:89
 msgid "Custom Label (Optional)"
 msgstr "Étiquette personnalisée (optionnelle)"
@@ -8377,7 +8377,7 @@ msgstr ""
 msgid "DAU/MAU"
 msgstr ""
 
-#: plugins/fdrs/plugin.py:150
+#: plugins/fdrs/plugin.py:183
 msgid "DON code"
 msgstr ""
 
@@ -8422,8 +8422,8 @@ msgstr "Sombre (par défaut)"
 #: app/templates/admin/communication/center.html:503
 #: app/templates/admin/reports/partials/_widget_palette.html:2
 #: app/templates/auth/account_settings.html:22
-#: app/templates/components/_sidebar_nav_categories.html:14
-#: app/templates/components/_sidebar_nav_categories.html:16
+#: app/templates/components/_sidebar_nav_categories.html:17
+#: app/templates/components/_sidebar_nav_categories.html:19
 #: app/templates/core/chat_immersive.html:152
 #: app/templates/core/layout.html:288 app/templates/core/layout.html:290
 #: app/templates/core/layout.html:444 app/templates/core/ns_structure.html:17
@@ -8727,7 +8727,7 @@ msgstr "Base de données"
 msgid "Database Pool"
 msgstr "Database Tables:"
 
-#: app/templates/admin/plugin_management.html:246
+#: app/templates/admin/plugin_management.html:255
 msgid "Database Tables:"
 msgstr "Database Tables:"
 
@@ -8831,8 +8831,7 @@ msgstr "Décimales"
 msgid "Decision"
 msgstr "Décision"
 
-#: app/templates/components/_sidebar_nav_categories.html:252
-#: app/templates/components/_sidebar_nav_categories.html:254
+#: plugins/ifrc/plugin.py:177
 #: plugins/ifrc/templates/decisions/catalogue.html:4
 #: plugins/ifrc/templates/decisions/catalogue.html:13
 #: plugins/ifrc/templates/decisions/catalogue.html:17
@@ -9824,7 +9823,7 @@ msgstr ""
 "Les sections de discussion nécessitent « Activer la discussion » dans les "
 "paramètres du modèle."
 
-#: app/templates/admin/plugin_management.html:245
+#: app/templates/admin/plugin_management.html:254
 msgid "Disk Space:"
 msgstr "Disk Space:"
 
@@ -10070,8 +10069,8 @@ msgstr "Étiquettes de documents"
 
 #: app/templates/admin/communication/center.html:517
 #: app/templates/admin/documents/documents.html:40
-#: app/templates/components/_sidebar_nav_categories.html:28
-#: app/templates/components/_sidebar_nav_categories.html:30
+#: app/templates/components/_sidebar_nav_categories.html:31
+#: app/templates/components/_sidebar_nav_categories.html:33
 msgid "Document Management"
 msgstr "Gestion des documents"
 
@@ -10196,8 +10195,8 @@ msgstr "Document téléchargé"
 #: app/templates/admin/docs/documentation.html:4
 #: app/templates/admin/docs/documentation.html:1098
 #: app/templates/admin/docs/documentation.html:1101
-#: app/templates/components/_sidebar_nav_categories.html:63
-#: app/templates/components/_sidebar_nav_categories.html:65
+#: app/templates/components/_sidebar_nav_categories.html:66
+#: app/templates/components/_sidebar_nav_categories.html:68
 #: app/templates/core/layout.html:293 app/templates/core/layout.html:295
 #: app/templates/core/layout.html:388 app/templates/core/layout.html:451
 #: app/templates/core/layout.html:453
@@ -11310,8 +11309,8 @@ msgid "Embed"
 msgstr "Intégration"
 
 #: app/templates/admin/embed_content/manage_embed_content.html:20
-#: app/templates/components/_sidebar_nav_categories.html:168
-#: app/templates/components/_sidebar_nav_categories.html:170
+#: app/templates/components/_sidebar_nav_categories.html:171
+#: app/templates/components/_sidebar_nav_categories.html:173
 msgid "Embed Content"
 msgstr "Intégrer du contenu"
 
@@ -12493,8 +12492,8 @@ msgstr "Date d’expiration"
 #: app/templates/admin/_validation_admin_shell.html:55
 #: app/templates/admin/data_exploration/explore_data.html:4
 #: app/templates/admin/data_exploration/explore_data.html:19
-#: app/templates/components/_sidebar_nav_categories.html:126
-#: app/templates/components/_sidebar_nav_categories.html:128
+#: app/templates/components/_sidebar_nav_categories.html:129
+#: app/templates/components/_sidebar_nav_categories.html:131
 msgid "Explore Data"
 msgstr "Explorer les données"
 
@@ -12863,7 +12862,7 @@ msgstr "FDS : Systèmes de données à l’échelle de la Fédération"
 msgid "FPs"
 msgstr "FP"
 
-#: plugins/fdrs/plugin.py:177
+#: plugins/fdrs/plugin.py:210
 msgid "Facebook"
 msgstr ""
 
@@ -12913,6 +12912,10 @@ msgstr "Échecs de connexion"
 msgid "Failed requests (HTTP 4xx/5xx)"
 msgstr ""
 
+#: app/templates/admin/plugin_management.html:246
+msgid "Failed to activate plugin"
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:4085
 msgid "Failed to add indicator"
 msgstr "Échec de l'ajout de l'indicateur"
@@ -12935,6 +12938,10 @@ msgstr "Échec de la copie de l'URL. Veuillez réessayer."
 #: app/templates/admin/validation_questions.html:287
 msgid "Failed to create follow-up question"
 msgstr "Oubli de créer une question de suivi"
+
+#: app/templates/admin/plugin_management.html:247
+msgid "Failed to deactivate plugin"
+msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:725
 msgid "Failed to delete document."
@@ -13227,7 +13234,7 @@ msgstr "Type de champ non plus pris en charge"
 
 #: app/templates/admin/plugin_management.html:72
 #: app/templates/admin/plugin_management.html:130
-#: app/templates/admin/plugin_management.html:242
+#: app/templates/admin/plugin_management.html:251
 msgid "Field Types"
 msgstr "No field types"
 
@@ -13800,7 +13807,7 @@ msgstr "Mot de passe oublié ?"
 msgid "Form"
 msgstr "Formulaire"
 
-#: app/templates/components/_sidebar_nav_categories.html:105
+#: app/templates/components/_sidebar_nav_categories.html:108
 msgid "Form & Data Management"
 msgstr "Gestion des formulaires et données"
 
@@ -14234,7 +14241,7 @@ msgstr "Répartition des genres par pays"
 
 #: app/templates/admin/settings/manage_settings.html:75
 #: app/templates/admin/templates/new_template.html:1211
-#: app/templates/components/_sidebar_nav_categories.html:9
+#: app/templates/components/_sidebar_nav_categories.html:12
 msgid "General"
 msgstr "Général"
 
@@ -14465,7 +14472,7 @@ msgid "Got it!"
 msgstr "Compris !"
 
 #: app/templates/admin/validation_dashboard.html:448
-#: app/templates/components/_sidebar_nav_categories.html:235
+#: app/templates/components/_sidebar_nav_categories.html:238
 msgid "Governance"
 msgstr "Gouvernance"
 
@@ -14473,7 +14480,7 @@ msgstr "Gouvernance"
 msgid "Governance & structure"
 msgstr "Gouvernance et structure"
 
-#: app/templates/components/_sidebar_nav_categories.html:233
+#: app/templates/components/_sidebar_nav_categories.html:236
 msgid "Governance Dashboard"
 msgstr "Tableau de bord de gouvernance"
 
@@ -14911,6 +14918,10 @@ msgstr ""
 "Maintenez Ctrl (Cmd sur Mac) pour en sélectionner plusieurs. Si vous "
 "choisissez les deux, la clé ne peut voir que les lignes correspondant à un "
 "modèle choisi et à un pays choisi."
+
+#: app/templates/admin/plugin_management.html:239
+msgid "Homepage"
+msgstr ""
 
 #: app/utils/form_localization.py:139
 msgid "Hospitals"
@@ -15757,6 +15768,10 @@ msgstr ""
 msgid "Inactive"
 msgstr "Inactif"
 
+#: app/templates/admin/plugin_management.html:84
+msgid "Inactive Plugins"
+msgstr ""
+
 #: app/templates/admin/assignments/gantt_chart.html:111
 msgid "Inactive Public"
 msgstr "Inactif"
@@ -15865,8 +15880,8 @@ msgstr "Indicateur"
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:116
 #: app/templates/admin/indicator_suggestions.html:15
 #: app/templates/admin/user_management/users.html:271
-#: app/templates/components/_sidebar_nav_categories.html:192
-#: app/templates/components/_sidebar_nav_categories.html:194
+#: app/templates/components/_sidebar_nav_categories.html:195
+#: app/templates/components/_sidebar_nav_categories.html:197
 msgid "Indicator Bank"
 msgstr "Banque d'indicateurs"
 
@@ -16670,7 +16685,7 @@ msgid "Key rotated successfully"
 msgstr "La clé a tourné avec succès"
 
 #: app/templates/admin/ai/knowledge_base.html:28
-#: app/templates/components/_sidebar_nav_categories.html:276
+#: app/templates/components/_sidebar_nav_categories.html:279
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:56
 msgid "Knowledge Base"
 msgstr "Base de connaissances"
@@ -16969,7 +16984,7 @@ msgstr ""
 msgid "Latest:"
 msgstr "Dernières nouvelles :"
 
-#: plugins/fdrs/plugin.py:168
+#: plugins/fdrs/plugin.py:201
 msgid "Latitude"
 msgstr ""
 
@@ -17135,7 +17150,7 @@ msgstr ""
 msgid "Library-wide total"
 msgstr "Total à l’échelle de la bibliothèque"
 
-#: app/templates/admin/plugin_management.html:240
+#: app/templates/admin/plugin_management.html:249
 msgid "License"
 msgstr "License"
 
@@ -17816,7 +17831,7 @@ msgstr "Déconnexion"
 msgid "Long text answer (multiple lines)."
 msgstr "Réponse longue (plusieurs lignes)."
 
-#: plugins/fdrs/plugin.py:171
+#: plugins/fdrs/plugin.py:204
 msgid "Longitude"
 msgstr ""
 
@@ -17924,8 +17939,8 @@ msgstr "Gérer"
 
 #: app/templates/admin/assignments/assignments.html:13
 #: app/templates/admin/assignments/assignments.html:52
-#: app/templates/components/_sidebar_nav_categories.html:116
-#: app/templates/components/_sidebar_nav_categories.html:118
+#: app/templates/components/_sidebar_nav_categories.html:119
+#: app/templates/components/_sidebar_nav_categories.html:121
 msgid "Manage Assignments"
 msgstr "Gérer les affectations"
 
@@ -17960,15 +17975,15 @@ msgstr "Questions sur la gestion"
 
 #: app/templates/admin/resources/manage_resources.html:4
 #: app/templates/admin/resources/manage_resources.html:13
-#: app/templates/components/_sidebar_nav_categories.html:164
-#: app/templates/components/_sidebar_nav_categories.html:166
+#: app/templates/components/_sidebar_nav_categories.html:167
+#: app/templates/components/_sidebar_nav_categories.html:169
 msgid "Manage Resources"
 msgstr "Gérer les ressources"
 
 #: app/templates/admin/templates/templates.html:14
 #: app/templates/admin/templates/templates.html:45
-#: app/templates/components/_sidebar_nav_categories.html:110
-#: app/templates/components/_sidebar_nav_categories.html:112
+#: app/templates/components/_sidebar_nav_categories.html:113
+#: app/templates/components/_sidebar_nav_categories.html:115
 msgid "Manage Templates"
 msgstr "Gérer les modèles"
 
@@ -17981,8 +17996,8 @@ msgstr "Gérer les traductions"
 
 #: app/templates/admin/user_management/users.html:22
 #: app/templates/admin/user_management/users.html:87
-#: app/templates/components/_sidebar_nav_categories.html:83
-#: app/templates/components/_sidebar_nav_categories.html:85
+#: app/templates/components/_sidebar_nav_categories.html:86
+#: app/templates/components/_sidebar_nav_categories.html:88
 msgid "Manage Users"
 msgstr "Gérer les utilisateurs"
 
@@ -18157,7 +18172,7 @@ msgstr "Rangée ajoutée manuellement"
 msgid "Map and table views"
 msgstr ""
 
-#: plugins/upr/plugin.py:236
+#: plugins/upr/plugin.py:239
 msgid ""
 "Map of Participating National Societies and the countries they support, with"
 " bilateral funding by strategic priority and summary figures."
@@ -19291,11 +19306,11 @@ msgstr "Besoin d’une révision uniquement"
 msgid "Needs suffix"
 msgstr "Suffixe des besoins"
 
-#: plugins/upr/analysis_labels.py:153 plugins/upr/plugin.py:234
+#: plugins/upr/analysis_labels.py:153 plugins/upr/plugin.py:237
 msgid "Network Bilateral Support"
 msgstr ""
 
-#: plugins/upr/plugin.py:267
+#: plugins/upr/plugin.py:270
 msgid "Network Bilateral Support and funding"
 msgstr ""
 
@@ -20103,7 +20118,7 @@ msgstr "Aucun événement"
 msgid "No evidence is attached to the current flags."
 msgstr ""
 
-#: app/templates/admin/plugin_management.html:243
+#: app/templates/admin/plugin_management.html:252
 msgid "No field types"
 msgstr "No field types"
 
@@ -21094,7 +21109,7 @@ msgstr "Non fixé"
 msgid "Not shared with other users."
 msgstr "Pas partagé avec d’autres utilisateurs."
 
-#: app/templates/admin/plugin_management.html:241
+#: app/templates/admin/plugin_management.html:250
 msgid "Not specified"
 msgstr "Not specified"
 
@@ -22035,8 +22050,8 @@ msgid "Organization sections"
 msgstr "Sections d’organisation"
 
 #: app/templates/admin/communication/center.html:522
-#: app/templates/components/_sidebar_nav_categories.html:186
-#: app/templates/components/_sidebar_nav_categories.html:188
+#: app/templates/components/_sidebar_nav_categories.html:189
+#: app/templates/components/_sidebar_nav_categories.html:191
 msgid "Organizational Structure"
 msgstr "Structure organisationnelle"
 
@@ -22129,7 +22144,7 @@ msgstr "Autres chemins (agrégés)"
 msgid "Other programs"
 msgstr "Autres programmes"
 
-#: plugins/fdrs/plugin.py:183
+#: plugins/fdrs/plugin.py:216
 msgid "Other social"
 msgstr ""
 
@@ -22818,7 +22833,7 @@ msgstr "Personnes"
 msgid "People reached"
 msgstr "Les gens ont atteint"
 
-#: plugins/ifrc/plugin.py:150
+#: plugins/ifrc/plugin.py:160
 msgid ""
 "People reached, programme highlights, and a country map, with a toggle to "
 "pillar indicators and activity narratives."
@@ -23033,7 +23048,7 @@ msgstr "Choisissez une ou plusieurs options dans une liste."
 msgid "Pie"
 msgstr "Tarte"
 
-#: plugins/ifrc/plugin.py:148
+#: plugins/ifrc/plugin.py:158
 msgid "Pilot Programmatic Partnership"
 msgstr ""
 
@@ -23365,8 +23380,8 @@ msgstr "Traductions de champs de plugins"
 #: app/templates/admin/plugin_management.html:7
 #: app/templates/admin/plugin_management.html:13
 #: app/templates/admin/plugin_management.html:17
-#: app/templates/components/_sidebar_nav_categories.html:42
-#: app/templates/components/_sidebar_nav_categories.html:44
+#: app/templates/components/_sidebar_nav_categories.html:45
+#: app/templates/components/_sidebar_nav_categories.html:47
 msgid "Plugin Management"
 msgstr "Gestion des Extensions"
 
@@ -23958,8 +23973,8 @@ msgstr "Projection"
 #: app/templates/admin/projects/list.html:11
 #: app/templates/admin/projects/list.html:16
 #: app/templates/admin/settings/manage_settings.html:173
-#: app/templates/components/_sidebar_nav_categories.html:120
-#: app/templates/components/_sidebar_nav_categories.html:122
+#: app/templates/components/_sidebar_nav_categories.html:123
+#: app/templates/components/_sidebar_nav_categories.html:125
 #: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:22
 msgid "Projects"
 msgstr ""
@@ -24659,8 +24674,8 @@ msgstr "Trace de raisonnement"
 #: app/templates/admin/ai/dashboard.html:128
 #: app/templates/admin/ai/reasoning_traces.html:18
 #: app/templates/admin/ai/trace_compare.html:14
-#: app/templates/components/_sidebar_nav_categories.html:278
-#: app/templates/components/_sidebar_nav_categories.html:280
+#: app/templates/components/_sidebar_nav_categories.html:281
+#: app/templates/components/_sidebar_nav_categories.html:283
 msgid "Reasoning Traces"
 msgstr "Traces de raisonnement"
 
@@ -24745,7 +24760,7 @@ msgstr ""
 msgid "Recipients"
 msgstr "Destinataires"
 
-#: app/templates/admin/plugin_management.html:251
+#: app/templates/admin/plugin_management.html:260
 msgid "Recommendation:"
 msgstr "Recommendation:"
 
@@ -24822,7 +24837,7 @@ msgstr "Refaire"
 msgid "Reference"
 msgstr ""
 
-#: app/templates/components/_sidebar_nav_categories.html:181
+#: app/templates/components/_sidebar_nav_categories.html:184
 msgid "Reference Data"
 msgstr "Données de référence"
 
@@ -25017,6 +25032,10 @@ msgstr "Événements connexes (même IP, 7 derniers jours)"
 #: app/templates/admin/indicator_bank/manage_indicator.html:276
 msgid "Related Programs"
 msgstr "Programmes connexes"
+
+#: app/templates/admin/plugin_management.html:240
+msgid "Related plugins"
+msgstr ""
 
 #: app/templates/admin/templates/new_template.html:475
 msgid "Related program"
@@ -25530,8 +25549,8 @@ msgstr "Commentaire du pays rapporteur"
 #: app/templates/admin/reports/list.html:29
 #: app/templates/admin/reports/view.html:4
 #: app/templates/admin/reports/view.html:53
-#: app/templates/components/_sidebar_nav_categories.html:132
-#: app/templates/components/_sidebar_nav_categories.html:134
+#: app/templates/components/_sidebar_nav_categories.html:135
+#: app/templates/components/_sidebar_nav_categories.html:137
 msgid "Reports"
 msgstr "Rapports"
 
@@ -25711,6 +25730,10 @@ msgstr "Nécessite une attention"
 msgid "Required Field"
 msgstr "Champ requis"
 
+#: app/templates/admin/plugin_management.html:243
+msgid "Required by:"
+msgstr ""
+
 #: app/templates/admin/validation_questions.html:149
 msgid "Required when status is Answered."
 msgstr "Obligatoire lorsque le statut est répondu."
@@ -25745,6 +25768,10 @@ msgstr "Nécessite une révision"
 #: app/templates/admin/validation_dashboard.html:463
 msgid "Requires revision"
 msgstr "Nécessite une révision"
+
+#: app/templates/admin/plugin_management.html:241
+msgid "Requires:"
+msgstr ""
 
 #: app/templates/admin/communication/registry.html:81
 msgid ""
@@ -25860,7 +25887,7 @@ msgstr "Résolu par"
 msgid "Resource Management"
 msgstr "Gestion des ressources"
 
-#: app/templates/admin/plugin_management.html:244
+#: app/templates/admin/plugin_management.html:253
 msgid "Resource Usage"
 msgstr "Resource Usage"
 
@@ -26766,7 +26793,7 @@ msgstr "Scan for New Plugins"
 msgid "Scanning..."
 msgstr "En train de scanner..."
 
-#: plugins/upr/plugin.py:258
+#: plugins/upr/plugin.py:261
 msgid ""
 "Scatter of funding requirement against the share met, coloured by INFORM "
 "risk class."
@@ -27082,7 +27109,7 @@ msgstr "Secrétariat de recherche"
 msgid "Search sectors or sub-sectors..."
 msgstr "Rechercher des secteurs ou sous-secteurs..."
 
-#: plugins/fdrs/plugin.py:186
+#: plugins/fdrs/plugin.py:219
 msgid "Search string"
 msgstr ""
 
@@ -27338,8 +27365,8 @@ msgstr "Alertes de sécurité"
 
 #: app/templates/admin/security/dashboard.html:6
 #: app/templates/admin/security/dashboard.html:23
-#: app/templates/components/_sidebar_nav_categories.html:227
-#: app/templates/components/_sidebar_nav_categories.html:229
+#: app/templates/components/_sidebar_nav_categories.html:230
+#: app/templates/components/_sidebar_nav_categories.html:232
 msgid "Security Dashboard"
 msgstr "Tableau de bord de sécurité"
 
@@ -29141,6 +29168,10 @@ msgstr "Certains documents ont échoué"
 msgid "Some documents failed."
 msgstr "Certains documents ont échoué."
 
+#: app/templates/admin/plugin_management.html:245
+msgid "Some features need inactive plugins:"
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:378
 msgid ""
 "Some fields in this form contain imputed values (highlighted in blue). These"
@@ -29276,7 +29307,7 @@ msgstr ""
 "Sources : récits internes {internes}, récits publics {public} (un par pays "
 "et par round, appels pays uniquement)."
 
-#: app/templates/admin/plugin_management.html:249
+#: app/templates/admin/plugin_management.html:258
 msgid "Space to be freed:"
 msgstr "Space to be freed:"
 
@@ -30283,8 +30314,8 @@ msgstr ""
 #: app/templates/admin/communication/center.html:520
 #: app/templates/admin/settings/manage_settings.html:24
 #: app/templates/admin/settings/manage_settings.html:28
-#: app/templates/components/_sidebar_nav_categories.html:49
-#: app/templates/components/_sidebar_nav_categories.html:51
+#: app/templates/components/_sidebar_nav_categories.html:52
+#: app/templates/components/_sidebar_nav_categories.html:54
 msgid "System Configuration"
 msgstr "Configuration du système"
 
@@ -30320,8 +30351,8 @@ msgstr ""
 #: app/routes/admin/monitoring.py:84 app/routes/admin/monitoring.py:106
 #: app/templates/admin/monitoring/system_monitoring.html:13
 #: app/templates/admin/monitoring/system_monitoring.html:58
-#: app/templates/components/_sidebar_nav_categories.html:245
-#: app/templates/components/_sidebar_nav_categories.html:247
+#: app/templates/components/_sidebar_nav_categories.html:248
+#: app/templates/components/_sidebar_nav_categories.html:250
 msgid "System Monitoring"
 msgstr "Surveillance du système"
 
@@ -31056,6 +31087,12 @@ msgid ""
 "patience."
 msgstr ""
 
+#: app/templates/admin/plugin_management.html:248
+msgid ""
+"The plugin's files are deleted from the server. Bundled plugins cannot be "
+"uninstalled."
+msgstr ""
+
 #: app/templates/admin/governance/dashboard.html:153
 #, python-format
 msgid "The previous acceptance expired on %(date)s."
@@ -31118,7 +31155,7 @@ msgstr ""
 "La soumission a été validée et approuvée. La saisie des données est "
 "terminée."
 
-#: plugins/upr/plugin.py:269
+#: plugins/upr/plugin.py:272
 msgid ""
 "The support map, priority chart and summary figures, with the bilateral "
 "funding rankings and INFORM coverage chart below."
@@ -32612,8 +32649,8 @@ msgstr "Journal de traduction"
 #: app/templates/admin/translations/manage_translations.html:171
 #: app/templates/admin/translations/quality_dashboard.html:22
 #: app/templates/admin/translations/quality_dashboard.html:28
-#: app/templates/components/_sidebar_nav_categories.html:35
-#: app/templates/components/_sidebar_nav_categories.html:37
+#: app/templates/components/_sidebar_nav_categories.html:38
+#: app/templates/components/_sidebar_nav_categories.html:40
 msgid "Translation Management"
 msgstr "Gestion des traductions"
 
@@ -32913,7 +32950,7 @@ msgstr ""
 " Effacez un champ de texte ou de chiffre et enregistrez pour revenir cette "
 "clé au code par défaut."
 
-#: plugins/fdrs/plugin.py:180
+#: plugins/fdrs/plugin.py:213
 msgid "Twitter"
 msgstr ""
 
@@ -32921,7 +32958,7 @@ msgstr ""
 msgid "Two Authentication Methods:"
 msgstr "Deux méthodes d’authentification :"
 
-#: plugins/upr/plugin.py:247
+#: plugins/upr/plugin.py:250
 msgid ""
 "Two rankings: Participating National Societies by bilateral funding sent, "
 "and countries by bilateral funding received."
@@ -33253,7 +33290,7 @@ msgstr "Plans unifiés"
 msgid "Uninstall"
 msgstr "Uninstall Plugin"
 
-#: app/templates/admin/plugin_management.html:253
+#: app/templates/admin/plugin_management.html:262
 #, python-format
 msgid "Uninstall %(plugin)s"
 msgstr "Uninstall %(plugin)s"
@@ -33262,7 +33299,7 @@ msgstr "Uninstall %(plugin)s"
 msgid "Uninstall Plugin"
 msgstr "Uninstall Plugin"
 
-#: app/templates/admin/plugin_management.html:255
+#: app/templates/admin/plugin_management.html:264
 msgid "Uninstalling this plugin will permanently remove:"
 msgstr "Uninstalling this plugin will permanently remove:"
 
@@ -33765,7 +33802,7 @@ msgstr "Téléchargé"
 msgid "Uploaded By"
 msgstr "Téléchargé par"
 
-#: app/templates/admin/plugin_management.html:247
+#: app/templates/admin/plugin_management.html:256
 msgid "Uploaded Files:"
 msgstr "Uploaded Files:"
 
@@ -34062,12 +34099,12 @@ msgstr "Utilisateur ajouté au pays"
 #: app/templates/admin/analytics/user_detail.html:5
 #: app/templates/admin/analytics/user_detail.html:12
 #: app/templates/admin/communication/center.html:524
-#: app/templates/components/_sidebar_nav_categories.html:217
+#: app/templates/components/_sidebar_nav_categories.html:220
 msgid "User Analytics"
 msgstr "Analyses utilisateur"
 
 #: app/templates/admin/analytics/dashboard.html:5
-#: app/templates/components/_sidebar_nav_categories.html:215
+#: app/templates/components/_sidebar_nav_categories.html:218
 msgid "User Analytics Dashboard"
 msgstr "Tableau de bord des analyses utilisateur"
 
@@ -34122,7 +34159,7 @@ msgstr "Utilisateur JWT — @mobile_auth_required"
 #: app/templates/admin/rbac/roles.html:15
 #: app/templates/admin/user_management/access_requests.html:168
 #: app/templates/admin/user_management/users.html:91
-#: app/templates/components/_sidebar_nav_categories.html:79
+#: app/templates/components/_sidebar_nav_categories.html:82
 msgid "User Management"
 msgstr "Gestion des utilisateurs"
 
@@ -34383,8 +34420,8 @@ msgstr "Validation"
 #: app/templates/admin/_validation_admin_shell.html:24
 #: app/templates/admin/validation_dashboard.html:6
 #: app/templates/admin/validation_dashboard.html:17
-#: app/templates/components/_sidebar_nav_categories.html:138
-#: app/templates/components/_sidebar_nav_categories.html:140
+#: app/templates/components/_sidebar_nav_categories.html:141
+#: app/templates/components/_sidebar_nav_categories.html:143
 msgid "Validation Dashboard"
 msgstr "Tableau de bord de validation"
 
@@ -34399,8 +34436,8 @@ msgstr "Traductions de messages de validation"
 #: app/templates/admin/_validation_admin_shell.html:15
 #: app/templates/admin/validation_questions.html:8
 #: app/templates/admin/validation_questions.html:19
-#: app/templates/components/_sidebar_nav_categories.html:144
-#: app/templates/components/_sidebar_nav_categories.html:146
+#: app/templates/components/_sidebar_nav_categories.html:147
+#: app/templates/components/_sidebar_nav_categories.html:149
 msgid "Validation Questions"
 msgstr "Validation Questions"
 
@@ -35013,7 +35050,7 @@ msgstr ""
 msgid "Warning: This action cannot be undone"
 msgstr "Supprimer cette version ? Cela ne peut pas être annulé."
 
-#: app/templates/admin/plugin_management.html:254
+#: app/templates/admin/plugin_management.html:263
 #: app/templates/admin/templates/templates.html:313
 msgid "Warning: This action cannot be undone!"
 msgstr "Supprimer cette version ? Cela ne peut pas être annulé."
@@ -35094,12 +35131,12 @@ msgstr ""
 msgid "Webhooks"
 msgstr "Webhooks"
 
-#: plugins/fdrs/plugin.py:165
+#: plugins/fdrs/plugin.py:198
 msgid "Website"
 msgstr ""
 
 #: app/templates/admin/embed_content/manage_embed_content.html:19
-#: app/templates/components/_sidebar_nav_categories.html:158
+#: app/templates/components/_sidebar_nav_categories.html:161
 msgid "Website Management"
 msgstr "Gestion du site web"
 
@@ -35193,7 +35230,7 @@ msgstr "Ce que cette clé peut faire"
 msgid "What was decided, and what residual risk remains."
 msgstr "Ce qui a été décidé, et quel risque résiduel subsiste."
 
-#: app/templates/admin/plugin_management.html:256
+#: app/templates/admin/plugin_management.html:265
 msgid "What will be removed:"
 msgstr "What will be removed:"
 
@@ -35502,6 +35539,10 @@ msgstr "Travailler..."
 #: app/templates/components/_fb_ai_config.html:17
 msgid "Working…"
 msgstr "Travailler..."
+
+#: app/templates/admin/plugin_management.html:242
+msgid "Works best with:"
+msgstr ""
 
 #: app/templates/core/chat_immersive.html:214
 msgid "World heatmap of volunteers by country"
@@ -36053,11 +36094,11 @@ msgstr "Votre compte utilisateur n'est associé à aucun pays."
 msgid "You’ll get access once your request is approved."
 msgstr "Vous aurez accès une fois votre demande approuvée."
 
-#: plugins/fdrs/plugin.py:156
+#: plugins/fdrs/plugin.py:189
 msgid "Zone"
 msgstr ""
 
-#: plugins/fdrs/plugin.py:153
+#: plugins/fdrs/plugin.py:186
 msgid "Zone code"
 msgstr ""
 
@@ -36962,7 +37003,7 @@ msgstr ""
 msgid "pending"
 msgstr "En attente"
 
-#: app/templates/components/_sidebar_nav_categories.html:83
+#: app/templates/components/_sidebar_nav_categories.html:86
 msgid "pending access requests"
 msgstr "Demandes d’accès en attente"
 
@@ -38009,3 +38050,7 @@ msgstr "✓"
 # [Removed] was: app/templates/admin/projects/list.html:36
 #~ msgid "Reference or title"
 #~ msgstr ""
+
+# [Removed] was: app/templates/admin/plugin_management.html:84
+#~ msgid "Custom Fields"
+#~ msgstr "Custom Fields"

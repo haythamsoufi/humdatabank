@@ -892,6 +892,11 @@ def _update_plugin_fields(plugin_item, form, request_form):
             try:
                 plugin_config = json.loads(request_form['plugin_config'])
                 plugin_item.config['plugin_config'] = plugin_config
+                form_integration = getattr(current_app, 'form_integration', None)
+                if form_integration is not None and plugin_config:
+                    form_integration.log_invalid_field_config(
+                        str(plugin_item.item_type or '').replace('plugin_', '', 1), plugin_config
+                    )
             except (json.JSONDecodeError, TypeError):
                 current_app.logger.warning(f"Invalid plugin config JSON for {plugin_item.item_type}")
 

@@ -130,11 +130,9 @@ def _materialize_public_fdrs_file(document: SubmittedDocument) -> None:
     if not getattr(document, "fdrs_import_key", None) and not (document.source_url or "").strip():
         return
     try:
-        from plugins.fdrs.services.fdrs_document_fetch_service import (
-            try_materialize_public_fdrs_document,
-        )
-
-        try_materialize_public_fdrs_document(document)
+        manager = getattr(current_app, "plugin_manager", None)
+        if manager is not None:
+            manager.materialize_document(document)
     except Exception as exc:
         current_app.logger.warning(
             "Public display could not fetch FDRS file for document %s: %s",

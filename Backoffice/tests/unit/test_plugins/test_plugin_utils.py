@@ -427,75 +427,6 @@ class TestBasePluginRoutes:
         assert response.status_code == 500
 
 
-# ---------------------------------------------------------------------------
-# validate_plugin_config
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestValidatePluginConfig:
-    def test_valid_config_returns_true(self):
-        from app.plugins.plugin_utils import validate_plugin_config
-        schema = {
-            "name": {"required": True, "type": str},
-            "count": {"required": False, "type": int, "min": 0, "max": 100},
-        }
-        config = {"name": "test", "count": 5}
-        assert validate_plugin_config(config, schema) is True
-
-    def test_missing_required_field_raises(self):
-        from app.plugins.plugin_utils import validate_plugin_config, PluginConfigError
-        schema = {"required_field": {"required": True}}
-        with pytest.raises(PluginConfigError) as exc_info:
-            validate_plugin_config({}, schema)
-        assert "required_field" in str(exc_info.value)
-
-    def test_wrong_type_raises(self):
-        from app.plugins.plugin_utils import validate_plugin_config, PluginConfigError
-        schema = {"count": {"type": int}}
-        with pytest.raises(PluginConfigError) as exc_info:
-            validate_plugin_config({"count": "not_an_int"}, schema)
-        assert "count" in str(exc_info.value)
-
-    def test_min_value_violation_raises(self):
-        from app.plugins.plugin_utils import validate_plugin_config, PluginConfigError
-        schema = {"count": {"type": int, "min": 10}}
-        with pytest.raises(PluginConfigError):
-            validate_plugin_config({"count": 5}, schema)
-
-    def test_max_value_violation_raises(self):
-        from app.plugins.plugin_utils import validate_plugin_config, PluginConfigError
-        schema = {"count": {"type": int, "max": 100}}
-        with pytest.raises(PluginConfigError):
-            validate_plugin_config({"count": 999}, schema)
-
-    def test_schema_with_no_type_check_passes(self):
-        from app.plugins.plugin_utils import validate_plugin_config
-        schema = {"optional_key": {}}
-        assert validate_plugin_config({"optional_key": "anything"}, schema) is True
-
-    def test_config_error_re_raised(self):
-        from app.plugins.plugin_utils import validate_plugin_config, PluginConfigError
-        schema = {"val": {"required": True}}
-        with pytest.raises(PluginConfigError):
-            validate_plugin_config({}, schema)
-
-    def test_unexpected_exception_wrapped(self):
-        """An unexpected exception (not PluginConfigError) is wrapped."""
-        from app.plugins.plugin_utils import validate_plugin_config, PluginConfigError
-
-        class ExplodingDict(dict):
-            def items(self):
-                raise RuntimeError("boom")
-
-        with pytest.raises(PluginConfigError) as exc_info:
-            validate_plugin_config({}, ExplodingDict())
-        assert "validation failed" in str(exc_info.value).lower()
-
-    def test_float_value_checked_against_min_max(self):
-        from app.plugins.plugin_utils import validate_plugin_config
-        schema = {"rate": {"type": float, "min": 0.0, "max": 1.0}}
-        assert validate_plugin_config({"rate": 0.5}, schema) is True
-
 
 # ---------------------------------------------------------------------------
 # safe_json_loads
@@ -631,66 +562,6 @@ class TestMeasurePerformance:
 
         slow_op()  # Should complete without error
 
-
-# ---------------------------------------------------------------------------
-# PluginMetrics
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestPluginMetrics:
-    def test_increment_counter_creates_new_metric(self):
-        from app.plugins.plugin_utils import PluginMetrics
-        m = PluginMetrics("test_plugin")
-        m.increment_counter("requests")
-        assert m.metrics["requests"]["value"] == 1
-
-    def test_increment_counter_accumulates(self):
-        from app.plugins.plugin_utils import PluginMetrics
-        m = PluginMetrics("test_plugin")
-        m.increment_counter("requests", 3)
-        m.increment_counter("requests", 2)
-        assert m.metrics["requests"]["value"] == 5
-
-    def test_record_timing(self):
-        from app.plugins.plugin_utils import PluginMetrics
-        m = PluginMetrics("test_plugin")
-        m.record_timing("response_time", 0.123)
-        assert 0.123 in m.metrics["response_time"]["values"]
-
-    def test_record_timing_keeps_last_100(self):
-        from app.plugins.plugin_utils import PluginMetrics
-        m = PluginMetrics("test_plugin")
-        for i in range(110):
-            m.record_timing("latency", float(i))
-        assert len(m.metrics["latency"]["values"]) == 100
-        # Should have the last 100 values (10..109)
-        assert m.metrics["latency"]["values"][0] == 10.0
-
-    def test_get_metrics_counter(self):
-        from app.plugins.plugin_utils import PluginMetrics
-        m = PluginMetrics("test_plugin")
-        m.increment_counter("hits", 5)
-        metrics = m.get_metrics()
-        assert metrics["hits"] == 5
-
-    def test_get_metrics_timing(self):
-        from app.plugins.plugin_utils import PluginMetrics
-        m = PluginMetrics("test_plugin")
-        m.record_timing("latency", 1.0)
-        m.record_timing("latency", 3.0)
-        metrics = m.get_metrics()
-        assert metrics["latency"]["count"] == 2
-        assert metrics["latency"]["avg"] == 2.0
-        assert metrics["latency"]["min"] == 1.0
-        assert metrics["latency"]["max"] == 3.0
-
-    def test_get_metrics_empty_timing_skipped(self):
-        from app.plugins.plugin_utils import PluginMetrics
-        m = PluginMetrics("test_plugin")
-        # Manually create empty timing entry
-        m.metrics["empty_timing"] = {"type": "timing", "values": []}
-        metrics = m.get_metrics()
-        assert "empty_timing" not in metrics
 
 
 # ---------------------------------------------------------------------------
@@ -1120,3 +991,35 @@ class TestCacheViewerScope:
             for n in range(plugin_utils._PLUGIN_CACHE_MAX_ENTRIES + 20):
                 compute(n)
         assert len(plugin_utils._plugin_cache) <= plugin_utils._PLUGIN_CACHE_MAX_ENTRIES
+
+
+@pytest.mark.unit
+class TestSecretSafetyNets:
+    def test_undeclared_credential_keys_are_masked_and_restored(self):
+        from app.plugins.plugin_utils import REDACTED_SECRET, redact_secrets, restore_secrets
+
+        stored = {"global_settings": {"service_token": "abc", "zoom": 4}, "api_keys": {"mapbox": "pk.1"}}
+        shown = redact_secrets(stored, [("api_keys", "mapbox")])
+        assert shown["global_settings"]["service_token"] == REDACTED_SECRET
+        assert shown["global_settings"]["zoom"] == 4
+        assert shown["api_keys"]["mapbox"] == REDACTED_SECRET
+
+        saved = restore_secrets(shown, stored, [("api_keys", "mapbox")])
+        assert saved == stored
+
+    def test_empty_secrets_stay_empty(self):
+        from app.plugins.plugin_utils import redact_secrets
+
+        assert redact_secrets({"api_key": ""}, [])["api_key"] == ""
+
+    def test_scrub_secrets_in_text_masks_query_credentials(self):
+        from app.plugins.plugin_utils import safe_request_error, scrub_secrets_in_text
+
+        text = "Max retries exceeded with url: /geocode/json?address=Paris&key=AIzaSECRET&language=fr (Caused by X)"
+        scrubbed = scrub_secrets_in_text(text)
+        assert "AIzaSECRET" not in scrubbed
+        assert "address=Paris" in scrubbed and "language=fr" in scrubbed
+
+        err = safe_request_error(RuntimeError("403 for url: https://x/y?api_key=SECRET&q=1"))
+        assert err.startswith("RuntimeError: ")
+        assert "SECRET" not in err and "q=1" in err

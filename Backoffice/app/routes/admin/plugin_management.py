@@ -233,6 +233,26 @@ def get_plugin_info(plugin_name):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+_AUDIT_RISK = {'install': 'medium', 'activate': 'medium', 'deactivate': 'medium', 'uninstall': 'high', 'upload': 'high'}
+
+
+def _audit_plugin_action(action: str, plugin_id: str, **details) -> None:
+    """Record a plugin lifecycle change in the admin audit trail. Never raises."""
+    try:
+        from app.services.platform.user_analytics_service import log_admin_action
+
+        log_admin_action(
+            f'plugin_{action}',
+            f'Plugin {plugin_id}: {action}',
+            target_type='plugin',
+            target_description=plugin_id,
+            new_values={'plugin_id': plugin_id, **details},
+            risk_level=_AUDIT_RISK.get(action, 'medium'),
+        )
+    except Exception as exc:  # pragma: no cover - auditing must not break the action
+        current_app.logger.warning('Could not audit plugin %s of %s: %s', action, plugin_id, exc)
+
+
 def _run_lifecycle(action: str, plugin_name: str, past_tense: str):
     """Run a manager lifecycle action, turning refusals into 400s with a readable reason."""
     plugin_manager = current_app.plugin_manager
@@ -242,10 +262,11 @@ def _run_lifecycle(action: str, plugin_name: str, past_tense: str):
             return json_bad_request(reason)
     try:
         success = getattr(plugin_manager, f'{action}_plugin')(plugin_name)
-    except PluginLifecycleError:
-        return json_bad_request(f'Plugin {plugin_name} cannot be {action}d right now')
+    except PluginLifecycleError as exc:
+        return json_bad_request(str(exc))
 
     if success:
+        _audit_plugin_action(action, plugin_name)
         return json_ok(success=True, message=f'Plugin {plugin_name} {past_tense} successfully')
     return json_bad_request(f'Failed to {action} plugin {plugin_name}')
 
@@ -352,7 +373,7 @@ def get_plugin_cleanup_info(plugin_name):
         return json_ok(
             success=True,
             cleanup_info=cleanup_info,
-            first_party=plugin_manager.is_first_party(plugin_name),
+            first_party=plugin_manager.is_bundled(plugin_name),
             dependents=plugin_manager.get_dependents(plugin_name),
         )
     except Exception as e:
@@ -461,7 +482,7 @@ def _install_plugin_archive(zip_data: bytes, expected_name: Optional[str]) -> Tu
         return None, f'Plugin name mismatch. Expected {expected_name}, got {plugin_id}'
 
     plugin_manager = current_app.plugin_manager
-    if plugin_id in plugin_manager.plugins or plugin_manager.is_first_party(plugin_id):
+    if plugin_id in plugin_manager.plugins or plugin_manager.is_bundled(plugin_id):
         return None, f'Plugin {plugin_id} is already installed. Uninstall it before uploading a new version.'
 
     plugins_root = Path(plugin_manager.plugin_directories[-1]).resolve()
@@ -559,6 +580,7 @@ def _handle_plugin_upload(expected_name: Optional[str], field_name: str):
     if rejection:
         return json_bad_request(rejection)
 
+    _audit_plugin_action('upload', plugin_id, size_bytes=file_size, filename=plugin_file.filename)
     return json_ok(
         success=True,
         plugin_id=plugin_id,
@@ -660,6 +682,9 @@ def serve_plugin_static(plugin_name, filename):
                 status=404,
                 mimetype='text/plain'
             )
+
+        if current_app.config.get('PLUGIN_STATIC_REQUIRE_ACTIVE', True) and not plugin_manager.is_plugin_active(plugin_name):
+            return current_app.response_class("Not found", status=404, mimetype='text/plain')
 
         static_dir = Path(static_dir).resolve()
         joined = safe_join(str(static_dir), filename)

@@ -1,5 +1,5 @@
 from app.plugins.base import BasePlugin, BaseFieldType
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from flask import current_app
 from plugins.metadata import FirstPartyPluginMetadata
 
@@ -79,6 +79,10 @@ class EmergencyOperationsFieldType(BaseFieldType):
             ]
         }
 
+    def normalize_value(self, data: Dict[str, Any], config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """The field only displays loaded operations; nothing is stored."""
+        return None
+
     def validate_config(self, config: Dict[str, Any]) -> bool:
         try:
             max_items = config.get('max_items', 10)
@@ -117,6 +121,13 @@ class EmergencyOperationsPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def description(self) -> str:
         return "Provides a field type that lists active IFRC operations for a country using GO API"
+
+    def get_list_option_count(self, list_id: str, form_item: Any, aes: Any) -> Optional[int]:
+        if list_id != 'emergency_operations':
+            return None
+        from plugins.emergency_operations.option_count import option_count
+
+        return option_count(form_item, aes)
 
     def get_field_types(self) -> List[BaseFieldType]:
         return [EmergencyOperationsFieldType()]

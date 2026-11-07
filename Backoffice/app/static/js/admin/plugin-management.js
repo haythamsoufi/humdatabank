@@ -32,6 +32,18 @@
         );
     }
 
+    function renderPluginNotices(plugin) {
+        const notes = [];
+        if (plugin.bundled) {
+            notes.push(`<span class="text-xs text-gray-500">${escapeHtml(i18n.notice_bundled)}</span>`);
+        }
+        const missing = Array.isArray(plugin.inactive_optional_plugins) ? plugin.inactive_optional_plugins : [];
+        if (plugin.is_active && missing.length > 0) {
+            notes.push(`<span class="text-xs text-yellow-700">${escapeHtml(i18n.notice_optional_inactive)} ${escapeHtml(missing.join(', '))}</span>`);
+        }
+        return notes.length ? `<div class="mt-1 flex flex-col gap-0.5">${notes.join('')}</div>` : '';
+    }
+
     function findPluginById(pluginId) {
         return (Array.isArray(pluginsData) ? pluginsData : []).find(p => String(getPluginId(p)) === String(pluginId)) || null;
     }
@@ -231,6 +243,7 @@
                         <div class="ml-4 min-w-0 whitespace-normal break-words">
                             <div class="text-sm font-medium text-gray-900">${escapeHtml(displayName)}</div>
                             <div class="text-sm text-gray-500">${escapeHtml(plugin.description || '')}</div>
+                            ${renderPluginNotices(plugin)}
                         </div>
                     </div>
                 </td>
@@ -256,36 +269,36 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex space-x-2 plugin-actions" data-plugin-name="${escapeHtmlAttr(pluginId)}">
                         <button data-action="view-details"
-                                class="text-blue-600 hover:text-blue-900 inline-flex items-center justify-center" title="${i18n.title_view_details}">
+                                class="text-blue-600 hover:text-blue-900 inline-flex items-center justify-center" title="${i18n.title_view_details}" aria-label="${i18n.title_view_details}">
                             <i class="fas fa-eye text-base align-middle leading-none"></i>
                         </button>
                         ${plugin.has_settings ? `<button data-action="settings"
-                                class="text-green-600 hover:text-green-900 inline-flex items-center justify-center" title="${i18n.title_settings}">
+                                class="text-green-600 hover:text-green-900 inline-flex items-center justify-center" title="${i18n.title_settings}" aria-label="${i18n.title_settings}">
                             <i class="fas fa-cog text-base align-middle leading-none"></i>
-                        </button>` : `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${i18n.title_settings}" aria-disabled="true">
+                        </button>` : `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${i18n.title_settings}" aria-label="${i18n.title_settings}" aria-disabled="true">
                             <i class="fas fa-cog text-base align-middle leading-none"></i>
                         </span>`}
                         ${plugin.always_on ?
-                            `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${plugin.is_active ? i18n.title_deactivate : i18n.title_activate}" aria-disabled="true">
+                            `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${plugin.is_active ? i18n.title_deactivate : i18n.title_activate}" aria-label="${plugin.is_active ? i18n.title_deactivate : i18n.title_activate}" aria-disabled="true">
                                 <i class="fas ${plugin.is_active ? 'fa-pause' : 'fa-play'} text-base align-middle leading-none"></i>
                             </span>` : (plugin.is_active ?
                             `<button data-action="deactivate"
-                                     class="text-orange-600 hover:text-orange-900 inline-flex items-center justify-center" title="${i18n.title_deactivate}">
+                                     class="text-orange-600 hover:text-orange-900 inline-flex items-center justify-center" title="${i18n.title_deactivate}" aria-label="${i18n.title_deactivate}">
                                 <i class="fas fa-pause text-base align-middle leading-none"></i>
                             </button>` :
                             `<button data-action="activate"
-                                     class="text-green-600 hover:text-green-900 inline-flex items-center justify-center" title="${i18n.title_activate}">
+                                     class="text-green-600 hover:text-green-900 inline-flex items-center justify-center" title="${i18n.title_activate}" aria-label="${i18n.title_activate}">
                                 <i class="fas fa-play text-base align-middle leading-none"></i>
                             </button>`)
                         }
                         <button data-action="reload"
-                                class="text-yellow-600 hover:text-yellow-900 inline-flex items-center justify-center" title="${i18n.title_reload}">
+                                class="text-yellow-600 hover:text-yellow-900 inline-flex items-center justify-center" title="${i18n.title_reload}" aria-label="${i18n.title_reload}">
                             <i class="fas fa-sync-alt text-base align-middle leading-none"></i>
                         </button>
-                        ${plugin.first_party ? `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${i18n.title_uninstall}" aria-disabled="true">
+                        ${plugin.first_party ? `<span class="text-gray-300 cursor-not-allowed inline-flex items-center justify-center" title="${i18n.title_uninstall}" aria-label="${i18n.title_uninstall}" aria-disabled="true">
                             <i class="fas fa-trash text-base align-middle leading-none"></i>
                         </span>` : `<button data-action="uninstall"
-                                class="text-red-600 hover:text-red-900 inline-flex items-center justify-center" title="${i18n.title_uninstall}">
+                                class="text-red-600 hover:text-red-900 inline-flex items-center justify-center" title="${i18n.title_uninstall}" aria-label="${i18n.title_uninstall}">
                             <i class="fas fa-trash text-base align-middle leading-none"></i>
                         </button>`}
                     </div>
@@ -309,8 +322,7 @@
         }, 0);
         document.getElementById('field-types-count').textContent = totalFieldTypes;
 
-        // This would need to be calculated from actual form usage
-        document.getElementById('custom-fields-count').textContent = '--';
+        document.getElementById('inactive-plugins-count').textContent = pluginsData.filter(p => !p.is_active).length;
     }
 
     async function _reloadAllPlugins() {
@@ -469,6 +481,24 @@
                 </div>
         `;
 
+        const requires = Array.isArray(plugin.requires) ? plugin.requires : [];
+        const optional = Array.isArray(plugin.optional_plugins) ? plugin.optional_plugins : [];
+        const dependents = Array.isArray(plugin.dependents) ? plugin.dependents : [];
+        if (requires.length || optional.length || dependents.length) {
+            const line = (label, ids) => ids.length
+                ? `<p class="text-sm"><span class="font-medium">${label}</span> ${escapeHtml(ids.join(', '))}</p>` : '';
+            content += `
+                <div>
+                    <h4 class="font-medium text-gray-700">${i18n.details_relationships}</h4>
+                    <div class="bg-gray-50 p-3 rounded space-y-1">
+                        ${line(i18n.details_requires, requires)}
+                        ${line(i18n.details_optional, optional)}
+                        ${line(i18n.details_required_by, dependents)}
+                    </div>
+                </div>
+            `;
+        }
+
         // Add resource usage if available
         if (plugin.resource_usage) {
             content += `
@@ -555,14 +585,14 @@
                     showSuccess(i18n.success_plugin_activated.replace('%(plugin)s', displayName));
                     await loadPlugins();
                 } else {
-                    showError(data.message || i18n.error_failed_install);
+                    showError(data.message || i18n.error_failed_activate);
                 }
             } else {
-                showError(await serverMessage(response, i18n.error_failed_install));
+                showError(await serverMessage(response, i18n.error_failed_activate));
             }
         } catch (error) {
             console.error('Error activating plugin:', error);
-            showError(i18n.error_failed_install);
+            showError(i18n.error_failed_activate);
         } finally {
             showLoading(false);
         }
@@ -597,14 +627,14 @@
                     showSuccess(i18n.success_plugin_deactivated.replace('%(plugin)s', displayName));
                     await loadPlugins();
                 } else {
-                    showError(data.message || i18n.error_failed_install);
+                    showError(data.message || i18n.error_failed_deactivate);
                 }
             } else {
-                showError(await serverMessage(response, i18n.error_failed_install));
+                showError(await serverMessage(response, i18n.error_failed_deactivate));
             }
         } catch (error) {
             console.error('Error deactivating plugin:', error);
-            showError(i18n.error_failed_install);
+            showError(i18n.error_failed_deactivate);
         } finally {
             showLoading(false);
         }
@@ -686,6 +716,9 @@
                 <div>
                     <h4 class="font-medium text-gray-700 mb-2">${i18n.uninstall_what_removed}</h4>
                     <div class="space-y-3">
+                <div class="bg-gray-50 p-3 rounded">
+                    <p class="text-sm text-gray-600">${escapeHtml(i18n.uninstall_files_deleted)}</p>
+                </div>
         `;
 
         if (cleanupInfo.database_tables && cleanupInfo.database_tables.length > 0) {

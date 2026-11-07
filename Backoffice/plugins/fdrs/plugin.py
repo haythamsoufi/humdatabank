@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.plugins.base import BasePlugin, DataExplorerTabConfig, SeedPermission, SeedRole
+from app.plugins.base import BasePlugin, DataExplorerTabConfig, ScheduledJob, SeedPermission, SeedRole
 from plugins.metadata import FirstPartyPluginMetadata
 
 # Tabs that used to share admin.data_explore.analysis. Each one is its own
@@ -35,10 +35,43 @@ _SPLIT_ANALYSIS_TABS: tuple[tuple[str, str, str, str, int, str], ...] = (
 )
 
 
+def _refresh_public_export_snapshot() -> None:
+    from flask import current_app
+
+    from plugins.fdrs.services.fdrs_public_export_cache import build_public_export_snapshot
+
+    summary = build_public_export_snapshot()
+    current_app.logger.info(
+        "FDRS public export snapshot %s rows=%s societies=%s",
+        summary.get("snapshot_date"),
+        summary.get("row_count"),
+        len(summary.get("societies") or []),
+    )
+
+
 class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def plugin_id(self) -> str:
         return "fdrs"
+
+    def get_optional_plugins(self) -> list[str]:
+        return ["upr"]
+
+    def materialize_document(self, document):
+        from plugins.fdrs.services import fdrs_document_fetch_service as fetch
+
+        return fetch.try_materialize_public_fdrs_document(document)
+
+    def get_scheduled_jobs(self) -> list[ScheduledJob]:
+        return [
+            ScheduledJob(
+                job_id="fdrs_public_export_snapshot",
+                name="Rebuild the public FDRS CSV and Excel snapshot",
+                func=_refresh_public_export_snapshot,
+                trigger="cron",
+                trigger_args={"hour": 4, "minute": 15, "timezone": "UTC"},
+            )
+        ]
 
     @property
     def display_name(self) -> str:

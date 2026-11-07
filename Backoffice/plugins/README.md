@@ -31,9 +31,9 @@ Backoffice/plugins/
 - Must define custom field types that inherit from `BaseFieldType`
 - Must implement all required methods and properties
 
-### 2. `routes.py`
-- Must define a `create_blueprint()` function that returns a Flask Blueprint
-- Can contain plugin-specific API endpoints and routes
+### 2. `routes.py` (optional)
+- The manager only calls `BasePlugin.get_blueprint()` (and `get_additional_blueprints()`). `routes.py` is a convention: bundled plugins expose `create_blueprint()` there and return it from `get_blueprint()`.
+- Every route needs an auth decorator (`plugin_route_wrapper`, `plugin_admin_route_wrapper`, `login_required`, `permission_required`, ...). `tests/unit/test_plugins/test_plugin_route_access.py` fails for routes without one unless they are listed there on purpose.
 
 ### 3. Static Assets
 - **JavaScript files**: Must be in `static/js/` directory
@@ -66,7 +66,8 @@ def get_form_builder_config(self) -> Dict[str, Any]:
 def get_entry_form_config(self) -> Dict[str, Any]:
     return {
         'template': 'plugins/plugin_name/field.html',
-        'js_module': 'JavaScriptModuleName',
+        'es_module_path': '/plugins/static/plugin_name/js/field.js',
+        'es_module_class': 'JavaScriptClassName',
         'css_files': ['plugin_name/static/css/style.css'],
         'data_attributes': ['data-attr1', 'data-attr2']
     }
@@ -91,7 +92,9 @@ See `interactive_map/` for a complete example plugin implementation.
 
 For **org-specific admin tools** (Data Explorer tabs, custom report pipelines, etc.) that should be removable without editing core app code, use a **plugin** with optional admin hooks on `BasePlugin` — same `plugin.py` entry point as form-field plugins.
 
-- Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`, optional `get_data_explorer_tab()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`, `get_api_endpoints()` for Admin → API Management)
+- Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`). Hooks consumed by core: `get_field_types()`, `get_blueprint()` / `get_additional_blueprints()`, `get_data_explorer_tabs()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`, `get_api_endpoints()` (Admin → API Management), `get_embed_visuals()`, `get_assignment_badges()`, `get_national_society_columns()`, `get_entry_form_assets()`, `get_documentation_source()`, `register_validation_packs()`, `get_required_plugins()` / `get_optional_plugins()`, and the ones added for decoupling: `get_nav_items()` (sidebar links, shown only while active), `get_scheduled_jobs()` (APScheduler jobs, skipped while inactive), `get_ai_tools()` (`AiToolSet` for the AI assistant), `get_list_option_count()` (size of a plugin-owned lookup list, for completion rates) and `materialize_document()` (fetch a missing document file). CLI commands live in `plugins/<id>/cli.py` as `register_cli(app)`; they are discovered from the file system (`app/plugins/cli_discovery.py`) so they exist even when plugins are not loaded. `get_admin_menu_items()`, `get_models()` and `get_migrations()` are informational and not consumed.
+- Field types may override `normalize_value()` (what is stored; return `None` for display-only fields) and `validate_value()` (return an error message to reject a submission).
+- Core must not import from `plugins.*`: `tests/unit/test_plugins/test_core_plugin_boundary.py` holds a ratchet baseline that can only shrink. Add an extension point instead of a new import.
 - Discovery: `Backoffice/app/plugins/manager.py` scans `plugins/*/plugin.py`
 - Example: `ifrc/` (PPP embeds + P&B Visuals under `ifrc/pb_progress/`)
 - FDRS: `fdrs/` (backend-only data-api sync, documents, matrix validation, quality methodology)
@@ -117,12 +120,17 @@ Admin-feature plugins (`is_admin_feature()`) register via the admin-feature blue
 - State is shared between workers through the lifecycle `plugin_data` row; each request compares `updated_at` and reloads when it changed.
 - On first boot, if that row is missing and `instance/plugin_states.json` exists, its `active_plugin_ids` are imported once. Each `plugins/*/plugin_config.json` is imported into that plugin’s `plugin_data` row when no row exists yet (existing DB rows are never overwritten).
 - Declare plugins that must be active first with `get_required_plugins()`. Activation is refused while a requirement is missing or inactive, and a plugin that others require cannot be deactivated or uninstalled.
-- First-party plugins (`plugins/metadata.py::FIRST_PARTY_PLUGIN_IDS`, currently only `interactive_map`) cannot be uninstalled from the UI because that would delete tracked code. Other bundled plugins can be deactivated or uninstalled like uploads.
+- Bundled plugins (`plugins/metadata.py::BUNDLED_PLUGIN_IDS`: their code ships in the repository and core imports it) cannot be uninstalled, because that would delete tracked code. They can be deactivated unless another active plugin requires them. `FIRST_PARTY_PLUGIN_IDS` only drives author metadata.
+- `get_optional_plugins()` declares soft dependencies: the plugin works without them, and the management page warns while they are inactive. Required-dependency cycles are logged at load.
+- Activation state is re-read from the database at most every `PLUGIN_ACTIVATION_SYNC_TTL_SECONDS` seconds per worker (default 2; `0` checks on every request). Static assets of inactive plugins answer 404 unless `PLUGIN_STATIC_REQUIRE_ACTIVE=false`.
+- Optional settings: `PLUGIN_FIELD_CONFIG_ENFORCE=true` rejects invalid plugin field config on save (default: log only); `PLUGIN_SECRETS_KEY` encrypts secret-looking plugin settings (`api_key`, `token`, `password`, ...) at rest as `enc:v1:...` (default: off; plaintext keeps reading, losing the key makes encrypted values unreadable); `PLUGIN_LOGGER_OWN_HANDLER_ONLY=true` stops plugin loggers propagating to root handlers.
+- Uploaded plugins are written to the local `plugins/` folder of one instance only; with several instances they must be deployed with the image instead.
+- Install, uninstall, activate, deactivate and upload are recorded in the admin audit trail (`plugin_<action>`).
 - `update_settings()` returns `False` by default. Override it together with `supports_settings_update()` to expose a settings form.
 
 ### Secrets in plugin settings
 
-Pass `secret_paths` to `BasePluginRoutes` so API keys are replaced by a placeholder in responses and kept unchanged when the placeholder is posted back (`redact_secrets` / `restore_secrets` in `app/plugins/plugin_utils.py`).
+Pass `secret_paths` to `BasePluginRoutes` so API keys are replaced by a placeholder in responses and kept unchanged when the placeholder is posted back (`redact_secrets` / `restore_secrets` in `app/plugins/plugin_utils.py`). Keys whose name looks secret (`api_key`, `token`, `password`, ...) are masked even when not declared. Never log a request URL that carries a key; use `safe_request_error()`.
 
 ### Uploading plugins
 

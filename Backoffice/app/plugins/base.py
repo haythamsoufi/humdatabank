@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from flask import Blueprint
 
@@ -120,6 +120,67 @@ class SeedRole:
     permission_codes: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class NavItem:
+    """Sidebar link a plugin contributes. Shown only while the plugin is active.
+
+    ``section`` is the ``data-category`` of the sidebar block that hosts the link
+    (``"analytics-monitoring"`` today). ``permission`` is checked with
+    ``has_permission`` and bypassed for system managers; ``None`` means any signed-in
+    user. ``label`` is passed through gettext when rendered.
+    """
+
+    label: str
+    endpoint: str
+    section: str = "analytics-monitoring"
+    icon: str = "fas fa-puzzle-piece"
+    permission: Optional[str] = None
+    priority: int = 100
+
+
+@dataclass(frozen=True)
+class AiToolSet:
+    """AI assistant tools a plugin contributes.
+
+    ``specs`` are OpenAI-style tool definitions, ``functions`` maps tool name to the callable
+    that runs it, and ``is_available`` decides per request whether the specs are offered
+    (plugin active, user allowed, ...). The core registry still owns the method that the
+    agent loop invokes for each name and forwards the call to ``functions``.
+    """
+
+    specs: Sequence[Dict[str, Any]]
+    functions: Dict[str, Callable[..., Dict[str, Any]]]
+    is_available: Callable[[], bool] = lambda: True
+
+    @property
+    def names(self) -> frozenset:
+        return frozenset(spec["function"]["name"] for spec in self.specs)
+
+
+@dataclass(frozen=True)
+class ScheduledJob:
+    """Background job a plugin contributes to the core scheduler.
+
+    ``func`` takes no arguments and runs inside an application context. The
+    scheduler skips a run while the owning plugin is inactive, so plugins do not
+    need their own activation checks. ``trigger_args`` are the APScheduler
+    arguments for ``trigger`` (``"cron"`` or ``"interval"``), for example
+    ``{"hour": 4, "minute": 15, "timezone": "UTC"}``.
+    """
+
+    job_id: str
+    name: str
+    func: Callable[[], None]
+    trigger: str
+    trigger_args: Dict[str, Any] = field(default_factory=dict)
+
+
+_CLIENT_METADATA_KEYS = (
+    '_schema_version', '_plugin_type', '_processed_at',
+    'data_not_available', 'not_applicable', 'metadata',
+)
+
+
 class BaseFieldType(ABC):
     """Base class for custom field types that can be used in forms."""
 
@@ -193,6 +254,22 @@ class BaseFieldType(ABC):
             'js': [],
             'css': []
         }
+
+    def normalize_value(self, data: Dict[str, Any], config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Reduce a submitted JSON value to what should be stored.
+
+        Called by core for every entry of this field type before size limits and
+        schema checks. Return ``None`` to store nothing (a display-only field).
+        The default drops client-side bookkeeping keys.
+        """
+        cleaned = dict(data)
+        for key in _CLIENT_METADATA_KEYS:
+            cleaned.pop(key, None)
+        return cleaned
+
+    def validate_value(self, data: Dict[str, Any], config: Dict[str, Any]) -> Optional[str]:
+        """Return an error message when the normalized value must be rejected, else ``None``."""
+        return None
 
     def get_validation_rules(self) -> List[str]:
         """List of validation rule types this field supports"""
@@ -304,17 +381,18 @@ class BasePlugin(ABC):
     def get_additional_blueprints(self) -> List[Blueprint]:
         """Extra blueprints beyond get_blueprint(), for plugins that own more than one
         URL namespace (e.g. a dedicated wizard blueprint plus a legacy-redirect
-        blueprint). Registered the same way as get_blueprint() — for admin-feature
-        plugins, always on and not activation-gated.
+        blueprint). Registered the same way as get_blueprint(): registered at start and
+        answered with 404 while the plugin is inactive.
         """
         return []
 
     def get_admin_menu_items(self) -> List[Dict[str, Any]]:
-        """Return admin menu items if this plugin provides admin functionality"""
+        """Legacy hook, only reported in installation info and not rendered anywhere.
+        Use get_nav_items() to add a sidebar link."""
         return []
 
     def get_models(self) -> List[Any]:
-        """Return database models if this plugin provides any"""
+        """Informational only (installation info); the manager does not register models."""
         return []
 
     def get_lookup_lists(self) -> List[Dict[str, Any]]:
@@ -322,7 +400,7 @@ class BasePlugin(ABC):
         return []
 
     def get_migrations(self) -> List[str]:
-        """Return migration files if this plugin provides any"""
+        """Informational only (installation info); migrations live in the core Alembic tree."""
         return []
 
     def get_data_explorer_tab(self) -> Optional[DataExplorerTabConfig]:
@@ -366,6 +444,32 @@ class BasePlugin(ABC):
 
     def get_csp_overrides(self) -> List[CspOverride]:
         """CSP overrides for plugin-served HTML assets."""
+        return []
+
+    def get_list_option_count(self, list_id: str, form_item: Any, aes: Any) -> Optional[int]:
+        """Number of options in a plugin-owned lookup list for one assignment, or None when it
+        cannot be proven. Used so the completion rate can drop matrices whose list is certainly
+        empty; answer None when unsure."""
+        return None
+
+    def materialize_document(self, document: Any) -> tuple[bool, Optional[str]]:
+        """Fetch the file of an imported document that has no local copy yet.
+
+        Return ``(True, None)`` when the file is now stored, ``(False, message)`` to refuse with a
+        user-facing reason, and ``(False, None)`` when the document is not this plugin's concern.
+        """
+        return False, None
+
+    def get_ai_tools(self) -> Optional[AiToolSet]:
+        """Tools for the AI assistant (see AiToolSet), or None."""
+        return None
+
+    def get_nav_items(self) -> List[NavItem]:
+        """Sidebar links for the admin navigation (active plugins only)."""
+        return []
+
+    def get_scheduled_jobs(self) -> List[ScheduledJob]:
+        """Periodic background jobs for the core scheduler (run only while the plugin is active)."""
         return []
 
     def get_embed_visuals(self) -> List[EmbedVisual]:
@@ -427,6 +531,15 @@ class BasePlugin(ABC):
 
     def get_required_plugins(self) -> List[str]:
         """``plugin_id`` values of other plugins this plugin cannot work without."""
+        return []
+
+    def get_optional_plugins(self) -> List[str]:
+        """``plugin_id`` values of plugins this one imports code or data from but can run without.
+
+        Unlike ``get_required_plugins`` this never blocks activation or deactivation. The
+        management page warns when one of them is inactive, and the manager checks at load time
+        that the declared edges stay acyclic.
+        """
         return []
 
     def install(self) -> bool:

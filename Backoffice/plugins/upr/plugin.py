@@ -96,6 +96,9 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
     def plugin_id(self) -> str:
         return "upr"
 
+    def get_optional_plugins(self) -> list[str]:
+        return ["emergency_operations", "interactive_map"]
+
     @property
     def display_name(self) -> str:
         return "UPR"

@@ -17,6 +17,7 @@ from app.plugins.plugin_utils import (
     clear_plugin_cache,
     redact_secrets,
     REDACTED_SECRET,
+    safe_request_error,
 )
 from app.utils.rate_limiting import hit_rate_limit
 from app.utils.api_helpers import get_json_safe
@@ -307,7 +308,7 @@ def create_blueprint():
             current_app.logger.error("Geocoding request timed out")
             return json_error('Geocoding request timed out. Please try again.', 504, success=False, error='Geocoding request timed out. Please try again.')
         except requests.exceptions.RequestException as e:
-            current_app.logger.error(f"Geocoding request error: {e}")
+            current_app.logger.error("Geocoding request error: %s", safe_request_error(e))
             return json_error('Failed to connect to geocoding service', 503, success=False, error='Failed to connect to geocoding service')
         except Exception as e:
             current_app.logger.error(f"Geocoding error: {e}", exc_info=True)

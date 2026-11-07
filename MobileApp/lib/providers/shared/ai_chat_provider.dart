@@ -990,9 +990,12 @@ class AiChatProvider with ChangeNotifier {
     _wsStreamConversationId = _conversationId;
     final streamGeneration = _wsConnectionSession;
     var httpFallbackStarted = false;
+    var serverAcceptedStream = false;
+    var recoveryStarted = false;
 
-    // Any stream failure (HTTP status, network, proxy drop) retries once over the plain
-    // HTTP endpoint, which also renders the backend's error message when the failure is real.
+    // A stream failure before the server accepted the turn (HTTP status, network, proxy block)
+    // retries once over the plain HTTP endpoint, which also renders the backend's error message
+    // when the failure is real.
     Future<void> fallbackToHttp() async {
       if (httpFallbackStarted) return;
       httpFallbackStarted = true;
@@ -1009,6 +1012,23 @@ class AiChatProvider with ChangeNotifier {
         branchFromEdit: _wsBranchFromEdit,
         branchConversationHistory: _wsBranchConversationHistory,
       );
+    }
+
+    // Once the server sent `meta` it is running the agent with `keep_running_on_disconnect`,
+    // so a dropped connection must not re-submit the turn (that would start a second full run
+    // while the first is still working). Wait for the persisted reply instead; only re-send
+    // when the server finished without producing one.
+    Future<void> recoverOrFallbackToHttp() async {
+      final cid = _conversationId;
+      if (!serverAcceptedStream || !isAuthenticated || cid == null || cid.isEmpty) {
+        await fallbackToHttp();
+        return;
+      }
+      if (httpFallbackStarted || recoveryStarted) return;
+      recoveryStarted = true;
+      DebugLogger.logWarn('AI', 'SSE stream dropped after the server accepted the turn; waiting for the stored reply');
+      final recovered = await _recoverStreamedTurnFromServer(cid, streamGeneration);
+      if (!recovered) await fallbackToHttp();
     }
 
     final history = branchFromEdit && branchConversationHistory != null
@@ -1030,6 +1050,7 @@ class AiChatProvider with ChangeNotifier {
       (data) async {
         try {
           if (streamGeneration != _wsConnectionSession) return;
+          if (data['type'] == 'meta') serverAcceptedStream = true;
           // The stream worker reports any unclassified server exception as error_type "Error".
           // Retry those once over plain HTTP (the long-standing path) instead of surfacing a
           // generic failure; classified errors (quota, DLP, auth, timeout...) are shown as-is.
@@ -1051,8 +1072,8 @@ class AiChatProvider with ChangeNotifier {
           _wsUserCancelled = false;
           return;
         }
-        DebugLogger.logWarn('AI', 'SSE stream error, falling back to HTTP: $e');
-        await fallbackToHttp();
+        DebugLogger.logWarn('AI', 'SSE stream error: $e');
+        await recoverOrFallbackToHttp();
       },
       onDone: () async {
         if (streamGeneration != _wsConnectionSession) return;
@@ -1063,10 +1084,81 @@ class AiChatProvider with ChangeNotifier {
         // 'done' / 'error' envelopes clear [_isStreaming]; still streaming means the
         // connection ended without a final envelope.
         if (!_isStreaming) return;
-        DebugLogger.logWarn('AI', 'SSE stream ended before completion, falling back to HTTP');
-        await fallbackToHttp();
+        DebugLogger.logWarn('AI', 'SSE stream ended before completion');
+        await recoverOrFallbackToHttp();
       },
     );
+  }
+
+  /// Follows a server-side run that outlived its SSE connection until it persists its reply.
+  ///
+  /// Returns `false` only when the server confirms the run ended without an assistant reply
+  /// (so re-sending is the only way to get an answer). Returns `true` when the reply was loaded,
+  /// the user navigated away or cancelled, or the server could not be reached; in the last case
+  /// the composer is released without re-sending, since the run may still be going.
+  Future<bool> _recoverStreamedTurnFromServer(String conversationId, int generation) async {
+    bool superseded() =>
+        generation != _wsConnectionSession || _conversationId != conversationId;
+
+    var unreachable = 0;
+    for (var i = 0; i < 150; i++) {
+      if (superseded()) return true;
+      Map<String, dynamic> data;
+      try {
+        data = await _service.getConversation(conversationId);
+      } catch (_) {
+        if (++unreachable >= 5) break;
+        await Future.delayed(const Duration(seconds: 2));
+        continue;
+      }
+      if (superseded()) return true;
+      unreachable = 0;
+
+      Map<String, dynamic>? active;
+      final conv = data['conversation'];
+      if (conv is Map) {
+        final meta = conv['meta'];
+        if (meta is Map) {
+          final inf = meta['inflight'];
+          if (inf is Map && (inf['status']?.toString() ?? '') == 'in_progress') {
+            active = Map<String, dynamic>.from(inf);
+          }
+        }
+      }
+      if (active != null) {
+        _applyInflightSnapshot(active);
+        notifyListeners();
+        await Future.delayed(const Duration(seconds: 2));
+        continue;
+      }
+
+      await _syncConversationFromServer(conversationId);
+      if (superseded()) return true;
+      final stored = await _persistence.getConversationMessages(conversationId);
+      if (superseded()) return true;
+      final hasReply = stored.isNotEmpty &&
+          stored.last.role == 'assistant' &&
+          stored.last.content.trim().isNotEmpty;
+      if (!hasReply) return false;
+      _messages = stored;
+      _isStreaming = false;
+      _clearAgentProgress();
+      _streamStatusHint = null;
+      notifyListeners();
+      return true;
+    }
+
+    if (superseded()) return true;
+    if (_messages.isNotEmpty &&
+        _messages.last.role == 'assistant' &&
+        _messages.last.content.isEmpty) {
+      _messages.removeLast();
+    }
+    _isStreaming = false;
+    _clearAgentProgress();
+    _streamStatusHint = null;
+    notifyListeners();
+    return true;
   }
 
   Future<void> _runWebSocketStream({

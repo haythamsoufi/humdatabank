@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../config/api_timeouts.dart';
 import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
 import '../utils/sse_event_parser.dart';
@@ -113,6 +114,8 @@ class AiChatService {
         includeAuth: isAuthenticated, // Only require auth if user is authenticated
         body: body,
         additionalHeaders: headers.isEmpty ? null : headers,
+        retryable: false,
+        timeout: ApiTimeouts.aiChat,
       );
 
       // Token might be expired/invalid: refresh once then retry the request.
@@ -133,6 +136,8 @@ class AiChatService {
               includeAuth: isAuthenticated,
               body: body,
               additionalHeaders: {'Authorization': 'Bearer $refreshed'},
+              retryable: false,
+              timeout: ApiTimeouts.aiChat,
             );
             if (retryResp.statusCode == 200) {
               return _decodeChatSuccess(retryResp.body);
@@ -166,8 +171,9 @@ class AiChatService {
         return await doChatRequest(token: token);
       } catch (e) {
         lastError = e is Exception ? e : Exception(e.toString());
-        // Retry on network errors
-        if (attempt < maxRetries && (e.toString().contains('SocketException') || e.toString().contains('TimeoutException'))) {
+        // Only retry when the connection failed outright. A timeout means the server may still be
+        // running the agent for this turn; re-sending would start a duplicate full run.
+        if (attempt < maxRetries && e.toString().contains('SocketException')) {
           await Future.delayed(Duration(milliseconds: 1000 * (attempt + 1)));
           continue;
         }

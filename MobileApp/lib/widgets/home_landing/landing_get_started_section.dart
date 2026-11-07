@@ -698,13 +698,6 @@ class _OverviewBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FdrsGlobalTotalCard(
-          l10n: l10n,
-          locale: locale,
-          indicatorLabel: indicatorLabel,
-          data: data,
-        ),
-        const SizedBox(height: 12),
         FdrsMapModeToggle(
           l10n: l10n,
           mode: mapVisualMode,
@@ -805,6 +798,13 @@ class _OverviewBody extends StatelessWidget {
           FdrsChoroplethLegend(l10n: l10n, lowColor: low, highColor: high),
         ],
         const SizedBox(height: 16),
+        FdrsGlobalTotalCard(
+          l10n: l10n,
+          locale: locale,
+          indicatorLabel: indicatorLabel,
+          data: data,
+        ),
+        const SizedBox(height: 12),
         _OverviewTopCountriesBar(
           theme: theme,
           l10n: l10n,

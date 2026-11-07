@@ -352,7 +352,7 @@ jobs:
           cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
           # Create the IPA archive with alternate bundle identifier name
           cd build/ios/ipa
-          zip -r app-unsigned-ci.ipa Payload
+          zip -r databank.ipa Payload
           cd ../../..
 
       - name: Archive iOS build artifacts (device)

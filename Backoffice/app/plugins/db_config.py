@@ -13,6 +13,7 @@ from flask import current_app, g, has_app_context
 
 from app.extensions import db
 from app.models.plugin_data import PluginData
+from app.plugins.secret_store import decrypt_secrets, encrypt_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ class DbPluginConfig:
                 # One-time import of a pre-database plugin_config.json.
                 row = self._get_or_create_row(for_update=False)
         if row is not None:
-            stored = row.data if isinstance(row.data, dict) else {}
+            stored = decrypt_secrets(row.data) if isinstance(row.data, dict) else {}
             self.config = self._merge_with_defaults(stored)
         else:
             # Without a stored row or legacy file, reads serve defaults and never insert.
@@ -136,7 +137,7 @@ class DbPluginConfig:
 
         try:
             row = self._get_or_create_row(for_update=True)
-            row.data = copy.deepcopy(config)
+            row.data = encrypt_secrets(config)
             self.config = copy.deepcopy(config)
             db.session.commit()
             self._forget_memo()
@@ -164,10 +165,10 @@ class DbPluginConfig:
 
         try:
             row = self._get_or_create_row(for_update=True)
-            stored = row.data if isinstance(row.data, dict) else {}
+            stored = decrypt_secrets(row.data) if isinstance(row.data, dict) else {}
             config = self._merge_with_defaults(stored)
             change(config)
-            row.data = copy.deepcopy(config)
+            row.data = encrypt_secrets(config)
             self.config = copy.deepcopy(config)
             db.session.commit()
             self._forget_memo()

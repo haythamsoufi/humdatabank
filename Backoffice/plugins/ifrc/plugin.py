@@ -22,6 +22,11 @@ from plugins.ifrc.pb_progress.versions import (
     resolve_requested_version,
 )
 
+def _(message: str) -> str:
+    """Marks a string for catalog extraction; the sidebar translates it when rendering."""
+    return message
+
+
 _IFRC_EMBED_CSP = (
     "default-src 'self'; "
     "script-src 'self'; "
@@ -169,7 +174,7 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
     def get_nav_items(self) -> list[NavItem]:
         return [
             NavItem(
-                label="Decision Maker",
+                label=_("Decision Maker"),
                 endpoint="decisions.page_catalogue",
                 section="analytics-monitoring",
                 icon="fas fa-clipboard-check",

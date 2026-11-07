@@ -31,13 +31,7 @@ PLUGIN_MANAGE_PERMISSION = 'admin.plugins.manage'
 REDACTED_SECRET = '********'
 
 
-_SECRET_KEY_NAME_RE = re.compile(
-    r"(api[_-]?key|secret|token|password|passwd|credential|private[_-]?key)", re.IGNORECASE
-)
-
-
-def _is_secret_key(name: Any) -> bool:
-    return isinstance(name, str) and bool(_SECRET_KEY_NAME_RE.search(name))
+from app.plugins.secret_store import SECRET_KEY_NAME_RE as _SECRET_KEY_NAME_RE, is_secret_key as _is_secret_key
 
 
 def redact_secrets(config: Dict[str, Any], secret_paths) -> Dict[str, Any]:
@@ -346,6 +340,13 @@ def get_plugin_logger(plugin_name: str) -> logging.Logger:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         # Logger level will be controlled by __init__.py
+        # Records otherwise reach stdout twice (own handler + root). Off by default because root
+        # handlers may carry redaction filters; enable once the root handler set is known.
+        try:
+            if current_app.config.get('PLUGIN_LOGGER_OWN_HANDLER_ONLY', False):
+                logger.propagate = False
+        except RuntimeError:
+            pass
 
     return logger
 

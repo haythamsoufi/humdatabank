@@ -1,11 +1,4 @@
 {
-  "app/cli.py": {
-    "fdrs": 1,
-    "nsd_report_forms": 2
-  },
-  "app/cli_commands/fdrs_societies.py": {
-    "fdrs": 1
-  },
   "app/models/__init__.py": {
     "fdrs": 1
   },
@@ -15,9 +8,6 @@
   "app/routes/admin/ai_management.py": {
     "fdrs": 1,
     "upr": 1
-  },
-  "app/routes/admin/content_management.py": {
-    "fdrs": 1
   },
   "app/routes/admin/data_sync_imputation.py": {
     "fdrs": 5,
@@ -45,9 +35,6 @@
   "app/routes/excel.py": {
     "fdrs": 1,
     "upr": 1
-  },
-  "app/routes/public.py": {
-    "fdrs": 1
   },
   "app/services/ai/agent/executor.py": {
     "upr": 4
@@ -95,7 +82,6 @@
     "upr": 1
   },
   "app/services/ai/tools/registry.py": {
-    "ifrc": 3,
     "upr": 5
   },
   "app/services/ai/validation/assignment_review.py": {
@@ -106,9 +92,6 @@
   },
   "app/services/ai/validation/ui_payload.py": {
     "upr": 1
-  },
-  "app/services/assignments/completion_service.py": {
-    "emergency_operations": 3
   },
   "app/services/data_quality/methodologies/__init__.py": {
     "fdrs": 1
@@ -125,9 +108,6 @@
   },
   "app/services/public/document_service.py": {
     "upr": 2
-  },
-  "app/services/reports/font_faces.py": {
-    "ifrc": 1
   },
   "app/services/validation/dashboard_service.py": {
     "upr": 2

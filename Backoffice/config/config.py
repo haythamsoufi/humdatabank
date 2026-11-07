@@ -392,6 +392,22 @@ class Config:
         os.environ.get("PLUGIN_UPLOAD_ENABLED"), default=_flask_config in ("development", "testing")
     )
 
+    # Plugin runtime knobs (see plugins/README.md).
+    # Seconds a worker may reuse the plugin activation state before re-reading it (0 = every request).
+    try:
+        PLUGIN_ACTIVATION_SYNC_TTL_SECONDS = max(0.0, float(os.environ.get("PLUGIN_ACTIVATION_SYNC_TTL_SECONDS", "2")))
+    except ValueError:
+        PLUGIN_ACTIVATION_SYNC_TTL_SECONDS = 2.0
+    # Static assets of inactive plugins answer 404.
+    PLUGIN_STATIC_REQUIRE_ACTIVE = _parse_bool(os.environ.get("PLUGIN_STATIC_REQUIRE_ACTIVE"), default=True)
+    # Encrypts secret-looking values (api_key, token, password, ...) of plugin settings at rest.
+    # Fernet key or passphrase; unset keeps values as plain JSON. Do not lose it once set.
+    PLUGIN_SECRETS_KEY = os.environ.get("PLUGIN_SECRETS_KEY") or None
+    # Stop plugin loggers from also propagating to the root handlers (avoids duplicate stdout lines).
+    PLUGIN_LOGGER_OWN_HANDLER_ONLY = _parse_bool(os.environ.get("PLUGIN_LOGGER_OWN_HANDLER_ONLY"), default=False)
+    # Reject (instead of only logging) form-builder saves whose plugin field config fails validate_config.
+    PLUGIN_FIELD_CONFIG_ENFORCE = _parse_bool(os.environ.get("PLUGIN_FIELD_CONFIG_ENFORCE"), default=False)
+
     # Kept so an existing DEV_ACT_AS_EXTRA_EMAILS env var still parses. The local Act as
     # picker lists every active user and does not read this list.
     DEV_ACT_AS_EXTRA_EMAILS: list[str] = [

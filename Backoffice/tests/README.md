@@ -8,6 +8,17 @@ This directory contains all tests for the Humanitarian Databank Backoffice, cons
 tests/
 ├── conftest.py              # Shared fixtures and configuration
 ├── unit/                    # Unit tests (fast, no database)
+│   ├── test_app/            # App-root modules (bootstrap, seeding, scheduler, …)
+│   ├── test_services/
+│   ├── test_routes/
+│   ├── test_utils/
+│   ├── test_models/
+│   ├── test_middleware/
+│   ├── test_forms/
+│   ├── test_plugins/
+│   ├── test_scripts/
+│   ├── test_templates/
+│   └── test_reports/
 ├── integration/             # Integration tests (require database)
 │   ├── test_transaction_middleware.py
 │   ├── test_static_cache.py

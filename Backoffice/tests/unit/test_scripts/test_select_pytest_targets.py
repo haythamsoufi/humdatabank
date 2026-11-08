@@ -10,7 +10,7 @@ from scripts.ci.select_pytest_targets import (
     plan_pytest_run,
 )
 
-BACKOFFICE_ROOT = Path(__file__).resolve().parents[2]
+BACKOFFICE_ROOT = Path(__file__).resolve().parents[3]
 
 
 class TestPlanPytestRun:
@@ -41,7 +41,7 @@ class TestPlanPytestRun:
     def test_workflow_maps_to_selector_tests_only(self):
         plan = plan_pytest_run([WORKFLOW_PATH], BACKOFFICE_ROOT)
         assert plan.mode == "selected"
-        assert plan.targets == ("tests/unit/test_select_pytest_targets.py",)
+        assert plan.targets == ("tests/unit/test_scripts/test_select_pytest_targets.py",)
         assert plan.needs_render_libs is False
 
     def test_requirements_alone_skips(self):
@@ -56,7 +56,7 @@ class TestPlanPytestRun:
         assert plan.mode == "skip"
 
     def test_changed_test_file_is_selected(self):
-        rel = "tests/unit/test_select_pytest_targets.py"
+        rel = "tests/unit/test_scripts/test_select_pytest_targets.py"
         plan = plan_pytest_run([f"Backoffice/{rel}"], BACKOFFICE_ROOT)
         assert plan.mode == "selected"
         assert plan.targets == (rel,)

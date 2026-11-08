@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-BACKOFFICE_ROOT = Path(__file__).resolve().parents[2]
+BACKOFFICE_ROOT = Path(__file__).resolve().parents[3]
 CHECK_SCRIPT = BACKOFFICE_ROOT / "scripts" / "ci" / "check_unsafe_gettext_embedding.py"
 SCRIPT_TAG = re.compile(
     r"<script\b([^>]*)>(.*?)</script>",

@@ -27,7 +27,7 @@ BACKOFFICE_ROOT = SCRIPT_PATH.parents[2]
 REPO_ROOT = BACKOFFICE_ROOT.parent
 
 WORKFLOW_PATH = ".github/workflows/backoffice-ci.yml"
-SELECTOR_TEST = "tests/unit/test_select_pytest_targets.py"
+SELECTOR_TEST = "tests/unit/test_scripts/test_select_pytest_targets.py"
 
 IGNORE_SUFFIXES = frozenset(
     {
@@ -242,9 +242,9 @@ def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
         }
     hits.update(_plugin_targets(rel, root, test_files))
     if rel.startswith("scripts/") and not rel.startswith("scripts/ci/"):
-        layout = root / "tests" / "unit" / "test_scripts_layout.py"
+        layout = root / "tests" / "unit" / "test_scripts" / "test_scripts_layout.py"
         if layout.is_file():
-            hits.add("tests/unit/test_scripts_layout.py")
+            hits.add("tests/unit/test_scripts/test_scripts_layout.py")
     return hits
 
 

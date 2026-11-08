@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-BACKOFFICE_ROOT = Path(__file__).resolve().parents[2]
+BACKOFFICE_ROOT = Path(__file__).resolve().parents[3]
 SCRIPTS_ROOT = BACKOFFICE_ROOT / "scripts"
 
 # Modules the app imports via ``from scripts.<category>.<module> import …``.

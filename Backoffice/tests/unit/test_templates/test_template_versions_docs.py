@@ -7,7 +7,7 @@ import pytest
 
 pytestmark = [pytest.mark.unit]
 
-ADMIN_DOCS = Path(__file__).resolve().parents[2] / 'docs' / 'user-guides' / 'admin'
+ADMIN_DOCS = Path(__file__).resolve().parents[3] / 'docs' / 'user-guides' / 'admin'
 LANGUAGES = ('', '.fr', '.es', '.ar', '.ru')
 GUIDES_REFERENCING_IT = (
     'edit-template',

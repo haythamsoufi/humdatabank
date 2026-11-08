@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-BACKOFFICE = Path(__file__).resolve().parents[2]
+BACKOFFICE = Path(__file__).resolve().parents[3]
 START_SSH = BACKOFFICE / "docker" / "start-ssh.sh"
 PROFILE = BACKOFFICE / "docker" / "azure-ssh-profile.sh"
 SSHD_CONFIG = BACKOFFICE / "sshd_config"

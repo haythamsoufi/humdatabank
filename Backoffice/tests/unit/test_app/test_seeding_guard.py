@@ -13,7 +13,7 @@ import pytest
 
 from app.seeding import create_default_data, dev_seeding_refusal_reason
 
-BACKOFFICE = Path(__file__).resolve().parents[2]
+BACKOFFICE = Path(__file__).resolve().parents[3]
 LOCAL_URL = "postgresql+psycopg2://app:pw@localhost:5432/db"
 
 

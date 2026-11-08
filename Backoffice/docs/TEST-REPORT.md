@@ -44,7 +44,7 @@ Re-run the full suite and regenerate `test_results.xml` / `coverage.xml` to conf
 
 | Module | Tests | Type | Priority | Covers |
 |--------|------:|------|:--------:|--------|
-| `tests/unit/test_ai_fastpaths.py` | 7 | Unit | P0 | Package re-export integrity; `run_unified_plans_focus_fastpath` query gating, tool availability, mocked success path |
+| `tests/unit/test_services/test_ai_fastpaths.py` | 7 | Unit | P0 | Package re-export integrity; `run_unified_plans_focus_fastpath` query gating, tool availability, mocked success path |
 | `tests/unit/test_upr.py` | 60 | Unit | P0 | `query_prefers_upr_documents`, `upr_kpi_applicable`, `upr_document_label`, `upr_suggestion_reason`, `format_ifrc_upr_extraction`, `_parse_int_number` |
 | `tests/unit/test_services/test_ai_tools_utils.py` | 44 | Unit | P1 | `ToolExecutionError`, `json_sanitize`, `truncate_json_value`, `tool_wrapper`, `apply_document_source_filters`, `rewrite_document_search_query`, country inference |
 | `tests/unit/test_services/test_fdrs_matrix.py` | 34 | Unit | P1 | `baseline_value`, `ytd_pct`, `threshold_exceeded`; `run_fdrs_matrix_rules` (death KPIs, non-zero, branches>units, fiscal year) |

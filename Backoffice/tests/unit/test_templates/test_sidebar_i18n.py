@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polib
 
-_BACKOFFICE = Path(__file__).resolve().parents[2]
+_BACKOFFICE = Path(__file__).resolve().parents[3]
 _SIDEBAR = _BACKOFFICE / "app" / "templates" / "components" / "_sidebar_nav_categories.html"
 _CATALOG_LANGS = ("ar", "es", "fr", "hi", "ru", "zh")
 _REQUIRED_MSGIDS = ("AI System", "AI Dashboard")

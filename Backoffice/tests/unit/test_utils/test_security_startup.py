@@ -18,7 +18,7 @@ from app.utils.security_startup import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.auth_security]
 
-BACKOFFICE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+BACKOFFICE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 STRONG = "s" * 48
 
 

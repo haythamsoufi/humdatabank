@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 TEMPLATE = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "app" / "templates" / "forms" / "entry_form" / "partials" / "matrix_table.html"
 )
 

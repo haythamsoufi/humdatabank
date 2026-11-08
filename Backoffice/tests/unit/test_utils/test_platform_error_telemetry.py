@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-BACKOFFICE = Path(__file__).resolve().parents[2]
+BACKOFFICE = Path(__file__).resolve().parents[3]
 TELEMETRY_PY = BACKOFFICE / "app" / "utils" / "platform_error_telemetry.py"
 
 

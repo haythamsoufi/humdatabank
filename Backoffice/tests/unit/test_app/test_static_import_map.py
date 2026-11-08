@@ -11,7 +11,7 @@ from app.static_import_map import (
     forms_module_import_map,
 )
 
-BACKOFFICE = Path(__file__).resolve().parents[2]
+BACKOFFICE = Path(__file__).resolve().parents[3]
 FORM_BUILDER_TEMPLATE = BACKOFFICE / "app" / "templates" / "forms" / "form_builder" / "form_builder.html"
 
 

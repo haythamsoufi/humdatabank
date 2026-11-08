@@ -170,7 +170,7 @@ FORMS_IMPORT_TREES = ("js/forms",) + LAYOUT_IMPORT_TREES
 
 # Modules imported by absolute /static/ path from inline <script type="module"> blocks
 # in templates/forms/form_builder/form_builder.html (not discoverable by scanning JS).
-# tests/unit/test_static_import_map.py keeps this list in sync with the template.
+# tests/unit/test_app/test_static_import_map.py keeps this list in sync with the template.
 FORM_BUILDER_TEMPLATE_MODULES = (
     "js/components/translation-modal.js",
     "js/components/translation-matrix.js",

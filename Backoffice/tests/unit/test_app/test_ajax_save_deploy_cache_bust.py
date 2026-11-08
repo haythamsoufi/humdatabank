@@ -16,7 +16,7 @@ import types
 from pathlib import Path
 from types import SimpleNamespace
 
-BACKOFFICE = Path(__file__).resolve().parents[2]
+BACKOFFICE = Path(__file__).resolve().parents[3]
 REPO_ROOT = BACKOFFICE.parent
 SW_PATH = BACKOFFICE / "app" / "static" / "js" / "sw.js"
 UPLOAD_SCRIPT = BACKOFFICE / "azure" / "upload-static-assets.sh"

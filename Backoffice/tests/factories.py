@@ -173,7 +173,7 @@ def create_test_admin(db_session, **kwargs):
         # `_grant()` below will happily "work" here (this test user gets
         # access) even though `flask rbac seed` would never create that
         # permission for a real user -- see
-        # tests/unit/test_rbac_catalog_completeness.py for the check that
+        # tests/unit/test_services/test_rbac_catalog_completeness.py for the check that
         # catches that class of drift against real route decorators.
         perm = db_session.query(RbacPermission).filter_by(code=code).first()
         if perm:

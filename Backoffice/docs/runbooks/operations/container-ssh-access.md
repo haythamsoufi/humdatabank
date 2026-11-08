@@ -74,7 +74,7 @@ docker run --rm -e ENABLE_SSH=true -e SSH_AUTH_MODE=key -e SSH_LISTEN_ADDRESS=0.
 ssh -p 2222 root@127.0.0.1
 ```
 
-Unit checks: `pytest tests/unit/test_container_hardening.py` (static assertions on the Dockerfile, `sshd_config`, entrypoint and profile script, plus `sshd -t` when an sshd binary is available).
+Unit checks: `pytest tests/unit/test_app/test_container_hardening.py` (static assertions on the Dockerfile, `sshd_config`, entrypoint and profile script, plus `sshd -t` when an sshd binary is available).
 
 ## Upgrade notes
 

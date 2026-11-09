@@ -34,6 +34,10 @@ class Assignment {
   /// state changes on the server. Compared with the value saved with an offline copy.
   final String? dataVersion;
 
+  /// When false, the mobile app must not save or refresh this form for offline use.
+  /// Missing on older payloads, which keep the previous always-on behavior.
+  final bool enableOfflineDownload;
+
   Assignment({
     required this.id,
     required this.name,
@@ -57,6 +61,7 @@ class Assignment {
     this.templateId,
     this.staticVersion,
     this.dataVersion,
+    this.enableOfflineDownload = true,
   });
 
   factory Assignment.fromJson(Map<String, dynamic> json) {
@@ -104,6 +109,9 @@ class Assignment {
       templateId: (json['template_id'] as num?)?.toInt(),
       staticVersion: json['static_version']?.toString(),
       dataVersion: json['data_version']?.toString(),
+      enableOfflineDownload: json.containsKey('enable_offline_download')
+          ? json['enable_offline_download'] == true
+          : true,
     );
   }
 
@@ -133,6 +141,7 @@ class Assignment {
       'template_id': templateId,
       'static_version': staticVersion,
       'data_version': dataVersion,
+      'enable_offline_download': enableOfflineDownload,
     };
   }
 

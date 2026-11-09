@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../config/app_config.dart';
 import '../config/fdrs_constants.dart';
 import 'api_service.dart';
+import 'offline_cache_service.dart';
 import '../di/service_locator.dart';
 
 /// Which indicator the home map shows: a headline indicator bank row, or a
@@ -148,13 +149,14 @@ class GlobalOverviewDataService {
 
   /// Distinct FDRS period names, newest first.
   ///
-  /// Public endpoint — no authentication required.
+  /// Public endpoint — no authentication required. The response is cached so
+  /// the home map can open offline; a later online load replaces it.
   Future<List<String>> listFdrsPeriods() async {
     final resp = await _api.get(
       AppConfig.mobileFdrsPeriodsEndpoint,
       queryParams: {'template_id': '${FdrsConstants.templateId}'},
       includeAuth: false,
-      useCache: false,
+      cacheTtl: OfflineCacheService.publicBrowseTtl,
     );
     if (resp.statusCode != 200) return [];
     final body = jsonDecode(resp.body);
@@ -180,7 +182,7 @@ class GlobalOverviewDataService {
           'locale': locale,
         },
         includeAuth: false,
-        useCache: false,
+        cacheTtl: OfflineCacheService.publicBrowseTtl,
       );
       if (resp.statusCode != 200) return [];
       return parseReachSectors(jsonDecode(resp.body));
@@ -235,7 +237,7 @@ class GlobalOverviewDataService {
       queryParams: qp,
       includeAuth: false,
       timeout: const Duration(seconds: 30),
-      useCache: false,
+      cacheTtl: OfflineCacheService.publicBrowseTtl,
     );
 
     if (resp.statusCode != 200) {

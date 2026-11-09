@@ -98,7 +98,11 @@ def _apply_role_type_and_implications(
     _log.debug("[_apply_role_type] normalized_role_type=%s", normalized_role_type)
 
     _FOCAL_POINT_ASSIGNMENT_CODES = frozenset(
-        {"assignment_viewer", "assignment_editor_submitter"}
+        {
+            "assignment_viewer",
+            "assignment_editor_submitter",
+            "assignment_documents_uploader",
+        }
     )
 
     required_codes: list[str] = []
@@ -183,7 +187,6 @@ def _selected_role_type_for_rerender(form) -> str | None:
         form.rbac_roles.data = _apply_role_type_and_implications(
             list(form.rbac_roles.data or []),
             role_type="focal_point",
-            drop_role_codes={"assignment_documents_uploader"},
         )
     return raw
 

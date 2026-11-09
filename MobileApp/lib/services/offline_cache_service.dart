@@ -60,6 +60,10 @@ class OfflineCacheService {
   static const String _tableName = 'api_cache';
   static const Duration _defaultTtl = Duration(hours: 1);
 
+  /// Country list, country profile, and the home map. Online loads refresh
+  /// this; offline loads may still read an older copy.
+  static const Duration publicBrowseTtl = Duration(days: 30);
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -125,8 +129,50 @@ class OfflineCacheService {
     }
   }
 
-  /// Get cached response if available and not expired
-  Future<CachedResponse?> getCachedResponse(String key) async {
+  /// Write many cache rows in one transaction.
+  Future<void> cacheResponses(
+    List<({String key, String data})> entries, {
+    Duration? ttl,
+  }) async {
+    if (entries.isEmpty) return;
+    try {
+      final db = await database;
+      final batch = db.batch();
+      final cachedAt = DateTime.now().toIso8601String();
+      final ttlSeconds = (ttl ?? _defaultTtl).inSeconds;
+      for (final entry in entries) {
+        batch.insert(
+          _tableName,
+          {
+            'key': entry.key,
+            'data': entry.data,
+            'cached_at': cachedAt,
+            'ttl_seconds': ttlSeconds,
+            'headers': null,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+      DebugLogger.logInfo(
+        'OFFLINE_CACHE',
+        'Cached ${entries.length} responses',
+      );
+    } catch (e, stackTrace) {
+      DebugLogger.logError('Failed to cache responses: $e');
+      DebugLogger.logError('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Get a cached response.
+  ///
+  /// Expired entries are deleted unless [allowExpired] is set. Offline reads
+  /// pass [allowExpired] so the last successful payload is still shown after
+  /// the TTL.
+  Future<CachedResponse?> getCachedResponse(
+    String key, {
+    bool allowExpired = false,
+  }) async {
     try {
       final db = await database;
       final maps = await db.query(
@@ -141,15 +187,17 @@ class OfflineCacheService {
 
       final cache = CachedResponse.fromMap(maps.first);
 
-      if (cache.isExpired) {
-        // Remove expired cache
+      if (cache.isExpired && !allowExpired) {
         await db.delete(_tableName, where: 'key = ?', whereArgs: [key]);
         DebugLogger.logInfo(
             'OFFLINE_CACHE', 'Expired cache removed for key: $key');
         return null;
       }
 
-      DebugLogger.logInfo('OFFLINE_CACHE', 'Cache hit for key: $key');
+      DebugLogger.logInfo(
+        'OFFLINE_CACHE',
+        cache.isExpired ? 'Serving expired cache for key: $key' : 'Cache hit for key: $key',
+      );
       return cache;
     } catch (e, stackTrace) {
       DebugLogger.logError('Failed to get cached response: $e');
@@ -196,12 +244,25 @@ class OfflineCacheService {
     }
   }
 
-  /// Clear all caches
-  Future<void> clearAll() async {
+  /// Clear cached API responses.
+  ///
+  /// [keepPublic] leaves `public::` entries (country list, profiles, home map)
+  /// so those screens still open after logout.
+  Future<void> clearAll({bool keepPublic = false}) async {
     try {
       final db = await database;
-      await db.delete(_tableName);
-      DebugLogger.logInfo('OFFLINE_CACHE', 'Cleared all caches');
+      if (keepPublic) {
+        await db.delete(
+          _tableName,
+          where: "key NOT LIKE 'public::%'",
+        );
+      } else {
+        await db.delete(_tableName);
+      }
+      DebugLogger.logInfo(
+        'OFFLINE_CACHE',
+        keepPublic ? 'Cleared non-public caches' : 'Cleared all caches',
+      );
     } catch (e, stackTrace) {
       DebugLogger.logError('Failed to clear all caches: $e');
       DebugLogger.logError('Stack trace: $stackTrace');

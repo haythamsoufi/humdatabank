@@ -139,6 +139,9 @@ function isNetworkFailure(error) {
 }
 
 async function handleSessionExpired() {
+    if (window.__IFRC_OFFLINE_BUNDLE) {
+        throw new Error('Offline');
+    }
     if (window.__ifrcAuthDrafts && typeof window.__ifrcAuthDrafts.saveNow === 'function') {
         try { await window.__ifrcAuthDrafts.saveNow(); } catch (_) { /* best-effort */ }
     }

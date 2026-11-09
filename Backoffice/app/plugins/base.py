@@ -497,7 +497,7 @@ class BasePlugin(ABC):
         """Public/admin API routes this plugin owns, for Admin → API Management.
 
         Each dict matches ``EXTERNAL_API_REGISTRY`` rows in
-        ``app/routes/admin/api_management.py`` (``path``, ``methods``, ``auth``,
+        ``app/routes/admin/api_registry.py`` (``path``, ``methods``, ``auth``,
         ``group``, ``description``, optional ``rate_limited`` / ``consumers`` /
         ``featured``). ``PluginManager.get_api_endpoints()`` merges these into
         the live registry so plugin routes are documented rather than flagged

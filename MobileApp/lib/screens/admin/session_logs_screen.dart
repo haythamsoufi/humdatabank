@@ -12,6 +12,7 @@ import '../../widgets/admin_filter_panel.dart';
 import '../../theme/grouped_sheet_style.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_fade_in_up.dart';
 import '../../widgets/shared/elevated_list_card.dart';
 import '../../config/routes.dart';
@@ -234,6 +235,7 @@ class _SessionLogsScreenState extends State<SessionLogsScreen>
     final provider = context.watch<SessionLogsProvider>();
 
     return Scaffold(
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       appBar: AppAppBar(
         title: loc.sessionLogsTitle,
         actions: [

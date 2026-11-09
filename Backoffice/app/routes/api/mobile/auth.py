@@ -443,19 +443,23 @@ def mobile_profile():
     rbac_roles = [{'code': code} for code in role_codes if code]
     access = AuthorizationService.access_level(user)
 
-    return mobile_ok(data={
-        'user': {
-            'id': user.id,
-            'email': user.email,
-            'name': user.name,
-            'title': user.title,
-            'chatbot_enabled': getattr(user, 'chatbot_enabled', False),
-            'profile_color': getattr(user, 'profile_color', '#3B82F6'),
-            'active': user.is_active,
-            'rbac_roles': rbac_roles,
-            'role': access,
-        },
-    })
+    from app.services.documents.entity_document_edit import can_use_entity_document_repository
+    from app.services.platform.app_settings_service import ai_beta_client_flags
+
+    user_payload = {
+        'id': user.id,
+        'email': user.email,
+        'name': user.name,
+        'title': user.title,
+        'chatbot_enabled': getattr(user, 'chatbot_enabled', False),
+        'profile_color': getattr(user, 'profile_color', '#3B82F6'),
+        'active': user.is_active,
+        'rbac_roles': rbac_roles,
+        'role': access,
+        'can_open_entity_documents': can_use_entity_document_repository(user),
+    }
+    user_payload.update(ai_beta_client_flags(user))
+    return mobile_ok(data={'user': user_payload})
 
 
 @mobile_bp.route('/auth/profile', methods=['PUT', 'PATCH'])

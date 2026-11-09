@@ -322,6 +322,8 @@ class AppConfig {
 
   /// Focal-point home: assignments + entities (same payload as legacy GET /api/v1/dashboard).
   static const String mobileUserDashboardEndpoint = '$mobileApiPrefix/user/dashboard';
+  static const String mobileEntityDocumentsEndpoint =
+      '$mobileApiPrefix/user/entity-documents';
   static const String mobileDashboardActivityEndpoint = '$mobileApiPrefix/admin/analytics/dashboard-activity';
   static const String mobileLoginLogsEndpoint = '$mobileApiPrefix/admin/analytics/login-logs';
   static const String mobileSessionLogsEndpoint = '$mobileApiPrefix/admin/analytics/session-logs';
@@ -391,6 +393,11 @@ class AppConfig {
   static const String mobileFdrsOverviewEndpoint = '$mobileApiPrefix/data/fdrs-overview';
   static const String mobileFdrsReachIndicatorsEndpoint =
       '$mobileApiPrefix/data/fdrs-reach-indicators';
+  static const String mobileOfflineHomeEndpoint = '$mobileApiPrefix/data/offline-home';
+  static const String mobileOfflineCountriesEndpoint =
+      '$mobileApiPrefix/data/offline-countries';
+  /// Every country's GO document list in one payload (`data.by_country`).
+  static const String mobileGoDocumentsEndpoint = '$mobileApiPrefix/data/go-documents';
   static const String mobileDisaggregationOverviewEndpoint =
       '$mobileApiPrefix/data/disaggregation-overview';
   static const String mobileScreenViewEndpoint = '$mobileApiPrefix/analytics/screen-view';

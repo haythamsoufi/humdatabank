@@ -55,6 +55,8 @@ class TestCountrymap:
         assert status == 200
         countries = body.get_json()['data']['countries']
         assert isinstance(countries, list)
+        match = next(row for row in countries if row['iso3'] == 'CAA')
+        assert match['logo_url'].endswith('/CAA.png')
 
 
 # ---------------------------------------------------------------------------
@@ -579,6 +581,92 @@ class TestMobileCountryProfile:
         assert entry['series'] == [{'period': '2024', 'value': 40}]
         assert data['documents'] == []
         assert data['cover_images'] == []
+
+
+class TestMobileCountryGoDocuments:
+    def test_invalid_iso3_returns_400(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_go_documents
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/12/go-documents', method='GET',
+        ):
+            resp = mobile_country_go_documents('12')
+
+        _, status = _parse(resp)
+        assert status == 400
+
+    def test_unknown_country_returns_404(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_go_documents
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/ZZZ/go-documents', method='GET',
+        ):
+            resp = mobile_country_go_documents('ZZZ')
+
+        _, status = _parse(resp)
+        assert status == 404
+
+    def test_returns_go_documents(self, app, db_session, monkeypatch):
+        from app.routes.api.mobile.public_data import mobile_country_go_documents
+        from tests.factories import create_test_country
+
+        country = create_test_country(db_session, name="Go Land")
+        sample = [{
+            "title": "Go Land Floods",
+            "url": "https://go-api.ifrc.org/api/DownloadFile/1/MDRxx001ea",
+            "year": 2024,
+            "document_type": "Emergency Appeal",
+        }]
+        monkeypatch.setattr(
+            "plugins.fdrs.services.go_operation_documents.fetch_go_operation_documents",
+            lambda **kwargs: (sample, True),
+        )
+
+        with app.test_request_context(
+            f'/api/mobile/v1/data/country-profile/{country.iso3}/go-documents', method='GET',
+        ):
+            resp = mobile_country_go_documents(country.iso3)
+
+        body, status = _parse(resp)
+        assert status == 200
+        data = body.get_json()['data']
+        assert data['available'] is True
+        assert data['documents'] == sample
+
+
+class TestMobileCountryOperations:
+    def test_returns_operations(self, app, db_session, monkeypatch):
+        from app.routes.api.mobile.public_data import mobile_country_operations
+        from tests.factories import create_test_country
+
+        country = create_test_country(db_session, name="Ops Land")
+        sample = {
+            "summary": {
+                "active_drefs": 1,
+                "active_appeals": 0,
+                "people_targeted": 10,
+                "amount_requested": 100,
+                "amount_funded": 40,
+            },
+            "operations": [{"name": "Floods", "appeal_type": "DREF"}],
+        }
+        monkeypatch.setattr(
+            "plugins.fdrs.services.go_operations.fetch_operations",
+            lambda **kwargs: (sample, True),
+        )
+
+        with app.test_request_context(
+            f'/api/mobile/v1/data/country-profile/{country.iso3}/operations', method='GET',
+        ):
+            resp = mobile_country_operations(country.iso3)
+
+        body, status = _parse(resp)
+        assert status == 200
+        data = body.get_json()['data']
+        assert data['available'] is True
+        assert data['supported'] is True
+        assert data['summary']['active_drefs'] == 1
+        assert data['operations'][0]['name'] == "Floods"
 
 
 class TestMobileRegionProfile:

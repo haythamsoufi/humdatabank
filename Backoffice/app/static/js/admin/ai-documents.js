@@ -3320,6 +3320,7 @@ function mapIfrcDocumentToRow(doc, importedSet) {
         title: doc.title || doc.base_filename || '',
         type: doc.type || '',
         year: doc.year != null && doc.year !== '' ? String(doc.year) : '',
+        date: doc.date ? String(doc.date).substring(0, 10) : '',
         country_name: doc.country_name || '',
         country_code: doc.country_code || '',
         country_id: doc.country_id != null ? doc.country_id : null,
@@ -3416,6 +3417,24 @@ const ifrcDocumentsColumnDefs = [
             if (v === '' || v == null) return '<span class="text-xs text-gray-400">\u2014</span>';
             return '<span class="text-sm text-gray-700">' + escapeHtml(String(v)) + '</span>';
         }
+    },
+    {
+        field: 'date',
+        headerName: cfg.t.date_4e8a1c90,
+        width: 130,
+        minWidth: 110,
+        maxWidth: 160,
+        filter: 'agDateColumnFilter',
+        filterParams: (typeof AgGridRenderers !== 'undefined' && AgGridRenderers.dateFilterParams)
+            ? AgGridRenderers.dateFilterParams
+            : undefined,
+        sortable: true,
+        cellRenderer: function(params) {
+            const v = params.value;
+            if (v === '' || v == null) return '<span class="text-xs text-gray-400">\u2014</span>';
+            return '<span class="text-sm text-gray-700">' + escapeHtml(String(v).substring(0, 10)) + '</span>';
+        },
+        cellStyle: { 'white-space': 'nowrap' }
     },
     {
         field: 'country_name',

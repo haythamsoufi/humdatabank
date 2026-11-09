@@ -1,8 +1,11 @@
 # ========== File: app/routes/public.py ==========
+from collections import OrderedDict
+from contextlib import suppress
 from pathlib import Path
+from threading import Lock
 from urllib.parse import urlparse
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify
+from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify, make_response
 from werkzeug.exceptions import HTTPException
 from app.models import db, Resource, SubmittedDocument
 from app.services.documents import public_access
@@ -19,6 +22,10 @@ from app.services.forms.processing_service import slugify_age_group
 bp = Blueprint("public", __name__)
 
 THUMBNAIL_SUBFOLDER_NAME = 'thumbnails'
+_PDF_THUMB_MAX_BYTES = 25 * 1024 * 1024
+_PDF_THUMB_CACHE: "OrderedDict[str, bytes]" = OrderedDict()
+_PDF_THUMB_LOCK = Lock()
+_PDF_THUMB_MAX_ENTRIES = 128
 
 _ALLOWED_CUSTOM_GPT_HOSTS = frozenset({'chatgpt.com', 'www.chatgpt.com'})
 
@@ -111,18 +118,104 @@ def _public_document_or_404(identifier) -> SubmittedDocument:
 
 
 def _stream_public_thumbnail(document: SubmittedDocument):
-    if not document.thumbnail_relative_path:
+    stored = _stored_thumbnail_response(document)
+    if stored is not None:
+        return stored
+    jpeg = _pdf_first_page_jpeg(document)
+    if not jpeg:
         abort(404)
+    response = make_response(jpeg)
+    response.headers["Content-Type"] = "image/jpeg"
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
 
+
+def _stored_thumbnail_response(document: SubmittedDocument):
+    if not document.thumbnail_relative_path:
+        return None
     thumb_cat = storage.submitted_document_rel_storage_category(document.thumbnail_relative_path)
     if not storage.exists(thumb_cat, document.thumbnail_relative_path):
-        abort(404)
-
+        return None
     return storage.stream_response(
         thumb_cat, document.thumbnail_relative_path,
         filename=os.path.basename(document.thumbnail_relative_path),
         as_attachment=False,
     )
+
+
+def _pdf_first_page_jpeg(document: SubmittedDocument) -> bytes | None:
+    """First page of a public PDF that has no stored thumbnail."""
+    if not (document.filename or "").lower().endswith(".pdf"):
+        return None
+    cache_key = f"{document.public_id}:{document.storage_path}"
+    with _PDF_THUMB_LOCK:
+        cached = _PDF_THUMB_CACHE.get(cache_key)
+        if cached is not None:
+            _PDF_THUMB_CACHE.move_to_end(cache_key)
+            return cached
+    pdf_bytes = _submitted_pdf_bytes(document)
+    if not pdf_bytes:
+        return None
+    jpeg = _render_pdf_jpeg(pdf_bytes)
+    if not jpeg:
+        return None
+    with _PDF_THUMB_LOCK:
+        _PDF_THUMB_CACHE[cache_key] = jpeg
+        _PDF_THUMB_CACHE.move_to_end(cache_key)
+        while len(_PDF_THUMB_CACHE) > _PDF_THUMB_MAX_ENTRIES:
+            _PDF_THUMB_CACHE.popitem(last=False)
+    return jpeg
+
+
+def _submitted_pdf_bytes(document: SubmittedDocument) -> bytes | None:
+    storage_path = (document.storage_path or "").strip()
+    if not storage_path or not storage.submitted_source_exists(storage_path):
+        _materialize_public_fdrs_file(document)
+        storage_path = (document.storage_path or "").strip()
+    if not storage_path or not storage.submitted_source_exists(storage_path):
+        return None
+    local_path, is_temp = storage.local_path_for_submitted_document_processing(storage_path)
+    if not local_path:
+        return None
+    try:
+        size = os.path.getsize(local_path)
+        if size <= 0 or size > _PDF_THUMB_MAX_BYTES:
+            return None
+        with open(local_path, "rb") as handle:
+            return handle.read()
+    except OSError as exc:
+        current_app.logger.warning("Public PDF thumbnail read failed: %s", exc)
+        return None
+    finally:
+        if is_temp:
+            with suppress(OSError):
+                os.remove(local_path)
+
+
+def _render_pdf_jpeg(pdf_bytes: bytes) -> bytes | None:
+    try:
+        import fitz
+    except ImportError:
+        current_app.logger.warning("Public PDF thumbnail skipped: PyMuPDF is not installed")
+        return None
+    doc = None
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if doc.page_count < 1:
+            return None
+        page = doc.load_page(0)
+        if page.rect.width <= 0:
+            return None
+        zoom = min(280.0 / float(page.rect.width), 2.5)
+        pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+        return pix.tobytes("jpeg", jpg_quality=82)
+    except Exception as exc:
+        current_app.logger.warning("Public PDF thumbnail render failed: %s", exc)
+        return None
+    finally:
+        if doc is not None:
+            with suppress(Exception):
+                doc.close()
 
 
 def _materialize_public_fdrs_file(document: SubmittedDocument) -> None:

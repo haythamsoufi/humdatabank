@@ -143,6 +143,41 @@ class TestNewAssignment:
         )
         assert resp.status_code in (200, 302)
 
+    def test_post_structured_period_fills_bounds(self, logged_in_client, db_session, app):
+        from datetime import date
+
+        from app.models.assignments import AssignedForm
+
+        cases = [
+            ("2027", date(2027, 1, 1), date(2027, 12, 31)),
+            ("2024-2025", date(2024, 1, 1), date(2025, 12, 31)),
+            ("Jan-Jun 2023", date(2023, 1, 1), date(2023, 6, 30)),
+            ("Mar 2026", date(2026, 3, 1), date(2026, 3, 31)),
+        ]
+        with patch("app.services.notification.core.notify_assignment_created"):
+            with app.app_context():
+                template = create_test_template(db_session)
+                template_id = template.id
+            for period_name, period_start, period_end in cases:
+                resp = logged_in_client.post(
+                    "/admin/assignments/new",
+                    data={
+                        "template_id": str(template_id),
+                        "period_name": period_name,
+                        "submit": "1",
+                    },
+                    follow_redirects=True,
+                )
+                assert resp.status_code in (200, 302)
+                with app.app_context():
+                    row = AssignedForm.query.filter_by(
+                        template_id=template_id,
+                        period_name=period_name,
+                    ).one()
+                    assert row.period_start == period_start
+                    assert row.period_end == period_end
+                    assert row.period_id is not None
+
     def test_post_with_published_template_no_entity(self, logged_in_client, db_session, app):
         with patch("app.services.notification.core.notify_assignment_created"):
             with app.app_context():
@@ -395,6 +430,8 @@ class TestAssignmentCopyConfig:
         assert 'id="copy-config-source"' in html
         assert "Annual copy source" in html
         assert "Copy Source Template" in html
+        assert 'name="enable_offline_download"' in html
+        assert "Allow offline download in the mobile app" in html
 
     def test_copy_config_payload(self, logged_in_client, db_session, app):
         from datetime import date
@@ -412,6 +449,7 @@ class TestAssignmentCopyConfig:
             assignment.enable_page_submission = True
             assignment.enable_export_excel = True
             assignment.enable_export_pdf = True
+            assignment.enable_offline_download = True
             assignment.expiry_date = date(2025, 12, 31)
             assignment.unique_token = "copy-config-token"
             assignment.is_public_active = True
@@ -437,6 +475,7 @@ class TestAssignmentCopyConfig:
         assert config["enable_page_submission"] is True
         assert config["enable_export_excel"] is True
         assert config["enable_export_pdf"] is True
+        assert config["enable_offline_download"] is True
         assert config["generate_public_url"] is True
         assert config["public_url_active"] is True
         assert country_id in config["country_ids"]
@@ -523,6 +562,8 @@ class TestEditAssignment:
         resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
         assert resp.status_code == 200
         html = resp.get_data(as_text=True)
+        assert 'id="assignment-offline-download-row"' in html
+        assert 'name="enable_offline_download"' in html
         assert 'id="entity-management-data"' in html
         marker = '<script type="application/json" id="entity-management-data">'
         start = html.find(marker)
@@ -569,6 +610,18 @@ class TestEditAssignment:
         assert 'id="assignment-status-overview"' in html
         assert 'id="assignment-status-chart"' in html
         assert "Status overview" in html
+        overview_tab = html.find('id="assignment-status-overview-tab"')
+        details_tab = html.find('id="assignment-details-tab"')
+        assert overview_tab != -1
+        assert overview_tab < details_tab
+        overview_btn = html[html.rfind("<button", 0, overview_tab): html.find("</button>", overview_tab)]
+        assert 'aria-selected="true"' in overview_btn
+        assert 'id="assignment-status-overview-panel"' in html
+        assert 'class="hidden"' not in html[
+            html.find('id="assignment-status-overview-panel"'): html.find(
+                ">", html.find('id="assignment-status-overview-panel"')
+            )
+        ]
 
     def test_new_assignment_hides_status_overview(self, logged_in_client):
         resp = logged_in_client.get("/admin/assignments/new")
@@ -599,6 +652,36 @@ class TestEditAssignment:
             follow_redirects=False,
         )
         assert resp.status_code in (200, 302)
+
+    def test_post_update_structured_period_fills_bounds(self, logged_in_client, db_session, app):
+        from datetime import date
+
+        from app.models.assignments import AssignedForm
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template
+            )
+            assignment_id = aes.assigned_form_id
+            template_id = template.id
+        resp = logged_in_client.post(
+            f"/admin/assignments/edit/{assignment_id}",
+            data={
+                "template_id": str(template_id),
+                "period_name": "Jan 2024-Mar 2025",
+                "submit": "1",
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code in (200, 302)
+        with app.app_context():
+            row = db_session.get(AssignedForm, assignment_id)
+            assert row.period_name == "Jan 2024-Mar 2025"
+            assert row.period_start == date(2024, 1, 1)
+            assert row.period_end == date(2025, 3, 31)
+            assert row.period_id is not None
 
     def test_get_shows_assignment_due_date_when_no_entity_has_one(
         self, logged_in_client, db_session, app

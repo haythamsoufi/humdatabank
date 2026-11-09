@@ -46,6 +46,7 @@ class CountryInfo {
   final String iso3;
   final String? region;
   final String? nationalSocietyName;
+  final String? logoUrl;
 
   const CountryInfo({
     required this.id,
@@ -54,6 +55,7 @@ class CountryInfo {
     this.iso2,
     this.region,
     this.nationalSocietyName,
+    this.logoUrl,
   });
 
   factory CountryInfo.fromJson(Map<String, dynamic> json) {
@@ -64,6 +66,7 @@ class CountryInfo {
       iso3: json['iso3']?.toString() ?? '',
       region: json['region']?.toString(),
       nationalSocietyName: json['national_society_name']?.toString(),
+      logoUrl: json['logo_url']?.toString(),
     );
   }
 }
@@ -158,6 +161,12 @@ class CountryDocument {
   final String? language;
   final String? languageCode;
 
+  /// Appeal or event name. Emergency documents are grouped by this.
+  final String? emergency;
+
+  /// Stable emergency id (appeal code, or ``event:<id>`` for situation reports).
+  final String? emergencyCode;
+
   const CountryDocument({
     required this.title,
     required this.url,
@@ -167,6 +176,8 @@ class CountryDocument {
     this.documentType,
     this.language,
     this.languageCode,
+    this.emergency,
+    this.emergencyCode,
   });
 
   factory CountryDocument.fromJson(Map<String, dynamic> json) {
@@ -182,10 +193,15 @@ class CountryDocument {
       documentType: json['document_type']?.toString(),
       language: _languageDisplayName(rawLanguage),
       languageCode: languageCode ?? rawLanguage,
+      emergency: _nonEmpty(json['emergency']),
+      emergencyCode: _nonEmpty(json['emergency_code']),
     );
   }
 
-  bool get isPdf => (filename ?? url).toLowerCase().endsWith('.pdf');
+  bool get isPdf {
+    final name = (filename ?? url).toLowerCase();
+    return name.endsWith('.pdf') || name.contains('/downloadfile/');
+  }
 
   bool get isImage {
     final name = (filename ?? url).toLowerCase();
@@ -208,6 +224,12 @@ const _languageNames = {
   'pt': 'Portuguese',
   'de': 'German',
 };
+
+String? _nonEmpty(Object? raw) {
+  final value = raw?.toString().trim();
+  if (value == null || value.isEmpty) return null;
+  return value;
+}
 
 String? _languageDisplayName(String? raw) {
   final value = raw?.trim();

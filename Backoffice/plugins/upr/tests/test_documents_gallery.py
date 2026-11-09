@@ -99,6 +99,36 @@ def test_parse_matches_mobile_catalogue_rules():
     assert haiti.published_at.year == 2024
 
 
+def test_catalogue_year_uses_appeals_date_when_title_has_no_year():
+    year, published = gallery.catalogue_year_and_date({
+        "AppealOrigType": "Emergency Appeal",
+        "AppealsName": "Kenya: Floods",
+        "AppealsDate": "2024-03-12T00:00:00Z",
+    })
+    assert year == 2024
+    assert published == "2024-03-12"
+
+
+def test_catalogue_title_year_wins_over_appeals_date():
+    year, published = gallery.catalogue_year_and_date({
+        "AppealOrigType": "INP_2023_KE",
+        "AppealsName": "Kenya Unified Plan",
+        "AppealsDate": "/Date(1710000000000)/",
+    })
+    assert year == 2023
+    assert published is not None
+    assert published.startswith("2024-")
+
+
+def test_catalogue_year_and_date_stay_empty_without_a_date():
+    year, published = gallery.catalogue_year_and_date({
+        "AppealsName": "Operations Update 3",
+        "AppealsDate": None,
+    })
+    assert year is None
+    assert published is None
+
+
 def test_filters_sort_and_fresh_window():
     older = _doc(
         url="https://go.ifrc.org/DownloadFile/2/old.pdf",

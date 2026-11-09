@@ -237,6 +237,13 @@ def _submitted_entry(document: SubmittedDocument) -> Optional[dict[str, Any]]:
     thumbnail = (document.thumbnail_source_url or "").strip() or None
     if document.thumbnail_relative_path:
         thumbnail = public_document_thumbnail_url(document, external=True)
+    elif (
+        document.storage_path
+        and not document.file_pending
+        and (document.filename or "").lower().endswith(".pdf")
+    ):
+        # No stored cover. The public thumbnail route renders the first page.
+        thumbnail = public_document_thumbnail_url(document, external=True)
     year = parse_period_year(document.period or "") or (
         document.uploaded_at.year if document.uploaded_at else None
     )
@@ -266,6 +273,53 @@ def country_documents(country_id: int) -> list[dict[str, Any]]:
         if entry is not None:
             documents.append(entry)
     return documents
+
+
+def public_documents_by_country() -> dict[int, list[dict[str, Any]]]:
+    """Public approved submitted documents grouped by every linked country.
+
+    A document is linked through its country column, its assignment entity, or
+    the extra country list. Newest uploads come first, matching
+    [country_documents].
+    """
+    rows = (
+        SubmittedDocument.query.options(
+            joinedload(SubmittedDocument.form_item),
+            joinedload(SubmittedDocument.assignment_entity_status),
+            joinedload(SubmittedDocument.countries),
+        )
+        .filter(SubmittedDocument.is_public.is_(True))
+        .order_by(SubmittedDocument.uploaded_at.desc(), SubmittedDocument.id.desc())
+        .all()
+    )
+    grouped: dict[int, list[dict[str, Any]]] = {}
+    seen: dict[int, set[int]] = {}
+    for document in rows:
+        if not is_public_and_approved(document):
+            continue
+        entry = _submitted_entry(document)
+        if entry is None:
+            continue
+        country_ids: set[int] = set()
+        if document.country_id:
+            country_ids.add(document.country_id)
+        assignment = document.assignment_entity_status
+        if (
+            assignment is not None
+            and assignment.entity_type == "country"
+            and assignment.entity_id
+        ):
+            country_ids.add(assignment.entity_id)
+        for country in document.countries or []:
+            if country.id:
+                country_ids.add(country.id)
+        for country_id in country_ids:
+            already = seen.setdefault(country_id, set())
+            if document.id in already:
+                continue
+            already.add(document.id)
+            grouped.setdefault(country_id, []).append(entry)
+    return grouped
 
 
 def society_documents(don_code: str) -> Optional[list[dict[str, Any]]]:

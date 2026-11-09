@@ -35,7 +35,6 @@ from app.utils.constants import (
 
 from app.routes.ai_documents import ai_docs_bp
 from app.routes.ai_documents.helpers import (
-    IFRC_APPEALS_TITLE_YEAR_RE,
     AI_DOCUMENTS_MANAGE_PERMISSIONS,
     _get_ifrc_basic_auth,
     _validate_ifrc_fetch_url,
@@ -46,6 +45,7 @@ from app.routes.ai_documents.helpers import (
 )
 from app.services.ai.ai_job_runner import job_cancel_requested, run_ai_job, signal_job_cancel
 from app.routes.ai_documents.upload import _process_document_sync, _run_import_process_in_thread
+from plugins.upr.documents.documents_gallery import catalogue_year_and_date
 
 logger = logging.getLogger(__name__)
 
@@ -563,15 +563,7 @@ def list_ifrc_api_documents():
             if type_filter and doc_type != type_filter:
                 continue
 
-            year = None
-            appeal_orig_type = (item.get('AppealOrigType') or '')
-            appeals_name = (item.get('AppealsName') or '')
-
-            year_match = IFRC_APPEALS_TITLE_YEAR_RE.search(
-                appeal_orig_type + ' ' + appeals_name
-            )
-            if year_match:
-                year = int(year_match.group(1))
+            year, published_date = catalogue_year_and_date(item)
 
             if year_filter:
                 try:
@@ -601,6 +593,7 @@ def list_ifrc_api_documents():
                 'title': (item.get('AppealsName') or ''),
                 'type': doc_type,
                 'year': year,
+                'date': published_date or '',
                 'appeals_type_id': appeals_type_id,
                 'country_code': location_country_code,
                 'country_name': _ifrc_display_country_name(
@@ -611,7 +604,6 @@ def list_ifrc_api_documents():
                 'country_id': country_info['id'] if country_info else None,
                 'region_code': (item.get('LocationRegionCode') or ''),
                 'region_name': (item.get('LocationRegionName') or ''),
-                'date': (item.get('AppealsDate') or ''),
                 'base_filename': base_filename
             })
 

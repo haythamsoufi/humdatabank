@@ -8,6 +8,7 @@ from app.models.assignments import AssignedForm, ReportingPeriod
 from app.services.forms.reporting_period_service import (
     backfill_assigned_forms_missing_period,
     dashboard_assignment_period_sort_key,
+    ensure_reporting_period_for_label,
     get_reporting_period,
     period_chronology_sort_key,
     resync_all_reporting_periods,
@@ -94,6 +95,28 @@ class TestSyncAssignedFormReportingPeriod:
             assert assigned_form.period_id is None
             assert assigned_form.period_start is None
             assert assigned_form.period_end is None
+
+    def test_picker_labels_create_catalog_and_fill_bounds(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            cases = [
+                ("2027", date(2027, 1, 1), date(2027, 12, 31)),
+                ("2024-2025", date(2024, 1, 1), date(2025, 12, 31)),
+                ("Jan-Jun 2023", date(2023, 1, 1), date(2023, 6, 30)),
+                ("Mar 2026", date(2026, 3, 1), date(2026, 3, 31)),
+            ]
+            for period_name, period_start, period_end in cases:
+                assigned_form = AssignedForm(template_id=template.id, period_name=period_name)
+                assert ensure_reporting_period_for_label(period_name) is not None
+                sync_assigned_form_reporting_period(assigned_form)
+                assert assigned_form.period_id is not None
+                assert assigned_form.period_start == period_start
+                assert assigned_form.period_end == period_end
+
+    def test_unstructured_label_does_not_create_catalog(self, db_session, app):
+        with app.app_context():
+            assert ensure_reporting_period_for_label("TestPeriod2024") is None
+            assert get_reporting_period("TestPeriod2024") is None
 
 
 class TestBackfillAssignedFormsMissingPeriod:

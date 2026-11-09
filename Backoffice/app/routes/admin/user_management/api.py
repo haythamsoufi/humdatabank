@@ -301,7 +301,6 @@ def api_user_update(user_id):
             requested_role_ids = _apply_role_type_and_implications(
                 requested_role_ids,
                 role_type=role_type,
-                drop_role_codes={"assignment_documents_uploader"},
             )
 
             if not requested_role_ids:

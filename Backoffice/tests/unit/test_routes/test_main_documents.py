@@ -38,6 +38,10 @@ def _focal_permissions(_user, permission, **_kwargs):
     return permission != "admin.documents.manage"
 
 
+def _focal_uploader_role(_user, role_code, **_kwargs):
+    return role_code == "assignment_documents_uploader"
+
+
 def _login(client, user):
     login_session(client, user.id)
 
@@ -117,6 +121,7 @@ class TestDocumentsSubmitNoEntities:
         _login(client, test_user)
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities", return_value=([], [], [])), \
              patch(_DOC_TYPES, return_value=["pdf"]):
             resp = client.get("/documents", follow_redirects=False)
@@ -135,6 +140,7 @@ class TestDocumentsSubmitNoSelectedEntity:
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=(mock_entity_list, [], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -156,6 +162,7 @@ class TestDocumentsSubmitRender:
         return [
             patch(f"{_AUTH_SVC}.is_system_manager", return_value=False),
             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions),
+            patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role),
             patch("app.routes.main.documents._build_user_nav_entities",
                   return_value=(entity_list, [country], ["country"])),
             patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -181,6 +188,7 @@ class TestDocumentsSubmitRender:
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -217,6 +225,7 @@ class TestDocumentsSubmitRender:
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=(entity_list, [country1, country2], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -239,7 +248,7 @@ class TestDocumentsSubmitRender:
         assert call_kwargs.get("show_entity_select") is True
 
     def test_entity_repo_label_set_for_single_entity(self, client, db_session, app, test_user):
-        """For single-entity users, documents_entity_repo_label should be set."""
+        """For single-entity users, documents_page_subtitle should show the entity in the page header."""
         country = create_test_country(db_session)
         _grant_entity_permission(db_session, test_user, "country", country.id)
         db_session.commit()
@@ -250,6 +259,7 @@ class TestDocumentsSubmitRender:
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -268,10 +278,10 @@ class TestDocumentsSubmitRender:
         assert resp.status_code == 200
         call_kwargs = mock_render.call_args[1]
         assert call_kwargs.get("show_entity_select") is False
-        assert call_kwargs.get("documents_entity_repo_label") is not None
+        assert call_kwargs.get("documents_page_subtitle") is not None
 
     def test_entity_repo_label_none_when_localized_name_raises(self, client, db_session, app, test_user):
-        """If EntityService.get_localized_entity_name raises, label should be None."""
+        """If EntityService.get_localized_entity_name raises, page subtitle should be None."""
         country = create_test_country(db_session)
         _grant_entity_permission(db_session, test_user, "country", country.id)
         db_session.commit()
@@ -282,6 +292,7 @@ class TestDocumentsSubmitRender:
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -299,7 +310,7 @@ class TestDocumentsSubmitRender:
 
         assert resp.status_code == 200
         call_kwargs = mock_render.call_args[1]
-        assert call_kwargs.get("documents_entity_repo_label") is None
+        assert call_kwargs.get("documents_page_subtitle") is None
 
 
 # ===========================================================================
@@ -313,6 +324,7 @@ class TestDocumentsSubmitPost:
         """Helper: applies auth + nav patches and POSTs to /documents."""
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch(_DOC_TYPES, return_value=["pdf"]), \
@@ -344,6 +356,7 @@ class TestDocumentsSubmitPost:
         mock_entity_dict = _make_mock_entity(country.id)
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
              patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch(f"{_AUTH_SVC}.has_role", side_effect=_focal_uploader_role), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch(_DOC_TYPES, return_value=["pdf"]), \

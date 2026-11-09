@@ -555,7 +555,7 @@ class AuthService {
         AppConfig.chatbotAiPolicyAcknowledgedKey,
       ]);
 
-      await OfflineCacheService().clearAll();
+      await OfflineCacheService().clearAll(keepPublic: true);
       await OfflineQueueService().clearAll();
       await AssignmentOfflineBundleService().clearAll();
       await AiChatPersistenceService().clearAllConversations();

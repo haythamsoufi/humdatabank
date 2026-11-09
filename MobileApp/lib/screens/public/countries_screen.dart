@@ -11,10 +11,13 @@ import '../../di/service_locator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/offline_cache_service.dart';
+import '../../services/public_browse_prefetch.dart';
 import '../../utils/constants.dart';
 import '../../utils/network_availability.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
 
@@ -27,6 +30,11 @@ class CountriesScreen extends StatefulWidget {
 
 class _CountriesScreenState extends State<CountriesScreen> {
   static const double _wideLayoutBreakpoint = 768;
+
+  /// Seeded sandbox countries. They exist for backoffice testing and are not
+  /// real National Societies, so they stay off the public list.
+  static const Set<String> _hiddenCountryNames = {'testland', 'testlantica'};
+  static const Set<String> _hiddenCountryIso3 = {'TST'};
 
   final ApiService _apiService = sl<ApiService>();
   final ScrollController _scrollController = ScrollController();
@@ -53,6 +61,16 @@ class _CountriesScreenState extends State<CountriesScreen> {
     super.dispose();
   }
 
+  static bool _isHiddenCountry(Map<String, dynamic> country) {
+    final iso3 = (country['iso3'] as String?)?.trim().toUpperCase();
+    if (iso3 != null && _hiddenCountryIso3.contains(iso3)) return true;
+    for (final key in ['name', 'localized_name']) {
+      final value = (country[key] as String?)?.trim().toLowerCase();
+      if (value != null && _hiddenCountryNames.contains(value)) return true;
+    }
+    return false;
+  }
+
   static String _displayName(Map<String, dynamic> country) {
     final localized = (country['localized_name'] as String?)?.trim();
     if (localized != null && localized.isNotEmpty) return localized;
@@ -60,23 +78,7 @@ class _CountriesScreenState extends State<CountriesScreen> {
     return (name != null && name.isNotEmpty) ? name : 'Unknown';
   }
 
-  static String? _displayNationalSociety(Map<String, dynamic> country) {
-    final localized =
-        (country['localized_national_society_name'] as String?)?.trim();
-    if (localized != null && localized.isNotEmpty) return localized;
-    final name = (country['national_society_name'] as String?)?.trim();
-    return (name != null && name.isNotEmpty) ? name : null;
-  }
-
   Future<void> _loadCountries({bool refresh = false}) async {
-    if (shouldDeferRemoteFetch) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
     if (!refresh) {
       setState(() {
         _isLoading = true;
@@ -88,13 +90,17 @@ class _CountriesScreenState extends State<CountriesScreen> {
       final languageProvider =
           Provider.of<LanguageProvider>(context, listen: false);
       final language = languageProvider.currentLanguage;
+      sl<PublicBrowsePrefetch>().warm(locale: language, force: refresh);
 
+      // ApiService stores this response and serves it when the device is
+      // offline or the backend cannot be reached.
       final response = await _apiService.get(
         AppConfig.mobileCountryMapEndpoint,
         queryParams: {
           'locale': language,
         },
         includeAuth: false,
+        cacheTtl: OfflineCacheService.publicBrowseTtl,
       );
 
       if (!mounted) return;
@@ -114,8 +120,10 @@ class _CountriesScreenState extends State<CountriesScreen> {
       } else {
         data = [];
       }
-      final List<Map<String, dynamic>> countries =
-          data.map((item) => item as Map<String, dynamic>).toList();
+      final List<Map<String, dynamic>> countries = data
+          .map((item) => item as Map<String, dynamic>)
+          .where((country) => !_isHiddenCountry(country))
+          .toList();
 
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final country in countries) {
@@ -211,6 +219,14 @@ class _CountriesScreenState extends State<CountriesScreen> {
     setState(() => _searchQuery = '');
   }
 
+  /// `true` when opened via [Navigator.pushNamed]; `false` inside the tab shell.
+  bool _isStandaloneScreen(BuildContext context) {
+    final routeName = ModalRoute.of(context)?.settings.name;
+    if (routeName == AppRoutes.countries) return true;
+    if (routeName == null || routeName == AppRoutes.dashboard) return false;
+    return Navigator.of(context).canPop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -219,6 +235,9 @@ class _CountriesScreenState extends State<CountriesScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppAppBar(title: localizations.countries),
+      bottomNavigationBar: _isStandaloneScreen(context)
+          ? AppBottomNavigationBar.shellTabBar
+          : null,
       body: _buildBody(context, localizations),
     );
   }
@@ -233,7 +252,9 @@ class _CountriesScreenState extends State<CountriesScreen> {
 
     if (_hasError) {
       return AppErrorState(
-        message: localizations.oopsSomethingWentWrong,
+        message: shouldDeferRemoteFetch
+            ? localizations.offlineNoInternet
+            : localizations.oopsSomethingWentWrong,
         showTitle: false,
         onRetry: _loadCountries,
         retryStyle: AppErrorRetryStyle.materialFilled,
@@ -408,15 +429,10 @@ class _CountriesScreenState extends State<CountriesScreen> {
     BuildContext context,
     AppLocalizations localizations,
   ) {
-    final theme = Theme.of(context);
     final filtered = _getFilteredCountries();
     final textScaler = MediaQuery.textScalerOf(context);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    // Two text lines for the country name, one for the national society.
-    final cardExtent = math.max(
-      76.0,
-      textScaler.scale(15) * 1.3 * 2 + textScaler.scale(12.5) * 1.3 + 28,
-    );
+    final nameExtent = _countryNameExtent(textScaler);
 
     return RefreshIndicator(
       color: Color(AppConstants.ifrcRed),
@@ -435,26 +451,6 @@ class _CountriesScreenState extends State<CountriesScreen> {
                   onTap: () => Navigator.of(context).pushNamed(
                     AppRoutes.regionDetail(_selectedRegion!),
                     arguments: _selectedRegion,
-                  ),
-                ),
-              ),
-            ),
-          if (filtered.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    _isSearching
-                        ? localizations.countriesCount(filtered.length)
-                        : '${_selectedRegion ?? ''} · '
-                            '${localizations.countriesCount(filtered.length)}',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                      color: context.textSecondaryColor,
-                    ),
                   ),
                 ),
               ),
@@ -494,19 +490,26 @@ class _CountriesScreenState extends State<CountriesScreen> {
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  mainAxisExtent: cardExtent,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
+                  mainAxisExtent: nameExtent,
+                  crossAxisSpacing: 0,
+                  mainAxisSpacing: 0,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final country = filtered[index];
                     final name = _displayName(country);
-                    final iso3 = country['iso3'] as String?;
-                    final nationalSociety = _displayNationalSociety(country);
-                    return _CountryCard(
+                    final rawIso3 = (country['iso3'] as String?)?.trim();
+                    final iso3 = (rawIso3 != null && rawIso3.isNotEmpty)
+                        ? rawIso3.toUpperCase()
+                        : null;
+                    return _CountryName(
                       name: name,
-                      subtitle: nationalSociety,
+                      showEndDivider:
+                          _countryGridShowsEndDivider(index, filtered.length),
+                      showBottomDivider: _countryGridShowsBottomDivider(
+                        index,
+                        filtered.length,
+                      ),
                       onTap: iso3 != null
                           ? () => _navigateToCountry(iso3, name)
                           : null,
@@ -522,6 +525,40 @@ class _CountriesScreenState extends State<CountriesScreen> {
   }
 }
 
+/// Two name lines plus vertical padding. Kept tall enough for a tap target.
+double _countryNameExtent(TextScaler textScaler) {
+  final name = textScaler.scale(15.5) * 1.3 * 2;
+  return math.max(52, name + 28);
+}
+
+/// Vertical rule only between the two columns, and only when both cells exist.
+bool _countryGridShowsEndDivider(int index, int count) =>
+    index.isEven && index + 1 < count;
+
+/// Horizontal rule between rows, not under the last row.
+bool _countryGridShowsBottomDivider(int index, int count) {
+  final lastRowStart = count - (count.isOdd ? 1 : 2);
+  return index < lastRowStart;
+}
+
+BoxDecoration _countryGridLines({
+  required Color color,
+  required bool showEndDivider,
+  required bool showBottomDivider,
+}) {
+  const hairline = 1.0;
+  return BoxDecoration(
+    border: BorderDirectional(
+      end: showEndDivider
+          ? BorderSide(color: color, width: hairline)
+          : BorderSide.none,
+      bottom: showBottomDivider
+          ? BorderSide(color: color, width: hairline)
+          : BorderSide.none,
+    ),
+  );
+}
+
 class _CountriesGridShimmer extends StatelessWidget {
   const _CountriesGridShimmer();
 
@@ -534,6 +571,7 @@ class _CountriesGridShimmer extends StatelessWidget {
     final highlight = isDark
         ? const Color(AppConstants.semanticShimmerHighlightDark)
         : const Color(AppConstants.semanticShimmerHighlightLight);
+    final extent = _countryNameExtent(MediaQuery.textScalerOf(context));
 
     return Shimmer.fromColors(
       baseColor: base,
@@ -542,17 +580,35 @@ class _CountriesGridShimmer extends StatelessWidget {
       child: GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          mainAxisExtent: 76,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
+          mainAxisExtent: extent,
+          crossAxisSpacing: 0,
+          mainAxisSpacing: 0,
         ),
         itemCount: 12,
-        itemBuilder: (_, _) => Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
+        itemBuilder: (context, index) => DecoratedBox(
+          decoration: _countryGridLines(
+            color: context.dividerColor,
+            showEndDivider: _countryGridShowsEndDivider(index, 12),
+            showBottomDivider: _countryGridShowsBottomDivider(index, 12),
+          ),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FractionallySizedBox(
+              widthFactor: index.isEven ? 0.72 : 0.58,
+              child: Container(
+                height: 12,
+                margin: EdgeInsetsDirectional.only(
+                  start: index.isEven ? 0 : 16,
+                  end: index.isEven ? 16 : 0,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -560,67 +616,60 @@ class _CountriesGridShimmer extends StatelessWidget {
   }
 }
 
-class _CountryCard extends StatelessWidget {
-  const _CountryCard({
+class _CountryName extends StatelessWidget {
+  const _CountryName({
     required this.name,
     required this.onTap,
-    this.subtitle,
+    required this.showEndDivider,
+    required this.showBottomDivider,
   });
 
   final String name;
-  final String? subtitle;
   final VoidCallback? onTap;
+  final bool showEndDivider;
+  final bool showBottomDivider;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final radius = BorderRadius.circular(14);
 
     return Semantics(
       button: onTap != null,
-      label: subtitle == null ? name : '$name, $subtitle',
+      label: name,
       excludeSemantics: true,
       onTap: onTap,
-      child: Material(
-        color: context.cardColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: radius,
-          side: BorderSide(color: context.borderColor),
+      child: DecoratedBox(
+        decoration: _countryGridLines(
+          color: context.dividerColor,
+          showEndDivider: showEndDivider,
+          showBottomDivider: showBottomDivider,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                showEndDivider ? 2 : 16,
+                12,
+                showEndDivider ? 16 : 2,
+                12,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
                   name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w500,
                     height: 1.3,
+                    letterSpacing: -0.1,
                     color: context.textColor,
                   ),
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 12.5,
-                      height: 1.3,
-                      color: context.textSecondaryColor,
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),

@@ -170,6 +170,23 @@ class AuthorizationService:
         return "user"
 
     @staticmethod
+    def can_access_entity_document_repository(user) -> bool:
+        """
+        Focal entity document library (``main.documents_submit``), not admin CMS.
+        """
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if AuthorizationService.is_system_manager(user):
+            return False
+        if AuthorizationService.has_rbac_permission(user, "admin.documents.manage"):
+            return False
+        if not AuthorizationService.has_role(user, "assignment_documents_uploader"):
+            return False
+        return bool(
+            AuthorizationService.has_rbac_permission(user, "assignment.documents.upload")
+        )
+
+    @staticmethod
     def get_role_codes(user) -> List[str]:
         """Return RBAC role codes for one user (cached per-request)."""
         if not user or not getattr(user, "is_authenticated", False):

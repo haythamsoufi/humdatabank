@@ -255,6 +255,8 @@ class TestPrepareSubmittedDocumentAiImportReclaim:
         existing.storage_path = "/tmp/old.pdf"
         existing.processing_status = "completed"
         existing.processing_error = "x"
+        existing.total_chunks = 0
+        existing.extra_metadata = {}
         existing.is_public = False
         existing.searchable = True
 
@@ -278,20 +280,112 @@ class TestPrepareSubmittedDocumentAiImportReclaim:
                             "file_size": 12,
                         },
                     ):
-                        with patch(
-                            "app.services.ai.documents.duplicates.find_reclaimable_ai_document",
-                            return_value=existing,
-                        ):
-                            with patch.object(ingest, "sync_ai_document_from_submitted"):
-                                with patch(
-                                    "app.services.ai.documents.submitted_metadata.apply_submitted_document_metadata_to_ai_doc"
-                                ):
-                                    with patch.object(ingest.db.session, "commit"):
-                                        result = ingest._prepare_submitted_document_ai_import(88, user_id=1)
+                        with patch.object(ingest, "_lock_import_keys"):
+                            with patch(
+                                "app.services.ai.documents.duplicates.find_same_content_ai_document",
+                                return_value=existing,
+                            ):
+                                with patch.object(ingest, "sync_ai_document_from_submitted"):
+                                    with patch(
+                                        "app.services.ai.documents.submitted_metadata.apply_submitted_document_metadata_to_ai_doc"
+                                    ):
+                                        with patch.object(ingest.db.session, "commit"):
+                                            result = ingest._prepare_submitted_document_ai_import(88, user_id=1)
 
         assert result["ok"] is True
         assert result["code"] == "reclaimed"
+        assert result["skip_processing"] is False
         assert result["ai_document_id"] == 501
         assert existing.submitted_document_id == 88
         assert existing.content_hash == "abc123"
         assert existing.processing_status == "pending"
+
+    def test_same_bytes_under_another_year_do_not_create_a_second_row(self, app, tmp_path):
+        from datetime import date
+        from types import SimpleNamespace
+
+        pdf_path = tmp_path / "plan.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4 same-bytes")
+
+        submitted = SimpleNamespace(
+            id=1910,
+            filename="Strategic Plan_Monaco_2024_fr.pdf",
+            storage_path=None,
+            source_url="https://data-api.ifrc.org/documents/MC/Strategic Plan_Monaco_2024_fr.pdf",
+            source_url_unreachable=False,
+            uploaded_by_user_id=1,
+            document_country=SimpleNamespace(id=10, name="Monaco"),
+            document_type="Strategic Plan",
+            document_label=None,
+            period="2024",
+            is_public=False,
+            status="approved",
+            fdrs_import_key="mc-2024",
+            language="fr",
+        )
+        keeper = SimpleNamespace(
+            id=761,
+            submitted_document_id=1913,
+            guidance_document_id=None,
+            user_id=1,
+            country_id=10,
+            country_name="Monaco",
+            filename="Strategic Plan_Monaco_2025_fr.pdf",
+            file_type="pdf",
+            file_size_bytes=100,
+            content_hash="abc123",
+            source_url="https://data-api.ifrc.org/documents/MC/Strategic Plan_Monaco_2025_fr.pdf",
+            storage_path=None,
+            processing_status="completed",
+            processing_error=None,
+            total_chunks=39,
+            is_public=True,
+            searchable=True,
+            title="Strategic Plan - Monaco (2025)",
+            document_category="strategic_plan",
+            document_date=date(2025, 12, 31),
+            document_language="fr",
+            extra_metadata={
+                "document_type_label": "Strategic Plan",
+                "reporting_period": "2025",
+                "source_system": "FDRS",
+            },
+        )
+
+        with app.app_context():
+            with patch("app.models.SubmittedDocument") as mock_sub:
+                mock_sub.query.get.return_value = submitted
+                with patch("app.models.AIDocument") as mock_ai:
+                    mock_ai.query.filter_by.return_value.first.return_value = None
+                    with patch.object(
+                        ingest,
+                        "_resolve_submitted_document_for_ai_processing",
+                        return_value={
+                            "ok": True,
+                            "file_path": str(pdf_path),
+                            "cleanup_temp": True,
+                            "filename": submitted.filename,
+                            "from_url": True,
+                            "source_url": submitted.source_url,
+                            "content_hash": "abc123",
+                            "file_type": "pdf",
+                            "file_size": 20,
+                        },
+                    ):
+                        with patch.object(ingest, "_lock_import_keys"):
+                            with patch(
+                                "app.services.ai.documents.duplicates.find_same_content_ai_document",
+                                return_value=keeper,
+                            ):
+                                with patch.object(ingest.db.session, "commit"):
+                                    with patch.object(ingest.db.session, "add") as mock_add:
+                                        result = ingest._prepare_submitted_document_ai_import(1910, user_id=1)
+
+        assert result["ok"] is True
+        assert result["code"] == "catalog_alias"
+        assert result["skip_processing"] is True
+        assert result["ai_document_id"] == 761
+        assert keeper.submitted_document_id == 1913
+        assert keeper.processing_status == "completed"
+        assert keeper.title == "Strategic Plan - Monaco (2024-2025)"
+        mock_add.assert_not_called()

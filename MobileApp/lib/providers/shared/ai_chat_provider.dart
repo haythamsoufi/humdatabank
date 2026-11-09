@@ -160,6 +160,20 @@ class AiChatProvider with ChangeNotifier {
   String? get conversationId => _conversationId;
   String? get failedMessage => _failedMessage;
 
+  /// Set when the server refuses AI because beta access is on and this account
+  /// is not allow-listed. The chat screen locks instead of leaving the composer up.
+  bool get betaAccessDenied => _betaAccessDenied;
+  bool _betaAccessDenied = false;
+
+  void _noteBetaAccessDenial(Object error) {
+    if (!AiChatHttpException.errorDeniesBetaAccess(error)) return;
+    if (_betaAccessDenied) return;
+    _betaAccessDenied = true;
+    _isStreaming = false;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   List<AiChatMessage> get messages => List.unmodifiable(_messages);
   List<AiConversationSummary> get conversations => List.unmodifiable(_orderedConversations());
 
@@ -931,6 +945,14 @@ class AiChatProvider with ChangeNotifier {
     }
 
     if (type == 'error') {
+      final message = data['message']?.toString() ?? 'Chat failed';
+      if (AiChatHttpException.textDeniesBetaAccess(message)) {
+        _clearAgentProgress();
+        _isStreaming = false;
+        _wsStreamConversationId = null;
+        _noteBetaAccessDenial(message);
+        return;
+      }
       _clearAgentProgress();
       _streamStatusHint = null;
       _errorType = data['error_type']?.toString();
@@ -1097,6 +1119,10 @@ class AiChatProvider with ChangeNotifier {
           return;
         }
         DebugLogger.logWarn('AI', 'SSE stream error: $e');
+        if (AiChatHttpException.errorDeniesBetaAccess(e)) {
+          _noteBetaAccessDenial(e);
+          return;
+        }
         await recoverOrFallbackToHttp();
       },
       onDone: () async {
@@ -1273,6 +1299,10 @@ class AiChatProvider with ChangeNotifier {
           return;
         }
         DebugLogger.logWarn('AI', 'WS error, falling back to HTTP: $e');
+        if (AiChatHttpException.errorDeniesBetaAccess(e)) {
+          _noteBetaAccessDenial(e);
+          return;
+        }
         await fallbackToHttp();
       },
       onDone: () async {
@@ -1292,12 +1322,16 @@ class AiChatProvider with ChangeNotifier {
   }
 
   Future<void> ensureTokenIfLoggedIn({required bool isAuthenticated}) async {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || _betaAccessDenied) return;
     // Best effort: fetch token only if we don't already have one cached.
     // If it fails, cookie auth may still work for HTTP, but WS benefits from token headers.
-    final cached = await _service.getCachedToken();
-    if (cached != null && cached.isNotEmpty) return;
-    await _service.fetchAndCacheToken();
+    try {
+      final cached = await _service.getCachedToken();
+      if (cached != null && cached.isNotEmpty) return;
+      await _service.fetchAndCacheToken();
+    } catch (e) {
+      _noteBetaAccessDenial(e);
+    }
   }
 
   /// Refreshes the conversation drawer from local DB (and server when online).
@@ -1326,6 +1360,7 @@ class AiChatProvider with ChangeNotifier {
       _messages = [];
       _pinnedConversationIds = {};
       _error = null;
+      _betaAccessDenied = false;
       _detachedAgentStepsByConversationId.clear();
       notifyListeners();
     }
@@ -1382,6 +1417,7 @@ class AiChatProvider with ChangeNotifier {
           });
           _pruneStalePinnedIds();
         } catch (e) {
+          _noteBetaAccessDenial(e);
           DebugLogger.logWarn('AI', 'Failed to sync conversations from server, using local: $e');
           // Keep local conversations if server sync fails
         }
@@ -1416,6 +1452,7 @@ class AiChatProvider with ChangeNotifier {
         await _maybeImportOfflineMessages(conversationId);
       }
     } catch (e) {
+      _noteBetaAccessDenial(e);
       _error = e.toString();
     } finally {
       _isLoading = false;
@@ -1943,6 +1980,11 @@ class AiChatProvider with ChangeNotifier {
       }
       _isStreaming = false; // Stop streaming immediately on error
       _clearAgentProgress();
+
+      if (AiChatHttpException.errorDeniesBetaAccess(e)) {
+        _noteBetaAccessDenial(e);
+        return;
+      }
 
       // Keep raw string for logging / edge cases; [errorType] drives user-facing copy in the UI.
       String errorMessage = e.toString();

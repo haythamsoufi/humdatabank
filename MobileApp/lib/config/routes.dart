@@ -3,6 +3,8 @@ class AppRoutes {
   static const String login = '/login';
   static const String azureLogin = '/azure-login';
   static const String dashboard = '/dashboard';
+  /// Focal assignment entity document repository (native screen).
+  static const String entityDocuments = '/entity-documents';
   static const String settings = '/settings';
   static const String notifications = '/notifications';
   static const String webview = '/webview';

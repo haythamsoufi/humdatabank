@@ -15,6 +15,7 @@ import '../../utils/constants.dart';
 import '../../utils/mobile_api_json.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_checkbox_list_tile.dart';
 
 class EditIndicatorScreen extends StatefulWidget {
@@ -396,6 +397,7 @@ class _EditIndicatorScreenState extends State<EditIndicatorScreen>
       appBar: AppAppBar(
         title: localizations.editIndicator,
       ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: _isLoading && !_detailReady
           ? const AppLoadingIndicator()
           : _indicator == null

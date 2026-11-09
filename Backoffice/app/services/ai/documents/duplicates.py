@@ -272,6 +272,13 @@ def _merge_loser_metadata_into_keeper(keeper: AIDocument, loser: AIDocument) -> 
         if not conflict:
             keeper.submitted_document_id = loser.submitted_document_id
 
+    try:
+        from app.services.ai.documents.submitted_metadata import absorb_catalog_from_ai_document
+
+        absorb_catalog_from_ai_document(keeper, loser)
+    except Exception as e:
+        logger.debug("Failed to merge catalog entries onto keeper %s: %s", keeper.id, e)
+
     if not keeper.guidance_document_id and loser.guidance_document_id:
         conflict = (
             AIDocument.query.filter(
@@ -348,6 +355,28 @@ def find_reclaimable_ai_document(
         ):
             return doc
     return None
+
+
+def find_same_content_ai_document(content_hash: Optional[str]) -> Optional[AIDocument]:
+    """
+    Return the preferred AIDocument whose file bytes match ``content_hash``.
+
+    Includes rows already linked to a submitted or guidance document. Callers
+    attach another catalog entry to this row instead of inserting a second copy.
+    """
+    hash_val = (content_hash or "").strip()
+    if not hash_val:
+        return None
+    docs = (
+        AIDocument.query.filter(AIDocument.content_hash == hash_val)
+        .order_by(AIDocument.id.asc())
+        .all()
+    )
+    if not docs:
+        return None
+    if len(docs) == 1:
+        return docs[0]
+    return choose_keeper(docs)
 
 
 def dedupe_documents(

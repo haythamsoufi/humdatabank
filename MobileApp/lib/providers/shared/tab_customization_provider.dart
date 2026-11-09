@@ -163,8 +163,8 @@ class TabCustomizationProvider extends ChangeNotifier {
         TabIds.notifications,
         TabIds.dashboard,
         TabIds.home,
-        TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
+        TabIds.countries,
         TabIds.admin,
       ];
     }
@@ -173,9 +173,8 @@ class TabCustomizationProvider extends ChangeNotifier {
         TabIds.notifications,
         TabIds.dashboard,
         TabIds.home,
-        TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
-        TabIds.analysis,
+        TabIds.countries,
         TabIds.settings,
       ];
     }
@@ -184,9 +183,8 @@ class TabCustomizationProvider extends ChangeNotifier {
         TabIds.resources,
         TabIds.dashboard,
         TabIds.home,
-        TabIds.unifiedPlanning,
         if (chatbotEnabled) TabIds.aiChat,
-        TabIds.analysis,
+        TabIds.countries,
         TabIds.settings,
       ];
     }
@@ -194,9 +192,8 @@ class TabCustomizationProvider extends ChangeNotifier {
       TabIds.resources,
       TabIds.indicators,
       TabIds.home,
-      TabIds.unifiedPlanning,
       if (chatbotEnabled) TabIds.aiChat,
-      TabIds.analysis,
+      TabIds.countries,
       TabIds.settings,
     ];
   }

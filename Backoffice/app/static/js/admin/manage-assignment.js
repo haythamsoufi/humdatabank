@@ -1415,6 +1415,8 @@
                 // Countries-only layout has no sub-tab nav; initializeAddEntitiesSubTabs
                 // returns early and would never load Part of filters otherwise.
                 loadCategoriesForAssignCountriesIfPresent();
+            } else if (panel.id === 'assignment-status-overview-panel') {
+                requestAnimationFrame(resizeAssignmentStatusChart);
             }
         }
 
@@ -1535,8 +1537,9 @@
                 }
             }
 
-            // Store selected tab in localStorage
-            localStorage.setItem('selectedAssignmentMainTab', tabId);
+            // Store selected tab in localStorage. Key is versioned so a previously
+            // saved "Assignment details" default does not override Status overview.
+            localStorage.setItem('selectedAssignmentSectionTab', tabId);
             window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Completed for tabId', tabId);
         }
 
@@ -1669,6 +1672,9 @@
 
         function getDefaultAssignmentEntityTab() {
             window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: resolving default tab');
+            if (document.getElementById('assignment-status-overview-panel')) {
+                return 'assignment-status-overview-panel';
+            }
             if (!canEditDetails && document.getElementById('manage-entities-panel')) {
                 return 'manage-entities-panel';
             }
@@ -1679,7 +1685,7 @@
             return null;
         }
 
-        // Initialize with stored tab or default to assignment details
+        // Initialize with the stored section, or Status overview when that tab exists
         function initializeEntityTabs(useStoredTab = true) {
             window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Starting, useStoredTab:', useStoredTab);
             // Ensure elements are available
@@ -1690,8 +1696,13 @@
                 return; // No tabs available yet
             }
 
-            const storedMainTab = localStorage.getItem('selectedAssignmentMainTab')
-                || localStorage.getItem('selectedAssignmentEntityTab');
+            if (cfg.forceLandingTab && document.getElementById(cfg.forceLandingTab)) {
+                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Forcing landing tab', cfg.forceLandingTab);
+                activateEntityTab(cfg.forceLandingTab);
+                return;
+            }
+
+            const storedMainTab = localStorage.getItem('selectedAssignmentSectionTab');
             window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Stored tab from localStorage:', storedMainTab);
 
             if (useStoredTab && storedMainTab && document.getElementById(storedMainTab)) {
@@ -1744,6 +1755,14 @@
             });
         }
 
+        var assignmentStatusChart = null;
+        function resizeAssignmentStatusChart() {
+            if (!assignmentStatusChart || typeof assignmentStatusChart.resize !== 'function') return;
+            var panel = document.getElementById('assignment-status-overview-panel');
+            if (!panel || panel.classList.contains('hidden') || panel.style.display === 'none') return;
+            assignmentStatusChart.resize();
+        }
+
         (function initAssignmentStatusChart() {
             var canvas = document.getElementById('assignment-status-chart');
             var chartCfg = cfg.statusChart;
@@ -1770,7 +1789,7 @@
             });
             var isRtl = document.documentElement.dir === 'rtl';
 
-            new Chart(canvas.getContext('2d'), {
+            assignmentStatusChart = new Chart(canvas.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: labels,
@@ -3151,6 +3170,7 @@
                 setNamedCheckbox('enable_export_pdf', config.enable_export_pdf);
                 setNamedCheckbox('email_attach_pdf', config.email_attach_pdf);
                 setNamedCheckbox('email_attach_excel', config.email_attach_excel);
+                setNamedCheckbox('enable_offline_download', config.enable_offline_download);
 
                 const accessControl = document.getElementById('assignment-access-control');
                 if (accessControl && Array.isArray(config.allowed_role_ids)) {

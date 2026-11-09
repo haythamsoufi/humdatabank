@@ -38,7 +38,9 @@ class AiChatService {
     try {
       final resp = await _api.get(AppConfig.aiV2TokenEndpoint, includeAuth: true, useCache: false);
       if (resp.statusCode != 200) {
+        final denied = AiChatHttpException.fromResponse(resp.statusCode, resp.body);
         DebugLogger.logWarn('AI', 'AI token request failed: HTTP ${resp.statusCode}');
+        if (denied.deniesBetaAccess) throw denied;
         return null;
       }
       final data = jsonDecode(resp.body);
@@ -48,6 +50,7 @@ class AiChatService {
       }
       return token;
     } catch (e) {
+      if (e is AiChatHttpException && e.deniesBetaAccess) rethrow;
       DebugLogger.logWarn('AI', 'AI token request error: $e');
       return null;
     }

@@ -11,6 +11,16 @@ void main() {
       );
       expect(e.message, 'AI beta access is limited to selected users.');
       expect(e.chatErrorType, 'forbidden');
+      expect(e.deniesBetaAccess, isTrue);
+      expect(AiChatHttpException.errorDeniesBetaAccess(e), isTrue);
+    });
+
+    test('recognizes the token endpoint error field', () {
+      final e = AiChatHttpException.fromResponse(
+        403,
+        '{"error":"AI beta access is limited to selected users."}',
+      );
+      expect(e.deniesBetaAccess, isTrue);
     });
 
     test('403 without a backend message does not claim the user lacks access', () {

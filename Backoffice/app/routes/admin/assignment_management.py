@@ -48,7 +48,10 @@ from app.services.assignments.workflow_service import apply_entity_status_change
 from app.utils.form_authorization import begin_aes_transition, lock_aes_rows_for_update
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
-from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
+from app.services.forms.reporting_period_service import (
+    ensure_reporting_period_for_label,
+    sync_assigned_form_reporting_period,
+)
 from app.services.audit.assignment_audit import (
     assignment_audit_label,
     assignment_settings_snapshot,
@@ -369,6 +372,7 @@ def _assignment_copy_config(assignment):
         "public_url_active": bool(assignment.is_public_active),
         "requires_delegation_review": bool(assignment.requires_delegation_review),
         "enable_page_submission": bool(assignment.enable_page_submission),
+        "enable_offline_download": bool(assignment.enable_offline_download),
         "enable_export_excel": bool(assignment.enable_export_excel),
         "enable_import_excel": bool(assignment.enable_import_excel),
         "enable_export_pdf": bool(assignment.enable_export_pdf),
@@ -628,6 +632,10 @@ class EditAssignmentDetailsForm(FlaskForm):
         "Allow save and submit per page",
         default=False,
     )
+    enable_offline_download = BooleanField(
+        "Allow offline download in the mobile app",
+        default=False,
+    )
     enable_export_excel = BooleanField(
         "Enable Export Excel button",
         default=False,
@@ -722,6 +730,7 @@ def manage_assignments():
                 'public_submission_count': public_submission_count,
                 'requires_delegation_review': bool(getattr(assignment, 'requires_delegation_review', False)),
                 'enable_page_submission': bool(getattr(assignment, 'enable_page_submission', False)),
+                'enable_offline_download': bool(getattr(assignment, 'enable_offline_download', False)),
                 'enable_upr_country_reporting_excel': assignment_uses_upr_country_reporting_excel(assignment),
                 'enable_unified_country_plan_excel': assignment_uses_unified_country_plan_excel(assignment),
                 'enable_export_excel': bool(getattr(assignment, 'enable_export_excel', False)),
@@ -914,6 +923,7 @@ def new_assignment():
                 data_owner_id=form.data_owner_id.data or None,
                 requires_delegation_review=bool(form.requires_delegation_review.data),
                 enable_page_submission=bool(form.enable_page_submission.data),
+                enable_offline_download=bool(form.enable_offline_download.data),
                 enable_export_excel=bool(form.enable_export_excel.data),
                 enable_import_excel=bool(form.enable_import_excel.data),
                 enable_export_pdf=bool(form.enable_export_pdf.data),
@@ -923,6 +933,7 @@ def new_assignment():
             )
             _apply_submission_review_recipient_from_form(new_assignment, form)
             sync_assignment_custom_excel_flags(new_assignment)
+            ensure_reporting_period_for_label(period_name)
             sync_assigned_form_reporting_period(new_assignment)
 
             # Warn if active and no data owner (soft enforcement)
@@ -1437,6 +1448,7 @@ def edit_assignment(assignment_id):
             next_page_mode = bool(form.enable_page_submission.data)
             assignment.template_id = form.template_id.data
             assignment.period_name = (form.period_name.data or '').strip()
+            ensure_reporting_period_for_label(assignment.period_name)
             sync_assigned_form_reporting_period(assignment)
             assignment.custom_name = (form.custom_name.data or '').strip() or None
             assignment.custom_name_translations = _parse_custom_name_translations_from_form()
@@ -1444,6 +1456,7 @@ def edit_assignment(assignment_id):
             assignment.data_owner_id = form.data_owner_id.data or None
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)
             assignment.enable_page_submission = next_page_mode
+            assignment.enable_offline_download = bool(form.enable_offline_download.data)
             assignment.enable_export_excel = bool(form.enable_export_excel.data)
             assignment.enable_import_excel = bool(form.enable_import_excel.data)
             assignment.enable_export_pdf = bool(form.enable_export_pdf.data)

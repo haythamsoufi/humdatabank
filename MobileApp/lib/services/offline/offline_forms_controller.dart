@@ -547,8 +547,20 @@ class OfflineFormsController extends ChangeNotifier {
       notifyListeners();
     }
     final cancel = CancelToken();
+    final jobSw = Stopwatch()..start();
     try {
+      DebugLogger.logInfo(
+        'OFFLINE_BUNDLE',
+        '${explicit ? 'user ' : ''}${job.kind.name} save start '
+            'assignment ${a.id} template=${a.templateId}',
+      );
       final cookie = await _readSessionCookie();
+      DebugLogger.logInfo(
+        'OFFLINE_BUNDLE',
+        'assignment ${a.id} session cookie '
+            '${cookie == null || cookie.isEmpty ? 'missing' : 'present'} '
+            '+${jobSw.elapsedMilliseconds}ms',
+      );
       final request = _request(a, queued.env, cookie, cancel);
       final limit = heavy ? _packageTimeout : _pageTimeout;
       final op = heavy
@@ -565,13 +577,19 @@ class OfflineFormsController extends ChangeNotifier {
       );
       _failedAt.remove(job.key);
       _progressed = true;
+      DebugLogger.logInfo(
+        'OFFLINE_BUNDLE',
+        '${job.kind.name} save finished assignment ${a.id} '
+            '${jobSw.elapsedMilliseconds}ms',
+      );
       return const OfflineSaveResult.success();
     } catch (e, st) {
       cancel.cancel('failed');
       _failedAt[job.key] = DateTime.now();
       DebugLogger.logWarn(
         'OFFLINE_BUNDLE',
-        '${job.kind.name} save failed for assignment ${a.id}: $e',
+        '${job.kind.name} save failed for assignment ${a.id} '
+            'after ${jobSw.elapsedMilliseconds}ms: $e',
       );
       unawaited(
         ClientDiagnosticsService.report(

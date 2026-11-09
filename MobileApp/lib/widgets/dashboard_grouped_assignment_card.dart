@@ -97,88 +97,99 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ColoredBox(
-                  color: cardTone.accent,
-                  child: const SizedBox(width: 6),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 13, 12, 12),
-                    child: Column(
+          child: Stack(
+            children: [
+              PositionedDirectional(
+                start: 0,
+                top: 0,
+                bottom: 0,
+                width: 6,
+                child: ColoredBox(color: cardTone.accent),
+              ),
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(20, 13, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Expanded(
+                          child: Text(
+                            _displayTitle(assignment),
+                            style: IOSTextStyle.callout(context).copyWith(
+                              fontWeight: FontWeight.w600,
+                              height: 1.25,
+                              color: titleColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Expanded(
-                              child: Text(
-                                _displayTitle(assignment),
-                                style: IOSTextStyle.callout(context).copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.25,
-                                  color: titleColor,
-                                ),
+                            _StatusChip(label: tone.label, tone: tone),
+                            if (overdue) ...[
+                              const SizedBox(height: 4),
+                              _StatusChip(
+                                label: localizations.overdue,
+                                tone: _danger(context),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                _StatusChip(label: tone.label, tone: tone),
-                                if (overdue) ...[
-                                  const SizedBox(height: 4),
-                                  _StatusChip(
-                                    label: localizations.overdue,
-                                    tone: _danger(context),
-                                  ),
-                                ],
-                              ],
-                            ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _metaLine(context, localizations, assignment),
-                          style: IOSTextStyle.footnote(
-                            context,
-                          ).copyWith(color: metaColor, height: 1.3),
-                        ),
-                        if ((showEnterDataButton && onEnterData != null) ||
-                            _showOfflineRow) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              if (_showOfflineRow)
-                                _OfflineActions(
-                                  isDownloading: isDownloadingOfflineForm,
-                                  hasSnapshot: hasOfflineFormSnapshot,
-                                  outdated: offlineBundleOutdated,
-                                  onDownload: onDownloadForOffline,
-                                  onDetails: onOfflineBundleDetails,
-                                  color: metaColor,
-                                ),
-                              const Spacer(),
-                              if (showEnterDataButton && onEnterData != null)
-                                _EnterDataButton(
-                                  label:
-                                      enterDataButtonText ??
-                                      localizations.enterData,
-                                  color: titleColor,
-                                  onPressed: onEnterData!,
-                                ),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
-                  ),
+                    if (_dueLine(context, localizations, assignment)
+                        case final dueLine?) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        dueLine,
+                        style: IOSTextStyle.footnote(
+                          context,
+                        ).copyWith(color: metaColor, height: 1.3),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final showEnter =
+                            showEnterDataButton && onEnterData != null;
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: constraints.maxWidth / 3,
+                              child: _CompletionMeter(
+                                rate: assignment.completionRate,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (_showOfflineRow)
+                              _OfflineActions(
+                                isDownloading: isDownloadingOfflineForm,
+                                hasSnapshot: hasOfflineFormSnapshot,
+                                outdated: offlineBundleOutdated,
+                                onDownload: onDownloadForOffline,
+                                onDetails: onOfflineBundleDetails,
+                                color: metaColor,
+                              ),
+                            if (showEnter)
+                              _EnterDataButton(
+                                label:
+                                    enterDataButtonText ??
+                                    localizations.enterData,
+                                color: titleColor,
+                                onPressed: onEnterData!,
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -203,22 +214,65 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
     return assignment.name;
   }
 
-  static String _metaLine(
+  static String? _dueLine(
     BuildContext context,
     AppLocalizations localizations,
     Assignment assignment,
   ) {
-    final percent = '${assignment.completionRate.toStringAsFixed(0)}%';
-    final completion = localizations.completion.toLowerCase();
-    final parts = <String>['$percent $completion'];
     final due = assignment.dueDate;
-    if (due != null) {
-      final locale = Localizations.localeOf(context).toString();
-      final formatted = DateFormat.yMMMd(locale).format(due.toLocal());
-      parts.add('${localizations.dueDate} $formatted');
-    }
-    return parts.join('  ·  ');
+    if (due == null) return null;
+    final locale = Localizations.localeOf(context).toString();
+    final formatted = DateFormat.yMMMd(locale).format(due.toLocal());
+    return '${localizations.dueDate} $formatted';
   }
+}
+
+/// Completion percent sitting on a short bar. Fill width is the rate; colour
+/// follows the same bands as the Backoffice dashboard (green / amber / red).
+class _CompletionMeter extends StatelessWidget {
+  const _CompletionMeter({required this.rate});
+
+  final double rate;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
+    final percent = rate.clamp(0, 100).toDouble();
+    final color = _completionColor(percent);
+    final track = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.12);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${percent.toStringAsFixed(0)}% ${localizations.completed.toLowerCase()}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: IOSTextStyle.footnote(
+            context,
+          ).copyWith(color: color, fontWeight: FontWeight.w700, height: 1.2),
+        ),
+        const SizedBox(height: 5),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: percent / 100,
+            minHeight: 4,
+            backgroundColor: track,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Color _completionColor(double percent) {
+  if (percent >= 80) return GroupedDashboardPalette.success.accent;
+  if (percent >= 25) return GroupedDashboardPalette.pending.accent;
+  return GroupedDashboardPalette.danger.accent;
 }
 
 class _StatusTone {
@@ -396,6 +450,7 @@ class _OfflineActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (isDownloading)
           const SizedBox(

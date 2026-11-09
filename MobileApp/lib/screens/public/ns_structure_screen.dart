@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../utils/constants.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart';
@@ -186,6 +187,7 @@ class _NSStructureScreenState extends State<NSStructureScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppAppBar(title: localizations.nsStructure),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: _isLoading
           ? const AppLoadingIndicator(
               message: 'Loading organizational structure...',

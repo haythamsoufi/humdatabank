@@ -976,6 +976,35 @@ class TestResolveMetadataVariable:
         result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'assignment_year'}, aes, None)
         assert result == '2026'
 
+    def test_assignment_year_detached_instance_falls_back_to_period_name(self):
+        """stream_template renders after the scoped session is removed.
+
+        Loaded columns stay on the instance; an unloaded reporting_period
+        raises DetachedInstanceError, which must not abort the entry form.
+        """
+        from datetime import date
+        from sqlalchemy.orm.exc import DetachedInstanceError
+
+        class _DetachedAssignment:
+            def __init__(self):
+                self.period_name = 'Jan-Jun 2026'
+                self.period_end = None
+                self.period_start = None
+
+            @property
+            def reporting_period(self):
+                raise DetachedInstanceError("Parent instance is not bound to a Session")
+
+        assert VariableResolutionService.get_assignment_year(_DetachedAssignment()) == '2026'
+
+        class _DetachedWithLoadedEnd(_DetachedAssignment):
+            def __init__(self):
+                super().__init__()
+                self.period_end = date(2025, 12, 31)
+                self.period_name = 'no year here'
+
+        assert VariableResolutionService.get_assignment_year(_DetachedWithLoadedEnd()) == '2025'
+
     def test_assignment_year_with_bare_mock_assignment_missing_period_attrs(self):
         """Regression: template-preview mode's MockAssignment (app/routes/forms/entry.py)
         is a bare duck-typed object exposing only `period_name` — no period_start,

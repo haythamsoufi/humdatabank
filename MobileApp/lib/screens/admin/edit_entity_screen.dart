@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_checkbox_list_tile.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../config/routes.dart';
@@ -136,6 +137,7 @@ class _EditEntityScreenState extends State<EditEntityScreen>
       appBar: AppAppBar(
         title: localizations.entityEditTitle(entityKey),
       ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: _isLoading && _nameController.text.isEmpty
           ? const AppLoadingIndicator()
           : ColoredBox(

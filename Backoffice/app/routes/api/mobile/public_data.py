@@ -4,7 +4,9 @@
 Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
     indicator-suggestions, data/periods, data/fdrs-overview, data/fdrs-reach-indicators, data/country-profile/<iso3>,
-    data/region-profile/<slug>,
+    data/country-profile/<iso3>/go-documents, data/go-documents, data/country-profile/<iso3>/operations,
+    data/offline-home, data/offline-countries,
+    data/region-profile/<slug>, data/region-profile/<slug>/operations,
     data/disaggregation-overview
     (global/regional for anonymous; country breakdown for authenticated org users), data/resources,
     data/unified-planning-config (appeals URL + unified planning type IDs for the mobile app),
@@ -32,7 +34,7 @@ from app.utils.mobile_responses import (
 )
 from app.utils.transactions import request_transaction_rollback
 from app.utils.sql_utils import safe_ilike_pattern
-from app.utils.sector_logo_urls import sector_logo_url
+from app.utils.sector_logo_urls import country_ns_logo_url, sector_logo_url
 from app.routes.api.mobile import mobile_bp
 # In-process JPEG cache lives in plugins.upr.documents.mobile.
 
@@ -63,6 +65,7 @@ def countrymap():
             'iso3': getattr(c, 'iso3', None),
             'region': getattr(c, 'region', None),
             'national_society_name': ns.name if ns else None,
+            'logo_url': country_ns_logo_url(ns, getattr(c, 'iso3', None)),
         })
 
     return mobile_ok(data={'countries': items}, meta={'total': len(items)})
@@ -300,55 +303,15 @@ def mobile_periods():
       - template_id (optional, default 21 — FDRS): scope to a specific form template
       - country_id (optional): scope to one country's assignments/submissions
     """
-    import re
-    from app.models import AssignedForm, PublicSubmission
     from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     country_id = request.args.get('country_id', type=int)
 
     try:
-        periods_set = set()
+        from plugins.fdrs.mobile import campaign_period_names
 
-        from app.models.enums import AssignmentScope
-
-        assigned_query = (
-            db.session.query(AssignedForm.period_name)
-            .distinct()
-            .filter(
-                AssignedForm.template_id == template_id,
-                AssignedForm.scope == AssignmentScope.campaign.value,
-            )
-        )
-        if country_id:
-            from app.models.assignments import AssignmentEntityStatus
-            assigned_query = assigned_query.join(AssignmentEntityStatus).filter(
-                AssignmentEntityStatus.entity_id == country_id,
-                AssignmentEntityStatus.entity_type == 'country',
-            )
-        for (period_name,) in assigned_query.filter(AssignedForm.period_name.isnot(None)).all():
-            if period_name:
-                periods_set.add(period_name)
-
-        public_query = (
-            db.session.query(AssignedForm.period_name)
-            .distinct()
-            .join(PublicSubmission, AssignedForm.id == PublicSubmission.assigned_form_id)
-            .filter(
-                AssignedForm.template_id == template_id,
-                AssignedForm.scope == AssignmentScope.campaign.value,
-            )
-        )
-        if country_id:
-            public_query = public_query.filter(PublicSubmission.country_id == country_id)
-        for (period_name,) in public_query.filter(AssignedForm.period_name.isnot(None)).all():
-            if period_name:
-                periods_set.add(period_name)
-
-        from app.services.forms.reporting_period_service import sort_period_names
-
-        sorted_periods = sort_period_names(list(periods_set))
-        return mobile_ok(data={'periods': sorted_periods})
+        return mobile_ok(data={'periods': campaign_period_names(template_id, country_id)})
     except Exception as e:
         current_app.logger.error('mobile_periods: %s', e, exc_info=True)
         return mobile_ok(data={'periods': []})
@@ -372,6 +335,24 @@ def mobile_fdrs_reach_indicators():
     return _impl()
 
 
+@mobile_bp.route('/data/offline-home', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=6)
+def mobile_offline_home():
+    """All home-map indicators and periods, for the offline cache."""
+    from plugins.fdrs.mobile import offline_home as _impl
+
+    return _impl()
+
+
+@mobile_bp.route('/data/offline-countries', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=4)
+def mobile_offline_countries():
+    """Country list, every country profile, and active operations, for the offline cache."""
+    from plugins.fdrs.mobile import offline_countries as _impl
+
+    return _impl()
+
+
 @mobile_bp.route('/data/country-profile/<iso3>', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_country_profile(iso3):
@@ -381,11 +362,47 @@ def mobile_country_profile(iso3):
     return _impl(iso3)
 
 
+@mobile_bp.route('/data/go-documents', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=4)
+def mobile_go_documents_all():
+    """GO document lists for every country, one response."""
+    from plugins.fdrs.mobile import go_documents_all as _impl
+
+    return _impl()
+
+
+@mobile_bp.route('/data/country-profile/<iso3>/go-documents', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def mobile_country_go_documents(iso3):
+    """Public GO emergency appeals, operations updates and situation reports for one country."""
+    from plugins.fdrs.mobile import country_go_documents as _impl
+
+    return _impl(iso3)
+
+
+@mobile_bp.route('/data/country-profile/<iso3>/operations', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def mobile_country_operations(iso3):
+    """Active GO emergencies for one country (counts, funding, and operations)."""
+    from plugins.fdrs.mobile import country_operations as _impl
+
+    return _impl(iso3)
+
+
 @mobile_bp.route('/data/region-profile/<slug>', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_region_profile(slug):
     """Public regional analysis (summed key indicators and top countries)."""
     from plugins.fdrs.mobile import region_profile as _impl
+
+    return _impl(slug)
+
+
+@mobile_bp.route('/data/region-profile/<slug>/operations', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def mobile_region_operations(slug):
+    """Active GO operations for one region (counts, funding, and countries)."""
+    from plugins.fdrs.mobile import region_operations as _impl
 
     return _impl(slug)
 

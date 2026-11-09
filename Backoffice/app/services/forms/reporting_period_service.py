@@ -174,6 +174,27 @@ def dashboard_assignment_period_sort_key(item: dict) -> DashboardAssignmentSortK
     return (year, float("-inf"), (item.get("period") or "").strip())
 
 
+def ensure_reporting_period_for_label(period_name: str | None) -> ReportingPeriod | None:
+    """Create or update the catalog row for an admin period-picker label.
+
+    Single year, year range, and month range labels get typed bounds.
+    Other labels are left unchanged so sync can still clear dates when no
+    catalog row exists.
+    """
+    from app.utils.reporting_period_label_parser import parse_structured_period_label
+
+    parsed = parse_structured_period_label(period_name or "")
+    if parsed is None:
+        return None
+    period_type, period_start, period_end = parsed
+    return upsert_reporting_period(
+        (period_name or "").strip(),
+        period_type=period_type,
+        period_start=period_start,
+        period_end=period_end,
+    )
+
+
 def sync_assigned_form_reporting_period(assigned_form: AssignedForm) -> None:
     """
     Link an AssignedForm to an existing reporting_period catalog row by name.

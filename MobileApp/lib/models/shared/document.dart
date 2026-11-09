@@ -9,7 +9,10 @@ class Document {
   final String? uploadedByName;
   final DateTime? uploadedAt;
   final String? assignmentPeriod;
+  final String? period;
   final bool isPublic;
+  final bool canEdit;
+  final bool canChangeStatus;
 
   Document({
     required this.id,
@@ -22,7 +25,10 @@ class Document {
     this.uploadedByName,
     this.uploadedAt,
     this.assignmentPeriod,
+    this.period,
     this.isPublic = false,
+    this.canEdit = false,
+    this.canChangeStatus = false,
   });
 
   factory Document.fromJson(Map<String, dynamic> json) {
@@ -40,7 +46,10 @@ class Document {
           : null,
       assignmentPeriod:
           (json['assignment_period'] ?? json['period'])?.toString(),
+      period: json['period']?.toString(),
       isPublic: json['is_public'] as bool? ?? false,
+      canEdit: json['can_edit'] as bool? ?? false,
+      canChangeStatus: json['can_change_status'] as bool? ?? false,
     );
   }
 
@@ -56,7 +65,10 @@ class Document {
       'uploaded_by_name': uploadedByName,
       'uploaded_at': uploadedAt?.toUtc().toIso8601String(),
       'assignment_period': assignmentPeriod,
+      'period': period,
       'is_public': isPublic,
+      'can_edit': canEdit,
+      'can_change_status': canChangeStatus,
     };
   }
 }

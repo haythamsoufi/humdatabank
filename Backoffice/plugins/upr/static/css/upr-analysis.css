@@ -483,6 +483,9 @@
     background: var(--upri-navy);
     color: #fff;
 }
+.upri-card__modes {
+    margin: 0.35rem 0 0.15rem;
+}
 .upri-card__sources {
     display: flex;
     flex-wrap: wrap;

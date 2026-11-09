@@ -14,6 +14,7 @@ from app.models import (
     FormData, FormItem, FormTemplate, FormTemplateVersion,
     AssignedForm, AssignmentEntityStatus
 )
+from sqlalchemy.orm.exc import DetachedInstanceError
 from typing import Dict, Any, Optional, Tuple, Set, List, Iterable
 import ast
 import logging
@@ -118,28 +119,47 @@ class VariableResolutionService:
     _PERIOD_SENTINEL_SAME_YEAR = '__same_year__'
 
     @classmethod
+    def _read_assignment_attr(cls, obj: Any, name: str):
+        """Read an assignment attribute without crashing on a detached ORM instance.
+
+        Preview mode passes a duck-typed stand-in that only sets ``period_name``.
+        ``getattr(..., None)`` covers that missing-attribute case.
+
+        The entry form is rendered with ``stream_template``. Flask pops the app
+        context before the body is iterated, and Flask-SQLAlchemy then removes
+        the scoped session. Loaded columns stay readable; an unloaded
+        relationship such as ``reporting_period`` raises
+        ``DetachedInstanceError``, which ``getattr``'s default does not swallow.
+        """
+        if obj is None:
+            return None
+        try:
+            return getattr(obj, name, None)
+        except DetachedInstanceError:
+            raw = getattr(obj, '__dict__', None)
+            if isinstance(raw, dict):
+                return raw.get(name)
+            return None
+
+    @classmethod
     def _assignment_primary_year(cls, assigned_form: Optional[AssignedForm]) -> Optional[int]:
         """Return the calendar year that best represents an assignment's reporting cycle."""
         if not assigned_form:
             return None
-        # Use getattr throughout: template-preview mode passes a lightweight duck-typed
-        # stand-in (MockAssignment in app/routes/forms/entry.py) that only sets
-        # period_name — it isn't a real AssignedForm row and has no period_start/
-        # period_end/reporting_period columns. Falling through to the period_name
-        # regex parse below (rather than raising AttributeError) is exactly the
-        # intended behavior for that case.
-        period_end = getattr(assigned_form, 'period_end', None)
+        period_end = cls._read_assignment_attr(assigned_form, 'period_end')
         if period_end is not None:
             return period_end.year
-        period_start = getattr(assigned_form, 'period_start', None)
+        period_start = cls._read_assignment_attr(assigned_form, 'period_start')
         if period_start is not None:
             return period_start.year
-        reporting_period = getattr(assigned_form, 'reporting_period', None)
-        if reporting_period is not None and reporting_period.period_end is not None:
-            return reporting_period.period_end.year
+        reporting_period = cls._read_assignment_attr(assigned_form, 'reporting_period')
+        if reporting_period is not None:
+            catalog_end = cls._read_assignment_attr(reporting_period, 'period_end')
+            if catalog_end is not None:
+                return catalog_end.year
         from app.utils.reporting_period_label_parser import _extract_years
 
-        years = _extract_years(assigned_form.period_name)
+        years = _extract_years(cls._read_assignment_attr(assigned_form, 'period_name'))
         return max(years) if years else None
 
     @classmethod

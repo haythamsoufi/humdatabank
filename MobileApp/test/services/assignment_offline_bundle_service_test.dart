@@ -398,6 +398,44 @@ void main() {
       },
     );
 
+    test('saves upr styles and scripts beside the page', () async {
+      final a = FakeAdapter({
+        '/forms/assignment/5': (
+          status: 200,
+          body:
+              '<html><head>'
+              '<link rel="stylesheet" href="/upr/fonts.css?v=9">'
+              '<link rel="stylesheet" href="/upr/static/css/upr.css">'
+              '<script src="/upr/static/js/upr-shared.js"></script>'
+              '</head><body></body></html>',
+        ),
+        '/upr/fonts.css': (
+          status: 200,
+          body:
+              "@font-face { src: url('/static/fonts/OpenSans-Regular.ttf'); }",
+        ),
+        '/upr/static/css/upr.css': (status: 200, body: '.upr{}'),
+        '/upr/static/js/upr-shared.js': (status: 200, body: 'window.upr = 1;'),
+        '/static/fonts/OpenSans-Regular.ttf': (status: 200, body: 'FONT'),
+      });
+      final s = build(a);
+      await savePackage(s, 5);
+      final page = await pageHtml(s, 5);
+      expect(page, contains('href="upr/fonts.css"'));
+      expect(page, contains('href="upr/static/css/upr.css"'));
+      expect(page, contains('src="upr/static/js/upr-shared.js"'));
+      expect(
+        File(p.join(pkgDir().path, 'upr/fonts.css')).readAsStringSync(),
+        contains("../static/fonts/OpenSans-Regular.ttf"),
+      );
+      expect(
+        File(
+          p.join(pkgDir().path, 'static/fonts/OpenSans-Regular.ttf'),
+        ).existsSync(),
+        isTrue,
+      );
+    });
+
     test('points the page at saved plugin files', () async {
       final s = build(pluginAdapter());
       await savePackage(s, 5);

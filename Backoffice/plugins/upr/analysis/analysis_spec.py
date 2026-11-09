@@ -33,6 +33,8 @@ Visual::
       "table":  Table | None,          # the same numbers as a drill-down table
       "table_label": str | None,
       "findings": [Finding, ...],      # what the data says; [] when nobody has written any
+      "modes": [{"id", "label", "chart": Chart}],  # optional scale toggle; chart is modes[0]
+      "modes_label": str | omitted,
     }
 
 Overview::
@@ -57,10 +59,12 @@ Chart::
     {
       "categories": [str], "series": [Series],
       "axes": {"primary": Axis, "secondary": Axis?},
-      "stacked", "height", "column_width", "border_radius", "curve", "stroke_width",
+      "stacked", "stack_type": "100%" | omitted, "horizontal", "pie",
+      "colors": [str] | omitted,
+      "height", "column_width", "border_radius", "curve", "stroke_width",
       "legend", "data_labels", "x_title", "gradient": [shade, from, to] | None,
     }
-    Series = {"name", "kind": "column"|"line"|"area", "data": [number|None],
+    Series = {"name", "kind": "column"|"line"|"area"|"pie", "data": [number|None],
               "color", "axis": "primary"|"secondary", "format", "dashed"}
     Axis   = {"format", "opposite", "min", "max", "tick_amount"}
 
@@ -210,7 +214,14 @@ def chart(
     x_title: str | None = None,
     gradient: Sequence[float] | None = None,
     horizontal: bool = False,
+    stack_type: str | None = None,
+    pie: bool = False,
+    colors: Sequence[str] | None = None,
 ) -> dict[str, Any]:
+    if stack_type not in (None, "100%"):
+        raise ValueError(f"unknown stack_type {stack_type!r}; expected '100%' or None")
+    if stack_type == "100%":
+        stacked = True
     spec = {
         "categories": list(categories),
         "series": list(series_list),
@@ -226,9 +237,18 @@ def chart(
         "x_title": x_title,
         "gradient": list(gradient) if gradient else None,
     }
-    # Omitted when false so existing view fixtures stay stable.
+    # Omitted when off so existing view fixtures stay stable.
+    # ``horizontal`` draws the columns as bars (categories on the vertical axis).
+    # ``stack_type`` "100%" normalises each bar to a share; tooltips keep series values.
+    # ``pie`` draws one series as slices named by ``categories``; ``colors`` paints the slices.
     if horizontal:
         spec["horizontal"] = True
+    if stack_type == "100%":
+        spec["stack_type"] = "100%"
+    if pie:
+        spec["pie"] = True
+    if colors:
+        spec["colors"] = list(colors)
     return spec
 
 

@@ -14,6 +14,7 @@ import '../../theme/grouped_sheet_style.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import 'unified_planning_participation_map_screen.dart';
 
 /// Dashboard aggregating IFRC unified planning documents, with document types
@@ -261,6 +262,7 @@ class _UnifiedPlanningAnalyticsScreenState
               ),
             ],
           ),
+          bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
           body: body,
         );
       },

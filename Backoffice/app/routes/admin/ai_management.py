@@ -305,6 +305,26 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
         file_path = prep["file_path"]
         filename = prep["filename"]
         cleanup_temp = bool(prep.get("cleanup_temp"))
+        if prep.get("skip_processing"):
+            item.entity_type = "ai_document"
+            item.entity_id = ai_doc_id
+            item.status = "completed"
+            item.error = None
+            try:
+                base_payload = item.payload if isinstance(item.payload, dict) else {}
+                new_payload = dict(base_payload)
+                new_payload["ai_document_id"] = ai_doc_id
+                new_payload["import_code"] = prep.get("code")
+                item.payload = new_payload
+            except Exception as e:
+                current_app.logger.debug("System import skip payload update failed: %s", e)
+            db.session.commit()
+            if cleanup_temp and file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
+            return
 
         item.entity_type = "ai_document"
         item.entity_id = ai_doc_id
@@ -1693,6 +1713,15 @@ def import_system_bulk():
         if len(ids) > 500:
             return json_bad_request("Too many documents selected (max 500)")
 
+        seen_ids: set[int] = set()
+        deduped_ids: list[int] = []
+        for sid in ids:
+            if sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            deduped_ids.append(sid)
+        ids = deduped_ids
+
         if concurrency is None:
             concurrency = int(
                 current_app.config.get("AI_DOCS_SYSTEM_IMPORT_CONCURRENCY")
@@ -1980,6 +2009,15 @@ def import_guidance_bulk():
             return json_bad_request("No guidance document IDs provided")
         if len(ids) > 500:
             return json_bad_request("Too many documents selected (max 500)")
+
+        seen_ids: set[int] = set()
+        deduped_ids: list[int] = []
+        for sid in ids:
+            if sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            deduped_ids.append(sid)
+        ids = deduped_ids
 
         if concurrency is None:
             concurrency = int(

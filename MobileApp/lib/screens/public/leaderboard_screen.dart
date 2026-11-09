@@ -10,6 +10,7 @@ import '../../providers/public/leaderboard_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: theme.scaffoldBackgroundColor,
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

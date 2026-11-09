@@ -1,0 +1,429 @@
+{# Document Modal (for both upload and edit) #}
+<div class="fixed z-50 inset-0 overflow-y-auto hidden" id="documentModal" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <form id="documentForm" method="POST" enctype="multipart/form-data"
+                  data-upload-action="{{ upload_action_url if upload_action_url is defined and upload_action_url else url_for('content_management.upload_document') }}"
+                  {% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and show_entity_select is defined and show_entity_select and selected_entity_type is defined and selected_entity_id is defined %}data-default-entity-value="{{ selected_entity_type }}:{{ selected_entity_id }}"{% endif %}>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title"
+                                data-upload-text="{{ _('Upload New Document')|forceescape }}"
+                                data-edit-text="{{ _('Edit Document')|forceescape }}">
+                                {{ _('Upload New Document') }}
+                            </h3>
+                            <div class="mt-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <!-- Left Column -->
+                                    <div class="space-y-4">
+                                        {% if documents_modal_entity_choices is defined and documents_modal_entity_choices %}
+                                        <div>
+                                            <label for="documentModalEntitySelect" class="block text-sm font-medium text-gray-700">{{ _('Entity') }}</label>
+                                            <select id="documentModalEntitySelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md"{% if not (documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav) %} required{% endif %}>
+                                                {% if not (documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav) %}
+                                                <option value="">{{ _('Select an entity') }}</option>
+                                                {% endif %}
+                                                {% set doc_modal_og = namespace(prev=None, open=False) %}
+                                                {% for row in documents_modal_entity_choices %}
+                                                    {% if row.entity_type != doc_modal_og.prev %}
+                                                        {% if doc_modal_og.open %}</optgroup>{% endif %}
+                                                        <optgroup label="{{ doc_modal_optgroup_label(row.entity_type) }}">
+                                                        {% set doc_modal_og.prev = row.entity_type %}
+                                                        {% set doc_modal_og.open = True %}
+                                                    {% endif %}
+                                                    <option value="{{ row.entity_type }}:{{ row.entity_id }}"
+                                                            data-entity-type="{{ row.entity_type }}"
+                                                            data-entity-id="{{ row.entity_id }}"
+                                                            {% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_id is defined and row.entity_type == selected_entity_type and (row.entity_id|int) == (selected_entity_id|int) %}selected{% endif %}>
+                                                        {{ row.label }}
+                                                    </option>
+                                                {% endfor %}
+                                                {% if doc_modal_og.open %}</optgroup>{% endif %}
+                                            </select>
+                                        </div>
+                                        <input type="hidden" name="linked_entity_type" id="linkedEntityTypeHidden" value="{% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined %}{{ selected_entity_type }}{% endif %}">
+                                        <input type="hidden" name="linked_entity_id" id="linkedEntityIdHidden" value="{% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_id is defined %}{{ selected_entity_id }}{% endif %}">
+                                        <input type="hidden" name="country_id" id="countryIdHidden"
+                                               value="{% if documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_type == 'country' and selected_entity_id is defined %}{{ selected_entity_id }}{% endif %}"
+                                               {% if not (documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_type == 'country') %}disabled{% endif %}>
+                                        {% elif documents_modal_lock_entity_to_nav is defined and documents_modal_lock_entity_to_nav and selected_entity_type is defined and selected_entity_id is defined %}
+                                        <input type="hidden" name="linked_entity_type" id="linkedEntityTypeHidden" value="{{ selected_entity_type }}">
+                                        {% if selected_entity_type == 'country' %}
+                                        <input type="hidden" name="country_id" id="countryIdHidden" value="{{ selected_entity_id }}">
+                                        {% endif %}
+                                        <input type="hidden" name="linked_entity_id" id="linkedEntityIdHidden" value="{{ selected_entity_id }}">
+                                        {% else %}
+                                        <div>
+                                            <label for="linkedEntityType" class="block text-sm font-medium text-gray-700">{{ _('Linked entity type') }}</label>
+                                            <select id="linkedEntityType" name="linked_entity_type" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                {% for et in (document_entity_types or []) %}
+                                                    <option value="{{ et.value }}">{{ et.label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div id="countrySelectWrap">
+                                            <label for="country" class="block text-sm font-medium text-gray-700">{{ _('Country') }}</label>
+                                            <select id="country" name="country_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select a country') }}</option>
+                                                {% for country in countries %}
+                                                    <option value="{{ country.id }}">{{ country.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div id="linkedEntityIdWrap" class="hidden">
+                                            <label for="linkedEntityId" class="block text-sm font-medium text-gray-700">{{ _('Entity') }}</label>
+                                            <select id="linkedEntityId" name="linked_entity_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select an entity') }}</option>
+                                            </select>
+                                        </div>
+                                        {% endif %}
+                                        <div>
+                                            <label for="documentType" class="block text-sm font-medium text-gray-700">{{ _('Document Type') }}</label>
+                                            <select id="documentType" name="document_type" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select document type') }}</option>
+                                                {% for doc_type in config.DOCUMENT_TYPES %}
+                                                    <option value="{{ doc_type }}">{{ doc_type }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div id="languageSection">
+                                            <label for="language" class="block text-sm font-medium text-gray-700">{{ _('Language') }}</label>
+                                            <select id="language" name="language" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="">{{ _('Select language') }}</option>
+                                                {# Pin supported languages first, in admin-configured order #}
+                                                {% set pinned_codes = ['en'] %}
+                                                {% for code in (SUPPORTED_LANGUAGES or []) %}
+                                                    {% set code_norm = (code|string|lower|replace('-', '_')) %}
+                                                    {% set base = (code_norm.split('_')[0] if code_norm else code) %}
+                                                    {% if base != 'en' and base not in pinned_codes %}
+                                                        {% set __ = pinned_codes.append(base) %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {% for code in pinned_codes %}
+                                                    {% if code in ALL_LANGUAGES_DISPLAY_NAMES %}
+                                                        <option value="{{ code }}">{{ (language_endonym(code) or ALL_LANGUAGES_DISPLAY_NAMES[code]) }}</option>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {# Show all other languages sorted alphabetically (keeps full list available) #}
+                                                {% set other_languages = [] %}
+                                                {% for code, name in ALL_LANGUAGES_DISPLAY_NAMES.items() %}
+                                                    {% if code not in pinned_codes %}
+                                                        {% set __ = other_languages.append({'code': code, 'name': name}) %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {% for lang in other_languages|sort(attribute='name') %}
+                                                    <option value="{{ lang.code }}">{{ (language_endonym(lang.code) or lang.name) }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- Right Column -->
+                                    <div class="space-y-4">
+                                        <div id="yearSection">
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Period/Year Covered') }}</label>
+                                            <div class="space-y-3">
+                                                <!-- Period Type Selection -->
+                                                <div>
+                                                    <select id="period-type" class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md">
+                                                        <option value="single-year">{{ _('Single Year') }}</option>
+                                                        <option value="year-range">{{ _('Year Range') }}</option>
+                                                        <option value="month-range">{{ _('Month Range') }}</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Single Year -->
+                                                <div id="single-year-fields" class="period-fields">
+                                                    <select id="single-year"
+                                                            class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                            data-year-select="true"
+                                                            data-year-min="2000"
+                                                            data-year-max="2100">
+                                                        <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Year Range -->
+                                                <div id="year-range-fields" class="period-fields hidden">
+                                                    <div class="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('Start Year') }}</label>
+                                                            <select id="start-year"
+                                                                    class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                    data-year-select="true"
+                                                                    data-year-min="2000"
+                                                                    data-year-max="2100">
+                                                                <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('End Year') }}</label>
+                                                            <select id="end-year"
+                                                                    class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                    data-year-select="true"
+                                                                    data-year-min="2000"
+                                                                    data-year-max="2100">
+                                                                <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Month Range -->
+                                                <div id="month-range-fields" class="period-fields hidden">
+                                                    <div class="space-y-2">
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('Start Period') }}</label>
+                                                            <div class="grid grid-cols-2 gap-1">
+                                                                <select id="start-month-year"
+                                                                        class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                        data-year-select="true"
+                                                                        data-year-min="2000"
+                                                                        data-year-max="2100">
+                                                                    <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                                </select>
+                                                                <select id="start-month" class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md">
+                                                                    <option value="01">{{ _('Jan') }}</option>
+                                                                    <option value="02">{{ _('Feb') }}</option>
+                                                                    <option value="03">{{ _('Mar') }}</option>
+                                                                    <option value="04">{{ _('Apr') }}</option>
+                                                                    <option value="05">{{ _('May') }}</option>
+                                                                    <option value="06">{{ _('Jun') }}</option>
+                                                                    <option value="07">{{ _('Jul') }}</option>
+                                                                    <option value="08">{{ _('Aug') }}</option>
+                                                                    <option value="09">{{ _('Sep') }}</option>
+                                                                    <option value="10">{{ _('Oct') }}</option>
+                                                                    <option value="11">{{ _('Nov') }}</option>
+                                                                    <option value="12">{{ _('Dec') }}</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ _('End Period') }}</label>
+                                                            <div class="grid grid-cols-2 gap-1">
+                                                                <select id="end-month-year"
+                                                                        class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                        data-year-select="true"
+                                                                        data-year-min="2000"
+                                                                        data-year-max="2100">
+                                                                    <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                                </select>
+                                                                <select id="end-month" class="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full text-sm border-gray-300 rounded-md">
+                                                                    <option value="01">{{ _('Jan') }}</option>
+                                                                    <option value="02">{{ _('Feb') }}</option>
+                                                                    <option value="03">{{ _('Mar') }}</option>
+                                                                    <option value="04">{{ _('Apr') }}</option>
+                                                                    <option value="05">{{ _('May') }}</option>
+                                                                    <option value="06">{{ _('Jun') }}</option>
+                                                                    <option value="07">{{ _('Jul') }}</option>
+                                                                    <option value="08">{{ _('Aug') }}</option>
+                                                                    <option value="09">{{ _('Sep') }}</option>
+                                                                    <option value="10">{{ _('Oct') }}</option>
+                                                                    <option value="11">{{ _('Nov') }}</option>
+                                                                    <option value="12">{{ _('Dec') }}</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Hidden field to store the generated period name -->
+                                                <input type="hidden" name="year" id="year" required>
+                                            </div>
+                                        </div>
+                                        <div id="statusSection" class="hidden">
+                                            <label for="status" class="block text-sm font-medium text-gray-700">{{ _('Document Status') }}</label>
+                                            <select id="status" name="status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md">
+                                                <option value="pending">{{ _('Pending Review') }}</option>
+                                                <option value="approved">{{ _('Approved') }}</option>
+                                                <option value="rejected">{{ _('Rejected') }}</option>
+                                            </select>
+                                            <p class="mt-1 text-sm text-gray-500">{{ _('Change the approval status of this document') }}</p>
+                                        </div>
+                                        <div class="flex items-start space-x-3">
+                                            <div class="flex items-center h-5">
+                                                <input id="is_public" name="is_public" type="checkbox" class="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded">
+                                            </div>
+                                            <div class="ml-3 text-sm">
+                                                <label for="is_public" class="font-medium text-gray-700">{{ _('Public Document') }}</label>
+                                                <p class="text-gray-500" id="publicHelpText"
+                                                   data-default-text="{{ _('Check this box to make the document publicly accessible')|forceescape }}"
+                                                   data-cover-text="{{ _('Cover images are always public and visible on country pages')|forceescape }}">
+                                                    {{ _('Check this box to make the document publicly accessible') }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- File Upload and Thumbnail Sections - Side by Side -->
+                                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <!-- File Upload Section -->
+                                    <div id="fileUploadSection">
+                                        <label for="document" class="block text-sm font-medium text-gray-700">{{ _('Document File') }}</label>
+                                        <div id="documentFileDropZone" class="mt-1 flex justify-center px-4 py-4 sm:px-5 sm:py-5 border-2 border-gray-300 border-dashed rounded-md">
+                                            <div id="documentUploadEmptyState" class="space-y-1 text-center w-full">
+                                                <i class="fas fa-upload text-gray-400 text-3xl mb-3" aria-hidden="true"></i>
+                                                <div class="flex flex-col items-center gap-1.5 text-sm text-gray-600 w-full">
+                                                    <label for="document" class="relative cursor-pointer bg-white rounded-md font-medium text-red-600 hover:text-red-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-red-500">
+                                                        <span id="documentUploadTriggerLabel">{{ _('Upload a file') }}</span>
+                                                    </label>
+                                                    <div class="text-center text-gray-500 leading-tight space-y-0.5 max-w-md mx-auto">
+                                                        <p class="text-sm m-0">{{ _('or drag and drop') }}</p>
+                                                        <p id="documentFileSizeHelp" class="text-xs m-0"
+                                                           data-default-text="{{ _('Any file up to 10MB')|forceescape }}"
+                                                           data-image-text="{{ _('Image files only (PNG, JPG, etc.) up to 10MB')|forceescape }}">{{ _('Any file up to 10MB') }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div id="documentCurrentFileState" class="hidden w-full text-left flex flex-col gap-2">
+                                                <div class="flex items-start gap-3 min-w-0">
+                                                    <i class="fas fa-file-alt text-gray-500 text-2xl flex-shrink-0 mt-0.5" aria-hidden="true"></i>
+                                                    <div class="min-w-0">
+                                                        <a id="currentDocumentFileLink" href="#"
+                                                           class="text-sm font-semibold text-blue-600 hover:text-blue-800 break-all leading-snug hidden focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 rounded-sm"
+                                                           target="_blank" rel="noopener noreferrer"
+                                                           aria-label="{{ _('Download document')|forceescape }}"></a>
+                                                        <span id="currentDocumentFileNamePlain" class="text-sm font-semibold text-gray-900 break-all leading-snug hidden"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col gap-1.5 w-full pt-2 border-t border-gray-200">
+                                                    <label for="document" class="relative cursor-pointer bg-white rounded-md text-sm font-medium text-red-600 hover:text-red-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-red-500 w-fit">
+                                                        <span>{{ _('Replace file') }}</span>
+                                                    </label>
+                                                    <div class="text-gray-500 leading-tight space-y-0.5">
+                                                        <p class="text-sm m-0">{{ _('or drag and drop') }}</p>
+                                                        <p id="documentFileSizeHelpEdit" class="text-xs m-0"
+                                                           data-default-text="{{ _('Any file up to 10MB')|forceescape }}"
+                                                           data-image-text="{{ _('Image files only (PNG, JPG, etc.) up to 10MB')|forceescape }}">{{ _('Any file up to 10MB') }}</p>
+                                                    </div>
+                                                </div>
+                                                <div id="documentPendingReplaceRow" class="hidden mt-2 pt-2 border-t border-gray-200 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                                                    <div class="min-w-0 flex-1">
+                                                        <span class="text-xs text-gray-500">{{ _('New file selected') }}</span>
+                                                        <span class="text-sm font-medium text-gray-800 break-all block sm:inline sm:ml-1" id="documentPendingReplaceName"></span>
+                                                    </div>
+                                                    <button type="button" id="documentClearReplaceBtn" class="text-xs text-red-600 hover:text-red-800 underline flex-shrink-0">{{ _('Clear selection') }}</button>
+                                                </div>
+                                            </div>
+                                            <input id="document" name="document" type="file" class="sr-only" autocomplete="off">
+                                        </div>
+                                    </div>
+                                    <!-- Thumbnail Upload Section - Only show for public documents -->
+                                    <div id="thumbnailSection" class="hidden">
+                                        <label for="thumbnail" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Thumbnail Image') }}</label>
+                                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md thumbnail-upload-container"
+                                             data-entity-type="document"
+                                             data-i18n-generating="{{ _('Generating...')|forceescape }}"
+                                             data-i18n-generating-thumb="{{ _('Generating thumbnail...')|forceescape }}"
+                                             data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail')|forceescape }}"
+                                             data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail')|forceescape }}"
+                                             data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.')|forceescape }}"
+                                             data-i18n-deleting="{{ _('Deleting...')|forceescape }}"
+                                             data-i18n-deleting-thumb="{{ _('Deleting thumbnail...')|forceescape }}"
+                                             data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!')|forceescape }}"
+                                             data-i18n-generated-success="{{ _('Thumbnail generated successfully!')|forceescape }}"
+                                             data-i18n-error-prefix="{{ _('Error:')|forceescape }}"
+                                             data-i18n-network-error="{{ _('Network error occurred')|forceescape }}"
+                                             data-i18n-generated-automatically="{{ _('Generated automatically')|forceescape }}"
+                                             data-i18n-current-thumbnail="{{ _('Current thumbnail:')|forceescape }}"
+                                             data-i18n-delete-label="{{ _('Delete')|forceescape }}"
+                                             data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.')|forceescape }}">
+                                            <div class="space-y-1 text-center w-full">
+                                                <div id="currentThumbnailDisplay" class="mb-3" style="display: none;">
+                                                    <div class="flex justify-between items-start mb-1">
+                                                        <p class="text-sm text-gray-600">{{ _('Current thumbnail:') }}</p>
+                                                        <button type="button"
+                                                                data-action="thumbnail:delete"
+                                                                data-entity-type="document"
+                                                                data-entity-id=""
+                                                                data-language-code=""
+                                                                id="delete-thumb-btn"
+                                                                class="inline-flex items-center px-2 py-1 border border-red-300 shadow-sm text-xs leading-4 font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                                title="{{ _('Delete thumbnail')|forceescape }}">
+                                                            <i class="fas fa-trash mr-1"></i>
+                                                            <span id="delete-thumb-text"
+                                                                  data-default-text="{{ _('Delete')|forceescape }}"
+                                                                  data-thumbnail-btn-text="delete"
+                                                                  data-deleting-text="{{ _('Deleting...')|forceescape }}">{{ _('Delete') }}</span>
+                                                        </button>
+                                                    </div>
+                                                    <img id="currentThumbnailImg" src="" alt="{{ _('Current thumbnail')|forceescape }}" class="max-w-full max-h-48 border rounded-md shadow-sm mx-auto">
+                                                    <p id="currentThumbnailFilename" class="text-xs text-gray-500 mt-1"
+                                                       data-prefix="{{ _('Original name:')|forceescape }}"
+                                                       data-thumbnail-filename="true"
+                                                       data-generated-text="{{ _('Generated automatically')|forceescape }}"></p>
+                                                    <div id="delete-thumb-status" class="mt-2 text-sm"
+                                                         data-thumbnail-status="delete"
+                                                         data-confirm-text="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.')|forceescape }}"
+                                                         data-deleting-text="{{ _('Deleting thumbnail...')|forceescape }}"
+                                                         data-success-text="{{ _('Thumbnail deleted successfully!')|forceescape }}"
+                                                         data-error-prefix="{{ _('Error:')|forceescape }}"
+                                                         data-network-error="{{ _('Network error occurred')|forceescape }}"></div>
+                                                </div>
+
+                                                <i class="fas fa-image text-gray-400 text-3xl mb-3"></i>
+                                                <div class="flex text-sm text-gray-600 justify-center">
+                                                    <label for="thumbnail" class="relative cursor-pointer bg-white rounded-md font-medium text-red-600 hover:text-red-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-red-500">
+                                                        <span>{{ _('Upload image') }}</span>
+                                                        <input type="file"
+                                                               name="thumbnail"
+                                                               id="thumbnail"
+                                                               accept="image/*"
+                                                               class="sr-only">
+                                                    </label>
+                                                    <p class="pl-1">{{ _('or drag and drop') }}</p>
+                                                </div>
+                                                <p id="thumbnailHelpText" class="text-xs text-gray-500"
+                                                   data-default-text="{{ _('Image files only (PNG, JPG, etc.)')|forceescape }}"
+                                                   data-replace-text="{{ _('To replace the current thumbnail, choose a new image below.')|forceescape }}">
+                                                    {{ _('Image files only (PNG, JPG, etc.)') }}
+                                                </p>
+
+                                                <div id="generateThumbnailSection" class="mt-3" style="display: none;">
+                                                    <button type="button"
+                                                            data-action="thumbnail:generate"
+                                                            data-entity-type="document"
+                                                            data-entity-id=""
+                                                            data-language-code=""
+                                                            id="generate-btn"
+                                                            class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                        <i class="fas fa-image mr-2"></i>
+                                                        <span id="generate-text"
+                                                              data-default-text="{{ _('Generate PDF Thumbnail')|forceescape }}"
+                                                              data-thumbnail-btn-text="generate"
+                                                              data-generating-text="{{ _('Generating...')|forceescape }}"
+                                                              data-regenerate-text="{{ _('Regenerate Thumbnail')|forceescape }}">{{ _('Generate PDF Thumbnail') }}</span>
+                                                    </button>
+                                                    <div id="generate-status" class="mt-2 text-sm"
+                                                         data-thumbnail-status="generate"
+                                                         data-generating-text="{{ _('Generating thumbnail...')|forceescape }}"
+                                                         data-success-text="{{ _('Thumbnail generated successfully!')|forceescape }}"
+                                                         data-error-prefix="{{ _('Error:')|forceescape }}"
+                                                         data-network-error="{{ _('Network error occurred')|forceescape }}"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" id="submitButton"
+                            data-upload-btn-text="{{ _('Upload')|forceescape }}"
+                            data-update-text="{{ _('Update')|forceescape }}"
+                            class="btn btn-success w-full sm:ml-3 sm:w-auto sm:text-sm">
+                        {{ _('Upload') }}
+                    </button>
+                    <button type="button" class="btn btn-secondary mt-3 w-full sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" data-action="close-modal">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

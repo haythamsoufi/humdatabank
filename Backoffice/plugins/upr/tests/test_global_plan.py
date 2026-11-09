@@ -297,3 +297,81 @@ def test_views_cover_all_sections():
     assert pns_row["countries"][0]["cells"][0] == "Danish RC"
     assert pns_row["countries"][0]["cells"][1] == 50
     assert views["prioritisation"]["visuals"]
+
+
+def _visual(views, section, visual_id):
+    return next(item for item in views[section]["visuals"] if item["id"] == visual_id)
+
+
+def test_regional_bars_are_percent_stacked_and_nsif_splits_are_pies():
+    payload = aggregate_global_plan(
+        [
+            _master(Entity="HNS", Attribute="SP Breakdown", Area="SP1", ValueNum=600, Region="Europe"),
+            _master(
+                ISO3="BBB",
+                Country="Benin",
+                Entity="HNS",
+                Attribute="SP Breakdown",
+                Area="SP2",
+                ValueNum=400,
+                Region="Africa",
+            ),
+            _master(Entity="IFRC Secretariat", Attribute="SP Breakdown", Area="SP1", ValueNum=250, Region="Europe"),
+            _master(
+                Section="Reach",
+                Indicator="People to be reached",
+                Attribute="SP Breakdown",
+                Area="SP1",
+                ValueNum=9000,
+                Entity="HNS",
+                Region="Europe",
+            ),
+            _master(
+                ISO3="BBB",
+                Country="Benin",
+                Section="Reach",
+                Indicator="People to be reached",
+                Attribute="SP Breakdown",
+                Area="SP2",
+                ValueNum=1000,
+                Entity="HNS",
+                Region="Africa",
+            ),
+        ],
+        [
+            {"Round": "P27", "ISO3": "AAA", "status": "approved"},
+            {"Round": "P27", "ISO3": "BBB", "status": "approved"},
+        ],
+        countries={
+            "AAA": {"name": "Aland", "region": "Europe"},
+            "BBB": {"name": "Benin", "region": "Africa"},
+        },
+        ns_flags={"AAA": {"nsif": True, "country": "Aland"}},
+        year=2027,
+    )
+    views = build_global_plan_views(payload)
+
+    for section, visual_id in (("geo", "gp_geo_region"), ("people_reached", "gp_people_region")):
+        item = _visual(views, section, visual_id)
+        assert item["chart"]["horizontal"] is True
+        assert item["chart"]["stacked"] is True
+        assert item["chart"]["stack_type"] == "100%"
+        assert [mode["id"] for mode in item["modes"]] == ["share", "values"]
+        assert item["modes"][0]["chart"] is item["chart"]
+        values = item["modes"][1]["chart"]
+        assert values["horizontal"] is True
+        assert values["stacked"] is True
+        assert "stack_type" not in values
+        assert values["categories"] == item["chart"]["categories"]
+        assert item["chart"]["series"]
+
+    submit = _visual(views, "overview", "gp_submit_priority")
+    assert submit["chart"]["pie"] is True
+    assert submit["chart"]["series"][0]["kind"] == "pie"
+    assert submit["chart"]["series"][0]["data"] == [1, 1]
+    assert len(submit["chart"]["colors"]) == 2
+
+    share = _visual(views, "secretariat", "gp_sec_share")
+    assert share["chart"]["pie"] is True
+    assert share["chart"]["series"][0]["format"] == "money"
+    assert share["chart"]["series"][0]["data"] == [250, 0]

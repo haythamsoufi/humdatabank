@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:pdfx/pdfx.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../config/app_config.dart';
@@ -16,7 +16,6 @@ import '../../services/unified_planning_pdf_thumbnail_cache.dart';
 import '../../utils/constants.dart';
 import '../../utils/debug_logger.dart';
 import '../../l10n/app_localizations.dart';
-import '../../utils/navigation_helper.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 
 class PdfViewerScreen extends StatefulWidget {
@@ -49,7 +48,10 @@ class PdfViewerScreen extends StatefulWidget {
 }
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
-  PdfController? _controller;
+  final PdfViewerController _pdfController = PdfViewerController();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  PdfTextSearcher? _textSearcher;
   Uint8List? _pdfBytes;
   bool _isDownloading = true;
   double _downloadProgress = 0;
@@ -58,6 +60,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   int _totalPages = 0;
   bool _showControls = true;
   bool _isSharing = false;
+  bool _searchOpen = false;
 
   @override
   void initState() {
@@ -67,7 +70,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _textSearcher?.removeListener(_onSearchChanged);
+    _textSearcher?.dispose();
+    _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -86,9 +92,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         );
         if (!mounted) return;
         _pdfBytes = bytes;
-        _controller = PdfController(
-          document: PdfDocument.openData(bytes),
-        );
         setState(() {
           _isDownloading = false;
           _downloadProgress = 1.0;
@@ -133,9 +136,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         if (!mounted) return;
 
         _pdfBytes = bytes;
-        _controller = PdfController(
-          document: PdfDocument.openData(bytes),
-        );
         setState(() {
           _isDownloading = false;
           _downloadProgress = 1.0;
@@ -155,7 +155,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  /// Renders first page off-screen after the viewer’s document is ready (separate [PdfDocument]).
+  /// Renders first page off-screen after the bytes are ready (separate [PdfDocument]).
   void _scheduleUnifiedPlanningLocalThumbnail() {
     if (kIsWeb) return;
     final key = widget.thumbnailCacheUrl?.trim();
@@ -167,7 +167,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   Future<void> _generateUnifiedPlanningThumbnail(String cacheUrl) async {
-    // Let [PdfController] / platform renderer initialize before a second openData.
+    // Let the viewer finish opening the same bytes before a second document open.
     await Future<void>.delayed(const Duration(milliseconds: 400));
     final bytes = _pdfBytes;
     if (bytes == null || !mounted) return;
@@ -221,6 +221,97 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
+  String get _pdfSourceName {
+    final url = widget.url?.trim();
+    if (url != null && url.isNotEmpty) return url;
+    final path = widget.localFilePath?.trim();
+    if (path != null && path.isNotEmpty) return path;
+    return widget.title;
+  }
+
+  void _onSearchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _attachSearcher(PdfViewerController controller) {
+    _textSearcher?.removeListener(_onSearchChanged);
+    _textSearcher?.dispose();
+    final searcher = PdfTextSearcher(controller)..addListener(_onSearchChanged);
+    _textSearcher = searcher;
+    final query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      searcher.startTextSearch(
+        query,
+        caseInsensitive: true,
+        searchImmediately: true,
+      );
+    }
+  }
+
+  void _openSearch() {
+    setState(() {
+      _searchOpen = true;
+      _showControls = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    _searchController.clear();
+    _textSearcher?.resetTextSearch();
+    _searchFocus.unfocus();
+    setState(() => _searchOpen = false);
+  }
+
+  void _onSearchQueryChanged(String value) {
+    final query = value.trim();
+    final searcher = _textSearcher;
+    if (searcher == null) return;
+    if (query.isEmpty) {
+      searcher.resetTextSearch();
+      return;
+    }
+    searcher.startTextSearch(query, caseInsensitive: true);
+  }
+
+  Future<void> _goToMatch(int delta) async {
+    final searcher = _textSearcher;
+    if (searcher == null || searcher.matches.isEmpty) return;
+    final count = searcher.matches.length;
+    final current = searcher.currentIndex ?? (delta > 0 ? -1 : 0);
+    final next = (current + delta) % count;
+    final index = next < 0 ? next + count : next;
+    await searcher.goToMatchOfIndex(index);
+  }
+
+  void _paintSearchMatches(Canvas canvas, Rect pageRect, PdfPage page) {
+    _textSearcher?.pageTextMatchPaintCallback(canvas, pageRect, page);
+  }
+
+  void _onPdfPageChanged(int? pageNumber) {
+    if (!mounted || pageNumber == null || pageNumber == _currentPage) return;
+    setState(() => _currentPage = pageNumber);
+  }
+
+  void _onPdfViewerReady(PdfDocument document, PdfViewerController controller) {
+    _attachSearcher(controller);
+    if (!mounted) return;
+    setState(() => _totalPages = document.pages.length);
+  }
+
+  bool _onPdfTap(
+    BuildContext context,
+    PdfViewerController controller,
+    PdfViewerGeneralTapHandlerDetails details,
+  ) {
+    if (details.type == PdfViewerGeneralTapType.tap) {
+      setState(() => _showControls = !_showControls);
+    }
+    return false;
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -260,7 +351,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        bottom: _searchOpen ? _buildSearchBar(loc) : null,
         actions: [
+          if (!_isDownloading && _error == null && !_searchOpen)
+            IconButton(
+              icon: const Icon(Icons.search_rounded),
+              tooltip: loc.pdfViewerSearch,
+              onPressed: _openSearch,
+            ),
           if (!_isDownloading && _error == null)
             _isSharing
                 ? const Padding(
@@ -285,8 +383,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         currentIndex: AppBottomNavigationBar.noTabSelected,
         backgroundColor: Colors.black.withValues(alpha: 0.52),
         lightForegroundOnBar: true,
-        onTap: (index) =>
-            NavigationHelper.popToMainThenOpenAiIfNeeded(context, index),
       ),
       body: _isDownloading
           ? _buildDownloading(ifrcRed, theme, loc)
@@ -401,47 +497,140 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   // ── PDF view ───────────────────────────────────────────────────────────────
 
+  PreferredSizeWidget _buildSearchBar(AppLocalizations loc) {
+    final searcher = _textSearcher;
+    final canStep = searcher != null && searcher.matches.isNotEmpty;
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(56),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 4, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocus,
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+                cursorColor: Colors.white,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: loc.pdfViewerSearchHint,
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: _onSearchQueryChanged,
+                onSubmitted: (value) {
+                  final query = value.trim();
+                  if (query.isEmpty) return;
+                  _textSearcher?.startTextSearch(
+                    query,
+                    caseInsensitive: true,
+                    searchImmediately: true,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            _searchStatus(loc),
+            IconButton(
+              tooltip: loc.pdfViewerSearchPrevious,
+              onPressed: canStep ? () => _goToMatch(-1) : null,
+              color: Colors.white,
+              disabledColor: Colors.white24,
+              icon: const Icon(Icons.keyboard_arrow_up_rounded),
+            ),
+            IconButton(
+              tooltip: loc.pdfViewerSearchNext,
+              onPressed: canStep ? () => _goToMatch(1) : null,
+              color: Colors.white,
+              disabledColor: Colors.white24,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            ),
+            IconButton(
+              tooltip: loc.pdfViewerSearchClose,
+              onPressed: _closeSearch,
+              color: Colors.white,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _searchStatus(AppLocalizations loc) {
+    final searcher = _textSearcher;
+    final query = _searchController.text.trim();
+    if (query.isEmpty || searcher == null) {
+      return const SizedBox(width: 4);
+    }
+    if (searcher.matches.isEmpty) {
+      if (searcher.isSearching) {
+        return const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.white54,
+          ),
+        );
+      }
+      return Text(
+        loc.pdfViewerSearchNoMatches,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      );
+    }
+    final index = (searcher.currentIndex ?? 0) + 1;
+    return Text(
+      '$index/${searcher.matches.length}',
+      style: const TextStyle(
+        color: Colors.white70,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
   Widget _buildPdf(Color accent) {
+    final bytes = _pdfBytes;
+    if (bytes == null) return const SizedBox.shrink();
     return Stack(
       children: [
-        // Main PDF viewer
-        GestureDetector(
-          onTap: () => setState(() => _showControls = !_showControls),
-          child: PdfView(
-            controller: _controller!,
-            scrollDirection: Axis.vertical,
-            onDocumentLoaded: (doc) {
-              setState(() => _totalPages = doc.pagesCount);
-            },
-            onPageChanged: (page) {
-              setState(() => _currentPage = page);
-            },
-            builders: PdfViewBuilders<DefaultBuilderOptions>(
-              options: const DefaultBuilderOptions(),
-              documentLoaderBuilder: (_) => Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(accent),
-                ),
+        PdfViewer.data(
+          bytes,
+          sourceName: _pdfSourceName,
+          controller: _pdfController,
+          params: PdfViewerParams(
+            backgroundColor: Colors.black,
+            margin: 8,
+            pageDropShadow: null,
+            matchTextColor: const Color(0x99FFEB3B),
+            activeMatchTextColor: const Color(0xE6FF9800),
+            pagePaintCallbacks: [_paintSearchMatches],
+            onPageChanged: _onPdfPageChanged,
+            onViewerReady: _onPdfViewerReady,
+            onGeneralTap: _onPdfTap,
+            loadingBannerBuilder: (_, _, _) => Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(accent),
               ),
-              pageLoaderBuilder: (_) => Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(accent.withValues(alpha: 0.6)),
-                ),
-              ),
-              errorBuilder: (_, err) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.warning_rounded,
-                        color: Colors.white38, size: 40),
-                    const SizedBox(height: 8),
-                    Text(err.toString(),
-                        style: const TextStyle(
-                            color: Colors.white38, fontSize: 12)),
-                  ],
+            ),
+            errorBannerBuilder: (_, error, _, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  error.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
                 ),
               ),
             ),

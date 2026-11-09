@@ -52,7 +52,8 @@ const String kOfflineApiRecordHandler = 'ifrcOfflineApiRecord';
 /// headless download-time load). Captures the JSON the form fetches for its own
 /// data — lookup lists, plugin data such as emergency operations, entry bootstrap,
 /// resolved variables — so the saved copy can serve them offline.
-final String kOfflineApiRecorderJs = '''
+final String kOfflineApiRecorderJs =
+    '''
 (function () {
   if (window.__ifrcApiRecorderInstalled) return;
   window.__ifrcApiRecorderInstalled = true;
@@ -172,6 +173,14 @@ $kOfflineApiKeyJs
         }));
       }
     } catch (e) {}
+    // A file:// page has no session. Falling through reaches a dev server that
+    // is still up (adb reverse) and answers 401, which sends the form to /login.
+    if (location.protocol === 'file:') {
+      return Promise.resolve(new Response('{"offline":true}', {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      }));
+    }
     if (typeof nativeFetch === 'function') return nativeFetch.apply(this, arguments);
     return Promise.reject(new TypeError('Failed to fetch'));
   };

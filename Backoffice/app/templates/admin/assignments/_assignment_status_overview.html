@@ -1,4 +1,4 @@
-{# Status dashboard shown at the top of manage_assignment.html for existing assignments. #}
+{# Status dashboard rendered in the Status overview tab on manage_assignment.html. #}
 {% from "components/_status_label.html" import status_label %}
 
 {% set overview = assignment_overview %}
@@ -7,15 +7,10 @@
 {% set cr = overview.avg_completion_pct %}
 {% set lifecycle = overview.lifecycle %}
 
-<div id="assignment-status-overview" class="mb-6 space-y-4" aria-labelledby="assignment-status-overview-title">
-    <div class="bg-white shadow-md border border-gray-200">
-        <div class="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-                <h2 id="assignment-status-overview-title" class="text-base font-semibold text-gray-800 flex items-center gap-2">
-                    <i class="fas fa-chart-bar text-blue-500" aria-hidden="true"></i>
-                    {{ _('Status overview') }}
-                </h2>
-                <p class="mt-1 text-xs text-gray-500">
+<div id="assignment-status-overview" class="space-y-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+            <p class="text-xs text-gray-500">
                     {% if overview.template_name %}
                         <span class="font-medium text-gray-700">{{ overview.template_name }}</span>
                         {% if overview.period_name %}
@@ -50,8 +45,7 @@
             </div>
         </div>
 
-        <div class="p-4 sm:p-6">
-            <div class="assignment-overview-row">
+        <div class="assignment-overview-row">
             <div class="assignment-overview-cards">
                 <{% if has_entities %}button type="button" data-open-entities-tab{% else %}div{% endif %}
                    class="bg-gray-50 p-4 rounded-lg border border-gray-200 text-left {% if has_entities %}hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer{% endif %}">
@@ -140,8 +134,6 @@
                             role="img"></canvas>
                 </div>
             </div>
-            </div>
-        </div>
     </div>
 </div>
 {% endif %}

@@ -416,13 +416,16 @@ class ApiService {
     final isOnline = _connectivity.isOnline;
     final isOffline = _connectivity.isOffline;
 
-    // Only use cache preemptively if we're definitely offline
-    // Otherwise, try the network request first and fall back to cache on failure
+    // Only use cache preemptively if we're definitely offline.
+    // Otherwise, try the network request first and fall back to cache on failure.
+    // Expired rows are still usable here: offline should show the last payload.
     if (isOffline && useCache) {
-      final cached = await _cacheService.getCachedResponse(cacheKey);
+      final cached = await _cacheService.getCachedResponse(
+        cacheKey,
+        allowExpired: true,
+      );
       if (cached != null) {
         DebugLogger.logApi('Returning cached response for: $endpoint');
-        // Create a response from cached data
         return http.Response(
           cached.data,
           200,
@@ -430,15 +433,19 @@ class ApiService {
         );
       }
       DebugLogger.logApi('No cached data available for: $endpoint');
-      // Don't throw here - let the network request attempt happen below
-      // We'll handle the error in the catch block
+      throw Exception(
+        'No internet connection and no cached data available.',
+      );
     }
 
     // Wi‑Fi can stay "online" while the backoffice is down. After a transport
     // failure we defer non‑critical work — serve cache immediately when
     // available so pull‑to‑refresh does not wait through live timeouts/retries.
     if (useCache && shouldDeferRemoteFetch) {
-      final cached = await _cacheService.getCachedResponse(cacheKey);
+      final cached = await _cacheService.getCachedResponse(
+        cacheKey,
+        allowExpired: true,
+      );
       if (cached != null) {
         DebugLogger.logApi(
             'Backend defer active — returning cached response for: $endpoint');
@@ -663,9 +670,12 @@ class ApiService {
         throw AuthenticationException('Session expired. Please log in again.');
       }
 
-      // Try cache as fallback if network request failed
+      // Try cache as fallback if network request failed, including past the TTL.
       if (useCache) {
-        final cached = await _cacheService.getCachedResponse(cacheKey);
+        final cached = await _cacheService.getCachedResponse(
+          cacheKey,
+          allowExpired: true,
+        );
         if (cached != null) {
           DebugLogger.logApi('Network request failed, returning cached response for: $endpoint');
           return http.Response(
@@ -697,9 +707,12 @@ class ApiService {
       rethrow;
     } catch (e) {
       _notePrimaryBackendTransportFailure(uri, usedLiveNetwork: usedLiveNetwork);
-      // Try cache as fallback if network request failed
+      // Try cache as fallback if network request failed, including past the TTL.
       if (useCache) {
-        final cached = await _cacheService.getCachedResponse(cacheKey);
+        final cached = await _cacheService.getCachedResponse(
+          cacheKey,
+          allowExpired: true,
+        );
         if (cached != null) {
           DebugLogger.logApi('Network request failed, returning cached response for: $endpoint');
           return http.Response(
@@ -1043,6 +1056,81 @@ class ApiService {
     } catch (e) {
       DebugLogger.logError('Failed to queue POST request: $e');
     }
+  }
+
+  /// Multipart POST. [Content-Type] is left to the request so the boundary is set.
+  ///
+  /// File bytes are not queued for offline retry.
+  Future<http.Response> postMultipart(
+    String endpoint, {
+    Map<String, String>? fields,
+    List<http.MultipartFile>? files,
+    bool includeAuth = true,
+  }) async {
+    if (includeAuth) await _guardSessionExpiry();
+
+    final isOnline = _connectivity.isOnline;
+    final uri = Uri.parse('${AppConfig.baseApiUrl}$endpoint');
+    const requestTimeout = ApiTimeouts.receive;
+
+    Future<http.Response> send(Map<String, String> headers) async {
+      final request = http.MultipartRequest('POST', uri);
+      request.headers.addAll(headers);
+      request.headers.remove('Content-Type');
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      if (files != null) {
+        request.files.addAll(files);
+      }
+      final streamed = await request.send().timeout(requestTimeout);
+      return http.Response.fromStream(streamed);
+    }
+
+    var headers = await _getHeaders(
+      includeAuth: includeAuth,
+      contentType: '',
+      httpMethod: 'POST',
+      endpoint: endpoint,
+    );
+    headers = await _applyRequestInterceptors(headers, endpoint);
+
+    DebugLogger.logApi('POST multipart ${uri.toString()}');
+    var response = await send(headers);
+    await _applyResponseInterceptors(response, endpoint);
+
+    if (response.statusCode == 401 && includeAuth) {
+      final hasRefresh = await _jwtService.hasRefreshToken();
+      if (hasRefresh && _tokenRefreshCallback != null) {
+        final refreshed = await _coalescedTokenRefresh();
+        if (refreshed) {
+          final retryHeaders = await _getHeaders(
+            includeAuth: includeAuth,
+            contentType: '',
+            httpMethod: 'POST',
+            endpoint: endpoint,
+          );
+          response = await send(
+            await _applyRequestInterceptors(retryHeaders, endpoint),
+          );
+          if (response.statusCode == 401) {
+            await _clearLocalAuthState('401 after multipart refresh retry failed');
+            throw AuthenticationException('Authentication required. Please log in.');
+          }
+        } else {
+          await _clearLocalAuthState('JWT refresh failed');
+          throw AuthenticationException('Session expired. Please log in again.');
+        }
+      } else {
+        await _clearLocalAuthState('No refresh token for 401 recovery');
+        throw AuthenticationException('Authentication required. Please log in.');
+      }
+    }
+
+    if (includeAuth && response.statusCode >= 200 && response.statusCode < 300) {
+      await _session.updateLastValidation(isOnline: isOnline);
+    }
+    return response;
   }
 
   Future<http.Response> put(

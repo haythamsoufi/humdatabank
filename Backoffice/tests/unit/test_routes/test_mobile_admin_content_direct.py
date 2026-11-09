@@ -394,8 +394,8 @@ class TestGetSubmittedDocumentFile:
         db_session.commit()
         db_session.refresh(doc)
 
-        mock_storage = MagicMock()
-        mock_storage.exists.return_value = False
+        manager = MagicMock()
+        manager.materialize_document.return_value = (False, None)
 
         with app.test_request_context(
             f'/api/mobile/v1/admin/content/documents/{doc.id}/file', method='GET'
@@ -403,14 +403,56 @@ class TestGetSubmittedDocumentFile:
             login_user(route_admin)
             with patch('app.routes.admin.content_management._check_document_access',
                        return_value=(True, None)), \
-                 patch('app.routes.admin.content_management._storage_category_for_submitted_document',
-                       return_value='documents'), \
-                 patch('app.services.platform.storage_service.exists', mock_storage.exists), \
-                 patch('app.services.platform.storage_service.stream_response', mock_storage.stream_response):
+                 patch('app.services.platform.storage_service.submitted_source_exists',
+                       return_value=False), \
+                 patch.object(app, 'plugin_manager', manager, create=True):
                 resp = get_submitted_document_file(doc.id)
 
         _, status = _parse(resp)
         assert status == 404
+        manager.materialize_document.assert_called_once()
+
+    def test_materializes_missing_fdrs_file(self, app, db_session, route_admin):
+        from app.routes.api.mobile.admin_content import get_submitted_document_file
+        from app.models import SubmittedDocument
+
+        doc = SubmittedDocument(
+            filename='report.pdf',
+            storage_path='country/1/missing.pdf',
+            uploaded_by_user_id=route_admin.id,
+            source_url='https://example.invalid/report.pdf',
+        )
+        db_session.add(doc)
+        db_session.commit()
+        db_session.refresh(doc)
+
+        manager = MagicMock()
+
+        def _materialize(document):
+            document.storage_path = 'country/1/fetched.pdf'
+            return True, None
+
+        manager.materialize_document.side_effect = _materialize
+
+        with app.test_request_context(
+            f'/api/mobile/v1/admin/content/documents/{doc.id}/file', method='GET'
+        ):
+            login_user(route_admin)
+            with patch('app.routes.admin.content_management._check_document_access',
+                       return_value=(True, None)), \
+                 patch('app.services.platform.storage_service.submitted_source_exists',
+                       side_effect=[False, True]), \
+                 patch('app.services.platform.storage_service.stream_submitted_document_response',
+                       return_value=('file-bytes', 200)) as stream, \
+                 patch.object(app, 'plugin_manager', manager, create=True):
+                resp = get_submitted_document_file(doc.id)
+
+        _, status = _parse(resp)
+        assert status == 200
+        manager.materialize_document.assert_called_once()
+        stream.assert_called_once()
+        assert stream.call_args.kwargs['filename'] == 'report.pdf'
+        assert stream.call_args.args[0] == 'country/1/fetched.pdf'
 
     def test_success(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_content import get_submitted_document_file
@@ -421,24 +463,22 @@ class TestGetSubmittedDocumentFile:
         db_session.commit()
         db_session.refresh(doc)
 
-        mock_storage = MagicMock()
-        mock_storage.exists.return_value = True
-        mock_storage.stream_response.return_value = ('file-bytes', 200)
-
         with app.test_request_context(
             f'/api/mobile/v1/admin/content/documents/{doc.id}/file', method='GET'
         ):
             login_user(route_admin)
             with patch('app.routes.admin.content_management._check_document_access',
                        return_value=(True, None)), \
-                 patch('app.routes.admin.content_management._storage_category_for_submitted_document',
-                       return_value='documents'), \
-                 patch('app.services.platform.storage_service.exists', mock_storage.exists), \
-                 patch('app.services.platform.storage_service.stream_response', mock_storage.stream_response):
+                 patch('app.services.platform.storage_service.submitted_source_exists',
+                       return_value=True), \
+                 patch('app.services.platform.storage_service.stream_submitted_document_response',
+                       return_value=('file-bytes', 200)) as stream:
                 resp = get_submitted_document_file(doc.id)
 
         _, status = _parse(resp)
-        assert status in (200, 500)
+        assert status == 200
+        stream.assert_called_once()
+        assert stream.call_args.kwargs['as_attachment'] is False
 
 
 # ---------------------------------------------------------------------------

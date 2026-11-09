@@ -4,6 +4,7 @@ import '../../providers/admin/resources_management_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../models/shared/resource.dart';
 import '../../widgets/app_bar.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
@@ -409,12 +410,8 @@ class _ResourcesManagementScreenState extends State<ResourcesManagementScreen>
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,
         ),
+        selectedTabId: TabIds.admin,
         chatbotEnabled: chatbot,
-        onTap: (index) {
-          Navigator.of(context).popUntil((route) {
-            return route.isFirst || route.settings.name == AppRoutes.dashboard;
-          });
-        },
       ),
     );
   }

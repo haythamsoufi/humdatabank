@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 
 /// In-app preview for non-PDF bytes (text, images) fetched via the mobile API.
 class SubmittedDocumentPreviewScreen extends StatefulWidget {
@@ -111,6 +112,7 @@ class _SubmittedDocumentPreviewScreenState
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppAppBar(title: widget.title),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: widget.isImage
           ? Center(
               child: InteractiveViewer(

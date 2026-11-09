@@ -13,6 +13,7 @@ import '../../theme/grouped_sheet_style.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 
 /// Client-side list ordering for [UnifiedPlanningDocumentsScreen].
 enum UnifiedPlanningListSort {
@@ -597,6 +598,8 @@ class _UnifiedPlanningDocumentsScreenState
           );
         },
       ),
+      bottomNavigationBar:
+          standalone ? AppBottomNavigationBar.shellTabBar : null,
     );
   }
 

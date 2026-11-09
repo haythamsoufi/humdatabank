@@ -28,6 +28,8 @@ import '../screens/shared/azure_login_screen.dart';
 import '../screens/shared/settings_screen.dart';
 import '../screens/shared/ai_chat_screen.dart';
 import '../screens/shared/main_navigation_screen.dart';
+import '../screens/shared/entity_document_repository_screen.dart';
+import '../models/shared/entity.dart';
 // Public screens
 import '../screens/public/webview_screen.dart'
     show WebViewScreen, WebViewScreenArgs;
@@ -130,6 +132,19 @@ class AppGoRouter {
           name: 'settings',
           builder: (context, state) =>
               const SettingsScreen(showBottomNav: true),
+        ),
+        GoRoute(
+          path: AppRoutes.entityDocuments,
+          name: 'entityDocuments',
+          builder: (context, state) {
+            final extra = state.extra;
+            if (extra is! Entity) {
+              return const Scaffold(
+                body: Center(child: Text('Missing entity context.')),
+              );
+            }
+            return EntityDocumentRepositoryScreen(entity: extra);
+          },
         ),
 
         // AI Chat with slide transition

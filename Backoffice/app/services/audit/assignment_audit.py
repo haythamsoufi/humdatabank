@@ -55,6 +55,7 @@ _ASSIGNMENT_FIELD_LABELS: Dict[str, str] = {
     "email_attach_pdf": "Email PDF snapshot",
     "email_attach_excel": "Email Excel snapshot",
     "enable_page_submission": "Per-page submit",
+    "enable_offline_download": "Mobile offline download",
     "submission_review_mode": "Submission review notification",
     "submission_review_recipients": "Submission review recipients",
     "allowed_roles": "Restricted to roles",
@@ -230,6 +231,7 @@ def assignment_settings_snapshot(assignment: Any) -> Dict[str, Any]:
         "email_attach_pdf": bool(getattr(assignment, "email_attach_pdf", False)),
         "email_attach_excel": bool(getattr(assignment, "email_attach_excel", False)),
         "enable_page_submission": bool(getattr(assignment, "enable_page_submission", False)),
+        "enable_offline_download": bool(getattr(assignment, "enable_offline_download", False)),
         "submission_review_mode": _submission_review_mode_label(
             getattr(assignment, "submission_review_recipient_mode", None)
         ),

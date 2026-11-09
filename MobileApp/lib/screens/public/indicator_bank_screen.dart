@@ -19,7 +19,7 @@ import '../../widgets/shimmer_list_placeholder.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/async/async_body.dart';
 import '../../config/routes.dart';
-import '../../utils/navigation_helper.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../l10n/app_localizations.dart';
 
 // Top-level row model for list view (sector filter tiers). Must be library scope so
@@ -343,14 +343,9 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
           bottomNavigationBar: _isStandaloneScreen(context)
               ? DrawerAwareBottomBar(
                   hidden: _sideDrawerOpen,
-                  child: AppBottomNavigationBar(
-                    currentIndex: 2, // Home tab highlighted
-                    onTap: (index) {
-                      NavigationHelper.popToMainThenOpenAiIfNeeded(
-                        context,
-                        index,
-                      );
-                    },
+                  child: const AppBottomNavigationBar(
+                    currentIndex: 2,
+                    selectedTabId: TabIds.indicators,
                   ),
                 )
               : null,

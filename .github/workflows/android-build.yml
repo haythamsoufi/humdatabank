@@ -153,6 +153,10 @@ jobs:
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: flutter pub get
 
+      - name: Drop PDFium WASM from the mobile bundle
+        working-directory: ${{ steps.flutter_path.outputs.path }}
+        run: dart run pdfrx:remove_wasm_modules
+
       - name: Analyze Dart (catch dependency/API issues before Gradle)
         if: github.event_name != 'workflow_dispatch' || inputs.run_flutter_analyze
         working-directory: ${{ steps.flutter_path.outputs.path }}

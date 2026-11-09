@@ -13,4 +13,17 @@ class FdrsConstants {
   static const int indicatorPeopleReached = 729;
   static const int indicatorIncome = 733;
   static const int indicatorExpenditure = 734;
+
+  /// Bank ids the home map requests directly. People reached is a group of
+  /// KPI codes, not one of these ids.
+  static const List<int> homeMapBankIds = [
+    indicatorVolunteers,
+    indicatorStaff,
+    indicatorBranches,
+    indicatorLocalUnits,
+    indicatorBloodDonors,
+    indicatorFirstAid,
+    indicatorIncome,
+    indicatorExpenditure,
+  ];
 }

@@ -89,6 +89,10 @@ class UserProfileService {
             profileColor: userData['profile_color'] as String?,
             countryIds: _extractCountryIds(userData),
             aiBetaTester: userData['ai_beta_tester'] == true,
+            aiBetaRestricted: userData['ai_beta_restricted'] == true,
+            rbacRoleCodes: User.parseRbacRoleCodesFromProfile(userData),
+            canOpenEntityDocuments:
+                User.parseCanOpenEntityDocumentsFromProfile(userData),
           );
 
           DebugLogger.logAuth(
@@ -287,6 +291,7 @@ class UserProfileService {
             profileColor: userMap['profile_color'] as String?,
             countryIds: _extractCountryIds(userMap),
             aiBetaTester: userMap['ai_beta_tester'] == true,
+            aiBetaRestricted: userMap['ai_beta_restricted'] == true,
           );
 
           DebugLogger.logAuth(

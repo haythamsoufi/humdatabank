@@ -31,6 +31,18 @@ void main() {
       expect(d.uploadedAt, DateTime.parse('2024-07-15T14:30:00.000Z'));
       expect(d.assignmentPeriod, '2024 Q1');
       expect(d.isPublic, true);
+      expect(d.canEdit, false);
+    });
+
+    test('reads period and can_edit', () {
+      final d = Document.fromJson({
+        'id': 21,
+        'period': '2023-2024',
+        'can_edit': true,
+      });
+      expect(d.period, '2023-2024');
+      expect(d.canEdit, true);
+      expect(d.canChangeStatus, false);
     });
 
     test('leaves optional fields null when absent', () {
@@ -50,6 +62,7 @@ void main() {
     test('isPublic defaults to false when absent', () {
       final d = Document.fromJson({'id': 2});
       expect(d.isPublic, false);
+      expect(d.canEdit, false);
     });
 
     test('isPublic is true when explicitly set', () {

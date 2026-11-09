@@ -9,6 +9,7 @@ import '../../models/shared/user.dart';
 import '../../providers/admin/access_requests_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../widgets/app_bar.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/shared/elevated_list_card.dart';
 import '../../config/routes.dart';
@@ -230,7 +231,7 @@ class _AccessRequestsScreenState extends State<AccessRequestsScreen>
             ),
           ),
         ),
-        bottomNavigationBar: const AppBottomNavigationBar(currentIndex: -1),
+        bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       );
     }
 
@@ -247,6 +248,7 @@ class _AccessRequestsScreenState extends State<AccessRequestsScreen>
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,
         ),
+        selectedTabId: TabIds.admin,
         chatbotEnabled: chatbot,
       ),
       body: RefreshIndicator(

@@ -23,7 +23,11 @@ _DOCUMENT_TYPE_LABEL_TO_CATEGORY: Dict[str, str] = {
 }
 
 _FDRS_SOURCE_ORGANIZATION = "FDRS"
-_PERIOD_YEAR_RE = re.compile(r"\b(19[89]\d|20[012]\d)\b")
+# 1989–2099. 2030+ is required for strategic-plan periods such as 2025-2030.
+_PERIOD_YEAR_RE = re.compile(r"\b(19[89]\d|20\d{2})\b")
+_PERIOD_RANGE_RE = re.compile(
+    r"(19[89]\d|20\d{2})\s*[-–—]\s*(19[89]\d|20\d{2})"
+)
 
 
 def is_fdrs_submitted_document(submitted_doc) -> bool:
@@ -243,7 +247,324 @@ def apply_submitted_document_metadata_to_ai_doc(ai_doc, submitted_doc) -> None:
         ai_doc.country_id = None
         ai_doc.country_name = None
 
-    extra = dict(getattr(ai_doc, "extra_metadata", None) or {})
+    extra = _metadata_dict(ai_doc)
     extra.update(hints.get("extra_metadata") or {})
-    if extra:
-        ai_doc.extra_metadata = extra
+    ai_doc.extra_metadata = extra
+    refresh_catalog_display(ai_doc)
+
+
+def _as_text(value) -> str:
+    """Return a stripped string. Non-strings (including mocks) become empty."""
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
+def _metadata_dict(ai_doc) -> Dict[str, Any]:
+    raw = getattr(ai_doc, "extra_metadata", None)
+    if isinstance(raw, dict):
+        return dict(raw)
+    return {}
+
+
+def years_covered_by_period(period: Optional[str]) -> list[int]:
+    """Years a catalog period covers. ``2025-2030`` expands; a single year stays one year."""
+    text = _as_text(period)
+    if not text:
+        return []
+    range_match = _PERIOD_RANGE_RE.fullmatch(text)
+    if range_match:
+        start, end = int(range_match.group(1)), int(range_match.group(2))
+        if start > end:
+            start, end = end, start
+        if end - start <= 40:
+            return list(range(start, end + 1))
+    return [int(year) for year in _PERIOD_YEAR_RE.findall(text)]
+
+
+def format_year_span(years: list[int]) -> str:
+    """``2023-2025`` when the years are contiguous, otherwise ``2020, 2024``."""
+    unique = sorted({int(year) for year in years})
+    if not unique:
+        return ""
+    if len(unique) == 1:
+        return str(unique[0])
+    if unique[-1] - unique[0] + 1 == len(unique):
+        return f"{unique[0]}-{unique[-1]}"
+    return ", ".join(str(year) for year in unique)
+
+
+def _catalog_entries(ai_doc) -> list[Dict[str, Any]]:
+    raw = _metadata_dict(ai_doc).get("catalog_entries") or []
+    if not isinstance(raw, list):
+        return []
+    return [dict(entry) for entry in raw if isinstance(entry, dict)]
+
+
+def _entry_key(entry: Dict[str, Any]) -> Optional[tuple]:
+    kind = _as_text(entry.get("kind")) or "submitted"
+    if kind == "guidance":
+        gid = entry.get("guidance_document_id")
+        try:
+            return ("guidance", int(gid)) if gid is not None else None
+        except (TypeError, ValueError):
+            return None
+    sid = entry.get("submitted_document_id")
+    try:
+        return ("submitted", int(sid)) if sid is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _period_from_title(title: str) -> str:
+    match = re.search(r"\(([^)]+)\)\s*$", title or "")
+    if not match:
+        return ""
+    inner = match.group(1).strip()
+    return inner if _PERIOD_YEAR_RE.search(inner) else ""
+
+
+def _type_from_title(title: str) -> str:
+    body = re.sub(r"\s*\([^)]*\)\s*$", "", title or "").strip()
+    if " - " not in body:
+        return ""
+    return body.split(" - ", 1)[0].strip()
+
+
+def _entry_from_ai_document(ai_doc) -> list[Dict[str, Any]]:
+    """Catalog rows implied by an AIDocument that has not stored ``catalog_entries`` yet."""
+    if ai_doc is None:
+        return []
+    extra = _metadata_dict(ai_doc)
+    title = _as_text(getattr(ai_doc, "title", None))
+    entries: list[Dict[str, Any]] = []
+    sid = getattr(ai_doc, "submitted_document_id", None)
+    try:
+        sid_int = int(sid) if sid is not None else None
+    except (TypeError, ValueError):
+        sid_int = None
+    if sid_int:
+        period = _as_text(extra.get("reporting_period")) or _period_from_title(title)
+        doc_type = _as_text(extra.get("document_type_label")) or _type_from_title(title)
+        entries.append(
+            {
+                "kind": "submitted",
+                "submitted_document_id": sid_int,
+                "period": period or None,
+                "document_type": doc_type or None,
+                "title": title or None,
+                "filename": _as_text(getattr(ai_doc, "filename", None)) or None,
+                "source_url": _as_text(getattr(ai_doc, "source_url", None)) or None,
+                "document_category": _as_text(getattr(ai_doc, "document_category", None)) or None,
+            }
+        )
+    gid = getattr(ai_doc, "guidance_document_id", None)
+    try:
+        gid_int = int(gid) if gid is not None else None
+    except (TypeError, ValueError):
+        gid_int = None
+    if gid_int:
+        entries.append(
+            {
+                "kind": "guidance",
+                "guidance_document_id": gid_int,
+                "title": _as_text(getattr(ai_doc, "title", None)) or None,
+                "filename": _as_text(getattr(ai_doc, "filename", None)) or None,
+            }
+        )
+    return entries
+
+
+def _append_catalog_entry(entries: list[Dict[str, Any]], entry: Dict[str, Any]) -> bool:
+    key = _entry_key(entry)
+    if key is None:
+        return False
+    for existing in entries:
+        if _entry_key(existing) == key:
+            for field, value in entry.items():
+                if value and not existing.get(field):
+                    existing[field] = value
+            return False
+    entries.append(entry)
+    return True
+
+
+def _ensure_self_catalog_entries(ai_doc) -> list[Dict[str, Any]]:
+    entries = _catalog_entries(ai_doc)
+    if entries:
+        return entries
+    entries = []
+    for entry in _entry_from_ai_document(ai_doc):
+        _append_catalog_entry(entries, entry)
+    return entries
+
+
+def catalog_entry_from_submitted(submitted_doc) -> Optional[Dict[str, Any]]:
+    if submitted_doc is None or getattr(submitted_doc, "id", None) is None:
+        return None
+    try:
+        sid = int(submitted_doc.id)
+    except (TypeError, ValueError):
+        return None
+    doc_type = submitted_document_type_label(submitted_doc)
+    doc_type = doc_type if isinstance(doc_type, str) else ""
+    period = _as_text(getattr(submitted_doc, "period", None))
+    filename = _as_text(getattr(submitted_doc, "filename", None))
+    title = ""
+    try:
+        built = build_ai_title_from_submitted_document(submitted_doc)
+        title = built if isinstance(built, str) else ""
+    except Exception:
+        title = filename
+    return {
+        "kind": "submitted",
+        "submitted_document_id": sid,
+        "period": period or None,
+        "document_type": doc_type.strip() or None,
+        "title": title or None,
+        "filename": filename or None,
+        "source_url": _as_text(getattr(submitted_doc, "source_url", None)) or None,
+        "document_category": map_document_type_label_to_category(doc_type) if doc_type else None,
+    }
+
+
+def refresh_catalog_display(ai_doc) -> None:
+    """
+    When one file was filed under several years or document types, show that on the title.
+
+    A single catalog row keeps the title already stored. Two or more years become
+    ``2023-2025`` when contiguous. Two document types are joined (``Annual Report / Strategic Plan``).
+    """
+    if ai_doc is None:
+        return
+    entries = [e for e in _catalog_entries(ai_doc) if (_as_text(e.get("kind")) or "submitted") == "submitted"]
+    if len(entries) < 2:
+        return
+
+    years: list[int] = []
+    periods: list[str] = []
+    types: list[str] = []
+    categories: list[str] = []
+    for entry in entries:
+        period = _as_text(entry.get("period"))
+        if period and period not in periods:
+            periods.append(period)
+        years.extend(years_covered_by_period(period))
+        doc_type = _as_text(entry.get("document_type"))
+        if doc_type and doc_type not in types:
+            types.append(doc_type)
+        category = _as_text(entry.get("document_category"))
+        if category and category not in categories:
+            categories.append(category)
+
+    span = format_year_span(years)
+    country = _as_text(getattr(ai_doc, "country_name", None))
+    fallback = _as_text(getattr(ai_doc, "title", None))
+    if types and country and span:
+        title = f"{' / '.join(types)} - {country} ({span})"
+    elif types and country:
+        title = f"{' / '.join(types)} - {country}"
+    elif types and span:
+        title = f"{' / '.join(types)} ({span})"
+    elif span and fallback:
+        body = re.sub(r"\s*\([^)]*\)\s*$", "", fallback).strip()
+        title = f"{body} ({span})" if body else span
+    else:
+        title = fallback
+    if title:
+        ai_doc.title = title
+
+    extra = _metadata_dict(ai_doc)
+    if years:
+        extra["coverage_years"] = sorted(set(years))
+        latest = max(years)
+        try:
+            ai_doc.document_date = date(latest, 12, 31)
+        except (TypeError, ValueError):
+            pass
+    if periods:
+        extra["reporting_periods"] = periods
+        extra["reporting_period"] = span or periods[0]
+    if categories:
+        extra["document_categories"] = categories
+    ai_doc.extra_metadata = extra
+
+
+def _remember_source_url(ai_doc, source_url: str) -> None:
+    url = _as_text(source_url)
+    if not url:
+        return
+    current = _as_text(getattr(ai_doc, "source_url", None))
+    if not current:
+        ai_doc.source_url = url
+        return
+    if current == url:
+        return
+    extra = _metadata_dict(ai_doc)
+    alt_urls = list(extra.get("alt_source_urls") or [])
+    if url not in alt_urls:
+        alt_urls.append(url)
+    extra["alt_source_urls"] = alt_urls
+    ai_doc.extra_metadata = extra
+
+
+def _store_catalog_entries(ai_doc, entries: list[Dict[str, Any]]) -> None:
+    extra = _metadata_dict(ai_doc)
+    extra["catalog_entries"] = entries
+    ai_doc.extra_metadata = extra
+
+
+def record_submitted_catalog_entry(ai_doc, submitted_doc) -> bool:
+    """
+    Remember a submitted-document catalog row on an existing AIDocument.
+
+    Used when the file bytes are already embedded for another year, document type,
+    or filename. Does not change which submitted document the row is primarily linked to.
+    """
+    entry = catalog_entry_from_submitted(submitted_doc)
+    if ai_doc is None or entry is None:
+        return False
+    entries = _ensure_self_catalog_entries(ai_doc)
+    added = _append_catalog_entry(entries, entry)
+    _store_catalog_entries(ai_doc, entries)
+    _remember_source_url(ai_doc, entry.get("source_url") or "")
+    refresh_catalog_display(ai_doc)
+    return added
+
+
+def record_guidance_catalog_entry(ai_doc, guidance) -> bool:
+    """Remember a guidance file that has the same bytes as an existing AIDocument."""
+    if ai_doc is None or guidance is None or getattr(guidance, "id", None) is None:
+        return False
+    try:
+        gid = int(guidance.id)
+    except (TypeError, ValueError):
+        return False
+    entry = {
+        "kind": "guidance",
+        "guidance_document_id": gid,
+        "title": _as_text(getattr(guidance, "title", None)) or _as_text(getattr(guidance, "filename", None)) or None,
+        "filename": _as_text(getattr(guidance, "filename", None)) or None,
+        "owner_key": _as_text(getattr(guidance, "owner_key", None)) or None,
+    }
+    entries = _ensure_self_catalog_entries(ai_doc)
+    added = _append_catalog_entry(entries, entry)
+    _store_catalog_entries(ai_doc, entries)
+    refresh_catalog_display(ai_doc)
+    return added
+
+
+def absorb_catalog_from_ai_document(keeper, loser) -> None:
+    """Copy catalog rows off a duplicate AIDocument before it is deleted."""
+    if keeper is None or loser is None:
+        return
+    entries = _ensure_self_catalog_entries(keeper)
+    for entry in _catalog_entries(loser):
+        _append_catalog_entry(entries, entry)
+    for entry in _entry_from_ai_document(loser):
+        _append_catalog_entry(entries, entry)
+    _store_catalog_entries(keeper, entries)
+    loser_url = _as_text(getattr(loser, "source_url", None))
+    if loser_url:
+        _remember_source_url(keeper, loser_url)
+    refresh_catalog_display(keeper)

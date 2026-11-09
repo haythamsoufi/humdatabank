@@ -3502,7 +3502,8 @@
                 or ''
             ) | tojson }},
             "assignment_year": {{ (
-                (get_assignment_year(assignment_status.assigned_form) if assignment_status and assignment_status.assigned_form and get_assignment_year is defined else None)
+                (entry_assignment_year if entry_assignment_year is defined and entry_assignment_year else None)
+                or (get_assignment_year(assignment_status.assigned_form) if assignment_status and assignment_status.assigned_form and get_assignment_year is defined else None)
                 or ''
             ) | tojson }},
             "country_iso": {{ (

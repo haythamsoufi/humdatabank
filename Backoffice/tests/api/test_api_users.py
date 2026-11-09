@@ -293,6 +293,8 @@ class TestGetCurrentUserProfile:
         data = resp.get_json()
         assert "ai_beta_tester" in data
         assert isinstance(data["ai_beta_tester"], bool)
+        assert "ai_beta_restricted" in data
+        assert isinstance(data["ai_beta_restricted"], bool)
 
 
 # ---------------------------------------------------------------------------
@@ -613,6 +615,7 @@ class TestGetDashboard:
                 "contributor_names", "is_public",
                 "template_id", "static_version", "data_version",
                 "form_definition_updated_at",
+                "enable_offline_download",
             ):
                 assert field in asgn, f"Missing field in assignment: {field}"
 

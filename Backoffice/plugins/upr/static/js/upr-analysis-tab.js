@@ -333,6 +333,34 @@
         if (chart) sec.charts.push(chart);
     }
 
+    function applyMode(button) {
+        if (button.classList.contains('is-active')) return;
+        var card = button.closest('[data-upri-visual]');
+        var visual = card && findVisual(sectionOf(button), card.getAttribute('data-upri-visual'));
+        if (!visual) return;
+        var modeId = button.getAttribute('data-upri-mode');
+        var mode = null;
+        (visual.modes || []).forEach(function (item) {
+            if (item.id === modeId) mode = item;
+        });
+        if (!mode || !mode.chart) return;
+        visual.chart = mode.chart;
+        card.querySelectorAll('[data-upri-mode]').forEach(function (item) {
+            var on = item === button;
+            item.classList.toggle('is-active', on);
+            item.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        var host = card.querySelector('.upri-chart');
+        var sec = sectionOf(button);
+        if (host && host._upriChart) {
+            try { host._upriChart.destroy(); } catch (e) { /* noop */ }
+            sec.charts = sec.charts.filter(function (chart) { return chart !== host._upriChart; });
+        }
+        var chart = host && A.charts.mount(host, mode.chart);
+        if (host) host._upriChart = chart || null;
+        if (chart) sec.charts.push(chart);
+    }
+
     function openVisualTable(btn) {
         var visual = findVisual(sectionOf(btn), btn.getAttribute('data-upri-table'));
         if (visual) A.dom.openTable(els.dialog, visual.table, { ui: UI });
@@ -538,6 +566,8 @@
         if (gpSectionBtn) setGpSection(gpSectionBtn.getAttribute('data-upri-gp-section'));
         var sourceBtn = target.closest('[data-upri-source]');
         if (sourceBtn) applySource(sourceBtn);
+        var modeBtn = target.closest('[data-upri-mode]');
+        if (modeBtn) applyMode(modeBtn);
         var gapBtn = target.closest('[data-upri-gap]');
         if (gapBtn) openGapTable(gapBtn);
         var tableBtn = target.closest('[data-upri-table]');

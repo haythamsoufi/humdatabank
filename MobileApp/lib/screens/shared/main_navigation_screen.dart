@@ -333,6 +333,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         // AiChatScreen manages its own keyboard insets (viewInsets.bottom
         // padding + inner resizeToAvoidBottomInset:true MediaQuery override).
         // Disable the outer Scaffold resize on that page to avoid double-inset.
+        final shellTabId = validIndex >= 0 && validIndex < visibleTabs.length
+            ? visibleTabs[validIndex].id
+            : null;
+        if (NavigationHelper.activeShellTabId != shellTabId) {
+          NavigationHelper.activeShellTabId = shellTabId;
+        }
+
         final onAiChatPage = chatbotEnabled &&
             _currentIndex >= 0 &&
             _currentIndex < visibleTabs.length &&

@@ -7,6 +7,7 @@ import '../../config/routes.dart';
 import '../../utils/constants.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_fade_in_up.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/async/async_body.dart';
 import '../../widgets/empty_state.dart';
@@ -149,12 +150,8 @@ class _AssignmentsScreenState extends State<AssignmentsScreen>
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,
         ),
+        selectedTabId: TabIds.admin,
         chatbotEnabled: chatbot,
-        onTap: (index) {
-          Navigator.of(context).popUntil((route) {
-            return route.isFirst || route.settings.name == AppRoutes.dashboard;
-          });
-        },
       ),
     );
   }

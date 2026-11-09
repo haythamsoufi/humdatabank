@@ -10,6 +10,7 @@ import '../../providers/admin/assignments_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/mobile_screen_scaffold.dart';
 import '../../config/routes.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
@@ -162,6 +163,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen>
       appBar: AppAppBar(
         title: loc.assignmentDetails,
       ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: RefreshIndicator(
         color: Color(AppConstants.ifrcRed),
         onRefresh: _load,

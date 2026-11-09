@@ -10,6 +10,7 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/mobile_screen_scaffold.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/network_availability.dart';
 import '../../widgets/loading_indicator.dart';
@@ -471,8 +472,8 @@ class _IndicatorDetailScreenState extends State<IndicatorDetailScreen> {
           });
         }
         final isAuthenticated = authProvider.isAuthenticated;
-        // For non-authenticated users: Indicator Bank is at index 1
-        // For authenticated users: Indicator Bank is not in the bottom nav
+        // Legacy slot: Indicators is index 1 for guests. The customized bar
+        // highlights [TabIds.indicators] wherever the user placed it.
         final currentNavIndex = isAuthenticated ? -1 : 1;
 
         final theme = Theme.of(context);
@@ -760,7 +761,7 @@ class _IndicatorDetailScreenState extends State<IndicatorDetailScreen> {
           ),
           bottomNavigationBar: AppBottomNavigationBar(
             currentIndex: currentNavIndex,
-            // onTap is optional - if not provided, uses NavigationHelper.navigateToMainTab by default
+            selectedTabId: TabIds.indicators,
           ),
         );
       },

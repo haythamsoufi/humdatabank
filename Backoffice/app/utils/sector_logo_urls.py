@@ -143,3 +143,12 @@ def github_ns_logo_url(iso3: str | None) -> Optional[str]:
     if len(code) != 3 or not code.isalpha():
         return None
     return f"https://raw.githubusercontent.com/FDRS-ifrc/general/main/ns_logos/{code}.png"
+
+
+def country_ns_logo_url(ns: Any, iso3: str | None) -> Optional[str]:
+    """Uploaded National Society logo, or the public FDRS file for this ISO3."""
+    if ns is not None:
+        uploaded = ns_logo_url(ns, external=True)
+        if uploaded:
+            return uploaded
+    return github_ns_logo_url(iso3)

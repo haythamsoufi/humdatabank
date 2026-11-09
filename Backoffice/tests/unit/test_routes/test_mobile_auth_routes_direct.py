@@ -308,6 +308,24 @@ class TestMobileProfileDirect:
         user_data = body.get_json()['data']['user']
         assert user_data['email'] == 'profile-direct@example.com'
         assert 'rbac_roles' in user_data
+        assert isinstance(user_data['ai_beta_restricted'], bool)
+        assert isinstance(user_data['ai_beta_tester'], bool)
+
+    def test_mobile_profile_reports_beta_lock_when_restricted(self, app, db_session):
+        from app.routes.api.mobile.auth import mobile_profile
+
+        with app.app_context():
+            user = create_test_user(db_session, email='beta-locked@example.com', password='Pass123!')
+        with app.test_request_context('/api/mobile/v1/auth/profile', method='GET'):
+            login_user(user)
+            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+                 patch('app.services.platform.app_settings_service.is_ai_beta_restricted', return_value=True), \
+                 patch('app.services.platform.app_settings_service.user_is_explicit_beta_tester', return_value=False):
+                resp = mobile_profile()
+        body = resp[0] if isinstance(resp, tuple) else resp
+        user_data = body.get_json()['data']['user']
+        assert user_data['ai_beta_restricted'] is True
+        assert user_data['ai_beta_tester'] is False
 
     def test_mobile_update_profile(self, app, db_session):
         from app.routes.api.mobile.auth import mobile_update_profile

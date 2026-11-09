@@ -174,6 +174,26 @@ def parse_ifrc_appeals(
     return documents
 
 
+def catalogue_year_and_date(item: Mapping[str, Any]) -> tuple[int | None, str | None]:
+    """Year and publish date for one PublicSiteAppeals row.
+
+    Unified plans usually encode the year in ``AppealOrigType`` or ``AppealsName``.
+    Emergency operations from GO usually do not, so the year then comes from
+    ``AppealsDate``. The date is that field as ``YYYY-MM-DD`` when it parses.
+    """
+    orig = str(item.get("AppealOrigType") or "")
+    name = str(item.get("AppealsName") or "")
+    year_match = _TITLE_YEAR_RE.search(f"{orig} {name}")
+    year = int(year_match.group(1)) if year_match else None
+    published = parse_appeals_date(item.get("AppealsDate"))
+    if published is None:
+        return year, None
+    published_date = published.astimezone(timezone.utc).date()
+    if year is None and 1990 <= published_date.year <= 2100:
+        year = published_date.year
+    return year, published_date.isoformat()
+
+
 def parse_appeals_date(raw: Any) -> datetime | None:
     """Parse IFRC ``AppealsDate`` (ISO, epoch seconds/ms, or .NET ``/Date(ms)/``)."""
     if raw is None or isinstance(raw, bool):

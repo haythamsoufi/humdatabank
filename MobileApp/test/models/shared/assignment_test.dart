@@ -49,6 +49,25 @@ void main() {
       expect(a.templateName, isNull);
       expect(a.isPublic, false);
       expect(a.isEffectivelyClosed, false);
+      expect(a.enableOfflineDownload, true);
+    });
+
+    test('enable_offline_download is explicit and round-trips', () {
+      final disabled = Assignment.fromJson({
+        'id': 1,
+        'name': 'x',
+        'enable_offline_download': false,
+      });
+      expect(disabled.enableOfflineDownload, false);
+      expect(disabled.toJson()['enable_offline_download'], false);
+
+      final enabled = Assignment.fromJson({
+        'id': 2,
+        'name': 'y',
+        'enable_offline_download': true,
+      });
+      expect(enabled.enableOfflineDownload, true);
+      expect(enabled.toJson()['enable_offline_download'], true);
     });
 
     test('coerces integer completion_rate to double', () {

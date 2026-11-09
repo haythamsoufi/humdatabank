@@ -16,6 +16,7 @@ import '../services/notification_service.dart';
 import '../services/ai_chat_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/global_overview_data_service.dart';
+import '../services/public_browse_prefetch.dart';
 import '../services/disaggregation_data_service.dart';
 import '../services/auth_service.dart';
 import '../services/auth_error_handler.dart';
@@ -66,6 +67,7 @@ void setupServiceLocator() {
       () => PushNotificationService());
   sl.registerLazySingleton<GlobalOverviewDataService>(
       () => GlobalOverviewDataService());
+  sl.registerLazySingleton<PublicBrowsePrefetch>(() => PublicBrowsePrefetch());
   sl.registerLazySingleton<DisaggregationDataService>(
       () => DisaggregationDataService());
 

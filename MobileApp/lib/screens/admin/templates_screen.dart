@@ -4,7 +4,7 @@ import '../../providers/admin/templates_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../utils/theme_extensions.dart';
 import '../../config/routes.dart';
-import '../../utils/navigation_helper.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../utils/constants.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_bar.dart';
@@ -272,10 +272,8 @@ class _TemplatesScreenState extends State<TemplatesScreen>
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,
         ),
+        selectedTabId: TabIds.admin,
         chatbotEnabled: chatbot,
-        onTap: (index) {
-          NavigationHelper.popToMainThenOpenAiIfNeeded(context, index);
-        },
       ),
     );
   }

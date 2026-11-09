@@ -78,8 +78,13 @@ class OfflineAssetScanner {
     return isBundledPath(asset.path);
   }
 
+  /// Same-origin files the form loads from disk. UPR serves its own tree at
+  /// `/upr/static/` plus the generated `/upr/fonts.css` stylesheet.
   static bool isBundledPath(String path) =>
-      path.startsWith('/static/') || path.startsWith('/plugins/static/');
+      path.startsWith('/static/') ||
+      path.startsWith('/plugins/static/') ||
+      path.startsWith('/upr/static/') ||
+      path == '/upr/fonts.css';
 
   /// Stable on-disk path for a third-party file, kept under its host so relative
   /// references inside CDN stylesheets keep resolving.
@@ -133,7 +138,7 @@ class OfflineAssetScanner {
   static String stripStaticUrlCacheQuery(String html) {
     return html.replaceAllMapped(
       RegExp(
-        r'(static/[\w./-]+\.(?:css|js|mjs|svg|woff2?|map))\?[^">\s\x27\)]*',
+        r'(upr/fonts\.css|static/[\w./-]+\.(?:css|js|mjs|svg|woff2?|ttf|otf|map))\?[^">\s\x27\)]*',
         caseSensitive: false,
       ),
       (m) => m[1]!,
@@ -210,6 +215,18 @@ class OfflineAssetScanner {
         caseSensitive: false,
       );
       for (final m in pluginRe.allMatches(html)) {
+        out.add(pageUri.resolve(m.group(0)!));
+      }
+    } catch (_) {}
+
+    try {
+      final uprRe = RegExp(
+        r'/upr/(?:static/[\w./-]+\.' +
+            ext +
+            r'|fonts\.css)(?:\?[^\s\x22\x27<>]*)?',
+        caseSensitive: false,
+      );
+      for (final m in uprRe.allMatches(html)) {
         out.add(pageUri.resolve(m.group(0)!));
       }
     } catch (_) {}
@@ -439,7 +456,109 @@ class OfflineAssetScanner {
     s = s.replaceAll('"/static/', '"static/');
     s = s.replaceAll("'/static/", "'static/");
     s = s.replaceAll('`/static/', '`static/');
+    s = s.replaceAllMapped(
+      RegExp(
+        r'\b(href|src|data-src|data-href|poster)\s*=\s*([\x22\x27])/upr/',
+        caseSensitive: true,
+      ),
+      (m) => '${m[1]}=${m[2]}upr/',
+    );
+    s = s.replaceAll('url(/upr/', 'url(upr/');
+    s = s.replaceAll('url("/upr/', 'url("upr/');
+    s = s.replaceAll("url('/upr/", "url('upr/");
+    s = s.replaceAll('"/upr/', '"upr/');
+    s = s.replaceAll("'/upr/", "'upr/");
+    s = s.replaceAll('`/upr/', '`upr/');
     return s;
+  }
+
+  /// Import-map addresses must be absolute or start with `./`, `/`, or `../`.
+  /// Rewriting `http://host/static/...` down to `static/...` makes Chrome drop
+  /// every entry ("Bare specifier"). Chrome resolves every address against the
+  /// document, including entries inside a scope. A scope only selects which map
+  /// applies, so each address stays a document-relative `./static/...` path.
+  static String rewriteImportMapsForFileUrl(String html) {
+    return html.replaceAllMapped(
+      RegExp(
+        r'<script\b([^>]*\btype\s*=\s*["\x27]importmap["\x27][^>]*)>([\s\S]*?)</script>',
+        caseSensitive: false,
+      ),
+      (m) {
+        final dynamic decoded;
+        try {
+          decoded = jsonDecode(m[2]!);
+        } catch (_) {
+          return m[0]!;
+        }
+        if (decoded is! Map) return m[0]!;
+        final fixed = _fileUrlImportMap(decoded);
+        return '<script${m[1]}>${jsonEncode(fixed)}</script>';
+      },
+    );
+  }
+
+  static Map<String, dynamic> _fileUrlImportMap(Map<dynamic, dynamic> raw) {
+    final out = <String, dynamic>{};
+    final imports = raw['imports'];
+    if (imports is Map) {
+      out['imports'] = _fileUrlImportEntries(imports);
+    }
+    final scopes = raw['scopes'];
+    if (scopes is Map) {
+      final nextScopes = <String, dynamic>{};
+      scopes.forEach((key, value) {
+        final scopePath = _bundleAssetPath(key.toString());
+        if (scopePath == null || value is! Map) {
+          nextScopes[key.toString()] = value;
+          return;
+        }
+        final scopeKey = scopePath.endsWith('/') ? scopePath : '$scopePath/';
+        nextScopes['./$scopeKey'] = _fileUrlImportEntries(value);
+      });
+      out['scopes'] = nextScopes;
+    }
+    return out;
+  }
+
+  static Map<String, String> _fileUrlImportEntries(
+    Map<dynamic, dynamic> entries,
+  ) {
+    final out = <String, String>{};
+    entries.forEach((key, value) {
+      if (value is! String) return;
+      final keyPath = _bundleAssetPath(key.toString());
+      final valuePath = _bundleAssetPath(value);
+      out[keyPath == null ? key.toString() : './$keyPath'] = valuePath == null
+          ? value
+          : './$valuePath';
+    });
+    return out;
+  }
+
+  /// Bundle-relative path (`static/...`, `upr/...`) or null when [raw] is not
+  /// one of the files we save beside the page.
+  static String? _bundleAssetPath(String raw) {
+    var s = raw.trim();
+    if (s.isEmpty) return null;
+    final hash = s.indexOf('#');
+    if (hash != -1) s = s.substring(0, hash);
+    final q = s.indexOf('?');
+    if (q != -1) s = s.substring(0, q);
+    if (s.startsWith('//')) s = 'https:$s';
+    final uri = Uri.tryParse(s);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      s = uri.path;
+    }
+    if (s.startsWith('./')) s = s.substring(2);
+    while (s.startsWith('/')) {
+      s = s.substring(1);
+    }
+    if (s.startsWith('static/') ||
+        s.startsWith('plugins/static/') ||
+        s.startsWith('upr/')) {
+      return s;
+    }
+    return null;
   }
 
   /// Rewrites `url(/static/...)` / quoted variants / `@import` to paths relative
@@ -454,7 +573,9 @@ class OfflineAssetScanner {
       final target = absStaticPath.startsWith('/')
           ? absStaticPath.substring(1)
           : absStaticPath;
-      if (!target.startsWith('static/')) {
+      if (!target.startsWith('static/') &&
+          !target.startsWith('upr/') &&
+          !target.startsWith('plugins/static/')) {
         return absStaticPath;
       }
       var cut = target.length;
@@ -477,7 +598,7 @@ class OfflineAssetScanner {
 
     var out = css.replaceAllMapped(
       RegExp(
-        r'url\(\s*([\x22\x27])(/static/[^\x22\x27]+)\1\s*\)',
+        r'url\(\s*([\x22\x27])(/(?:static|upr/static|plugins/static)/[^\x22\x27]+)\1\s*\)',
         caseSensitive: false,
       ),
       (m) {
@@ -489,7 +610,10 @@ class OfflineAssetScanner {
     );
 
     out = out.replaceAllMapped(
-      RegExp(r'url\(\s*(/static/[^)\s]+)\s*\)', caseSensitive: false),
+      RegExp(
+        r'url\(\s*(/(?:static|upr/static|plugins/static)/[^)\s]+)\s*\)',
+        caseSensitive: false,
+      ),
       (m) {
         final path = m[1]!;
         final rel = resolveTargetToUrl(path);
@@ -499,7 +623,7 @@ class OfflineAssetScanner {
 
     out = out.replaceAllMapped(
       RegExp(
-        r'@import\s+([\x22\x27])(/static/[^\x22\x27]+)\1',
+        r'@import\s+([\x22\x27])(/(?:static|upr/static|plugins/static)/[^\x22\x27]+)\1',
         caseSensitive: false,
       ),
       (m) {

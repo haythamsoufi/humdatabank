@@ -290,6 +290,27 @@ class AppLocalizations {
       'loading_preferences': 'Loading preferences...',
       'loading_notifications': 'Loading notifications...',
       'loading_dashboard': 'Loading dashboard...',
+      'entity_document_repository': 'Document repository',
+      'entity_document_repository_hint':
+          'Upload and browse documents for your entity',
+      'document_type': 'Document type',
+      'select_document_type': 'Select document type',
+      'filename': 'Filename',
+      'public_document': 'Public document',
+      'replace_attachment': 'Replace attachment',
+      'new_file_selected': 'New file selected',
+      'clear_selection': 'Clear selection',
+      'document_updated': 'Document updated.',
+      'document_update_failed': 'Could not update the document.',
+      'cover_image_always_public': 'Cover images are always public.',
+      'file_too_large': 'File too large. Maximum size is 50MB.',
+      'file_type_not_allowed':
+          'That file type is not allowed. Use PDF, Office, text, CSV, or an image.',
+      'could_not_open_files': 'Could not open the file picker.',
+      'document_status': 'Approval status',
+      'pending_review': 'Pending review',
+      'rejected': 'Rejected',
+      'period_hint': 'For example 2024 or 2023-2024',
       'loading_audit_logs': 'Loading audit logs...',
       'loading_analytics': 'Loading analytics...',
       'loading_organizations': 'Loading organizations...',
@@ -1053,6 +1074,12 @@ class AppLocalizations {
       'pdf_viewer_could_not_load': 'Could not load document.',
       'pdf_viewer_download_failed_http': 'Download failed. Please try again.',
       'pdf_viewer_filename_fallback': 'document',
+      'pdf_viewer_search': 'Search',
+      'pdf_viewer_search_hint': 'Search in document',
+      'pdf_viewer_search_no_matches': 'No matches',
+      'pdf_viewer_search_next': 'Next match',
+      'pdf_viewer_search_previous': 'Previous match',
+      'pdf_viewer_search_close': 'Close search',
       'action_share': 'Share',
 
       // Translation entry UI
@@ -1096,15 +1123,34 @@ class AppLocalizations {
       'countries_regions': 'Regions',
       'countries_count': '%s countries',
       'country_detail_key_figures': 'Key figures',
+      'country_detail_institutional': 'Institutional',
       'country_detail_key_indicators': 'Key indicators',
       'country_detail_top_sectors': 'Top sectors',
       'country_detail_documents': 'Documents',
+      'country_detail_document_tiles': 'Tiles',
+      'country_detail_document_list': 'List',
+      'country_detail_ns_documents': 'National Society',
+      'country_detail_operations_documents': 'Operations',
+      'country_detail_no_operations_documents':
+          'No operation documents for this country',
+      'country_detail_operations_unavailable':
+          'Operation documents could not be loaded',
       'country_detail_all_types': 'All types',
       'country_detail_load_more': 'Load more',
       'country_detail_no_trend': 'No trend data for this indicator',
       'country_detail_no_documents': 'No public documents available',
       'country_detail_not_found': 'Country not found',
       'country_detail_open_failed': 'Could not open this document',
+      'emergencies_title': 'Emergencies',
+      'region_operations_title': 'Operations',
+      'emergencies_active_drefs': 'Active DREF',
+      'emergencies_active_appeals': 'Active appeals',
+      'emergencies_people_targeted': 'People targeted',
+      'emergencies_funding': 'Funding',
+      'emergencies_none': 'No active operations',
+      'emergencies_unavailable': 'Operations could not be loaded',
+      'emergencies_funded_of': '%s of %s requested',
+      'emergencies_by_country': 'Active operations by country',
       'region_overview_link': 'See %s region overview',
       'region_total_countries': 'Total countries',
       'region_coverage': 'Based on %s of %s countries',
@@ -1236,6 +1282,9 @@ class AppLocalizations {
       'ai_semantic_new_chat_hint': 'Starts a new empty conversation',
       'ai_beta_tester_banner':
           'AI beta tester — experimental assistant features may be enabled.',
+      'ai_beta_access_locked_title': 'Request access to use AI',
+      'ai_beta_access_locked_body':
+          'AI is currently in beta and available only to selected users. Request access from an administrator before you can use chat.',
       'ai_empty_welcome': 'How can I help you today?',
       'ai_policy_chip_title': 'AI use policy',
       'ai_policy_sheet_summary_line':
@@ -2271,6 +2320,9 @@ class AppLocalizations {
       'ai_semantic_new_chat_hint': 'Inicia una conversación nueva vacía',
       'ai_beta_tester_banner':
           'Evaluador beta de IA: pueden estar activas funciones experimentales.',
+      'ai_beta_access_locked_title': 'Solicite acceso para usar la IA',
+      'ai_beta_access_locked_body':
+          'La IA está en fase beta y solo está disponible para usuarios seleccionados. Solicite acceso a un administrador antes de usar el chat.',
       'ai_empty_welcome': '¿En qué puedo ayudarle hoy?',
       'ai_policy_chip_title': 'Política de uso de IA',
       'ai_policy_sheet_summary_line':
@@ -3313,6 +3365,9 @@ class AppLocalizations {
       'ai_semantic_new_chat_hint': 'Démarre une nouvelle conversation vide',
       'ai_beta_tester_banner':
           'Testeur bêta IA — des fonctions expérimentales peuvent être activées.',
+      'ai_beta_access_locked_title': 'Demandez l\'accès pour utiliser l\'IA',
+      'ai_beta_access_locked_body':
+          'L\'IA est actuellement en bêta et réservée à certains utilisateurs. Demandez l\'accès à un administrateur avant d\'utiliser le chat.',
       'ai_empty_welcome': 'Comment puis-je vous aider aujourd\'hui ?',
       'ai_policy_chip_title': 'Politique d\'utilisation de l\'IA',
       'ai_policy_sheet_summary_line':
@@ -4313,6 +4368,9 @@ class AppLocalizations {
       'ai_semantic_new_chat_hint': 'يبدأ محادثة فارغة جديدة',
       'ai_beta_tester_banner':
           'مختبر بيتا للذكاء الاصطناعي — قد تكون ميزات تجريبية مفعّلة.',
+      'ai_beta_access_locked_title': 'اطلب الوصول لاستخدام الذكاء الاصطناعي',
+      'ai_beta_access_locked_body':
+          'الذكاء الاصطناعي حالياً في مرحلة بيتا ومتاح لمستخدمين محددين فقط. اطلب الوصول من مسؤول قبل استخدام المحادثة.',
       'ai_empty_welcome': 'كيف يمكنني مساعدتك اليوم؟',
       'ai_policy_chip_title': 'سياسة استخدام الذكاء الاصطناعي',
       'ai_policy_sheet_summary_line':
@@ -5340,6 +5398,9 @@ class AppLocalizations {
       'ai_semantic_new_chat_hint': 'एक नई खाली बातचीत शुरू करता है',
       'ai_beta_tester_banner':
           'AI बीटा परीक्षक — प्रायोगिक सुविधाएँ सक्षम हो सकती हैं।',
+      'ai_beta_access_locked_title': 'AI उपयोग के लिए पहुँच का अनुरोध करें',
+      'ai_beta_access_locked_body':
+          'AI अभी बीटा में है और केवल चुने हुए उपयोगकर्ताओं के लिए उपलब्ध है। चैट उपयोग करने से पहले व्यवस्थापक से पहुँच का अनुरोध करें।',
       'ai_empty_welcome': 'आज मैं आपकी कैसे मदद कर सकता हूँ?',
       'ai_policy_chip_title': 'AI उपयोग नीति',
       'ai_policy_sheet_summary_line':
@@ -6374,6 +6435,9 @@ class AppLocalizations {
       'ai_semantic_new_chat_hint': 'Начинает новую пустую беседу',
       'ai_beta_tester_banner':
           'Бета-тестер ИИ — могут быть включены экспериментальные функции.',
+      'ai_beta_access_locked_title': 'Запросите доступ к ИИ',
+      'ai_beta_access_locked_body':
+          'ИИ сейчас в бета-версии и доступен только выбранным пользователям. Запросите доступ у администратора, чтобы пользоваться чатом.',
       'ai_empty_welcome': 'Чем могу помочь сегодня?',
       'ai_policy_chip_title': 'Политика использования ИИ',
       'ai_policy_sheet_summary_line':
@@ -7350,6 +7414,9 @@ class AppLocalizations {
       'ai_semantic_new_chat_hint': '开始新的空白对话',
       'ai_beta_tester_banner':
           'AI 内测用户 — 可能启用实验性功能。',
+      'ai_beta_access_locked_title': '申请使用 AI 的权限',
+      'ai_beta_access_locked_body':
+          'AI 目前处于测试阶段，仅向选定用户开放。使用聊天前，请向管理员申请访问权限。',
       'ai_empty_welcome': '今天我能为您做什么？',
       'ai_policy_chip_title': 'AI 使用政策',
       'ai_policy_sheet_summary_line':
@@ -7478,6 +7545,26 @@ class AppLocalizations {
   String get accessDenied => translate('access_denied');
   String get general => translate('general');
   String get documentManagement => translate('document_management');
+  String get entityDocumentRepository => translate('entity_document_repository');
+  String get entityDocumentRepositoryHint =>
+      translate('entity_document_repository_hint');
+  String get documentType => translate('document_type');
+  String get selectDocumentType => translate('select_document_type');
+  String get filename => translate('filename');
+  String get publicDocument => translate('public_document');
+  String get replaceAttachment => translate('replace_attachment');
+  String get newFileSelected => translate('new_file_selected');
+  String get clearSelection => translate('clear_selection');
+  String get documentUpdated => translate('document_updated');
+  String get documentUpdateFailed => translate('document_update_failed');
+  String get coverImageAlwaysPublic => translate('cover_image_always_public');
+  String get fileTooLarge => translate('file_too_large');
+  String get fileTypeNotAllowed => translate('file_type_not_allowed');
+  String get couldNotOpenFiles => translate('could_not_open_files');
+  String get documentStatus => translate('document_status');
+  String get pendingReview => translate('pending_review');
+  String get rejected => translate('rejected');
+  String get periodHint => translate('period_hint');
   String get translationManagement => translate('translation_management');
   String get pluginManagement => translate('plugin_management');
   String get systemConfiguration => translate('system_configuration');
@@ -8722,6 +8809,12 @@ class AppLocalizations {
   String pdfViewerDownloadFailedHttp(int code) =>
       translate('pdf_viewer_download_failed_http');
   String get pdfViewerFilenameFallback => translate('pdf_viewer_filename_fallback');
+  String get pdfViewerSearch => translate('pdf_viewer_search');
+  String get pdfViewerSearchHint => translate('pdf_viewer_search_hint');
+  String get pdfViewerSearchNoMatches => translate('pdf_viewer_search_no_matches');
+  String get pdfViewerSearchNext => translate('pdf_viewer_search_next');
+  String get pdfViewerSearchPrevious => translate('pdf_viewer_search_previous');
+  String get pdfViewerSearchClose => translate('pdf_viewer_search_close');
   String get actionShare => translate('action_share');
 
   // Translation entry UI
@@ -8784,16 +8877,44 @@ class AppLocalizations {
   String countriesCount(int count) =>
       translate('countries_count').replaceAll('%s', '$count');
   String get countryDetailKeyFigures => translate('country_detail_key_figures');
+  String get countryDetailInstitutional =>
+      translate('country_detail_institutional');
   String get countryDetailKeyIndicators =>
       translate('country_detail_key_indicators');
   String get countryDetailTopSectors => translate('country_detail_top_sectors');
   String get countryDetailDocuments => translate('country_detail_documents');
+  String get countryDetailDocumentTiles =>
+      translate('country_detail_document_tiles');
+  String get countryDetailDocumentList =>
+      translate('country_detail_document_list');
+  String get countryDetailNsDocuments =>
+      translate('country_detail_ns_documents');
+  String get countryDetailOperationsDocuments =>
+      translate('country_detail_operations_documents');
+  String get countryDetailNoOperationsDocuments =>
+      translate('country_detail_no_operations_documents');
+  String get countryDetailOperationsUnavailable =>
+      translate('country_detail_operations_unavailable');
   String get countryDetailAllTypes => translate('country_detail_all_types');
   String get countryDetailLoadMore => translate('country_detail_load_more');
   String get countryDetailNoTrend => translate('country_detail_no_trend');
   String get countryDetailNoDocuments => translate('country_detail_no_documents');
   String get countryDetailNotFound => translate('country_detail_not_found');
   String get countryDetailOpenFailed => translate('country_detail_open_failed');
+  String get emergenciesTitle => translate('emergencies_title');
+  String get regionOperationsTitle => translate('region_operations_title');
+  String get emergenciesActiveDrefs => translate('emergencies_active_drefs');
+  String get emergenciesActiveAppeals => translate('emergencies_active_appeals');
+  String get emergenciesPeopleTargeted =>
+      translate('emergencies_people_targeted');
+  String get emergenciesFunding => translate('emergencies_funding');
+  String get emergenciesNone => translate('emergencies_none');
+  String get emergenciesUnavailable => translate('emergencies_unavailable');
+  String emergenciesFundedOf(String funded, String requested) =>
+      translate('emergencies_funded_of')
+          .replaceFirst('%s', funded)
+          .replaceFirst('%s', requested);
+  String get emergenciesByCountry => translate('emergencies_by_country');
   String regionOverviewLink(String region) =>
       translate('region_overview_link').replaceAll('%s', region);
   String get regionTotalCountries => translate('region_total_countries');
@@ -8924,6 +9045,8 @@ class AppLocalizations {
   String get aiSemanticNewChatLabel => translate('ai_semantic_new_chat_label');
   String get aiSemanticNewChatHint => translate('ai_semantic_new_chat_hint');
   String get aiBetaTesterBanner => translate('ai_beta_tester_banner');
+  String get aiBetaAccessLockedTitle => translate('ai_beta_access_locked_title');
+  String get aiBetaAccessLockedBody => translate('ai_beta_access_locked_body');
   String get aiEmptyWelcome => translate('ai_empty_welcome');
   String get aiPolicyChipTitle => translate('ai_policy_chip_title');
   String get aiPolicySheetSummaryLine => translate('ai_policy_sheet_summary_line');

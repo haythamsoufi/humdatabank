@@ -1187,7 +1187,9 @@ def handle_assignment_form(aes_id):
             current_user, "admin.documents.manage"
         ):
             documents_library_url = url_for("content_management.manage_documents")
-        elif AuthorizationService.has_rbac_permission(current_user, "assignment.documents.upload"):
+        elif AuthorizationService.has_role(current_user, "assignment_documents_uploader") and AuthorizationService.has_rbac_permission(
+            current_user, "assignment.documents.upload"
+        ):
             documents_library_url = url_for("main.documents_submit")
 
     open_validation_questions = []
@@ -1261,8 +1263,14 @@ def handle_assignment_form(aes_id):
     # stream_template returns a Response with a Jinja2 generator body.
     # Flask sends the <head> and first blocks to the browser immediately, so CSS/JS
     # loading begins in parallel while the rest of the template renders.
-    # The transaction middleware detects is_streamed=True and defers the DB session
-    # cleanup to response.call_on_close, keeping ORM objects live throughout render.
+    # The generator is consumed only after Flask pops the app context, which
+    # removes the scoped session. Resolve the year while AssignedForm is bound;
+    # an unloaded reporting_period later raises DetachedInstanceError.
+    try:
+        entry_assignment_year = VariableResolutionService.get_assignment_year(assignment)
+    except Exception:
+        current_app.logger.debug("entry assignment year resolve failed", exc_info=True)
+        entry_assignment_year = None
     response = stream_template(
         "forms/entry_form/entry_form.html",
         open_validation_questions=open_validation_questions,
@@ -1316,6 +1324,7 @@ def handle_assignment_form(aes_id):
         get_localized_template_name=get_localized_template_name,
         get_assignment_year=VariableResolutionService.get_assignment_year,
         get_assignment_year_from_period_name=VariableResolutionService.get_assignment_year_from_period_name,
+        entry_assignment_year=entry_assignment_year,
         plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
         form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None,
         template_id=form_template.id,
@@ -1733,6 +1742,7 @@ def _preview_template_impl(template_id):
                          get_localized_template_name=get_localized_template_name,
                          get_assignment_year=VariableResolutionService.get_assignment_year,
                          get_assignment_year_from_period_name=VariableResolutionService.get_assignment_year_from_period_name,
+                         entry_assignment_year=VariableResolutionService.get_assignment_year(mock_acs.assigned_form),
                          is_preview_mode=True,
                          template_id=template.id,
                          template_variables=variable_configs,

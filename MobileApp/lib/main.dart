@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'config/routes.dart';
@@ -11,6 +12,7 @@ import 'providers/shared/auth_provider.dart';
 import 'services/auth_service.dart';
 import 'services/jwt_token_service.dart';
 import 'providers/shared/dashboard_provider.dart';
+import 'providers/shared/entity_document_repository_provider.dart';
 import 'providers/shared/notification_provider.dart';
 import 'providers/shared/language_provider.dart';
 import 'providers/shared/theme_provider.dart';
@@ -76,6 +78,11 @@ void main() async {
   performanceService.recordMainStart();
 
   WidgetsFlutterBinding.ensureInitialized();
+  // Android and iOS use native PDFium. The bundled WASM module is for web only,
+  // so don't print the debug-time size warning on device builds.
+  if (!kIsWeb) {
+    await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true);
+  }
 
   // Verbose DEBUG logs (API/NAV/…) are off unless VERBOSE_LOGS is set (see DebugLogger.applyStartupLogPolicy).
 
@@ -402,6 +409,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => AssignmentsProvider()),
         ChangeNotifierProvider(create: (_) => AdminDashboardProvider()),
         ChangeNotifierProvider(create: (_) => DocumentManagementProvider()),
+        ChangeNotifierProvider(
+          create: (_) => EntityDocumentRepositoryProvider(),
+        ),
         ChangeNotifierProvider(create: (_) => TranslationManagementProvider()),
         ChangeNotifierProvider(create: (_) => ResourcesManagementProvider()),
         ChangeNotifierProvider(

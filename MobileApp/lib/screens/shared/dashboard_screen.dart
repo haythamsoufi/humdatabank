@@ -29,6 +29,7 @@ import '../../services/assignment_offline_bundle_service.dart';
 import '../../services/offline/offline_forms_controller.dart';
 import '../../utils/network_availability.dart';
 import '../public/webview_screen.dart';
+import 'entity_document_repository_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -193,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _offlineForms.expectPages(
         all: [...provider.currentAssignments, ...provider.pastAssignments],
         eligible: provider.currentAssignments.where(
-          (a) => _shouldShowEnterDataButton(role, a),
+          (a) => _canSaveOffline(role, a),
         ),
         language: env.language,
       );
@@ -223,11 +224,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       await _offlineForms.reconcile(
         all: [...provider.currentAssignments, ...provider.pastAssignments],
         eligible: provider.currentAssignments.where(
-          (a) => _shouldShowEnterDataButton(role, a),
+          (a) => _canSaveOffline(role, a),
         ),
         env: _offlineEnvironment(),
         clearFailures: clearFailures,
-        otherEntityEligible: (a) => _shouldShowEnterDataButton(role, a),
+        otherEntityEligible: (a) => _canSaveOffline(role, a),
       );
     } catch (e) {
       DebugLogger.logWarn('OFFLINE_BUNDLE', 'Reconcile failed: $e');
@@ -340,11 +341,81 @@ class _DashboardScreenState extends State<DashboardScreen>
     Navigator.of(context).pushNamed(AppRoutes.webview, arguments: path);
   }
 
+  void _openEntityDocumentRepository(
+    BuildContext context,
+    DashboardProvider provider,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    final entity = provider.selectedEntity ??
+        (provider.entities.isNotEmpty ? provider.entities.first : null);
+    if (entity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.noDocumentsFound)),
+      );
+      return;
+    }
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: AppRoutes.entityDocuments),
+        builder: (_) => EntityDocumentRepositoryScreen(entity: entity),
+      ),
+    );
+  }
+
+  bool _showEntityDocumentRepository(AuthProvider authProvider) {
+    return authProvider.user?.canOpenEntityDocumentRepository ?? false;
+  }
+
+  Widget _buildEntityDocumentRepositoryRow({
+    required AppLocalizations localizations,
+    required DashboardProvider provider,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 2, 8, 0),
+      child: InkWell(
+        onTap: () => _openEntityDocumentRepository(context, provider),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              Icon(
+                Icons.folder_open_rounded,
+                color: Color(AppConstants.ifrcRed),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  localizations.entityDocumentRepository,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: IOSTextStyle.subheadline(context).copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: scheme.onSurface.withValues(alpha: 0.35),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Saves the assignment's form for offline use (the template's shared files
   /// are only downloaded when the device does not have them yet).
   Future<void> _saveForOffline(Assignment assignment) async {
     final loc = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
+    if (!assignment.enableOfflineDownload) return;
     final env = _offlineEnvironment();
     if (!env.online) {
       messenger.showSnackBar(
@@ -422,7 +493,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final page = index.pages[assignment.id];
     final package = page == null ? null : index.packages[page.packageKey];
     final isStale = status.outdated;
-    final canUpdateNow = _offlineEnvironment().online && isStale;
+    final canUpdateNow =
+        assignment.enableOfflineDownload &&
+        _offlineEnvironment().online &&
+        isStale;
 
     final titleText =
         assignment.periodName != null && assignment.periodName!.isNotEmpty
@@ -550,6 +624,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         );
       },
     );
+  }
+
+  /// Offline save is a separate assignment setting from Enter Data.
+  bool _canSaveOffline(String? userRole, Assignment assignment) {
+    return assignment.enableOfflineDownload &&
+        _shouldShowEnterDataButton(userRole, assignment);
   }
 
   bool _shouldShowEnterDataButton(String? userRole, Assignment assignment) {
@@ -737,7 +817,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     unawaited(_openAssignmentForm(context, assignment));
                   },
                   onDownloadForOffline:
-                      showEnter &&
+                      _canSaveOffline(authProvider.user?.role, assignment) &&
                           offlineProvider.isOnline &&
                           !shouldDeferRemoteFetch
                       ? () => _saveForOffline(assignment)
@@ -1343,6 +1423,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 _buildOfflineStaleBundleBanner(
                                   loc: localizations,
                                   offline: offlineProvider,
+                                ),
+
+                              if (_showEntityDocumentRepository(authProvider) &&
+                                  _hasLoadedOnce)
+                                _buildEntityDocumentRepositoryRow(
+                                  localizations: localizations,
+                                  provider: provider,
                                 ),
 
                               // Open assignments (collapsible; title: "You have …")

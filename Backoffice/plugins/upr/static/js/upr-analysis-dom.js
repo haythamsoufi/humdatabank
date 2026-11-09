@@ -308,6 +308,22 @@
             section.appendChild(seg);
         }
 
+        // Scale toggle (100% stack vs actual amounts). The drawn chart is modes[0];
+        // exports leave the control off and keep that default.
+        if (interactive && visual.modes && visual.modes.length > 1) {
+            var modes = node('div', 'upri-seg upri-card__modes');
+            modes.setAttribute('role', 'group');
+            if (visual.modes_label) modes.setAttribute('aria-label', visual.modes_label);
+            visual.modes.forEach(function (mode, index) {
+                var button = node('button', 'upri-seg__btn' + (index === 0 ? ' is-active' : ''), mode.label);
+                button.type = 'button';
+                button.setAttribute('data-upri-mode', mode.id);
+                button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
+                modes.appendChild(button);
+            });
+            section.appendChild(modes);
+        }
+
         if (visual.kind === 'panels') {
             var grid = node('div', 'upri-chart upri-cap-grid');
             (visual.panels || []).forEach(function (panel) { grid.appendChild(panelBlock(panel, plots, size)); });

@@ -11,6 +11,7 @@ import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_fade_in_up.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/shimmer_list_placeholder.dart';
@@ -163,7 +164,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
       return Scaffold(
         appBar: AppAppBar(title: localizations.manageUsers),
         body: Center(child: Text(localizations.accessDenied)),
-        bottomNavigationBar: const AppBottomNavigationBar(currentIndex: -1),
+        bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       );
     }
 
@@ -244,6 +245,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,
         ),
+        selectedTabId: TabIds.admin,
         chatbotEnabled: chatbot,
       ),
     );

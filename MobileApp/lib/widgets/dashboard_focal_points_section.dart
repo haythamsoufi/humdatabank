@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/shared/focal_point_contact.dart';
@@ -302,7 +301,7 @@ class _ContactRow extends StatelessWidget {
               if (contact.email.isNotEmpty) ...[
                 _ContactAction(
                   tooltip: localizations.email,
-                  color: GroupedDashboardPalette.mailAction,
+                  alignment: Alignment.centerRight,
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     unawaited(
@@ -312,15 +311,21 @@ class _ContactRow extends StatelessWidget {
                       ),
                     );
                   },
-                  child: const FaIcon(
-                    FontAwesomeIcons.solidEnvelope,
-                    size: 14,
-                    color: GroupedDashboardPalette.onFill,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 3),
+                    child: Icon(
+                      Icons.mail_rounded,
+                      size: 16,
+                      color: _actionColor(
+                        GroupedDashboardPalette.mailAction,
+                        isDark,
+                      ),
+                    ),
                   ),
                 ),
                 _ContactAction(
                   tooltip: 'Teams',
-                  color: GroupedDashboardPalette.teamsAction,
+                  alignment: Alignment.centerLeft,
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     final teamsUri = Uri.parse(
@@ -329,9 +334,17 @@ class _ContactRow extends StatelessWidget {
                     );
                     unawaited(onLaunch(context, teamsUri));
                   },
-                  child: const CustomPaint(
-                    size: Size(16, 16),
-                    painter: _TeamsGlyphPainter(GroupedDashboardPalette.onFill),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 3),
+                    child: CustomPaint(
+                      size: const Size(18, 18),
+                      painter: _TeamsGlyphPainter(
+                        _actionColor(
+                          GroupedDashboardPalette.teamsAction,
+                          isDark,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -348,33 +361,34 @@ class _ContactRow extends StatelessWidget {
   }
 }
 
+/// Lighten a brand color so a bare glyph stays visible on a dark row.
+Color _actionColor(Color color, bool isDark) =>
+    isDark ? Color.lerp(color, Colors.white, 0.42)! : color;
+
 class _ContactAction extends StatelessWidget {
   const _ContactAction({
     required this.tooltip,
-    required this.color,
     required this.onPressed,
     required this.child,
+    this.alignment = Alignment.center,
   });
 
   final String tooltip;
-  final Color color;
   final VoidCallback onPressed;
   final Widget child;
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 6),
-      child: Tooltip(
-        message: tooltip,
-        child: Material(
-          color: color,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onPressed,
-            child: SizedBox(width: 34, height: 34, child: Center(child: child)),
-          ),
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 28,
+          height: 36,
+          child: Align(alignment: alignment, child: child),
         ),
       ),
     );

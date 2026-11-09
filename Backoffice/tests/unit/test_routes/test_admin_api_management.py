@@ -372,7 +372,13 @@ class TestApiManagementHelpers:
         for path in (
             "/api/v1/public/global-trend",
             "/api/v1/public/documents/search",
-            "/api/v1/public/documents/<uuid:document_id>/download",
+            "/api/v1/public/documents/<uuid:public_id>/download",
+            "/api/v1/public/documents/<uuid:public_id>",
+            "/api/v1/public/documents/chunks/<uuid:chunk_public_id>/context",
+            "/api/v1/dashboard/offline-entities",
+            "/api/mobile/v1/data/offline-home",
+            "/api/mobile/v1/data/offline-countries",
+            "/api/mobile/v1/data/go-documents",
             "/api/v1/uploads/spef/<filename>",
             "/api/v1/uploads/ns/<filename>",
             "/api/v1/dashboard/data-quality",
@@ -384,11 +390,21 @@ class TestApiManagementHelpers:
             "/api/mobile/v1/templates/<template_id>/structure",
             "/api/mobile/v1/templates/<template_id>/resolve-fields",
             "/api/mobile/v1/templates/<template_id>/items/by-stable-key/<stable_key>",
+            "/api/mobile/v1/user/entity-documents",
         ):
             assert path in by_path, path
         assert by_path["/api/v1/public/documents/search"]["auth"] == "public"
+        assert by_path["/api/v1/public/documents/<uuid:public_id>"]["auth"] == "public"
         assert by_path["/api/v1/dashboard/data-quality"]["auth"] == "session"
+        assert by_path["/api/v1/dashboard/offline-entities"]["auth"] == "session"
         assert by_path["/api/mobile/v1/templates/<template_id>/structure"]["auth"] == "user"
+        entity_docs = by_path["/api/mobile/v1/user/entity-documents"]
+        assert entity_docs["auth"] == "user"
+        assert entity_docs["surface"] == "mobile"
+        assert [p["name"] for p in entity_docs["query_params"]][:2] == ["entity_type", "entity_id"]
+        assert by_path["/api/mobile/v1/data/offline-home"]["auth"] == "public"
+        assert by_path["/api/mobile/v1/data/offline-countries"]["auth"] == "public"
+        assert by_path["/api/mobile/v1/data/go-documents"]["auth"] == "public"
 
     def test_scan_documents_indicator_bank_app_routes(self, app):
         from app.routes.admin.api_management import scan_flask_routes
@@ -406,9 +422,17 @@ class TestApiManagementHelpers:
         for path in (
             "/api/v1/public/global-trend",
             "/api/v1/uploads/spef/<filename>",
+            "/api/v1/dashboard/offline-entities",
+            "/api/v1/public/documents/<public_id>",
+            "/api/v1/public/documents/<public_id>/download",
+            "/api/v1/public/documents/chunks/<chunk_public_id>/context",
             "/api/mobile/v1/auth/oauth/exchange",
             "/api/mobile/v1/data/disaggregation-overview",
+            "/api/mobile/v1/data/offline-home",
+            "/api/mobile/v1/data/offline-countries",
+            "/api/mobile/v1/data/go-documents",
             "/api/mobile/v1/templates/<template_id>/structure",
+            "/api/mobile/v1/user/entity-documents",
         ):
             assert path not in undoc
         if not app.config.get("WEBSOCKET_ENABLED", False):

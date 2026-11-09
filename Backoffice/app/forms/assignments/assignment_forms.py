@@ -60,6 +60,11 @@ class AssignedFormForm(BaseForm):
         default=False,
     )
 
+    enable_offline_download = BooleanField(
+        "Allow offline download in the mobile app",
+        default=False,
+    )
+
     enable_export_excel = BooleanField(
         "Enable Export Excel button",
         default=False,

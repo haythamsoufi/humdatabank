@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hum_databank_app/l10n/app_localizations.dart';
 import 'package:hum_databank_app/models/shared/assignment.dart';
 import 'package:hum_databank_app/models/shared/focal_point_contact.dart';
@@ -107,6 +106,74 @@ void main() {
     expect(find.text('In Progress'), findsOneWidget);
   });
 
+  testWidgets('completion rate sits above a bar filled to that rate', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardGroupedAssignmentCard(assignment: _assignment('approved')),
+    );
+
+    expect(find.text('73% completed'), findsOneWidget);
+    final bar = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator),
+    );
+    expect(bar.value, closeTo(0.73, 0.001));
+    expect(bar.color, GroupedDashboardPalette.pending.accent);
+    final barWidth = tester.getSize(find.byType(LinearProgressIndicator)).width;
+    final cardWidth = tester
+        .getSize(find.byType(DashboardGroupedAssignmentCard))
+        .width;
+    // Accent stripe (6) plus the card's horizontal padding (14 + 12).
+    expect(barWidth, closeTo((cardWidth - 32) / 3, 1));
+
+    final label = tester.widget<Text>(find.text('73% completed'));
+    expect(label.style?.color, GroupedDashboardPalette.pending.accent);
+  });
+
+  testWidgets('low completion uses the danger colour and a short fill', (
+    tester,
+  ) async {
+    final low = Assignment(
+      id: 3,
+      name: 'Just started',
+      status: 'pending',
+      completionRate: 10,
+    );
+    await _pump(tester, DashboardGroupedAssignmentCard(assignment: low));
+
+    expect(find.text('10% completed'), findsOneWidget);
+    final bar = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator),
+    );
+    expect(bar.value, closeTo(0.10, 0.001));
+    expect(bar.color, GroupedDashboardPalette.danger.accent);
+  });
+
+  testWidgets('completion bar sits on the last line beside download and enter data', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardGroupedAssignmentCard(
+        assignment: _assignment('pending'),
+        showEnterDataButton: true,
+        onEnterData: () {},
+        onDownloadForOffline: () {},
+      ),
+    );
+
+    final bar = tester.getRect(find.byType(LinearProgressIndicator));
+    final download = tester.getRect(find.byIcon(Icons.download_rounded));
+    final enter = tester.getRect(find.text('Enter Data'));
+    final label = tester.getRect(find.text('73% completed'));
+
+    expect(label.bottom, lessThanOrEqualTo(bar.top));
+    expect(bar.right, lessThan(download.left));
+    expect(enter.left - download.right, lessThan(24));
+    expect((bar.center.dy - enter.center.dy).abs(), lessThan(24));
+  });
+
   testWidgets('downloaded assignment shows only the saved cloud icon', (
     tester,
   ) async {
@@ -158,8 +225,7 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(FontAwesomeIcons.solidEnvelope), findsOneWidget);
-    expect(find.byType(CustomPaint), findsWidgets);
+    expect(find.byIcon(Icons.mail_rounded), findsOneWidget);
     final paints = tester.widgetList<CustomPaint>(find.byType(CustomPaint));
     expect(
       paints.where((paint) => paint.painter != null).length,

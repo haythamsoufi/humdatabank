@@ -227,6 +227,9 @@ def ensure_fdrs_assignments_for_sync(
             enable_export_excel=bool(getattr(reference, "enable_export_excel", True)),
             enable_import_excel=bool(getattr(reference, "enable_import_excel", True)),
             enable_export_pdf=bool(getattr(reference, "enable_export_pdf", False)),
+            enable_offline_download=bool(
+                getattr(reference, "enable_offline_download", False)
+            ),
             data_owner_id=getattr(reference, "data_owner_id", None),
             requires_delegation_review=bool(
                 getattr(reference, "requires_delegation_review", False)

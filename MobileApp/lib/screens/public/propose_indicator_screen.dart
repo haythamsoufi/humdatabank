@@ -4,6 +4,7 @@ import '../../providers/public/indicator_bank_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../utils/constants.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_checkbox_list_tile.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -145,6 +146,7 @@ class _ProposeIndicatorScreenState extends State<ProposeIndicatorScreen> {
       appBar: AppAppBar(
         title: localizations.indicatorBankProposeTitle,
       ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: SafeArea(
         child: _submitSuccess ? _buildSuccessView(localizations) : _buildForm(localizations),
       ),

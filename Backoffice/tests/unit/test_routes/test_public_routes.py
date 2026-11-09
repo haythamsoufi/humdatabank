@@ -390,6 +390,20 @@ class TestDownloadDocumentThumbnailPublic(_PublicImageRouteCases):
         doc = _make_document(db_session, thumbnail_relative_path=None)
         assert self._get(client, doc, by_public_id=True).status_code == 404
 
+    def test_pdf_without_stored_thumbnail_renders_first_page(self, client, db_session):
+        doc = _make_document(
+            db_session,
+            filename="report.pdf",
+            thumbnail_relative_path=None,
+            storage_path="docs/report.pdf",
+        )
+        jpeg = b"\xff\xd8\xff\xd9"
+        with patch("app.routes.public._pdf_first_page_jpeg", return_value=jpeg):
+            resp = client.get(f"/documents/thumbnail/{doc.public_id}")
+        assert resp.status_code == 200
+        assert resp.mimetype == "image/jpeg"
+        assert resp.data == jpeg
+
 
 class TestDisplayDocumentFilePublic(_PublicImageRouteCases):
     kind = "display"

@@ -9,6 +9,7 @@ import '../../utils/ios_settings_style.dart';
 import '../../utils/theme_extensions.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../widgets/admin_user_banner.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/ios_list_tile.dart';
@@ -82,6 +83,7 @@ class _AdminScreenState extends State<AdminScreen>
                 currentIndex: AppBottomNavigationBar.adminTabNavIndex(
                   chatbotEnabled: user.chatbotEnabled,
                 ),
+                selectedTabId: TabIds.admin,
                 chatbotEnabled: user.chatbotEnabled,
               )
             : null;

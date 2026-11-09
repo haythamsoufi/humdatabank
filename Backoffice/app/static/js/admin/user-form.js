@@ -247,7 +247,10 @@
                         });
                         roleTypeSelect.addEventListener('change', handleRoleTypeChangeFromUser);
                         syncRoleTypeUi();
-                        if (roleTypeSelect.value === 'focal_point') {
+                        // New focal-point accounts preview Assignment Viewer because save will
+                        // grant it. Existing accounts must show the saved roles: previewing
+                        // Viewer here made unsaved access look granted.
+                        if (cfg.isNew && roleTypeSelect.value === 'focal_point') {
                           ensureMinimumFocalPointAssignmentRoles();
                         }
                         try { recomputeLocks(); } catch (e) {}
@@ -821,10 +824,14 @@
                       applyRoleHighlights();
                       // After helpers exist: if Focal Point is selected (including after a failed
                       // save), strip any leftover checked admin roles that are only hidden in the UI.
+                      // Do not tick Assignment Viewer here for an existing user — that tick is
+                      // not saved until submit, and the dashboard treats it as missing.
                       if (roleTypeSelect && roleTypeSelect.value === 'focal_point') {
                         window.__clientLog && window.__clientLog('[user_form:roles] focal_point init cleanup — clearing admin roles still checked in DOM');
                         clearAdminRolesForFocalPoint();
-                        ensureMinimumFocalPointAssignmentRoles();
+                        if (cfg.isNew) {
+                          ensureMinimumFocalPointAssignmentRoles();
+                        }
                       }
                       recomputeLocks();
                       initTranslatorLanguagePanel();

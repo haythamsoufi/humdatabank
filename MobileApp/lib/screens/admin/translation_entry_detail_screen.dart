@@ -8,6 +8,7 @@ import '../../utils/theme_extensions.dart';
 import '../../config/routes.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import 'translation_entry_ui.dart';
 
 /// Full-screen view of one translation entry (msgid + per-locale strings).
@@ -49,6 +50,7 @@ class _TranslationEntryDetailScreenState
       appBar: AppAppBar(
         title: loc.indicatorDetailDetails,
       ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           16,

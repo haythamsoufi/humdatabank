@@ -8,6 +8,29 @@
 }
 @keyframes fdrs-pub-spin { to { transform: rotate(360deg); } }
 </style>
+{% if assignments %}
+<div id="fdrs-pub-progress" class="hidden mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+  <div class="flex items-start justify-between gap-3 mb-2">
+    <div>
+      <p id="fdrs-pub-progress-title" class="text-sm font-semibold text-blue-900">Publishing…</p>
+      <p id="fdrs-pub-progress-stage" class="text-sm text-blue-800 mt-0.5">Starting…</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="fdrs-pub-progress-spinner" class="inline-block w-4 h-4 border-2 border-blue-200 border-t-blue-700 rounded-full animate-spin" aria-hidden="true"></span>
+      <button type="button" id="fdrs-pub-cancel-btn" class="btn btn-secondary text-sm">
+        <span id="fdrs-pub-cancel-btn-text">Stop publishing</span>
+      </button>
+    </div>
+  </div>
+  <div class="h-2 bg-blue-100 rounded overflow-hidden">
+    <div id="fdrs-pub-progress-bar" class="h-2 bg-blue-600 rounded" style="width: 0%"></div>
+  </div>
+  <div class="flex justify-between text-xs text-blue-800 mt-1">
+    <span id="fdrs-pub-progress-text">0%</span>
+    <span id="fdrs-pub-progress-count"></span>
+  </div>
+</div>
+{% endif %}
 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-900">
   <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>
   Compare public FDRS figures with the last published snapshot for the selected reporting period.
@@ -99,28 +122,6 @@
         <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">Select a reporting period to preview.</td></tr>
       </tbody>
     </table>
-  </div>
-</div>
-
-<div id="fdrs-pub-progress" class="hidden mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-  <div class="flex items-start justify-between gap-3 mb-2">
-    <div>
-      <p id="fdrs-pub-progress-title" class="text-sm font-semibold text-blue-900">Publishing…</p>
-      <p id="fdrs-pub-progress-stage" class="text-sm text-blue-800 mt-0.5">Starting…</p>
-    </div>
-    <div class="flex items-center gap-2">
-      <span id="fdrs-pub-progress-spinner" class="inline-block w-4 h-4 border-2 border-blue-200 border-t-blue-700 rounded-full animate-spin" aria-hidden="true"></span>
-      <button type="button" id="fdrs-pub-cancel-btn" class="btn btn-secondary text-sm">
-        <span id="fdrs-pub-cancel-btn-text">Stop publishing</span>
-      </button>
-    </div>
-  </div>
-  <div class="h-2 bg-blue-100 rounded overflow-hidden">
-    <div id="fdrs-pub-progress-bar" class="h-2 bg-blue-600 rounded" style="width: 0%"></div>
-  </div>
-  <div class="flex justify-between text-xs text-blue-800 mt-1">
-    <span id="fdrs-pub-progress-text">0%</span>
-    <span id="fdrs-pub-progress-count"></span>
   </div>
 </div>
 

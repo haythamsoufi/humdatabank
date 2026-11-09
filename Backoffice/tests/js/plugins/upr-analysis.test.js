@@ -150,8 +150,51 @@ describe('charts.buildOptions', () => {
             series: [{ ...col('Lapsed', 'primary', 'abs_int'), data: [-3, null] }],
         });
         expect(o.chart.stacked).toBe(true);
+        expect(o.chart.stackType).toBeUndefined();
         expect(o.yaxis.labels.formatter(-3)).toBe('3');
         expect(o.tooltip.y.formatter(-3, { seriesIndex: 0 })).toBe('3');
+    });
+
+    it('draws a 100% stacked horizontal bar with a percent axis and amount tooltips', () => {
+        const o = A.charts.buildOptions({
+            ...base,
+            stacked: true,
+            stack_type: '100%',
+            horizontal: true,
+            categories: ['Africa', 'Europe'],
+            axes: { primary: { format: 'money' } },
+            series: [
+                { name: 'SP1', kind: 'column', data: [750, 250], color: '#111', axis: 'primary', format: 'money', dashed: false },
+                { name: 'SP2', kind: 'column', data: [250, 750], color: '#222', axis: 'primary', format: 'money', dashed: false },
+            ],
+        });
+        expect(o.chart.type).toBe('bar');
+        expect(o.chart.stacked).toBe(true);
+        expect(o.chart.stackType).toBe('100%');
+        expect(o.plotOptions.bar.horizontal).toBe(true);
+        expect(o.xaxis.max).toBe(100);
+        expect(o.xaxis.labels.formatter(25)).toBe('25%');
+        expect(o.tooltip.y.formatter(750, { seriesIndex: 0, dataPointIndex: 0 })).toBe(`${(750).toLocaleString()} (75%)`);
+        expect(o.tooltip.y.formatter(250, { seriesIndex: 1, dataPointIndex: 0 })).toBe(`${(250).toLocaleString()} (25%)`);
+    });
+
+    it('draws a two-slice pie from categories and one series', () => {
+        const o = A.charts.buildOptions({
+            ...base,
+            pie: true,
+            height: 280,
+            categories: ['NSIF focus', 'Other'],
+            colors: ['#011e41', '#f39200'],
+            series: [{ name: 'Funding', kind: 'pie', data: [2_000_000, null], color: '#011e41', axis: 'primary', format: 'money', dashed: false }],
+        });
+        expect(o.chart.type).toBe('pie');
+        expect(o.series).toEqual([2_000_000, 0]);
+        expect(o.labels).toEqual(['NSIF focus', 'Other']);
+        expect(o.colors).toEqual(['#011e41', '#f39200']);
+        expect(o.legend.position).toBe('bottom');
+        expect(o.dataLabels.formatter(62.5)).toBe('62.5%');
+        expect(o.tooltip.y.formatter(2_000_000)).toBe('2M');
+        expect(o.xaxis).toBeUndefined();
     });
 
     it('applies gradient fills to area series and honours legend, labels and titles', () => {
@@ -204,9 +247,14 @@ describe('server views (contract fixture)', () => {
         views.forEach((view) => {
             everyChart(view).forEach(({ id, chart }) => {
                 const o = A.charts.buildOptions(chart);
-                expect(o.series.length, id).toBe(chart.series.length);
-                o.series.forEach((s) => expect(s.data.length, id).toBe(chart.categories.length));
-                expect(o.xaxis.categories, id).toEqual(chart.categories);
+                if (chart.pie) {
+                    expect(o.chart.type, id).toBe('pie');
+                    expect(o.labels, id).toEqual(chart.categories);
+                } else {
+                    expect(o.series.length, id).toBe(chart.series.length);
+                    o.series.forEach((s) => expect(s.data.length, id).toBe(chart.categories.length));
+                    expect(o.xaxis.categories, id).toEqual(chart.categories);
+                }
                 count += 1;
             });
         });
@@ -272,6 +320,35 @@ describe('server views (contract fixture)', () => {
         expect(buttons[0].classList.contains('is-active')).toBe(true);
         const printed = A.dom.renderCard(visual, { interactive: false, ui: {} });
         expect(printed.element.querySelector('[data-upri-source]')).toBeNull();
+    });
+
+    it('offers a 100% / values toggle and keeps the share chart when printed', () => {
+        const share = { categories: ['Africa'], series: [{ name: 'SP1', data: [1] }], stacked: true, stack_type: '100%', horizontal: true, height: 200 };
+        const values = { categories: ['Africa'], series: share.series, stacked: true, horizontal: true, height: 200 };
+        const visual = {
+            id: 'gp_geo_region',
+            title: 'Funding requirements geographically',
+            hint: 'Share',
+            kind: 'chart',
+            wide: false,
+            chart: share,
+            table: { title: 'Funding', columns: ['Region'], rows: [] },
+            modes: [
+                { id: 'share', label: '100%', chart: share },
+                { id: 'values', label: 'Values', chart: values },
+            ],
+            modes_label: 'Chart scale',
+        };
+        const shown = A.dom.renderCard(visual, { ui: {} });
+        const buttons = [...shown.element.querySelectorAll('[data-upri-mode]')];
+        expect(buttons.map((b) => b.textContent)).toEqual(['100%', 'Values']);
+        expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
+        expect(buttons[0].classList.contains('is-active')).toBe(true);
+        expect(shown.element.querySelector('.upri-card__modes').getAttribute('aria-label')).toBe('Chart scale');
+        expect(shown.plots[0].chart.stack_type).toBe('100%');
+        const printed = A.dom.renderCard(visual, { interactive: false, ui: {} });
+        expect(printed.element.querySelector('[data-upri-mode]')).toBeNull();
+        expect(printed.plots[0].chart).toBe(share);
     });
 
     it('shows each capacity panel with its latest figure', () => {

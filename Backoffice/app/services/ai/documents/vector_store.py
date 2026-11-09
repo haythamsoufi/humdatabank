@@ -9,9 +9,9 @@ import hashlib
 import json
 import logging
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import List, Dict, Any, Optional, Tuple
-from sqlalchemy import text, func, inspect as sa_inspect
+from sqlalchemy import and_, or_, text, func, inspect as sa_inspect
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from flask import current_app
@@ -23,6 +23,79 @@ from app.services.ai.documents.embedding import AIEmbeddingService, EmbeddingCac
 from app.utils.sql_utils import safe_ilike_pattern
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_filter_date(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value)[:10])
+
+
+def document_covers_date_range_clause(date_range):
+    """
+    Match ``document_date`` or any year in ``extra_metadata.coverage_years``.
+
+    A file filed under several catalog years keeps one embedding. Year filters
+    still match every year that file was published under.
+    """
+    if not date_range:
+        return None
+    min_raw, max_raw = None, None
+    if isinstance(date_range, (list, tuple)) and len(date_range) >= 2:
+        min_raw, max_raw = date_range[0], date_range[1]
+    elif isinstance(date_range, dict):
+        min_raw, max_raw = date_range.get("min"), date_range.get("max")
+    else:
+        return None
+    try:
+        min_d = _parse_filter_date(min_raw)
+        max_d = _parse_filter_date(max_raw)
+    except (TypeError, ValueError):
+        return None
+    if min_d is None and max_d is None:
+        return None
+
+    date_clauses = []
+    if min_d is not None:
+        date_clauses.append(AIDocument.document_date >= min_d)
+    if max_d is not None:
+        date_clauses.append(AIDocument.document_date <= max_d)
+
+    overlap = text(
+        """
+        EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements_text(
+            CASE
+              WHEN ai_documents.extra_metadata IS NOT NULL
+               AND jsonb_typeof((ai_documents.extra_metadata)::jsonb -> 'coverage_years') = 'array'
+              THEN (ai_documents.extra_metadata)::jsonb -> 'coverage_years'
+              ELSE '[]'::jsonb
+            END
+          ) AS cov(yr)
+          WHERE cov.yr ~ '^[0-9]{4}$'
+            AND (:coverage_year_min IS NULL OR cov.yr::int >= :coverage_year_min)
+            AND (:coverage_year_max IS NULL OR cov.yr::int <= :coverage_year_max)
+        )
+        """
+    ).bindparams(
+        coverage_year_min=min_d.year if min_d is not None else None,
+        coverage_year_max=max_d.year if max_d is not None else None,
+    )
+    if not date_clauses:
+        return overlap
+    return or_(and_(*date_clauses), overlap)
+
+
+def apply_date_range_filter(query, date_range):
+    clause = document_covers_date_range_clause(date_range)
+    if clause is None:
+        return query
+    return query.filter(clause)
 
 
 class VectorStoreError(Exception):
@@ -574,19 +647,8 @@ class AIVectorStore:
                 if "country_name" in filters and (filters.get("country_name") or "").strip():
                     similarity_query = similarity_query.filter(self._country_name_filter(filters["country_name"]))
                 # Optional date_range filter: {"min": date, "max": date} or (min_date, max_date)
-                if "date_range" in filters and filters.get("date_range"):
-                    dr = filters["date_range"]
-                    min_d, max_d = None, None
-                    if isinstance(dr, (list, tuple)) and len(dr) >= 2:
-                        min_d, max_d = dr[0], dr[1]
-                    elif isinstance(dr, dict):
-                        min_d, max_d = dr.get("min"), dr.get("max")
-                    if min_d is not None:
-                        d = min_d if isinstance(min_d, date) else date.fromisoformat(str(min_d)[:10])
-                        similarity_query = similarity_query.filter(AIDocument.document_date >= d)
-                    if max_d is not None:
-                        d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
-                        similarity_query = similarity_query.filter(AIDocument.document_date <= d)
+                if filters.get("date_range"):
+                    similarity_query = apply_date_range_filter(similarity_query, filters.get("date_range"))
                 if filters.get("require_phrase"):
                     similarity_query = self._apply_require_phrase_filter(
                         similarity_query, filters["require_phrase"]
@@ -668,20 +730,8 @@ class AIVectorStore:
             # Apply country filter if provided
             if filters and filters.get("country_id"):
                 similarity_query = similarity_query.filter(self._country_id_filter(int(filters["country_id"])))
-            # Apply date_range filter if provided
             if filters and filters.get("date_range"):
-                dr = filters["date_range"]
-                min_d, max_d = None, None
-                if isinstance(dr, (list, tuple)) and len(dr) >= 2:
-                    min_d, max_d = dr[0], dr[1]
-                elif isinstance(dr, dict):
-                    min_d, max_d = dr.get("min"), dr.get("max")
-                if min_d is not None:
-                    d = min_d if isinstance(min_d, date) else date.fromisoformat(str(min_d)[:10])
-                    similarity_query = similarity_query.filter(AIDocument.document_date >= d)
-                if max_d is not None:
-                    d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
-                    similarity_query = similarity_query.filter(AIDocument.document_date <= d)
+                similarity_query = apply_date_range_filter(similarity_query, filters.get("date_range"))
 
             # Order by similarity and limit (text() for label consistency)
             results = similarity_query.order_by(text("similarity DESC")).limit(top_k).all()
@@ -858,18 +908,7 @@ class AIVectorStore:
                 ).bindparams(workflow_role_json=role_json)
             )
         if filters.get("date_range"):
-            dr = filters["date_range"]
-            min_d, max_d = None, None
-            if isinstance(dr, (list, tuple)) and len(dr) >= 2:
-                min_d, max_d = dr[0], dr[1]
-            elif isinstance(dr, dict):
-                min_d, max_d = dr.get("min"), dr.get("max")
-            if min_d is not None:
-                d = min_d if isinstance(min_d, date) else date.fromisoformat(str(min_d)[:10])
-                query = query.filter(AIDocument.document_date >= d)
-            if max_d is not None:
-                d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
-                query = query.filter(AIDocument.document_date <= d)
+            query = apply_date_range_filter(query, filters.get("date_range"))
         if filters.get("require_phrase"):
             query = AIVectorStore._apply_require_phrase_filter(query, filters["require_phrase"])
         return query
@@ -1279,19 +1318,8 @@ class AIVectorStore:
                         query = query.filter(AIDocument.submitted_document_id.is_(None))
                 if 'country_name' in filters and (filters.get('country_name') or '').strip():
                     query = query.filter(self._country_name_filter(filters['country_name']))
-                if "date_range" in filters and filters.get("date_range"):
-                    dr = filters["date_range"]
-                    min_d, max_d = None, None
-                    if isinstance(dr, (list, tuple)) and len(dr) >= 2:
-                        min_d, max_d = dr[0], dr[1]
-                    elif isinstance(dr, dict):
-                        min_d, max_d = dr.get("min"), dr.get("max")
-                    if min_d is not None:
-                        d = min_d if isinstance(min_d, date) else date.fromisoformat(str(min_d)[:10])
-                        query = query.filter(AIDocument.document_date >= d)
-                    if max_d is not None:
-                        d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
-                        query = query.filter(AIDocument.document_date <= d)
+                if filters.get("date_range"):
+                    query = apply_date_range_filter(query, filters.get("date_range"))
                 if filters.get("require_phrase"):
                     query = self._apply_require_phrase_filter(query, filters["require_phrase"])
 

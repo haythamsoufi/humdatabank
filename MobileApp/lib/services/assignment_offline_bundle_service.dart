@@ -167,6 +167,7 @@ String _renderPage(
   var html = OfflineAssetScanner.rewriteHtmlAssetRefs(input.html, input.assets);
   html = OfflineAssetScanner.demoteHtmlRootStaticPaths(html);
   html = OfflineAssetScanner.stripStaticUrlCacheQuery(html);
+  html = OfflineAssetScanner.rewriteImportMapsForFileUrl(html);
   return OfflineAssetScanner.injectOfflineHead(
     html,
     input.message,
@@ -259,6 +260,7 @@ class AssignmentOfflineBundleService {
   final OfflineFormStore _store;
   final _KeyedMutex _locks = _KeyedMutex();
   final Map<int, List<String>> _traces = {};
+  final Map<int, Stopwatch> _traceClocks = {};
   int _epoch = 0;
 
   // ---------------------------------------------------------------- tracing
@@ -268,10 +270,23 @@ class AssignmentOfflineBundleService {
   List<String> traceFor(int assignmentId) =>
       List.unmodifiable(_traces[assignmentId] ?? const <String>[]);
 
+  void _beginTrace(int assignmentId) {
+    _traces[assignmentId] = <String>[];
+    _traceClocks[assignmentId] = Stopwatch()..start();
+  }
+
+  /// Stores the step and prints it immediately. A save used to stay silent
+  /// until it failed, so a slow page request left no Dart log at all.
   void _trace(int assignmentId, String line) {
+    final clock = _traceClocks[assignmentId];
+    final stamped = clock == null
+        ? line
+        : '+${clock.elapsedMilliseconds}ms $line';
+    final stored = stamped.length > 300 ? stamped.substring(0, 300) : stamped;
     final list = _traces.putIfAbsent(assignmentId, () => <String>[]);
     if (list.length >= 120) list.removeAt(0);
-    list.add(line.length > 300 ? line.substring(0, 300) : line);
+    list.add(stored);
+    DebugLogger.logInfo('OFFLINE_BUNDLE', 'a$assignmentId $stored');
   }
 
   static String _tracePath(Uri u) => u.path.isEmpty
@@ -533,13 +548,21 @@ class AssignmentOfflineBundleService {
     final recorder = request.recordApiResponses;
     if (recorder == null) return const [];
     final id = request.assignmentId;
+    _trace(id, 'recording form');
+    final sw = Stopwatch()..start();
     try {
       final recorded = await recorder(formUrl).timeout(_recordingTimeout);
-      _trace(id, 'recorder entries=${recorded.length}');
+      _trace(
+        id,
+        'recorder entries=${recorded.length} ${sw.elapsedMilliseconds}ms',
+      );
       return recorded;
     } catch (e, st) {
       if (e is DioException && CancelToken.isCancel(e)) rethrow;
-      _trace(id, 'recorder failed ${_describeError(e)}');
+      _trace(
+        id,
+        'recorder failed ${_describeError(e)} ${sw.elapsedMilliseconds}ms',
+      );
       DebugLogger.logWarn(
         'OFFLINE_BUNDLE',
         'Could not record form API data for assignment $id: $e\n$st',
@@ -553,13 +576,23 @@ class AssignmentOfflineBundleService {
   /// Saves the template's shared files (replacing any previous package of it)
   /// and the assignment's page. Existing pages of other assignments are kept
   /// and refreshed later. A failed attempt never damages the previous copy.
-  Future<void> savePackageAndPage(OfflineFormRequest request) =>
-      _locks.run(request.packageKey, () => _savePackageAndPage(request));
+  Future<void> savePackageAndPage(OfflineFormRequest request) {
+    DebugLogger.logInfo(
+      'OFFLINE_BUNDLE',
+      'a${request.assignmentId} package+page begin key=${request.packageKey}',
+    );
+    return _locks.run(request.packageKey, () => _savePackageAndPage(request));
+  }
 
   /// Saves only the assignment's page, using the template's saved package.
   /// Throws when the package is missing or no longer matches the server.
-  Future<void> savePage(OfflineFormRequest request) =>
-      _locks.run(request.packageKey, () => _savePage(request));
+  Future<void> savePage(OfflineFormRequest request) {
+    DebugLogger.logInfo(
+      'OFFLINE_BUNDLE',
+      'a${request.assignmentId} page begin key=${request.packageKey}',
+    );
+    return _locks.run(request.packageKey, () => _savePage(request));
+  }
 
   Future<_FetchedPage> _fetchPage(OfflineFormRequest r) async {
     final id = r.assignmentId;
@@ -571,16 +604,34 @@ class AssignmentOfflineBundleService {
         'Cookie': r.sessionCookieHeader!,
     };
 
-    final resp = await _dio.get<List<int>>(
-      resolved,
-      options: Options(responseType: ResponseType.bytes, headers: headers),
-      cancelToken: r.cancelToken,
-    );
+    _trace(id, 'GET ${_tracePath(pageUri)}');
+    final net = Stopwatch()..start();
+    final waiting = Timer.periodic(const Duration(seconds: 5), (_) {
+      _trace(
+        id,
+        'GET still waiting ${_tracePath(pageUri)} ${net.elapsedMilliseconds}ms',
+      );
+    });
+    final Response<List<int>> resp;
+    try {
+      resp = await _dio.get<List<int>>(
+        resolved,
+        options: Options(responseType: ResponseType.bytes, headers: headers),
+        cancelToken: r.cancelToken,
+      );
+    } finally {
+      waiting.cancel();
+    }
+    final netMs = net.elapsedMilliseconds;
     final status = resp.statusCode ?? 0;
     final bytes = resp.data;
+    final redirects = resp.redirects
+        .map((hop) => '${hop.statusCode}:${_tracePath(hop.location)}')
+        .join(' ');
     _trace(
       id,
-      'page ${_tracePath(pageUri)} HTTP $status bytes=${bytes?.length ?? 0}',
+      'page ${_tracePath(pageUri)} HTTP $status bytes=${bytes?.length ?? 0} '
+      '${netMs}ms${redirects.isEmpty ? '' : ' redirects=$redirects'}',
     );
     if (status >= 400) {
       throw AssignmentOfflineBundleException(
@@ -597,6 +648,7 @@ class AssignmentOfflineBundleService {
     }
 
     final html = utf8.decode(bytes, allowMalformed: true);
+    final parse = Stopwatch()..start();
     final analysis = await _inBackground(_analyzePage, (
       html,
       resolved,
@@ -610,7 +662,8 @@ class AssignmentOfflineBundleService {
         .length;
     _trace(
       id,
-      'refs total=${refs.length} dom=${analysis.dom.length} other-host=$other',
+      'refs total=${refs.length} dom=${analysis.dom.length} other-host=$other '
+      'parse=${parse.elapsedMilliseconds}ms',
     );
     return _FetchedPage(
       html: html,
@@ -680,8 +733,12 @@ class AssignmentOfflineBundleService {
       enqueue(u, isSpeculative: !page.domRefs.contains(u.toString()));
     }
 
+    var lastStarted = '';
+
     Future<void> fetchOne(Uri absolute) async {
       final absKey = absolute.toString();
+      lastStarted = _tracePath(absolute);
+      final fetchSw = Stopwatch()..start();
       final external = !OfflineAssetScanner.isSameOrigin(absolute, pageUri);
       final relPath = external
           ? OfflineAssetScanner.externalRelativePath(absolute)
@@ -741,6 +798,11 @@ class AssignmentOfflineBundleService {
       } catch (e) {
         if (e is DioException && CancelToken.isCancel(e)) rethrow;
         markMissing(absolute, _describeError(e));
+      } finally {
+        final ms = fetchSw.elapsedMilliseconds;
+        if (ms >= 1000) {
+          _trace(id, 'slow ${_tracePath(absolute)} ${ms}ms');
+        }
       }
     }
 
@@ -763,10 +825,30 @@ class AssignmentOfflineBundleService {
       }
     }
 
-    await Future.wait([for (var i = 0; i < _crawlWorkers; i++) worker()]);
-
+    _trace(id, 'crawl start queued=${pending.length} known=${assets.length}');
     if (pending.isNotEmpty) {
-      _trace(id, 'stopped at $_maxAssets assets');
+      final heartbeat = Timer.periodic(const Duration(seconds: 5), (_) {
+        _trace(
+          id,
+          'crawl working saved=${outcome.savedPaths.length} '
+          'missing=${outcome.missing.length} queued=${pending.length} '
+          'inFlight=$inFlight last=$lastStarted',
+        );
+      });
+      final crawlSw = Stopwatch()..start();
+      try {
+        await Future.wait([for (var i = 0; i < _crawlWorkers; i++) worker()]);
+      } finally {
+        heartbeat.cancel();
+      }
+      if (pending.isNotEmpty) {
+        _trace(id, 'stopped at $_maxAssets assets');
+      }
+      _trace(
+        id,
+        'crawl done saved=${outcome.savedPaths.length} '
+        'missing=${outcome.missing.length} ${crawlSw.elapsedMilliseconds}ms',
+      );
     }
     if (outcome.critical.isNotEmpty) {
       throw AssignmentOfflineBundleException(
@@ -790,6 +872,7 @@ class AssignmentOfflineBundleService {
   ) async {
     final list = relPaths.toList();
     if (list.isEmpty) return;
+    final sw = Stopwatch()..start();
     try {
       await Isolate.run(
         () => rewriteSavedFilesSync(
@@ -806,6 +889,7 @@ class AssignmentOfflineBundleService {
           ),
         ),
       );
+      _trace(id, 'rewrite files=${list.length} ${sw.elapsedMilliseconds}ms');
     } catch (e, st) {
       _trace(id, 'rewrite failed ${_describeError(e)}');
       DebugLogger.logWarn(
@@ -823,6 +907,7 @@ class AssignmentOfflineBundleService {
     required Map<String, String> assets,
     required String? packageStaticVersion,
   }) async {
+    final sw = Stopwatch()..start();
     final pageAssets = <String, String>{};
     for (final ref in page.refs) {
       final key = ref.toString();
@@ -859,13 +944,14 @@ class AssignmentOfflineBundleService {
         language: request.language,
       ).toJson(),
     );
+    _trace(id, 'page file written ${html.length}B ${sw.elapsedMilliseconds}ms');
   }
 
   Future<void> _savePackageAndPage(OfflineFormRequest request) async {
     final id = request.assignmentId;
     final key = request.packageKey;
     final epoch = _epoch;
-    _traces[id] = <String>[];
+    _beginTrace(id);
     _trace(
       id,
       'package+page template=${request.templateId} '
@@ -990,7 +1076,7 @@ class AssignmentOfflineBundleService {
   Future<void> _savePageUnchecked(OfflineFormRequest request, int epoch) async {
     final id = request.assignmentId;
     final key = request.packageKey;
-    _traces[id] = <String>[];
+    _beginTrace(id);
     _trace(
       id,
       'page only template=${request.templateId} lang=${request.language}',

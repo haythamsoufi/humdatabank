@@ -8,6 +8,7 @@ import '../../config/fdrs_constants.dart';
 import '../../di/service_locator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/global_overview_data_service.dart';
+import '../../services/public_browse_prefetch.dart';
 import '../../utils/constants.dart';
 import 'country_centroids_cache.dart';
 import 'fdrs_world_map.dart';
@@ -36,11 +37,15 @@ class LandingGetStartedSection extends StatefulWidget {
     required this.l10n,
     required this.locale,
     required this.shortcuts,
+    this.forcePrefetch = false,
   });
 
   final AppLocalizations l10n;
   final String locale;
   final List<LandingShortcutItem> shortcuts;
+
+  /// Pull-to-refresh rebuilds this section and should download a fresh pack.
+  final bool forcePrefetch;
 
   @override
   State<LandingGetStartedSection> createState() =>
@@ -68,6 +73,10 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
     ]);
     _datasetFuture = _loadPeriodsThenData();
     _loadReachSectors();
+    sl<PublicBrowsePrefetch>().warm(
+      locale: widget.locale,
+      force: widget.forcePrefetch,
+    );
   }
 
   Future<void> _loadReachSectors() async {
@@ -93,6 +102,7 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
         _datasetFuture = _loadPeriodsThenData();
       });
       _loadReachSectors();
+      sl<PublicBrowsePrefetch>().warm(locale: widget.locale, force: true);
     }
   }
 

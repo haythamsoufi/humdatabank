@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/admin/user_analytics_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../widgets/app_bar.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/loading_indicator.dart';
@@ -321,12 +322,8 @@ class _UserAnalyticsScreenState extends State<UserAnalyticsScreen>
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,
         ),
+        selectedTabId: TabIds.admin,
         chatbotEnabled: chatbot,
-        onTap: (index) {
-          Navigator.of(context).popUntil((route) {
-            return route.isFirst || route.settings.name == AppRoutes.dashboard;
-          });
-        },
       ),
     );
   }

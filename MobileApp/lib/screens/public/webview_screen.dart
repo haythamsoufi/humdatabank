@@ -123,8 +123,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
   double _progress = 0;
   String? _error;
   String? _pageTitle;
-  final int _currentNavIndex =
-      -1; // -1 means no tab is active (WebView is on top)
+  // Pushed over the shell: keep that tab highlighted.
+  final int _currentNavIndex = AppBottomNavigationBar.noTabSelected;
+
+  /// Assignment entry forms bring their own page header. The Flutter bar
+  /// (title, refresh, close) is only for other pages opened in this screen.
+  bool get _isAssignmentForm {
+    if (widget.forceOfflineAssignmentBundle ||
+        widget.offlineAssignmentId != null) {
+      return true;
+    }
+    return widget.initialUrl.contains('/forms/assignment/');
+  }
 
   String? _payloadLanguage;
   Future<_WebViewPayload>? _payloadFuture;
@@ -1013,33 +1023,36 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
         final localizations = AppLocalizations.of(context)!;
         final theme = Theme.of(context);
+        final showScreenHeader = !_isAssignmentForm;
 
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
-          appBar: AppAppBar(
-            title: _pageTitle ?? localizations.loading,
-            actions: [
-              if (_webViewController != null)
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    if (widget.forceOfflineAssignmentBundle &&
-                        widget.offlineAssignmentId != null) {
-                      _invalidatePayload();
-                    }
-                    _webViewController?.reload();
-                  },
-                  tooltip: localizations.refresh,
-                ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                tooltip: localizations.close,
-              ),
-            ],
-          ),
+          appBar: showScreenHeader
+              ? AppAppBar(
+                  title: _pageTitle ?? localizations.loading,
+                  actions: [
+                    if (_webViewController != null)
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () {
+                          if (widget.forceOfflineAssignmentBundle &&
+                              widget.offlineAssignmentId != null) {
+                            _invalidatePayload();
+                          }
+                          _webViewController?.reload();
+                        },
+                        tooltip: localizations.refresh,
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      tooltip: localizations.close,
+                    ),
+                  ],
+                )
+              : null,
           body: ColoredBox(
             color: theme.scaffoldBackgroundColor,
             child: SafeArea(
@@ -1052,7 +1065,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     height:
                         MediaQuery.of(context).size.height -
                         MediaQuery.of(context).padding.top -
-                        AppAppBar.toolbarHeight -
+                        (showScreenHeader ? AppAppBar.toolbarHeight : 0) -
                         50 - // Bottom navigation bar height
                         MediaQuery.of(
                           context,

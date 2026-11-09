@@ -8,6 +8,7 @@ import '../../providers/admin/login_logs_provider.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_fade_in_up.dart';
 import '../../config/routes.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
@@ -263,6 +264,7 @@ class _LoginLogsScreenState extends State<LoginLogsScreen>
     final provider = context.watch<LoginLogsProvider>();
 
     return Scaffold(
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       appBar: AppAppBar(
         title: loc.loginLogsTitle,
         actions: [

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../providers/shared/ai_chat_provider.dart';
 import '../../providers/shared/auth_provider.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../models/shared/ai_chat.dart';
 import '../../models/shared/ai_chat_launch_args.dart';
 import '../../widgets/ai_chat_agent_progress_panel.dart';
@@ -97,6 +98,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   /// null = initial load not yet completed (sentinel to avoid double-loading).
   String? _lastLoadedUserId;
 
+  /// Previous [User.aiBetaAccessLocked] so a grant while this screen is cached can load chat.
+  bool? _lastBetaAccessLocked;
+
   /// Last UI locale language code applied to [AiChatProvider] (API + alignment with settings).
   String? _appliedLocaleLangCode;
 
@@ -164,6 +168,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       _lastLoadedUserId = auth.user?.id.toString() ?? '';
       await context.read<AiChatProvider>().loadChatUiPrefs();
       if (!mounted) return;
+      if (auth.user?.aiBetaAccessLocked == true) return;
       await _loadConversations();
       if (!mounted) return;
       await _applyRouteLaunchArgsOnce();
@@ -172,6 +177,10 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
 
   Future<void> _applyRouteLaunchArgsOnce() async {
     if (!mounted || _routeLaunchApplied) return;
+    if (context.read<AuthProvider>().user?.aiBetaAccessLocked == true ||
+        context.read<AiChatProvider>().betaAccessDenied) {
+      return;
+    }
     _routeLaunchApplied = true;
     final launch = AiChatLaunchArgs.parse(ModalRoute.of(context)?.settings.arguments);
     if (launch.startNewConversation) {
@@ -204,13 +213,28 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
     // guard below is skipped during that brief window to avoid a double-load.
     final auth = context.watch<AuthProvider>();
     final currentUserId = auth.user?.id.toString() ?? '';
+    final betaAccessLocked = auth.user?.aiBetaAccessLocked == true ||
+        context.read<AiChatProvider>().betaAccessDenied;
     if (_lastLoadedUserId != null && currentUserId != _lastLoadedUserId) {
       _lastLoadedUserId = currentUserId;
+      if (!betaAccessLocked) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          await _loadConversations();
+        });
+      }
+    } else if (_lastLoadedUserId != null &&
+        _lastBetaAccessLocked == true &&
+        !betaAccessLocked) {
+      // Same account was granted beta access while this screen stayed mounted.
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
         await _loadConversations();
+        if (!mounted) return;
+        await _applyRouteLaunchArgsOnce();
       });
     }
+    _lastBetaAccessLocked = betaAccessLocked;
 
     // Watch for quota errors and restore failed message
     final ai = context.watch<AiChatProvider>();
@@ -247,6 +271,8 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
 
   Future<void> _loadConversations() async {
     final auth = context.read<AuthProvider>();
+    final ai = context.read<AiChatProvider>();
+    if (auth.user?.aiBetaAccessLocked == true || ai.betaAccessDenied) return;
     final isAuthed = auth.isAuthenticated;
     // Don't block UI on token fetch (it can timeout/retry); conversations can still load via cookie auth / local DB.
     unawaited(context.read<AiChatProvider>().ensureTokenIfLoggedIn(isAuthenticated: isAuthed));
@@ -1002,6 +1028,77 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
     );
   }
 
+  Widget _buildBetaAccessLock(
+    BuildContext context,
+    ThemeData theme,
+    AppLocalizations localizations,
+  ) {
+    // The page draws under the tab bar (extendBody). Inset that height so the
+    // notice sits in the visible area, not halfway behind the bar.
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _chatEmptyMaxWidth),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _chatPagePaddingH),
+            child: Semantics(
+              container: true,
+              label:
+                  '${localizations.aiBetaAccessLockedTitle}. ${localizations.aiBetaAccessLockedBody}',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: _chatBannerSurface(theme),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _chatOutline(theme).withValues(alpha: 0.6),
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.lock_outline_rounded,
+                    size: 34,
+                    color: _chatMuted(theme),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  localizations.aiBetaAccessLockedTitle,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                    height: 1.25,
+                    color: _chatBody(theme),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  localizations.aiBetaAccessLockedBody,
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.4,
+                    color: _chatMuted(theme),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1015,6 +1112,8 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
     _maybeScrollToBottom(ai);
 
     final localizations = AppLocalizations.of(context)!;
+    final betaAccessLocked =
+        ai.betaAccessDenied || auth.user?.aiBetaAccessLocked == true;
     // AppBar title: current conversation title or "New chat" (aligned with chat_immersive main title)
     final match = ai.conversations.where((c) => c.id == ai.conversationId);
     final appBarTitle = match.isEmpty
@@ -1047,7 +1146,13 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       appBar: AppAppBar(
         title: appBarTitle,
         automaticallyImplyLeading: false,
-        leading: Builder(
+        leading: betaAccessLocked
+            ? IconButton(
+                icon: Icon(Icons.lock_outline_rounded, color: _chatMuted(theme)),
+                onPressed: null,
+                tooltip: localizations.aiBetaAccessLockedTitle,
+              )
+            : Builder(
           builder: (scaffoldContext) {
             return IconButton(
               icon: Icon(Icons.menu_rounded, color: _chatBody(theme)),
@@ -1061,6 +1166,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
           },
         ),
         actions: [
+          if (betaAccessLocked)
+            const SizedBox(width: 48)
+          else
           Semantics(
             label: localizations.aiSemanticNewChatLabel,
             hint: localizations.aiSemanticNewChatHint,
@@ -1074,7 +1182,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
           ),
         ],
       ),
-      drawer: _buildDrawer(context, auth, ai, isAuthed),
+      drawer: betaAccessLocked ? null : _buildDrawer(context, auth, ai, isAuthed),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1083,6 +1191,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
+            if (betaAccessLocked) {
+              return _buildBetaAccessLock(context, theme, localizations);
+            }
             // Prefer inline progress (last row) over the top banner so the panel stays
             // under the user message, same as while streaming (incl. interim narration).
             final hasInlineProgressSlot = ai.messages.isNotEmpty &&
@@ -1850,6 +1961,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   }
 
   Future<void> _send(BuildContext context, bool isAuthenticated) async {
+    final auth = context.read<AuthProvider>();
+    final chat = context.read<AiChatProvider>();
+    if (auth.user?.aiBetaAccessLocked == true || chat.betaAccessDenied) return;
     final msg = _controller.text.trim();
     if (msg.isEmpty) return;
 
@@ -1915,6 +2029,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   }
 
   Future<void> _retry(BuildContext context, bool isAuthenticated) async {
+    final auth = context.read<AuthProvider>();
+    final chat = context.read<AiChatProvider>();
+    if (auth.user?.aiBetaAccessLocked == true || chat.betaAccessDenied) return;
     if (_redirectToLoginIfGuest(context, isAuthenticated)) return;
     final provider = context.read<AiChatProvider>();
     if (provider.failedMessage != null) {
@@ -2882,6 +2999,7 @@ class _AiChatScreenWithBottomNavState extends State<AiChatScreenWithBottomNav> {
               hidden: _sideDrawerOpen,
               child: AppBottomNavigationBar(
                 currentIndex: navTabIndex,
+                selectedTabId: TabIds.aiChat,
                 isFocalPoint: isFocalPoint,
                 chatbotEnabled: chatbot,
               ),

@@ -363,7 +363,23 @@
                                     <div class="text-xs text-gray-600">{{ rbac_groups.assignment|length }} role(s)</div>
                                 </div>
                                 <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                    {# Viewer, then Documents (Upload), then the remaining assignment roles. #}
+                                    {% set _assignment_buckets = namespace(viewer=[], documents=[], editor=[], approver=[], other=[]) %}
                                     {% for subfield in rbac_groups.assignment %}
+                                        {% set _assignment_code = (role_codes_by_id|default({})).get(subfield.data, '') %}
+                                        {% if _assignment_code == 'assignment_viewer' %}
+                                            {% set __ = _assignment_buckets.viewer.append(subfield) %}
+                                        {% elif _assignment_code == 'assignment_documents_uploader' %}
+                                            {% set __ = _assignment_buckets.documents.append(subfield) %}
+                                        {% elif _assignment_code == 'assignment_editor_submitter' %}
+                                            {% set __ = _assignment_buckets.editor.append(subfield) %}
+                                        {% elif _assignment_code == 'assignment_approver' %}
+                                            {% set __ = _assignment_buckets.approver.append(subfield) %}
+                                        {% else %}
+                                            {% set __ = _assignment_buckets.other.append(subfield) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% for subfield in _assignment_buckets.viewer + _assignment_buckets.documents + _assignment_buckets.editor + _assignment_buckets.approver + _assignment_buckets.other %}
                                         {% set raw_label = (subfield.label.text or '') %}
                                         {% set display_label = raw_label %}
                                         {# Strip "Assignment " prefix inside the group #}

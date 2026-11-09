@@ -93,6 +93,12 @@ class OfflineApiRecorder {
     var loaded = false;
     String? failure;
     InAppWebViewController? controller;
+    final started = DateTime.now();
+    final path = Uri.tryParse(formUrl)?.path ?? formUrl;
+    DebugLogger.logInfo(
+      'OFFLINE_API',
+      'start $path quiet=${quietFor.inSeconds}s timeout=${timeout.inSeconds}s',
+    );
 
     final headless = HeadlessInAppWebView(
       initialUrlRequest: URLRequest(
@@ -119,12 +125,17 @@ class OfflineApiRecorder {
         );
       },
       onLoadStop: (c, url) {
-        final path = url?.path ?? '';
-        if (path.contains('/login') || path.contains('/auth/')) {
+        final loadedPath = url?.path ?? '';
+        if (loadedPath.contains('/login') || loadedPath.contains('/auth/')) {
           failure = 'Session expired while preparing the offline copy.';
         }
         loaded = true;
         loadedAt = DateTime.now();
+        DebugLogger.logInfo(
+          'OFFLINE_API',
+          'loaded $loadedPath '
+              '+${DateTime.now().difference(started).inMilliseconds}ms',
+        );
       },
       onReceivedHttpError: (c, request, response) {
         if (request.isForMainFrame == true &&
@@ -139,9 +150,13 @@ class OfflineApiRecorder {
       },
     );
 
-    final started = DateTime.now();
     try {
       await headless.run().timeout(const Duration(seconds: 20));
+      DebugLogger.logInfo(
+        'OFFLINE_API',
+        'headless ready $path '
+            '+${DateTime.now().difference(started).inMilliseconds}ms',
+      );
       while (DateTime.now().difference(started) < timeout) {
         await Future<void>.delayed(const Duration(milliseconds: 400));
         if (failure != null) break;
@@ -166,17 +181,24 @@ class OfflineApiRecorder {
       try {
         await headless.dispose().timeout(const Duration(seconds: 5));
       } catch (e) {
-        DebugLogger.logWarn('OFFLINE_API', 'Headless WebView dispose failed: $e');
+        DebugLogger.logWarn(
+          'OFFLINE_API',
+          'Headless WebView dispose failed: $e',
+        );
       }
     }
 
+    final elapsedMs = DateTime.now().difference(started).inMilliseconds;
     if (failure != null) {
-      DebugLogger.logWarn('OFFLINE_API', 'Recording $formUrl failed: $failure');
+      DebugLogger.logWarn(
+        'OFFLINE_API',
+        'Recording $path failed after ${elapsedMs}ms: $failure',
+      );
       throw AssignmentOfflineBundleException(failure!);
     }
     DebugLogger.logInfo(
       'OFFLINE_API',
-      'Recorded ${collected.length} API responses for $formUrl',
+      'Recorded ${collected.length} API responses for $path +${elapsedMs}ms',
     );
     return collected;
   }

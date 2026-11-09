@@ -76,6 +76,17 @@ class AiChatHttpException implements Exception {
     return 'server_error';
   }
 
+  /// Server copy when AI beta is on and this account is not allow-listed.
+  bool get deniesBetaAccess => textDeniesBetaAccess(message);
+
+  static bool textDeniesBetaAccess(String? raw) =>
+      (raw ?? '').toLowerCase().contains('beta access is limited');
+
+  static bool errorDeniesBetaAccess(Object error) {
+    if (error is AiChatHttpException) return error.deniesBetaAccess;
+    return textDeniesBetaAccess(error.toString());
+  }
+
   @override
   String toString() => message;
 }

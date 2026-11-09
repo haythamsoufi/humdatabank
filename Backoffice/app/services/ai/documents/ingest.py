@@ -2,9 +2,11 @@
 
 import logging
 import os
+import zlib
 from typing import Any, Dict, Optional, Tuple
 
 from flask import current_app
+from sqlalchemy import text
 
 from app.extensions import db
 
@@ -109,6 +111,236 @@ def _submitted_is_ai_public(submitted) -> bool:
     if not bool(getattr(submitted, "is_public", False)):
         return False
     return _normalize_document_status(getattr(submitted, "status", None)) == DocumentStatus.APPROVED
+
+
+def _processing_status_str(doc) -> str:
+    raw = getattr(doc, "processing_status", None)
+    if raw is None:
+        return ""
+    if hasattr(raw, "value"):
+        raw = raw.value
+    return str(raw).strip().lower()
+
+
+def _chunk_count(doc) -> int:
+    try:
+        return int(getattr(doc, "total_chunks", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _ai_document_is_embedded(doc) -> bool:
+    """True when this row already has a completed embedding and must not be re-embedded."""
+    return _processing_status_str(doc) == "completed" and _chunk_count(doc) > 0
+
+
+def _parallel_import_should_skip(doc) -> bool:
+    """Another worker inserted this row while we were downloading the same file."""
+    return _processing_status_str(doc) in ("pending", "processing", "completed")
+
+
+def _hash_lock_key(content_hash: str) -> int:
+    crc = zlib.crc32((content_hash or "").strip().lower().encode("utf-8")) & 0xFFFFFFFF
+    if crc >= 2**31:
+        crc -= 2**32
+    return int(crc)
+
+
+def _advisory_xact_lock(namespace: int, key: int) -> None:
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(:ns, :key)"),
+        {"ns": int(namespace), "key": int(key)},
+    )
+
+
+def _lock_import_keys(
+    *,
+    submitted_document_id: Optional[int] = None,
+    guidance_document_id: Optional[int] = None,
+    content_hash: Optional[str] = None,
+) -> None:
+    """
+    Serialize imports that would insert the same submitted row or the same file bytes.
+
+    Hash is locked first, then the catalog id, so two workers cannot deadlock.
+    """
+    try:
+        if content_hash:
+            _advisory_xact_lock(2, _hash_lock_key(content_hash))
+        if submitted_document_id:
+            _advisory_xact_lock(1, int(submitted_document_id))
+        if guidance_document_id:
+            _advisory_xact_lock(3, int(guidance_document_id))
+    except Exception as e:
+        logger.debug("AI import advisory lock skipped: %s", e)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+
+def _discard_temp_import_file(prep: Dict[str, Any]) -> None:
+    if not prep.get("cleanup_temp"):
+        return
+    file_path = prep.get("file_path")
+    if file_path and os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+
+
+def _import_skip_result(
+    ai_doc,
+    *,
+    file_path: str,
+    filename: str,
+    cleanup_temp: bool,
+    code: str,
+    message: str,
+) -> Dict[str, Any]:
+    return {
+        "ok": True,
+        "code": code,
+        "message": message,
+        "ai_document_id": int(ai_doc.id),
+        "file_path": file_path,
+        "filename": filename,
+        "cleanup_temp": cleanup_temp,
+        "skip_processing": True,
+    }
+
+
+def _reuse_submitted_ai_document(
+    existing_ai_doc,
+    submitted_doc,
+    *,
+    file_path: str,
+    filename: str,
+    cleanup_temp: bool,
+    from_url: bool,
+    source_url: str,
+    resolved: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Re-queue an AIDocument that is already linked to this submitted document."""
+    existing_ai_doc.processing_status = "pending"
+    existing_ai_doc.processing_error = None
+    sync_ai_document_from_submitted(submitted_doc, ai_doc=existing_ai_doc)
+    if from_url:
+        existing_ai_doc.source_url = source_url or existing_ai_doc.source_url
+        existing_ai_doc.filename = filename
+        if resolved.get("file_size") is not None:
+            existing_ai_doc.file_size_bytes = resolved["file_size"]
+        if resolved.get("content_hash"):
+            existing_ai_doc.content_hash = resolved["content_hash"]
+        if resolved.get("file_type"):
+            existing_ai_doc.file_type = resolved["file_type"]
+    db.session.commit()
+    return {
+        "ok": True,
+        "code": "reprocessing",
+        "message": "Processing started",
+        "ai_document_id": existing_ai_doc.id,
+        "file_path": file_path,
+        "filename": filename,
+        "cleanup_temp": cleanup_temp,
+        "skip_processing": False,
+    }
+
+
+def _attach_submitted_catalog_entry(
+    keeper,
+    submitted_doc,
+    *,
+    submitted_doc_id: int,
+    file_path: str,
+    filename: str,
+    cleanup_temp: bool,
+    from_url: bool,
+    source_url: str,
+    content_hash: Optional[str],
+    file_type: Optional[str],
+    file_size,
+    storage_path_for_ai,
+    derived_country,
+    uid: Optional[int],
+) -> Dict[str, Any]:
+    """
+    Point a submitted-document catalog row at an AIDocument that already has these bytes.
+
+    The first catalog row becomes the primary link. Later years, document types, and
+    ``_1`` filenames are stored on that row and are not embedded again.
+    """
+    from app.services.ai.documents.submitted_metadata import (
+        apply_submitted_document_metadata_to_ai_doc,
+        record_submitted_catalog_entry,
+    )
+
+    as_primary = not getattr(keeper, "submitted_document_id", None)
+    if as_primary:
+        keeper.submitted_document_id = submitted_doc_id
+        keeper.filename = filename or keeper.filename
+        keeper.file_type = file_type or keeper.file_type
+        keeper.file_size_bytes = file_size or keeper.file_size_bytes
+        if content_hash:
+            keeper.content_hash = content_hash
+        if from_url:
+            keeper.source_url = source_url or keeper.source_url
+            keeper.storage_path = None
+        elif storage_path_for_ai:
+            keeper.storage_path = storage_path_for_ai
+        if not keeper.user_id and uid:
+            keeper.user_id = uid
+        keeper.is_public = _submitted_is_ai_public(submitted_doc)
+        keeper.searchable = True
+        if derived_country and not keeper.country_id:
+            keeper.country_id = int(getattr(derived_country, "id", 0)) or None
+            keeper.country_name = getattr(derived_country, "name", None)
+        sync_ai_document_from_submitted(submitted_doc, ai_doc=keeper)
+        apply_submitted_document_metadata_to_ai_doc(keeper, submitted_doc)
+    elif _submitted_is_ai_public(submitted_doc):
+        keeper.is_public = True
+
+    record_submitted_catalog_entry(keeper, submitted_doc)
+    embedded = _ai_document_is_embedded(keeper)
+    if embedded:
+        db.session.commit()
+        logger.info(
+            "Linked submitted document %s to existing AI document %s (same file bytes)",
+            submitted_doc_id,
+            keeper.id,
+        )
+        return _import_skip_result(
+            keeper,
+            file_path=file_path,
+            filename=filename,
+            cleanup_temp=cleanup_temp,
+            code="catalog_alias",
+            message=(
+                "This file is already in the knowledge base. "
+                "The extra catalog entry was linked to the existing document."
+            ),
+        )
+
+    keeper.processing_status = "pending"
+    keeper.processing_error = None
+    db.session.commit()
+    logger.info(
+        "Reused AI document %s for submitted document %s (same file bytes, primary=%s)",
+        keeper.id,
+        submitted_doc_id,
+        as_primary,
+    )
+    return {
+        "ok": True,
+        "code": "reclaimed" if as_primary else "catalog_alias",
+        "message": "Processing started",
+        "ai_document_id": keeper.id,
+        "file_path": file_path,
+        "filename": filename,
+        "cleanup_temp": cleanup_temp,
+        "skip_processing": False,
+    }
 
 
 def sync_ai_document_is_public_from_submitted(submitted) -> None:
@@ -393,28 +625,16 @@ def _prepare_submitted_document_ai_import(
 
     existing_ai_doc = AIDocument.query.filter_by(submitted_document_id=submitted_doc_id).first()
     if existing_ai_doc:
-        existing_ai_doc.processing_status = "pending"
-        existing_ai_doc.processing_error = None
-        sync_ai_document_from_submitted(submitted_doc, ai_doc=existing_ai_doc)
-        if from_url:
-            existing_ai_doc.source_url = source_url or existing_ai_doc.source_url
-            existing_ai_doc.filename = filename
-            if resolved.get("file_size") is not None:
-                existing_ai_doc.file_size_bytes = resolved["file_size"]
-            if resolved.get("content_hash"):
-                existing_ai_doc.content_hash = resolved["content_hash"]
-            if resolved.get("file_type"):
-                existing_ai_doc.file_type = resolved["file_type"]
-        db.session.commit()
-        return {
-            "ok": True,
-            "code": "reprocessing",
-            "message": "Processing started",
-            "ai_document_id": existing_ai_doc.id,
-            "file_path": file_path,
-            "filename": filename,
-            "cleanup_temp": cleanup_temp,
-        }
+        return _reuse_submitted_ai_document(
+            existing_ai_doc,
+            submitted_doc,
+            file_path=file_path,
+            filename=filename,
+            cleanup_temp=cleanup_temp,
+            from_url=from_url,
+            source_url=source_url,
+            resolved=resolved,
+        )
 
     processor = AIDocumentProcessor()
     if not processor.is_supported_file(filename):
@@ -462,55 +682,67 @@ def _prepare_submitted_document_ai_import(
         except (TypeError, ValueError):
             uid = None
 
-    # Reclaim an existing standalone AIDocument with the same bytes/URL instead of
-    # creating a linked+standalone duplicate (common after FDRS sync vs IFRC import).
-    from app.services.ai.documents.duplicates import find_reclaimable_ai_document
+    # One knowledge-base row per file. Another year, document type, or filename of the
+    # same bytes is recorded on the existing row. The lock closes the check-then-insert
+    # race that imported the same submitted document twice.
+    from app.services.ai.documents.duplicates import (
+        find_reclaimable_ai_document,
+        find_same_content_ai_document,
+    )
     from app.services.ai.documents.submitted_metadata import apply_submitted_document_metadata_to_ai_doc
 
-    reclaim = find_reclaimable_ai_document(
-        content_hash=content_hash,
-        source_url=source_url or getattr(submitted_doc, "source_url", None),
-        exclude_submitted_document_id=submitted_doc_id,
-    )
-    if reclaim is not None:
-        reclaim.submitted_document_id = submitted_doc_id
-        reclaim.processing_status = "pending"
-        reclaim.processing_error = None
-        reclaim.filename = filename or reclaim.filename
-        reclaim.file_type = file_type or reclaim.file_type
-        reclaim.file_size_bytes = file_size or reclaim.file_size_bytes
-        if content_hash:
-            reclaim.content_hash = content_hash
-        if from_url:
-            reclaim.source_url = source_url or reclaim.source_url
-            reclaim.storage_path = None
-        elif storage_path_for_ai:
-            reclaim.storage_path = storage_path_for_ai
-        if not reclaim.user_id and uid:
-            reclaim.user_id = uid
-        reclaim.is_public = _submitted_is_ai_public(submitted_doc)
-        reclaim.searchable = True
-        if derived_country and not reclaim.country_id:
-            reclaim.country_id = int(getattr(derived_country, "id", 0)) or None
-            reclaim.country_name = getattr(derived_country, "name", None)
-        sync_ai_document_from_submitted(submitted_doc, ai_doc=reclaim)
-        apply_submitted_document_metadata_to_ai_doc(reclaim, submitted_doc)
-        db.session.commit()
-        logger.info(
-            "Reclaimed AI document %s for submitted document %s (hash/url match, from_url=%s)",
-            reclaim.id,
-            submitted_doc_id,
-            from_url,
+    _lock_import_keys(submitted_document_id=submitted_doc_id, content_hash=content_hash)
+    raced = AIDocument.query.filter_by(submitted_document_id=submitted_doc_id).first()
+    if raced is not None:
+        if _parallel_import_should_skip(raced):
+            logger.info(
+                "Skipped parallel AI import for submitted document %s; AI doc %s already exists",
+                submitted_doc_id,
+                raced.id,
+            )
+            return _import_skip_result(
+                raced,
+                file_path=file_path,
+                filename=filename,
+                cleanup_temp=cleanup_temp,
+                code="already_importing",
+                message="This document is already imported.",
+            )
+        return _reuse_submitted_ai_document(
+            raced,
+            submitted_doc,
+            file_path=file_path,
+            filename=filename,
+            cleanup_temp=cleanup_temp,
+            from_url=from_url,
+            source_url=source_url,
+            resolved=resolved,
         )
-        return {
-            "ok": True,
-            "code": "reclaimed",
-            "message": "Processing started",
-            "ai_document_id": reclaim.id,
-            "file_path": file_path,
-            "filename": filename,
-            "cleanup_temp": cleanup_temp,
-        }
+
+    keeper = find_same_content_ai_document(content_hash) if content_hash else None
+    if keeper is None:
+        keeper = find_reclaimable_ai_document(
+            content_hash=content_hash,
+            source_url=source_url or getattr(submitted_doc, "source_url", None),
+            exclude_submitted_document_id=submitted_doc_id,
+        )
+    if keeper is not None:
+        return _attach_submitted_catalog_entry(
+            keeper,
+            submitted_doc,
+            submitted_doc_id=submitted_doc_id,
+            file_path=file_path,
+            filename=filename,
+            cleanup_temp=cleanup_temp,
+            from_url=from_url,
+            source_url=source_url,
+            content_hash=content_hash,
+            file_type=file_type,
+            file_size=file_size,
+            storage_path_for_ai=storage_path_for_ai,
+            derived_country=derived_country,
+            uid=uid,
+        )
 
     ai_doc = AIDocument(
         submitted_document_id=submitted_doc_id,
@@ -632,6 +864,75 @@ def _prepare_guidance_document_ai_import(
         except (TypeError, ValueError):
             uid = None
 
+    from app.services.ai.documents.duplicates import find_same_content_ai_document
+    from app.services.ai.documents.submitted_metadata import record_guidance_catalog_entry
+
+    _lock_import_keys(guidance_document_id=int(guidance_doc_id), content_hash=content_hash)
+    raced = AIDocument.query.filter_by(guidance_document_id=int(guidance_doc_id)).first()
+    if raced is not None:
+        if _parallel_import_should_skip(raced):
+            return _import_skip_result(
+                raced,
+                file_path=file_path,
+                filename=filename,
+                cleanup_temp=cleanup_temp,
+                code="already_importing",
+                message="This guidance document is already imported.",
+            )
+        raced.processing_status = "pending"
+        raced.processing_error = None
+        raced.title = guidance.title or filename
+        raced.filename = filename
+        raced.is_public = False
+        db.session.commit()
+        return {
+            "ok": True,
+            "code": "reprocessing",
+            "message": "Processing started",
+            "ai_document_id": raced.id,
+            "file_path": file_path,
+            "filename": filename,
+            "cleanup_temp": cleanup_temp,
+            "skip_processing": False,
+        }
+
+    keeper = find_same_content_ai_document(content_hash) if content_hash else None
+    if keeper is not None:
+        if not getattr(keeper, "guidance_document_id", None):
+            keeper.guidance_document_id = int(guidance_doc_id)
+        record_guidance_catalog_entry(keeper, guidance)
+        if _ai_document_is_embedded(keeper):
+            db.session.commit()
+            logger.info(
+                "Linked guidance document %s to existing AI document %s (same file bytes)",
+                guidance_doc_id,
+                keeper.id,
+            )
+            return _import_skip_result(
+                keeper,
+                file_path=file_path,
+                filename=filename,
+                cleanup_temp=cleanup_temp,
+                code="catalog_alias",
+                message=(
+                    "This file is already in the knowledge base. "
+                    "The guidance entry was linked to the existing document."
+                ),
+            )
+        keeper.processing_status = "pending"
+        keeper.processing_error = None
+        db.session.commit()
+        return {
+            "ok": True,
+            "code": "catalog_alias",
+            "message": "Processing started",
+            "ai_document_id": keeper.id,
+            "file_path": file_path,
+            "filename": filename,
+            "cleanup_temp": cleanup_temp,
+            "skip_processing": False,
+        }
+
     extra_metadata = {
         "source": "guidance_document",
         "guidance_owner_key": guidance.owner_key,
@@ -686,6 +987,14 @@ def enqueue_submitted_document_ai_processing(
     prep = _prepare_submitted_document_ai_import(submitted_doc_id, user_id=user_id)
     if not prep.get("ok"):
         return prep
+    if prep.get("skip_processing"):
+        _discard_temp_import_file(prep)
+        return {
+            "ok": True,
+            "code": prep.get("code") or "catalog_alias",
+            "message": prep.get("message") or "Already imported",
+            "ai_document_id": prep.get("ai_document_id"),
+        }
     _run_import_process_in_thread(
         current_app._get_current_object(),
         prep["ai_document_id"],
@@ -718,6 +1027,14 @@ def process_submitted_document_ai_import_sync(
     prep = _prepare_submitted_document_ai_import(submitted_doc_id, user_id=user_id)
     if not prep.get("ok"):
         return prep
+    if prep.get("skip_processing"):
+        _discard_temp_import_file(prep)
+        return {
+            "ok": True,
+            "code": prep.get("code") or "catalog_alias",
+            "message": prep.get("message") or "Already imported",
+            "ai_document_id": prep.get("ai_document_id"),
+        }
 
     ai_doc_id = int(prep["ai_document_id"])
     file_path = prep["file_path"]

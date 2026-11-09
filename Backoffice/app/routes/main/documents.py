@@ -1,14 +1,8 @@
 from flask import render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_required, current_user
-from app.models import db, User, AssignedForm, Country, SubmittedDocument
-from app.models.documents import submitted_document_countries
-from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import EntityType
 from app.services.organization.entity_service import EntityService
-from app.services.assignments.access_service import assignment_access_clause
-from sqlalchemy import and_, or_, literal
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
-from datetime import datetime
 from flask_babel import _
 from config import Config
 from app.utils.entity_groups import get_enabled_entity_groups
@@ -41,6 +35,10 @@ def documents_submit():
         current_user, "admin.documents.manage"
     ):
         return redirect(url_for("content_management.manage_documents"))
+
+    if not AuthorizationService.has_role(current_user, "assignment_documents_uploader"):
+        flash(_("Access denied."), "warning")
+        return redirect(url_for("main.dashboard"))
 
     if not AuthorizationService.has_rbac_permission(current_user, "assignment.documents.upload"):
         flash(_("Access denied."), "warning")
@@ -102,110 +100,31 @@ def documents_submit():
     sel_type = selected_entity_type
     sel_id = int(selected_entity_id)
 
-    aes_id_subq = db.session.query(AssignmentEntityStatus.id).filter(
-        AssignmentEntityStatus.entity_type == sel_type,
-        AssignmentEntityStatus.entity_id == sel_id,
-    )
+    from app.services.documents.entity_repository_service import list_entity_repository_rows
 
-    assignment_access = assignment_access_clause(current_user, AssignmentEntityStatus.assigned_form_id)
-    assignment_raw_query = (
-        db.session.query(
-            SubmittedDocument,
-            SubmittedDocument.status.label("status"),
-            User,
-            SubmittedDocument.uploaded_at.label("uploaded_at"),
-            AssignedForm.period_name.label("assignment_period"),
-            AssignmentEntityStatus,
-        )
-        .join(User, SubmittedDocument.uploaded_by_user_id == User.id)
-        .join(AssignmentEntityStatus, SubmittedDocument.assignment_entity_status_id == AssignmentEntityStatus.id)
-        .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
-        .filter(SubmittedDocument.assignment_entity_status_id.in_(aes_id_subq))
-    )
-    if assignment_access is not None:
-        assignment_raw_query = assignment_raw_query.filter(assignment_access)
-    assignment_raw = assignment_raw_query.order_by(SubmittedDocument.uploaded_at.desc()).all()
-
-    # All AES rows share the same (sel_type, sel_id) because of the subquery filter above,
-    # so we resolve the country once instead of calling aes.country (→ EntityService DB
-    # lookup) for every document row.
-    _entity_country = EntityService.get_country_for_entity(sel_type, sel_id)
-
-    assignment_tuples = []
-    for doc, status, user, uploaded_at, assignment_period, aes in assignment_raw:
-        assignment_tuples.append((doc, status, _entity_country, user, uploaded_at, assignment_period))
-
-    standalone_clauses = [
-        and_(
-            SubmittedDocument.linked_entity_type == sel_type,
-            SubmittedDocument.linked_entity_id == sel_id,
-        ),
-        SubmittedDocument.storage_path.startswith(f"{sel_type}/{sel_id}/", autoescape=True),
-    ]
-    if sel_type == EntityType.country.value:
-        m2m_for_country = db.session.query(submitted_document_countries.c.submitted_document_id).filter(
-            submitted_document_countries.c.country_id == sel_id
-        )
-        standalone_clauses.extend(
-            [
-                SubmittedDocument.country_id == sel_id,
-                SubmittedDocument.id.in_(m2m_for_country),
-            ]
-        )
-
-    standalone_docs_query = (
-        db.session.query(
-            SubmittedDocument,
-            SubmittedDocument.status.label("status"),
-            Country,
-            User,
-            SubmittedDocument.uploaded_at.label("uploaded_at"),
-            literal(None).label("assignment_period"),
-        )
-        .join(User, SubmittedDocument.uploaded_by_user_id == User.id)
-        .outerjoin(Country, SubmittedDocument.country_id == Country.id)
-        .filter(
-            SubmittedDocument.assignment_entity_status_id.is_(None),
-            SubmittedDocument.public_submission_id.is_(None),
-            or_(*standalone_clauses),
-        )
-        .order_by(SubmittedDocument.uploaded_at.desc())
-    )
-
-    by_doc_id = {}
-    for t in assignment_tuples:
-        by_doc_id[t[0].id] = t
-    standalone_query_rows = standalone_docs_query.all()
-    for t in standalone_query_rows:
-        if t[0].id not in by_doc_id:
-            by_doc_id[t[0].id] = t
-
-    merged = sorted(by_doc_id.values(), key=lambda row: row[4] or datetime.min, reverse=True)
+    merged = list_entity_repository_rows(current_user, sel_type, sel_id)
     documents = [_row_with_focal_entity_access(r) for r in merged]
 
     show_entity_select = len(user_entities) > 1
-    documents_entity_repo_label = None
     selected_entity_display_name = next(
         (e.get("display_name") for e in user_entities if e.get("entity_type") == sel_type and e.get("entity_id") == sel_id),
         None,
     )
+    documents_page_subtitle = None
     if not show_entity_select:
         try:
-            label = selected_entity_display_name or EntityService.get_localized_entity_name(
+            documents_page_subtitle = selected_entity_display_name or EntityService.get_localized_entity_name(
                 sel_type, sel_id, include_hierarchy=True,
             )
-            documents_entity_repo_label = "{} — {}".format(label, _("Document repository"))
         except Exception:
-            documents_entity_repo_label = None
+            documents_page_subtitle = None
     log_pfx = "[documents_submit]"
     current_app.logger.info(
-        "%s user_id=%s entity=%s:%s assignment_rows=%s standalone_rows=%s merged=%s final_rows=%s show_entity_select=%s",
+        "%s user_id=%s entity=%s:%s merged=%s final_rows=%s show_entity_select=%s",
         log_pfx,
         getattr(current_user, "id", None),
         sel_type,
         sel_id,
-        len(assignment_raw),
-        len(standalone_query_rows),
         len(merged),
         len(documents),
         show_entity_select,
@@ -236,13 +155,13 @@ def documents_submit():
         documents=documents,
         countries=countries_for_modal,
         show_country_column=False,
-        title=_("Submit Documents"),
-        page_title=_("Submit Documents"),
+        title=_("Document repository"),
+        page_title=_("Document repository"),
         next_url=next_url,
         upload_action_url=url_for("content_management.upload_document", next=next_url),
         user_entities=user_entities,
         show_entity_select=show_entity_select,
-        documents_entity_repo_label=documents_entity_repo_label,
+        documents_page_subtitle=documents_page_subtitle,
         selected_entity=selected_entity,
         selected_entity_type=selected_entity_type,
         selected_entity_id=selected_entity_id,

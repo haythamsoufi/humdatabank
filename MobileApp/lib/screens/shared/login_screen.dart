@@ -507,9 +507,8 @@ class _LoginScreenState extends State<LoginScreen> {
           return AppBottomNavigationBar(
             currentIndex: _bottomNavHighlightIndex(context),
             chatbotEnabled: chatbot,
-            onTap: (index) {
-              Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
-            },
+            // Login is an overlay, not a child of the current tab.
+            inheritShellHighlight: false,
           );
         },
       ),

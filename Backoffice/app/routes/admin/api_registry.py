@@ -1,0 +1,1116 @@
+"""Canonical catalog of routes shown on Admin -> API Management.
+
+Plugin routes stay with their plugins and arrive through Plugin.get_api_endpoints().
+get_endpoint_registry() in api_management merges those rows with ENDPOINT_REGISTRY.
+"""
+
+# ---------------------------------------------------------------------------
+# Unified Endpoint Registry
+# Canonical source of truth for every API surface in the system.
+#
+# surface values:
+#   'v1'              – External data API  (/api/v1/*)
+#   'mobile'          – Flutter mobile API (/api/mobile/v1/*)
+#   'ai'              – AI chat + documents (/api/ai/v2/* and /api/ai/documents/*)
+#   'indicator_bank'  – Indicator Bank app routes (/Indicator, /Sector, /list-home, …)
+#   'fdrs_public'     – data.ifrc.org legacy contract (/api/data, /api/entities/ns, /csv/export, …)
+#
+# auth values (consistent vocabulary across surfaces):
+#   'public'             – no auth required
+#   'api_key'            – @require_api_key(capability=...): DB api_keys row holding that capability
+#                          (the deprecated MOBILE_APP_API_KEY env key only gets MOBILE_APP_API_KEY_CAPABILITIES)
+#   'api_key_or_session' – @require_api_key_or_session(capability=...) or @api_capability(...) +
+#                          runtime authenticate_api_request(); a session user is checked by RBAC instead
+#   'session'            – @login_required (Flask-Login session)
+#   'ai_session'         – resolve_ai_identity() (session or AI Bearer JWT)
+#   'user'               – @mobile_auth_required (mobile JWT or session)
+#   'rbac'               – @mobile_auth_required(permission=…)
+#
+# flag types:
+#   'mismatch'  – client calls endpoint with wrong auth mode
+#   'contract'  – API payload contract broken (client ≠ server expectations)
+#   'bug'       – server-side code bug on this endpoint
+#   'policy'    – authorization policy inconsistency
+#   'unused'    – endpoint defined/registered but not called by any consumer
+#   'minor'     – low-priority improvement opportunity
+# ---------------------------------------------------------------------------
+
+# ── External Data API  /api/v1/* ─────────────────────────────────────────────
+EXTERNAL_API_REGISTRY = [
+    # ── Submissions ───────────────────────────────────────────────────────────
+    {'group': 'Submissions', 'path': '/api/v1/submissions', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': False,
+     'description': 'List submissions; API key gets paginated view, session/Basic returns all accessible',
+     'consumers': 'External integrations',
+     'deprecated_envelope': True},
+    {'group': 'Submissions', 'path': '/api/v1/submissions/<submission_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Full detail for one assigned or public submission'},
+
+    # ── Form Templates & Items ─────────────────────────────────────────────────
+    {'group': 'Templates & Form Items', 'path': '/api/v1/templates', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': False,
+     'description': 'Template list; pagination differs by auth type',
+     'deprecated_envelope': True},
+    {'group': 'Templates & Form Items', 'path': '/api/v1/templates/<template_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Full template structure (pages, sections, items)'},
+    {'group': 'Templates & Form Items', 'path': '/api/v1/templates/<template_id>/data', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Paginated form data for one template'},
+    {'group': 'Templates & Form Items', 'path': '/api/v1/form-items', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': False,
+     'description': 'Form items listing with optional filters'},
+    {'group': 'Templates & Form Items', 'path': '/api/v1/form-items/<item_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Single form item detail'},
+    {'group': 'Templates & Form Items', 'path': '/api/v1/lookup-lists', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Paginated lookup lists used for dynamic field options'},
+    {'group': 'Templates & Form Items', 'path': '/api/v1/lookup-lists/<list_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Lookup list detail with all rows'},
+    {'group': 'Templates & Form Items', 'path': '/api/v1/assigned-forms', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': True,
+     'description': 'Assigned form IDs and their associated country IDs'},
+
+    # ── Form Data ──────────────────────────────────────────────────────────────
+    {'group': 'Form Data', 'path': '/api/v1/data', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': True, 'featured': True,
+     'description': (
+         'Unified submission data bundle: facts (data, dynamic_data, repeat_data, matrix_cells) plus '
+         'dimension tables (form_items, countries, national_societies, indicator_bank). '
+         'Percentage-type fields return value/num_value as 0–1 decimals (25% → 0.25). '
+         'layout=star for BI export. live=true reloads dimension tables from the database. '
+         '/api/v1/data/tables redirects here (308).'
+     )},
+    {'group': 'Form Data', 'path': '/api/v1/data/tables', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': True, 'featured': False,
+     'description': 'Legacy redirect (308) to /api/v1/data — same query string preserved.'},
+    {'group': 'Form Data', 'path': '/api/v1/countries/<country_id>/data', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Paginated form data scoped to one country'},
+
+    # ── Countries & Geography ──────────────────────────────────────────────────
+    {'group': 'Countries & Geography', 'path': '/api/v1/countrymap', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': True,
+     'description': 'Country list/map payload with optional locale, filters, and pagination',
+     'overlaps': ['/api/mobile/v1/data/countrymap']},
+    {'group': 'Countries & Geography', 'path': '/api/v1/nationalsocietymap', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'National societies list with optional locale, filters, and pagination'},
+    {'group': 'Countries & Geography', 'path': '/api/v1/periods', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Distinct period names from assigned and public data'},
+
+    # ── Indicator Bank ─────────────────────────────────────────────────────────
+    {'group': 'Indicator Bank', 'path': '/api/v1/indicator-bank', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Indicator bank listing with filters and pagination',
+     'overlaps': ['/api/mobile/v1/data/indicator-bank']},
+    {'group': 'Indicator Bank', 'path': '/api/v1/indicator-bank/<indicator_id>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Single indicator detail by ID',
+     'overlaps': ['/api/mobile/v1/data/indicator-bank/<indicator_id>']},
+    {'group': 'Indicator Bank', 'path': '/api/v1/indicator-suggestions', 'methods': ['GET', 'POST'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'List or submit indicator suggestions',
+     'overlaps': ['/api/mobile/v1/data/indicator-suggestions']},
+    {'group': 'Indicator Bank', 'path': '/api/v1/indicator-suggestions/<suggestion_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Single suggestion detail'},
+    {'group': 'Indicator Bank', 'path': '/api/v1/indicator-suggestions/<suggestion_id>/status', 'methods': ['PUT'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Update suggestion status (approve, reject, etc.)'},
+
+    # ── Sectors ────────────────────────────────────────────────────────────────
+    {'group': 'Sectors', 'path': '/api/v1/sectors', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Active sectors list'},
+    {'group': 'Sectors', 'path': '/api/v1/subsectors', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Active subsectors list'},
+    {'group': 'Sectors', 'path': '/api/v1/sectors-subsectors', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Combined sectors + nested subsectors payload',
+     'overlaps': ['/api/mobile/v1/data/sectors-subsectors']},
+
+    # ── Users ──────────────────────────────────────────────────────────────────
+    {'group': 'Users', 'path': '/api/v1/users', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Paginated user directory with optional role/search filters'},
+    {'group': 'Users', 'path': '/api/v1/users/<user_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Single user detail'},
+    {'group': 'Users', 'path': '/api/v1/user/profile', 'methods': ['GET', 'PUT', 'PATCH'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Current user profile — read or update (session only)'},
+    {'group': 'Users', 'path': '/api/v1/dashboard', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Session user dashboard (assignments, entities, notifications)'},
+    {'group': 'Users', 'path': '/api/v1/dashboard/offline-entities', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': (
+         'Assignments and contacts for every entity the signed-in user can select, '
+         'so one downloaded form template works offline. The mobile app calls the JWT route instead.'
+     ),
+     'query_params': [
+         {'name': 'template_ids', 'type': 'text', 'placeholder': '21,24',
+          'description': 'Comma-separated form template ids. Entities with no matching assignment are omitted.'},
+         {'name': 'limit', 'type': 'number', 'placeholder': '60',
+          'description': 'Maximum entities returned (default 60, at most 100).'},
+     ]},
+
+    # ── Documents & Resources ──────────────────────────────────────────────────
+    {'group': 'Documents & Resources', 'path': '/api/v1/submitted-documents', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Paginated submitted documents with country, type, language, status filters'},
+    {'group': 'Documents & Resources', 'path': '/api/v1/resources', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Resources library with pagination and filters',
+     'overlaps': ['/api/mobile/v1/data/resources']},
+    {'group': 'Embed Content', 'path': '/api/v1/embed-content', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Active embed content items, optionally filtered by category slug'},
+    {'group': 'Documents & Resources', 'path': '/api/v1/uploads/sectors/<filename>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': False,
+     'description': 'Stream a sector logo file from system storage'},
+    {'group': 'Documents & Resources', 'path': '/api/v1/uploads/branding/<filename>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': False,
+     'description': 'Stream organization logo/favicon uploaded from admin settings'},
+    {'group': 'Documents & Resources', 'path': '/api/v1/uploads/spef/<filename>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': False, 'paginated': False,
+     'description': 'Stream an SP/EF catalog icon from system storage'},
+    {'group': 'Documents & Resources', 'path': '/api/v1/uploads/ns/<filename>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': False, 'paginated': False,
+     'description': 'Stream a National Society logo from system storage'},
+
+    # ── Quiz ───────────────────────────────────────────────────────────────────
+    {'group': 'Quiz', 'path': '/api/v1/quiz/leaderboard', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Top users by quiz score',
+     'overlaps': ['/api/mobile/v1/data/quiz/leaderboard']},
+    {'group': 'Quiz', 'path': '/api/v1/quiz/submit-score', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Add score to the current user (session only)'},
+
+    # ── System ─────────────────────────────────────────────────────────────────
+    {'group': 'System', 'path': '/api/v1/csrf-token', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Issue a CSRF token for session-backed clients (e.g. mobile session mode)'},
+    {'group': 'System', 'path': '/api/v1/common-words', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True,
+     'description': 'Active common words / tooltip glossary for a language',
+     'deprecated_envelope': True},
+    {'group': 'System', 'path': '/api/v1/variables/resolve', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Resolve template variable expressions for the logged-in user'},
+    {'group': 'System', 'path': '/api/v1/matrix/auto-load-entities', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Resolve matrix auto-load entity IDs for a saved context (template/period/item/AES)'},
+    {'group': 'System', 'path': '/api/v1/matrix/auto-load-entities/batch', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Batch the auto-load lookup: one access check for several matrix columns on the same assignment'},
+    {'group': 'System', 'path': '/api/v1/matrix/own-rows', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False,
+     'description': "Rows the same entity saved on another matrix, from a matrix's include_own_matrix_rows setting"},
+    {'group': 'System', 'path': '/api/v1/platform-error', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Accept JSON from static error pages and client reporter (403/502/503/504) to log platform events'},
+    {'group': 'System', 'path': '/api/v1/client-error', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Accept JSON from client reporter for JavaScript runtime errors (SecurityEvent, no admin email)'},
+    {'group': 'System', 'path': '/api/v1/dashboard/data-quality/templates', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Templates the signed-in user can score for one entity on the data-quality dashboard',
+     'query_params': [
+         {'name': 'entity_type', 'type': 'text', 'placeholder': 'country',
+          'description': 'Entity type the dashboard is showing.'},
+         {'name': 'entity_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Entity id. The user must have access to it.'},
+     ]},
+    {'group': 'System', 'path': '/api/v1/dashboard/data-quality', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Data-quality score for one entity, template, and reporting period',
+     'query_params': [
+         {'name': 'entity_type', 'type': 'text', 'placeholder': 'country',
+          'description': 'Entity type.'},
+         {'name': 'entity_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Entity id. The user must have access to it.'},
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Form template id.'},
+         {'name': 'period', 'type': 'text', 'placeholder': '2024',
+          'description': 'Reporting period name.'},
+     ]},
+    {'group': 'System', 'path': '/api/v1/validation-questions', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Open validation questions for an entity or assignment the signed-in user can access',
+     'query_params': [
+         {'name': 'entity_type', 'type': 'text', 'placeholder': 'country',
+          'description': 'Entity type. Required together with entity_id unless assignment_entity_status_id is set.'},
+         {'name': 'entity_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Entity id.'},
+         {'name': 'assignment_entity_status_id', 'type': 'number', 'placeholder': '10',
+          'description': 'Scope questions to one assignment entity status.'},
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Optional template filter.'},
+         {'name': 'period', 'type': 'text', 'placeholder': '2024',
+          'description': 'Optional reporting period.'},
+         {'name': 'status', 'type': 'text', 'placeholder': 'open',
+          'description': 'Question status. Default open. Use all for every status.'},
+     ]},
+    {'group': 'System', 'path': '/api/v1/validation-questions/<question_id>/answer', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Save an answer on a validation question (JSON body field answer_text). Requires a CSRF token.'},
+
+    # ── Public assistant API  /api/v1/public/* ────────────────────────────────
+    {'group': 'Public API', 'path': '/api/v1/public/global-trend', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Compact global totals by reporting period for one public indicator',
+     'query_params': [
+         {'name': 'indicator_bank_id', 'type': 'number', 'placeholder': '724',
+          'description': 'Indicator bank id. Use query when the id is not known.'},
+         {'name': 'query', 'type': 'text', 'placeholder': 'volunteers',
+          'description': 'Metric name used to resolve the indicator when no id is passed.'},
+         {'name': 'period_name', 'type': 'text', 'placeholder': '2024',
+          'description': 'Limit the trend to one reporting period.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/indicators/resolve', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Map a metric name to an indicator bank id',
+     'query_params': [
+         {'name': 'query', 'type': 'text', 'placeholder': 'volunteers',
+          'description': 'Required metric name.'},
+         {'name': 'limit', 'type': 'number', 'placeholder': '5',
+          'description': 'Maximum matches (1–20, default 5).'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/submissions/coverage', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'How many countries have a public submitted value for a template or indicator, by period',
+     'query_params': [
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Form template. 21 is FDRS, 24 is the Unified Country Plan.'},
+         {'name': 'indicator_bank_id', 'type': 'number', 'placeholder': '724',
+          'description': 'Optional indicator bank id.'},
+         {'name': 'period_name', 'type': 'text', 'placeholder': '2024',
+          'description': 'One reporting period. Omit for every year.'},
+         {'name': 'query', 'type': 'text', 'placeholder': 'volunteers',
+          'description': 'Metric name used when indicator_bank_id is omitted.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/countries/resolve', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Resolve a country name, ISO code, or numeric id',
+     'query_params': [
+         {'name': 'query', 'type': 'text', 'placeholder': 'Kenya',
+          'description': 'Required country name, ISO2, ISO3, or id.'},
+         {'name': 'limit', 'type': 'number', 'placeholder': '5',
+          'description': 'Maximum matches (1–20, default 5).'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/search', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Search public document chunks. The caller writes the answer from the returned text.',
+     'query_params': [
+         {'name': 'query', 'type': 'text', 'placeholder': 'health',
+          'description': 'Required search text.'},
+         {'name': 'country_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Limit chunks to one country.'},
+         {'name': 'country_ids', 'type': 'text', 'placeholder': '1,2',
+          'description': 'Comma-separated country ids for a batched search.'},
+         {'name': 'full_coverage', 'type': 'select', 'options': ['true', 'false'],
+          'description': 'Search every country instead of the top matches only.'},
+         {'name': 'page', 'type': 'number', 'placeholder': '1',
+          'description': 'Page number when full coverage is on.'},
+         {'name': 'per_page', 'type': 'number', 'placeholder': '80',
+          'description': 'Page size when full coverage is on.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/chunks/<uuid:chunk_public_id>/context', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Neighboring chunks around one public document chunk (opaque UUID chunk_public_id)'},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/<uuid:public_id>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Public metadata for one document (opaque public_id UUID; title, countries, source URL)'},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/<uuid:public_id>/download', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Download or redirect to a public document file (opaque public_id UUID)'},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/catalog', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Count public documents by type, year, and country. This is an inventory, not a text search.',
+     'query_params': [
+         {'name': 'document_type', 'type': 'text', 'placeholder': 'annual_report',
+          'description': 'Document type, such as annual_report or unified_plan.'},
+         {'name': 'year', 'type': 'number', 'placeholder': '2024',
+          'description': 'Calendar year. Omit for every year.'},
+         {'name': 'country_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Limit the inventory to one country.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/reports/country', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'One-country report data: headline indicators, a trend, and cited document themes',
+     'query_params': [
+         {'name': 'country', 'type': 'text', 'placeholder': 'Kenya',
+          'description': 'Required country name or code.'},
+         {'name': 'period_hint', 'type': 'text', 'placeholder': '2024',
+          'description': 'Reporting period hint, such as a year.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/reports/template', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'HTML skeleton and design tokens for rendering a country report',
+     'query_params': [
+         {'name': 'style', 'type': 'text', 'placeholder': 'default',
+          'description': 'Report style. Default is default.'},
+     ]},
+]
+
+# ── AI Chat API  /api/ai/v2/* ─────────────────────────────────────────────────
+AI_API_REGISTRY = [
+    # ── Chat ──────────────────────────────────────────────────────────────────
+    {'group': 'Chat', 'path': '/api/ai/v2/chat', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Non-streaming chat request; anonymous allowed if Website proxy secret matches',
+     'consumers': 'Backoffice, Website, Mobile'},
+    {'group': 'Chat', 'path': '/api/ai/v2/chat/stream', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'SSE streaming chat; same identity and proxy rules as /chat',
+     'consumers': 'Backoffice, Website, Mobile'},
+    {'group': 'Chat', 'path': '/api/ai/v2/chat/cancel', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Signal SSE stream cancellation by request_id'},
+    {'group': 'Chat', 'path': '/api/ai/v2/ws', 'methods': ['WS'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'WebSocket streaming chat (flask-sock). Mounted only when WEBSOCKET_ENABLED is on.',
+     'consumers': 'Backoffice, Mobile'},
+    {'group': 'Chat', 'path': '/api/ai/v2/feedback', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Submit like/dislike feedback on a reasoning trace'},
+
+    # ── Conversations ──────────────────────────────────────────────────────────
+    {'group': 'Conversations', 'path': '/api/ai/v2/conversations', 'methods': ['GET', 'DELETE'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'List current user conversations (GET) or delete all (DELETE, requires confirm param)'},
+    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>', 'methods': ['GET', 'DELETE'],
+     'auth': 'ai_session', 'rate_limited': False,
+     'description': 'Get messages for a conversation (GET) or delete it entirely (DELETE)'},
+    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/clear-inflight', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Clear stale inflight metadata on a conversation'},
+    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/export', 'methods': ['GET'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Download conversation history as JSON export'},
+    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/messages', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Append a persisted message to a conversation (e.g. client-side errors)'},
+    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/import', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Bulk-import client-side message history (e.g. mobile offline sync)'},
+
+    # ── Tools & Tokens ────────────────────────────────────────────────────────
+    {'group': 'Tools & Tokens', 'path': '/api/ai/v2/table/export', 'methods': ['POST'],
+     'auth': 'ai_session', 'rate_limited': True,
+     'description': 'Build and return Excel file from AI chat table rows'},
+    {'group': 'Tools & Tokens', 'path': '/api/ai/v2/token', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Issue short-lived AI JWT for Website / Mobile clients (@login_required)',
+     'consumers': 'Website, Mobile (AiChatService)'},
+    {'group': 'Tools & Tokens', 'path': '/api/ai/v2/health', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': False,
+     'description': 'AI stack health check (optional ?probe=embedding for RAG status)'},
+]
+
+# ── AI Documents / RAG API  /api/ai/documents/* ───────────────────────────────
+# Flask-Login session (not the /api/ai/v2 chat JWT). Variable names MUST match
+# url_map so the live scanner treats these as documented.
+AI_DOCUMENTS_API_REGISTRY = [
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/upload', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Multipart upload; requires admin.documents.manage'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/<document_id>/reprocess', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Re-chunk and re-embed an existing document'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/duplicates', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'List duplicate AI document groups (content hash, else source URL)'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/dedupe', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Deduplicate AI documents (keep best copy per group, delete extras)'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Paginated list of AI documents visible to the current user'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/<document_id>', 'methods': ['GET', 'PATCH', 'DELETE'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Get metadata (optional include_chunks), update fields, or delete document + embeddings'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/<document_id>/download', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Download original file or redirect to trusted source_url'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/search', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Vector / hybrid similarity search over embedded chunks'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/answer', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Document-grounded Q&A (RAG) over the user-visible corpus'},
+    {'group': 'Documents (RAG)', 'path': '/api/ai/documents/ws', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'WebSocket stream for document QA. Mounted only when WEBSOCKET_ENABLED is on.'},
+
+    {'group': 'Workflow docs', 'path': '/api/ai/documents/workflows/sync', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Admin: re-index workflow markdown from disk into the vector store'},
+    {'group': 'Workflow docs', 'path': '/api/ai/documents/workflows', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'List workflow documentation entries (role-filtered for non-admins)'},
+    {'group': 'Workflow docs', 'path': '/api/ai/documents/workflows/<workflow_id>', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Single workflow doc + tour config'},
+    {'group': 'Workflow docs', 'path': '/api/ai/documents/workflows/<workflow_id>/tour', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Interactive tour JSON for a workflow (lang query param)'},
+    {'group': 'Workflow docs', 'path': '/api/ai/documents/workflows/search', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Keyword search over workflow documentation'},
+
+    {'group': 'IFRC API import', 'path': '/api/ai/documents/ifrc-api/types', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'IFRC PublicSiteTypes-derived document type list (admin.documents.manage)'},
+    {'group': 'IFRC API import', 'path': '/api/ai/documents/ifrc-api/filter-options', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Filter options for IFRC appeals (country vs type axes)'},
+    {'group': 'IFRC API import', 'path': '/api/ai/documents/ifrc-api/list', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'List IFRC API documents matching filters; marks already-imported URLs'},
+    {'group': 'IFRC API import', 'path': '/api/ai/documents/ifrc-api/import', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Import one document from an IFRC API URL'},
+    {'group': 'IFRC API import', 'path': '/api/ai/documents/ifrc-api/import-bulk', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': True,
+     'description': 'Start parallel bulk IFRC import job; returns job_id'},
+    {'group': 'IFRC API import', 'path': '/api/ai/documents/ifrc-api/import-bulk/<job_id>/status', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Poll bulk import job and per-item status'},
+    {'group': 'IFRC API import', 'path': '/api/ai/documents/ifrc-api/import-bulk/<job_id>/cancel', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False,
+     'description': 'Request cancellation of a bulk import job (best-effort)'},
+]
+
+# ── Mobile App API  /api/mobile/v1/* ─────────────────────────────────────────
+# auth values:
+#   'public'  – no token required (anyone reaching the server can call it)
+#   'user'    – @mobile_auth_required (JWT or session, no RBAC check)
+#   'rbac'    – @mobile_auth_required(permission=…) (user + RBAC gate)
+#
+# flag types:
+#   'mismatch'  – Flutter client calls endpoint with wrong auth mode
+#   'contract'  – API payload contract broken (client ≠ server expectations)
+#   'bug'       – Server-side code bug on this endpoint
+#   'policy'    – Authorization policy inconsistency
+#   'unused'    – Endpoint defined but not wired in any Flutter provider
+#   'minor'     – Low-priority improvement opportunity
+# ---------------------------------------------------------------------------
+MOBILE_ENDPOINT_REGISTRY = [
+    # ── AUTH ──────────────────────────────────────────────────────────────────
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/token', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Issue JWT access + refresh tokens (password login)',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/refresh', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Refresh JWT access token using refresh token',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/oauth/exchange', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'description': 'Redeem the one-time Azure login code and PKCE verifier for a mobile JWT pair',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/exchange-session', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Exchange session cookie for JWT tokens (Azure/SSO login)',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/session', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'Validate current session / check login state',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/logout', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Logout and invalidate session / tokens',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/change-password', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Change authenticated user password',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/profile', 'methods': ['GET', 'PUT', 'PATCH'],
+     'auth': 'user',
+     'description': 'Get or update authenticated user profile',
+     'flutter': 'AuthService / UserProfileService'},
+
+    # ── NOTIFICATIONS ─────────────────────────────────────────────────────────
+    {'group': 'Notifications', 'path': '/api/mobile/v1/notifications', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'List user notifications',
+     'flutter': 'NotificationService'},
+    {'group': 'Notifications', 'path': '/api/mobile/v1/notifications/count', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'Get unread notification count',
+     'flutter': 'NotificationService'},
+    {'group': 'Notifications', 'path': '/api/mobile/v1/notifications/mark-read', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Mark notifications as read',
+     'flutter': 'NotificationService'},
+    {'group': 'Notifications', 'path': '/api/mobile/v1/notifications/mark-unread', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Mark notifications as unread',
+     'flutter': 'NotificationService'},
+    {'group': 'Notifications', 'path': '/api/mobile/v1/notifications/preferences', 'methods': ['GET', 'POST'],
+     'auth': 'user',
+     'description': 'Get or update notification preferences',
+     'flutter': 'NotificationService'},
+
+    # ── DEVICES ───────────────────────────────────────────────────────────────
+    {'group': 'Devices', 'path': '/api/mobile/v1/devices/register', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Register device token for push notifications',
+     'flutter': 'PushNotificationService'},
+    {'group': 'Devices', 'path': '/api/mobile/v1/diagnostics/client-error', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Report an on-device failure (e.g. offline form download) as a low-severity security event',
+     'flutter': 'ClientDiagnosticsService'},
+    {'group': 'Devices', 'path': '/api/mobile/v1/devices/unregister', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Unregister device from push notifications',
+     'flutter': 'PushNotificationService'},
+    {'group': 'Devices', 'path': '/api/mobile/v1/devices/heartbeat', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Device presence heartbeat',
+     'flutter': 'PushNotificationService'},
+
+    # ── PUBLIC DATA ───────────────────────────────────────────────────────────
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/countrymap', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Country list with locale support and a National Society logo URL '
+         '(uploaded logo, otherwise the public FDRS emblem). Public and rate-limited.'
+     ),
+     'flutter': 'CountriesScreen / CountriesWidget',
+     'overlaps': ['/api/v1/countrymap']},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/sectors-subsectors', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Sectors and nested subsectors list',
+     'flutter': 'IndicatorBankProvider',
+     'overlaps': ['/api/v1/sectors-subsectors']},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/indicator-bank', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Public indicator bank listing (up to 2 000/page)',
+     'flutter': 'IndicatorBankProvider',
+     'overlaps': ['/api/v1/indicator-bank']},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/indicator-bank/<indicator_id>', 'methods': ['GET'],
+     'auth': 'public',
+     'description': 'Single indicator detail (public)',
+     'flutter': 'IndicatorDetailScreen',
+     'overlaps': ['/api/v1/indicator-bank/<indicator_id>']},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/indicator-suggestions', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Submit a new indicator suggestion',
+     'flutter': 'IndicatorBankScreen',
+     'overlaps': ['/api/v1/indicator-suggestions']},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/periods', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'List available reporting periods',
+     'flutter': 'GlobalOverviewDataService'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/fdrs-overview', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'FDRS aggregated totals per country (GET). Required query: indicator_bank_id or kpi_code. '
+         'Optional: template_id, period_name, locale. Path has no <id> segment — ID is only in the query string.'
+     ),
+     'flutter': 'GlobalOverviewDataService'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/fdrs-reach-indicators', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'People-reached indicators (FDRS KPI codes) grouped by sector, for the home map chips. '
+         'Optional query: template_id, locale.'
+     ),
+     'flutter': 'GlobalOverviewDataService'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/offline-home', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'description': (
+         'Home-map pack for the offline cache: reporting periods, people-reached sectors, '
+         'and one overview per indicator and period. Optional query: template_id, locale, indicator_bank_ids.'
+     ),
+     'flutter': 'PublicBrowsePrefetch (AppConfig.mobileOfflineHomeEndpoint)'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/offline-countries', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'description': (
+         'Country pack for the offline cache: the country list, every country profile, and active operations. '
+         'Optional query: template_id, locale.'
+     ),
+     'flutter': 'PublicBrowsePrefetch (AppConfig.mobileOfflineCountriesEndpoint)'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/country-profile/<iso3>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Public country profile: key figures, indicator series, cover images and public documents. '
+         'Optional query: template_id, locale.'
+     ),
+     'flutter': 'CountryDetailScreen'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/go-documents', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'description': (
+         'GO document lists for every country in one payload (data.by_country). '
+         'The app reads one country from this list instead of calling the per-country route.'
+     ),
+     'flutter': 'PublicBrowsePrefetch (AppConfig.mobileGoDocumentsEndpoint)'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/country-profile/<iso3>/go-documents', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Public IFRC GO documents for one country: emergency appeals, operations updates, '
+         'DREF and other appeal files, plus public situation reports. '
+         'data.available is false when GO could not be reached.'
+     ),
+     'flutter': 'CountryDetailScreen'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/country-profile/<iso3>/operations', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Active IFRC GO emergencies for one country: DREF and appeal counts, people targeted, '
+         'funding, and the active operations. data.available is false when GO could not be reached.'
+     ),
+     'flutter': 'CountryDetailScreen'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/region-profile/<slug>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Regional analysis: key indicators summed across the region per period, with reporting '
+         'coverage and top countries. Optional query: template_id, locale.'
+     ),
+     'flutter': 'RegionDetailScreen'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/region-profile/<slug>/operations', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Active IFRC GO operations for one region: counts, people targeted, funding, '
+         'and the countries with the most people targeted. data.supported is false when the '
+         'region has no GO counterpart.'
+     ),
+     'flutter': 'RegionDetailScreen'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/disaggregation-overview', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'description': (
+         'Sex, age, and geography breakdown from the published public snapshot. '
+         'Anonymous callers get global and regional totals. Signed-in organization users can request country rows they are allowed to see.'
+     ),
+     'flutter': 'GlobalOverviewDataService',
+     'query_params': [
+         {'name': 'indicator_bank_id', 'type': 'number', 'placeholder': '729',
+          'description': 'Indicator bank id. Default is people reached.'},
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Form template id. Default is FDRS.'},
+         {'name': 'period_name', 'type': 'text', 'placeholder': '2024',
+          'description': 'Optional reporting period.'},
+         {'name': 'country_id', 'type': 'number', 'placeholder': '1',
+          'description': 'One country. Organization users only.'},
+     ]},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/resources', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'Resources/publications library (search, type, locale). '
+         'Use grouped=true (no search) for subgroup sections; otherwise paginated list. '
+         'No auth required; same content family as /api/v1/resources (API key there).'
+     ),
+     'flutter': 'PublicResourcesProvider',
+     'overlaps': ['/api/v1/resources']},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/unified-planning-config', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'PublicSiteAppeals base URL and unified planning AppealsTypeId list '
+         '(Plan, Mid-Year Report, Annual Report) for the client document catalogue.'
+     ),
+     'flutter': 'PublicResourcesProvider'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/unified-planning-thumbnail', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'JPEG first page of an IFRC PDF for grid thumbnails (query: url). '
+         'Server fetches PDF with IFRC credentials; returns image/jpeg, not JSON.'
+     ),
+     'flutter': 'UnifiedPlanningPdfThumbnailCache'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/quiz/leaderboard', 'methods': ['GET'],
+     'auth': 'user', 'rate_limited': True,
+     'description': 'Quiz global leaderboard — requires mobile JWT (scores attributed to users)',
+     'flutter': 'LeaderboardProvider',
+     'overlaps': ['/api/v1/quiz/leaderboard']},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/quiz/submit-score', 'methods': ['POST'],
+     'auth': 'user',
+     'description': 'Submit quiz score — user_name derived from current_user, only score required from client',
+     'flutter': 'QuizGameProvider'},
+
+    # ── USER ──────────────────────────────────────────────────────────────────
+    {'group': 'User', 'path': '/api/mobile/v1/user/dashboard', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'User-scoped dashboard data (entities, assignments)',
+     'flutter': 'DashboardRepository'},
+    {'group': 'User', 'path': '/api/mobile/v1/user/dashboard/offline-entities', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'Assignments and contacts of every entity the user can select (optionally only of '
+                    'given template_ids) so downloaded form templates work offline for all entities',
+     'flutter': 'DashboardRepository'},
+    {'group': 'User', 'path': '/api/mobile/v1/user/entity-documents', 'methods': ['GET'],
+     'auth': 'user',
+     'description': (
+         'Documents for one assigned entity, the same set as the web /documents page. '
+         'Assignment document uploaders can open it, and so can system managers and document admins. '
+         'Each row has id, file_name, document_type, language, period, status, country_name, '
+         'uploaded_by_name, uploaded_at, assignment_period, is_public, can_edit, and '
+         'can_change_status. '
+         'can_edit is false for approved documents unless the caller manages documents. '
+         'meta.document_types and meta.languages repeat the edit-form catalog; '
+         'languages are every ISO language, not only the UI display languages.'
+     ),
+     'flutter': 'EntityDocumentRepositoryProvider',
+     'query_params': [
+         {'name': 'entity_type', 'type': 'text', 'placeholder': 'country',
+          'description': 'Required. Entity type, such as country or national_society.'},
+         {'name': 'entity_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Required. Entity id. The user must be allowed to see documents for it.'},
+         {'name': 'search', 'type': 'text', 'placeholder': 'report',
+          'description': 'Optional filename search.'},
+         {'name': 'status', 'type': 'select', 'options': ['pending', 'approved', 'rejected'],
+          'description': 'Optional document status.'},
+         {'name': 'type', 'type': 'text', 'placeholder': 'annual_report',
+          'description': 'Optional document type. document_type is accepted as an alias.'},
+         {'name': 'page', 'type': 'number', 'placeholder': '1',
+          'description': 'Page number. Default 1.'},
+         {'name': 'per_page', 'type': 'number', 'placeholder': '50',
+          'description': 'Page size. Default 50, at most 200.'},
+     ]},
+    {'group': 'User', 'path': '/api/mobile/v1/user/entity-documents/catalog', 'methods': ['GET'],
+     'auth': 'user',
+     'description': (
+         'Document types configured for the repository, and every ISO language from '
+         'ALL_LANGUAGES_DISPLAY_NAMES (not only the UI display languages). '
+         'Used by the mobile document edit form.'
+     ),
+     'flutter': 'EntityDocumentRepositoryProvider'},
+    {'group': 'User', 'path': '/api/mobile/v1/user/entity-documents/<doc_id>', 'methods': ['POST'],
+     'auth': 'user',
+     'description': (
+         'Update one repository document the caller can edit. JSON or form fields: '
+         'document_type, language, period (year is accepted), is_public, filename, and status. '
+         'status (pending, approved, rejected) is stored only for system managers and document admins. '
+         'A multipart file part named document replaces the stored file and archives the previous one. '
+         'Focal uploaders cannot edit approved documents. Cover Image clears language and period and stays public.'
+     ),
+     'flutter': 'EntityDocumentRepositoryProvider'},
+
+    # ── TEMPLATES ─────────────────────────────────────────────────────────────
+    {'group': 'Templates', 'path': '/api/mobile/v1/templates/<template_id>/structure', 'methods': ['GET'],
+     'auth': 'user', 'paginated': False,
+     'description': 'Published form structure, including stable keys, for a template the user can access',
+     'flutter': 'Form structure client'},
+    {'group': 'Templates', 'path': '/api/mobile/v1/templates/<template_id>/resolve-fields', 'methods': ['POST'],
+     'auth': 'user', 'paginated': False,
+     'description': 'Resolve stable_key references in a fields array to published form item ids',
+     'flutter': 'Form structure client'},
+    {'group': 'Templates', 'path': '/api/mobile/v1/templates/<template_id>/items/by-stable-key/<stable_key>', 'methods': ['GET'],
+     'auth': 'user', 'paginated': False,
+     'description': 'Look up one published form item id by stable key',
+     'flutter': 'Form structure client'},
+
+    # ── ANALYTICS ─────────────────────────────────────────────────────────────
+    {'group': 'Analytics', 'path': '/api/mobile/v1/analytics/screen-view', 'methods': ['POST'],
+     'auth': 'user', 'rate_limited': True,
+     'description': 'Track in-app screen view event',
+     'flutter': 'ScreenViewTracker (AppConfig.mobileScreenViewEndpoint)'},
+
+    # ── ADMIN — USERS ─────────────────────────────────────────────────────────
+    {'group': 'Admin: Users', 'path': '/api/mobile/v1/admin/users', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.users.view',
+     'description': 'List all users',
+     'flutter': 'ManageUsersProvider'},
+    {'group': 'Admin: Users', 'path': '/api/mobile/v1/admin/users/<user_id>', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.users.view',
+     'description': 'Get user details',
+     'flutter': 'ManageUsersProvider'},
+    {'group': 'Admin: Users', 'path': '/api/mobile/v1/admin/users/<user_id>', 'methods': ['PUT', 'PATCH'],
+     'auth': 'rbac', 'permission': 'admin.users.edit',
+     'description': 'Update user details / role assignment',
+     'flutter': 'ManageUsersProvider'},
+    {'group': 'Admin: Users', 'path': '/api/mobile/v1/admin/users/<user_id>/activate', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.users.deactivate',
+     'description': 'Activate a user account',
+     'flutter': 'ManageUsersProvider'},
+    {'group': 'Admin: Users', 'path': '/api/mobile/v1/admin/users/<user_id>/deactivate', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.users.deactivate',
+     'description': 'Deactivate a user account',
+     'flutter': 'ManageUsersProvider'},
+    {'group': 'Admin: Users', 'path': '/api/mobile/v1/admin/users/rbac-roles', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.users.view',
+     'description': 'List available RBAC role definitions',
+     'flutter': 'ManageUsersProvider'},
+
+    # ── ADMIN — ACCESS REQUESTS ───────────────────────────────────────────────
+    {'group': 'Admin: Access', 'path': '/api/mobile/v1/admin/access-requests', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.access_requests.view',
+     'description': 'List pending access requests',
+     'flutter': 'AccessRequestsProvider'},
+    {'group': 'Admin: Access', 'path': '/api/mobile/v1/admin/access-requests/<request_id>/approve', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.access_requests.approve',
+     'description': 'Approve a single access request',
+     'flutter': 'AccessRequestsProvider'},
+    {'group': 'Admin: Access', 'path': '/api/mobile/v1/admin/access-requests/approve-all', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.access_requests.approve',
+     'description': 'Approve all pending access requests',
+     'flutter': 'AccessRequestsProvider'},
+    {'group': 'Admin: Access', 'path': '/api/mobile/v1/admin/access-requests/<request_id>/reject', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.access_requests.reject',
+     'description': 'Reject an access request',
+     'flutter': 'AccessRequestsProvider'},
+
+    # ── ADMIN — ANALYTICS ─────────────────────────────────────────────────────
+    {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/analytics/dashboard-stats', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.analytics.view',
+     'description': 'Admin dashboard statistics (users, submissions, etc.)',
+     'flutter': 'AdminDashboardProvider'},
+    {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/analytics/dashboard-activity', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.analytics.view',
+     'description': 'Recent admin dashboard activity feed',
+     'flutter': 'UserAnalyticsProvider'},
+    {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/analytics/login-logs', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.analytics.view',
+     'description': 'Login event logs',
+     'flutter': 'LoginLogsProvider'},
+    {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/analytics/session-logs', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.analytics.view',
+     'description': 'Session logs',
+     'flutter': 'SessionLogsProvider'},
+    {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/analytics/sessions/<session_id>/end', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.analytics.view',
+     'description': 'Force-terminate a live user session',
+     'flutter': 'SessionLogsProvider'},
+    {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/analytics/audit-trail', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.audit.view',
+     'description': 'System audit trail events',
+     'flutter': 'AuditTrailProvider'},
+    {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/notifications/send', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.communication.manage',
+     'description': 'Send push notification to selected users',
+     'flutter': 'AdminDashboardProvider'},
+
+    # ── ADMIN — CONTENT ───────────────────────────────────────────────────────
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/templates', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.templates.view',
+     'description': 'List form templates',
+     'flutter': 'TemplatesProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/templates/<template_id>/delete', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.templates.delete',
+     'description': 'Delete a form template',
+     'flutter': 'TemplatesProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.assignments.view',
+     'description': 'List form assignments',
+     'flutter': 'AssignmentsProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments/<assignment_id>', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.assignments.view',
+     'description': 'Single assignment detail with entity rows and deadline fields',
+     'flutter': 'AssignmentsProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments/<assignment_id>/delete', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.assignments.delete',
+     'description': 'Delete a form assignment',
+     'flutter': 'AssignmentsProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments/<assignment_id>/toggle-public', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.assignments.public_submissions.manage',
+     'description': 'Toggle public visibility of an assignment',
+     'flutter': 'AssignmentsProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/assignments/<assignment_id>/generate-url', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.assignments.public_submissions.manage',
+     'description': 'Generate public submission URL for an assignment',
+     'flutter': 'AssignmentsProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/documents', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.documents.manage',
+     'description': 'List submitted documents',
+     'flutter': 'DocumentManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/documents/<document_id>/file', 'methods': ['GET'],
+     'auth': 'user',
+     'description': 'Stream submitted document bytes (JWT; entity-level access via _check_document_access)',
+     'flutter': 'DocumentManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/documents/<document_id>/delete', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.documents.manage',
+     'description': 'Delete a submitted document',
+     'flutter': 'DocumentManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/resources', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.resources.manage',
+     'description': 'List resources',
+     'flutter': 'ResourcesManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/resources/<resource_id>/file', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.resources.manage',
+     'description': 'Stream a resource translation file (optional language query param)',
+     'flutter': 'ResourcesManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/resources/<resource_id>/delete', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.resources.manage',
+     'description': 'Delete a resource',
+     'flutter': 'ResourcesManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/indicator-bank', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.indicator_bank.view',
+     'description': 'Admin indicator bank listing (includes archived)',
+     'flutter': 'IndicatorBankAdminProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/indicator-bank/<indicator_id>', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.indicator_bank.view',
+     'description': 'Get a single indicator bank item',
+     'flutter': 'IndicatorBankAdminProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/indicator-bank/<indicator_id>/edit', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.indicator_bank.edit',
+     'description': 'Edit indicator bank item fields',
+     'flutter': 'IndicatorBankAdminProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/indicator-bank/<indicator_id>/archive', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.indicator_bank.archive',
+     'description': 'Archive an indicator bank item',
+     'flutter': 'IndicatorBankAdminProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/indicator-bank/<indicator_id>/delete', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.indicator_bank.edit',
+     'description': 'Delete an indicator bank item',
+     'flutter': 'IndicatorBankAdminProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/translations', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.translations.manage',
+     'description': 'List translations for admin review',
+     'flutter': 'TranslationManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/translations/sources', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.translations.manage',
+     'description': 'Distinct gettext #: file paths for mobile source filter',
+     'flutter': 'TranslationManagementProvider'},
+    {'group': 'Admin: Content', 'path': '/api/mobile/v1/admin/content/translations/<translation_id>', 'methods': ['POST'],
+     'auth': 'rbac', 'permission': 'admin.translations.manage',
+     'description': 'Update a translation string',
+     'flutter': 'TranslationManagementProvider'},
+
+    # ── ADMIN — ORG ───────────────────────────────────────────────────────────
+    {'group': 'Admin: Org', 'path': '/api/mobile/v1/admin/org/branches/<country_id>', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.organization.manage',
+     'description': 'List NS branches for a country (consistent with /admin/org/structure)',
+     'flutter': '— (AppConfig constant defined, not yet wired in any provider)'},
+    {'group': 'Admin: Org', 'path': '/api/mobile/v1/admin/org/subbranches/<branch_id>', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.organization.manage',
+     'description': 'List NS sub-branches for a branch (consistent with /admin/org/structure)',
+     'flutter': '— (AppConfig constant defined, not yet wired in any provider)'},
+    {'group': 'Admin: Org', 'path': '/api/mobile/v1/admin/org/structure', 'methods': ['GET'],
+     'auth': 'rbac', 'permission': 'admin.organization.manage',
+     'description': 'Full org structure as flat lists (countries, branches, sub-branches)',
+     'flutter': 'OrganizationalStructureProvider'},
+]
+
+# ── Indicator Bank app  /Indicator, /Sector, /list-home, … ───────────────────
+# Same paths and response shapes the IFRC Indicator Bank Blazor public app
+# already calls. Auth is X-API-Key or Authorization: Bearer.
+_IB_LANGUAGE_PARAM = {
+    'name': 'language',
+    'type': 'text',
+    'placeholder': 'en',
+    'description': 'Locale for translated text (en, fr, es, ar). Same effect as the X-Language header.',
+}
+_IB_APP_CONSUMERS = 'IFRC Indicator Bank Blazor'
+
+INDICATOR_BANK_APP_REGISTRY = [
+    {'group': 'Indicator Bank app', 'path': '/list-home', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Home page sector tiles: id, name, indicator count, order, and logo bytes.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Sector', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Active sectors with nested subsectors for the sidebar and suggestion form.',
+     'query_params': [
+         {'name': 'includeImages', 'type': 'select', 'options': ['true', 'false'],
+          'description': 'Include sector logo bytes when true.'},
+         _IB_LANGUAGE_PARAM,
+     ]},
+    {'group': 'Indicator Bank app', 'path': '/Subsector', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Flat list of active subsectors (parent sector id, name, order).',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Indicator list. Response is {values, count, page:{offset, limit}}. '
+         'Archived rows are excluded unless ShowIsArchived=true. '
+         'Repeat list parameters for more than one value (SectorIds=1&SectorIds=2).'
+     ),
+     'query_params': [
+         {'name': 'Filter', 'type': 'text', 'placeholder': 'volunteer',
+          'description': 'Case-insensitive match on indicator name or definition.'},
+         {'name': 'SectorIds', 'type': 'text', 'placeholder': '1',
+          'description': 'Sector id. Repeat the parameter for more than one sector.'},
+         {'name': 'SubsectorIds', 'type': 'text', 'placeholder': '10',
+          'description': 'Subsector id. Repeat the parameter for more than one subsector.'},
+         {'name': 'IndicatorIds', 'type': 'text', 'placeholder': '724',
+          'description': 'Indicator id. Repeat the parameter for more than one indicator.'},
+         {'name': 'Tags', 'type': 'text', 'placeholder': 'health',
+          'description': 'Tag that must be present. Repeat the parameter for more than one tag.'},
+         {'name': 'ShowIsArchived', 'type': 'select', 'options': ['true', 'false'],
+          'description': 'true returns only archived indicators. false or omitted returns active indicators.'},
+         {'name': 'Offset', 'type': 'number', 'placeholder': '0',
+          'description': 'Rows to skip (default 0).'},
+         {'name': 'Limit', 'type': 'number', 'placeholder': '1000',
+          'description': 'Page size (default 1000).'},
+         _IB_LANGUAGE_PARAM,
+     ]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/<indicator_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'One indicator, including sectors, subsectors, tags, and localized name and definition.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/search', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Semantic search (pgvector). Returns up to 20 matches with id, title, definition, and score. '
+         'Falls back to a name/definition text match when embeddings are missing. Empty filter returns [].'
+     ),
+     'query_params': [
+         {'name': 'filter', 'type': 'text', 'placeholder': 'volunteer',
+          'description': 'Search text. Filter is accepted as an alias.'},
+         _IB_LANGUAGE_PARAM,
+     ]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/tags', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Sorted distinct tags from active indicators.'},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/selectOptions', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Suggestion form dropdowns: units, types, disaggregations, emergencies, SPEF, '
+         'tags, monitoring questions, and related programmes.'
+     ),
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/Suggestion', 'methods': ['POST'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Submit a public suggestion as JSON. Requires name, email, motivation, and reCAPTCHA token. '
+         'operation is 0 (new), 1 (correction), or 2 (other). Optional: indicatorId, title, definition, '
+         'typeOfMeasurement, unitOfMeasurement, primary/secondary/tertiary sector and subsector, tags. '
+         'Needs the indicators:suggest capability. Returns 200 with an empty body.'
+     )},
+    {'group': 'Indicator Bank app', 'path': '/CommonWord', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Glossary terms and meanings for indicator tooltips.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Excel', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Public indicator workbook (indicatorbank.xlsx). Response is a spreadsheet, not JSON.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+]
+
+# Combined registry — single source of truth for all API surfaces
+ENDPOINT_REGISTRY = (
+    [dict(e, surface='v1')     for e in EXTERNAL_API_REGISTRY] +
+    [dict(e, surface='ai')     for e in AI_API_REGISTRY] +
+    [dict(e, surface='ai')     for e in AI_DOCUMENTS_API_REGISTRY] +
+    [dict(e, surface='mobile') for e in MOBILE_ENDPOINT_REGISTRY] +
+    [dict(e, surface='indicator_bank') for e in INDICATOR_BANK_APP_REGISTRY]
+)

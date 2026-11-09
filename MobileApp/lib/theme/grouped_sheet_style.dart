@@ -262,7 +262,9 @@ abstract final class GroupedSheetStyle {
           return scheme.outline;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return primaryFill;
+          if (states.contains(WidgetState.selected)) {
+            return IOSColors.getSystemGreen(context);
+          }
           return line;
         }),
         trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),

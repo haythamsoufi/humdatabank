@@ -69,15 +69,93 @@
         return 'line';
     }
 
-    function tooltipFormatter(series) {
+    function tooltipFormatter(series, spec) {
         return function (value, opts) {
-            var s = series[opts && opts.seriesIndex != null ? opts.seriesIndex : 0] || {};
-            return formatters().format(value, s.format);
+            var index = opts && opts.seriesIndex != null ? opts.seriesIndex : 0;
+            var s = series[index] || {};
+            var text = formatters().format(value, s.format);
+            // 100% stacks draw shares on the axis; the tooltip keeps the amount and adds the share.
+            if (spec && spec.stack_type === '100%' && typeof value === 'number' && opts) {
+                var point = opts.dataPointIndex;
+                var total = 0;
+                series.forEach(function (item) {
+                    var n = item.data ? item.data[point] : null;
+                    if (typeof n === 'number') total += Math.abs(n);
+                });
+                if (total) text += ' (' + formatters().pct(Math.abs(value) / total * 100) + ')';
+            }
+            return text;
         };
+    }
+
+    function isPie(spec) {
+        if (spec.pie) return true;
+        var kinds = kindsOf(spec.series || []);
+        return kinds.length === 1 && kinds[0] === 'pie';
+    }
+
+    function pieNumber(value) {
+        return typeof value === 'number' && !isNaN(value) ? value : 0;
+    }
+
+    /** One series whose points are the slices named by ``categories``. */
+    function buildPieOptions(spec) {
+        var series = spec.series || [];
+        var source = series[0] || {};
+        var values = (source.data || []).map(pieNumber);
+        var labels = spec.categories || [];
+        var colors = (spec.colors && spec.colors.length) ? spec.colors : series.map(function (s) { return s.color; });
+        var fmt = source.format || 'int';
+        var options = {
+            chart: { type: 'pie', height: spec.height || 280 },
+            series: values,
+            labels: labels,
+            colors: colors,
+            stroke: { width: 2, colors: ['#fff'] },
+            grid: { show: false },
+            legend: { show: spec.legend !== false, position: 'bottom', fontSize: '12px' },
+            dataLabels: {
+                enabled: true,
+                formatter: function (val) {
+                    var n = typeof val === 'number' ? val : parseFloat(val);
+                    return formatters().pct(n);
+                },
+                style: { fontSize: '12px', fontWeight: 600 },
+                dropShadow: { enabled: false }
+            },
+            plotOptions: { pie: { expandOnClick: false } },
+            tooltip: {
+                shared: false,
+                intersect: true,
+                y: { formatter: function (value) { return formatters().format(value, fmt); } }
+            }
+        };
+        if (spec.width) options.chart.width = spec.width;
+        return options;
+    }
+
+    function applyPercentStack(options, spec) {
+        if (!spec.stacked || spec.stack_type !== '100%') return;
+        options.chart.stackType = '100%';
+        var pctFmt = formatters().formatter('pct');
+        if (spec.horizontal) {
+            options.xaxis.min = 0;
+            options.xaxis.max = 100;
+            options.xaxis.tickAmount = 4;
+            options.xaxis.labels = Object.assign({}, options.xaxis.labels, { formatter: pctFmt });
+            return;
+        }
+        if (options.yaxis && !Array.isArray(options.yaxis)) {
+            options.yaxis.min = 0;
+            options.yaxis.max = 100;
+            options.yaxis.tickAmount = 4;
+            options.yaxis.labels = Object.assign({}, options.yaxis.labels, { formatter: pctFmt });
+        }
     }
 
     /** ApexCharts options for one view chart. */
     function buildOptions(spec) {
+        if (isPie(spec)) return buildPieOptions(spec);
         var series = spec.series || [];
         var kinds = kindsOf(series);
         var options = {
@@ -90,7 +168,7 @@
             }),
             xaxis: { categories: spec.categories || [] },
             yaxis: yAxes(spec),
-            tooltip: { y: { formatter: tooltipFormatter(series) } }
+            tooltip: { y: { formatter: tooltipFormatter(series, spec) } }
         };
 
         if (spec.stacked) options.chart.stacked = true;
@@ -158,6 +236,7 @@
         if (spec.legend === false) options.legend = { show: false };
         if (spec.data_labels) options.dataLabels = { enabled: true, style: { fontSize: '11px' } };
         if (spec.x_title) options.xaxis.title = { text: spec.x_title, style: AXIS_TITLE_STYLE };
+        applyPercentStack(options, spec);
         return options;
     }
 

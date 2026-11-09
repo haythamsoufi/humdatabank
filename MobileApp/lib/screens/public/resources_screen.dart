@@ -10,8 +10,8 @@ import '../../models/shared/resource.dart';
 import '../../models/shared/resource_list_section.dart';
 import '../../providers/public/public_resources_provider.dart';
 import '../../providers/shared/language_provider.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../utils/constants.dart';
-import '../../utils/navigation_helper.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
@@ -198,12 +198,9 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
           bottomNavigationBar: isStandalone
               ? DrawerAwareBottomBar(
                   hidden: _sideDrawerOpen,
-                  child: AppBottomNavigationBar(
+                  child: const AppBottomNavigationBar(
                     currentIndex: 2,
-                    onTap: (index) {
-                      NavigationHelper.popToMainThenOpenAiIfNeeded(
-                          context, index);
-                    },
+                    selectedTabId: TabIds.resources,
                   ),
                 )
               : null,

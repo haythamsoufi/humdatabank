@@ -113,6 +113,7 @@ function mergeCsrfHeaders(init, token) {
 }
 
 function redirectToLoginAfterSessionExpiry() {
+    if (window.__IFRC_OFFLINE_BUNDLE) return;
     const next = window.location.pathname + window.location.search + window.location.hash;
     window.location.href = '/login?next=' + encodeURIComponent(next);
 }
@@ -193,6 +194,7 @@ async function refreshCSRFTokenViaSessionApi() {
 
 // Function to refresh CSRF token
 function refreshCSRFToken() {
+    if (window.__IFRC_OFFLINE_BUNDLE) return Promise.resolve(getCSRFToken());
     if (csrfSessionExpired) return Promise.resolve(null);
     if (csrfRefreshPromise) return csrfRefreshPromise;
 

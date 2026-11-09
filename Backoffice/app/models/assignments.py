@@ -168,6 +168,10 @@ class AssignedForm(db.Model):
     # When true, each form page can be saved/submitted independently
     enable_page_submission = Column(Boolean, default=False, nullable=False)
 
+    # When true, the mobile app can save this form for use without a connection.
+    # Off until an admin opts in, including assignments that already exist.
+    enable_offline_download = Column(Boolean, default=False, nullable=False)
+
     # Optional override for the assignment's display name.
     # When None the UI falls back to "<template name> – <period>".
     custom_name = Column(String(200), nullable=True)

@@ -69,10 +69,17 @@ dependencies:
   flutter_svg: ^2.2.0
   fl_chart: ">=0.70.2 <2.0.0"
   font_awesome_flutter: ">=10.9.0 <11.0.0"
-  # In-app PDF viewer — iOS uses PDFKit (no CocoaPod needed); Android uses PdfRenderer
+  # Thumbnails use pdfx (iOS PDFKit, Android PdfRenderer).
+  # The viewer itself uses pdfrx 2.2.x so in-document text search can highlight
+  # matches. 2.5+ needs Dart 3.12 / Flutter 3.47, which is newer than CI.
+  # Release workflows run `dart run pdfrx:remove_wasm_modules` so the web-only
+  # PDFium WASM asset is not packaged into Android or iOS builds.
   pdfx: ^2.9.0
+  pdfrx: 2.2.24
   # File sharing (share sheet) and temp-directory access for PDF share
   share_plus: ^10.0.0
+  # System document picker for replacing a repository attachment
+  file_selector: ^1.0.3
   path_provider: ^2.1.0
 
   # Wide range so both Flutter SDK pins resolve (e.g. 0.19.x vs 0.20.x via flutter_localizations)

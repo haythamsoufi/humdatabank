@@ -9,6 +9,16 @@ class User {
   final List<int>? countryIds;
   final bool aiBetaTester;
 
+  /// Server toggle: AI is limited to selected users.
+  /// False when the field is absent (older servers), so chat stays usable.
+  final bool aiBetaRestricted;
+
+  /// RBAC role codes from profile (e.g. `assignment_documents_uploader`).
+  final List<String> rbacRoleCodes;
+
+  /// From mobile profile when the server supports it; otherwise null (use [rbacRoleCodes]).
+  final bool? canOpenEntityDocuments;
+
   User({
     required this.id,
     required this.email,
@@ -19,7 +29,13 @@ class User {
     this.profileColor,
     this.countryIds,
     this.aiBetaTester = false,
+    this.aiBetaRestricted = false,
+    this.rbacRoleCodes = const [],
+    this.canOpenEntityDocuments,
   });
+
+  /// Chat is locked when beta restriction is on and this user is not allow-listed.
+  bool get aiBetaAccessLocked => aiBetaRestricted && !aiBetaTester;
 
   User copyWith({
     int? id,
@@ -31,6 +47,9 @@ class User {
     String? profileColor,
     List<int>? countryIds,
     bool? aiBetaTester,
+    bool? aiBetaRestricted,
+    List<String>? rbacRoleCodes,
+    bool? canOpenEntityDocuments,
   }) {
     return User(
       id: id ?? this.id,
@@ -42,6 +61,18 @@ class User {
       profileColor: profileColor ?? this.profileColor,
       countryIds: countryIds ?? this.countryIds,
       aiBetaTester: aiBetaTester ?? this.aiBetaTester,
+      aiBetaRestricted: aiBetaRestricted ?? this.aiBetaRestricted,
+      rbacRoleCodes: rbacRoleCodes ?? this.rbacRoleCodes,
+      canOpenEntityDocuments:
+          canOpenEntityDocuments ?? this.canOpenEntityDocuments,
+    );
+  }
+
+  bool get canOpenEntityDocumentRepository {
+    final explicit = canOpenEntityDocuments;
+    if (explicit != null) return explicit;
+    return rbacRoleCodes.any(
+      (c) => c.toLowerCase() == 'assignment_documents_uploader',
     );
   }
 
@@ -58,7 +89,34 @@ class User {
           ? List<int>.from(json['country_ids'])
           : null,
       aiBetaTester: json['ai_beta_tester'] == true,
+      aiBetaRestricted: json['ai_beta_restricted'] == true,
+      rbacRoleCodes: parseRbacRoleCodesFromProfile(json),
+      canOpenEntityDocuments: parseCanOpenEntityDocumentsFromProfile(json),
     );
+  }
+
+  static bool? parseCanOpenEntityDocumentsFromProfile(Map<String, dynamic> json) {
+    if (!json.containsKey('can_open_entity_documents')) return null;
+    return json['can_open_entity_documents'] == true;
+  }
+
+  static List<String> parseRbacRoleCodesFromProfile(Map<String, dynamic> json) {
+    final raw = json['rbac_role_codes'] ?? json['rbac_roles'];
+    if (raw is! List) return const [];
+    final codes = <String>[];
+    for (final item in raw) {
+      if (item is String && item.trim().isNotEmpty) {
+        codes.add(item.trim());
+        continue;
+      }
+      if (item is Map) {
+        final code = item['code'];
+        if (code != null && '$code'.trim().isNotEmpty) {
+          codes.add('$code'.trim());
+        }
+      }
+    }
+    return codes;
   }
 
   Map<String, dynamic> toJson() {
@@ -72,6 +130,10 @@ class User {
       'profile_color': profileColor,
       'country_ids': countryIds,
       'ai_beta_tester': aiBetaTester,
+      'ai_beta_restricted': aiBetaRestricted,
+      'rbac_role_codes': rbacRoleCodes,
+      if (canOpenEntityDocuments != null)
+        'can_open_entity_documents': canOpenEntityDocuments,
     };
   }
 

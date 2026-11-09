@@ -290,6 +290,13 @@
                                 <span class="nav-menu-button-label font-medium text-sm">{{ _('Dashboard') }}</span>
                             </a>
 
+                            {% if current_user_has_role('assignment_documents_uploader') and not (is_system_manager or has_permission('admin.documents.manage')) %}
+                            <a href="{{ url_for('main.documents_submit') }}" class="nav-menu-button group{% if request.endpoint == 'main.documents_submit' %} active{% endif %}" title="{{ _('Documents')|forceescape }}"{% if request.endpoint == 'main.documents_submit' %} aria-current="page"{% endif %}>
+                                {{ svg_icon('document-text', 'w-5 h-5 flex-shrink-0') }}
+                                <span class="nav-menu-button-label font-medium text-sm">{{ _('Documents') }}</span>
+                            </a>
+                            {% endif %}
+
                             <a href="{{ url_for('help_docs.index') }}" class="nav-menu-button group{% if nav_documentation_active %} active{% endif %}" title="{{ _('Documentation')|forceescape }}"{% if nav_documentation_active %} aria-current="page"{% endif %}>
                                 {{ svg_icon('book', 'w-5 h-5 flex-shrink-0') }}
                                 <span class="nav-menu-button-label font-medium text-sm">{{ _('Documentation') }}</span>
@@ -443,6 +450,12 @@
                              {{ svg_icon('home', 'sidebar-icon w-6 h-6 mr-3') }}
                              <span class="sidebar-text">{{ _('Dashboard') }}</span>
                          </a>
+                        {% if current_user_has_role('assignment_documents_uploader') and not (is_system_manager or has_permission('admin.documents.manage')) %}
+                        <a href="{{ url_for('main.documents_submit') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white{% if request.endpoint == 'main.documents_submit' %} active{% endif %}" title="{{ _('Documents')|forceescape }}"{% if request.endpoint == 'main.documents_submit' %} aria-current="page"{% endif %}>
+                             {{ svg_icon('document-text', 'sidebar-icon w-6 h-6 mr-3') }}
+                             <span class="sidebar-text">{{ _('Documents') }}</span>
+                         </a>
+                        {% endif %}
                         <a href="{{ url_for('main.manage_ns_hierarchy') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('NS Structure')|forceescape }}">
                              {{ svg_icon('sitemap', 'sidebar-icon w-6 h-6 mr-3') }}
                              <span class="sidebar-text">{{ _('NS Structure') }}</span>

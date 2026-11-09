@@ -49,10 +49,6 @@
     pin_actions_on_scroll=True
 ) }}
 
-{% if assignment %}
-{% include "admin/assignments/_assignment_status_overview.html" %}
-{% endif %}
-
 {% set resolved_entity_types = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
 {% set has_countries = 'countries' in resolved_entity_types %}
 {% set has_projects = 'projects' in resolved_entity_types %}
@@ -64,7 +60,10 @@
 {% if (not assignment or can_manage_assignment_entities) and (has_countries or has_projects or has_secretariat) %}
 {% set __ = entity_tabs.order.append('add_entities') %}{% endif %}
 {% if (not assignment or can_manage_assignment_entities) and has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
-{% set show_main_tabs = entity_tabs.order|length > 0 %}
+{% set show_status_overview = true if (assignment and assignment_overview) else false %}
+{# Validation errors live on Assignment details; land there so they stay visible. #}
+{% set details_tab_active = (not show_status_overview) or form.errors %}
+{% set show_main_tabs = show_status_overview or (entity_tabs.order|length > 0) %}
 {% set default_add_entities_subtab = 'countries' if has_countries else ('projects' if has_projects else 'secretariat') %}
 {# Determine if we should show sub-tabs within Add Entities: hide if only one sub-tab is available #}
 {% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_projects else 0) + (1 if has_secretariat else 0) %}
@@ -76,12 +75,22 @@
 <div class="bg-white shadow-md border border-gray-200 mb-8">
     {% if show_main_tabs %}
     {% call scroll_tab_bar(inner_id='assignment-main-tabs', aria_label=_('Assignment sections')) %}
+            {% if show_status_overview %}
+            <button type="button" role="tab"
+                    id="assignment-status-overview-tab"
+                    data-tabs-target="#assignment-status-overview-panel"
+                    class="{{ admin_underline_tab_btn_classes(not details_tab_active) }}"
+                    aria-controls="assignment-status-overview-panel"
+                    aria-selected="{{ 'false' if details_tab_active else 'true' }}">
+                <i class="fas fa-chart-bar mr-1.5"></i>{{ _('Status overview') }}
+            </button>
+            {% endif %}
             <button type="button" role="tab"
                     id="assignment-details-tab"
                     data-tabs-target="#assignment-details-panel"
-                    class="{{ admin_underline_tab_btn_classes(true) }}"
+                    class="{{ admin_underline_tab_btn_classes(details_tab_active) }}"
                     aria-controls="assignment-details-panel"
-                    aria-selected="true">
+                    aria-selected="{{ 'true' if details_tab_active else 'false' }}">
                 <i class="fas fa-file-alt mr-1.5"></i>{{ _('Assignment details') }}
             </button>
             {% if assignment and assignment_entities %}
@@ -119,7 +128,12 @@
 
     <div class="p-6">
     <div id="assignment-main-tabs-content">
-        <div id="assignment-details-panel" role="tabpanel" aria-labelledby="assignment-details-tab">
+        {% if show_status_overview %}
+        <div id="assignment-status-overview-panel" role="tabpanel" aria-labelledby="assignment-status-overview-tab"{% if details_tab_active %} class="hidden"{% endif %}>
+            {% include "admin/assignments/_assignment_status_overview.html" %}
+        </div>
+        {% endif %}
+        <div id="assignment-details-panel" role="tabpanel" aria-labelledby="assignment-details-tab"{% if show_main_tabs and not details_tab_active %} class="hidden"{% endif %}>
             <form id="manageAssignmentForm" method="POST" action="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if assignment else url_for('assignment_management.new_assignment') }}">
         {{ form.csrf_token }}
         {% if not assignment and form.confirm_duplicate is defined %}
@@ -651,6 +665,20 @@
                     </div>
                 </div>
                 {% endif %}
+
+                {% if form.enable_offline_download is defined %}
+                <div class="border-t border-gray-200 pt-3" id="assignment-offline-download-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_offline_download(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_offline_download") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_offline_download.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save this form in the mobile app and open it without a connection. Leave this off for assignments that should only be completed online.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -738,6 +766,18 @@
                 <div class="min-w-0 flex-1">
                     {{ form.email_attach_excel.label(class="text-sm font-medium text-gray-800") }}
                     <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach a filled Excel snapshot to those emails. A custom workbook is used when a plugin already has one set up for this assignment; otherwise the generic item-row workbook is used. Independent of the Export Excel button.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.enable_offline_download is defined %}
+            <div class="flex items-start gap-3" id="assignment-offline-download-row">
+                <div class="pt-0.5">
+                    {{ form.enable_offline_download(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_offline_download") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_offline_download.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save this form in the mobile app and open it without a connection. Leave this off for assignments that should only be completed online.') }}</p>
                 </div>
             </div>
             {% endif %}
@@ -1449,6 +1489,7 @@
 <script nonce="{{ csp_nonce() }}">
 window.manageAssignmentConfig = {
     assignmentId: {{ assignment.id if assignment else 'null' }},
+    forceLandingTab: {{ ('assignment-details-panel' if form.errors else none)|tojson }},
     permissions: {
         canEditDetails: {{ can_edit_assignment_details|tojson }},
         canManageEntities: {{ can_manage_assignment_entities|tojson }},

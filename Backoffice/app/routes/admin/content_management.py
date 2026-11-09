@@ -41,7 +41,6 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_server_error
 from app.utils.file_paths import (
     get_resource_upload_path,
-    save_submission_document,
 )
 from app.services.platform import storage_service as storage
 from app.utils.error_handling import handle_json_view_exception, handle_view_exception
@@ -2011,120 +2010,11 @@ def edit_document(doc_id):
             # Handle new document file upload (replace existing file)
             new_doc_file = request.files.get('document')
             if new_doc_file and new_doc_file.filename:
-                _ALLOWED_DOC_EXTS = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv'}
-                _ALLOWED_IMG_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
-                _MAX_FILE_SIZE_MB = 50
+                from app.services.documents.entity_document_edit import replace_submitted_document_file
 
-                new_filename = secure_filename(new_doc_file.filename)
-                file_ext = os.path.splitext(new_filename)[1].lower()
-
-                if file_ext not in _ALLOWED_DOC_EXTS and file_ext not in _ALLOWED_IMG_EXTS:
-                    flash(f"File type '{file_ext}' is not allowed. Allowed types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, and images.", "warning")
-                else:
-                    new_doc_file.seek(0, 2)
-                    file_size = new_doc_file.tell()
-                    new_doc_file.seek(0)
-                    if file_size > _MAX_FILE_SIZE_MB * 1024 * 1024:
-                        flash(f"File too large. Maximum size is {_MAX_FILE_SIZE_MB}MB.", "warning")
-                    else:
-                        old_storage_path = document.storage_path
-                        old_thumb_path = document.thumbnail_relative_path
-                        old_main_cat = storage.submitted_document_rel_storage_category(old_storage_path)
-                        old_thumb_cat = (
-                            storage.submitted_document_rel_storage_category(old_thumb_path)
-                            if old_thumb_path
-                            else None
-                        )
-
-                        can_replace = True
-                        ps_for_replace = None
-                        replace_aes = None
-                        if document.assignment_entity_status_id and document.form_item_id:
-                            replace_aes = document.assignment_entity_status or AssignmentEntityStatus.query.get(
-                                document.assignment_entity_status_id
-                            )
-                            if not replace_aes:
-                                flash("Cannot replace file: assignment record missing.", "warning")
-                                can_replace = False
-                        elif document.public_submission_id and document.form_item_id:
-                            ps_for_replace = PublicSubmission.query.get(document.public_submission_id)
-                            if not ps_for_replace or not ps_for_replace.assigned_form_id:
-                                flash(
-                                    "Cannot replace file: public submission is missing assigned form.",
-                                    "warning",
-                                )
-                                can_replace = False
-                        else:
-                            lib_ent = _standalone_entity_for_library_paths(document)
-                            if not lib_ent:
-                                flash("Cannot replace file: linked entity is unknown.", "warning")
-                                can_replace = False
-
-                        if can_replace:
-                            archive_uuid = str(uuid.uuid4())
-
-                            version_record = {
-                                'filename': document.filename,
-                                'replaced_at': utcnow().isoformat(),
-                            }
-                            try:
-                                arc_rel = f"archive/{archive_uuid}/{os.path.basename(old_storage_path)}"
-                                storage.archive(old_main_cat, old_storage_path, arc_rel)
-                                storage.delete(old_main_cat, old_storage_path)
-                                version_record['storage_path'] = arc_rel
-                            except Exception as e:
-                                current_app.logger.warning(f"[DOCUMENT_EDIT] Could not archive old file: {e}")
-
-                            if old_thumb_path and old_thumb_cat:
-                                try:
-                                    arc_thumb = f"archive/{archive_uuid}/thumbnails/{os.path.basename(old_thumb_path)}"
-                                    storage.archive(old_thumb_cat, old_thumb_path, arc_thumb)
-                                    storage.delete(old_thumb_cat, old_thumb_path)
-                                    version_record['thumbnail_relative_path'] = arc_thumb
-                                except Exception as e:
-                                    current_app.logger.warning(f"[DOCUMENT_EDIT] Could not archive old thumbnail: {e}")
-
-                            versions = list(document.archived_versions or [])
-                            versions.append(version_record)
-                            document.archived_versions = versions
-
-                            new_folder_uuid = str(uuid.uuid4())
-                            if document.assignment_entity_status_id and document.form_item_id and replace_aes:
-                                new_rel_path = save_submission_document(
-                                    new_doc_file,
-                                    document.assignment_entity_status_id,
-                                    new_filename,
-                                    is_public=False,
-                                    entity_type=replace_aes.entity_type,
-                                    entity_id=replace_aes.entity_id,
-                                )
-                            elif document.public_submission_id and document.form_item_id:
-                                new_rel_path = save_submission_document(
-                                    new_doc_file,
-                                    0,
-                                    new_filename,
-                                    is_public=True,
-                                    form_id=ps_for_replace.assigned_form_id,
-                                    submission_id=ps_for_replace.id,
-                                    entity_type="country",
-                                    entity_id=ps_for_replace.country_id,
-                                )
-                            else:
-                                et_slug, eid = _standalone_entity_for_library_paths(document)
-                                new_rel_path = storage.upload(
-                                    storage.ENTITY_REPO_ROOT,
-                                    storage.standalone_entity_file_rel_path(
-                                        et_slug, eid, new_folder_uuid, new_filename
-                                    ),
-                                    new_doc_file,
-                                )
-                            document.filename = new_filename
-                            document.storage_path = new_rel_path
-                            document.thumbnail_filename = None
-                            document.thumbnail_relative_path = None
-                            current_app.logger.info(
-                                f"[DOCUMENT_EDIT] File replaced for document {doc_id}: '{new_filename}' (old archived)"
-                            )
+                _replaced, _replace_warnings = replace_submitted_document_file(document, new_doc_file)
+                for _warning in _replace_warnings:
+                    flash(_warning, "warning")
 
             # Handle thumbnail upload (only when the main file was NOT just replaced —
             # that branch already clears the old thumbnail)

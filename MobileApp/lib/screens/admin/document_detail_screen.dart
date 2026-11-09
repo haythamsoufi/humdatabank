@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../config/app_config.dart';
@@ -11,12 +12,15 @@ import '../../config/routes.dart';
 import '../../di/service_locator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/shared/document.dart';
+import '../../providers/shared/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/mobile_screen_scaffold.dart';
+import '../shared/entity_document_edit_screen.dart';
 import 'submitted_document_preview_screen.dart';
 
 bool _bytesLookLikePdf(List<int> bytes) =>
@@ -293,16 +297,45 @@ class DocumentDetailScreen extends StatefulWidget {
 
 class _DocumentDetailScreenState extends State<DocumentDetailScreen>
     with AdminScreenViewLoggingMixin {
+  late Document _document;
+
   @override
   String get adminScreenViewRoutePath =>
       AppRoutes.documentDetail(widget.document.id);
+
+  @override
+  void initState() {
+    super.initState();
+    _document = widget.document;
+  }
+
+  @override
+  void didUpdateWidget(covariant DocumentDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.document.id != widget.document.id) {
+      _document = widget.document;
+    }
+  }
+
+  Future<void> _openEdit() async {
+    final updated = await Navigator.of(context).push<Document>(
+      MaterialPageRoute<Document>(
+        builder: (_) => EntityDocumentEditScreen(document: _document),
+      ),
+    );
+    if (updated != null && mounted) {
+      setState(() => _document = updated);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final document = widget.document;
+    final document = _document;
+    final canEdit = document.canEdit ||
+        (context.watch<AuthProvider>().user?.isAdmin ?? false);
     final title = document.fileName ?? loc.genericUntitledDocument;
     final uploadedAtLabel = _formatDocumentUploadedAt(context, document.uploadedAt);
     final accent = Color(AppConstants.ifrcRed);
@@ -312,6 +345,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen>
       appBar: AppAppBar(
         title: title,
       ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + bottomInset),
         children: [
@@ -423,11 +457,11 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen>
                     value: uploadedAtLabel,
                   ),
                 ],
-                if (document.assignmentPeriod != null) ...[
+                if ((document.period ?? document.assignmentPeriod) != null) ...[
                   const SizedBox(height: 10),
                   _DetailLine(
-                    label: 'Period',
-                    value: document.assignmentPeriod!,
+                    label: loc.period,
+                    value: (document.period ?? document.assignmentPeriod)!,
                   ),
                 ],
                 const SizedBox(height: 10),
@@ -439,6 +473,22 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen>
             ),
           ),
           const SizedBox(height: 24),
+          if (canEdit) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _openEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: Text(loc.editDocument),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: accent,
+                  side: BorderSide(color: accent),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(

@@ -5,7 +5,7 @@ import '../../providers/admin/admin_dashboard_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../config/app_navigation.dart';
 import '../../config/routes.dart';
-import '../../utils/navigation_helper.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../utils/admin_screen_view_logging_mixin.dart';
 import '../../utils/ios_constants.dart';
 import '../../widgets/bottom_navigation_bar.dart';
@@ -355,11 +355,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   currentIndex: AppBottomNavigationBar.adminTabNavIndex(
                     chatbotEnabled: user?.chatbotEnabled ?? false,
                   ),
+                  selectedTabId: TabIds.admin,
                   chatbotEnabled: user?.chatbotEnabled ?? false,
-                  onTap: (index) {
-                    NavigationHelper.popToMainThenOpenAiIfNeeded(
-                        context, index);
-                  },
                 )
               : null,
         );

@@ -10,6 +10,7 @@ import '../../utils/theme_extensions.dart';
 import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/routes.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/loading_indicator.dart';
 
@@ -214,6 +215,7 @@ class _QuizGameScreenState extends State<QuizGameScreen>
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       extendBodyBehindAppBar: true,
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: Stack(
         children: [
           // Main content

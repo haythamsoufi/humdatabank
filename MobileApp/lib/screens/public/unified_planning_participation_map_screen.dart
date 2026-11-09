@@ -13,6 +13,7 @@ import '../../theme/grouped_sheet_style.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/home_landing/fdrs_world_map.dart';
 import '../../widgets/home_landing/world_geojson_cache.dart';
@@ -279,6 +280,7 @@ class _UnifiedPlanningParticipationMapScreenState
           ),
           automaticallyImplyLeading: false,
         ),
+        bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
         body: AppLoadingIndicator(color: theme.colorScheme.primary),
       );
     }
@@ -345,6 +347,7 @@ class _UnifiedPlanningParticipationMapScreenState
           ),
         ],
       ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

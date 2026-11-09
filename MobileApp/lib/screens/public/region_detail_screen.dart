@@ -16,6 +16,7 @@ import '../../utils/theme_extensions.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/mobile_screen_scaffold.dart';
+import '../../widgets/public/go_operations_section.dart';
 import '../../widgets/public/indicator_trend.dart';
 
 /// Native regional analysis: key indicators summed across the region, trend and top countries.
@@ -44,6 +45,9 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
   String? _error;
   String? _loadedLanguage;
   String? _selectedKey;
+  GoOperationsSnapshot? _operations;
+  bool _operationsFailed = false;
+  int _operationsRequest = 0;
 
   @override
   void initState() {
@@ -71,6 +75,8 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
+      _operations = null;
+      _operationsFailed = false;
     });
 
     try {
@@ -105,6 +111,7 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
         _selectedKey = _firstAvailableKey(profile);
         _isLoading = false;
       });
+      _loadOperations();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -112,6 +119,41 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadOperations() async {
+    final request = ++_operationsRequest;
+    try {
+      final response = await _apiService.get(
+        '${AppConfig.mobileRegionProfileEndpoint}/${Uri.encodeComponent(widget.regionSlug)}/operations',
+        includeAuth: false,
+      );
+      if (!mounted || request != _operationsRequest) return;
+      final decoded = response.statusCode == 200 ? jsonDecode(response.body) : null;
+      final data = decoded is Map ? decoded['data'] : null;
+      if (data is! Map) {
+        setState(() => _operationsFailed = true);
+        return;
+      }
+      setState(() {
+        _operations = GoOperationsSnapshot.fromJson(Map<String, dynamic>.from(data));
+        _operationsFailed = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _operationsRequest) return;
+      setState(() => _operationsFailed = true);
+    }
+  }
+
+  Widget _operationsSection(AppLocalizations loc) {
+    return GoOperationsSection(
+      title: loc.regionOperationsTitle,
+      snapshot: _operations,
+      loading: _operations == null && !_operationsFailed,
+      failed: _operationsFailed,
+      onRetry: _loadOperations,
+      showCountries: true,
+    );
   }
 
   String? _firstAvailableKey(RegionProfile profile) {
@@ -135,9 +177,7 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
 
     return MobileScreenScaffold(
       safeArea: false,
-      bottomNavigationBar: const AppBottomNavigationBar(
-        currentIndex: AppBottomNavigationBar.noTabSelected,
-      ),
+      bottomNavigationBar: AppBottomNavigationBar.shellTabBar,
       body: HeroScreenFrame(
         heroVisible: _profile != null && _error == null && !_isLoading,
         child: ColoredBox(
@@ -256,6 +296,10 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
         children: [
           _buildHero(context, loc),
           Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _operationsSection(loc),
+          ),
+          Padding(
             padding: const EdgeInsets.all(24),
             child: Center(
               child: Text(
@@ -282,6 +326,8 @@ class _RegionDetailScreenState extends State<RegionDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _operationsSection(loc),
+              const SizedBox(height: 24),
               _buildKeyFigures(profile, loc),
               const SizedBox(height: 24),
               KeyIndicatorSelector(

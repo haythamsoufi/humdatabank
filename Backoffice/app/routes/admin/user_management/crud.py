@@ -757,19 +757,6 @@ def new_user():
     if not can_assign_rbac_roles:
         form.rbac_roles.choices = []
     else:
-        # Hide deprecated upload-only role: document upload is part of Editor & Submitter.
-        # The role exists for backward compatibility but should not be assigned directly.
-        try:
-            deprecated = RbacRole.query.filter_by(code="assignment_documents_uploader").first()
-            if deprecated:
-                form.rbac_roles.choices = [
-                    (rid, label)
-                    for (rid, label) in (form.rbac_roles.choices or [])
-                    if int(rid) != int(deprecated.id)
-                ]
-        except Exception as e:
-            current_app.logger.debug("deprecated role filter failed: %s", e)
-
         # Non-system-managers can only assign admin roles they already have.
         # (They may still assign non-admin roles like assignment_* as needed.)
         if not current_is_sys_mgr and (form.rbac_roles.choices or []):
@@ -874,12 +861,11 @@ def new_user():
                         requested_role_ids = list(form.rbac_roles.data or [])
                         if (not current_is_sys_mgr) and restricted_role_ids:
                             requested_role_ids = [rid for rid in requested_role_ids if int(rid) not in restricted_role_ids]
-                        # Backend enforcement: role_type defaults + drop deprecated upload-only role.
+                        # Backend enforcement: role_type defaults (focal point vs admin).
                         role_type = request.form.get("role_type")
                         requested_role_ids = _apply_role_type_and_implications(
                             requested_role_ids,
                             role_type=role_type,
-                            drop_role_codes={"assignment_documents_uploader"},
                         )
                         if not current_is_sys_mgr:
                             requested_role_ids, dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)
@@ -1090,18 +1076,6 @@ def edit_user(user_id):
     if not can_assign_rbac_roles and not roles_read_only:
         form.rbac_roles.choices = []
     else:
-        # Hide deprecated upload-only role: document upload is part of Editor & Submitter.
-        try:
-            deprecated = RbacRole.query.filter_by(code="assignment_documents_uploader").first()
-            if deprecated:
-                form.rbac_roles.choices = [
-                    (rid, label)
-                    for (rid, label) in (form.rbac_roles.choices or [])
-                    if int(rid) != int(deprecated.id)
-                ]
-        except Exception as e:
-            current_app.logger.debug("deprecated role filter failed: %s", e)
-
         # Non-system-managers can only assign admin roles they already have.
         if (not current_is_sys_mgr) and can_assign_rbac_roles and (form.rbac_roles.choices or []):
             form.rbac_roles.choices = _filter_role_choices_for_actor(form.rbac_roles.choices, current_user)
@@ -1191,12 +1165,11 @@ def edit_user(user_id):
                 requested_role_ids = list(form.rbac_roles.data or [])
                 if (not current_is_sys_mgr) and restricted_role_ids:
                     requested_role_ids = [rid for rid in requested_role_ids if int(rid) not in restricted_role_ids]
-                # Backend enforcement: role_type defaults + drop deprecated upload-only role.
+                # Backend enforcement: role_type defaults (focal point vs admin).
                 role_type = request.form.get("role_type")
                 requested_role_ids = _apply_role_type_and_implications(
                     requested_role_ids,
                     role_type=role_type,
-                    drop_role_codes={"assignment_documents_uploader"},
                 )
                 if not current_is_sys_mgr:
                     requested_role_ids, dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)

@@ -14,6 +14,7 @@ void main() {
         'profile_color': '#ff0000',
         'country_ids': [1, 2, 3],
         'ai_beta_tester': true,
+        'ai_beta_restricted': true,
       };
 
       final user = User.fromJson(json);
@@ -27,6 +28,8 @@ void main() {
       expect(user.profileColor, '#ff0000');
       expect(user.countryIds, [1, 2, 3]);
       expect(user.aiBetaTester, true);
+      expect(user.aiBetaRestricted, true);
+      expect(user.aiBetaAccessLocked, false);
     });
 
     test('applies defaults for missing required-like fields', () {
@@ -37,6 +40,8 @@ void main() {
       expect(user.role, 'focal_point');
       expect(user.chatbotEnabled, false);
       expect(user.aiBetaTester, false);
+      expect(user.aiBetaRestricted, false);
+      expect(user.aiBetaAccessLocked, false);
     });
 
     test('leaves optional fields null when absent', () {
@@ -59,6 +64,31 @@ void main() {
       expect(user.countryIds, isEmpty);
     });
 
+    test('locks chat only when beta is restricted and the user is not a tester', () {
+      final locked = User.fromJson({
+        'id': 1,
+        'email': 'x@y.z',
+        'ai_beta_restricted': true,
+        'ai_beta_tester': false,
+      });
+      final allowed = User.fromJson({
+        'id': 1,
+        'email': 'x@y.z',
+        'ai_beta_restricted': true,
+        'ai_beta_tester': true,
+      });
+      final unrestricted = User.fromJson({
+        'id': 1,
+        'email': 'x@y.z',
+        'ai_beta_restricted': false,
+        'ai_beta_tester': false,
+      });
+
+      expect(locked.aiBetaAccessLocked, true);
+      expect(allowed.aiBetaAccessLocked, false);
+      expect(unrestricted.aiBetaAccessLocked, false);
+    });
+
     test('ai_beta_tester is false when value is non-boolean truthy', () {
       final user = User.fromJson({
         'id': 1,
@@ -67,6 +97,43 @@ void main() {
       });
 
       expect(user.aiBetaTester, false);
+    });
+
+    test('parses rbac_roles and flags document repository access', () {
+      final user = User.fromJson({
+        'id': 1,
+        'email': 'focal@example.org',
+        'rbac_roles': [
+          {'code': 'assignment_editor_submitter'},
+          {'code': 'assignment_documents_uploader'},
+        ],
+      });
+
+      expect(user.rbacRoleCodes, [
+        'assignment_editor_submitter',
+        'assignment_documents_uploader',
+      ]);
+      expect(user.canOpenEntityDocumentRepository, isTrue);
+    });
+
+    test('can_open_entity_documents from server overrides rbac list', () {
+      final withoutRole = User.fromJson({
+        'id': 1,
+        'email': 'focal@example.org',
+        'can_open_entity_documents': true,
+        'rbac_roles': [],
+      });
+      expect(withoutRole.canOpenEntityDocumentRepository, isTrue);
+
+      final denied = User.fromJson({
+        'id': 1,
+        'email': 'focal@example.org',
+        'can_open_entity_documents': false,
+        'rbac_roles': [
+          {'code': 'assignment_documents_uploader'},
+        ],
+      });
+      expect(denied.canOpenEntityDocumentRepository, isFalse);
     });
   });
 
@@ -80,6 +147,7 @@ void main() {
         chatbotEnabled: true,
         countryIds: [10],
         aiBetaTester: true,
+        aiBetaRestricted: true,
       );
 
       final json = user.toJson();
@@ -90,6 +158,7 @@ void main() {
       expect(json['chatbot_enabled'], true);
       expect(json['country_ids'], [10]);
       expect(json['ai_beta_tester'], true);
+      expect(json['ai_beta_restricted'], true);
     });
 
     test('includes null values for unset optional fields', () {
@@ -115,6 +184,7 @@ void main() {
         'profile_color': '#abcdef',
         'country_ids': [4, 5, 6],
         'ai_beta_tester': true,
+        'ai_beta_restricted': false,
       };
 
       final user1 = User.fromJson(original);
@@ -130,6 +200,8 @@ void main() {
       expect(user2.profileColor, user1.profileColor);
       expect(user2.countryIds, user1.countryIds);
       expect(user2.aiBetaTester, user1.aiBetaTester);
+      expect(user2.aiBetaRestricted, user1.aiBetaRestricted);
+      expect(user2.aiBetaAccessLocked, user1.aiBetaAccessLocked);
     });
 
     test('round-trip with minimal fields', () {

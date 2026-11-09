@@ -18,8 +18,9 @@ class IOSColors {
   static const Color systemGray5 = Color(0xFFE5E5EA);
   static const Color systemGray6 = Color(0xFFF2F2F7);
 
-  // System Green (Success)
+  // System Green — iPhone switch on-state (light / dark).
   static const Color systemGreen = Color(0xFF34C759);
+  static const Color systemGreenDark = Color(0xFF30D158);
 
   // System Red (Error)
   static const Color systemRed = Color(0xFFFF3B30);
@@ -43,6 +44,11 @@ class IOSColors {
   /// Get theme-aware system blue
   static Color getSystemBlue(BuildContext context) {
     return context.isDarkTheme ? systemBlueDark : systemBlue;
+  }
+
+  /// iPhone switch green.
+  static Color getSystemGreen(BuildContext context) {
+    return context.isDarkTheme ? systemGreenDark : systemGreen;
   }
 
   /// Get theme-aware grouped background

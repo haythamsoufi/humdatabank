@@ -552,8 +552,8 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
         {
             "code": "assignment_editor_submitter",
             "name": "Assignment Editor & Submitter",
-            "description": "Can enter data and submit assignments (no approval powers).",
-            "permission_codes": ["assignment.view", "assignment.enter", "assignment.submit", "assignment.documents.upload"],
+            "description": "Can enter data and submit assignments (no approval powers). Document upload is the separate Documents (Upload) role.",
+            "permission_codes": ["assignment.view", "assignment.enter", "assignment.submit"],
         },
         {
             "code": "assignment_documents_uploader",

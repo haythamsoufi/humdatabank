@@ -685,6 +685,26 @@ def user_has_ai_beta_access(user) -> bool:
     return uid in set(get_ai_beta_allowed_user_ids())
 
 
+def ai_beta_client_flags(user) -> Dict[str, bool]:
+    """Flags clients use to lock AI when beta access is restricted.
+
+    ``ai_beta_restricted`` is the server toggle.
+    ``ai_beta_tester`` is true only when that toggle is on and this user is allow-listed.
+    A client locks chat when restricted is true and tester is false.
+    """
+    try:
+        restricted = bool(is_ai_beta_restricted())
+        tester = bool(user_is_explicit_beta_tester(user)) if restricted else False
+    except Exception as e:
+        logger.debug("ai_beta_client_flags failed: %s", e)
+        restricted = False
+        tester = False
+    return {
+        "ai_beta_restricted": restricted,
+        "ai_beta_tester": tester,
+    }
+
+
 def user_is_explicit_beta_tester(user) -> bool:
     """Return True for users explicitly in the AI beta allow-list when beta mode is ON.
 

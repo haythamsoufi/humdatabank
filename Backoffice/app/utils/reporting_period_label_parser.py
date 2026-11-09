@@ -1,7 +1,11 @@
 """Parse human period labels into typed bounds.
 
-Used only by maintenance scripts to seed the reporting_period catalog.
-Runtime application code must read bounds from the catalog / assigned_form dates.
+``parse_structured_period_label`` accepts the labels the assignment period
+picker produces (single year, year range, month range). Admin save uses it to
+create the catalog row, then copies those bounds onto the assignment.
+
+``parse_period_label`` is the looser parser used by maintenance scripts. It
+also treats other text that contains a year as an annual or custom span.
 """
 
 from __future__ import annotations
@@ -28,6 +32,12 @@ _MONTH_RANGE_SAME_YEAR_RE = re.compile(
     rf"(?P<sm>{_MONTH_TOKEN})\s*[-–]\s*(?P<em>{_MONTH_TOKEN})\s+(?P<y>\d{{4}})",
     re.IGNORECASE,
 )
+_SINGLE_MONTH_RE = re.compile(
+    rf"(?P<m>{_MONTH_TOKEN})\s+(?P<y>\d{{4}})",
+    re.IGNORECASE,
+)
+_SINGLE_YEAR_RE = re.compile(r"\d{4}")
+_YEAR_RANGE_RE = re.compile(r"\d{4}-\d{4}")
 _MONTH_ALIASES = {
     "jan": 1,
     "january": 1,
@@ -110,6 +120,37 @@ def _try_parse_month_range(raw: str) -> Optional[PeriodBounds]:
     return None
 
 
+def _try_parse_single_month(raw: str) -> Optional[PeriodBounds]:
+    match = _SINGLE_MONTH_RE.fullmatch(raw.strip())
+    if not match:
+        return None
+    month = _month_token_to_number(match.group("m"))
+    if not month:
+        return None
+    year = int(match.group("y"))
+    return _month_range_bounds(month, year, month, year)
+
+
+def parse_structured_period_label(period_name: str) -> Optional[PeriodBounds]:
+    """Parse a period-picker label into (period_type, period_start, period_end).
+
+    Accepts only the exact labels the admin form generates:
+    ``2027``, ``2024-2025``, ``Jan 2024``, ``Jan-Jun 2024``, ``Jan 2024-Mar 2025``.
+    Other text, including a label that merely contains a year, returns None.
+    """
+    raw = (period_name or "").strip()
+    if not raw:
+        return None
+    if _SINGLE_YEAR_RE.fullmatch(raw) or _YEAR_RANGE_RE.fullmatch(raw):
+        return parse_period_label(raw)
+    if (
+        _MONTH_YEAR_PAIR_RANGE_RE.fullmatch(raw)
+        or _MONTH_RANGE_SAME_YEAR_RE.fullmatch(raw)
+    ):
+        return _try_parse_month_range(raw)
+    return _try_parse_single_month(raw)
+
+
 def parse_period_label(period_name: str) -> Optional[PeriodBounds]:
     """Parse a human period label into (period_type, period_start, period_end)."""
     raw = (period_name or "").strip()
@@ -123,6 +164,10 @@ def parse_period_label(period_name: str) -> Optional[PeriodBounds]:
     month_range = _try_parse_month_range(raw)
     if month_range is not None:
         return month_range
+
+    single_month = _try_parse_single_month(raw)
+    if single_month is not None:
+        return single_month
 
     if len(years) == 1:
         year = years[0]

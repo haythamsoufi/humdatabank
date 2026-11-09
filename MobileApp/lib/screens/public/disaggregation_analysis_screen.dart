@@ -10,7 +10,6 @@ import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../providers/shared/tab_customization_provider.dart';
 import '../../services/disaggregation_data_service.dart';
-import '../../utils/navigation_helper.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
@@ -230,30 +229,12 @@ class _DisaggregationAnalysisScreenState
         child: _buildBody(loc, theme, bottomPad),
       ),
       bottomNavigationBar: isStandalone
-          ? Consumer2<AuthProvider, TabCustomizationProvider>(
-              builder: (context, auth, tabs, _) {
-                final user = auth.user;
-                final chatbot = user?.chatbotEnabled ?? false;
-                final analysisIndex = tabs.indexOfTab(
-                  TabIds.analysis,
-                  isAdmin: user?.isAdmin ?? false,
-                  isAuthenticated: auth.isAuthenticated,
-                  isFocalPoint: user?.isFocalPoint ?? false,
-                  chatbotEnabled: chatbot,
-                );
-                return DrawerAwareBottomBar(
-                  hidden: _sideDrawerOpen,
-                  child: AppBottomNavigationBar(
-                    currentIndex: analysisIndex >= 0 ? analysisIndex : 0,
-                    onTap: (index) {
-                      NavigationHelper.popToMainThenOpenAiIfNeeded(
-                        context,
-                        index,
-                      );
-                    },
-                  ),
-                );
-              },
+          ? DrawerAwareBottomBar(
+              hidden: _sideDrawerOpen,
+              child: const AppBottomNavigationBar(
+                currentIndex: AppBottomNavigationBar.noTabSelected,
+                selectedTabId: TabIds.analysis,
+              ),
             )
           : null,
     );

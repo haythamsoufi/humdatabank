@@ -13,6 +13,7 @@ import '../../utils/network_availability.dart';
 import '../../utils/ios_constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
+import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/mobile_screen_scaffold.dart';
@@ -409,24 +410,27 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
 
     return MobileScreenScaffold(
       appBar: AppAppBar(title: title),
-      bottomNavigationBar: detail != null && dirty
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: FilledButton.icon(
-                  onPressed: _saving ? null : () => _confirmSave(context, loc, detail),
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(loc.adminUserDetailSaveChanges),
-                ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (detail != null && dirty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: FilledButton.icon(
+                onPressed: _saving ? null : () => _confirmSave(context, loc, detail),
+                icon: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(loc.adminUserDetailSaveChanges),
               ),
-            )
-          : null,
+            ),
+          AppBottomNavigationBar.shellTabBar,
+        ],
+      ),
       body: _loading && detail == null
           ? AppLoadingIndicator(message: loc.loadingUserProfile)
           : _error != null && detail == null

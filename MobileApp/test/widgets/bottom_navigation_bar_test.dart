@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hum_databank_app/l10n/app_localizations.dart';
 import 'package:hum_databank_app/providers/shared/tab_customization_provider.dart';
+import 'package:hum_databank_app/utils/navigation_helper.dart';
 import 'package:hum_databank_app/utils/theme.dart';
 import 'package:hum_databank_app/widgets/bottom_navigation_bar.dart';
 
@@ -159,5 +160,42 @@ void main() {
     );
     expect(icon.localToGlobal(Offset.zero).dx, greaterThan(47));
     expect(pillRect.left, greaterThan(47));
+  });
+
+  testWidgets('pushed screens keep the shell tab highlighted', (tester) async {
+    NavigationHelper.activeShellTabId = TabIds.home;
+    addTearDown(() => NavigationHelper.activeShellTabId = null);
+
+    Future<void> pump({bool inherit = true, String? selectedTabId}) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme(),
+          localizationsDelegates: const [AppLocalizations.delegate],
+          supportedLocales: const [Locale('en')],
+          home: Scaffold(
+            body: const SizedBox.shrink(),
+            bottomNavigationBar: AppBottomNavigationBar(
+              currentIndex: AppBottomNavigationBar.noTabSelected,
+              inheritShellHighlight: inherit,
+              selectedTabId: selectedTabId,
+              visibleTabs: _tabs,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    await pump();
+    expect(find.byIcon(Icons.home_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.home_outlined), findsNothing);
+
+    await pump(inherit: false);
+    expect(find.byIcon(Icons.home_rounded), findsNothing);
+    expect(find.byIcon(Icons.home_outlined), findsOneWidget);
+
+    // A parent tab that is not in the bar falls back to the shell tab.
+    await pump(selectedTabId: TabIds.countries);
+    expect(find.byIcon(Icons.home_rounded), findsOneWidget);
   });
 }

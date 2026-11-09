@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/shared/notification_provider.dart';
 import '../../providers/shared/auth_provider.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
@@ -1048,13 +1049,10 @@ class _NotificationPreferencesScreenState
           final user = authProvider.user;
           final isAdmin = user?.isAdmin ?? false;
 
-          // For admin users, notifications is at index 0
-          // For non-admin, we use -1 to indicate no tab is active
-          // The default navigation behavior will handle tab switching from nested screens
           return AppBottomNavigationBar(
             currentIndex: isAdmin ? 0 : -1,
+            selectedTabId: TabIds.notifications,
             chatbotEnabled: user?.chatbotEnabled ?? false,
-            // onTap is optional - if not provided, uses NavigationHelper.navigateToMainTab by default
           );
         },
       ),

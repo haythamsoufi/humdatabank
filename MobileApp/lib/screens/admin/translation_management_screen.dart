@@ -5,6 +5,7 @@ import '../../providers/shared/auth_provider.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
+import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../config/routes.dart';
 import '../../utils/constants.dart';
@@ -454,12 +455,8 @@ class _TranslationManagementScreenState extends State<TranslationManagementScree
         currentIndex: AppBottomNavigationBar.adminTabNavIndex(
           chatbotEnabled: chatbot,
         ),
+        selectedTabId: TabIds.admin,
         chatbotEnabled: chatbot,
-        onTap: (index) {
-          Navigator.of(context).popUntil((route) {
-            return route.isFirst || route.settings.name == AppRoutes.dashboard;
-          });
-        },
       ),
     );
   }

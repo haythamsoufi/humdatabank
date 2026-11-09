@@ -418,6 +418,18 @@ def list_documents():
     )
 
 
+def _missing_submitted_file_message(document, user_msg: str | None) -> str:
+    """Message when bytes are still absent after an on-demand fetch attempt."""
+    if user_msg:
+        return user_msg
+    if getattr(document, 'source_url', None) or getattr(document, 'fdrs_import_key', None):
+        return (
+            'This document is not stored locally yet (FDRS import could not download the file). '
+            'Re-run FDRS sync after IFRC enables document URLs, or upload the file manually.'
+        )
+    return 'File not found on server'
+
+
 @mobile_bp.route('/admin/content/documents/<int:document_id>/file', methods=['GET'])
 @mobile_auth_required
 def get_submitted_document_file(document_id):
@@ -426,16 +438,16 @@ def get_submitted_document_file(document_id):
     Query ``attachment=1`` (or ``true`` / ``yes``) sets ``Content-Disposition``
     to attachment for save/share clients; default is inline for in-app preview.
 
+    Path resolution and on-demand FDRS fetch match the web download route.
     Authorization matches the web download rules (admin document managers or
     focal points with entity access via ``_check_document_access``).
     """
     import mimetypes
 
+    from werkzeug.exceptions import NotFound
+
     from app.models import SubmittedDocument
-    from app.routes.admin.content_management import (
-        _check_document_access,
-        _storage_category_for_submitted_document,
-    )
+    from app.routes.admin.content_management import _check_document_access
     from app.services.platform import storage_service as storage
 
     document = db.session.get(SubmittedDocument, document_id)
@@ -447,21 +459,33 @@ def get_submitted_document_file(document_id):
         return mobile_forbidden(msg or 'Access denied')
 
     try:
-        main_cat = _storage_category_for_submitted_document(document)
-        if not storage.exists(main_cat, document.storage_path):
-            return mobile_not_found('File not found on server')
+        storage_path = (document.storage_path or '').strip()
+        has_local_file = bool(storage_path and storage.submitted_source_exists(storage_path))
+        user_msg = None
+        if not has_local_file:
+            manager = getattr(current_app, 'plugin_manager', None)
+            materialized, user_msg = (
+                manager.materialize_document(document) if manager is not None else (False, None)
+            )
+            storage_path = (document.storage_path or '').strip()
+            has_local_file = materialized or bool(
+                storage_path and storage.submitted_source_exists(storage_path)
+            )
+        if not has_local_file:
+            return mobile_not_found(_missing_submitted_file_message(document, user_msg))
 
         guessed, _ = mimetypes.guess_type(document.filename or '')
         mimetype = guessed or 'application/octet-stream'
         raw_attachment = (request.args.get('attachment') or '').strip().lower()
         as_attachment = raw_attachment in {'1', 'true', 'yes'}
-        return storage.stream_response(
-            main_cat,
-            document.storage_path,
+        return storage.stream_submitted_document_response(
+            storage_path,
             filename=document.filename or f'document_{document_id}',
             mimetype=mimetype,
             as_attachment=as_attachment,
         )
+    except NotFound:
+        return mobile_not_found('File not found on server')
     except Exception as e:
         current_app.logger.error('get_submitted_document_file: %s', e, exc_info=True)
         return mobile_server_error()

@@ -277,13 +277,7 @@ def get_current_user_profile():
                 current_app.logger.warning(f"Error extracting country IDs: {e}")
                 country_ids = []
 
-        try:
-            from app.services.platform.app_settings_service import user_is_explicit_beta_tester
-
-            _ai_beta_tester_badge = bool(user_is_explicit_beta_tester(user))
-        except Exception as e:
-            current_app.logger.debug("ai_beta_tester flag omitted from profile: %s", e)
-            _ai_beta_tester_badge = False
+        from app.services.platform.app_settings_service import ai_beta_client_flags
 
         profile_data = {
             'id': user.id,
@@ -293,8 +287,8 @@ def get_current_user_profile():
             'chatbot_enabled': getattr(user, 'chatbot_enabled', True),
             'profile_color': getattr(user, 'profile_color', None),
             'country_ids': country_ids,
-            'ai_beta_tester': _ai_beta_tester_badge,
         }
+        profile_data.update(ai_beta_client_flags(user))
 
         # Include RBAC roles
         try:
@@ -425,14 +419,7 @@ def update_current_user_profile():
                 current_app.logger.warning(f"Error extracting country IDs: {e}")
                 country_ids = []
 
-        # Return updated profile
-        try:
-            from app.services.platform.app_settings_service import user_is_explicit_beta_tester
-
-            _ai_beta_tester_badge = bool(user_is_explicit_beta_tester(user))
-        except Exception as e:
-            current_app.logger.debug("ai_beta_tester flag omitted from profile update: %s", e)
-            _ai_beta_tester_badge = False
+        from app.services.platform.app_settings_service import ai_beta_client_flags
 
         profile_data = {
             'id': user.id,
@@ -442,9 +429,9 @@ def update_current_user_profile():
             'chatbot_enabled': getattr(user, 'chatbot_enabled', True),
             'profile_color': getattr(user, 'profile_color', None),
             'country_ids': country_ids,
-            'ai_beta_tester': _ai_beta_tester_badge,
             'message': 'Profile updated successfully'
         }
+        profile_data.update(ai_beta_client_flags(user))
 
         # Include RBAC roles
         try:
@@ -825,6 +812,9 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
             if pub_latest_at
             else None,
             'form_definition_updated_at': form_definition_updated_at,
+            'enable_offline_download': bool(
+                assigned_form and getattr(assigned_form, 'enable_offline_download', False)
+            ),
             'template_id': template_id,
             'static_version': static_version,
             'data_version': _assignment_data_version(

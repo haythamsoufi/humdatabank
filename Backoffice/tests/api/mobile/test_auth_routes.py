@@ -321,3 +321,5 @@ class TestMobileAuthRoutesExtended:
         user = body['data']['user']
         assert 'rbac_roles' in user
         assert 'role' in user
+        assert 'can_open_entity_documents' in user
+        assert isinstance(user['can_open_entity_documents'], bool)

@@ -289,6 +289,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   key: ValueKey(_getStartedEpoch),
                                   l10n: localizations,
                                   locale: language,
+                                  forcePrefetch: _getStartedEpoch > 0,
                                   shortcuts:
                                       _buildShortcuts(context, localizations),
                                 ),

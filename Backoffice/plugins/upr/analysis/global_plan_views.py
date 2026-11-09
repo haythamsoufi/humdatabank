@@ -90,6 +90,88 @@ def _area_name(code: str, area_labels: Mapping[str, str]) -> str:
     return str(area_labels.get(code) or code)
 
 
+# NSIF focus, then the rest. Shared by the two-slice pies.
+SLICE_COLORS = (COLORS["navy"], COLORS["amber"])
+
+
+def _theme_series(rows: list[Mapping[str, Any]], area_labels: Mapping[str, str], fmt: str) -> list[dict[str, Any]]:
+    return [
+        series(
+            _area_name(area, area_labels),
+            [r.get(area) for r in rows],
+            kind="column",
+            color=THEME_COLORS.get(area, COLORS["grey"]),
+            fmt=fmt,
+        )
+        for area in THEME_CODES
+        if any(r.get(area) for r in rows)
+    ]
+
+
+def _two_slice_pie(names: list[str], values: list[Any], *, series_name: str, fmt: str, height: int = 280) -> dict[str, Any]:
+    return chart(
+        names,
+        [series(series_name, values, kind="pie", color=SLICE_COLORS[0], fmt=fmt)],
+        axes={"primary": axis(fmt)},
+        pie=True,
+        colors=list(SLICE_COLORS),
+        height=height,
+    )
+
+
+def _region_composition(
+    visual_id: str,
+    title: str,
+    hint: str,
+    rows: list[Mapping[str, Any]],
+    area_labels: Mapping[str, str],
+    labels: Mapping[str, str],
+    *,
+    fmt: str,
+    height: int,
+) -> dict[str, Any]:
+    """100% stacked bars (share of each region), with a values toggle for the same stack."""
+    table_spec = table(
+        title,
+        [labels["gp_col_region"], *[_area_name(a, area_labels) for a in THEME_CODES]],
+        plain_rows([[r.get("key"), *[r.get(a) for a in THEME_CODES]] for r in rows]),
+    )
+    series_list = _theme_series(rows, area_labels, fmt)
+    if not series_list:
+        return visual(
+            visual_id,
+            title,
+            hint,
+            chart=chart([], [], axes={"primary": axis(fmt)}),
+            table=table_spec,
+        )
+    categories = [str(r.get("key") or "") for r in rows]
+    share = chart(
+        categories,
+        series_list,
+        axes={"primary": axis(fmt)},
+        stacked=True,
+        stack_type="100%",
+        horizontal=True,
+        height=height,
+    )
+    amounts = chart(
+        categories,
+        series_list,
+        axes={"primary": axis(fmt)},
+        stacked=True,
+        horizontal=True,
+        height=height,
+    )
+    built = visual(visual_id, title, hint, chart=share, table=table_spec)
+    built["modes"] = [
+        {"id": "share", "label": labels["gp_mode_share"], "chart": share},
+        {"id": "values", "label": labels["gp_mode_values"], "chart": amounts},
+    ]
+    built["modes_label"] = labels["gp_chart_mode"]
+    return built
+
+
 def _kpi(kpi_id: str, label: str, value: Any, fmt: str, labels: Mapping[str, str], year: Any = None) -> dict[str, Any]:
     delta = {"latest": value, "latest_year": year} if year is not None else None
     return kpi(kpi_id, label, value, fmt, delta, labels)
@@ -296,35 +378,26 @@ def _overview(payload, labels, year, area_labels):
     )
 
     nsif_share = (payload.get("secretariat") or {}).get("nsif_share") or {}
+    countries = payload.get("countries") or []
+    nsif_count = sum(1 for c in countries if c.get("nsif") and c.get("plan_submitted"))
+    other_count = sum(1 for c in countries if not c.get("nsif") and c.get("plan_submitted"))
     submit_visual = visual(
         "gp_submit_priority",
         labels["gp_submit_title"],
         labels["gp_submit_hint"],
-        chart=chart(
+        chart=_two_slice_pie(
             [labels["gp_nsif"], labels["gp_other"]],
-            [
-                series(
-                    labels["gp_kpi_countries"],
-                    [
-                        sum(1 for c in payload.get("countries") or [] if c.get("nsif") and c.get("plan_submitted")),
-                        sum(1 for c in payload.get("countries") or [] if not c.get("nsif") and c.get("plan_submitted")),
-                    ],
-                    kind="column",
-                    color=COLORS["navy"],
-                    fmt="int",
-                )
-            ],
-            axes={"primary": axis("int")},
-            legend=False,
-            height=260,
+            [nsif_count, other_count],
+            series_name=labels["gp_kpi_countries"],
+            fmt="int",
         ),
         table=table(
             labels["gp_submit_title"],
             [labels["gp_col_group"], labels["gp_kpi_countries"], labels["gp_col_fr"]],
             plain_rows(
                 [
-                    [labels["gp_nsif"], None, nsif_share.get("nsif")],
-                    [labels["gp_other"], None, nsif_share.get("other")],
+                    [labels["gp_nsif"], nsif_count, nsif_share.get("nsif")],
+                    [labels["gp_other"], other_count, nsif_share.get("other")],
                 ]
             ),
         ),
@@ -402,20 +475,11 @@ def _secretariat(payload, labels, year, area_labels):
         "gp_sec_share",
         labels["gp_sec_share_title"],
         labels["gp_sec_share_hint"],
-        chart=chart(
+        chart=_two_slice_pie(
             [labels["gp_nsif"], labels["gp_other"]],
-            [
-                series(
-                    labels["gp_col_fr"],
-                    [share.get("nsif"), share.get("other")],
-                    kind="column",
-                    color=COLORS["amber"],
-                    fmt="money",
-                )
-            ],
-            axes={"primary": axis("money")},
-            legend=False,
-            height=260,
+            [share.get("nsif"), share.get("other")],
+            series_name=labels["gp_col_fr"],
+            fmt="money",
         ),
     )
     return kpis, [theme_visual, top_visual, share_visual], [labels["gp_note_live"]]
@@ -664,34 +728,15 @@ def _geo(payload, labels, year, area_labels):
     kpis = [
         _kpi("geo_nsif", labels["gp_kpi_nsif_countries"], len([c for c in payload.get("countries") or [] if c.get("nsif")]), "int", labels, year),
     ]
-    regional = visual(
+    regional = _region_composition(
         "gp_geo_region",
         fill(labels["gp_geo_title"], year=year or ""),
         labels["gp_geo_hint"],
-        chart=chart(
-            [r.get("key") for r in rows],
-            [
-                series(
-                    _area_name(area, area_labels),
-                    [r.get(area) for r in rows],
-                    kind="column",
-                    color=THEME_COLORS.get(area, COLORS["grey"]),
-                    fmt="money",
-                )
-                for area in THEME_CODES
-                if any(r.get(area) for r in rows)
-            ],
-            axes={"primary": axis("money")},
-            stacked=True,
-            height=340,
-        )
-        if rows
-        else chart([], [], axes={"primary": axis("money")}),
-        table=table(
-            fill(labels["gp_geo_title"], year=year or ""),
-            [labels["gp_col_region"], *[_area_name(a, area_labels) for a in THEME_CODES]],
-            plain_rows([[r.get("key"), *[r.get(a) for a in THEME_CODES]] for r in rows]),
-        ),
+        rows,
+        area_labels,
+        labels,
+        fmt="money",
+        height=340,
     )
     nsif_visual = visual(
         "gp_geo_nsif",
@@ -752,34 +797,15 @@ def _people_reached(payload, labels, year, area_labels):
             plain_rows([[_area_name(a, area_labels), selected.get(a)] for a in codes]),
         ),
     )
-    region_visual = visual(
+    region_visual = _region_composition(
         "gp_people_region",
         fill(labels["gp_people_region_title"], year=year or ""),
         labels["gp_people_region_hint"],
-        chart=chart(
-            [r.get("key") for r in rows],
-            [
-                series(
-                    _area_name(area, area_labels),
-                    [r.get(area) for r in rows],
-                    kind="column",
-                    color=THEME_COLORS.get(area, COLORS["grey"]),
-                    fmt="int",
-                )
-                for area in THEME_CODES
-                if any(r.get(area) for r in rows)
-            ],
-            axes={"primary": axis("int")},
-            stacked=True,
-            height=320,
-        )
-        if rows
-        else chart([], [], axes={"primary": axis("int")}),
-        table=table(
-            fill(labels["gp_people_region_title"], year=year or ""),
-            [labels["gp_col_region"], *[_area_name(a, area_labels) for a in THEME_CODES]],
-            plain_rows([[r.get("key"), *[r.get(a) for a in THEME_CODES]] for r in rows]),
-        ),
+        rows,
+        area_labels,
+        labels,
+        fmt="int",
+        height=320,
     )
     return kpis, [theme_visual, region_visual], [labels["gp_note_live"]]
 

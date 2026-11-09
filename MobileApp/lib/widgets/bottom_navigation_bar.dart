@@ -26,23 +26,42 @@ import 'tab_customization_dialog.dart';
 /// iOS 26, and the ultra-thin system blur on earlier versions. Other
 /// platforms keep a Flutter [BackdropFilter] approximation.
 class AppBottomNavigationBar extends StatelessWidget {
-  /// Pass as [currentIndex] when no tab should appear selected.
+  /// Pass as [currentIndex] when this screen is not itself a tab.
+  ///
+  /// The bar then highlights [NavigationHelper.activeShellTabId] — the tab
+  /// the shell is still showing under this route — unless
+  /// [inheritShellHighlight] is false (login, where nothing should be selected).
   static const int noTabSelected = -1;
 
-  /// Legacy: page index for Settings in an older 5-tab guest layout.
+  /// Bottom bar for a route pushed over the tab shell.
+  ///
+  /// Uses [noTabSelected] so the highlighted tab stays the shell tab.
+  static const Widget shellTabBar = AppBottomNavigationBar(
+    currentIndex: noTabSelected,
+  );
+
+  /// Legacy: page index for Settings in the 5-tab guest layout.
   /// Prefer [TabCustomizationProvider.indexOfTab] with [TabIds.settings].
   @Deprecated('Resolve settings tab index via TabCustomizationProvider')
-  static const int settingsTabIndex = 5;
+  static const int settingsTabIndex = 4;
 
   /// Bottom bar index for the AI tab when [chatbotEnabled] is true
-  /// (after home + unified planning in the default layout).
-  static const int aiChatNavIndex = 4;
+  /// (immediately after Home in the default layout).
+  static const int aiChatNavIndex = 3;
 
-  /// Bottom bar slot for the Admin/Analysis tab (shifts right when AI is shown).
+  /// Bottom bar slot for the Admin tab (shifts right when AI is shown).
   static int adminTabNavIndex({required bool chatbotEnabled}) =>
-      chatbotEnabled ? 5 : 4;
+      chatbotEnabled ? 4 : 3;
 
   final int currentIndex;
+
+  /// Highlights this tab in the customized bar.
+  ///
+  /// Wins over [currentIndex] when the id is visible. When the user has hidden
+  /// that tab, nothing is highlighted. [currentIndex] remains the fallback for
+  /// the legacy layout (no [TabCustomizationProvider] in the tree).
+  final String? selectedTabId;
+
   final Function(int)? onTap;
   final bool? isFocalPoint;
   final bool useDefaultNavigation;
@@ -56,6 +75,10 @@ class AppBottomNavigationBar extends StatelessWidget {
 
   /// When `true`, long-pressing the bar opens the tab customization dialog.
   final bool enableCustomization;
+
+  /// When [currentIndex] is [noTabSelected] and [selectedTabId] is missing or
+  /// hidden, highlight the tab [MainNavigationScreen] is on.
+  final bool inheritShellHighlight;
 
   /// When non-null, used as the bar background instead of [Theme] surface
   /// (e.g. translucent black over a full-screen PDF).
@@ -103,12 +126,14 @@ class AppBottomNavigationBar extends StatelessWidget {
   const AppBottomNavigationBar({
     super.key,
     required this.currentIndex,
+    this.selectedTabId,
     this.onTap,
     this.isFocalPoint,
     this.useDefaultNavigation = true,
     this.chatbotEnabled,
     this.visibleTabs,
     this.enableCustomization = false,
+    this.inheritShellHighlight = true,
     this.backgroundColor,
     this.lightForegroundOnBar = false,
   });
@@ -152,12 +177,99 @@ class AppBottomNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ── Customized path ─────────────────────────────────────────────────────
-    if (visibleTabs != null && visibleTabs!.isNotEmpty) {
-      return _buildCustomized(context, visibleTabs!);
+    // One tab list for the whole app: the caller's list, or the same
+    // customized set [MainNavigationScreen] builds its pages from.
+    final tabs = _resolveVisibleTabs(context);
+    if (tabs != null && tabs.isNotEmpty) {
+      return _buildCustomized(context, tabs);
     }
-    // ── Legacy / hardcoded path (admin sub-screens, etc.) ───────────────────
+    // Tests and trees without [TabCustomizationProvider].
     return _buildLegacy(context);
+  }
+
+  /// Customized tabs for this session. Explicit [visibleTabs] win so the shell
+  /// can pass the same list it uses for its [PageView].
+  List<TabDefinition>? _resolveVisibleTabs(BuildContext context) {
+    if (visibleTabs != null && visibleTabs!.isNotEmpty) return visibleTabs;
+    // Nullable watch returns null when the provider is absent (widget tests).
+    final auth = context.watch<AuthProvider?>();
+    final customization = context.watch<TabCustomizationProvider?>();
+    if (auth == null || customization == null) return null;
+    final user = auth.user;
+    return customization.getVisibleTabs(
+      isAdmin: user?.isAdmin ?? false,
+      isAuthenticated: auth.isAuthenticated,
+      isFocalPoint: isFocalPoint ?? (user?.isFocalPoint ?? false),
+      chatbotEnabled: chatbotEnabled ?? (user?.chatbotEnabled ?? false),
+    );
+  }
+
+  int _highlightIndex(List<TabDefinition> tabs) {
+    if (selectedTabId != null) {
+      final byId = tabs.indexWhere((t) => t.id == selectedTabId);
+      // Hidden tab: do not fall back to a legacy slot (that lights the wrong icon).
+      if (byId >= 0) return byId;
+    } else if (currentIndex >= 0) {
+      if (currentIndex >= tabs.length) return tabs.length - 1;
+      return currentIndex;
+    }
+    return _inheritedShellIndex(tabs);
+  }
+
+  /// Shell tab under this route, or -1 when it is hidden or inheritance is off.
+  int _inheritedShellIndex(List<TabDefinition> tabs) {
+    if (!inheritShellHighlight) return -1;
+    final id = NavigationHelper.activeShellTabId;
+    if (id == null) return -1;
+    return tabs.indexWhere((t) => t.id == id);
+  }
+
+  /// Legacy (no [TabCustomizationProvider]) slot for [tabId], if that layout has it.
+  int? _legacyIndexForTab(
+    String tabId, {
+    required bool isAdmin,
+    required bool isAuthenticated,
+    required bool isFocalPoint,
+    required bool chatbot,
+  }) {
+    final shift = chatbot ? 1 : 0;
+    if (isAdmin) {
+      switch (tabId) {
+        case TabIds.notifications:
+          return 0;
+        case TabIds.dashboard:
+          return 1;
+        case TabIds.home:
+          return 2;
+        case TabIds.aiChat:
+          return chatbot ? 3 : null;
+        case TabIds.admin:
+          return 3 + shift;
+        default:
+          return null;
+      }
+    }
+    switch (tabId) {
+      case TabIds.notifications:
+        return isAuthenticated && isFocalPoint ? 0 : null;
+      case TabIds.resources:
+        if (isAuthenticated && isFocalPoint) return null;
+        return 0;
+      case TabIds.indicators:
+        return isAuthenticated ? null : 1;
+      case TabIds.dashboard:
+        return isAuthenticated ? 1 : null;
+      case TabIds.home:
+        return 2;
+      case TabIds.aiChat:
+        return chatbot ? 3 : null;
+      case TabIds.analysis:
+        return 3 + shift;
+      case TabIds.settings:
+        return 4 + shift;
+      default:
+        return null;
+    }
   }
 
   // =========================================================================
@@ -165,10 +277,7 @@ class AppBottomNavigationBar extends StatelessWidget {
   // =========================================================================
 
   Widget _buildCustomized(BuildContext context, List<TabDefinition> tabs) {
-    final int itemCount = tabs.length;
-    final int selectedTabIndex = currentIndex < 0
-        ? -1
-        : (currentIndex >= itemCount ? itemCount - 1 : currentIndex);
+    final int selectedTabIndex = _highlightIndex(tabs);
 
     final l10n = AppLocalizations.of(context)!;
 
@@ -199,7 +308,7 @@ class AppBottomNavigationBar extends StatelessWidget {
   }
 
   // =========================================================================
-  // Legacy layout — hardcoded per role (unchanged logic)
+  // Legacy layout — hardcoded per role (no tab customization provider)
   // =========================================================================
 
   Widget _buildLegacy(BuildContext context) {
@@ -209,19 +318,51 @@ class AppBottomNavigationBar extends StatelessWidget {
     final c = _effectiveChatbot(context);
 
     // When chatbot is enabled, indices from the AI slot onward are +1 vs no-AI layout.
-    final int shiftedIdx = c ? 5 : 4;
-    final int settingsIdx = c ? 6 : 5;
+    final int shiftedIdx = c ? 4 : 3;
+    final int settingsIdx = c ? 5 : 4;
 
     // Tab layout (visual left→right, indices match PageView pages):
-    // Admin:          … Home(2) Unified planning(3) [AI(4)] Admin(4/5)
-    // Focal/Auth/Guest: … Home(2) Unified planning(3) [AI(4)] Analysis(4/5) Settings(5/6)
-    final int itemCount = (isAdmin ? 5 : 6) + (c ? 1 : 0);
+    // Admin:          … Home(2) [AI(3)] Admin(3/4)
+    // Focal/Auth/Guest: … Home(2) [AI(3)] Countries(3/4) Settings(4/5)
+    final int itemCount = (isAdmin ? 4 : 5) + (c ? 1 : 0);
 
-    // Negative currentIndex → no tab highlighted (e.g. login overlay).
-    // Do not coerce to 0 — that would incorrectly highlight the first tab.
-    final int selectedTabIndex = currentIndex < 0
-        ? -1
-        : (currentIndex >= itemCount ? itemCount - 1 : currentIndex);
+    // Negative currentIndex keeps the shell tab, unless this bar opts out
+    // (login). Do not coerce to 0 — that would highlight the first tab.
+    final int? explicitIdIndex = selectedTabId == null
+        ? null
+        : _legacyIndexForTab(
+            selectedTabId!,
+            isAdmin: isAdmin,
+            isAuthenticated: isAuthenticated,
+            isFocalPoint: isFocalPoint,
+            chatbot: c,
+          );
+    final int selectedTabIndex;
+    if (explicitIdIndex != null &&
+        explicitIdIndex >= 0 &&
+        explicitIdIndex < itemCount) {
+      selectedTabIndex = explicitIdIndex;
+    } else if (selectedTabId == null && currentIndex >= 0) {
+      selectedTabIndex =
+          currentIndex >= itemCount ? itemCount - 1 : currentIndex;
+    } else if (inheritShellHighlight) {
+      final inherited = NavigationHelper.activeShellTabId == null
+          ? null
+          : _legacyIndexForTab(
+              NavigationHelper.activeShellTabId!,
+              isAdmin: isAdmin,
+              isAuthenticated: isAuthenticated,
+              isFocalPoint: isFocalPoint,
+              chatbot: c,
+            );
+      selectedTabIndex = (inherited != null &&
+              inherited >= 0 &&
+              inherited < itemCount)
+          ? inherited
+          : -1;
+    } else {
+      selectedTabIndex = -1;
+    }
 
     final l10n = AppLocalizations.of(context)!;
 
@@ -291,21 +432,6 @@ class AppBottomNavigationBar extends StatelessWidget {
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
                 onTap: () => _handleTap(context, 2),
-              ),
-            ),
-            // Unified planning documents (index 3)
-            Flexible(
-              flex: 1,
-              child: _buildNavItem(
-                context: context,
-                index: 3,
-                selectedTabIndex: selectedTabIndex,
-                icon: Icons.assignment_outlined,
-                activeIcon: Icons.assignment,
-                label: l10n.resourcesUnifiedPlanningSectionTitle,
-                showBadge: false,
-                lightForegroundOnBar: lightForegroundOnBar,
-                onTap: () => _handleTap(context, 3),
               ),
             ),
             if (c) aiTab(),
@@ -409,32 +535,17 @@ class AppBottomNavigationBar extends StatelessWidget {
                 onTap: () => _handleTap(context, 2),
               ),
             ),
-            // Unified planning documents (index 3)
-            Flexible(
-              flex: 1,
-              child: _buildNavItem(
-                context: context,
-                index: 3,
-                selectedTabIndex: selectedTabIndex,
-                icon: Icons.assignment_outlined,
-                activeIcon: Icons.assignment,
-                label: l10n.resourcesUnifiedPlanningSectionTitle,
-                showBadge: false,
-                lightForegroundOnBar: lightForegroundOnBar,
-                onTap: () => _handleTap(context, 3),
-              ),
-            ),
             if (c) aiTab(),
-            // Disaggregation Analysis (index shifts when AI is shown)
+            // Countries (index shifts when AI is shown)
             Flexible(
               flex: 1,
               child: _buildNavItem(
                 context: context,
                 index: shiftedIdx,
                 selectedTabIndex: selectedTabIndex,
-                icon: Icons.insights_outlined,
-                activeIcon: Icons.insights,
-                label: l10n.analysis,
+                icon: Icons.public_outlined,
+                activeIcon: Icons.public,
+                label: l10n.countries,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
                 onTap: () => _handleTap(context, shiftedIdx),

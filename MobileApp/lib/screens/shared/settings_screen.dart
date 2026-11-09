@@ -50,10 +50,10 @@ class SettingsScreen extends StatelessWidget {
           title: localizations.accountSettings,
           bottomNavigationBar: showBottomNav
               ? AppBottomNavigationBar(
-                  // The admin layout has no Settings tab, so nothing is highlighted.
                   currentIndex: (user?.isAdmin ?? false)
                       ? AppBottomNavigationBar.noTabSelected
                       : ((user?.chatbotEnabled ?? false) ? 6 : 5),
+                  selectedTabId: TabIds.settings,
                   chatbotEnabled: user?.chatbotEnabled ?? false,
                 )
               : null,

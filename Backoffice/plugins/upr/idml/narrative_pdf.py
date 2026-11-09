@@ -8,7 +8,7 @@ from pathlib import Path
 from plugins.upr.errors import UprError
 from plugins.upr.idml.constants import _STYLE_RUNS
 from plugins.upr.idml.narrative_style import folio_label, folio_html
-from plugins.upr.raster import _PLUGIN_FONTS_DIR
+from plugins.upr.dashboards.raster import _PLUGIN_FONTS_DIR
 
 _APP_FONTS_DIR = Path(__file__).resolve().parents[3] / "app" / "static" / "fonts"
 
@@ -113,8 +113,8 @@ def _table_html(rows: list[list[list[dict]]]) -> str:
 
 
 def _narrative_css() -> str:
-    from plugins.upr.i18n import current_export_language, rtl_css, uses_arabic_font
-    from plugins.upr.typography import (
+    from plugins.upr.dashboards.i18n import current_export_language, rtl_css, uses_arabic_font
+    from plugins.upr.dashboards.typography import (
         ARABIC_NUMBER_STACK,
         LATIN_NUMBER_STACK,
         print_typography_css,
@@ -222,14 +222,14 @@ html, body {{
 
 
 def render_narrative_pdf_bytes(styled: list[dict], *, folio: str = "", full_fonts: bool = False) -> bytes:
-    from plugins.upr.i18n import (
+    from plugins.upr.dashboards.i18n import (
         arabic_font_class,
         current_export_language,
         rtl_document_attrs,
         uses_arabic_font,
     )
-    from plugins.upr.raster import write_weasyprint_pdf
-    from plugins.upr.typography import print_typography_css
+    from plugins.upr.dashboards.raster import write_weasyprint_pdf
+    from plugins.upr.dashboards.typography import print_typography_css
 
     _ = folio
     lang = current_export_language()

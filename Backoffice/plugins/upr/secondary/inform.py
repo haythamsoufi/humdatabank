@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 
 from openpyxl import load_workbook
 
-from plugins.upr.flow import inform_class
+from plugins.upr.analysis.flow import inform_class
 from plugins.upr.secondary import paths
 from plugins.upr.secondary.io import write_json
 from plugins.upr.secondary.registry import touch_source

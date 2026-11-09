@@ -99,7 +99,7 @@ def main() -> int:
 
     app = create_app()
     with app.app_context():
-        from plugins.upr.bundle import bundle_category_name
+        from plugins.upr.dashboards.bundle import bundle_category_name
 
         category = bundle_category_name()
         catalog = load_part_of_category_catalog()

@@ -1,7 +1,7 @@
 """In-process LRU for Mapbox tiles shared by UPR and Interactive Map proxies."""
 from unittest.mock import MagicMock, patch
 
-from plugins.upr.flow import clear_mapbox_tile_cache, mapbox_tile
+from plugins.upr.analysis.flow import clear_mapbox_tile_cache, mapbox_tile
 
 
 def _upstream(body=b"\x89PNG", content_type="image/png", status=200):

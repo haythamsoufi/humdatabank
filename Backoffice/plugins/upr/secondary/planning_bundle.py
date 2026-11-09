@@ -7,7 +7,7 @@ from typing import Any
 from app.extensions import db
 from app.models.core import Country
 from app.models.organization import NationalSociety
-from plugins.upr.bundle import BUNDLE_CATEGORY_KEY, bundle_category_name
+from plugins.upr.dashboards.bundle import BUNDLE_CATEGORY_KEY, bundle_category_name
 
 
 def _bundle_text_key() -> str:

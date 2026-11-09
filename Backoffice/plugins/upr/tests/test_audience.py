@@ -7,7 +7,7 @@ import zipfile
 
 import pytest
 
-from plugins.upr.audience import (
+from plugins.upr.dashboards.audience import (
     detect_narrative_audience,
     parse_narrative_audience,
     resolve_narrative_audience,

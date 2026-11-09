@@ -72,7 +72,7 @@ class TestPlanPytestRun:
 
     def test_maps_plugin_module_to_plugin_test_file(self):
         plan = plan_pytest_run(
-            ["Backoffice/plugins/upr/raster.py"],
+            ["Backoffice/plugins/upr/dashboards/raster.py"],
             BACKOFFICE_ROOT,
         )
         assert plan.mode == "selected"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from plugins.upr.catalog import (
+from plugins.upr.dashboards.catalog import (
     PNS_PLAN_TEMPLATE_ID,
     PNS_REPORT_TEMPLATE_ID,
     UPR_PLANNING_TEMPLATE_ID,

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from plugins.upr.data import (
+from plugins.upr.dashboards.data import (
     _apply_support_funding,
     _expand_plan_support_years,
     _extend_support_with_funding,
@@ -43,10 +43,10 @@ from plugins.upr.data import (
     t22_host_funding_by_pns,
     t23_host_funding_by_pns,
 )
-from plugins.upr.catalog import SUPPORT_AREA_CODES
-from plugins.upr.matrix import _is_support_funding_column
-from plugins.upr.people_reached import _plan_people_reached
-from plugins.upr.pns_funding import (
+from plugins.upr.dashboards.catalog import SUPPORT_AREA_CODES
+from plugins.upr.dashboards.matrix import _is_support_funding_column
+from plugins.upr.dashboards.people_reached import _plan_people_reached
+from plugins.upr.dashboards.pns_funding import (
     t23_funding_column,
     t23_host_row_metrics,
     t23_reported_funding,
@@ -55,7 +55,7 @@ from plugins.upr.pns_funding import (
 
 @pytest.mark.unit
 def test_split_modules_keep_runtime_imports():
-    from plugins.upr import indicators, pns_funding, support
+    from plugins.upr.dashboards import indicators, pns_funding, support
 
     assert pns_funding.NationalSociety is not None
     assert support.logger is not None
@@ -80,11 +80,11 @@ def test_ns_logo_src_falls_back_to_github_iso3():
 def test_spef_icon_srcs_uses_indicator_bank_url(monkeypatch):
     row = SimpleNamespace(id=3, code="SP1", icon_filename="SP1.png", is_active=True)
     monkeypatch.setattr(
-        "plugins.upr.icons._load_spef_catalog_rows",
+        "plugins.upr.dashboards.icons._load_spef_catalog_rows",
         lambda: [row],
     )
     monkeypatch.setattr(
-        "plugins.upr.icons._spef_catalog_icon_url",
+        "plugins.upr.dashboards.icons._spef_catalog_icon_url",
         lambda item: f"/api/v1/uploads/spef/{item.icon_filename}",
     )
     icons = spef_icon_srcs(inline=False)
@@ -93,14 +93,14 @@ def test_spef_icon_srcs_uses_indicator_bank_url(monkeypatch):
 
 @pytest.mark.unit
 def test_spef_icon_srcs_uses_plugin_eo_icon(monkeypatch):
-    monkeypatch.setattr("plugins.upr.icons._load_spef_catalog_rows", lambda: [])
+    monkeypatch.setattr("plugins.upr.dashboards.icons._load_spef_catalog_rows", lambda: [])
     icons = spef_icon_srcs(inline=False)
     assert icons["EO"].endswith("icons/eo-emergency.png")
 
 
 @pytest.mark.unit
 def test_spef_icon_srcs_inlines_plugin_eo_icon(monkeypatch):
-    monkeypatch.setattr("plugins.upr.icons._load_spef_catalog_rows", lambda: [])
+    monkeypatch.setattr("plugins.upr.dashboards.icons._load_spef_catalog_rows", lambda: [])
     icons = spef_icon_srcs(inline=True)
     assert icons["EO"].startswith("data:image/png;base64,")
     assert icons["SP1"].startswith("data:image/png;base64,")
@@ -110,11 +110,11 @@ def test_spef_icon_srcs_inlines_plugin_eo_icon(monkeypatch):
 def test_spef_icon_srcs_inline_skips_http_catalog_url(monkeypatch):
     row = SimpleNamespace(id=3, code="SP1", icon_filename="", is_active=True)
     monkeypatch.setattr(
-        "plugins.upr.icons._load_spef_catalog_rows",
+        "plugins.upr.dashboards.icons._load_spef_catalog_rows",
         lambda: [row],
     )
     monkeypatch.setattr(
-        "plugins.upr.icons._spef_catalog_icon_url",
+        "plugins.upr.dashboards.icons._spef_catalog_icon_url",
         lambda item: "/indicator-bank/spef-lookups/3/icon",
     )
     icons = spef_icon_srcs(inline=True)
@@ -125,7 +125,7 @@ def test_spef_icon_srcs_inline_skips_http_catalog_url(monkeypatch):
 @pytest.mark.unit
 def test_reach_rows_use_catalog_icon(monkeypatch):
     monkeypatch.setattr(
-        "plugins.upr.people_reached.spef_icon_srcs",
+        "plugins.upr.dashboards.people_reached.spef_icon_srcs",
         lambda: {"SP1": "/indicator-bank/spef-lookups/3/icon"},
     )
     rows = _reach_rows({"SP1": 1000})
@@ -236,7 +236,7 @@ def test_split_cell_key_keeps_supported_column():
 
 @pytest.mark.unit
 def test_support_from_cells_ticks(monkeypatch):
-    monkeypatch.setattr("plugins.upr.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
+    monkeypatch.setattr("plugins.upr.dashboards.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
     rows = _support_from_cells({"7_SP1": 1, "7_EFs": 1}, planned=True)
     assert len(rows) == 1
     assert rows[0]["name"] == "Netherlands Red Cross"
@@ -247,7 +247,7 @@ def test_support_from_cells_ticks(monkeypatch):
 
 @pytest.mark.unit
 def test_support_from_cells_reporting_supported_columns(monkeypatch):
-    monkeypatch.setattr("plugins.upr.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
+    monkeypatch.setattr("plugins.upr.dashboards.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
     rows = _support_from_cells(
         {"7_SP1 Supported": 1, "7_SP2 Planned": 1, "7_EFs Supported": 1},
         planned=False,
@@ -260,7 +260,7 @@ def test_support_from_cells_reporting_supported_columns(monkeypatch):
 
 @pytest.mark.unit
 def test_support_from_cells_reads_total_funding_column(monkeypatch):
-    monkeypatch.setattr("plugins.upr.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
+    monkeypatch.setattr("plugins.upr.dashboards.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
     rows = _support_from_cells(
         {"7_SP1 Supported": 1, "7_Total": 1_200_000},
         planned=False,
@@ -291,7 +291,7 @@ def test_pns_area_funding_from_plan_cells_groups_by_ns():
 
 @pytest.mark.unit
 def test_expand_plan_support_years_emits_year_rows(monkeypatch):
-    monkeypatch.setattr("plugins.upr.support._ns_names", lambda ids: {12: "Austrian Red Cross"})
+    monkeypatch.setattr("plugins.upr.dashboards.support._ns_names", lambda ids: {12: "Austrian Red Cross"})
     ticks = [
         {
             "ns_id": 49,
@@ -481,15 +481,15 @@ def test_sum_t23_host_cells_ignores_funding_requirement():
 @pytest.mark.unit
 def test_report_support_does_not_use_planning_requirement(monkeypatch):
     monkeypatch.setattr(
-        "plugins.upr.support._load_t23_funding_by_pns",
+        "plugins.upr.dashboards.support._load_t23_funding_by_pns",
         lambda *_args, **_kwargs: {7: 100_000},
     )
     monkeypatch.setattr(
-        "plugins.upr.support._load_t22_funding_by_pns",
+        "plugins.upr.dashboards.support._load_t22_funding_by_pns",
         lambda *_args, **_kwargs: {7: 2_600_000, 12: 9_000_000},
     )
     monkeypatch.setattr(
-        "plugins.upr.support._ns_names",
+        "plugins.upr.dashboards.support._ns_names",
         lambda ids: {7: "Danish Red Cross", 12: "Austrian Red Cross"},
     )
     rows = _report_support(
@@ -520,7 +520,7 @@ def test_t22_host_funding_by_pns_prefers_total():
 
 @pytest.mark.unit
 def test_extend_support_with_funding_adds_amount_only_rows(monkeypatch):
-    monkeypatch.setattr("plugins.upr.support._ns_names", lambda ids: {12: "Austrian Red Cross"})
+    monkeypatch.setattr("plugins.upr.dashboards.support._ns_names", lambda ids: {12: "Austrian Red Cross"})
     amounts = {49: 1_700_000, 12: 650_000}
     rows = _apply_support_funding(
         [
@@ -801,7 +801,7 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
         numeric_value=9000,
     )
     monkeypatch.setattr(
-        "plugins.upr.indicators._load_dynamic_indicator_rows",
+        "plugins.upr.dashboards.indicators._load_dynamic_indicator_rows",
         lambda aes_id: [other_dyn, ea_dyn],
     )
 
@@ -822,7 +822,7 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
 
 @pytest.mark.unit
 def test_indicator_visual_row_keeps_percent_and_skips_blank_yesno():
-    from plugins.upr.indicators import _indicator_visual_row
+    from plugins.upr.dashboards.indicators import _indicator_visual_row
 
     percent_entry = SimpleNamespace(
         data_not_available=False,
@@ -880,7 +880,7 @@ def test_indicator_visual_row_keeps_percent_and_skips_blank_yesno():
 
 @pytest.mark.unit
 def test_report_emergencies_includes_percentage_and_skips_blank_yesno(monkeypatch):
-    from plugins.upr.indicators import _report_emergencies
+    from plugins.upr.dashboards.indicators import _report_emergencies
 
     section = SimpleNamespace(
         id=9,
@@ -911,7 +911,7 @@ def test_report_emergencies_includes_percentage_and_skips_blank_yesno(monkeypatc
             return True
 
     monkeypatch.setattr(
-        "plugins.upr.indicators.RepeatGroupInstance",
+        "plugins.upr.dashboards.indicators.RepeatGroupInstance",
         SimpleNamespace(
             query=_Query(),
             assignment_entity_status_id=_Col(),
@@ -921,7 +921,7 @@ def test_report_emergencies_includes_percentage_and_skips_blank_yesno(monkeypatc
         ),
     )
     monkeypatch.setattr(
-        "plugins.upr.indicators._load_dynamic_indicator_rows",
+        "plugins.upr.dashboards.indicators._load_dynamic_indicator_rows",
         lambda aes_id: [
             SimpleNamespace(
                 repeat_instance_number=1,
@@ -968,7 +968,7 @@ def test_report_emergencies_includes_percentage_and_skips_blank_yesno(monkeypatc
 
 @pytest.mark.unit
 def test_report_emergencies_uses_other_text_code_from_stored_choice(monkeypatch):
-    from plugins.upr.indicators import _report_emergencies
+    from plugins.upr.dashboards.indicators import _report_emergencies
 
     section = SimpleNamespace(
         id=9,
@@ -1009,7 +1009,7 @@ def test_report_emergencies_uses_other_text_code_from_stored_choice(monkeypatch)
             return True
 
     monkeypatch.setattr(
-        "plugins.upr.indicators.RepeatGroupInstance",
+        "plugins.upr.dashboards.indicators.RepeatGroupInstance",
         SimpleNamespace(
             query=_Query(),
             assignment_entity_status_id=_Col(),
@@ -1018,7 +1018,7 @@ def test_report_emergencies_uses_other_text_code_from_stored_choice(monkeypatch)
             instance_number=_Col(),
         ),
     )
-    monkeypatch.setattr("plugins.upr.indicators._load_dynamic_indicator_rows", lambda aes_id: [])
+    monkeypatch.setattr("plugins.upr.dashboards.indicators._load_dynamic_indicator_rows", lambda aes_id: [])
 
     emergencies = _report_emergencies(1641, [SimpleNamespace(form_section=section)])
     assert emergencies[0]["name"] == "Bangladesh Population Movement"
@@ -1095,7 +1095,7 @@ def _people_entry(value):
 
 @pytest.mark.unit
 def test_plan_people_reached_maps_area_codes(monkeypatch):
-    monkeypatch.setattr("plugins.upr.people_reached.spef_icon_srcs", lambda: {})
+    monkeypatch.setattr("plugins.upr.dashboards.people_reached.spef_icon_srcs", lambda: {})
     longer = SimpleNamespace(id=10, label="People to be reached through longer term programmes")
     emergency = SimpleNamespace(id=11, label="People to be reached through Emergency Appeals")
     by_item = {
@@ -1117,7 +1117,7 @@ def test_plan_people_reached_maps_area_codes(monkeypatch):
 
 @pytest.mark.unit
 def test_report_people_reached_folds_emergency_into_disasters_and_drops_long_term(monkeypatch):
-    monkeypatch.setattr("plugins.upr.people_reached.spef_icon_srcs", lambda: {})
+    monkeypatch.setattr("plugins.upr.dashboards.people_reached.spef_icon_srcs", lambda: {})
     disasters = _people_item(1, "Number of people reached with disaster risk reduction.", "SP2")
     emergency = _people_item(
         2,
@@ -1149,7 +1149,7 @@ def test_report_people_reached_folds_emergency_into_disasters_and_drops_long_ter
 
 @pytest.mark.unit
 def test_visual_export_filename():
-    from plugins.upr.service import visual_export_filename
+    from plugins.upr.dashboards.service import visual_export_filename
 
     name = visual_export_filename(
         {"iso3": "AFG", "round_code": "P25", "period_name": "2025"},
@@ -1170,7 +1170,7 @@ def test_visual_export_filename():
 
 @pytest.mark.unit
 def test_filename_from_visual_title_strips_illegal_chars():
-    from plugins.upr.data import filename_from_visual_title
+    from plugins.upr.dashboards.data import filename_from_visual_title
 
     assert filename_from_visual_title("Bangladesh — Unified Plan – 2026") == (
         "Bangladesh - Unified Plan - 2026.pdf"
@@ -1182,7 +1182,7 @@ def test_filename_from_visual_title_strips_illegal_chars():
 
 @pytest.mark.unit
 def test_visual_export_filename_keeps_localized_title():
-    from plugins.upr.service import visual_export_filename
+    from plugins.upr.dashboards.service import visual_export_filename
 
     name = visual_export_filename(
         {
@@ -1201,12 +1201,12 @@ def test_visual_export_filename_keeps_localized_title():
 
 @pytest.mark.unit
 def test_visuals_browser_title_uses_country_and_assignment(monkeypatch):
-    from plugins.upr.data import visuals_browser_title
+    from plugins.upr.dashboards.data import visuals_browser_title
 
     assigned = SimpleNamespace(display_name="Unified Plan – 2026")
     aes = SimpleNamespace(assigned_form=assigned)
     monkeypatch.setattr(
-        "plugins.upr.data._country_for_aes",
+        "plugins.upr.dashboards.data._country_for_aes",
         lambda _aes: SimpleNamespace(name="Bangladesh"),
     )
     assert visuals_browser_title(aes) == "Bangladesh — Unified Plan – 2026"
@@ -1214,13 +1214,13 @@ def test_visuals_browser_title_uses_country_and_assignment(monkeypatch):
 
 @pytest.mark.unit
 def test_visuals_browser_title_keeps_localized_country(monkeypatch):
-    from plugins.upr.data import visuals_browser_title
+    from plugins.upr.dashboards.data import visuals_browser_title
 
     assigned = SimpleNamespace(display_name="Unified Country Report")
     aes = SimpleNamespace(assigned_form=assigned)
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     monkeypatch.setattr(
-        "plugins.upr.data._country_for_aes",
+        "plugins.upr.dashboards.data._country_for_aes",
         lambda _aes: SimpleNamespace(
             name="Afghanistan",
             iso2="AF",
@@ -1235,9 +1235,9 @@ def test_visuals_browser_title_keeps_localized_country(monkeypatch):
 
 @pytest.mark.unit
 def test_localized_assignment_title_uses_custom_translation(monkeypatch):
-    from plugins.upr.i18n import localized_assignment_title
+    from plugins.upr.dashboards.i18n import localized_assignment_title
 
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     assigned = SimpleNamespace(
         custom_name="Unified Country Report",
         custom_name_translations={"ar": "التقرير القطري الموحد"},
@@ -1250,9 +1250,9 @@ def test_localized_assignment_title_uses_custom_translation(monkeypatch):
 
 @pytest.mark.unit
 def test_localized_assignment_title_uses_catalog_for_template(monkeypatch):
-    from plugins.upr.i18n import localized_assignment_title
+    from plugins.upr.dashboards.i18n import localized_assignment_title
 
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     assigned = SimpleNamespace(
         custom_name="",
         template=SimpleNamespace(name="Unified Country Report"),

@@ -47,7 +47,7 @@ def build_indesign_package(
     word_bytes: bytes | None = None,
 ) -> dict:
     import fitz
-    from plugins.upr.data import filename_from_visual_title, title_for_export_filename
+    from plugins.upr.dashboards.data import filename_from_visual_title, title_for_export_filename
 
     work_dir = Path(work_dir)
     links = work_dir / "Links"
@@ -56,7 +56,7 @@ def build_indesign_package(
     title = title_for_export_filename(meta) or "UPR"
     idml_name = filename_from_visual_title(title, "idml")
 
-    from plugins.upr.i18n import is_rtl, uses_arabic_font
+    from plugins.upr.dashboards.i18n import is_rtl, uses_arabic_font
 
     pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     doc = Idml(rtl=is_rtl(), arabic_font=uses_arabic_font())
@@ -67,7 +67,7 @@ def build_indesign_package(
 
     styled: list[dict] = []
     if word_bytes:
-        from plugins.upr.i18n import translate_styled_blocks
+        from plugins.upr.dashboards.i18n import translate_styled_blocks
 
         styled = translate_styled_blocks(
             style_narrative_blocks(

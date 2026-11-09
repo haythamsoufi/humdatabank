@@ -19,7 +19,7 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
-from plugins.upr.catalog import UPR_FORM_TEMPLATE_IDS
+from plugins.upr.dashboards.catalog import UPR_FORM_TEMPLATE_IDS
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ def get_upr_formdata_validation_prompt(context: Optional[Dict[str, Any]] = None)
     period = ctx.get("period_name") or ctx.get("period_year") or "the assignment period"
     effective_label = (ctx.get("upr_effective_label") or ctx.get("form_item_label") or "").strip()
 
-    from plugins.upr.catalog import (
+    from plugins.upr.dashboards.catalog import (
         PLAN_TEMPLATE_ID,
         PNS_PLAN_TEMPLATE_ID,
         PNS_REPORT_TEMPLATE_ID,

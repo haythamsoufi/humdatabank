@@ -88,10 +88,10 @@ def build_cover_chrome(
     logos: dict[str, tuple[str, float, float]],
     footer: dict[str, dict] | None = None,
 ) -> list[str]:
-    from plugins.upr.audience import INTERNAL_COVER_BANNER, INTERNAL_COVER_BANNER_H, is_internal_narrative
-    from plugins.upr.i18n import localized_country_header, t
-    from plugins.upr.maa_codes import appeal_code_for_cover
-    from plugins.upr.render import COVER_FOOTER_NOTE, COVER_FOOTER_ORG
+    from plugins.upr.dashboards.audience import INTERNAL_COVER_BANNER, INTERNAL_COVER_BANNER_H, is_internal_narrative
+    from plugins.upr.dashboards.i18n import localized_country_header, t
+    from plugins.upr.dashboards.maa_codes import appeal_code_for_cover
+    from plugins.upr.dashboards.render import COVER_FOOTER_NOTE, COVER_FOOTER_ORG
 
     country = localized_country_header(meta)
     subtitle = (meta.get("document_subtitle") or "").strip()
@@ -253,7 +253,7 @@ def build_native_pages(doc: Idml, pdf_doc, payload: dict, links: Path, pdf_name:
     _hydrate_reach_icons(payload, pdf_doc)
     meta = payload.get("meta") or {}
     svgs = export_visual_svgs(payload, links)
-    from plugins.upr.audience import INTERNAL_COVER_BANNER_H, is_internal_narrative
+    from plugins.upr.dashboards.audience import INTERNAL_COVER_BANNER_H, is_internal_narrative
 
     banner_h = INTERNAL_COVER_BANNER_H if is_internal_narrative(meta) else 0.0
     logo_y = LOGO_Y + banner_h

@@ -4,6 +4,19 @@
             position: relative;
         }
 
+        /*
+         * Plugin analysis / chart panels (UPR Impact, FDRS, P&B, …).
+         * pageContentContainer is max-w-full, so without a cap these stretch
+         * across ultrawide monitors and charts become unreadably wide.
+         * Keep the Data Table full-bleed for the grid.
+         */
+        .explore-panel:not(#panel-data-table) {
+            max-width: 80rem; /* 1280px — ~3 chart columns without sparse bars */
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
         /* Loading spinner animation */
         @keyframes spin {
             0% { transform: rotate(0deg); }

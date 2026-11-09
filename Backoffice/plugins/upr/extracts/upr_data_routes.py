@@ -1,0 +1,714 @@
+"""UPR long-form extract for Power BI.
+
+``GET /api/v1/upr/data`` returns the tables the Fabric "UPR Monster" dataflow
+loaded, already shaped:
+
+- ``data`` — reporting and planning facts, including comment indicators
+- ``submissions`` — assignment status, round, and FDS validation
+
+Round is taken from the assignment period. Authenticate with a Bearer token,
+``X-API-Key``, ``?api_key=`` (Power Query / Power BI), or a Backoffice session.
+Register the route in Admin → API Management via ``API_ENDPOINTS``.
+"""
+
+from __future__ import annotations
+
+from flask import request
+
+from app.utils.api_helpers import (
+    GENERIC_ERROR_MESSAGE,
+    api_error,
+    json_response,
+)
+from app.utils.api_data_filters import parse_assignment_id_filters
+from app.utils.auth import require_api_key_or_session
+from app.services.security.api_key_permissions import DATA_READ
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.rate_limiting import api_rate_limit
+from plugins.upr import bp
+from plugins.upr.extracts.api_cache import get_or_build_upr_payload
+from plugins.upr.extracts.ns_key_data import NS_KEY_COLUMNS, load_ns_key_rows
+from plugins.upr.extracts.overall_data import OVERALL_COLUMNS, build_overall_data
+from plugins.upr.extracts.upr_data import (
+    FACT_COLUMNS,
+    MASTER_COLUMNS,
+    SUBMISSION_COLUMNS,
+    TEMPLATE_KIND,
+    build_upr_data,
+    build_upr_master,
+    build_upr_submissions,
+    parse_round_codes,
+)
+
+# URL-builder contract. Core renders these; it does not know this plugin's paths.
+_UPR_QUERY_PARAMS = [
+    {
+        "name": "template",
+        "type": "select",
+        "options": ["report", "plan", "pns"],
+        "labels": ["Report", "Plan", "PNS"],
+        "description": "Unified Report, Unified Plan, or PNS report",
+    },
+    {
+        "name": "round",
+        "type": "text",
+        "placeholder": "MYR26,P27",
+        "description": "One or more round codes, comma-separated, for example MYR26,P27. Omit to return every round.",
+    },
+    {
+        "name": "iso3",
+        "type": "select",
+        "option_source": "country_iso3",
+        "description": "Filter by ISO 3166-1 alpha-3 (alias: country_iso3)",
+    },
+    {"name": "submission_id", "type": "text", "description": "One assignment-country submission id (AssignmentEntityStatus id)."},
+    {"name": "assignment_id", "type": "text", "description": "Assignment (AssignedForm) id; comma-separated or repeated for several."},
+    {"name": "template_id", "type": "text", "description": "Numeric form template id: 22, 23, 24 or 33."},
+    {"name": "country_id", "type": "text", "description": "Filter by country id."},
+    {"name": "country_iso2", "type": "text", "description": "Filter by ISO 3166-1 alpha-2."},
+    {"name": "period_name", "type": "text", "description": "Exact assignment period name, for example 2027."},
+    {"name": "item_id", "type": "text", "description": "Limit /data and /master to one form item id."},
+]
+
+API_ENDPOINTS = [
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Documentation for the UPR Power BI extracts: each endpoint, its query parameters, "
+            "and the columns it returns."
+        ),
+        "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": [],
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/data",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Unified Plan and Report facts for Power BI (templates 33, 24, and 23). "
+            "Returns data and submissions already shaped like the UPR dataflow. "
+            "Filters: template (report|plan|pns), round (one code or several, for example MYR26,P27), iso3, section. "
+            "Returns the complete filtered extract; this endpoint is not paginated."
+        ),
+        "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": _UPR_QUERY_PARAMS + [
+            {
+                "name": "section",
+                "type": "text",
+                "placeholder": "Funding",
+                "description": "Limit facts to one Section value. Omit to return every section.",
+            },
+        ],
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/overall",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "FDRS (template 21) and Unified Reporting (template 33) merged into one extract, "
+            "with the same columns as /api/v1/upr/data except Source is renamed Data source and Country Value is replaced by FDRS Value and UPR Value (what each source reported; Value is the final figure). "
+            "Indicators are matched by Indicator Bank id per country and year. "
+            "FDRS takes priority; where FDRS has no figure, Unified Reporting is used "
+            "(annual report first, then mid-year). Data source is FDRS or Unified Reporting. "
+            "Unified Reporting, Unified Plan, and PNS data (templates 33, 24, 23, 22) include every "
+            "workflow status, as in /api/v1/upr/data. FDRS (template 21) is approved-only. "
+            "Filters: iso3, year, section. Returns the complete filtered extract; this endpoint is not paginated."
+        ),
+        "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": [
+            {
+                "name": "iso3",
+                "type": "select",
+                "option_source": "country_iso3",
+                "description": "Filter by ISO 3166-1 alpha-3 (alias: country_iso3)",
+            },
+            {
+                "name": "year",
+                "type": "number",
+                "placeholder": "2024",
+                "description": "Calendar year. Omit for every year.",
+            },
+            {
+                "name": "section",
+                "type": "text",
+                "placeholder": "NS Data",
+                "description": "Limit facts to one Section value. Omit to return every section.",
+            },
+        ],
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/submissions",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Country submission statuses for all Unified Plan and Report rounds. "
+            "Filters: template (report|plan|pns), round (one code or several, for example MYR26,P27), iso3. "
+            "Returns the complete filtered extract; this endpoint is not paginated."
+        ),
+        "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": list(_UPR_QUERY_PARAMS),
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/master",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Default (layout=long): planning extract for Excel — Round, ISO3, Region, Country, NS, "
+            "Part of Bundle, Data status, Attribute order, Attribute, Value. Attribute already names "
+            "the measure (Volunteers from nskeydata, Total Population, INFORM…, Reach 2027 SP1, "
+            "HNS 2027 SP1, IFRC 2027 EAs SPRM/OPS, IFRC 2027 New Total, Danish Red Cross 2027, "
+            "Total FR 2027, 2027 New Total, …). Secondary snapshots and multilateral/EAs SPRM/OPS "
+            "are managed under UPR plugin settings. Rows are sorted by Round, Attribute order, Country. "
+            "layout=wide is the same measures as columns. layout=detail is the UPR Data sheet. "
+            "Filters: round, iso3, layout; detail also supports template and section. "
+            "Returns the complete filtered extract; this endpoint is not paginated."
+        ),
+        "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": _UPR_QUERY_PARAMS + [
+            {
+                "name": "layout",
+                "type": "select",
+                "options": ["long", "wide", "detail"],
+                "description": (
+                    "long (default): Round/Country/… + Attribute + Value for Excel pivot. "
+                    "wide: one row per country and round. detail: UPR Data sheet columns."
+                ),
+            },
+            {
+                "name": "section",
+                "type": "text",
+                "placeholder": "Section name",
+                "description": "Limit rows to one Section value (layout=detail only). Omit to return every section.",
+            },
+        ],
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/documents",
+        "methods": ["GET"],
+        "auth": "public",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Landscape HTML gallery of the same unified plans and reports "
+            "as the mobile app. Public — no API key. Open the URL directly, or iframe it. "
+            "For a Power BI HTML visual, request format=powerbi to receive an iframe snippet. "
+            "Dropdowns filter by country, document type, and year; sort and search (q) match the app."
+        ),
+        "consumers": "Power BI HTML visual, browser",
+        "paginated": False,
+        "query_params": [
+            {
+                "name": "format",
+                "type": "text",
+                "placeholder": "powerbi",
+                "description": "Set to powerbi to return an iframe snippet for the HTML visual. Omit for the gallery page.",
+            },
+            {
+                "name": "q",
+                "type": "text",
+                "placeholder": "Kenya plan",
+                "description": "Search title, country, country code, and document type.",
+            },
+            {
+                "name": "country",
+                "type": "text",
+                "placeholder": "Kenya",
+                "description": "Country display name. Omit for every country.",
+            },
+            {
+                "name": "type",
+                "type": "text",
+                "placeholder": "1851",
+                "description": "Appeals type id: 1851 Plan, 10009 Mid-Year Report, 10011 Annual Report.",
+            },
+            {
+                "name": "year",
+                "type": "text",
+                "placeholder": "2026",
+                "description": "Document year taken from the IFRC title. Omit for every year.",
+            },
+            {
+                "name": "sort",
+                "type": "select",
+                "options": ["newest", "oldest", "country_az", "country_za"],
+                "description": "newest (default), oldest, country_az, or country_za.",
+            },
+        ],
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/nskeydata",
+        "methods": ["GET"],
+        "auth": "public",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Volunteers, staff, branches, and local units: one figure per country and year. "
+            "Public — no API key. "
+            "Templates 21 (FDRS), 24 (planning), and 33 (annual and mid-year reporting) collect the same four indicators. "
+            "The row uses the latest approved time period for that country and year: "
+            "FDRS, then annual reporting, then mid-year reporting, then planning. "
+            "A later approval of an earlier period does not replace it. "
+            "A planning round is dated to the year it was reported: P27 belongs to 2026. "
+            "Source names that round (FDRS, Planning 2027, Annual reporting 2024, or Mid-year reporting 2024). "
+            "For planning, the year in Source is the plan year while Year is the year the figures belong to. "
+            "All four figures come from that source; a blank there stays blank. "
+            "Only approved country assignments are included. "
+            "Filters: iso2, iso3, year."
+        ),
+        "consumers": "Power BI, browser, Custom GPT, MCP",
+        "paginated": False,
+        "query_params": [
+            {
+                "name": "iso2",
+                "type": "text",
+                "placeholder": "KE",
+                "description": "Filter by ISO 3166-1 alpha-2. Omit for every country.",
+            },
+            {
+                "name": "iso3",
+                "type": "select",
+                "option_source": "country_iso3",
+                "description": "Filter by ISO 3166-1 alpha-3. Omit for every country.",
+            },
+            {
+                "name": "year",
+                "type": "number",
+                "placeholder": "2024",
+                "description": "Calendar year. Omit for every year.",
+            },
+        ],
+    },
+]
+
+_TEMPLATE_FILTERS = frozenset(TEMPLATE_KIND.values())
+
+
+_COLUMNS_BY_PATH = {
+    "/api/v1/upr/data": {"data": list(FACT_COLUMNS), "submissions": list(SUBMISSION_COLUMNS)},
+    "/api/v1/upr/overall": {"data": list(OVERALL_COLUMNS)},
+    "/api/v1/upr/submissions": {"data": list(SUBMISSION_COLUMNS)},
+    "/api/v1/upr/master": {"data": list(MASTER_COLUMNS)},
+    "/api/v1/nskeydata": {"data": list(NS_KEY_COLUMNS)},
+}
+
+_SECTION_VALUES = (
+    "NS Data",
+    "Core indicators",
+    "Other indicators",
+    "Funding",
+    "Support",
+    "Activities",
+    "Reach",
+    "Emergencies",
+    "Comments",
+)
+
+
+def upr_api_documentation() -> dict:
+    """Parameter and column reference for the UPR extracts."""
+    return {
+        "auth": (
+            "Bearer token, X-API-Key header, api_key query parameter, "
+            "or a Backoffice session. "
+            "GET /api/v1/upr/documents and GET /api/v1/nskeydata are public and do not use this."
+        ),
+        "round_codes": {
+            "report_midyear": "MYRyy, for example MYR26",
+            "report_annual": "ARyy, for example AR25",
+            "plan": "Pyy, for example P27",
+        },
+        "endpoints": [_endpoint_doc(endpoint) for endpoint in API_ENDPOINTS],
+    }
+
+
+def _endpoint_doc(endpoint: dict) -> dict:
+    path = endpoint["path"]
+    doc = {
+        "path": path,
+        "methods": list(endpoint["methods"]),
+        "description": endpoint["description"],
+        "paginated": bool(endpoint.get("paginated")),
+        "parameters": [_parameter_doc(param) for param in endpoint.get("query_params") or []],
+    }
+    if endpoint.get("auth"):
+        doc["auth"] = endpoint["auth"]
+    columns = _COLUMNS_BY_PATH.get(path)
+    if columns:
+        doc["columns"] = columns
+    return doc
+
+
+def _parameter_doc(param: dict) -> dict:
+    name = param["name"]
+    doc = {
+        "name": name,
+        "required": False,
+        "description": param.get("description"),
+    }
+    if name == "template":
+        doc["values"] = list(param.get("options") or [])
+    elif name == "round":
+        doc["multiple"] = True
+        doc["example"] = "MYR26,P27"
+        doc["repeat"] = "round=MYR26&round=P27"
+    elif name == "section":
+        doc["values"] = list(_SECTION_VALUES)
+        doc["example"] = param.get("placeholder")
+    elif name == "iso2":
+        doc["example"] = "KE"
+    elif name == "iso3":
+        doc["example"] = "AFG"
+    options = param.get("options")
+    if options and "values" not in doc:
+        doc["values"] = list(options)
+    return doc
+
+
+def _round_param() -> str | None:
+    """Canonical comma-separated round filter. Repeated ``round`` params are combined."""
+    codes = parse_round_codes(",".join(request.args.getlist("round")))
+    return ",".join(codes) if codes else None
+
+
+def _request_scope() -> tuple[dict, str | None]:
+    """Filters shared with ``/api/v1/data``: ids, template_id, country, period, item.
+
+    Returns ``(scope, iso3)``; ``country_iso3`` is an alias of ``iso3``. Raises ``ValueError``
+    for malformed values.
+    """
+    scope: dict = {}
+    for key in ("submission_id", "template_id", "country_id", "item_id"):
+        raw = (request.args.get(key) or "").strip()
+        if raw:
+            if not raw.isdigit():
+                raise ValueError(f"{key} must be an integer")
+            scope[key] = int(raw)
+    assignment_ids = parse_assignment_id_filters(request.args)
+    if assignment_ids:
+        scope["assignment_ids"] = sorted(assignment_ids)
+    iso2 = (request.args.get("country_iso2") or request.args.get("iso2") or "").strip().upper()
+    if iso2:
+        if len(iso2) != 2 or not iso2.isalpha():
+            raise ValueError("country_iso2 must be a 2-letter country code")
+        scope["iso2"] = iso2
+    period = (request.args.get("period_name") or "").strip()
+    if period:
+        scope["period_name"] = period
+    iso3 = (request.args.get("iso3") or request.args.get("country_iso3") or "").strip().upper() or None
+    if iso3 and (len(iso3) != 3 or not iso3.isalpha()):
+        raise ValueError("iso3 must be a 3-letter country code")
+    return scope, iso3
+
+
+def _extract_response(body, *, cache_hit: bool):
+    response = json_response(body)
+    response.headers["X-UPR-Cache"] = "HIT" if cache_hit else "MISS"
+    # Prevent browser/proxy caches from outliving the transactionally versioned
+    # server cache.
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@bp.route("/api/v1/upr", methods=["GET"], strict_slashes=False)
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+def get_upr_docs():
+    """Query parameters and response columns for the UPR extracts (not the data itself)."""
+    return json_response(upr_api_documentation())
+
+
+@bp.route("/api/v1/upr/data", methods=["GET"])
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+def get_upr_data():
+    """Long-form UPR facts and submissions. Comment answers are rows in data."""
+    try:
+        template = (request.args.get("template") or "").strip().lower() or None
+        if template and template not in _TEMPLATE_FILTERS:
+            return api_error("template must be report, plan, or pns", 400)
+
+        round_code = _round_param()
+        scope, iso3 = _request_scope()
+        section = (request.args.get("section") or request.args.get("table") or "").strip().lower() or None
+        params = {
+            "template": template,
+            "round": round_code,
+            "iso3": iso3,
+            "section": section,
+        }
+        if scope:
+            params["scope"] = scope
+        payload, cache_hit = get_or_build_upr_payload(
+            "data",
+            params,
+            lambda: build_upr_data(
+                template=template,
+                round_code=round_code,
+                iso3=iso3,
+                table=section,
+                scope=scope,
+            ),
+        )
+        facts = payload["data"]
+        return _extract_response(
+            {
+                "data": facts,
+                "submissions": payload["submissions"],
+                "meta": {
+                    "total": len(facts),
+                    "submissions": len(payload["submissions"]),
+                    "columns": list(FACT_COLUMNS),
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except ValueError as error:
+        return api_error(str(error), 400)
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+@bp.route("/api/v1/upr/overall", methods=["GET"])
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+def get_upr_overall():
+    """FDRS and Unified Reporting merged; FDRS wins where both reported an indicator."""
+    try:
+        iso3 = (request.args.get("iso3") or request.args.get("country_iso3") or "").strip().upper() or None
+        if iso3 and (len(iso3) != 3 or not iso3.isalpha()):
+            return api_error("iso3 must be a 3-letter country code", 400)
+        year_raw = (request.args.get("year") or "").strip()
+        if year_raw and (not year_raw.isdigit() or len(year_raw) != 4):
+            return api_error("year must be a 4-digit calendar year", 400)
+        year = int(year_raw) if year_raw else None
+        section = (request.args.get("section") or "").strip().lower() or None
+
+        payload, cache_hit = get_or_build_upr_payload(
+            "overall",
+            {"iso3": iso3, "year": year, "section": section},
+            lambda: build_overall_data(iso3=iso3, year=year, section=section),
+        )
+        rows = payload["data"]
+        return _extract_response(
+            {
+                "data": rows,
+                "meta": {
+                    "total": len(rows),
+                    "columns": list(OVERALL_COLUMNS),
+                    "priority": (
+                        "Per country, year and indicator: FDRS, then Unified Reporting "
+                        "annual report, then Unified Reporting mid-year. "
+                        "FDRS approved only; Unified Reporting any status."
+                    ),
+                    "data_sources": ["FDRS", "Unified Reporting"],
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+@bp.route("/api/v1/upr/submissions", methods=["GET"])
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+def get_upr_submissions():
+    """Country assignment statuses across all UPR rounds."""
+    try:
+        template = (request.args.get("template") or "").strip().lower() or None
+        if template and template not in _TEMPLATE_FILTERS:
+            return api_error("template must be report, plan, or pns", 400)
+
+        round_code = _round_param()
+        scope, iso3 = _request_scope()
+        params = {
+            "template": template,
+            "round": round_code,
+            "iso3": iso3,
+        }
+        if scope:
+            params["scope"] = scope
+        payload, cache_hit = get_or_build_upr_payload(
+            "submissions",
+            params,
+            lambda: build_upr_submissions(
+                template=template,
+                round_code=round_code,
+                iso3=iso3,
+                scope=scope,
+            ),
+        )
+        rows = payload["data"]
+        return _extract_response(
+            {
+                "data": rows,
+                "meta": {
+                    "total": len(rows),
+                    "columns": list(SUBMISSION_COLUMNS),
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except ValueError as error:
+        return api_error(str(error), 400)
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+def _secondary_summary_table() -> list[dict]:
+    """One row per secondary reference source (population, INFORM, HDI, …)."""
+    from plugins.upr.secondary.registry import list_sources
+
+    keys = ("id", "label", "source", "edition", "status", "row_count", "updated_at")
+    out = []
+    for item in list_sources():
+        row = {key: item.get(key) for key in keys}
+        rounds = item.get("rounds")
+        if rounds is not None:
+            row["rounds"] = [
+                {k: r.get(k) for k in ("round", "year", "row_count", "updated_at")} for r in rounds
+            ]
+        out.append(row)
+    return out
+
+
+@bp.route("/api/v1/upr/master", methods=["GET"])
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+def get_upr_master():
+    """Flat rows matching the UPR Master workbook sheet ``UPR Data``."""
+    try:
+        template = (request.args.get("template") or "").strip().lower() or None
+        if template and template not in _TEMPLATE_FILTERS:
+            return api_error("template must be report, plan, or pns", 400)
+
+        round_code = _round_param()
+        scope, iso3 = _request_scope()
+        section = (request.args.get("section") or "").strip().lower() or None
+        layout = (request.args.get("layout") or "long").strip().lower()
+        if layout not in {"wide", "long", "detail"}:
+            return api_error("layout must be long, wide, or detail", 400)
+        params = {
+            "template": template,
+            "round": round_code,
+            "iso3": iso3,
+            "section": section,
+            "layout": layout,
+        }
+        if scope:
+            params["scope"] = scope
+        payload, cache_hit = get_or_build_upr_payload(
+            "master",
+            params,
+            lambda: build_upr_master(
+                template=template,
+                round_code=round_code,
+                iso3=iso3,
+                section=section,
+                scope=scope,
+                layout=layout,
+            ),
+        )
+        rows = payload["data"]
+        return _extract_response(
+            {
+                "data": rows,
+                "secondary_summary": _secondary_summary_table(),
+                "meta": {
+                    "total": len(rows),
+                    "columns": payload.get("columns") or list(MASTER_COLUMNS),
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except ValueError as error:
+        return api_error(str(error), 400)
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+def _ns_key_filters() -> tuple[str | None, str | None, int | None]:
+    iso2 = (request.args.get("iso2") or "").strip().upper() or None
+    if iso2 and (len(iso2) != 2 or not iso2.isalpha()):
+        raise ValueError("iso2 must be a 2-letter country code")
+    iso3 = (request.args.get("iso3") or "").strip().upper() or None
+    if iso3 and (len(iso3) != 3 or not iso3.isalpha()):
+        raise ValueError("iso3 must be a 3-letter country code")
+    year_raw = (request.args.get("year") or "").strip()
+    if not year_raw:
+        return iso2, iso3, None
+    if not year_raw.isdigit() or len(year_raw) != 4:
+        raise ValueError("year must be a 4-digit calendar year")
+    return iso2, iso3, int(year_raw)
+
+
+@bp.route("/api/v1/nskeydata", methods=["GET"])
+@api_rate_limit()
+def get_ns_key_data():
+    """One approved figure per country and year for the four National Society key indicators.
+
+    Public read — no API key or session required.
+    """
+    try:
+        try:
+            iso2, iso3, year = _ns_key_filters()
+        except ValueError as error:
+            return api_error(str(error), 400)
+
+        payload, cache_hit = get_or_build_upr_payload(
+            "nskeydata-period",
+            {},
+            lambda: {"data": load_ns_key_rows()},
+        )
+        rows = payload["data"]
+        if iso2:
+            rows = [row for row in rows if row.get("ISO2") == iso2]
+        if iso3:
+            rows = [row for row in rows if row.get("ISO3") == iso3]
+        if year is not None:
+            rows = [row for row in rows if row.get("Year") == year]
+        return _extract_response(
+            {
+                "data": rows,
+                "meta": {
+                    "total": len(rows),
+                    "columns": list(NS_KEY_COLUMNS),
+                    "priority": (
+                        "Latest approved time period for that country and year: "
+                        "FDRS (template 21), then annual reporting, then mid-year reporting, "
+                        "then planning (template 24). "
+                        "Planning 2027 (P27) is the 2026 figure."
+                    ),
+                    "sources": [
+                        "FDRS",
+                        "Planning YYYY",
+                        "Annual reporting YYYY",
+                        "Mid-year reporting YYYY",
+                    ],
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+

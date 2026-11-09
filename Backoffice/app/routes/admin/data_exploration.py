@@ -24,6 +24,7 @@ from app.utils.datetime_helpers import utcnow
 from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.data_explorer import (
     CORE_DATA_EXPLORER_PERMISSIONS,
+    canonical_explore_tab_id,
     explore_tab_access_flags,
     manage_flag_key,
     resolve_explore_tab,
@@ -232,11 +233,31 @@ def _templates_for_disaggregation(templates, tab_flags):
     return panel_templates
 
 
+def _redirect_legacy_explore_tab():
+    """Send ``?tab=<retired id>`` to the current tab id, keeping the other query params."""
+    requested_tab = request.args.get("tab")
+    if not requested_tab:
+        return None
+    try:
+        canonical = canonical_explore_tab_id(_plugin_manager(), requested_tab)
+    except Exception as exc:
+        logger.debug("Legacy explore tab redirect skipped: %s", exc)
+        return None
+    if not canonical or canonical == requested_tab:
+        return None
+    params = request.args.to_dict(flat=True)
+    params["tab"] = canonical
+    return redirect(url_for("data_exploration.explore_data", **params))
+
+
 # === Data Exploration Routes ===
 @bp.route("/data-exploration", methods=["GET"])
 @data_explorer_required
 def explore_data():
     """Display data exploration page with filters for template and assignment."""
+    legacy_redirect = _redirect_legacy_explore_tab()
+    if legacy_redirect is not None:
+        return legacy_redirect
     try:
         tab_flags = _explore_tab_access_flags(current_user)
         requested_tab = request.args.get('tab')

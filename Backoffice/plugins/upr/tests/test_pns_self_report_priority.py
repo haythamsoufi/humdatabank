@@ -6,16 +6,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from plugins.upr.catalog import PLAN_ITEM_FALLBACKS
-from plugins.upr.financial import _plan_financial
-from plugins.upr.pns_funding import (
+from plugins.upr.dashboards.catalog import PLAN_ITEM_FALLBACKS
+from plugins.upr.dashboards.financial import _plan_financial
+from plugins.upr.dashboards.pns_funding import (
     PnsPlanOverride,
     overrides_for_year,
     strip_pns_rows,
     t22_funding_cells_by_year,
     t22_host_funding_by_pns,
 )
-from plugins.upr.support import _plan_support
+from plugins.upr.dashboards.support import _plan_support
 
 HOST_COUNTRY = 1
 Y0_ITEM = SimpleNamespace(id=PLAN_ITEM_FALLBACKS["funding_y0"], label="Funding Requirement", order=0)
@@ -126,7 +126,7 @@ def _overrides():
 
 @pytest.mark.unit
 def test_plan_financial_pns_self_report_replaces_country_figure_per_year(monkeypatch):
-    monkeypatch.setattr("plugins.upr.financial.load_t22_pns_overrides", lambda *_a, **_k: _overrides())
+    monkeypatch.setattr("plugins.upr.dashboards.financial.load_t22_pns_overrides", lambda *_a, **_k: _overrides())
     by_item = _plan_entries(
         {
             "HNS_SP1": 1_000_000,
@@ -148,17 +148,17 @@ def test_plan_financial_pns_self_report_replaces_country_figure_per_year(monkeyp
 
 @pytest.mark.unit
 def test_plan_financial_without_overrides_uses_country_figures(monkeypatch):
-    monkeypatch.setattr("plugins.upr.financial.load_t22_pns_overrides", lambda *_a, **_k: {})
+    monkeypatch.setattr("plugins.upr.dashboards.financial.load_t22_pns_overrides", lambda *_a, **_k: {})
     result = _plan_financial(ITEMS, _plan_entries({"7_SP1": 5_000_000}), "2026", country_id=HOST_COUNTRY)
     assert result["years"][0]["pns"] == 5_000_000
 
 
 @pytest.mark.unit
 def test_plan_support_pns_self_report_takes_priority(monkeypatch):
-    monkeypatch.setattr("plugins.upr.support.load_t22_pns_overrides", lambda *_a, **_k: _overrides())
-    monkeypatch.setattr("plugins.upr.support._load_t22_funding_by_pns", lambda *_a, **_k: {})
+    monkeypatch.setattr("plugins.upr.dashboards.support.load_t22_pns_overrides", lambda *_a, **_k: _overrides())
+    monkeypatch.setattr("plugins.upr.dashboards.support._load_t22_funding_by_pns", lambda *_a, **_k: {})
     monkeypatch.setattr(
-        "plugins.upr.support._ns_names",
+        "plugins.upr.dashboards.support._ns_names",
         lambda ids: {7: "British Red Cross", 12: "Austrian Red Cross", 20: "Danish Red Cross"},
     )
     by_item = _plan_entries(

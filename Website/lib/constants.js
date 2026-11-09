@@ -18,7 +18,7 @@ export const GLOBAL_INITIATIVE_TEMPLATE_IDS = {
 
 /**
  * Unified Planning and Reporting template ids. These match Backoffice
- * `plugins/upr/catalog.py` (plan 24, country reporting 33).
+ * `plugins/upr/dashboards/catalog.py` (plan 24, country reporting 33).
  */
 export const UPR_PLAN_TEMPLATE_ID = 24;
 export const UPR_REPORT_TEMPLATE_ID = 33;

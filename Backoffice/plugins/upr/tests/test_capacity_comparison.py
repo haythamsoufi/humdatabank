@@ -1,10 +1,10 @@
 """Planning vs reporting comparison for volunteers, staff, branches, and local units."""
 
-from plugins.upr.capacity_comparison import (
+from plugins.upr.dashboards.capacity_comparison import (
     build_capacity_comparison,
     rows_to_observations,
 )
-from plugins.upr.catalog import KPI_BANK_IDS, PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+from plugins.upr.dashboards.catalog import KPI_BANK_IDS, PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
 
 VOLUNTEERS = KPI_BANK_IDS["volunteers"]
 STAFF = KPI_BANK_IDS["staff"]

@@ -11,6 +11,19 @@
     var root = global.UprAnalysis = global.UprAnalysis || {};
 
     var TRACKS = ['ALL', 'P', 'MYR', 'AR'];
+    var GP_SECTIONS = [
+        'overview',
+        'secretariat',
+        'pns',
+        'yearly',
+        'regional',
+        'divisional',
+        'geo',
+        'people_reached',
+        'emergencies',
+        'countries',
+        'prioritisation'
+    ];
 
     function hasData(view) {
         return !!(view && view.has_data);
@@ -18,8 +31,7 @@
 
     /**
      * The sections that can be exported right now:
-     * ``[{id, label, available}]`` — ``data`` plus one ``track:<code>`` per
-     * participation round type.
+     * ``[{id, label, available}]`` — ``data``, ``track:<code>``, ``global_plan:<id>``.
      */
     function sections(source, ui) {
         ui = ui || {};
@@ -31,6 +43,15 @@
             list.push({
                 id: 'track:' + track,
                 label: title ? title + ' — ' + label : label,
+                available: hasData(view)
+            });
+        });
+        GP_SECTIONS.forEach(function (sectionId) {
+            var view = source.globalPlan && source.globalPlan[sectionId];
+            var label = ui['gp_section_' + sectionId] || sectionId;
+            list.push({
+                id: 'global_plan:' + sectionId,
+                label: label,
                 available: hasData(view)
             });
         });
@@ -59,7 +80,7 @@
     }
 
     /**
-     * ``options``: ``{impact, narrative, ui, region, generatedAt, selected,
+     * ``options``: ``{impact, narrative, globalPlan, ui, region, generatedAt, selected,
      * includeTables}`` where ``selected`` is a list of section ids (see
      * ``sections``). Unavailable or unselected sections are skipped. Returns
      * ``[]`` when nothing is left to show.
@@ -67,13 +88,20 @@
     function buildOutline(options) {
         var ui = options.ui || {};
         var wanted = options.selected || [];
-        var source = { impact: options.impact, narrative: options.narrative };
+        var source = {
+            impact: options.impact,
+            narrative: options.narrative,
+            globalPlan: options.globalPlan
+        };
         var body = [];
 
         sections(source, ui).forEach(function (entry) {
             if (!entry.available || wanted.indexOf(entry.id) === -1) return;
             if (entry.id === 'data') {
                 body = body.concat(sectionBlocks(entry.id, ui.section_data || options.impact.title, options.impact, options));
+            } else if (entry.id.indexOf('global_plan:') === 0) {
+                var gpId = entry.id.slice('global_plan:'.length);
+                body = body.concat(sectionBlocks(entry.id, entry.label, options.globalPlan[gpId], options));
             } else {
                 var track = entry.id.slice('track:'.length);
                 body = body.concat(sectionBlocks(entry.id, entry.label, options.narrative[track], options));
@@ -83,11 +111,15 @@
 
         var when = options.generatedAt instanceof Date ? options.generatedAt : new Date();
         var date = when.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-        var title = (options.impact && options.impact.title) || (options.narrative && options.narrative.ALL && options.narrative.ALL.title) || '';
+        var title = (options.impact && options.impact.title)
+            || (options.globalPlan && options.globalPlan.overview && options.globalPlan.overview.title)
+            || (options.narrative && options.narrative.ALL && options.narrative.ALL.title)
+            || '';
         var cover = {
             type: 'cover',
             title: title,
-            lead: options.impact && options.impact.lead,
+            lead: (options.impact && options.impact.lead)
+                || (options.globalPlan && options.globalPlan.overview && options.globalPlan.overview.lead),
             lines: [
                 root.format.fill(ui.export_region, { region: options.region || ui.export_all_regions || '' }),
                 root.format.fill(ui.export_generated, { date: date })
@@ -96,5 +128,10 @@
         return [cover].concat(body);
     }
 
-    root.pages = { TRACKS: TRACKS, sections: sections, buildOutline: buildOutline };
+    root.pages = {
+        TRACKS: TRACKS,
+        GP_SECTIONS: GP_SECTIONS,
+        sections: sections,
+        buildOutline: buildOutline
+    };
 })(typeof window !== 'undefined' ? window : globalThis);

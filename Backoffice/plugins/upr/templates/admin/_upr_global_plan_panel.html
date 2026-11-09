@@ -1,0 +1,272 @@
+{% set overlay = settings.global_plan_overlay or {} %}
+{% set years = overlay.years or {} %}
+<div class="space-y-6" id="upr-global-plan-settings"
+     data-overlay-url="{{ url_for('upr.global_plan_overlay_save') }}"
+     data-overlay="{{ overlay|tojson|forceescape }}">
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+        <p class="font-medium mb-1">{{ _('Manual overlays for the Analysis → Global Plan tab') }}</p>
+        <p>{{ _('Live Unified Plan funding, reach and PNS figures come from the databank. Use this form for special purpose funds, emergency-appeal estimates, appeal lines, large-emergency country flags, and Geneva division rows that are not in the forms.') }}</p>
+        <p class="mt-2">{{ _('ODA and NSIF flags are National Society categories — edit them under') }}
+            <a class="underline font-medium" href="{{ url_for('organization.index', tab='nss') }}">{{ _('Organization') }}</a>.
+        </p>
+    </div>
+
+    <section class="border border-gray-200 rounded-lg p-4 bg-white">
+        <h3 class="text-base font-semibold text-gray-800 mb-3">{{ _('Year totals') }}</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <label class="text-sm">
+                <span class="block text-gray-600 mb-1">{{ _('Year') }}</span>
+                <input type="number" id="gp-year" class="w-full border border-gray-300 rounded-md px-3 py-2" value="2027" min="2020" max="2040">
+            </label>
+            <label class="text-sm">
+                <span class="block text-gray-600 mb-1">{{ _('Special purpose funds (CHF)') }}</span>
+                <input type="number" id="gp-spf" class="w-full border border-gray-300 rounded-md px-3 py-2" step="any">
+            </label>
+            <label class="text-sm">
+                <span class="block text-gray-600 mb-1">{{ _('New emergency appeals estimate (CHF)') }}</span>
+                <input type="number" id="gp-ea-est" class="w-full border border-gray-300 rounded-md px-3 py-2" step="any">
+            </label>
+            <label class="text-sm">
+                <span class="block text-gray-600 mb-1">{{ _('EA rolling-over estimate (CHF)') }}</span>
+                <input type="number" id="gp-ea-rollover" class="w-full border border-gray-300 rounded-md px-3 py-2" step="any">
+            </label>
+            <label class="text-sm md:col-span-2 flex items-start gap-2 pt-6">
+                <input type="checkbox" id="gp-use-manual-ea" class="mt-1 rounded border-gray-300">
+                <span>{{ _('Use manual EA rolling estimate for IFRC (instead of country-plan EA totals) for this year') }}</span>
+            </label>
+            <label class="text-sm md:col-span-4">
+                <span class="block text-gray-600 mb-1">{{ _('Note for this year') }}</span>
+                <input type="text" id="gp-year-note" class="w-full border border-gray-300 rounded-md px-3 py-2" maxlength="500">
+            </label>
+        </div>
+        <p class="mt-2 text-xs text-gray-500">{{ _('By default, IFRC emergency funding on Global Plan charts comes from country Unified Plan EA lines. Tick the box only when you want the manual rolling-over figure to replace those country EA totals for the IFRC Secretariat.') }}</p>
+        <button type="button" id="gp-apply-year" class="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg">{{ _('Apply year totals') }}</button>
+        <p id="gp-years-summary" class="mt-3 text-sm text-gray-600"></p>
+    </section>
+
+    <section class="border border-gray-200 rounded-lg p-4 bg-white">
+        <h3 class="text-base font-semibold text-gray-800 mb-3">{{ _('Large emergency countries (ISO3)') }}</h3>
+        <textarea id="gp-large-ea" class="w-full border border-gray-300 rounded-md px-3 py-2 font-mono text-sm" rows="2"
+                  placeholder="UKR, SDN, ..."></textarea>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Comma-separated ISO3 codes used in the prioritisation “large emergency” signal.') }}</p>
+    </section>
+
+    <section class="border border-gray-200 rounded-lg p-4 bg-white">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-semibold text-gray-800">{{ _('Emergency appeals') }}</h3>
+            <button type="button" id="gp-add-appeal" class="text-sm text-indigo-700 hover:underline">{{ _('Add row') }}</button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm" id="gp-appeals-table">
+                <thead class="bg-gray-50 text-left">
+                    <tr>
+                        <th class="px-2 py-1">{{ _('Year') }}</th>
+                        <th class="px-2 py-1">{{ _('Name') }}</th>
+                        <th class="px-2 py-1">{{ _('ISO3') }}</th>
+                        <th class="px-2 py-1">{{ _('Country') }}</th>
+                        <th class="px-2 py-1">{{ _('Region') }}</th>
+                        <th class="px-2 py-1">{{ _('Requested') }}</th>
+                        <th class="px-2 py-1">{{ _('Funded') }}</th>
+                        <th class="px-2 py-1"></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="border border-gray-200 rounded-lg p-4 bg-white">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-semibold text-gray-800">{{ _('Division rows') }}</h3>
+            <button type="button" id="gp-add-division" class="text-sm text-indigo-700 hover:underline">{{ _('Add row') }}</button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm" id="gp-divisions-table">
+                <thead class="bg-gray-50 text-left">
+                    <tr>
+                        <th class="px-2 py-1">{{ _('Year') }}</th>
+                        <th class="px-2 py-1">{{ _('Division') }}</th>
+                        <th class="px-2 py-1">{{ _('Department') }}</th>
+                        <th class="px-2 py-1">{{ _('Area') }}</th>
+                        <th class="px-2 py-1">{{ _('Value (CHF)') }}</th>
+                        <th class="px-2 py-1"></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="flex items-center gap-3">
+        <button type="button" id="gp-save" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-lg text-sm">{{ _('Save Global Plan overlay') }}</button>
+        <span id="gp-save-status" class="text-sm text-gray-600" aria-live="polite"></span>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  const root = document.getElementById("upr-global-plan-settings");
+  if (!root) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
+  let overlay = {};
+  try { overlay = JSON.parse(root.getAttribute("data-overlay") || "{}") || {}; } catch (e) { overlay = {}; }
+  overlay.years = overlay.years || {};
+  overlay.appeals = Array.isArray(overlay.appeals) ? overlay.appeals : [];
+  overlay.divisions = Array.isArray(overlay.divisions) ? overlay.divisions : [];
+  overlay.large_emergency_iso3 = Array.isArray(overlay.large_emergency_iso3) ? overlay.large_emergency_iso3 : [];
+
+  const yearInput = document.getElementById("gp-year");
+  const spfInput = document.getElementById("gp-spf");
+  const eaEstInput = document.getElementById("gp-ea-est");
+  const eaRolloverInput = document.getElementById("gp-ea-rollover");
+  const useManualEaInput = document.getElementById("gp-use-manual-ea");
+  const noteInput = document.getElementById("gp-year-note");
+  const largeInput = document.getElementById("gp-large-ea");
+  const statusEl = document.getElementById("gp-save-status");
+  const yearsSummary = document.getElementById("gp-years-summary");
+  const appealsBody = document.querySelector("#gp-appeals-table tbody");
+  const divisionsBody = document.querySelector("#gp-divisions-table tbody");
+
+  function numOrNull(value) {
+    if (value === "" || value === null || value === undefined) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function loadYearForm() {
+    const y = String(yearInput.value || "");
+    const block = overlay.years[y] || {};
+    spfInput.value = block.special_purpose_funds ?? "";
+    eaEstInput.value = block.new_emergency_appeals_estimate ?? "";
+    eaRolloverInput.value = block.emergency_appeals_rollover ?? "";
+    useManualEaInput.checked = !!block.use_manual_ea_rollover;
+    noteInput.value = block.note || "";
+    yearsSummary.textContent = Object.keys(overlay.years).sort().map(function (key) {
+      const b = overlay.years[key] || {};
+      const eaMode = b.use_manual_ea_rollover ? ("manual EA=" + (b.emergency_appeals_rollover ?? "—")) : "country EA";
+      return key + ": SPF=" + (b.special_purpose_funds ?? "—") + ", new EA est=" + (b.new_emergency_appeals_estimate ?? "—") + ", " + eaMode;
+    }).join(" · ");
+  }
+
+  function applyYear() {
+    const y = String(yearInput.value || "").trim();
+    if (!y) return;
+    overlay.years[y] = {
+      special_purpose_funds: numOrNull(spfInput.value),
+      new_emergency_appeals_estimate: numOrNull(eaEstInput.value),
+      emergency_appeals_rollover: numOrNull(eaRolloverInput.value),
+      use_manual_ea_rollover: !!useManualEaInput.checked,
+      note: (noteInput.value || "").trim()
+    };
+    loadYearForm();
+  }
+
+  function appealRow(data) {
+    data = data || {};
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="px-1 py-1"><input type="number" class="gp-a-year w-20 border rounded px-1 py-1" value="' + (data.year ?? "") + '"></td>' +
+      '<td class="px-1 py-1"><input type="text" class="gp-a-name w-40 border rounded px-1 py-1" value="' + (data.name || "").replace(/"/g, "&quot;") + '"></td>' +
+      '<td class="px-1 py-1"><input type="text" class="gp-a-iso3 w-16 border rounded px-1 py-1" value="' + (data.iso3 || "") + '"></td>' +
+      '<td class="px-1 py-1"><input type="text" class="gp-a-country w-32 border rounded px-1 py-1" value="' + (data.country || "").replace(/"/g, "&quot;") + '"></td>' +
+      '<td class="px-1 py-1"><input type="text" class="gp-a-region w-28 border rounded px-1 py-1" value="' + (data.region || "").replace(/"/g, "&quot;") + '"></td>' +
+      '<td class="px-1 py-1"><input type="number" class="gp-a-req w-28 border rounded px-1 py-1" step="any" value="' + (data.amount_requested ?? "") + '"></td>' +
+      '<td class="px-1 py-1"><input type="number" class="gp-a-fund w-28 border rounded px-1 py-1" step="any" value="' + (data.amount_funded ?? "") + '"></td>' +
+      '<td class="px-1 py-1"><button type="button" class="gp-remove text-red-600 text-xs">Remove</button></td>';
+    tr.querySelector(".gp-remove").addEventListener("click", function () { tr.remove(); });
+    return tr;
+  }
+
+  function divisionRow(data) {
+    data = data || {};
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="px-1 py-1"><input type="number" class="gp-d-year w-20 border rounded px-1 py-1" value="' + (data.year ?? "") + '"></td>' +
+      '<td class="px-1 py-1"><input type="text" class="gp-d-div w-40 border rounded px-1 py-1" value="' + (data.division || "").replace(/"/g, "&quot;") + '"></td>' +
+      '<td class="px-1 py-1"><input type="text" class="gp-d-dept w-32 border rounded px-1 py-1" value="' + (data.department || "").replace(/"/g, "&quot;") + '"></td>' +
+      '<td class="px-1 py-1"><input type="text" class="gp-d-area w-20 border rounded px-1 py-1" value="' + (data.area || "EFs") + '"></td>' +
+      '<td class="px-1 py-1"><input type="number" class="gp-d-value w-28 border rounded px-1 py-1" step="any" value="' + (data.value ?? "") + '"></td>' +
+      '<td class="px-1 py-1"><button type="button" class="gp-remove text-red-600 text-xs">Remove</button></td>';
+    tr.querySelector(".gp-remove").addEventListener("click", function () { tr.remove(); });
+    return tr;
+  }
+
+  function renderTables() {
+    appealsBody.replaceChildren();
+    overlay.appeals.forEach(function (row) { appealsBody.appendChild(appealRow(row)); });
+    divisionsBody.replaceChildren();
+    overlay.divisions.forEach(function (row) { divisionsBody.appendChild(divisionRow(row)); });
+    largeInput.value = (overlay.large_emergency_iso3 || []).join(", ");
+    loadYearForm();
+  }
+
+  function collectAppeals() {
+    return Array.from(appealsBody.querySelectorAll("tr")).map(function (tr) {
+      return {
+        year: numOrNull(tr.querySelector(".gp-a-year").value),
+        name: tr.querySelector(".gp-a-name").value.trim(),
+        iso3: tr.querySelector(".gp-a-iso3").value.trim().toUpperCase(),
+        country: tr.querySelector(".gp-a-country").value.trim(),
+        region: tr.querySelector(".gp-a-region").value.trim(),
+        amount_requested: numOrNull(tr.querySelector(".gp-a-req").value),
+        amount_funded: numOrNull(tr.querySelector(".gp-a-fund").value)
+      };
+    });
+  }
+
+  function collectDivisions() {
+    return Array.from(divisionsBody.querySelectorAll("tr")).map(function (tr) {
+      return {
+        year: numOrNull(tr.querySelector(".gp-d-year").value),
+        division: tr.querySelector(".gp-d-div").value.trim(),
+        department: tr.querySelector(".gp-d-dept").value.trim(),
+        area: tr.querySelector(".gp-d-area").value.trim() || "EFs",
+        value: numOrNull(tr.querySelector(".gp-d-value").value)
+      };
+    });
+  }
+
+  document.getElementById("gp-apply-year").addEventListener("click", applyYear);
+  yearInput.addEventListener("change", loadYearForm);
+  document.getElementById("gp-add-appeal").addEventListener("click", function () {
+    appealsBody.appendChild(appealRow({ year: Number(yearInput.value) || null }));
+  });
+  document.getElementById("gp-add-division").addEventListener("click", function () {
+    divisionsBody.appendChild(divisionRow({ year: Number(yearInput.value) || null, area: "EFs" }));
+  });
+
+  document.getElementById("gp-save").addEventListener("click", function () {
+    applyYear();
+    const body = {
+      overlay: {
+        years: overlay.years,
+        appeals: collectAppeals(),
+        divisions: collectDivisions(),
+        large_emergency_iso3: largeInput.value
+      }
+    };
+    statusEl.textContent = {{ _('Saving…')|tojson }};
+    fetch(root.getAttribute("data-overlay-url"), {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRFToken": csrf
+      },
+      body: JSON.stringify(body)
+    }).then(function (resp) { return resp.json().then(function (data) { return { ok: resp.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) throw new Error((result.data && (result.data.error || result.data.message)) || "Save failed");
+        overlay = result.data.overlay || body.overlay;
+        renderTables();
+        statusEl.textContent = {{ _('Saved.')|tojson }};
+      })
+      .catch(function (err) {
+        statusEl.textContent = err.message || {{ _('Save failed.')|tojson }};
+      });
+  });
+
+  renderTables();
+})();
+</script>

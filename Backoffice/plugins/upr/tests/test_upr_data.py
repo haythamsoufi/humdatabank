@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from plugins.upr import upr_data
-from plugins.upr.catalog import (
+from plugins.upr.extracts import upr_data
+from plugins.upr.dashboards.catalog import (
     PLAN_TEMPLATE_ID,
     PNS_REPORT_TEMPLATE_ID,
     REPORT_TEMPLATE_ID,
 )
-from plugins.upr.upr_data import (
+from plugins.upr.extracts.upr_data import (
     ItemView,
     appeal_code_from_text,
     assignment_year,
@@ -188,7 +188,7 @@ def test_nested_sex_age_disagg_flattens_age_bands():
 
 
 def test_fact_and_master_columns_include_shared_shaping_fields():
-    from plugins.upr.upr_data import FACT_COLUMNS, MASTER_COLUMNS
+    from plugins.upr.extracts.upr_data import FACT_COLUMNS, MASTER_COLUMNS
 
     assert "Breakdown" in FACT_COLUMNS
     assert "Data status" in FACT_COLUMNS
@@ -200,7 +200,7 @@ def test_fact_and_master_columns_include_shared_shaping_fields():
 
 
 def test_master_scalar_attaches_breakdown_json():
-    from plugins.upr.upr_data import breakdown_from_disagg, master_rows_for_item
+    from plugins.upr.extracts.upr_data import breakdown_from_disagg, master_rows_for_item
 
     disagg = {
         "mode": "sex",
@@ -392,6 +392,7 @@ def test_plan_funding_year_follows_the_item_when_the_label_has_no_offset():
         disagg={"mode": "matrix", "values": {"HNS_SP1": 80}},
     )
     assert rows[0]["Section"] == "Funding"
+    assert rows[0]["Indicator"] == "Funding Requirement"
     assert rows[0]["Year"] == 2027
     assert rows[0]["Entity"] == "HNS"
     assert rows[0]["NS"] == "Afghan Red Crescent Society"
@@ -665,7 +666,7 @@ def test_master_comment_and_other_indicator_and_pns_host():
 
 
 def test_pns_plan_t22_funding_is_emitted_per_host_country_and_year():
-    from plugins.upr.catalog import PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.dashboards.catalog import PNS_PLAN_TEMPLATE_ID
 
     place = {**_PLACE, "template": "pns", "iso3": "NOR", "country": "Norway", "period_name": "2027", "round": "P27", "source": "PNS Data"}
     item = _item(template_id=PNS_PLAN_TEMPLATE_ID, item_type="matrix", label="Funding Requirement", bank_id=None, bank_name=None, bank_area=None)
@@ -684,8 +685,141 @@ def test_pns_plan_t22_funding_is_emitted_per_host_country_and_year():
     assert any(r["SP/EF"] == "SP1" and r["Year"] == 2027 for r in rows)
 
 
+def test_pns_plan_t22_synthesizes_total_from_longer_term_when_fr_tot_missing():
+    """Spanish RC-style: SP/EF only → still emit Attribute=Total (= sum of Longer-term)."""
+    from plugins.upr.dashboards.catalog import PNS_PLAN_TEMPLATE_ID
+
+    place = {
+        **_PLACE,
+        "template": "pns",
+        "iso3": "ESP",
+        "country": "Spain",
+        "ns": "Spanish Red Cross",
+        "period_name": "2027",
+        "round": "P27",
+        "source": "PNS Data",
+        "status": "submitted",
+    }
+    item = _item(
+        template_id=PNS_PLAN_TEMPLATE_ID,
+        item_type="matrix",
+        label="Funding Requirement",
+        bank_id=None,
+        bank_name=None,
+        bank_area=None,
+    )
+    rows = facts_for_item(
+        item,
+        "pns_plan_funding",
+        place,
+        value=None,
+        disagg={"mode": "matrix", "values": {"45_SP1_2027": 100, "45_SP2_2027": 50, "45_EFs_2027": 10}},
+        country_by_id={45: {"name": "Colombia", "iso3": "COL", "region": "Americas"}},
+    )
+    longer = [r for r in rows if r["Attribute"] == "Longer-term"]
+    totals = [r for r in rows if r["Attribute"] == "Total"]
+    assert {(r["SP/EF"], r["ValueNum"]) for r in longer} == {("SP1", 100), ("SP2", 50), ("EFs", 10)}
+    assert len(totals) == 1
+    assert totals[0]["ValueNum"] == 160
+    assert totals[0]["SP/EF"] is None
+    assert all(r["Indicator"] == "Funding Requirement" for r in rows)
+
+
+def test_ensure_pns_fact_totals_covers_country_data_longer_term():
+    """Host-plan PNS rows (Country Data) with Longer-term only also get Attribute=Total."""
+    from plugins.upr.extracts.upr_data import _ensure_pns_plan_fact_totals
+
+    rows = [
+        {
+            "Round": "P27",
+            "ISO3": "BFA",
+            "NS": "Spanish Red Cross",
+            "Section": "Funding",
+            "Entity": "PNS",
+            "Source": "Country Data",
+            "Attribute": "Longer-term",
+            "SP/EF": "SP1",
+            "Indicator": "Funding Requirement",
+            "Year": 2027,
+            "Value": 100,
+            "ValueNum": 100,
+            "PNS Value": None,
+        },
+        {
+            "Round": "P27",
+            "ISO3": "BFA",
+            "NS": "Spanish Red Cross",
+            "Section": "Funding",
+            "Entity": "PNS",
+            "Source": "Country Data",
+            "Attribute": "Longer-term",
+            "SP/EF": "SP2",
+            "Indicator": "Funding Requirement",
+            "Year": 2027,
+            "Value": 50,
+            "ValueNum": 50,
+            "PNS Value": None,
+        },
+    ]
+    out = _ensure_pns_plan_fact_totals(rows)
+    totals = [r for r in out if r["Attribute"] == "Total"]
+    assert len(totals) == 1
+    assert totals[0]["ValueNum"] == 150
+    assert totals[0]["Source"] == "Country Data"
+    assert totals[0]["SP/EF"] is None
+
+
+def test_ensure_pns_fact_totals_when_pns_reported_blank_keeps_country_total():
+    """Nigeria/Norwegian style: PNS reported blank → Value null, Total still carries Country Value."""
+    from plugins.upr.extracts.upr_data import _ensure_pns_plan_fact_totals
+
+    rows = [
+        {
+            "Round": "P27",
+            "ISO3": "NGA",
+            "NS": "Norwegian Red Cross",
+            "Section": "Funding",
+            "Entity": "PNS",
+            "Source": "Country Data",
+            "Attribute": "Longer-term",
+            "SP/EF": "SP3",
+            "Indicator": "Funding Requirement",
+            "Year": 2027,
+            "Value": None,
+            "ValueNum": None,
+            "Country Value": 787000,
+            "PNS Value": None,
+            "PNS reported": "Yes",
+        },
+        {
+            "Round": "P27",
+            "ISO3": "NGA",
+            "NS": "Norwegian Red Cross",
+            "Section": "Funding",
+            "Entity": "PNS",
+            "Source": "Country Data",
+            "Attribute": "Longer-term",
+            "SP/EF": "EFs",
+            "Indicator": "Funding Requirement",
+            "Year": 2027,
+            "Value": None,
+            "ValueNum": None,
+            "Country Value": 68165,
+            "PNS Value": None,
+            "PNS reported": "Yes",
+        },
+    ]
+    out = _ensure_pns_plan_fact_totals(rows)
+    totals = [r for r in out if r["Attribute"] == "Total"]
+    assert len(totals) == 1
+    assert totals[0]["Country Value"] == 855165
+    assert totals[0]["ValueNum"] is None
+    assert totals[0]["PNS Value"] is None
+    assert totals[0]["PNS reported"] == "Yes"
+
+
 def test_pns_report_t23_funding_is_emitted_per_host_country():
-    from plugins.upr.catalog import PNS_REPORT_TEMPLATE_ID
+    from plugins.upr.dashboards.catalog import PNS_REPORT_TEMPLATE_ID
 
     place = {
         **_PLACE,
@@ -723,11 +857,11 @@ def test_pns_report_t23_funding_is_emitted_per_host_country():
 
 
 def test_pns_reported_value_wins_over_country_value_in_merge():
-    from plugins.upr.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
-    from plugins.upr.upr_data import _merge_pns_plan_funding
+    from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.extracts.upr_data import _merge_pns_plan_funding
 
     def row(sub, source, num, entity="PNS", **kw):
-        base = {"Round": "P27", "ISO3": "COL", "NS": "Norwegian Red Cross", "Section": "Funding", "Indicator": "Funding",
+        base = {"Round": "P27", "ISO3": "COL", "NS": "Norwegian Red Cross", "Section": "Funding", "Indicator": "Funding Requirement",
                 "Year": 2027, "Attribute": "Total", "SP/EF": None, "Source": source, "Entity": entity, "submission_id": sub,
                 "Value": num, "ValueNum": num, "Country Value": None, "PNS Value": None, "PNS reported": None}
         base.update(kw)
@@ -742,14 +876,175 @@ def test_pns_reported_value_wins_over_country_value_in_merge():
     out = _merge_pns_plan_funding(t24 + [t22], places, [places[2] | {"submission_id": 2}], hosts={"COL"})
     assert len(out) == 2
     y27 = next(r for r in out if r["Year"] == 2027)
+    assert y27["Source"] == "PNS Data"
     assert (y27["Country Value"], y27["PNS Value"], y27["PNS reported"], y27["ValueNum"]) == (500, 300, "Yes", 300)
     y28 = next(r for r in out if r["Year"] == 2028)
     assert (y28["Country Value"], y28["PNS Value"], y28["PNS reported"], y28["ValueNum"]) == (70, None, "Yes", None)
 
 
+def test_pns_reported_merge_takes_pns_whole_and_keeps_country_value():
+    """When PNS reported, host Country Data themes are replaced by the PNS set (like /overall)."""
+    from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.extracts.upr_data import _merge_pns_plan_funding
+
+    def row(sub, source, num, **kw):
+        base = {
+            "Round": "P27",
+            "ISO3": "COL",
+            "NS": "Spanish Red Cross",
+            "Section": "Funding",
+            "Indicator": "Funding Requirement",
+            "Year": 2027,
+            "Attribute": "Total",
+            "SP/EF": None,
+            "Source": source,
+            "Entity": "PNS",
+            "submission_id": sub,
+            "Value": num,
+            "ValueNum": num,
+            "Country Value": None,
+            "PNS Value": None,
+            "PNS reported": None,
+        }
+        base.update(kw)
+        return base
+
+    places = {
+        1: {"template_id": PLAN_TEMPLATE_ID, "round": "P27", "ns": "Colombian Red Cross", "status": "approved"},
+        2: {"template_id": PNS_PLAN_TEMPLATE_ID, "round": "P27", "ns": "Spanish Red Cross", "status": "submitted"},
+    }
+    t24 = [
+        row(1, "Country Data", 500),
+        row(1, "Country Data", 200, Attribute="Longer-term", **{"SP/EF": "SP1"}),
+        row(1, "Country Data", 50, Attribute="Longer-term", **{"SP/EF": "EFs"}),
+    ]
+    # Emit path synthesizes Total=160 from SP/EF when fr_tot is absent.
+    t22 = [
+        row(2, "PNS Data", 120, Attribute="Longer-term", **{"SP/EF": "SP1", "PNS Value": 120, "PNS reported": "Yes"}),
+        row(2, "PNS Data", 40, Attribute="Longer-term", **{"SP/EF": "SP2", "PNS Value": 40, "PNS reported": "Yes"}),
+        row(2, "PNS Data", 160, **{"PNS Value": 160, "PNS reported": "Yes"}),
+    ]
+    out = _merge_pns_plan_funding(t24 + t22, places, [places[2] | {"submission_id": 2}], hosts={"COL"})
+    assert all(r["Source"] == "PNS Data" for r in out)
+    assert {r.get("SP/EF") for r in out} == {"SP1", "SP2", None}
+    total = next(r for r in out if r["Attribute"] == "Total")
+    sp1 = next(r for r in out if r.get("SP/EF") == "SP1")
+    assert total["PNS reported"] == "Yes"
+    assert total["ValueNum"] == 160
+    assert total["Country Value"] == 500
+    assert sp1["ValueNum"] == 120
+    assert sp1["Country Value"] == 200
+
+
+def test_pns_merge_keeps_funding_for_hosts_without_unified_plan():
+    """Norwegian→UKR style: T22 host with no T24 plan must still appear in /data."""
+    from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.extracts.upr_data import _merge_pns_plan_funding
+
+    places = {
+        1: {"template_id": PLAN_TEMPLATE_ID, "round": "P27", "ns": "Colombian Red Cross", "status": "approved"},
+        2: {"template_id": PNS_PLAN_TEMPLATE_ID, "round": "P27", "ns": "Norwegian Red Cross", "status": "submitted"},
+    }
+    host = {
+        "Round": "P27",
+        "ISO3": "COL",
+        "NS": "Norwegian Red Cross",
+        "Section": "Funding",
+        "Indicator": "Funding Requirement",
+        "Year": 2027,
+        "Attribute": "Total",
+        "SP/EF": None,
+        "Source": "Country Data",
+        "Entity": "PNS",
+        "submission_id": 1,
+        "Value": 500,
+        "ValueNum": 500,
+        "Country Value": None,
+        "PNS Value": None,
+        "PNS reported": None,
+    }
+    t22_col = {
+        **host,
+        "Source": "PNS Data",
+        "submission_id": 2,
+        "Value": 300,
+        "ValueNum": 300,
+        "PNS Value": 300,
+        "PNS reported": "Yes",
+    }
+    t22_ukr = {
+        **t22_col,
+        "ISO3": "UKR",
+        "Value": 13_266_679,
+        "ValueNum": 13_266_679,
+        "PNS Value": 13_266_679,
+    }
+    out = _merge_pns_plan_funding(
+        [host, t22_col, t22_ukr],
+        places,
+        [places[2] | {"submission_id": 2}],
+        hosts={"COL"},  # UKR has no Unified Plan
+    )
+    by_iso = {r["ISO3"]: r for r in out if r["Attribute"] == "Total"}
+    assert by_iso["COL"]["ValueNum"] == 300
+    assert by_iso["UKR"]["ValueNum"] == 13_266_679
+    assert by_iso["UKR"]["Source"] == "PNS Data"
+
+
+def test_pns_merge_total_country_value_from_host_themes_when_host_has_no_total():
+    """Rwanda-style: host SP/EF only → Country Value on PNS Total = sum of host themes."""
+    from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.extracts.upr_data import _merge_pns_plan_funding
+
+    def row(sub, source, num, **kw):
+        base = {
+            "Round": "P27",
+            "ISO3": "RWA",
+            "NS": "Spanish Red Cross",
+            "Section": "Funding",
+            "Indicator": "Funding Requirement",
+            "Year": 2027,
+            "Attribute": "Total",
+            "SP/EF": None,
+            "Source": source,
+            "Entity": "PNS",
+            "submission_id": sub,
+            "Value": num,
+            "ValueNum": num,
+            "Country Value": None,
+            "PNS Value": None,
+            "PNS reported": None,
+        }
+        base.update(kw)
+        return base
+
+    places = {
+        1: {"template_id": PLAN_TEMPLATE_ID, "round": "P27", "ns": "Rwandan Red Cross", "status": "approved"},
+        2: {"template_id": PNS_PLAN_TEMPLATE_ID, "round": "P27", "ns": "Spanish Red Cross", "status": "submitted"},
+    }
+    t24 = [
+        row(1, "Country Data", 561840, Attribute="Longer-term", **{"SP/EF": "SP1"}),
+        row(1, "Country Data", 93640, Attribute="Longer-term", **{"SP/EF": "SP2"}),
+        row(1, "Country Data", 93640, Attribute="Longer-term", **{"SP/EF": "SP3"}),
+        row(1, "Country Data", 30000, Attribute="Longer-term", **{"SP/EF": "EFs"}),
+    ]
+    t22 = [
+        row(2, "PNS Data", 299800, Attribute="Longer-term", **{"SP/EF": "SP1", "PNS Value": 299800}),
+        row(2, "PNS Data", 164219, Attribute="Longer-term", **{"SP/EF": "SP2", "PNS Value": 164219}),
+        row(2, "PNS Data", 92246, Attribute="Longer-term", **{"SP/EF": "SP3", "PNS Value": 92246}),
+        row(2, "PNS Data", 27674, Attribute="Longer-term", **{"SP/EF": "EFs", "PNS Value": 27674}),
+        row(2, "PNS Data", 583939, **{"PNS Value": 583939}),
+    ]
+    out = _merge_pns_plan_funding(t24 + t22, places, [places[2] | {"submission_id": 2}], hosts={"RWA"})
+    total = next(r for r in out if r["Attribute"] == "Total")
+    assert total["PNS Value"] == 583939
+    assert total["ValueNum"] == 583939
+    assert total["Country Value"] == 779120
+
+
 def test_master_pns_reported_value_wins_over_country_value():
-    from plugins.upr.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
-    from plugins.upr.upr_data import _merge_master_pns_plan_funding, _master_pns_plan_funding_rows
+    from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, PNS_PLAN_TEMPLATE_ID
+    from plugins.upr.extracts.upr_data import _merge_master_pns_plan_funding, _master_pns_plan_funding_rows
 
     place = {**_PLACE, "template": "pns", "iso3": "NOR", "country": "Norway", "ns": "Norwegian Red Cross",
              "round": "P27", "period_name": "2027", "status": "submitted", "source": "PNS Data", "submission_id": 2,
@@ -770,7 +1065,7 @@ def test_master_pns_reported_value_wins_over_country_value():
 
 
 def test_plan_funding_ea_column_takes_code_from_selected_header():
-    from plugins.upr.upr_data import _plan_funding_facts
+    from plugins.upr.extracts.upr_data import _plan_funding_facts
 
     cells = {"IFRC Secretariat_EA1": 11500000, "col_header|EA1": "Afghanistan: Population Movement (MDRAF070)"}
     rows = _plan_funding_facts(_item(label="Funding Requirement"), _PLACE, cells, {})
@@ -778,7 +1073,7 @@ def test_plan_funding_ea_column_takes_code_from_selected_header():
 
 
 def test_plan_funding_skips_col_header_go_unmatched_flags():
-    from plugins.upr.upr_data import _plan_funding_facts
+    from plugins.upr.extracts.upr_data import _plan_funding_facts
 
     cells = {
         "IFRC Secretariat_EA1": 120000000,

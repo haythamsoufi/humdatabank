@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from plugins.upr.i18n import (
+from plugins.upr.dashboards.i18n import (
     can_machine_translate,
     current_export_language,
     get_visuals_progress,
@@ -55,7 +55,7 @@ def test_is_rtl_and_document_attrs():
 def test_localized_form_item_prefers_bank_without_translations():
     from types import SimpleNamespace
 
-    from plugins.upr.i18n import localized_form_item_label, localized_indicator_label
+    from plugins.upr.dashboards.i18n import localized_form_item_label, localized_indicator_label
 
     bank = SimpleNamespace(name="People reached with climate activities", name_translations=None)
     item = SimpleNamespace(
@@ -72,9 +72,9 @@ def test_localized_form_item_prefers_bank_without_translations():
 def test_localized_form_item_uses_locale_translation(monkeypatch):
     from types import SimpleNamespace
 
-    from plugins.upr.i18n import localized_form_item_label
+    from plugins.upr.dashboards.i18n import localized_form_item_label
 
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "fr")
     bank = SimpleNamespace(name="People reached with climate activities", name_translations=None)
     item = SimpleNamespace(
         label="Climate people",
@@ -87,20 +87,20 @@ def test_localized_form_item_uses_locale_translation(monkeypatch):
 
 @pytest.mark.unit
 def test_t_and_batch_noop_for_english(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "en")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "en")
     assert t("People reached") == "People reached"
     assert t_batch(["A", "B"]) == ["A", "B"]
 
 
 @pytest.mark.unit
 def test_t_system_language_uses_visual_catalog(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
-    monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: True)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "fr")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_system_language", lambda lang=None: True)
 
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("system languages must not call the translation API")
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate", fail_if_called)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate", fail_if_called)
     monkeypatch.setattr("flask_babel.gettext", lambda text: f"PO:{text}")
     assert t("People reached") == "Personnes atteintes"
     assert t("Financial Overview") == "Aperçu financier"
@@ -114,7 +114,7 @@ def test_t_system_language_uses_visual_catalog(monkeypatch):
 
 @pytest.mark.unit
 def test_visual_string_tables_cover_each_language():
-    from plugins.upr.strings import VISUAL_STRINGS, lookup_visual_string
+    from plugins.upr.dashboards.strings import VISUAL_STRINGS, lookup_visual_string
 
     keys = set(VISUAL_STRINGS["fr"])
     for lang, table in VISUAL_STRINGS.items():
@@ -127,10 +127,10 @@ def test_visual_string_tables_cover_each_language():
 
 @pytest.mark.unit
 def test_formatters_and_render_use_visual_catalog(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
-    monkeypatch.setattr("plugins.upr.render.current_export_language", lambda: "fr")
-    from plugins.upr.formatters import document_subtitle, format_count
-    from plugins.upr.render import render_dashboard_html
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "fr")
+    monkeypatch.setattr("plugins.upr.dashboards.render.current_export_language", lambda: "fr")
+    from plugins.upr.dashboards.formatters import document_subtitle, format_count
+    from plugins.upr.dashboards.render import render_dashboard_html
 
     assert format_count(None) == "Non communiqué"
     assert document_subtitle("plan", "2026", plan_years=[2026, 2027, 2028]) == (
@@ -162,8 +162,8 @@ def test_formatters_and_render_use_visual_catalog(monkeypatch):
 
 @pytest.mark.unit
 def test_render_dashboard_sets_rtl_dir_for_arabic(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
-    from plugins.upr.render import render_dashboard_html
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
+    from plugins.upr.dashboards.render import render_dashboard_html
 
     html = render_dashboard_html(
         {
@@ -214,8 +214,8 @@ def test_render_dashboard_sets_rtl_dir_for_arabic(monkeypatch):
 
 @pytest.mark.unit
 def test_hebrew_is_rtl_without_arabic_font(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "he")
-    from plugins.upr.render import render_dashboard_html
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "he")
+    from plugins.upr.dashboards.render import render_dashboard_html
 
     html = render_dashboard_html(
         {
@@ -237,8 +237,8 @@ def test_hebrew_is_rtl_without_arabic_font(monkeypatch):
 
 @pytest.mark.unit
 def test_rtl_financial_network_puts_bars_left_of_labels(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
-    from plugins.upr.render import render_dashboard_html
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
+    from plugins.upr.dashboards.render import render_dashboard_html
 
     html = render_dashboard_html(
         {
@@ -313,7 +313,7 @@ def test_parse_progress_id_and_store():
 
 @pytest.mark.unit
 def test_can_machine_translate_fails_closed(monkeypatch):
-    import plugins.upr.i18n as i18n
+    import plugins.upr.dashboards.i18n as i18n
 
     monkeypatch.setattr(i18n, "is_system_language", lambda lang=None: False)
     real_import = __import__
@@ -329,8 +329,8 @@ def test_can_machine_translate_fails_closed(monkeypatch):
 
 @pytest.mark.unit
 def test_localize_export_batches_non_system_language(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "de")
-    monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: False)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "de")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_system_language", lambda lang=None: False)
     batches = []
 
     def fake_batch(texts, lang, source_language="en"):
@@ -339,12 +339,12 @@ def test_localize_export_batches_non_system_language(monkeypatch):
         batches.append(list(texts))
         return [f"DE:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
 
     def fail_single(*_args, **_kwargs):
         raise AssertionError("localize_export should batch, not call t() one-by-one")
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate", fail_single)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate", fail_single)
     progress = []
     builds = []
 
@@ -362,14 +362,14 @@ def test_localize_export_batches_non_system_language(monkeypatch):
 
 @pytest.mark.unit
 def test_localize_export_skips_system_language(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
-    monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: True)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_system_language", lambda lang=None: True)
     builds = []
 
     def fail_batch(*_args, **_kwargs):
         raise AssertionError("system languages must not batch-MT")
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fail_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fail_batch)
 
     def work():
         builds.append(1)
@@ -381,15 +381,15 @@ def test_localize_export_skips_system_language(monkeypatch):
 
 @pytest.mark.unit
 def test_unsupported_language_skips_live_mt(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "rm")
-    monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: False)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "rm")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_system_language", lambda lang=None: False)
     assert can_machine_translate("rm") is False
 
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("unsupported languages must not call the translation API")
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate", fail_if_called)
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fail_if_called)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate", fail_if_called)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fail_if_called)
     assert t("Not reported") == "Not reported"
     assert t_batch(["Not reported", "Country"]) == ["Not reported", "Country"]
     builds = []
@@ -404,14 +404,14 @@ def test_unsupported_language_skips_live_mt(monkeypatch):
 
 @pytest.mark.unit
 def test_t_uses_translator_for_other_languages(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "de")
-    monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: False)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "de")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_system_language", lambda lang=None: False)
 
     def fake_translate(text, lang):
         assert lang == "de"
         return f"DE:{text}"
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate", fake_translate)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate", fake_translate)
     assert t("People reached") == "DE:People reached"
 
 
@@ -419,13 +419,13 @@ def test_t_uses_translator_for_other_languages(monkeypatch):
 def test_localized_country_uses_babel_territory(monkeypatch):
     from types import SimpleNamespace
 
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
-    monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: True)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "fr")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_system_language", lambda lang=None: True)
 
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("system languages must not call the translation API")
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate", fail_if_called)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate", fail_if_called)
     country = SimpleNamespace(name="Uganda", iso2="UG", name_translations=None)
     assert localized_country_name(country) == "Ouganda"
     assert localized_country_name(iso2="UG", fallback="Uganda") == "Ouganda"
@@ -436,7 +436,7 @@ def test_localized_country_uses_babel_territory(monkeypatch):
 def test_localized_country_prefers_stored_translation(monkeypatch):
     from types import SimpleNamespace
 
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "fr")
     country = SimpleNamespace(
         name="Uganda",
         iso2="UG",
@@ -449,13 +449,13 @@ def test_localized_country_prefers_stored_translation(monkeypatch):
 def test_localized_ns_uses_stored_translation(monkeypatch):
     from types import SimpleNamespace
 
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "fr")
     ns = SimpleNamespace(
         name="The Netherlands Red Cross",
         name_translations={"fr": "Croix-Rouge néerlandaise", "es": "Cruz Roja Neerlandesa"},
     )
     assert localized_ns_display_name(ns) == "Croix-Rouge néerlandaise"
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "en")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "en")
     assert localized_ns_display_name(ns) == "Netherlands Red Cross"
 
 
@@ -463,16 +463,16 @@ def test_localized_ns_uses_stored_translation(monkeypatch):
 def test_localized_ns_machine_translates_other_languages(monkeypatch):
     from types import SimpleNamespace
 
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "de")
-    monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: False)
-    monkeypatch.setattr("plugins.upr.i18n.t", lambda text: f"DE:{text}")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "de")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_system_language", lambda lang=None: False)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.t", lambda text: f"DE:{text}")
     ns = SimpleNamespace(name="The Netherlands Red Cross", name_translations={"fr": "Croix-Rouge néerlandaise"})
     assert localized_ns_display_name(ns) == "DE:Netherlands Red Cross"
 
 
 @pytest.mark.unit
 def test_t_batch_and_styled_blocks(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "es")
     calls = []
 
     def fake_batch(texts, lang, source_language="en"):
@@ -480,7 +480,7 @@ def test_t_batch_and_styled_blocks(monkeypatch):
         calls.append(list(texts))
         return [f"ES:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
     blocks = [
         {"style": "Body", "text": "Context", "runs": [{"text": "Context", "href": "", "bold": False}]},
         {"style": "Blank", "text": "", "runs": [{"text": " ", "href": "", "bold": False}]},
@@ -502,14 +502,14 @@ def test_t_batch_and_styled_blocks(monkeypatch):
 @pytest.mark.unit
 def test_translate_styled_blocks_rebuilds_text_from_translated_runs(monkeypatch):
     """block["text"] is never queued for MT; it's rebuilt by joining translated runs."""
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "es")
     calls = []
 
     def fake_batch(texts, lang, source_language="en"):
         calls.append(list(texts))
         return [f"ES:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
     blocks = [
         {
             "style": "Body",
@@ -531,14 +531,14 @@ def test_translate_styled_blocks_rebuilds_text_from_translated_runs(monkeypatch)
 @pytest.mark.unit
 def test_translate_styled_blocks_dedupes_repeated_runs(monkeypatch):
     """Repeated headings/labels/org names are translated once, like localize_export."""
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "es")
     calls = []
 
     def fake_batch(texts, lang, source_language="en"):
         calls.append(list(texts))
         return [f"ES:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
     blocks = [
         {"style": "Body", "text": "Repeat me", "runs": [{"text": "Repeat me", "href": "", "bold": False}]},
         {"style": "Body", "text": "Repeat me", "runs": [{"text": "Repeat me", "href": "", "bold": False}]},
@@ -564,40 +564,40 @@ _FR_NARRATIVE = (
 
 @pytest.mark.unit
 def test_t_batch_translates_into_english_from_detected_source(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "en")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "en")
     seen = []
 
     def fake_batch(texts, lang, source_language="en"):
         seen.append((list(texts), lang, source_language))
         return ["Help" for _ in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
-    monkeypatch.setattr("plugins.upr.i18n._cached_translations", lambda *_a, **_k: {})
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._cached_translations", lambda *_a, **_k: {})
     assert t_batch(["помощь населению"], source_language="ru") == ["Help"]
     assert seen == [(["помощь населению"], "en", "ru")]
 
 
 @pytest.mark.unit
 def test_t_batch_skips_when_source_matches_target(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "fr")
 
     def fail_batch(*_args, **_kwargs):
         raise AssertionError("same-language narrative must not call the translation API")
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fail_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fail_batch)
     assert t_batch(["bonjour les volontaires"], source_language="fr") == ["bonjour les volontaires"]
 
 
 @pytest.mark.unit
 def test_translate_styled_blocks_russian_into_english(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "en")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "en")
     calls = []
 
     def fake_batch(texts, lang, source_language="en"):
         calls.append((list(texts), lang, source_language))
         return [f"EN:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
     blocks = [
         {"style": "Body", "text": _RU_NARRATIVE, "runs": [{"text": _RU_NARRATIVE, "href": "", "bold": False}]},
     ]
@@ -609,12 +609,12 @@ def test_translate_styled_blocks_russian_into_english(monkeypatch):
 
 @pytest.mark.unit
 def test_translate_styled_blocks_skips_when_narrative_matches_export_language(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ru")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ru")
 
     def fail_batch(*_args, **_kwargs):
         raise AssertionError("narrative already in the export language")
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fail_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fail_batch)
     blocks = [
         {"style": "Body", "text": _RU_NARRATIVE, "runs": [{"text": _RU_NARRATIVE, "href": "", "bold": False}]},
     ]
@@ -624,14 +624,14 @@ def test_translate_styled_blocks_skips_when_narrative_matches_export_language(mo
 
 @pytest.mark.unit
 def test_translate_styled_blocks_french_into_spanish(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "es")
     calls = []
 
     def fake_batch(texts, lang, source_language="en"):
         calls.append((lang, source_language))
         return [f"ES:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
     blocks = [
         {"style": "Body", "text": _FR_NARRATIVE, "runs": [{"text": _FR_NARRATIVE, "href": "", "bold": False}]},
     ]
@@ -642,8 +642,8 @@ def test_translate_styled_blocks_french_into_spanish(monkeypatch):
 
 @pytest.mark.unit
 def test_t_batch_reports_chunk_progress(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
-    monkeypatch.setattr("plugins.upr.i18n._T_BATCH_CHUNK", 2)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._T_BATCH_CHUNK", 2)
     batches = []
 
     def fake_batch(texts, lang, source_language="en"):
@@ -651,7 +651,7 @@ def test_t_batch_reports_chunk_progress(monkeypatch):
         batches.append(list(texts))
         return [f"AR:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
     progress = []
     out = t_batch(
         ["a", "b", "c", "d", "e"],
@@ -667,8 +667,8 @@ def test_t_batch_reports_chunk_progress(monkeypatch):
 
 @pytest.mark.unit
 def test_t_batch_uses_cached_chunks(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
-    monkeypatch.setattr("plugins.upr.i18n._T_BATCH_CHUNK", 2)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._T_BATCH_CHUNK", 2)
     cache_lookups = []
 
     def fake_cache(texts, lang, source_language="en"):
@@ -681,8 +681,8 @@ def test_t_batch_uses_cached_chunks(monkeypatch):
         called.append(list(texts))
         return [f"AR:{item}" for item in texts]
 
-    monkeypatch.setattr("plugins.upr.i18n._cached_translations", fake_cache)
-    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._cached_translations", fake_cache)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n._machine_translate_batch", fake_batch)
     progress = []
     out = t_batch(
         ["a", "b", "c"],
@@ -698,8 +698,8 @@ def test_t_batch_uses_cached_chunks(monkeypatch):
 
 @pytest.mark.unit
 def test_raster_wrap_sets_rtl_html(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
-    from plugins.upr.raster import _wrap
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
+    from plugins.upr.dashboards.raster import _wrap
 
     html = _wrap(
         "<div class='upr-dashboard'>x</div>",
@@ -717,7 +717,7 @@ def test_raster_wrap_sets_rtl_html(monkeypatch):
     assert "@bottom-center" in html
     assert "fonts.googleapis.com" not in html
     assert "html[dir=\"rtl\"] .upr-fin-grid" in html
-    from plugins.upr.raster import _rtl_print_css
+    from plugins.upr.dashboards.raster import _rtl_print_css
 
     rtl = _rtl_print_css("ar")
     assert "table-layout: fixed" in rtl

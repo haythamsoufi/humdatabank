@@ -110,7 +110,7 @@ def create_blueprint():
         if hit_rate_limit(_viewer_key('interactive_map:tiles'), TILE_REQUESTS_PER_USER_PER_MINUTE):
             return json_error('Too many tile requests', 429, success=False, error='Too many tile requests')
 
-        from plugins.upr.flow import mapbox_tile
+        from plugins.upr.analysis.flow import mapbox_tile
 
         body, mimetype, error = mapbox_tile(z, x, y)
         if error == 'invalid':

@@ -2192,7 +2192,7 @@ def _load_shared_appeal_catalogue() -> List[Dict[str, Any]]:
         return _APPEAL_CATALOGUE_ROWS
     rows: List[Dict[str, Any]] = []
     try:
-        from plugins.upr.maa_codes import load_appeal_catalogue
+        from plugins.upr.dashboards.maa_codes import load_appeal_catalogue
 
         loaded = load_appeal_catalogue()
         if isinstance(loaded, list):

@@ -12,15 +12,15 @@ from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException, NotFound
 
 from plugins.upr import bp, _PLUGIN_DIR
-from plugins.upr.catalog import dashboards_for_kind, kind_for_template
-from plugins.upr.i18n import (
+from plugins.upr.dashboards.catalog import dashboards_for_kind, kind_for_template
+from plugins.upr.dashboards.i18n import (
     get_visuals_progress,
     localize_export,
     parse_export_language,
     parse_progress_id,
     rtl_document_attrs,
 )
-from plugins.upr.data import (
+from plugins.upr.dashboards.data import (
     UprError,
     assignment_supports_visuals,
     build_payload,
@@ -31,10 +31,10 @@ from plugins.upr.data import (
     normalize_export_format,
     visuals_browser_title,
 )
-from plugins.upr.render import render_dashboard_html, render_dashboards_html, render_report_html
-from plugins.upr.audience import resolve_narrative_audience
+from plugins.upr.dashboards.render import render_dashboard_html, render_dashboards_html, render_report_html
+from plugins.upr.dashboards.audience import resolve_narrative_audience
 from plugins.upr.idml import read_narrative_upload
-from plugins.upr.assignment_job import (
+from plugins.upr.dashboards.assignment_job import (
     build_assignment_export_status,
     create_assignment_export_job,
     ensure_assignment_export_job_running,
@@ -42,7 +42,7 @@ from plugins.upr.assignment_job import (
     serve_assignment_export,
     start_assignment_export_job,
 )
-from plugins.upr.bulk_job import (
+from plugins.upr.dashboards.bulk_job import (
     build_bulk_export_status_payload,
     create_bulk_export_job,
     ensure_bulk_export_job_running,
@@ -51,7 +51,7 @@ from plugins.upr.bulk_job import (
     serve_bulk_export_zip,
     start_bulk_export_job,
 )
-from plugins.upr.library import (
+from plugins.upr.dashboards.library import (
     build_library_archive,
     library_status,
     open_library_dashboard,
@@ -91,7 +91,7 @@ def upr_static_url(filename: str) -> str:
 @bp.app_template_global("upr_analysis_text")
 def upr_analysis_text() -> dict[str, str]:
     """Analysis display text for templates (same catalogue the views use)."""
-    from plugins.upr.analysis_labels import analysis_labels
+    from plugins.upr.analysis.analysis_labels import analysis_labels
 
     return analysis_labels()
 
@@ -99,7 +99,7 @@ def upr_analysis_text() -> dict[str, str]:
 @bp.app_template_global("upr_analysis_ui")
 def upr_analysis_ui() -> dict[str, str]:
     """Interface strings for the Analysis scripts."""
-    from plugins.upr.analysis_labels import analysis_ui_labels
+    from plugins.upr.analysis.analysis_labels import analysis_ui_labels
 
     return analysis_ui_labels()
 
@@ -163,7 +163,7 @@ def _visual_payload(aes_id: int, *, inline_icons: bool = False):
     bundle = _requested_bundle()
     if not bundle:
         return build_payload(aes_id, inline_icons=inline_icons)
-    from plugins.upr.bundle import build_bundle_payload
+    from plugins.upr.dashboards.bundle import build_bundle_payload
 
     return build_bundle_payload(aes_id, bundle, inline_icons=inline_icons)
 
@@ -254,7 +254,8 @@ def _aes_or_404(aes_id: int) -> AssignmentEntityStatus:
 
 
 def upr_settings_status() -> dict:
-    from plugins.upr.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+    from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+    from plugins.upr.analysis.global_plan_overlay import load_overlay
     from plugins.upr.secondary.registry import list_sources
 
     try:
@@ -263,12 +264,19 @@ def upr_settings_status() -> dict:
         current_app.logger.exception("UPR secondary settings status failed")
         secondary_sources = []
 
+    try:
+        global_plan_overlay = load_overlay()
+    except Exception:
+        current_app.logger.exception("UPR Global Plan overlay status failed")
+        global_plan_overlay = {}
+
     return {
         "planning_template_id": PLAN_TEMPLATE_ID,
         "reporting_template_id": REPORT_TEMPLATE_ID,
         "data_source": "GO-API / Excel",
         "secondary_sources": secondary_sources,
         "secondary_by_id": {item.get("id"): item for item in secondary_sources if item.get("id")},
+        "global_plan_overlay": global_plan_overlay,
     }
 
 
@@ -400,7 +408,7 @@ def secondary_preview(source_id: str):
 def upr_tools():
     """UPR tools hub: data sync & imputation, plus Excel import."""
     from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-    from plugins.upr.catalog import PLAN_TEMPLATE_ID
+    from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID
 
     return render_data_sync_imputation_page(
         PLAN_TEMPLATE_ID,
@@ -462,7 +470,7 @@ def static_file(filename: str):
 @login_required
 def fonts_css():
     """@font-face + Tajawal inherit rules — same stacks WeasyPrint uses."""
-    from plugins.upr.typography import browser_stylesheet, export_style_token
+    from plugins.upr.dashboards.typography import browser_stylesheet, export_style_token
 
     response = Response(browser_stylesheet(), mimetype="text/css; charset=utf-8")
     response.set_etag(export_style_token())
@@ -542,7 +550,7 @@ def assignment_bundles(aes_id: int):
     """Bundles this assignment can switch to, when another country on the same form shares one."""
     try:
         aes = _aes_or_404(aes_id)
-        from plugins.upr.bundle import bundle_options_for_aes
+        from plugins.upr.dashboards.bundle import bundle_options_for_aes
 
         return json_ok(bundles=bundle_options_for_aes(aes))
     except UprError as exc:
@@ -1052,30 +1060,30 @@ def manage_page():
     return redirect(url_for("data_exploration.explore_data", tab="upr"))
 
 
-@bp.route("/admin/data-exploration/upr-impact/data", methods=["GET"])
+@bp.route("/admin/data-exploration/upr-analysis/data", methods=["GET"])
 @permission_required("admin.data_explore.upr_impact")
-def impact_data():
+def analysis_data():
     """Per-round analysis series for the Analysis tab (coverage, funding, reach, partners, capacity)."""
     try:
-        from plugins.upr.analysis_service import build_impact_analysis
+        from plugins.upr.analysis.analysis_service import build_data_analysis
 
         region = (request.args.get("region") or "").strip() or None
-        analysis = build_impact_analysis(region=region)
-        return json_ok(impact=analysis["payload"], view=analysis["view"])
+        analysis = build_data_analysis(region=region)
+        return json_ok(analysis=analysis["payload"], view=analysis["view"])
     except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
 
-@bp.route("/admin/data-exploration/upr-impact/narrative", methods=["GET"])
+@bp.route("/admin/data-exploration/upr-analysis/narrative", methods=["GET"])
 @permission_required("admin.data_explore.upr_impact")
-def impact_narrative():
+def analysis_narrative():
     """Narrative participation (internal + public documents, vs data) for the Analysis tab.
 
-    Kept separate from :func:`impact_data` because it calls the IFRC document
+    Kept separate from :func:`analysis_data` because it calls the IFRC document
     API, which is slower and can fail independently of the database.
     """
     try:
-        from plugins.upr.analysis_service import build_narrative_analysis
+        from plugins.upr.analysis.analysis_service import build_narrative_analysis
 
         region = (request.args.get("region") or "").strip() or None
         analysis = build_narrative_analysis(region=region)
@@ -1084,12 +1092,12 @@ def impact_narrative():
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
 
-@bp.route("/admin/data-exploration/upr-impact/flows", methods=["GET"])
+@bp.route("/admin/data-exploration/upr-analysis/flows", methods=["GET"])
 @permission_required("admin.data_explore.upr_impact")
-def impact_flows():
+def analysis_flows():
     """PNS → host-country bilateral support flows for the Analysis flow map."""
     try:
-        from plugins.upr.flow import build_support_flows
+        from plugins.upr.analysis.flow import build_support_flows
 
         region = (request.args.get("region") or "").strip() or None
         flows = build_support_flows(region=region)
@@ -1097,6 +1105,46 @@ def impact_flows():
     except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
+
+@bp.route("/admin/data-exploration/upr-analysis/global-plan", methods=["GET"])
+@permission_required("admin.data_explore.upr_impact")
+def analysis_global_plan():
+    """Global Plan dashboard (funding by actor/theme, prioritisation, overlays)."""
+    try:
+        from plugins.upr.analysis.analysis_service import build_global_plan_analysis
+
+        region = (request.args.get("region") or "").strip() or None
+        year_raw = (request.args.get("year") or "").strip()
+        year = int(year_raw) if year_raw.isdigit() else None
+        analysis = build_global_plan_analysis(region=region, year=year)
+        return json_ok(global_plan=analysis["payload"], views=analysis["views"])
+    except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+@bp.route("/admin/plugins/upr/global-plan/overlay", methods=["GET"])
+@login_required
+@permission_required("admin.plugins.manage")
+def global_plan_overlay_get():
+    from plugins.upr.analysis.global_plan_overlay import load_overlay
+
+    return json_ok(overlay=load_overlay(), settings=upr_settings_status())
+
+
+@bp.route("/admin/plugins/upr/global-plan/overlay", methods=["PUT", "POST"])
+@login_required
+@permission_required("admin.plugins.manage")
+def global_plan_overlay_save():
+    from plugins.upr.analysis.global_plan_overlay import save_overlay
+
+    payload = request.get_json(silent=True) or {}
+    overlay = payload.get("overlay", payload)
+    try:
+        saved = save_overlay(overlay)
+    except Exception as error:  # noqa: BLE001
+        current_app.logger.exception("UPR Global Plan overlay save failed")
+        return json_bad_request(str(error))
+    return json_ok(overlay=saved, settings=upr_settings_status())
 
 def _support_flow_public():
     """Do not start a session for an anonymous visitor of the framed visual."""
@@ -1118,7 +1166,7 @@ def support_flow_embed():
     Public so Embed Content and other parents can iframe it without a session.
     Filters accept ``year``, ``pns`` (ISO3) and ``recipient`` (ISO3).
     """
-    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+    from plugins.upr.analysis.analysis_labels import analysis_labels, analysis_ui_labels
 
     _support_flow_public()
     year = (request.args.get("year") or "").strip()
@@ -1152,7 +1200,7 @@ def support_flow_embed():
 @rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_funding:{get_client_ip()}")
 def support_funding_embed():
     """Frameable bilateral funding rankings, separate from the support map."""
-    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+    from plugins.upr.analysis.analysis_labels import analysis_labels, analysis_ui_labels
 
     _support_flow_public()
     year = (request.args.get("year") or "").strip()
@@ -1178,7 +1226,7 @@ def support_funding_embed():
 @rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_coverage:{get_client_ip()}")
 def support_coverage_embed():
     """Frameable scatter of funding-requirement coverage by INFORM risk class."""
-    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+    from plugins.upr.analysis.analysis_labels import analysis_labels, analysis_ui_labels
 
     _support_flow_public()
     year = (request.args.get("year") or "").strip()
@@ -1204,7 +1252,7 @@ def support_coverage_embed():
 @rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_overview:{get_client_ip()}")
 def support_overview_embed():
     """Frameable page with the support map above the funding rankings."""
-    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+    from plugins.upr.analysis.analysis_labels import analysis_labels, analysis_ui_labels
 
     _support_flow_public()
     year = (request.args.get("year") or "").strip()
@@ -1240,7 +1288,7 @@ def support_flow_data():
     """Flow geometry for the public embed. The Analysis tab uses the signed-in route."""
     _support_flow_public()
     try:
-        from plugins.upr.flow import build_support_flows
+        from plugins.upr.analysis.flow import build_support_flows
 
         region = (request.args.get("region") or "").strip() or None
         flows = build_support_flows(region=region, public_tiles=True)
@@ -1253,7 +1301,7 @@ def support_flow_data():
 @rate_limit(requests_per_minute=600, key_func=lambda: f"upr_support_flow_tiles:{get_client_ip()}")
 def support_flow_tile(z, x, y):
     """Mapbox tiles for the public embed. The token stays on the server."""
-    from plugins.upr.flow import mapbox_tile
+    from plugins.upr.analysis.flow import mapbox_tile
 
     _support_flow_public()
     body, mimetype, error = mapbox_tile(z, x, y)
@@ -1298,7 +1346,7 @@ def countries():
         return json_bad_request(str(exc))
     kind = kind_for_template(int(assigned.template_id))
     lang = _requested_language(strict=False)
-    from plugins.upr.i18n import t
+    from plugins.upr.dashboards.i18n import t
 
     with force_locale(lang):
         dashboards = [
@@ -1308,7 +1356,7 @@ def countries():
             }
             for spec in dashboards_for_kind(kind)
         ]
-    from plugins.upr.bundle import list_bundles_for_bulk
+    from plugins.upr.dashboards.bundle import list_bundles_for_bulk
 
     return json_ok(
         countries=list_countries_for_bulk(assigned.id),
@@ -1347,7 +1395,7 @@ def library():
 
 
 def _library_bundle_id(assigned_form_id: int) -> str | None:
-    from plugins.upr.bundle import bundle_library_id, bundle_on_assignment
+    from plugins.upr.dashboards.bundle import bundle_library_id, bundle_on_assignment
 
     name = (request.args.get("bundle") or "").strip()
     if not name:

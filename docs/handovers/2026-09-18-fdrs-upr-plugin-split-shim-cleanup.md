@@ -80,7 +80,7 @@ Only if a stricter plugin cut is requested:
 - NS logos (`ns_logo_service.py`, `sector_logo_urls.py`)
 - Activity catalog / `activity_logging_skip.py` labels
 - Public `report_service.py` and governance tiles (import updates only)
-- Thin mobile wrappers in `app/routes/api/mobile/public_data.py` (already delegate to `plugins.upr.mobile`)
+- Thin mobile wrappers in `app/routes/api/mobile/public_data.py` (already delegate to `plugins.upr.documents.mobile`)
 - Entry-form JS `upr-excel-import-apply.js` (sibling ES module of `excel-export.js`)
 
 ---

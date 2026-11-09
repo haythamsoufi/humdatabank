@@ -1,0 +1,866 @@
+/* Analysis tab — Data Explorer. Plain CSS so it needs no Tailwind rebuild. */
+/* Chart colours come from the view (plugins/upr/analysis/analysis_spec.py COLORS); these
+ * variables only style the page chrome around the charts. */
+:root {
+    --upri-navy: #011e41;
+    --upri-red: #f5333f;
+    --upri-amber: #f39200;
+    --upri-teal: #2a9d8f;
+    --upri-green: #6ba543;
+}
+
+#panel-upr-analysis {
+    color: #111827;
+}
+
+/* Our flex/grid rules below out-specify the UA [hidden] style, so make the
+ * hidden attribute authoritative again for state/empty/loading toggles. */
+#panel-upr-analysis [hidden] {
+    display: none !important;
+}
+
+.upri-intro {
+    margin-bottom: 1rem;
+}
+.upri-intro__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+    margin: 0 0 0.25rem;
+}
+.upri-intro__lead {
+    margin: 0;
+    max-width: 60rem;
+    font-size: 0.9rem;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+.upri-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem 1rem;
+    padding: 0.85rem 0 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 1.25rem;
+}
+.upri-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.upri-field__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.upri-select {
+    min-width: 14rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    background: #fff;
+}
+.upri-select:focus {
+    outline: none;
+    border-color: var(--upri-navy);
+    box-shadow: 0 0 0 2px rgba(1, 30, 65, 0.18);
+}
+.upri-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+}
+.upri-btn:hover {
+    border-color: #9ca3af;
+    background: #f9fafb;
+}
+
+.upri-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 14rem;
+    color: #6b7280;
+    text-align: center;
+}
+.upri-state i {
+    font-size: 1.75rem;
+    color: #9ca3af;
+}
+.upri-state--error { color: #b91c1c; }
+.upri-state--error i { color: #ef4444; }
+
+/* KPI strip */
+.upri-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.upri-kpi {
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid var(--upri-navy);
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 0.85rem 1rem;
+}
+.upri-kpi__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.3rem;
+}
+.upri-kpi__value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.upri-kpi__meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.upri-kpi__delta--up { color: #15803d; }
+.upri-kpi__delta--down { color: #b91c1c; }
+.upri-kpi__delta--flat { color: #6b7280; }
+.upri-kpi__context {
+    color: #9ca3af;
+    font-weight: 500;
+}
+
+/* Two charts share a row only when each is at least 40rem. Narrower columns
+   rotated category labels into the next card. */
+.upri-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 40rem), 1fr));
+    gap: 1rem;
+}
+.upri-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 1rem 1rem 0.5rem;
+    min-width: 0;
+}
+.upri-card--wide {
+    grid-column: 1 / -1;
+}
+/* Wide cards still get a readable chart width (stacked bars etc. stay dense). */
+.upri-card--wide > .upri-chart {
+    max-width: 48rem;
+    margin-inline: auto;
+}
+.upri-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+.upri-card__text {
+    min-width: 0;
+}
+.upri-card__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+    margin: 0;
+}
+.upri-table-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-top: -0.15rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background: #fff;
+    color: #4b5563;
+    cursor: pointer;
+}
+.upri-table-btn:hover,
+.upri-table-btn:focus-visible {
+    border-color: var(--upri-navy);
+    color: var(--upri-navy);
+    background: #f8fafc;
+    outline: none;
+}
+.upri-card__hint {
+    margin: 0.2rem 0 0;
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+.upri-chart {
+    min-height: 18rem;
+}
+.upri-cap-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem 2rem;
+    min-height: 0;
+}
+.upri-cap__name {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.upri-cap__value {
+    margin: 0.1rem 0 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+.upri-cap__year {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #9ca3af;
+}
+#panel-upr-analysis .apexcharts-svg title {
+    display: none;
+}
+@media (max-width: 700px) {
+    .upri-cap-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.upri-footnote {
+    margin: 1rem 0 0;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.upri-dialog {
+    width: min(52rem, calc(100vw - 2rem));
+    max-height: min(36rem, calc(100vh - 2rem));
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 40px rgba(1, 30, 65, 0.18);
+}
+.upri-dialog::backdrop {
+    background: rgba(17, 24, 39, 0.45);
+}
+.upri-dialog__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.upri-dialog__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+}
+.upri-dialog__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #4b5563;
+    cursor: pointer;
+}
+.upri-dialog__close:hover,
+.upri-dialog__close:focus-visible {
+    background: #f3f4f6;
+    color: var(--upri-navy);
+    outline: none;
+}
+.upri-dialog__note {
+    margin: 0;
+    padding: 0.75rem 1rem 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #4b5563;
+}
+.upri-dialog__scroll {
+    overflow: auto;
+    max-height: calc(min(36rem, 100vh - 2rem) - 7rem);
+    padding: 0.75rem 1rem 1rem;
+}
+.upri-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+.upri-table th,
+.upri-table td {
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid #eef0f2;
+    text-align: right;
+    white-space: nowrap;
+}
+.upri-table th:first-child,
+.upri-table td:first-child {
+    text-align: left;
+}
+.upri-table th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    color: #374151;
+    font-weight: 600;
+    z-index: 1;
+}
+.upri-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    font-weight: 700;
+    color: var(--upri-navy);
+    cursor: pointer;
+}
+.upri-expand i {
+    width: 0.7rem;
+    font-size: 0.65rem;
+    color: #6b7280;
+}
+.upri-expand:hover,
+.upri-expand:focus-visible {
+    color: var(--upri-red);
+    outline: none;
+}
+.upri-table__detail td {
+    background: #f8fafc;
+    font-weight: 400;
+    color: #374151;
+}
+.upri-table__detail td:first-child {
+    padding-left: 1.75rem;
+}
+.upri-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.55rem 1rem 0;
+    font-size: 0.78rem;
+    color: #374151;
+}
+.upri-legend__swatch {
+    flex: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 0.15rem;
+    background: #ffedd5;
+    box-shadow: inset 0 0 0 1px #fdba74;
+}
+.upri-cell--midyear {
+    color: #9a3412;
+    background: #ffedd5;
+}
+.upri-table__detail .upri-cell--midyear {
+    background: #fff7ed;
+}
+
+.upri-subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.25rem;
+    margin: 0 0 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.upri-subtabs__btn {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.55rem 0.9rem;
+    background: transparent;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #4b5563;
+    cursor: pointer;
+}
+.upri-subtabs__btn:hover {
+    color: var(--upri-navy);
+}
+.upri-subtabs__btn.is-active {
+    color: var(--upri-navy);
+    border-bottom-color: var(--upri-red);
+}
+.upri-pane .upri-flow {
+    margin-top: 0;
+}
+.upri-pane .upri-narr {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+/* Narrative participation */
+.upri-narr {
+    margin-top: 2rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e5e7eb;
+}
+.upri-gp-year-field {
+    min-width: 8rem;
+}
+.upri-gp-year-hint {
+    margin: 0 0 0.75rem;
+    font-size: 0.8rem;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+.upri-narr__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    margin-bottom: 1rem;
+}
+.upri-seg {
+    display: inline-flex;
+    flex: none;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    background: #fff;
+}
+.upri-seg__btn {
+    padding: 0.45rem 0.85rem;
+    border: 0;
+    border-right: 1px solid #d1d5db;
+    background: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+}
+.upri-seg__btn:last-child {
+    border-right: 0;
+}
+.upri-seg__btn:hover {
+    background: #f9fafb;
+}
+.upri-seg__btn:focus-visible {
+    outline: 2px solid var(--upri-navy);
+    outline-offset: -2px;
+}
+.upri-seg__btn.is-active {
+    background: var(--upri-navy);
+    color: #fff;
+}
+.upri-card__sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.15rem 0 0.75rem;
+    border: 0;
+    background: transparent;
+    overflow: visible;
+}
+.upri-card__sources .upri-seg__btn {
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+}
+.upri-card__sources .upri-seg__btn:last-child {
+    border-right: 1px solid #d1d5db;
+}
+.upri-state--compact {
+    min-height: 6rem;
+}
+.upri-warning {
+    margin: 0 0 1rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid #fcd34d;
+    border-radius: 0.375rem;
+    background: #fffbeb;
+    font-size: 0.8125rem;
+    color: #92400e;
+}
+.upri-gaps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+    padding: 0.6rem 0 0.75rem;
+}
+.upri-gap {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+.upri-gap:hover,
+.upri-gap:focus-visible {
+    border-color: var(--upri-navy);
+    background: #f8fafc;
+    outline: none;
+}
+.upri-gap__count {
+    min-width: 2.25rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+    font-variant-numeric: tabular-nums;
+}
+.upri-gap__label {
+    font-size: 0.78rem;
+    line-height: 1.3;
+    color: #4b5563;
+}
+.upri-gap.is-empty .upri-gap__count {
+    color: #9ca3af;
+}
+
+/* Global Plan year overview hero (IFRC / HNS / PNS bars + total bubble) */
+.upri-card--overview {
+    padding-bottom: 0.85rem;
+}
+.upri-card--overview > .upri-card__head .upri-card__text {
+    /* Title/hint live on the cream board; keep the table button. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+.upri-card--overview > .upri-card__head {
+    position: relative;
+    min-height: 0;
+    margin: 0 0 0.35rem;
+    justify-content: flex-end;
+}
+.upri-overview {
+    --upri-overview-ink: #1a1a1a;
+    --upri-overview-cream: #f7f4ec;
+    --upri-overview-red: #e30613;
+    max-width: 44rem;
+    margin-inline: auto;
+    background: var(--upri-overview-cream);
+    border-radius: 0.25rem;
+    padding: 1.35rem 1.5rem 1.5rem;
+    color: var(--upri-overview-ink);
+}
+.upri-overview__title {
+    margin: 0 0 1rem;
+    font-size: clamp(1.65rem, 2.4vw, 2.15rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--upri-overview-ink);
+}
+.upri-overview__body {
+    display: grid;
+    grid-template-columns: minmax(10.5rem, 15rem) minmax(12rem, 1fr);
+    gap: 0.5rem 0.75rem;
+    align-items: stretch;
+    min-height: 17rem;
+}
+.upri-overview__legend {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 1.75rem 0 0.35rem;
+    gap: 1.35rem;
+}
+.upri-overview__row {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr) minmax(1.5rem, 2.5fr);
+    align-items: center;
+    column-gap: 0.55rem;
+}
+.upri-overview__amount {
+    font-size: 1.05rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+.upri-overview__label {
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #222;
+}
+.upri-overview__line {
+    position: relative;
+    display: block;
+    height: 1px;
+    background: var(--upri-overview-ink);
+    min-width: 1.25rem;
+}
+.upri-overview__line::after {
+    content: "";
+    position: absolute;
+    right: -3px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--upri-overview-ink);
+    transform: translateY(-50%);
+}
+.upri-overview__bars {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: clamp(0.85rem, 2vw, 1.35rem);
+    min-height: 16.5rem;
+    padding: 2.75rem 0.25rem 0 0.5rem;
+}
+.upri-overview__bar {
+    flex: 0 0 auto;
+    width: clamp(2.6rem, 5vw, 3.4rem);
+    border-radius: 2px 2px 0 0;
+    min-height: 0.4rem;
+}
+.upri-overview__total {
+    position: absolute;
+    top: 0;
+    right: 0.15rem;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: clamp(8.5rem, 16vw, 10.5rem);
+    height: clamp(8.5rem, 16vw, 10.5rem);
+    padding: 0.85rem 0.75rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 10px 28px rgba(0, 0, 0, 0.12);
+    text-align: center;
+}
+.upri-overview__total-value {
+    margin: 0;
+    font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--upri-overview-red);
+}
+.upri-overview__people {
+    margin: 0.35rem 0 0;
+    max-width: 7.5rem;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    color: #111;
+}
+.upri-overview__people strong {
+    font-weight: 800;
+}
+.upri-overview__caption {
+    position: absolute;
+    top: 0.35rem;
+    left: 0;
+    z-index: 3;
+    max-width: 11.5rem;
+    margin: 0;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.35rem;
+    background: #fff;
+    border: 1px solid #e5e1d6;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: #374151;
+}
+.upri-overview__caption::after {
+    content: "";
+    position: absolute;
+    right: -0.35rem;
+    top: 50%;
+    width: 0.55rem;
+    height: 0.55rem;
+    background: #fff;
+    border-right: 1px solid #e5e1d6;
+    border-bottom: 1px solid #e5e1d6;
+    transform: translateY(-50%) rotate(-45deg);
+}
+
+@media (max-width: 700px) {
+    .upri-grid {
+        grid-template-columns: 1fr;
+    }
+    .upri-card--wide {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 900px) {
+    .upri-overview__body {
+        grid-template-columns: 1fr;
+    }
+    .upri-overview__bars {
+        min-height: 14rem;
+        justify-content: center;
+        padding-top: 3.5rem;
+    }
+    .upri-overview__total {
+        right: 50%;
+        transform: translateX(55%);
+    }
+    .upri-overview__caption {
+        left: 0.25rem;
+        max-width: 9.5rem;
+    }
+    .upri-overview__row {
+        grid-template-columns: 4.5rem minmax(0, 1fr);
+    }
+    .upri-overview__line {
+        display: none;
+    }
+}
+
+/* Export dialog (presentation / A4 report) */
+.upri-toolbar__export {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+.upri-export {
+    width: min(30rem, calc(100vw - 2rem));
+}
+.upri-export .upri-dialog__note {
+    padding-bottom: 0.25rem;
+}
+.upri-export__fields {
+    margin: 0;
+    padding: 0.6rem 1rem 0;
+    border: 0;
+}
+.upri-export__fields .upri-field__label {
+    padding: 0;
+    margin-bottom: 0.35rem;
+}
+.upri-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.35rem 0;
+    font-size: 0.875rem;
+    color: #111827;
+    cursor: pointer;
+}
+.upri-check input {
+    margin-top: 0.2rem;
+    accent-color: var(--upri-navy);
+}
+.upri-check.is-disabled {
+    color: #9ca3af;
+    cursor: default;
+}
+.upri-check__hint {
+    margin-left: 0.35rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+.upri-export__extra {
+    padding: 0.25rem 1rem 0;
+}
+.upri-export__empty {
+    margin: 0;
+    padding: 0.75rem 1rem 0;
+    font-size: 0.85rem;
+    color: #92400e;
+}
+.upri-export__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem;
+}
+
+/* Findings: what the data says about a visual (listed under its chart) */
+.upri-findings-wrap {
+    margin-top: 0.35rem;
+    padding: 0.6rem 0 0.75rem;
+    border-top: 1px solid #eef0f2;
+}
+.upri-findings__heading {
+    margin: 0 0 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.upri-findings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.upri-finding {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 4px solid var(--upri-navy);
+    border-radius: 0.25rem;
+    background: #f8fafc;
+}
+.upri-finding--positive {
+    border-left-color: var(--upri-green);
+}
+.upri-finding--attention {
+    border-left-color: var(--upri-amber);
+}
+.upri-finding__body {
+    min-width: 0;
+}
+.upri-finding__title {
+    margin: 0 0 0.1rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+}
+.upri-finding__text {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #374151;
+}

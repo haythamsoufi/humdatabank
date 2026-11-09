@@ -4,7 +4,7 @@ The **UPR Analysis** Data Explorer tab, the **presentation** and the **A4 report
 
 ```
 live data ──► aggregators ──► payload ──► views ──► outline ──► renderers
-              impact.py       (raw        impact_views.py   pages.js    tab           (upr-impact.js)
+              analysis_data.py (raw       analysis_views.py pages.js    tab           (upr-analysis-tab.js)
               narrative.py    series)     narrative_views.py            presentation  (slides.js)
                                           analysis_spec.py              A4 report     (report.js)
                                           analysis_labels.py
@@ -13,16 +13,16 @@ live data ──► aggregators ──► payload ──► views ──► outl
 | Layer | Files | Owns |
 |---|---|---|
 | Rules shared by every layer | `analysis_common.py` | Round codes and order, "submitted" statuses, the settled-round ratio, year-over-year change, region scoping |
-| Aggregation (pure) | `impact.py`, `narrative.py` | Numbers: per-year data series, participation by stage |
+| Aggregation (pure) | `analysis_data.py`, `narrative.py` | Numbers: per-year data series, participation by stage |
 | Display text | `analysis_labels.py` | Every title, hint, series name, column heading and note (one msgid catalogue, Flask-Babel) |
 | View schema + helpers | `analysis_spec.py` | The JSON structure below, palette, table and KPI helpers |
-| Views | `impact_views.py`, `narrative_views.py` | Which visuals exist, how each series is drawn, what each table shows |
-| Entry points | `analysis_service.py` | `build_impact_analysis`, `build_narrative_analysis`, `build_analysis_bundle` |
+| Views | `analysis_views.py`, `narrative_views.py` | Which visuals exist, how each series is drawn, what each table shows |
+| Entry points | `analysis_service.py` | `build_data_analysis`, `build_narrative_analysis`, `build_analysis_bundle` |
 | Browser renderers | `static/js/upr-analysis-{format,charts,dom}.js` | Raw value → text, view chart → ApexCharts options, cards / KPIs / tables, and `dom.renderBlock` for exports |
 | Export outline | `static/js/upr-analysis-pages.js` | Which blocks (cover, section, KPIs, visuals, tables, notes) an export contains, in order |
 | Presentation | `static/js/upr-analysis-slides.js`, `css/upr-analysis-export.css` | 16:9 slide deck: navigation, scaling, full screen |
 | A4 report | `static/js/upr-analysis-report.js`, `css/upr-analysis-{export,print}.css` | A4 pagination and the print flow |
-| The tab | `static/js/upr-impact.js`, `templates/upr/impact_panel.html` | Fetching, loading states, region and round-type controls, the export dialog |
+| The tab | `static/js/upr-analysis-tab.js`, `templates/upr/analysis_panel.html` | Fetching, loading states, region and round-type controls, the export dialog |
 
 ## The view
 
@@ -37,14 +37,14 @@ Defined in the docstring of `analysis_spec.py`. In short, a view is
 - A **chart** is `categories` + `series` (`kind`: `column` / `line` / `area`, `axis`, `format`, `color`) + `axes`. It names no charting library.
 - Values stay **raw**; a `format` name (`int`, `money`, `pct`, `abs_int`) says how to print them. Chart axes, tooltips, KPIs and table cells all share one number.
 
-The data section has one view (`impact_views.build_impact_view`). The participation section has one view per round type (`narrative_views.build_narrative_views` → `ALL`, `P`, `MYR`, `AR`), so switching needs no new request and an export can walk all of them.
+The data section has one view (`analysis_views.build_analysis_view`). The participation section has one view per round type (`narrative_views.build_narrative_views` → `ALL`, `P`, `MYR`, `AR`), so switching needs no new request and an export can walk all of them.
 
-`GET /admin/data-exploration/upr-impact/data` returns `{impact, view}`; `/upr-impact/narrative` returns `{narrative, views}`. `impact`/`narrative` are the raw payloads, kept for API consumers.
+`GET /admin/data-exploration/upr-analysis/data` returns `{analysis, view}`; `/upr-analysis/narrative` returns `{narrative, views}`. `analysis`/`narrative` are the raw payloads, kept for API consumers.
 
 ## Adding or changing a visual
 
 1. Add the text to `analysis_labels.analysis_labels()` (reuse existing msgids where you can).
-2. Add a function to `impact_views.py` or `narrative_views.py` returning `visual(...)` and register it in the view builder. The tab renders it with no JavaScript change.
+2. Add a function to `analysis_views.py` or `narrative_views.py` returning `visual(...)` and register it in the view builder. The tab renders it with no JavaScript change.
 3. If a chart needs a new look, extend the chart spec and `upr-analysis-charts.js` together, with a case in `tests/js/plugins/upr-analysis.test.js`.
 4. Regenerate the contract fixture (below) and run both test suites.
 
@@ -53,7 +53,7 @@ The data section has one view (`impact_views.build_impact_view`). The participat
 A visual can carry `findings: [Finding]`, short written takeaways such as "Planned funding doubled between 2024 and 2025". They are **part of the view**, so the tab, the slides and the A4 report show the same words and a translation covers all three. No findings are written yet; every visual's list is empty and nothing renders until one is added.
 
 ```python
-from plugins.upr.analysis_spec import finding, visual
+from plugins.upr.analysis.analysis_spec import finding, visual
 
 visual(
     "funding", title, hint, chart=chart, table=table,
@@ -95,7 +95,7 @@ npm run test:js -- tests/js/plugins/upr-analysis.test.js                # from B
 Both are built **in the browser from the views the tab already loaded** (same region, no extra request), because the visuals are ApexCharts drawn by JavaScript. They do not recompute numbers or re-type text.
 
 ```
-Export dialog (upr-impact.js)  ─ selected sections ─►  pages.buildOutline()  ─ blocks ─►  slides.open()
+Export dialog (upr-analysis-tab.js)  ─ selected sections ─►  pages.buildOutline()  ─ blocks ─►  slides.open()
                                                                                    └────►  report.open()
 ```
 

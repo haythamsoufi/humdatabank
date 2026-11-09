@@ -1,7 +1,7 @@
 """UPR validation-dashboard round codes."""
 
-from plugins.upr.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
-from plugins.upr.validation_dashboard import (
+from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+from plugins.upr.validation.validation_dashboard import (
     choose_validation_rounds,
     round_display_label,
     round_for_assignment,

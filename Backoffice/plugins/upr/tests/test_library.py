@@ -30,13 +30,13 @@ class _Store:
 @pytest.fixture
 def store(monkeypatch):
     fake = _Store()
-    monkeypatch.setattr("plugins.upr.library.storage_service", fake)
+    monkeypatch.setattr("plugins.upr.dashboards.library.storage_service", fake)
     return fake
 
 
 @pytest.mark.unit
 def test_library_round_trip(store, tmp_path):
-    from plugins.upr.library import library_status, store_rendered_country
+    from plugins.upr.dashboards.library import library_status, store_rendered_country
 
     combined = tmp_path / "combined.png"
     combined.write_bytes(b"combined-v1")
@@ -91,7 +91,7 @@ def test_library_round_trip(store, tmp_path):
 
 @pytest.mark.unit
 def test_store_rejects_unknown_dashboard_without_writing(store, tmp_path):
-    from plugins.upr.library import store_rendered_country
+    from plugins.upr.dashboards.library import store_rendered_country
 
     path = tmp_path / "x.png"
     path.write_bytes(b"nope")
@@ -109,7 +109,7 @@ def test_store_rejects_unknown_dashboard_without_writing(store, tmp_path):
 
 @pytest.mark.unit
 def test_empty_store_does_not_clear_existing(store, tmp_path):
-    from plugins.upr.library import library_status, store_rendered_country
+    from plugins.upr.dashboards.library import library_status, store_rendered_country
 
     path = tmp_path / "combined.png"
     path.write_bytes(b"png")
@@ -136,7 +136,7 @@ def test_empty_store_does_not_clear_existing(store, tmp_path):
 
 @pytest.mark.unit
 def test_library_archive_includes_every_stored_country(store, tmp_path):
-    from plugins.upr.library import build_library_archive, store_rendered_country
+    from plugins.upr.dashboards.library import build_library_archive, store_rendered_country
 
     afg = tmp_path / "afg.png"
     afg.write_bytes(b"afg-png")
@@ -167,7 +167,7 @@ def test_library_archive_includes_every_stored_country(store, tmp_path):
 
 @pytest.mark.unit
 def test_library_status_ignores_corrupt_index(store):
-    from plugins.upr.library import library_status
+    from plugins.upr.dashboards.library import library_status
 
     store.files["library/1/png/en/index.json"] = b"not-json"
     assert library_status(1, "png", "en") == {}

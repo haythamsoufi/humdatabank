@@ -20,7 +20,7 @@ def tile_client(app, logged_in_admin_client):
     view = app.view_functions.get("interactive_map_plugin.proxy_mapbox_tile")
     if view is None:
         pytest.skip("interactive_map plugin is not registered in the test app")
-    from plugins.upr.flow import clear_mapbox_tile_cache
+    from plugins.upr.analysis.flow import clear_mapbox_tile_cache
 
     clear_mapbox_tile_cache()
     fake_config = MagicMock(get_api_key=lambda provider: "token")
@@ -66,7 +66,7 @@ def test_tile_responses_are_private_cache(tile_client):
 
 def test_second_tile_request_skips_upstream(tile_client):
     """In-process LRU: identical z/x/y must not re-hit Mapbox on a warm worker."""
-    from plugins.upr.flow import clear_mapbox_tile_cache
+    from plugins.upr.analysis.flow import clear_mapbox_tile_cache
 
     clear_mapbox_tile_cache()
     upstream = _upstream("image/png", b"\x89PNG-cached")

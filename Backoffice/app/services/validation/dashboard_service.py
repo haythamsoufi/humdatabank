@@ -86,12 +86,12 @@ def _upr_dashboard():
     Importing ``plugins.upr`` at module scope pulls admin routes, which import
     this module again before its functions exist.
     """
-    from plugins.upr.catalog import (
+    from plugins.upr.dashboards.catalog import (
         UPR_LEGACY_REPORTING_TEMPLATE_ID,
         UPR_REPORTING_TEMPLATE_ID,
         UPR_VALIDATION_TEMPLATE_IDS,
     )
-    from plugins.upr.validation_dashboard import upr_display_name, upr_product_tab
+    from plugins.upr.validation.validation_dashboard import upr_display_name, upr_product_tab
 
     return {
         "legacy_id": UPR_LEGACY_REPORTING_TEMPLATE_ID,

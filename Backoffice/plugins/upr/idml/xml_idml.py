@@ -75,7 +75,7 @@ def _table_cell_height(paras: list[dict]) -> float:
 
 def _rtl_font(font: str, *, arabic_font: bool) -> str:
     """Tajawal for Arabic-script stories. Visual KPI digits stay in the raster PNG."""
-    from plugins.upr.typography import ARABIC_FAMILY
+    from plugins.upr.dashboards.typography import ARABIC_FAMILY
 
     if not arabic_font:
         return font
@@ -763,7 +763,7 @@ def _styles_xml(*, rtl: bool = False, arabic_font: bool = False) -> str:
     band = ' RuleBelow="true" RuleBelowLineWeight="2" RuleBelowColor="Color/BannerNavy" RuleBelowOffset="3"'
     start = "RightAlign" if rtl else "LeftAlign"
     justified = "RightJustified" if rtl else "LeftJustified"
-    from plugins.upr.typography import idml_applied_font
+    from plugins.upr.dashboards.typography import idml_applied_font
 
     heading = idml_applied_font(arabic_font=arabic_font, heading=True)
     body = idml_applied_font(arabic_font=arabic_font, heading=False)

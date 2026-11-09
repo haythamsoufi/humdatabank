@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from app.plugins.base import DataExplorerTabConfig
 from app.plugins.data_explorer import (
+    canonical_explore_tab_id,
     explore_first_tab,
     resolve_explore_tab,
     user_can_access_data_explorer_nav,
@@ -49,12 +50,13 @@ def test_fdrs_plugin_owns_fdrs_explorer_tabs():
     assert ifrc_tabs["pb-progress"].panel_template == "plugins/ifrc/pb_progress/tab_panel.html"
 
     upr_tabs = {tab.tab_id: tab for tab in UprPlugin().get_data_explorer_tabs()}
-    assert list(upr_tabs) == ["upr", "upr-impact"]
+    assert list(upr_tabs) == ["upr", "upr-analysis"]
     assert upr_tabs["upr"].plugin_id == "upr"
     assert upr_tabs["upr"].permission == "admin.data_explore.upr_visuals"
-    assert upr_tabs["upr-impact"].plugin_id == "upr"
-    assert upr_tabs["upr-impact"].permission == "admin.data_explore.upr_impact"
-    assert upr_tabs["upr-impact"].panel_template == "plugins/upr/upr/impact_panel.html"
+    assert upr_tabs["upr-analysis"].plugin_id == "upr"
+    assert upr_tabs["upr-analysis"].permission == "admin.data_explore.upr_impact"
+    assert upr_tabs["upr-analysis"].legacy_tab_ids == ("upr-impact",)
+    assert upr_tabs["upr-analysis"].panel_template == "plugins/upr/upr/analysis_panel.html"
 
 
 def test_explore_first_tab_returns_lowest_priority_accessible_tab():
@@ -86,6 +88,30 @@ def test_resolve_explore_tab_falls_back_when_requested_tab_not_accessible():
     manager = _plugin_manager_with_pb_progress()
 
     assert resolve_explore_tab(flags, manager, "pb-progress") == "data-table"
+
+
+def test_resolve_explore_tab_accepts_legacy_upr_impact_id():
+    flags = {
+        "can_access_data_table": True,
+        "can_access_upr_analysis": True,
+    }
+    manager = MagicMock()
+    manager.get_data_explorer_tabs.return_value = [
+        DataExplorerTabConfig(
+            tab_id="upr-analysis",
+            label="UPR Analysis",
+            permission="admin.data_explore.upr_impact",
+            priority=46,
+            panel_template="plugins/upr/upr/analysis_panel.html",
+            plugin_id="upr",
+            legacy_tab_ids=("upr-impact",),
+        )
+    ]
+
+    assert canonical_explore_tab_id(manager, "upr-impact") == "upr-analysis"
+    assert canonical_explore_tab_id(manager, "upr-analysis") == "upr-analysis"
+    assert resolve_explore_tab(flags, manager, "upr-impact") == "upr-analysis"
+    assert resolve_explore_tab({"can_access_data_table": True}, manager, "upr-impact") == "data-table"
 
 
 def test_resolve_explore_tab_falls_back_for_unknown_tab():

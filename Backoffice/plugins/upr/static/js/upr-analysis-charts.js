@@ -1,4 +1,4 @@
-/* UPR Analysis — turns a view "chart" (plugins/upr/analysis_spec.py) into
+/* UPR Analysis — turns a view "chart" (plugins/upr/analysis/analysis_spec.py) into
  * ApexCharts options. Pure: no DOM and no globals beyond UprAnalysis.format, so
  * the tab, a browser presentation or a chart-to-image export all draw the same
  * chart from the same description. */
@@ -101,6 +101,35 @@
         if (series.some(function (s) { return s.kind === 'column'; })) {
             options.plotOptions = {
                 bar: { columnWidth: spec.column_width, borderRadius: spec.border_radius }
+            };
+        }
+
+        // Long names (countries, National Societies) sit on the value axis as
+        // columns and collide once the card is only a grid column wide.
+        // Horizontal bars keep every name on its own row, inside the card.
+        if (spec.horizontal) {
+            var valueAxis = ((spec.axes || {}).primary || {});
+            var rows = (spec.categories || []).length;
+            options.chart.height = Math.max(spec.height || 240, rows * 28 + 48);
+            options.plotOptions = options.plotOptions || {};
+            options.plotOptions.bar = {
+                horizontal: true,
+                barHeight: spec.column_width || '60%',
+                borderRadius: spec.border_radius
+            };
+            options.xaxis.labels = { formatter: formatters().formatter(valueAxis.format) };
+            options.yaxis = {
+                labels: {
+                    maxWidth: 220,
+                    style: { fontSize: '11px', colors: '#374151' }
+                }
+            };
+        } else if (series.some(function (s) { return s.kind === 'column'; })) {
+            options.xaxis.labels = {
+                rotate: -40,
+                trim: true,
+                hideOverlappingLabels: true,
+                maxHeight: 72
             };
         }
 

@@ -34,7 +34,7 @@ from app.utils.request_validation import enforce_csrf_json
 @permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_rounds_api():
     """UPR round list: each option is named like the assignment (2026 planning, 2026 midyear reporting)."""
-    from plugins.upr.validation_dashboard import upr_validation_rounds
+    from plugins.upr.validation.validation_dashboard import upr_validation_rounds
 
     return json_ok(rounds=upr_validation_rounds())
 
@@ -64,7 +64,7 @@ register_validation_scope_routes(
 @permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_capacity_api():
     """Volunteers, staff, branches, and local units on planning vs country reporting."""
-    from plugins.upr.capacity_comparison import load_capacity_comparison
+    from plugins.upr.dashboards.capacity_comparison import load_capacity_comparison
 
     return json_ok(**load_capacity_comparison())
 
@@ -74,7 +74,7 @@ def validation_dashboard_capacity_api():
 @permission_required(VALIDATION_DASHBOARD_PERMISSION)
 def validation_dashboard_emergencies_api():
     """Applicable emergencies for a UPR round, marked covered or not on each list."""
-    from plugins.upr.catalog import UPR_VALIDATION_TEMPLATE_IDS
+    from plugins.upr.dashboards.catalog import UPR_VALIDATION_TEMPLATE_IDS
     from plugins.upr.validation.emergency_catalogue import load_round_emergencies
 
     template_id = request.args.get("template_id", type=int)

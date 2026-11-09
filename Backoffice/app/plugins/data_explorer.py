@@ -149,6 +149,23 @@ def explore_first_tab(flags: dict[str, bool], plugin_manager: "PluginManager") -
     return min(candidates, key=lambda item: item[0])[1]
 
 
+def canonical_explore_tab_id(
+    plugin_manager: "PluginManager",
+    requested_tab: str | None,
+) -> str | None:
+    """Map a retired ``?tab=`` value onto the id that replaced it.
+
+    Plugins list the old id on ``DataExplorerTabConfig.legacy_tab_ids`` so a
+    bookmark still selects the tab. The current id is returned unchanged.
+    """
+    if not requested_tab:
+        return requested_tab
+    for tab in plugin_manager.get_data_explorer_tabs():
+        if requested_tab == tab.tab_id or requested_tab in tab.legacy_tab_ids:
+            return tab.tab_id
+    return requested_tab
+
+
 def resolve_explore_tab(
     flags: dict[str, bool],
     plugin_manager: "PluginManager",
@@ -156,6 +173,7 @@ def resolve_explore_tab(
 ) -> str:
     """Return the active tab, honoring ?tab= when the user may access it."""
     default_tab = explore_first_tab(flags, plugin_manager)
+    requested_tab = canonical_explore_tab_id(plugin_manager, requested_tab)
     if not requested_tab:
         return default_tab
     if requested_tab in _accessible_explore_tab_ids(flags, plugin_manager):

@@ -5,7 +5,7 @@
 {% block title %}UPR Plugin Settings{% endblock %}
 
 {% set active_tab = request.args.get('tab') or 'overview' %}
-{% if active_tab not in ['overview', 'secondary'] %}{% set active_tab = 'overview' %}{% endif %}
+{% if active_tab not in ['overview', 'secondary', 'global-plan'] %}{% set active_tab = 'overview' %}{% endif %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-6" id="upr-settings"
@@ -39,6 +39,13 @@
                 {% if ready_count %}
                 <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">{{ ready_count }}</span>
                 {% endif %}
+            </button>
+            <button type="button" role="tab" id="tab-global-plan"
+                    data-tab="global-plan"
+                    aria-controls="panel-global-plan"
+                    aria-selected="{{ 'true' if active_tab == 'global-plan' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(active_tab == 'global-plan') }}">
+                <i class="fas fa-earth-americas mr-1.5"></i>Global Plan
             </button>
         {% endcall %}
 
@@ -103,6 +110,11 @@
              class="settings-panel p-4 sm:p-6{% if active_tab != 'secondary' %} hidden{% endif %}">
             {% include "plugins/upr/admin/_upr_secondary_panel.html" %}
         </div>
+
+        <div id="panel-global-plan" role="tabpanel" aria-labelledby="tab-global-plan"
+             class="settings-panel p-4 sm:p-6{% if active_tab != 'global-plan' %} hidden{% endif %}">
+            {% include "plugins/upr/admin/_upr_global_plan_panel.html" %}
+        </div>
     </div>
 </div>
 
@@ -113,7 +125,7 @@
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || "";
 
   function setTab(name, { push } = { push: true }) {
-    const id = name === "secondary" ? "secondary" : "overview";
+    const id = (name === "secondary" || name === "global-plan") ? name : "overview";
     if (window.AdminUnderlineTabs && typeof window.AdminUnderlineTabs.activateStripTab === "function") {
       window.AdminUnderlineTabs.activateStripTab("#upr-settings-tabs", id, {
         panelSelector: "#upr-settings .settings-panel",
@@ -144,6 +156,9 @@
 
   if (location.hash === "#secondary" || location.hash === "#upr-secondary") {
     setTab("secondary", { push: true });
+  }
+  if (location.hash === "#global-plan" || location.hash === "#upr-global-plan") {
+    setTab("global-plan", { push: true });
   }
 
   function reloadSecondary() {

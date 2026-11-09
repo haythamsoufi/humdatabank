@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.utils.datetime_helpers import utcnow
-from plugins.upr.assignment_job import (
+from plugins.upr.dashboards.assignment_job import (
     ASSIGNMENT_EXPORT_JOB_TYPE,
     REUSE_COMPLETED_SECONDS,
     _reusable_job_id,
@@ -16,7 +16,7 @@ from plugins.upr.assignment_job import (
     export_still_pulsing,
     take_matching_pdf_bytes,
 )
-from plugins.upr.typography import export_style_token
+from plugins.upr.dashboards.typography import export_style_token
 
 
 def _job(**meta):
@@ -137,11 +137,11 @@ def test_find_reusable_skips_stale_completed(tmp_path):
 
 def _patch_pdf_lookup(monkeypatch, job_id, job):
     monkeypatch.setattr(
-        "plugins.upr.assignment_job.find_reusable_assignment_export_job",
+        "plugins.upr.dashboards.assignment_job.find_reusable_assignment_export_job",
         lambda **_k: job_id,
     )
     monkeypatch.setattr(
-        "plugins.upr.assignment_job.AIJob",
+        "plugins.upr.dashboards.assignment_job.AIJob",
         SimpleNamespace(query=SimpleNamespace(get=lambda _id: job)),
     )
 
@@ -174,15 +174,15 @@ def test_take_matching_pdf_bytes_waits_for_inflight(tmp_path, monkeypatch):
     )
     states = iter([running, done])
     monkeypatch.setattr(
-        "plugins.upr.assignment_job.find_reusable_assignment_export_job",
+        "plugins.upr.dashboards.assignment_job.find_reusable_assignment_export_job",
         lambda **_k: "pdf-job",
     )
     monkeypatch.setattr(
-        "plugins.upr.assignment_job.AIJob",
+        "plugins.upr.dashboards.assignment_job.AIJob",
         SimpleNamespace(query=SimpleNamespace(get=lambda _id: next(states))),
     )
-    monkeypatch.setattr("plugins.upr.assignment_job.db.session.expire_all", lambda: None)
-    monkeypatch.setattr("plugins.upr.assignment_job.time.sleep", lambda _s: None)
+    monkeypatch.setattr("plugins.upr.dashboards.assignment_job.db.session.expire_all", lambda: None)
+    monkeypatch.setattr("plugins.upr.dashboards.assignment_job.time.sleep", lambda _s: None)
     data, name = take_matching_pdf_bytes(aes_id=3129, timeout=2)
     assert data.startswith(b"%PDF")
     assert name == "x.pdf"
@@ -232,7 +232,7 @@ def test_export_still_pulsing_ignores_bad_heartbeat_stamp():
 
 def test_take_matching_pdf_bytes_none_when_no_job(monkeypatch):
     monkeypatch.setattr(
-        "plugins.upr.assignment_job.find_reusable_assignment_export_job",
+        "plugins.upr.dashboards.assignment_job.find_reusable_assignment_export_job",
         lambda **_k: None,
     )
     assert take_matching_pdf_bytes(aes_id=3129) is None

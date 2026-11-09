@@ -18,7 +18,7 @@ from app.services.imports.import_change_log import (
     attach_import_change_log_to_activity,
     set_import_audit_details,
 )
-from plugins.upr.catalog import UPR_TEMPLATE_CHOICES
+from plugins.upr.dashboards.catalog import UPR_TEMPLATE_CHOICES
 from plugins.upr.excel._scripts_path import ensure_scripts_in_path as _ensure_scripts_in_path
 from plugins.upr.excel.excel_import_service import UprExcelImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime

@@ -1,4 +1,4 @@
-/* UPR Analysis — DOM renderers for a view (plugins/upr/analysis_spec.py):
+/* UPR Analysis — DOM renderers for a view (plugins/upr/analysis/analysis_spec.py):
  * KPI cards, visual cards, notes and the drill-down table dialog. They only
  * read the view they are given, so the presentation and the A4 report reuse the
  * very same cards (renderBlock). Charts are not drawn here: renderCard reports
@@ -168,6 +168,65 @@
         return wrap;
     }
 
+    function overviewBoard(visual) {
+        var data = (visual && visual.overview) || {};
+        var rows = data.rows || [];
+        var board = node('div', 'upri-overview');
+        if (data.year != null) board.setAttribute('data-year', String(data.year));
+
+        var boardTitle = node('h4', 'upri-overview__title', (visual && visual.title) || '');
+        board.appendChild(boardTitle);
+
+        var body = node('div', 'upri-overview__body');
+        var legend = node('div', 'upri-overview__legend');
+        var max = 0;
+        rows.forEach(function (row) {
+            var n = Number(row.value);
+            if (isFinite(n) && n > max) max = n;
+        });
+        if (max <= 0) max = 1;
+
+        rows.forEach(function (row) {
+            var item = node('div', 'upri-overview__row');
+            item.setAttribute('data-overview-row', row.id || '');
+            item.appendChild(node('span', 'upri-overview__amount', row.display || '—'));
+            item.appendChild(node('span', 'upri-overview__label', row.label || ''));
+            item.appendChild(node('span', 'upri-overview__line', ''));
+            legend.appendChild(item);
+        });
+        body.appendChild(legend);
+
+        var barsWrap = node('div', 'upri-overview__bars');
+        // Left → right: shortest to tallest (PNS, HNS, IFRC) to match the reference graphic.
+        var barOrder = rows.slice().reverse();
+        barOrder.forEach(function (row) {
+            var n = Number(row.value);
+            if (!isFinite(n) || n < 0) n = 0;
+            var bar = node('div', 'upri-overview__bar');
+            bar.setAttribute('data-overview-bar', row.id || '');
+            bar.style.background = row.color || '#9ca3af';
+            bar.style.height = Math.max(4, Math.round((n / max) * 100)) + '%';
+            bar.title = (row.label || '') + ': ' + (row.display || '');
+            barsWrap.appendChild(bar);
+        });
+
+        var total = node('div', 'upri-overview__total');
+        total.appendChild(node('p', 'upri-overview__total-value', data.total_display || '—'));
+        var people = node('p', 'upri-overview__people');
+        people.appendChild(node('strong', null, data.people_display || '—'));
+        people.appendChild(document.createTextNode(' ' + (data.people_caption || '')));
+        total.appendChild(people);
+        barsWrap.appendChild(total);
+
+        if (data.total_caption) {
+            barsWrap.appendChild(node('p', 'upri-overview__caption', data.total_caption));
+        }
+
+        body.appendChild(barsWrap);
+        board.appendChild(body);
+        return board;
+    }
+
     // Printed and projected cards cannot click through to a list, so each gap
     // is spelled out with the countries it names.
     function gapLists(gaps, options) {
@@ -204,7 +263,11 @@
         var interactive = !options || options.interactive !== false;
         var size = (options && options.size) || {};
         var plots = [];
-        var section = node('section', 'upri-card' + (visual.wide ? ' upri-card--wide' : ''));
+        var isOverview = visual.kind === 'overview';
+        var section = node(
+            'section',
+            'upri-card' + (visual.wide ? ' upri-card--wide' : '') + (isOverview ? ' upri-card--overview' : '')
+        );
         var headingId = 'upri-vis-' + visual.id + '-h';
         section.setAttribute('data-upri-visual', visual.id);
         section.setAttribute('aria-labelledby', headingId);
@@ -251,6 +314,8 @@
             section.appendChild(grid);
         } else if (visual.kind === 'gaps') {
             section.appendChild(interactive ? gapButtons(visual.gaps) : gapLists(visual.gaps, options));
+        } else if (isOverview) {
+            section.appendChild(overviewBoard(visual));
         } else {
             var host = node('div', 'upri-chart');
             section.appendChild(host);

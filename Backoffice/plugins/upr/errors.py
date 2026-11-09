@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.models.assignments import AssignmentEntityStatus
-from plugins.upr.catalog import UPR_VISUAL_TEMPLATE_IDS
+from plugins.upr.dashboards.catalog import UPR_VISUAL_TEMPLATE_IDS
 
 
 class UprError(ValueError):

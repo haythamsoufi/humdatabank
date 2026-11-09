@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from plugins.upr.audience import INTERNAL_COVER_BANNER
-from plugins.upr.catalog import (
+from plugins.upr.dashboards.audience import INTERNAL_COVER_BANNER
+from plugins.upr.dashboards.catalog import (
     PLAN_TEMPLATE_ID,
     REACH_CODES,
     REPORT_TEMPLATE_ID,
@@ -18,7 +18,7 @@ from plugins.upr.catalog import (
     kind_for_template,
     section_to_area,
 )
-from plugins.upr.formatters import (
+from plugins.upr.dashboards.formatters import (
     _arabic_million_suffix,
     _format_millions_compact,
     appeal_number,
@@ -36,7 +36,7 @@ from plugins.upr.formatters import (
     to_number,
     with_chf,
 )
-from plugins.upr.render import (
+from plugins.upr.dashboards.render import (
     _finance_network_density,
     render_dashboard_html,
     render_dashboards_html,
@@ -125,7 +125,7 @@ def test_format_count_and_chf():
 
 @pytest.mark.unit
 def test_round_to_nearest_thousand_half_up():
-    from plugins.upr.formatters import format_thousands, round_to_nearest_thousand
+    from plugins.upr.dashboards.formatters import format_thousands, round_to_nearest_thousand
 
     assert round_to_nearest_thousand(1_120_346) == 1_120_000
     assert round_to_nearest_thousand(30_195) == 30_000
@@ -195,13 +195,13 @@ def test_format_compact_chf_matches_tableau():
     ],
 )
 def test_format_compact_chf_arabic_million_suffix(monkeypatch, value, expected):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     assert format_compact_chf(value) == expected
 
 
 @pytest.mark.unit
 def test_arabic_million_fraction_uses_singular_even_below_one(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     assert _arabic_million_suffix(0.5) == "مليون"
     assert _format_millions_compact(500_000) == "0.5 مليون"
 
@@ -211,7 +211,7 @@ def test_chf_label_stays_iso_except_arabic(monkeypatch):
     assert chf_label() == "CHF"
     assert with_chf("1.2M", prefix=True) == "CHF 1.2M"
     assert with_chf("6.7M") == "6.7M CHF"
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     assert chf_label() == "فرنك سويسري"
     assert with_chf("6.7 مليون", prefix=True) == "مليون فرنك سويسري 6.7"
     assert with_chf("مليون 6.7") == "مليون فرنك سويسري 6.7"
@@ -463,7 +463,7 @@ def test_render_reach_and_support():
 
 @pytest.mark.unit
 def test_reach_rtl_reverses_columns(monkeypatch):
-    monkeypatch.setattr("plugins.upr.render.is_rtl", lambda: True)
+    monkeypatch.setattr("plugins.upr.dashboards.render.is_rtl", lambda: True)
     payload = _payload()
     payload["people_reached"].insert(
         0,
@@ -712,7 +712,7 @@ def test_public_narrative_cover_has_no_internal_banner():
 
 @pytest.mark.unit
 def test_cover_country_type_shrinks_long_names():
-    from plugins.upr.render import _cover_country_type
+    from plugins.upr.dashboards.render import _cover_country_type
 
     short_size, _, short_extra = _cover_country_type("UGANDA")
     mid_size, _, _ = _cover_country_type("BOSNIA AND HERZEGOVINA")
@@ -1257,7 +1257,7 @@ def test_emergency_title_is_code_slash_name():
 def test_number_styles_use_montserrat():
     from pathlib import Path
 
-    from plugins.upr.raster import _font_css
+    from plugins.upr.dashboards.raster import _font_css
 
     css = (
         Path(__file__).resolve().parents[1] / "static" / "css" / "upr.css"
@@ -1284,7 +1284,7 @@ def test_number_styles_use_montserrat():
     assert "text-align: start" in yes_block
     percent_block = css.split(".upr-bar-yes.upr-num {", 1)[1].split("}", 1)[0]
     assert "text-align: start" in percent_block
-    from plugins.upr.typography import ARABIC_NUMBER_STACK, typography_css
+    from plugins.upr.dashboards.typography import ARABIC_NUMBER_STACK, typography_css
 
     fonts = typography_css()
     assert "Tajawal" in fonts

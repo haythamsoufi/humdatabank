@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from plugins.upr.service import UprVisualsService, visual_export_filename
+from plugins.upr.dashboards.service import UprVisualsService, visual_export_filename
 
 
 @pytest.mark.unit
@@ -42,7 +42,7 @@ def test_render_isolated_parallel_runs_jobs_together(monkeypatch):
         return Path(job["output_path"])
 
     ticks = []
-    monkeypatch.setattr("plugins.upr.service.run_isolated", fake_isolated)
+    monkeypatch.setattr("plugins.upr.dashboards.service.run_isolated", fake_isolated)
     paths = UprVisualsService._render_isolated_parallel(
         [{"kind": "pdf", "output_path": "a.pdf"}, {"kind": "narrative_pages", "output_path": "b.pdf"}],
         on_tick=ticks.append,
@@ -63,10 +63,10 @@ def test_png_bytes_reuses_matching_pdf(tmp_path, monkeypatch):
     def fake_locale(lang):
         yield lang
 
-    monkeypatch.setattr("plugins.upr.service.current_app", _App())
-    monkeypatch.setattr("plugins.upr.service.export_locale", fake_locale)
+    monkeypatch.setattr("plugins.upr.dashboards.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr.dashboards.service.export_locale", fake_locale)
     monkeypatch.setattr(
-        "plugins.upr.assignment_job.take_matching_pdf_bytes",
+        "plugins.upr.dashboards.assignment_job.take_matching_pdf_bytes",
         lambda **_k: (b"%PDF-reuse", "AFG_visuals.pdf"),
     )
 
@@ -75,7 +75,7 @@ def test_png_bytes_reuses_matching_pdf(tmp_path, monkeypatch):
         Path(job["output_path"]).write_bytes(b"png-bytes")
         return Path(job["output_path"])
 
-    monkeypatch.setattr("plugins.upr.service.run_isolated", fake_isolated)
+    monkeypatch.setattr("plugins.upr.dashboards.service.run_isolated", fake_isolated)
     data, filename = UprVisualsService.png_bytes(3129, "combined", lang="en")
     assert data == b"png-bytes"
     assert filename == "AFG_visuals.png"
@@ -92,10 +92,10 @@ def test_png_bytes_falls_back_to_html_when_no_pdf(tmp_path, monkeypatch):
     def fake_locale(lang):
         yield lang
 
-    monkeypatch.setattr("plugins.upr.service.current_app", _App())
-    monkeypatch.setattr("plugins.upr.service.export_locale", fake_locale)
+    monkeypatch.setattr("plugins.upr.dashboards.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr.dashboards.service.export_locale", fake_locale)
     monkeypatch.setattr(
-        "plugins.upr.assignment_job.take_matching_pdf_bytes",
+        "plugins.upr.dashboards.assignment_job.take_matching_pdf_bytes",
         lambda **_k: None,
     )
     monkeypatch.setattr(
@@ -108,7 +108,7 @@ def test_png_bytes_falls_back_to_html_when_no_pdf(tmp_path, monkeypatch):
         assert html == "<html/>"
         Path(dest).write_bytes(b"html-png")
 
-    monkeypatch.setattr("plugins.upr.service.render_png_isolated", fake_png)
+    monkeypatch.setattr("plugins.upr.dashboards.service.render_png_isolated", fake_png)
     data, filename = UprVisualsService.png_bytes(3129, "combined", lang="en")
     assert data == b"html-png"
     assert filename.endswith(".png")
@@ -122,7 +122,7 @@ def test_render_isolated_parallel_single_job(monkeypatch):
         seen.append(job["kind"])
         return Path("only.pdf")
 
-    monkeypatch.setattr("plugins.upr.service.run_isolated", fake_isolated)
+    monkeypatch.setattr("plugins.upr.dashboards.service.run_isolated", fake_isolated)
     paths = UprVisualsService._render_isolated_parallel([{"kind": "pdf"}])
     assert seen == ["pdf"]
     assert paths == [Path("only.pdf")]
@@ -133,7 +133,7 @@ def test_render_bulk_item_png_writes_file(tmp_path, monkeypatch):
     def fake_png(_html, tmp, dashboard_id="combined", **_kwargs):
         Path(tmp).write_bytes(b"png-bytes")
 
-    monkeypatch.setattr("plugins.upr.service.render_png_isolated", fake_png)
+    monkeypatch.setattr("plugins.upr.dashboards.service.render_png_isolated", fake_png)
     tmp, arcname = UprVisualsService._render_bulk_item(
         tmp_path,
         payload={"meta": {"iso3": "AFG", "round_code": "P26"}},
@@ -158,8 +158,8 @@ def test_narrative_pdf_bytes_runs_isolated(tmp_path, monkeypatch):
     def fake_locale(lang):
         yield lang
 
-    monkeypatch.setattr("plugins.upr.service.current_app", _App())
-    monkeypatch.setattr("plugins.upr.service.export_locale", fake_locale)
+    monkeypatch.setattr("plugins.upr.dashboards.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr.dashboards.service.export_locale", fake_locale)
     monkeypatch.setattr(
         UprVisualsService,
         "_dashboard_html",
@@ -171,7 +171,7 @@ def test_narrative_pdf_bytes_runs_isolated(tmp_path, monkeypatch):
         lambda blocks, country_name="": blocks,
     )
     monkeypatch.setattr(
-        "plugins.upr.service.translate_styled_blocks",
+        "plugins.upr.dashboards.service.translate_styled_blocks",
         lambda blocks, on_progress=None: blocks,
     )
 
@@ -184,7 +184,7 @@ def test_narrative_pdf_bytes_runs_isolated(tmp_path, monkeypatch):
         Path(job["output_path"]).write_bytes(b"%PDF-" + job["kind"].encode())
         return Path(job["output_path"])
 
-    monkeypatch.setattr("plugins.upr.service.run_isolated", fake_isolated)
+    monkeypatch.setattr("plugins.upr.dashboards.service.run_isolated", fake_isolated)
     monkeypatch.setattr(
         "plugins.upr.idml.merge_report_pdfs",
         lambda visuals, narrative, folio="": visuals + narrative,
@@ -215,8 +215,8 @@ def test_narrative_pdf_bytes_restyles_attached_pdf(tmp_path, monkeypatch):
     def fake_locale(lang):
         yield lang
 
-    monkeypatch.setattr("plugins.upr.service.current_app", _App())
-    monkeypatch.setattr("plugins.upr.service.export_locale", fake_locale)
+    monkeypatch.setattr("plugins.upr.dashboards.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr.dashboards.service.export_locale", fake_locale)
     monkeypatch.setattr(
         UprVisualsService,
         "_dashboard_html",
@@ -231,7 +231,7 @@ def test_narrative_pdf_bytes_restyles_attached_pdf(tmp_path, monkeypatch):
         lambda blocks, country_name="": blocks,
     )
     monkeypatch.setattr(
-        "plugins.upr.service.translate_styled_blocks",
+        "plugins.upr.dashboards.service.translate_styled_blocks",
         lambda blocks, on_progress=None: blocks,
     )
 
@@ -242,7 +242,7 @@ def test_narrative_pdf_bytes_restyles_attached_pdf(tmp_path, monkeypatch):
         Path(job["output_path"]).write_bytes(b"%PDF-" + job["kind"].encode())
         return Path(job["output_path"])
 
-    monkeypatch.setattr("plugins.upr.service.run_isolated", fake_isolated)
+    monkeypatch.setattr("plugins.upr.dashboards.service.run_isolated", fake_isolated)
     monkeypatch.setattr(
         "plugins.upr.idml.merge_report_pdfs",
         lambda visuals, narrative, folio="": visuals + narrative,
@@ -271,8 +271,8 @@ def test_narrative_pdf_bytes_passes_internal_audience(tmp_path, monkeypatch):
         seen.update(kw)
         return {"meta": {"document_title": "Uganda", "iso3": "UGA"}}, "<html/>"
 
-    monkeypatch.setattr("plugins.upr.service.current_app", _App())
-    monkeypatch.setattr("plugins.upr.service.export_locale", fake_locale)
+    monkeypatch.setattr("plugins.upr.dashboards.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr.dashboards.service.export_locale", fake_locale)
     monkeypatch.setattr(UprVisualsService, "_dashboard_html", classmethod(fake_html))
     monkeypatch.setattr("plugins.upr.idml.load_narrative_paragraphs", lambda _word: [{"text": "Hello"}])
     monkeypatch.setattr(
@@ -280,7 +280,7 @@ def test_narrative_pdf_bytes_passes_internal_audience(tmp_path, monkeypatch):
         lambda blocks, country_name="": blocks,
     )
     monkeypatch.setattr(
-        "plugins.upr.service.translate_styled_blocks",
+        "plugins.upr.dashboards.service.translate_styled_blocks",
         lambda blocks, on_progress=None: blocks,
     )
 
@@ -288,7 +288,7 @@ def test_narrative_pdf_bytes_passes_internal_audience(tmp_path, monkeypatch):
         Path(job["output_path"]).write_bytes(b"%PDF-x")
         return Path(job["output_path"])
 
-    monkeypatch.setattr("plugins.upr.service.run_isolated", fake_isolated)
+    monkeypatch.setattr("plugins.upr.dashboards.service.run_isolated", fake_isolated)
     monkeypatch.setattr(
         "plugins.upr.idml.merge_report_pdfs",
         lambda visuals, narrative, folio="": visuals + narrative,

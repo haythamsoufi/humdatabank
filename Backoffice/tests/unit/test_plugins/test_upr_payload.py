@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from plugins.upr.catalog import PLAN_TEMPLATE_ID
-from plugins.upr.data import build_payload
+from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID
+from plugins.upr.dashboards.data import build_payload
 from tests.factories import create_test_assignment_entity_status, create_test_country, create_test_template
 
 
@@ -13,8 +13,8 @@ from tests.factories import create_test_assignment_entity_status, create_test_co
 def test_build_payload_empty_upr_assignment(db_session, monkeypatch):
     country = create_test_country(db_session, name="Côte d'Ivoire Visuals")
     template = create_test_template(db_session, name="Unified Plan 2026")
-    monkeypatch.setattr("plugins.upr.catalog.PLAN_TEMPLATE_ID", template.id)
-    monkeypatch.setattr("plugins.upr.catalog.UPR_VISUAL_TEMPLATE_IDS", frozenset({template.id}))
+    monkeypatch.setattr("plugins.upr.dashboards.catalog.PLAN_TEMPLATE_ID", template.id)
+    monkeypatch.setattr("plugins.upr.dashboards.catalog.UPR_VISUAL_TEMPLATE_IDS", frozenset({template.id}))
     monkeypatch.setattr("plugins.upr.errors.UPR_VISUAL_TEMPLATE_IDS", frozenset({template.id}))
 
     aes = create_test_assignment_entity_status(

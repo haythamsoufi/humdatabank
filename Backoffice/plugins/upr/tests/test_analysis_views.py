@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels, fill
-from plugins.upr.analysis_spec import (
+from plugins.upr.analysis.analysis_labels import analysis_labels, analysis_ui_labels, fill
+from plugins.upr.analysis.analysis_spec import (
     FINDING_TONES,
     country_rows,
     delta_view,
@@ -19,10 +19,10 @@ from plugins.upr.analysis_spec import (
     with_abs_change,
     year_label,
 )
-from plugins.upr.impact import aggregate_impact
-from plugins.upr.impact_views import build_impact_view
-from plugins.upr.narrative import aggregate_participation
-from plugins.upr.narrative_views import VIEW_TRACKS, build_narrative_view, build_narrative_views
+from plugins.upr.analysis.analysis_data import aggregate_analysis
+from plugins.upr.analysis.analysis_views import build_analysis_view
+from plugins.upr.analysis.narrative import aggregate_participation
+from plugins.upr.analysis.narrative_views import VIEW_TRACKS, build_narrative_view, build_narrative_views
 
 LABELS = analysis_labels()
 FIXTURE = Path(__file__).parent / "fixtures" / "analysis_views.json"
@@ -75,7 +75,7 @@ def impact_payload():
         _sub(Round="MYR25", ISO3="BBB", status="assigned"),
         _sub(Round="MYR25", ISO3="CCC", status="assigned"),
     ]
-    return aggregate_impact(master, subs)
+    return aggregate_analysis(master, subs)
 
 
 @pytest.fixture()
@@ -121,7 +121,7 @@ def test_contract_fixture_matches_the_view_builders(impact_payload, narrative_pa
     ``UPR_UPDATE_FIXTURES=1 pytest plugins/upr/tests/test_analysis_views.py``
     """
     current = {
-        "impact": build_impact_view(impact_payload),
+        "impact": build_analysis_view(impact_payload),
         "narrative": build_narrative_views(narrative_payload),
     }
     rendered = json.dumps(current, indent=1, ensure_ascii=False) + "\n"
@@ -137,12 +137,12 @@ def test_contract_fixture_matches_the_view_builders(impact_payload, narrative_pa
 
 
 def test_views_are_json_serialisable(impact_payload, narrative_payload):
-    json.dumps(build_impact_view(impact_payload))
+    json.dumps(build_analysis_view(impact_payload))
     json.dumps(build_narrative_views(narrative_payload))
 
 
 def test_every_chart_series_matches_its_categories(impact_payload, narrative_payload):
-    views = [build_impact_view(impact_payload), *build_narrative_views(narrative_payload).values()]
+    views = [build_analysis_view(impact_payload), *build_narrative_views(narrative_payload).values()]
     seen = 0
     for view in views:
         for vis, chart in _walk_charts(view):
@@ -155,7 +155,7 @@ def test_every_chart_series_matches_its_categories(impact_payload, narrative_pay
 
 def test_every_visual_has_an_id_title_and_table(impact_payload, narrative_payload):
     ids = []
-    for view in [build_impact_view(impact_payload), build_narrative_view(narrative_payload, "ALL")]:
+    for view in [build_analysis_view(impact_payload), build_narrative_view(narrative_payload, "ALL")]:
         for vis in view["visuals"]:
             assert vis["id"] and vis["title"]
             assert vis["table"] and vis["table"]["columns"]
@@ -164,7 +164,7 @@ def test_every_visual_has_an_id_title_and_table(impact_payload, narrative_payloa
 
 
 def test_table_rows_match_column_count(impact_payload, narrative_payload):
-    views = [build_impact_view(impact_payload), *build_narrative_views(narrative_payload).values()]
+    views = [build_analysis_view(impact_payload), *build_narrative_views(narrative_payload).values()]
     for view in views:
         for vis in view["visuals"]:
             tables = [vis["table"], *[g["table"] for g in vis.get("gaps") or []]]
@@ -180,7 +180,7 @@ def test_table_rows_match_column_count(impact_payload, narrative_payload):
 
 
 def test_impact_view_has_the_five_visuals_in_order(impact_payload):
-    view = build_impact_view(impact_payload)
+    view = build_analysis_view(impact_payload)
     assert view["has_data"] is True
     assert [v["id"] for v in view["visuals"]] == ["coverage", "funding", "reach", "partners", "capacity"]
     assert [k["id"] for k in view["kpis"]] == ["coverage", "plan_requirement", "reach", "partners", "partner_funding"]
@@ -188,14 +188,14 @@ def test_impact_view_has_the_five_visuals_in_order(impact_payload):
 
 
 def test_impact_view_is_empty_without_submissions():
-    view = build_impact_view(aggregate_impact([], []))
+    view = build_analysis_view(aggregate_analysis([], []))
     assert view["has_data"] is False
     assert view["visuals"] == [] and view["kpis"] == []
-    assert build_impact_view(None)["has_data"] is False
+    assert build_analysis_view(None)["has_data"] is False
 
 
 def test_open_years_are_starred_and_noted(impact_payload):
-    view = build_impact_view(impact_payload)
+    view = build_analysis_view(impact_payload)
     assert 2025 in impact_payload["in_progress_years"]
     cats = view["visuals"][0]["chart"]["categories"]
     assert cats == ["2024", "2025 *"]
@@ -204,7 +204,7 @@ def test_open_years_are_starred_and_noted(impact_payload):
 
 
 def test_funding_series_follow_the_year_axis_and_mark_midyear(impact_payload):
-    view = build_impact_view(impact_payload)
+    view = build_analysis_view(impact_payload)
     funding = next(v for v in view["visuals"] if v["id"] == "funding")
     plan, reported, spent = funding["chart"]["series"]
     assert funding["chart"]["categories"] == ["2024", "2025 *"]
@@ -221,7 +221,7 @@ def test_funding_series_follow_the_year_axis_and_mark_midyear(impact_payload):
 
 
 def test_country_rows_drop_empty_lines_and_rank_by_largest_figure(impact_payload):
-    view = build_impact_view(impact_payload)
+    view = build_analysis_view(impact_payload)
     funding = next(v for v in view["visuals"] if v["id"] == "funding")
     row_2025 = next(r for r in funding["table"]["rows"] if r["cells"][0] == "2025 *")
     names = [c["cells"][0] for c in row_2025["countries"]]
@@ -229,7 +229,7 @@ def test_country_rows_drop_empty_lines_and_rank_by_largest_figure(impact_payload
 
 
 def test_capacity_panels_are_separate_charts_with_a_latest_figure(impact_payload):
-    view = build_impact_view(impact_payload)
+    view = build_analysis_view(impact_payload)
     capacity = next(v for v in view["visuals"] if v["id"] == "capacity")
     panels = {p["id"]: p for p in capacity["panels"]}
     assert list(panels) == ["volunteers", "staff", "branches", "local_units"]
@@ -239,7 +239,7 @@ def test_capacity_panels_are_separate_charts_with_a_latest_figure(impact_payload
 
 
 def test_partner_chart_splits_planning_and_reporting(impact_payload):
-    view = build_impact_view(impact_payload)
+    view = build_analysis_view(impact_payload)
     visual = next(v for v in view["visuals"] if v["id"] == "partners")
     assert [s["id"] for s in visual["sources"]] == ["all", "pns", "country"]
     assert visual["chart"] is visual["sources"][0]["chart"]
@@ -409,31 +409,39 @@ def test_visual_hints_describe_the_data_and_leave_interaction_hints_to_the_tab(n
 
 
 def test_analysis_service_builds_payloads_and_views_for_every_consumer(monkeypatch, impact_payload, narrative_payload):
-    from plugins.upr import analysis_service
+    from plugins.upr.analysis import analysis_service
+    from plugins.upr.analysis.global_plan import SECTION_IDS
 
+    gp_payload = {"has_data": False, "years": [], "year": None}
     seen = []
-    monkeypatch.setattr(analysis_service, "build_upr_impact", lambda *, region=None: seen.append(("impact", region)) or impact_payload)
+    monkeypatch.setattr(analysis_service, "build_upr_analysis", lambda *, region=None: seen.append(("data", region)) or impact_payload)
     monkeypatch.setattr(
         analysis_service,
         "build_narrative_participation",
         lambda *, region=None: seen.append(("narrative", region)) or narrative_payload,
     )
+    monkeypatch.setattr(
+        analysis_service,
+        "build_upr_global_plan",
+        lambda *, region=None, year=None: seen.append(("global_plan", region, year)) or gp_payload,
+    )
 
     bundle = analysis_service.build_analysis_bundle(region="Africa")
 
-    assert seen == [("impact", "Africa"), ("narrative", "Africa")]
+    assert seen == [("data", "Africa"), ("narrative", "Africa"), ("global_plan", "Africa", None)]
     assert bundle["region"] == "Africa"
-    assert bundle["impact"]["payload"] is impact_payload
-    assert bundle["impact"]["view"]["has_data"] is True
+    assert bundle["data"]["payload"] is impact_payload
+    assert bundle["data"]["view"]["has_data"] is True
     assert bundle["narrative"]["payload"] is narrative_payload
     assert set(bundle["narrative"]["views"]) == set(VIEW_TRACKS)
+    assert set(bundle["global_plan"]["views"]) == set(SECTION_IDS)
 
 
 # -- findings -----------------------------------------------------------------
 
 
 def test_finding_helper_builds_the_documented_shape():
-    from plugins.upr.analysis_spec import finding
+    from plugins.upr.analysis.analysis_spec import finding
 
     plain = finding("growth", "Participation doubled.")
     assert plain == {"id": "growth", "title": None, "text": "Participation doubled.", "tone": "info", "focus": None}
@@ -445,14 +453,14 @@ def test_finding_helper_builds_the_documented_shape():
 
 
 def test_finding_helper_rejects_unknown_tones():
-    from plugins.upr.analysis_spec import finding
+    from plugins.upr.analysis.analysis_spec import finding
 
     with pytest.raises(ValueError):
         finding("x", "text", tone="shouting")
 
 
 def test_visual_carries_its_findings_and_defaults_to_none():
-    from plugins.upr.analysis_spec import finding, visual
+    from plugins.upr.analysis.analysis_spec import finding, visual
 
     assert visual("v", "T", "h")["findings"] == []
     found = finding("a", "text")
@@ -461,7 +469,7 @@ def test_visual_carries_its_findings_and_defaults_to_none():
 
 def test_every_visual_lists_findings_that_the_renderers_can_place(impact_payload, narrative_payload):
     # A finding's focus names chart categories; a typo would silently highlight nothing.
-    views = [build_impact_view(impact_payload), *build_narrative_views(narrative_payload).values()]
+    views = [build_analysis_view(impact_payload), *build_narrative_views(narrative_payload).values()]
     for view in views:
         for vis in view["visuals"]:
             assert isinstance(vis["findings"], list)

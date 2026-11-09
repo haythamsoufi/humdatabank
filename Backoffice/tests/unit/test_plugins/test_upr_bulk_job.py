@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from app.models import AIJob, AIJobItem
-from plugins.upr.bulk_job import (
+from plugins.upr.dashboards.bulk_job import (
     BULK_EXPORT_JOB_TYPE,
     _process_bulk_export_item_sync,
     build_bulk_export_status_payload,
@@ -41,11 +41,11 @@ def _create_job(admin_user, **overrides):
 @pytest.fixture
 def assigned_form(monkeypatch):
     monkeypatch.setattr(
-        "plugins.upr.data.get_assigned_form_for_bulk",
+        "plugins.upr.dashboards.data.get_assigned_form_for_bulk",
         lambda _id: SimpleNamespace(id=7, template_id=24, period_name="Annual 2026"),
     )
     monkeypatch.setattr(
-        "plugins.upr.bulk_job.dashboards_for_kind",
+        "plugins.upr.dashboards.bulk_job.dashboards_for_kind",
         lambda _kind: [SimpleNamespace(id="combined"), SimpleNamespace(id="in_support")],
     )
 
@@ -90,14 +90,14 @@ class TestCreateBulkExportJob:
     def test_rejects_in_flight_when_thread_alive(self, db_session, admin_user, assigned_form, app):
         with app.app_context():
             _create_job(admin_user)
-            with patch("plugins.upr.bulk_job.is_job_thread_alive", return_value=True):
+            with patch("plugins.upr.dashboards.bulk_job.is_job_thread_alive", return_value=True):
                 with pytest.raises(RuntimeError, match="already running"):
                     _create_job(admin_user)
 
     def test_orphaned_job_is_failed_so_new_export_can_start(self, db_session, admin_user, assigned_form, app):
         with app.app_context():
             first = _create_job(admin_user)
-            with patch("plugins.upr.bulk_job.is_job_thread_alive", return_value=False):
+            with patch("plugins.upr.dashboards.bulk_job.is_job_thread_alive", return_value=False):
                 second = _create_job(admin_user)
         first_job = AIJob.query.get(first)
         assert first_job.status == "failed"
@@ -115,7 +115,7 @@ class TestCancelAndActive:
         job = AIJob.query.get(job_id)
         job.status = "running"
         db_session.commit()
-        with patch("plugins.upr.bulk_job.signal_job_cancel") as mock_signal:
+        with patch("plugins.upr.dashboards.bulk_job.signal_job_cancel") as mock_signal:
             status = request_bulk_export_cancel(job_id)
         assert status == "cancel_requested"
         db_session.refresh(job)
@@ -148,17 +148,17 @@ class TestRenderLoop:
             job_id = _create_job(admin_user, aes_ids=[11, 22])
         item = AIJobItem.query.filter_by(job_id=job_id).one()
         monkeypatch.setattr(
-            "plugins.upr.data.list_countries_for_bulk",
+            "plugins.upr.dashboards.data.list_countries_for_bulk",
             lambda _id: [{"aes_id": 11}, {"aes_id": 22}],
         )
         monkeypatch.setattr(
-            "plugins.upr.bulk_job.build_payload",
+            "plugins.upr.dashboards.bulk_job.build_payload",
             lambda aes_id, **_kw: {
                 "meta": {"iso3": "AFG" if aes_id == 11 else "BGD", "round_code": "P26"},
                 "dashboards": [{"id": "combined"}],
             },
         )
-        monkeypatch.setattr("plugins.upr.bulk_job.render_dashboard_html", lambda *_a, **_k: "<html/>")
+        monkeypatch.setattr("plugins.upr.dashboards.bulk_job.render_dashboard_html", lambda *_a, **_k: "<html/>")
         calls = {"n": 0}
 
         def fake_png(_html, tmp, dashboard_id="combined", **_kwargs):
@@ -167,10 +167,10 @@ class TestRenderLoop:
                 raise RuntimeError("render boom")
             Path(tmp).write_bytes(b"png-bytes")
 
-        monkeypatch.setattr("plugins.upr.service.render_png_isolated", fake_png)
+        monkeypatch.setattr("plugins.upr.dashboards.service.render_png_isolated", fake_png)
         uploaded: dict = {}
         monkeypatch.setattr(
-            "plugins.upr.bulk_job.storage_service.upload",
+            "plugins.upr.dashboards.bulk_job.storage_service.upload",
             lambda _c, key, data: uploaded.update(key=key, data=data),
         )
         _process_bulk_export_item_sync(app, job_id=job_id, item_id=item.id)
@@ -186,26 +186,26 @@ class TestRenderLoop:
             job_id = _create_job(admin_user, export_format="pdf")
         item = AIJobItem.query.filter_by(job_id=job_id).one()
         monkeypatch.setattr(
-            "plugins.upr.data.list_countries_for_bulk",
+            "plugins.upr.dashboards.data.list_countries_for_bulk",
             lambda _id: [{"aes_id": 11, "iso3": "AFG", "country_name": "Afghanistan"}],
         )
         monkeypatch.setattr(
-            "plugins.upr.bulk_job.build_payload",
+            "plugins.upr.dashboards.bulk_job.build_payload",
             lambda aes_id, **_kw: {
                 "meta": {"iso3": "AFG", "round_code": "P26", "document_title": "Afghanistan INP AR 2026"},
                 "dashboards": [{"id": "combined"}],
             },
         )
-        monkeypatch.setattr("plugins.upr.bulk_job.render_dashboard_html", lambda *_a, **_k: "<html/>")
+        monkeypatch.setattr("plugins.upr.dashboards.bulk_job.render_dashboard_html", lambda *_a, **_k: "<html/>")
 
         def fake_isolated(job, timeout=120):
             Path(job["output_path"]).write_bytes(b"%PDF-1.4")
             return Path(job["output_path"])
 
-        monkeypatch.setattr("plugins.upr.service.run_isolated", fake_isolated)
+        monkeypatch.setattr("plugins.upr.dashboards.service.run_isolated", fake_isolated)
         uploaded: dict = {}
         monkeypatch.setattr(
-            "plugins.upr.bulk_job.storage_service.upload",
+            "plugins.upr.dashboards.bulk_job.storage_service.upload",
             lambda _c, key, data: uploaded.update(key=key, data=data),
         )
         _process_bulk_export_item_sync(app, job_id=job_id, item_id=item.id)

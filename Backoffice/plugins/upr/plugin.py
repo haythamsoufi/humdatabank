@@ -97,7 +97,9 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
         return "upr"
 
     def get_optional_plugins(self) -> list[str]:
-        return ["emergency_operations", "interactive_map"]
+        # Mapbox tiles/config are read from interactive_map when present, but UPR
+        # serves its own tile proxy and falls back to MAPBOX_ACCESS_TOKEN / OSM.
+        return ["emergency_operations"]
 
     @property
     def display_name(self) -> str:
@@ -128,7 +130,7 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
         return bp
 
     def get_api_endpoints(self):
-        from plugins.upr.upr_data_routes import API_ENDPOINTS
+        from plugins.upr.extracts.upr_data_routes import API_ENDPOINTS
 
         return list(API_ENDPOINTS)
 
@@ -162,14 +164,15 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
                 manage_requires_system_manager=True,
             ),
             DataExplorerTabConfig(
-                tab_id="upr-impact",
+                tab_id="upr-analysis",
                 label="UPR Analysis",
                 permission="admin.data_explore.upr_impact",
                 priority=46,
-                panel_template="plugins/upr/upr/impact_panel.html",
+                panel_template="plugins/upr/upr/analysis_panel.html",
                 plugin_id=self.plugin_id,
                 icon="fas fa-arrow-trend-up",
                 manage_requires_system_manager=False,
+                legacy_tab_ids=("upr-impact",),
             ),
         ]
 
@@ -215,7 +218,7 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
         unregister_pack(RULE_PACK_UPR)
 
     def get_entry_form_assets(self, template_id: int | None) -> list[dict[str, str]]:
-        from plugins.upr.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+        from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
         from plugins.upr.routes import upr_static_url
 
         if template_id not in (PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID):
@@ -331,7 +334,7 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
         can_manage = flags.get("can_manage_upr", False)
         active_job = None
         if can_manage:
-            from plugins.upr.bulk_job import get_active_bulk_export_job
+            from plugins.upr.dashboards.bulk_job import get_active_bulk_export_job
 
             active_job = get_active_bulk_export_job()
         return {

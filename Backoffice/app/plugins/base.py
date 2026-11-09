@@ -22,6 +22,8 @@ class DataExplorerTabConfig:
     plugin_id: str
     icon: str = "fas fa-puzzle-piece"
     manage_requires_system_manager: bool = True
+    # Retired ?tab= values that should open this tab (bookmarks, shared links).
+    legacy_tab_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

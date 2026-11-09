@@ -7,7 +7,7 @@
     var root = document.getElementById('upri-coverage');
     if (!root) return;
 
-    var UI = (window.UprImpactConfig && window.UprImpactConfig.ui) || {};
+    var UI = (window.UprAnalysisConfig && window.UprAnalysisConfig.ui) || {};
     if (root.getAttribute('data-ui')) {
         try {
             var parsed = JSON.parse(root.getAttribute('data-ui'));

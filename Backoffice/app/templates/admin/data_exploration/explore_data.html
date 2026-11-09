@@ -365,6 +365,38 @@
         return active ? (active.getAttribute('data-pb-version') || '') : '';
     }
 
+    // Plugin tabs add their own query params (for example UPR Analysis subtabs)
+    // through window.exploreTabQueryExtras[tabId] = function () { return {subtab: 'global-plan'}; }.
+    const RESERVED_EXPLORE_URL_PARAMS = {};
+    RESERVED_EXPLORE_URL_PARAMS[URL_PARAM_TEMPLATE] = true;
+    RESERVED_EXPLORE_URL_PARAMS[URL_PARAM_PERIOD] = true;
+    RESERVED_EXPLORE_URL_PARAMS[URL_PARAM_COUNTRY] = true;
+    RESERVED_EXPLORE_URL_PARAMS[URL_PARAM_ITEM] = true;
+    RESERVED_EXPLORE_URL_PARAMS[URL_PARAM_TAB] = true;
+    RESERVED_EXPLORE_URL_PARAMS[URL_PARAM_PB_VERSION] = true;
+    RESERVED_EXPLORE_URL_PARAMS[URL_PARAM_INCLUDE_NON_REPORTED] = true;
+
+    function exploreQueryExtras(tab) {
+        const providers = window.exploreTabQueryExtras;
+        const provider = providers && providers[tab];
+        if (typeof provider !== 'function') return {};
+        let extras = {};
+        try {
+            extras = provider() || {};
+        } catch (err) {
+            console.error('Explore tab URL extras failed', err);
+            return {};
+        }
+        const clean = {};
+        Object.keys(extras).forEach(function(key) {
+            if (!key || RESERVED_EXPLORE_URL_PARAMS[key]) return;
+            const value = extras[key];
+            if (value === undefined || value === null || value === '') return;
+            clean[key] = String(value);
+        });
+        return clean;
+    }
+
     // Update the browser URL with current form parameters (and optional tab) without reload
     function applyParamsToUrl(paramOverrides) {
         const tab = paramOverrides && paramOverrides[URL_PARAM_TAB] !== undefined
@@ -405,6 +437,10 @@
         if (tab) usp.set(URL_PARAM_TAB, tab);
         if (pbProgressTab && pbVersion) usp.set(URL_PARAM_PB_VERSION, pbVersion);
         if (includeNonReported) usp.set(URL_PARAM_INCLUDE_NON_REPORTED, includeNonReported);
+        const extras = exploreQueryExtras(tab);
+        Object.keys(extras).forEach(function(key) {
+            usp.set(key, extras[key]);
+        });
 
         const query = usp.toString();
         const newUrl = query ? (window.location.pathname + '?' + query) : window.location.pathname;

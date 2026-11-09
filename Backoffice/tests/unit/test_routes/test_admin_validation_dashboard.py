@@ -398,7 +398,7 @@ class TestValidationDashboardCapacityApi:
             "summary": {"attention_rows": 0},
         }
         with _perm_patch(), \
-             patch("plugins.upr.capacity_comparison.load_capacity_comparison", return_value=payload):
+             patch("plugins.upr.dashboards.capacity_comparison.load_capacity_comparison", return_value=payload):
             resp = logged_in_client.get("/admin/validation-dashboard/api/capacity")
         assert resp.status_code == 200
         data = resp.get_json()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from plugins.upr.overall_data import (
+from plugins.upr.extracts.overall_data import (
     OVERALL_COLUMNS,
     SOURCE_FDRS,
     SOURCE_PNS_REPORTING,
@@ -13,7 +13,7 @@ from plugins.upr.overall_data import (
     fdrs_role,
     merge_facts,
 )
-from plugins.upr.upr_data import (
+from plugins.upr.extracts.upr_data import (
     ItemView,
     collapse_breakdowns,
     data_status_label,
@@ -203,6 +203,31 @@ def test_planning_and_pns_rows_get_their_own_data_source():
     assert _planning_data_source({"Round": "MYR26", "Source": "PNS Data"}) == "PNS Reporting"
 
 
+def test_finish_planning_upr_value_uses_country_value_not_winning_value():
+    """When PNS wins Value, UPR Value must still show the host Country Value (e.g. Rwanda 779120)."""
+    fact = {
+        "Round": "P27",
+        "Source": "PNS Data",
+        "Entity": "PNS",
+        "NS": "Spanish Red Cross",
+        "Section": "Funding",
+        "Attribute": "Total",
+        "Indicator": "Funding",
+        "Value": 583939,
+        "ValueNum": 583939,
+        "Country Value": 779120,
+        "PNS Value": 583939,
+        "PNS reported": "Yes",
+        "UPR Value": 583939,  # stale from unkeyed merge_facts
+        "_data_source": "PNS Planning",
+    }
+    out = _finish(fact, ANNUAL)
+    assert out["Data source"] == "PNS Planning"
+    assert out["UPR Value"] == 779120
+    assert out["PNS Value"] == 583939
+    assert out["ValueNum"] == 583939
+
+
 def test_data_status_is_title_cased():
     assert data_status_label("pending") == "Pending"
     assert data_status_label("approved") == "Approved"
@@ -261,7 +286,7 @@ def test_funding_sources_ur_wins_when_fdrs_has_none():
 
 
 def test_ur_source_entity_maps_pns_to_other_national_society():
-    from plugins.upr.overall_data import _ur_source_entity
+    from plugins.upr.extracts.overall_data import _ur_source_entity
 
     assert _ur_source_entity("PNSs") == "Other National Society"
     assert _ur_source_entity("PNS") == "Other National Society"

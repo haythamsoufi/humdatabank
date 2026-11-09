@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from plugins.upr.bulk import (
+from plugins.upr.dashboards.bulk import (
     collect_narrative_uploads,
     match_narrative_path,
     normalize_export_format,
 )
 from plugins.upr.errors import UprError
-from plugins.upr.export_job import run_export_job_file
+from plugins.upr.dashboards.export_job import run_export_job_file
 
 
 def _docx_bytes(text: str = "Hello") -> bytes:
@@ -115,7 +115,7 @@ def test_run_export_job_file_pdf(tmp_path, monkeypatch):
     def fake_pdf(_html, dashboard_id="combined", zoom=1.0, title=""):
         return b"%PDF-fake"
 
-    monkeypatch.setattr("plugins.upr.export_job.render_pdf_bytes", fake_pdf)
+    monkeypatch.setattr("plugins.upr.dashboards.export_job.render_pdf_bytes", fake_pdf)
     run_export_job_file(job)
     assert out.read_bytes() == b"%PDF-fake"
 
@@ -143,7 +143,7 @@ def test_run_export_job_file_png_from_pdf(tmp_path, monkeypatch):
         assert dashboard_id == "combined"
         Path(path).write_bytes(b"png-from-pdf")
 
-    monkeypatch.setattr("plugins.upr.export_job.render_png_from_pdf", fake_from_pdf)
+    monkeypatch.setattr("plugins.upr.dashboards.export_job.render_png_from_pdf", fake_from_pdf)
     run_export_job_file(job)
     assert out.read_bytes() == b"png-from-pdf"
 
@@ -170,7 +170,7 @@ def test_run_export_job_file_idml(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr("plugins.upr.export_job.render_pdf_bytes", lambda *_a, **_k: b"%PDF")
+    monkeypatch.setattr("plugins.upr.dashboards.export_job.render_pdf_bytes", lambda *_a, **_k: b"%PDF")
 
     def fake_package(**_kw):
         return {"zip_bytes": b"PK-idml"}
@@ -203,7 +203,7 @@ def test_run_export_job_file_narrative_uses_pretranslated_blocks(tmp_path, monke
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr("plugins.upr.export_job.render_pdf_bytes", lambda *_a, **_k: b"%PDF-vis")
+    monkeypatch.setattr("plugins.upr.dashboards.export_job.render_pdf_bytes", lambda *_a, **_k: b"%PDF-vis")
 
     def fake_narrative(blocks, folio=""):
         assert blocks[0]["text"] == "مرحبا"
@@ -270,7 +270,7 @@ def test_run_export_job_file_narrative_restyles_attached_pdf(tmp_path, monkeypat
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr("plugins.upr.export_job.render_pdf_bytes", lambda *_a, **_k: b"%PDF-vis")
+    monkeypatch.setattr("plugins.upr.dashboards.export_job.render_pdf_bytes", lambda *_a, **_k: b"%PDF-vis")
     monkeypatch.setattr(
         "plugins.upr.idml.load_narrative_paragraphs",
         lambda data: [{"text": "Hello from PDF"}] if data.startswith(b"%PDF") else [],
@@ -280,7 +280,7 @@ def test_run_export_job_file_narrative_restyles_attached_pdf(tmp_path, monkeypat
         lambda blocks, country_name="": [{"style": "Body", "text": blocks[0]["text"]}],
     )
     monkeypatch.setattr(
-        "plugins.upr.i18n.translate_styled_blocks",
+        "plugins.upr.dashboards.i18n.translate_styled_blocks",
         lambda blocks, on_progress=None: blocks,
     )
 

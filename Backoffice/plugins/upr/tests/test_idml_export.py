@@ -7,7 +7,7 @@ import zipfile
 
 import pytest
 
-from plugins.upr.data import UprError
+from plugins.upr.dashboards.data import UprError
 from plugins.upr.idml import (
     DOCX_MAX_BYTES,
     DOCX_MAX_UNCOMPRESSED_BYTES,
@@ -25,7 +25,7 @@ from plugins.upr.idml import (
 from plugins.upr.idml.pages import add_narrative_pages
 from plugins.upr.idml.builder import zip_indesign_package
 from plugins.upr.idml.xml_idml import Idml, _xml_text
-from plugins.upr.service import visual_export_filename
+from plugins.upr.dashboards.service import visual_export_filename
 
 
 def _docx_bytes(*body_xml: str, extra_rels: str = "", extra_files: dict[str, bytes] | None = None) -> bytes:
@@ -640,7 +640,7 @@ def test_narrative_pdf_subsets_fonts_by_default(monkeypatch):
 def test_arabic_narrative_pdf_registers_tajawal(monkeypatch):
     captured = {}
     _patch_weasyprint(monkeypatch, captured)
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     from plugins.upr.idml.narrative_pdf import render_narrative_pdf_bytes
 
     render_narrative_pdf_bytes(
@@ -662,7 +662,7 @@ def test_arabic_narrative_pdf_embeds_tajawal(monkeypatch):
     """Live WeasyPrint: Arabic narrative must embed Tajawal, not a system fallback."""
     fitz = pytest.importorskip("fitz")
     pytest.importorskip("weasyprint")
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     from plugins.upr.idml.narrative_pdf import render_narrative_pdf_bytes
 
     pdf = render_narrative_pdf_bytes(

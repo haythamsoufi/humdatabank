@@ -17,18 +17,18 @@
  *
  * The year control shows one calendar year at a time. A plan and a report in
  * that year are a single link. Geometry and tiles come from the server
- * (plugins/upr/flow.py via /admin/data-exploration/upr-impact/flows). Leaflet
+ * (plugins/upr/analysis/flow.py via /admin/data-exploration/upr-analysis/flows). Leaflet
  * handles pan/zoom repositioning of the polylines natively. */
 (function () {
     'use strict';
 
     var CFG = window.UprFlowConfig || {};
-    var panel = document.getElementById('panel-upr-impact');
+    var panel = document.getElementById('panel-upr-analysis');
     var embed = document.getElementById('upri-flow-embed');
     var root = embed || panel;
     if (!root) return;
 
-    var UI = (window.UprImpactConfig && window.UprImpactConfig.ui) || CFG.ui || {};
+    var UI = (window.UprAnalysisConfig && window.UprAnalysisConfig.ui) || CFG.ui || {};
     if (embed && embed.getAttribute('data-ui')) {
         try { UI = JSON.parse(embed.getAttribute('data-ui')); } catch (e) { /* keep defaults */ }
     }
@@ -1272,7 +1272,7 @@
         observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
         var flowPane = document.getElementById('upri-pane-flow');
         if (flowPane) observer.observe(flowPane, { attributes: true, attributeFilter: ['hidden'] });
-        var tabBtn = byId('tab-upr-impact');
+        var tabBtn = byId('tab-upr-analysis');
         if (tabBtn) tabBtn.addEventListener('click', function () { window.setTimeout(revealMap, 0); });
     }
 })();

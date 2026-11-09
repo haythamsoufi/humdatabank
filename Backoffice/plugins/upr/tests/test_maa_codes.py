@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from plugins.upr.maa_codes import (
+from plugins.upr.dashboards.maa_codes import (
     appeal_code_for_cover,
     choose_maa_code,
     load_appeal_catalogue,
     resolve_appeal_number,
 )
-from plugins.upr.render import _doc_footer
+from plugins.upr.dashboards.render import _doc_footer
 
 
 def _row(code, *, iso="SY", status="Active", start="2023-01-01", end="2026-12-31", **extra):
@@ -99,7 +99,7 @@ def test_load_appeal_catalogue_uses_the_emergency_operations_cache(monkeypatch):
         lambda: Store(),
     )
     monkeypatch.setattr(
-        "plugins.upr.maa_codes._schedule_refresh_once",
+        "plugins.upr.dashboards.maa_codes._schedule_refresh_once",
         lambda: None,
     )
     assert load_appeal_catalogue() == payload["results"]
@@ -124,7 +124,7 @@ def test_load_appeal_catalogue_ignores_a_legacy_cache(monkeypatch):
         "plugins.emergency_operations.appeal_group.fetch_appeal_group_records",
         _boom,
     )
-    import plugins.upr.maa_codes as maa_codes
+    import plugins.upr.dashboards.maa_codes as maa_codes
 
     maa_codes._live_rows = None
     maa_codes._live_loaded_at = 0.0
@@ -154,7 +154,7 @@ def test_live_fetch_warms_an_empty_emergency_operations_cache(monkeypatch):
         "plugins.emergency_operations.appeal_group.fetch_appeal_group_records",
         lambda *_args, **_kwargs: [_row("MAASY002")],
     )
-    import plugins.upr.maa_codes as maa_codes
+    import plugins.upr.dashboards.maa_codes as maa_codes
 
     maa_codes._live_rows = None
     maa_codes._live_loaded_at = 0.0
@@ -178,7 +178,7 @@ def test_live_fetch_warms_an_empty_emergency_operations_cache(monkeypatch):
         "plugins.emergency_operations.data_store.get_data_store",
         lambda: WarmStore(),
     )
-    monkeypatch.setattr("plugins.upr.maa_codes._schedule_refresh_once", lambda: None)
+    monkeypatch.setattr("plugins.upr.dashboards.maa_codes._schedule_refresh_once", lambda: None)
     assert load_appeal_catalogue()[0]["code"] == "MAASY002"
 
 

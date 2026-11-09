@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from plugins.upr.flow import _centroids, aggregate_flows
+from plugins.upr.analysis.flow import _centroids, aggregate_flows
 
 
 COUNTRIES = {
@@ -152,7 +152,7 @@ def test_midyear_expenditure_keeps_country_the_annual_report_omits():
 
 
 def test_inform_class_label_for_master_export():
-    from plugins.upr.flow import inform_class_label
+    from plugins.upr.analysis.flow import inform_class_label
 
     assert inform_class_label("very_high") == "Very High"
     assert inform_class_label("High") == "High"
@@ -161,7 +161,7 @@ def test_inform_class_label_for_master_export():
 
 
 def test_coverage_point_uses_inform_class_and_funding_met():
-    from plugins.upr.flow import _coverage_points, inform_class
+    from plugins.upr.analysis.flow import _coverage_points, inform_class
 
     assert inform_class(7.8) == "very_high"
     assert inform_class(2.2) == "low"
@@ -180,7 +180,7 @@ def test_coverage_point_uses_inform_class_and_funding_met():
 
 
 def test_pns_reporting_priority_columns_are_expenditure():
-    from plugins.upr.upr_data import _pns_column_indicator
+    from plugins.upr.extracts.upr_data import _pns_column_indicator
 
     assert _pns_column_indicator("SP1") == "Expenditure"
     assert _pns_column_indicator("EFs") == "Expenditure"
@@ -188,3 +188,25 @@ def test_pns_reporting_priority_columns_are_expenditure():
     assert _pns_column_indicator("Total Expenditure") == "Expenditure"
     assert _pns_column_indicator("Total Funding") == "Funding"
     assert _pns_column_indicator("Comments") is None
+
+
+def test_support_flows_read_the_detail_master(monkeypatch):
+    """Flow edges need Section / Entity / NS, which the Excel long layout drops."""
+    seen = {}
+
+    def fake_master(**kwargs):
+        seen["kwargs"] = kwargs
+        return {"data": []}
+
+    monkeypatch.setattr("plugins.upr.extracts.upr_data.build_upr_master", fake_master)
+    monkeypatch.setattr("plugins.upr.analysis.flow.load_countries", lambda: {})
+    monkeypatch.setattr("plugins.upr.analysis.flow._donor_name_to_iso3", lambda: {})
+    monkeypatch.setattr(
+        "plugins.upr.analysis.flow.get_or_build_upr_payload",
+        lambda namespace, params, loader: (loader(), False),
+    )
+
+    from plugins.upr.analysis.flow import build_support_flows
+
+    build_support_flows()
+    assert seen["kwargs"].get("layout") == "detail"

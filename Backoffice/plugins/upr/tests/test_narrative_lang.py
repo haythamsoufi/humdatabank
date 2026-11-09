@@ -2,7 +2,7 @@
 
 import pytest
 
-from plugins.upr.narrative_lang import detect_narrative_language
+from plugins.upr.documents.narrative_lang import detect_narrative_language
 
 
 @pytest.mark.unit

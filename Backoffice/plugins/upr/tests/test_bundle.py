@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from plugins.upr.bundle import bundle_library_id, bundles_from_membership, merge_upr_payloads
+from plugins.upr.dashboards.bundle import bundle_library_id, bundles_from_membership, merge_upr_payloads
 
 
 def _payload(**overrides):

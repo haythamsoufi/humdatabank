@@ -1,5 +1,5 @@
 /* UPR Analysis — number formatting shared by every renderer (tab, export, slides).
- * A view carries raw numbers plus a format name (see plugins/upr/analysis_spec.py);
+ * A view carries raw numbers plus a format name (see plugins/upr/analysis/analysis_spec.py);
  * this module turns a number into text so a KPI, a chart axis, a tooltip and a
  * table cell always agree. */
 (function (global) {

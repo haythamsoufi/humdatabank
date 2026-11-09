@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from plugins.upr.typography import (
+from plugins.upr.dashboards.typography import (
     ARABIC_BODY_STACK,
     ARABIC_FAMILY,
     ARABIC_NUMBER_STACK,

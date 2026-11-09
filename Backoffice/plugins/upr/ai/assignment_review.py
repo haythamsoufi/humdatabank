@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from plugins.upr.ai.matrix_reading import interpret_upr_matrix, parse_upr_number
 from plugins.upr.ai.prompts import is_upr_form_template
-from plugins.upr.catalog import (
+from plugins.upr.dashboards.catalog import (
     AREA_LABELS,
     PLAN_ITEM_FALLBACKS,
     PLAN_LABEL_NEEDLES,

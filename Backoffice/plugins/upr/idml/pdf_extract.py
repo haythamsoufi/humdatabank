@@ -185,7 +185,7 @@ def _hydrate_reach_icons(payload: dict, pdf_doc) -> None:
 
 
 def _section_htmls(payload: dict) -> list[tuple[str, str]]:
-    from plugins.upr import render as R
+    from plugins.upr.dashboards import render as R
 
     wrap = R._combined_section_wrap
     kind = (payload.get("meta") or {}).get("kind") or "report"
@@ -220,7 +220,7 @@ def _section_htmls(payload: dict) -> list[tuple[str, str]]:
 def _tight_clip(page, *, full_width: bool = False):
     """Trim to ink (text/icons). Ignore tall empty section boxes WeasyPrint leaves behind."""
     import fitz
-    from plugins.upr.raster import _is_page_backdrop
+    from plugins.upr.dashboards.raster import _is_page_backdrop
 
     clip = fitz.Rect()
     for block in page.get_text("blocks"):
@@ -291,7 +291,7 @@ _FLOW_IDS = {"strategic_priorities", "enabling_functions", "support"}
 
 
 def export_visual_svgs(payload: dict, links: Path) -> list[tuple[str, str, float, float]]:
-    from plugins.upr.raster import render_pdf_bytes
+    from plugins.upr.dashboards.raster import render_pdf_bytes
 
     for stale in links.glob("*.svg"):
         stale.unlink()

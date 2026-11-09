@@ -234,7 +234,7 @@ def style_narrative_blocks(blocks: list[dict], *, country_name: str = "") -> lis
         if not style:
             continue
         if style == "AdditionalHead":
-            from plugins.upr.i18n import t
+            from plugins.upr.dashboards.i18n import t
 
             text = t("ADDITIONAL INFORMATION")
             row = {"text": text, "runs": [{"text": text, "href": "", "bold": True}], "bullet": False}
@@ -255,7 +255,7 @@ def style_narrative_blocks(blocks: list[dict], *, country_name: str = "") -> lis
 def folio_label(meta: dict) -> str:
     year = str((meta or {}).get("year") or "").strip()
     kind = str((meta or {}).get("kind") or "report")
-    from plugins.upr.i18n import t
+    from plugins.upr.dashboards.i18n import t
 
     label = "unified plan" if kind == "plan" else "annual report"
     if year:

@@ -925,7 +925,7 @@ class TestUnifiedPlanningThumbnail:
 
     def test_cached_response(self, app, db_session):
         """Returns cached JPEG if already in cache."""
-        from plugins.upr.mobile import (
+        from plugins.upr.documents.mobile import (
             unified_planning_thumbnail,
             _UNIFIED_PLANNING_THUMB_JPEG,
             _UNIFIED_PLANNING_THUMB_LOCK,

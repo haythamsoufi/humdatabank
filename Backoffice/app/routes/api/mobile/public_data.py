@@ -34,7 +34,7 @@ from app.utils.transactions import request_transaction_rollback
 from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.sector_logo_urls import sector_logo_url
 from app.routes.api.mobile import mobile_bp
-# In-process JPEG cache lives in plugins.upr.mobile.
+# In-process JPEG cache lives in plugins.upr.documents.mobile.
 
 
 @mobile_bp.route('/data/countrymap', methods=['GET'])
@@ -754,7 +754,7 @@ def public_resources():
 @mobile_rate_limit(requests_per_minute=60)
 def unified_planning_config():
     """Public config for unified planning documents: appeals API URL and type IDs."""
-    from plugins.upr.mobile import unified_planning_config as _impl
+    from plugins.upr.documents.mobile import unified_planning_config as _impl
 
     return _impl()
 
@@ -763,7 +763,7 @@ def unified_planning_config():
 @mobile_rate_limit(requests_per_minute=120)
 def unified_planning_thumbnail():
     """Return a small JPEG of the PDF first page for unified-planning grid tiles."""
-    from plugins.upr.mobile import unified_planning_thumbnail as _impl
+    from plugins.upr.documents.mobile import unified_planning_thumbnail as _impl
 
     return _impl()
 

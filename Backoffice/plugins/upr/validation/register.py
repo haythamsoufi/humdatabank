@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.services.validation.pack_registry import ValidationPack, ValidationTracker, register_pack
 from app.services.validation.rule_registry import ValidationRuleDefinition
 from app.services.validation.types import CheckResult
-from plugins.upr.catalog import UPR_VALIDATION_TEMPLATE_IDS
+from plugins.upr.dashboards.catalog import UPR_VALIDATION_TEMPLATE_IDS
 from plugins.upr.validation.emergency_coverage import (
     RULE_MISSING,
     RULE_NO_LONGER_APPLICABLE,

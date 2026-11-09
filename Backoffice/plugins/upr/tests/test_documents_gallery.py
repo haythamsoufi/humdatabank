@@ -11,7 +11,7 @@ from flask import Flask
 
 from app.plugins.jinja_plugin_loader import PluginTemplateLoader
 from plugins.upr import bp
-from plugins.upr import documents_gallery as gallery
+from plugins.upr.documents import documents_gallery as gallery
 
 _TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 
@@ -333,7 +333,7 @@ def test_thumbnail_get_uses_url_b64_and_serves_cached_jpeg():
     import base64
     from hashlib import sha256
 
-    from plugins.upr.mobile import (
+    from plugins.upr.documents.mobile import (
         _UNIFIED_PLANNING_THUMB_JPEG,
         _UNIFIED_PLANNING_THUMB_LOCK,
         _decode_thumbnail_url_b64,
@@ -367,7 +367,7 @@ def test_thumbnail_get_uses_url_b64_and_serves_cached_jpeg():
 
 
 def test_api_docs_list_the_public_gallery():
-    from plugins.upr.upr_data_routes import upr_api_documentation
+    from plugins.upr.extracts.upr_data_routes import upr_api_documentation
 
     by_path = {item["path"]: item for item in upr_api_documentation()["endpoints"]}
     gallery_doc = by_path["/api/v1/upr/documents"]

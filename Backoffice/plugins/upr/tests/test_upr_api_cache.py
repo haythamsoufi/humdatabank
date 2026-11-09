@@ -6,8 +6,8 @@ import json
 
 from flask import Flask
 
-from plugins.upr import api_cache
-from plugins.upr import upr_data_routes
+from plugins.upr.extracts import api_cache
+from plugins.upr.extracts import upr_data_routes
 
 
 def setup_function():

@@ -37,7 +37,7 @@ def load_inform_risk() -> dict[str, Any]:
         path = paths.LEGACY_INFORM_RISK
     payload = read_json(path, default={}) or {}
     scores = _by_iso3_map(payload)
-    from plugins.upr.flow import inform_class, inform_class_label
+    from plugins.upr.analysis.flow import inform_class, inform_class_label
 
     # Prefer class codes when present; always export human-readable labels
     # (Very High), matching INFORM Severity Category in the master extract.

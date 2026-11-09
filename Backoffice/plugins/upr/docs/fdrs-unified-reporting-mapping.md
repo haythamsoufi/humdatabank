@@ -1,6 +1,6 @@
 # FDRS + Unified Reporting: merged endpoint and indicator mapping
 
-Endpoint: `GET /api/v1/upr/overall` (same auth as `/api/v1/upr/data`; code in `plugins/upr/overall_data.py`).
+Endpoint: `GET /api/v1/upr/overall` (same auth as `/api/v1/upr/data`; code in `plugins/upr/extracts/overall_data.py`).
 
 Shaping shared with `/api/v1/upr/data` and `/api/v1/upr/master` (no FDRS merge on those): nested sex/age/direct-indirect → `Breakdown` on the Total row, `Data status`, `Indicator ID` / `indicatorId`, SectionB = EA Code when present else Section, blank Entity → HNS/PNS, and plan emergency reach with `SP/EF` = `EA1`.. (Attribute holds the matrix column).
 

@@ -1,6 +1,6 @@
 """Turn the Unified Plan/Report extract into permission-filtered observations.
 
-The extract comes from ``plugins.upr.upr_data`` (the same fact tables the Power BI endpoints serve), cached
+The extract comes from ``plugins.upr.extracts.upr_data`` (the same fact tables the Power BI endpoints serve), cached
 against the database revision. That cache holds source facts only and is never keyed to a user. Each
 request filters the rows to the user's countries here, before any metric or rule is calculated.
 """
@@ -679,8 +679,8 @@ def build_decision_data(
 
 def load_extract() -> tuple[dict[str, Any], bool]:
     """Source facts for all rounds and countries, cached against the database revision (no user data in the key)."""
-    from plugins.upr.api_cache import get_or_build_upr_payload
-    from plugins.upr.upr_data import build_upr_data, build_upr_submissions
+    from plugins.upr.extracts.api_cache import get_or_build_upr_payload
+    from plugins.upr.extracts.upr_data import build_upr_data, build_upr_submissions
 
     def build() -> dict[str, Any]:
         plan = build_upr_data(template="plan")

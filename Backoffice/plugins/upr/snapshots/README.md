@@ -11,7 +11,7 @@ Do **not** commit the source `.xlsx` (repo-wide gitignore). Commit the JSON so i
 | `2026_ifrc_secretariat_actuals.json` | `MYR26`, `AR26` | `Jan-Jun 2026`, `2026` | mid-year exists; annual when created | `System Financial Figures 2026.xlsx` | `Final` on sheet `Final (2)` |
 | `2025_ifrc_secretariat_actuals.json` | `AR25`, `MYR25` | `2025`, `Jan-Jun 2025` | 29 and 30 | `System financial figures 2025.xlsx` | `Final` on sheet `Final` |
 
-`ifrc_secretariat_actuals_for_report` in `plugins/upr/financial.py` loads the file registered for `period_to_round(period_name, "report")`. Each calendar year is one snapshot shared by the mid-year and annual reports. Other years stay **Not reported** until a snapshot is added **and** registered in `_IFRC_ACTUALS_SNAPSHOTS`.
+`ifrc_secretariat_actuals_for_report` in `plugins/upr/dashboards/financial.py` loads the file registered for `period_to_round(period_name, "report")`. Each calendar year is one snapshot shared by the mid-year and annual reports. Other years stay **Not reported** until a snapshot is added **and** registered in `_IFRC_ACTUALS_SNAPSHOTS`.
 
 ## Source workbook
 

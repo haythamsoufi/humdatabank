@@ -386,7 +386,7 @@ def test_fonts_css_is_shared_typography():
     from flask import Flask
 
     from plugins.upr.routes import fonts_css
-    from plugins.upr.typography import ARABIC_FAMILY, export_style_token
+    from plugins.upr.dashboards.typography import ARABIC_FAMILY, export_style_token
 
     app = Flask(__name__)
     with app.test_request_context("/upr/fonts.css"):

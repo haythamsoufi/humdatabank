@@ -7,10 +7,10 @@ from datetime import datetime
 
 from flask import Flask
 
-from plugins.upr import api_cache
-from plugins.upr import upr_data_routes
-from plugins.upr.catalog import KPI_BANK_IDS, PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
-from plugins.upr.ns_key_data import build_ns_key_rows
+from plugins.upr.extracts import api_cache
+from plugins.upr.extracts import upr_data_routes
+from plugins.upr.dashboards.catalog import KPI_BANK_IDS, PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+from plugins.upr.extracts.ns_key_data import build_ns_key_rows
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 
 VOLUNTEERS = KPI_BANK_IDS["volunteers"]

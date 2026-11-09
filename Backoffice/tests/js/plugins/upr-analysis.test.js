@@ -1,6 +1,6 @@
 /**
  * UPR Analysis renderers: formatting, view-chart -> Apex options, and DOM cards
- * built from the server views (plugins/upr/analysis_spec.py).
+ * built from the server views (plugins/upr/analysis/analysis_spec.py).
  *
  * The fixture is produced by the Python view builders
  * (plugins/upr/tests/test_analysis_views.py regenerates and checks it), so these
@@ -75,6 +75,22 @@ describe('charts.buildOptions', () => {
     };
     const col = (name, axis = 'primary', format = 'int') => ({ name, kind: 'column', data: [1, 2], color: '#111', axis, format, dashed: false });
     const line = (name, axis = 'primary', format = 'int', dashed = false) => ({ name, kind: 'line', data: [1, 2], color: '#222', axis, format, dashed });
+
+    it('draws long category names as horizontal bars on the value axis', () => {
+        const o = A.charts.buildOptions({
+            ...base,
+            horizontal: true,
+            categories: ['Norwegian Red Cross', 'Ukraine', 'Venezuela, Bolivarian Republic of'],
+            axes: { primary: { format: 'money' } },
+            series: [col('Funding', 'primary', 'money')],
+        });
+        expect(o.plotOptions.bar.horizontal).toBe(true);
+        expect(o.plotOptions.bar.columnWidth).toBeUndefined();
+        expect(o.chart.height).toBeGreaterThanOrEqual(3 * 28 + 48);
+        expect(o.xaxis.labels.formatter(2_000_000)).toBe('2M');
+        expect(o.yaxis.labels.maxWidth).toBe(220);
+        expect(o.yaxis.labels.formatter).toBeUndefined();
+    });
 
     it('draws a column-only chart as a bar chart without line styling', () => {
         const o = A.charts.buildOptions({ ...base, series: [col('A'), col('B')] });
@@ -234,6 +250,10 @@ describe('server views (contract fixture)', () => {
             expect(element.querySelector('[data-upri-table]').getAttribute('data-upri-table')).toBe(visual.id);
             if (visual.kind === 'chart') expect(plots).toHaveLength(1);
             if (visual.kind === 'panels') expect(plots).toHaveLength(visual.panels.length);
+            if (visual.kind === 'overview') {
+                expect(plots).toHaveLength(0);
+                expect(element.querySelector('.upri-overview')).not.toBeNull();
+            }
             if (visual.kind === 'gaps') {
                 expect(plots).toHaveLength(0);
                 expect(element.querySelectorAll('[data-upri-gap]')).toHaveLength(visual.gaps.length);

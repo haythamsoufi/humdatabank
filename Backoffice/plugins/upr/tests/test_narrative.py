@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 import requests
 
-from plugins.upr import narrative
-from plugins.upr.narrative import (
+from plugins.upr.analysis import narrative
+from plugins.upr.analysis.narrative import (
     INTERNAL_TYPE_PREFIX,
     PUBLIC_TYPE_PREFIX,
     aggregate_participation,

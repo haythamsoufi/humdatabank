@@ -11,8 +11,8 @@ import re
 from typing import Any
 
 from plugins.emergency_operations.appeal_group import parse_operation_label
-from plugins.upr.catalog import PLAN_TEMPLATE_ID, UPR_VALIDATION_TEMPLATE_IDS
-from plugins.upr.formatters import to_number
+from plugins.upr.dashboards.catalog import PLAN_TEMPLATE_ID, UPR_VALIDATION_TEMPLATE_IDS
+from plugins.upr.dashboards.formatters import to_number
 from plugins.upr.validation.emergency_coverage import (
     EmergencyRef,
     FieldEmergencyCoverage,

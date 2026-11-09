@@ -1,4 +1,4 @@
-from plugins.upr.master_wide import compute_new_totals, melt_master_long, pivot_master_wide
+from plugins.upr.extracts.master_wide import compute_new_totals, melt_master_long, pivot_master_wide
 
 
 def _row(**kw):

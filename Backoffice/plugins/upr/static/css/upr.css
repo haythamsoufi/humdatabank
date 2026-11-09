@@ -1690,7 +1690,7 @@
 }
 
 /*
-  RTL layout only. Fonts are plugins/upr/typography.py
+  RTL layout only. Fonts are plugins/upr/dashboards/typography.py
   (screen: /upr/fonts.css; print: raster + WeasyPrint).
   Layout uses [dir=rtl]. Tajawal uses .upr-arabic-font (ar/fa/ur only).
   Finance/support/reach tables are pre-reversed LTR HTML. .upr-bars uses

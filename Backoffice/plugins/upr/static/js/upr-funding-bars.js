@@ -9,7 +9,7 @@
     var root = document.getElementById('upri-funding');
     if (!root) return;
 
-    var UI = (window.UprImpactConfig && window.UprImpactConfig.ui) || {};
+    var UI = (window.UprAnalysisConfig && window.UprAnalysisConfig.ui) || {};
     if (root.getAttribute('data-ui')) {
         try {
             var parsed = JSON.parse(root.getAttribute('data-ui'));
@@ -390,7 +390,7 @@
     function paneOpen() {
         var pane = hostingPane();
         if (!pane) return true;
-        var panel = byId('panel-upr-impact');
+        var panel = byId('panel-upr-analysis');
         return pane && !pane.hidden && panel && !panel.classList.contains('hidden') && panel.offsetParent !== null;
     }
 
@@ -475,7 +475,7 @@
         ensureLoaded();
     } else {
         var pane = hostingPane();
-        var panel = byId('panel-upr-impact');
+        var panel = byId('panel-upr-analysis');
         if (pane && panel && window.MutationObserver) {
             var observer = new MutationObserver(function () { ensureLoaded(); });
             observer.observe(pane, { attributes: true, attributeFilter: ['hidden'] });

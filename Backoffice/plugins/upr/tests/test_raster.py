@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import plugins.upr.raster as _raster_mod
-from plugins.upr.raster import (
+import plugins.upr.dashboards.raster as _raster_mod
+from plugins.upr.dashboards.raster import (
     MAX_PNG_EDGE,
     PNG_EXPORT_SCALE,
     _css_for_print,
@@ -42,7 +42,7 @@ def test_export_fonts_are_inlined():
 def test_export_open_sans_files_are_real_ttf():
     from pathlib import Path
 
-    from plugins.upr.raster import _APP_FONTS_DIR
+    from plugins.upr.dashboards.raster import _APP_FONTS_DIR
 
     for name in ("OpenSans-Regular.ttf", "OpenSans-Bold.ttf", "OpenSans-Italic.ttf", "OpenSans-BoldItalic.ttf"):
         path = Path(_APP_FONTS_DIR) / name
@@ -98,7 +98,7 @@ def test_print_css_drops_weasyprint_unsupported_decls():
 
 @pytest.mark.unit
 def test_rtl_print_css_keeps_fixed_columns_and_hidden_labels():
-    from plugins.upr.raster import _rtl_print_css
+    from plugins.upr.dashboards.raster import _rtl_print_css
 
     css = _rtl_print_css("ar")
     assert "table-layout: fixed" in css
@@ -147,7 +147,7 @@ def test_rtl_print_css_keeps_fixed_columns_and_hidden_labels():
 
 @pytest.mark.unit
 def test_print_css_drops_webkit_scrollbar_and_embed_chrome():
-    from plugins.upr.raster import _print_css
+    from plugins.upr.dashboards.raster import _print_css
 
     printed = _print_css()
     assert "::-webkit-scrollbar" not in printed
@@ -188,8 +188,8 @@ def test_wrap_sets_document_open_sans():
 
 @pytest.mark.unit
 def test_arabic_export_uses_tajawal_body_font(monkeypatch):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
-    from plugins.upr.raster import _document_body_font_css, _pdf_page_css, _wrap
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
+    from plugins.upr.dashboards.raster import _document_body_font_css, _pdf_page_css, _wrap
 
     assert "Tajawal" in _document_body_font_css("ar")
     assert "p, h1" not in _document_body_font_css("ar")
@@ -206,7 +206,7 @@ def test_arabic_export_uses_tajawal_body_font(monkeypatch):
 def test_summarize_child_log_drops_weasyprint_noise():
     raw = (
         "Ignored `box-shadow: none` at 1670:188, unknown property.\n"
-        "INFO plugins.upr.raster: UPR PNG done reach (56204 bytes)\n"
+        "INFO plugins.upr.dashboards.raster: UPR PNG done reach (56204 bytes)\n"
         "UPR PNG done reach (56204 bytes)\n"
         "OSError: broken pipe\n"
     )
@@ -216,7 +216,7 @@ def test_summarize_child_log_drops_weasyprint_noise():
 
 @pytest.mark.unit
 def test_pdf_canvas_is_a4_landscape_for_single_chips():
-    from plugins.upr.catalog import A4_PAGE_HEIGHT_PX, A4_PAGE_WIDTH_PX
+    from plugins.upr.dashboards.catalog import A4_PAGE_HEIGHT_PX, A4_PAGE_WIDTH_PX
 
     width, height = _page_size("strategic_priorities")
     assert width == A4_PAGE_WIDTH_PX
@@ -229,7 +229,7 @@ def test_pdf_canvas_is_a4_landscape_for_single_chips():
 
 @pytest.mark.unit
 def test_combined_pdf_is_portrait_and_keeps_sections_together():
-    from plugins.upr.catalog import A4_PORTRAIT_HEIGHT_PX, A4_PORTRAIT_WIDTH_PX
+    from plugins.upr.dashboards.catalog import A4_PORTRAIT_HEIGHT_PX, A4_PORTRAIT_WIDTH_PX
 
     width, height = _page_size("combined")
     assert width == A4_PORTRAIT_WIDTH_PX
@@ -354,7 +354,7 @@ def test_stitch_pixmaps_pads_narrower_page():
 def test_render_png_from_pdf_writes_png(tmp_path):
     import fitz
 
-    from plugins.upr.raster import render_png_from_pdf
+    from plugins.upr.dashboards.raster import render_png_from_pdf
 
     doc = fitz.open()
     page = doc.new_page(width=80, height=60)
@@ -470,7 +470,7 @@ def test_render_png_isolated_raises_on_child_crash(tmp_path, monkeypatch):
         return Result()
 
     monkeypatch.setattr(_raster_mod.subprocess, "run", fake_run)
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: "ar")
     with pytest.raises(RuntimeError, match="crashed"):
         _raster_mod.render_png_isolated("<html/>", tmp_path / "x.png", dashboard_id="combined")
     assert captured["env"].get("UPR_VISUALS_LANG") == "ar"
@@ -532,13 +532,13 @@ def test_resolve_export_image_src_inlines_trusted_github(monkeypatch):
     untrusted = "https://example.test/icon.png"
     assert resolve_export_image_src(untrusted) == untrusted
 
-    from plugins.upr.raster import (
+    from plugins.upr.dashboards.raster import (
         _APP_FONTS_DIR,
         _PB_FONTS_DIR,
         _check_restricted_export_url,
         _is_allowed_local_path,
     )
-    from plugins.upr.typography import resolve_font_file
+    from plugins.upr.dashboards.typography import resolve_font_file
 
     with pytest.raises(ValueError, match="Blocked export URL"):
         _check_restricted_export_url("https://fonts.googleapis.com/css2?family=Tajawal")
@@ -556,7 +556,7 @@ def test_restricted_url_fetcher_is_a_weasyprint_url_fetcher():
     """WeasyPrint 70 rejects a plain callable, so the fetcher must subclass URLFetcher."""
     URLFetcher = pytest.importorskip("weasyprint.urls").URLFetcher
 
-    from plugins.upr.raster import _build_restricted_url_fetcher
+    from plugins.upr.dashboards.raster import _build_restricted_url_fetcher
 
     fetcher = _build_restricted_url_fetcher()
     assert isinstance(fetcher, URLFetcher)
@@ -605,7 +605,7 @@ def test_rewrite_export_images_rewrites_plugin_src():
 def test_trim_pixmap_drops_white_margin():
     import fitz
 
-    from plugins.upr.raster import _trim_pixmap
+    from plugins.upr.dashboards.raster import _trim_pixmap
 
     width, height = 20, 30
     samples = bytearray([255] * (width * height * 3))
@@ -642,7 +642,7 @@ def test_render_pdf_bytes_subsets_fonts_by_default(monkeypatch):
     monkeypatch.setattr("weasyprint.CSS", FakeCSS)
     monkeypatch.setattr("weasyprint.HTML", FakeHTML)
     monkeypatch.setattr("weasyprint.text.fonts.FontConfiguration", FakeFontConfiguration)
-    from plugins.upr.raster import render_pdf_bytes
+    from plugins.upr.dashboards.raster import render_pdf_bytes
 
     render_pdf_bytes("<div class='upr-dashboard'/>", dashboard_id="combined")
     assert captured.get("full_fonts") is False
@@ -672,7 +672,7 @@ def test_render_pdf_bytes_can_embed_full_fonts(monkeypatch):
     monkeypatch.setattr("weasyprint.CSS", FakeCSS)
     monkeypatch.setattr("weasyprint.HTML", FakeHTML)
     monkeypatch.setattr("weasyprint.text.fonts.FontConfiguration", FakeFontConfiguration)
-    from plugins.upr.raster import render_pdf_bytes
+    from plugins.upr.dashboards.raster import render_pdf_bytes
 
     render_pdf_bytes("<div/>", dashboard_id="combined", full_fonts=True)
     assert captured.get("full_fonts") is True
@@ -718,10 +718,10 @@ def _widest_reach_band(pdf_bytes: bytes):
 @pytest.mark.unit
 @pytest.mark.parametrize("lang", ["en", "ar"])
 def test_combined_reach_band_bleeds_after_narrative_merge(monkeypatch, lang):
-    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: lang)
-    monkeypatch.setattr("plugins.upr.i18n.is_rtl", lambda lang_code=None: lang == "ar")
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.current_export_language", lambda: lang)
+    monkeypatch.setattr("plugins.upr.dashboards.i18n.is_rtl", lambda lang_code=None: lang == "ar")
     from plugins.upr.idml.narrative_pdf import merge_report_pdfs
-    from plugins.upr.raster import render_pdf_bytes
+    from plugins.upr.dashboards.raster import render_pdf_bytes
 
     pdf = render_pdf_bytes(_reach_preview_html(rtl=lang == "ar"), dashboard_id="combined")
     page_rect, band = _widest_reach_band(pdf)

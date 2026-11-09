@@ -402,6 +402,12 @@ def tool_wrapper(func: Callable) -> Callable:
                 'error': 'Tool execution failed.',
                 'error_type': type(e).__name__,
             }
+            # Expose only the exception *class* of the underlying cause (e.g. OperationalError,
+            # QueryCanceled, Timeout) so traces show why without leaking messages/SQL.
+            _cause = getattr(e, '__cause__', None) or getattr(e, '__context__', None)
+            if _cause is not None:
+                payload['error_cause_type'] = type(_cause).__name__
+            payload['execution_time_ms'] = execution_time
             log_tool_usage(
                 tool_name=tool_name,
                 tool_input=log_kwargs,
@@ -1156,6 +1162,43 @@ class AIToolsRegistry:
 
         return run_analyze_unified_plans_focus_areas(areas=areas, limit=limit)
 
+    def _hybrid_search_with_retry(self, **search_kwargs: Any) -> List[Dict[str, Any]]:
+        """Run vector_store.hybrid_search, retrying transient VectorStoreError.
+
+        Vector/DB failures (connection drops, statement timeouts, cold starts) are usually
+        transient; a failed attempt also leaves the SQLAlchemy session in a bad state, so
+        roll back between attempts. The last error is re-raised unchanged.
+        """
+        from app.services.ai.documents.vector_store import VectorStoreError
+        from app.extensions import db
+
+        try:
+            attempts = max(1, int(current_app.config.get("AI_VECTOR_SEARCH_MAX_ATTEMPTS", 3)))
+            base_delay = float(current_app.config.get("AI_VECTOR_SEARCH_RETRY_DELAY_SEC", 0.75))
+        except (TypeError, ValueError):
+            attempts, base_delay = 3, 0.75
+
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return self.vector_store.hybrid_search(**search_kwargs)
+            except VectorStoreError as exc:
+                last_exc = exc
+                cause = exc.__cause__ or exc.__context__
+                logger.warning(
+                    "Vector search attempt %d/%d failed: %s (cause: %s: %s)",
+                    attempt, attempts, exc,
+                    type(cause).__name__ if cause else "n/a", cause,
+                )
+                try:
+                    db.session.rollback()
+                except Exception as rb_err:
+                    logger.debug("Vector search retry: rollback failed: %s", rb_err)
+                if attempt < attempts:
+                    time.sleep(base_delay * attempt)
+        assert last_exc is not None
+        raise last_exc
+
     @tool_wrapper
     def search_documents(
         self,
@@ -1277,7 +1320,7 @@ class AIToolsRegistry:
 
         _emit_progress(f"Retrieving up to {int(top_k)} matches…")
 
-        results = self.vector_store.hybrid_search(
+        results = self._hybrid_search_with_retry(
             query_text=query,
             vector_query_text=vector_query,
             keyword_query_text=keyword_query,
@@ -1423,7 +1466,7 @@ class AIToolsRegistry:
                         top_k=top_k,
                     )
                 else:
-                    results = self.vector_store.hybrid_search(
+                    results = self._hybrid_search_with_retry(
                         query_text=query,
                         vector_query_text=vector_query,
                         keyword_query_text=keyword_query,
@@ -1434,7 +1477,7 @@ class AIToolsRegistry:
                     )
             except Exception as _msr_err:
                 logger.warning("Multi-step retrieval error, falling back: %s", _msr_err)
-                results = self.vector_store.hybrid_search(
+                results = self._hybrid_search_with_retry(
                     query_text=query,
                     vector_query_text=vector_query,
                     keyword_query_text=keyword_query,
@@ -1444,7 +1487,7 @@ class AIToolsRegistry:
                     user_role=user_role,
                 )
         else:
-            results = self.vector_store.hybrid_search(
+            results = self._hybrid_search_with_retry(
                 query_text=query,
                 vector_query_text=vector_query,
                 keyword_query_text=keyword_query,
@@ -2467,6 +2510,11 @@ class AIToolsRegistry:
         tn = str(tool_name or "").strip()
         if not tn or tn.startswith("_"):
             raise ToolExecutionError(f"Unknown tool: {tool_name!r}")
+        # Cheap policy gate first (anonymous allow-list); the exposed-set check below stays authoritative.
+        from app.services.ai.policies.access_policy import resolve_ai_access_policy
+
+        if not resolve_ai_access_policy().allows_tool(tn):
+            raise ToolExecutionError(f"Unknown or disallowed tool for this request: {tool_name!r}")
         try:
             defs = self.get_tool_definitions_openai() or []
             exposed: Set[str] = {n for n in (openapi_function_name(td) for td in defs) if n}

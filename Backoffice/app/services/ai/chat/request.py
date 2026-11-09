@@ -10,8 +10,6 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-
-logger = logging.getLogger(__name__)
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -19,8 +17,17 @@ from flask import current_app
 
 from app.extensions import db
 from app.models.ai_chat import AIConversation, AIMessage
+from app.services.ai.chat.dlp import mask_conversation_history
 from app.utils.datetime_helpers import utcnow
-from app.utils.ai_utils import detect_query_language, normalize_language_code, sanitize_page_context
+from app.utils.ai_utils import (
+    detect_query_language,
+    is_form_builder_assistant_context,
+    is_user_history_entry,
+    normalize_language_code,
+    sanitize_page_context,
+)
+
+logger = logging.getLogger(__name__)
 
 
 MAX_CLIENT_MESSAGE_ID_CHARS = 64
@@ -151,11 +158,25 @@ def load_conversation_history_for_llm(conversation_id: str, user_id: int) -> Lis
             .all()
         )
         q = list(reversed(q))
-        return [
-            {"isUser": (m.role == "user"), "message": (m.content or "")}
-            for m in q
-            if m.role in ("user", "assistant") and (m.content or "").strip()
-        ]
+        entries: List[Dict[str, Any]] = []
+        trace_ids_by_index: Dict[int, int] = {}
+        for m in q:
+            if m.role not in ("user", "assistant") or not (m.content or "").strip():
+                continue
+            if m.role == "assistant" and isinstance(m.meta, dict):
+                _tid = m.meta.get("trace_id")
+                if isinstance(_tid, int) or (isinstance(_tid, str) and _tid.isdigit()):
+                    trace_ids_by_index[len(entries)] = int(_tid)
+            entries.append({"isUser": (m.role == "user"), "message": (m.content or "")})
+        # Give the agent a factual record of tools used/failed per assistant turn so follow-ups
+        # ("what did you check?") and attribution ("the numbers I reported") stay accurate.
+        try:
+            from app.services.ai.runtime.turn_digest import attach_turn_digests
+
+            attach_turn_digests(entries, trace_ids_by_index)
+        except Exception as e_dig:
+            logger.debug("AI chat: turn digest attach skipped: %s", e_dig)
+        return entries
     except Exception as e_hist:
         current_app.logger.debug("AI chat: failed to load conversation history: %s", e_hist, exc_info=True)
         return []
@@ -381,6 +402,24 @@ def parse_chat_request(
     return parsed, None, 0
 
 
+def _edit_branch_history(parsed: ChatRequestParsed) -> List[Dict[str, Any]]:
+    """The client's transcript for an edit/retry branch, made safe to persist and send to the LLM.
+
+    It ends with the message being (re)sent and was captured before DLP ran, so its user
+    turns are masked and the trailing user turn becomes ``parsed.message``: the text the
+    route's DLP gate already screened (and masked where needed).
+    """
+    history = mask_conversation_history(
+        parsed.conversation_history,
+        form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
+    )
+    if history and is_user_history_entry(history[-1]):
+        history[-1] = {**history[-1], "isUser": True, "message": parsed.message}
+    else:
+        history.append({"isUser": True, "message": parsed.message})
+    return history
+
+
 def resolve_conversation_and_history(
     identity: Any,
     parsed: ChatRequestParsed,
@@ -414,6 +453,7 @@ def resolve_conversation_and_history(
         except Exception as e:
             logger.debug("resolve_conversation_and_history debug log failed: %s", e)
     if parsed.branch_from_edit and conversation_id and history:
+        history = _edit_branch_history(parsed)
         try:
             replace_conversation_messages(
                 conversation_id=conversation_id,
@@ -490,13 +530,13 @@ def _sanitize_anonymous_history(
 
 
 def apply_anonymous_rules(parsed: ChatRequestParsed) -> ChatRequestParsed:
-    """For anonymous users: clear conversation_id and persistence fields; cap client conversation_history."""
+    """For anonymous users: clear conversation_id and persistence fields; cap and DLP-mask client conversation_history."""
     return ChatRequestParsed(
         message=parsed.message,
         page_context=parsed.page_context,
         conversation_id=None,
         preferred_language=parsed.preferred_language,
-        conversation_history=_sanitize_anonymous_history(parsed.conversation_history),
+        conversation_history=mask_conversation_history(_sanitize_anonymous_history(parsed.conversation_history)),
         client_message_id=None,
         branch_from_edit=False,
         sources_cfg=getattr(parsed, "sources_cfg", None),

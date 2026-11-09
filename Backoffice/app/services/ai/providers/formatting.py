@@ -16,24 +16,22 @@ from markupsafe import escape
 logger = logging.getLogger(__name__)
 
 
+_RE_LONG_OPAQUE_TOKEN = re.compile(r"\b[A-Za-z0-9/_+=-]{64,}\b")
+
+
 def scrub_pii_text(text: str) -> str:
     """
     Best-effort PII redaction for outbound LLM requests.
+
+    Masks everything the AI chat DLP guard detects (same patterns, so the two cannot
+    drift apart), plus long opaque tokens that DLP does not flag on their own.
     Not a full DLP system; reduces accidental leakage of obvious identifiers.
     """
     if not text or not isinstance(text, str):
         return ""
-    t = text
-    t = re.sub(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", "[REDACTED_EMAIL]", t, flags=re.IGNORECASE)
-    t = re.sub(
-        r"(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)",
-        lambda m: "[REDACTED_PHONE]" if sum(c.isdigit() for c in m.group(0)) >= 9 else m.group(0),
-        t,
-    )
-    t = re.sub(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b", "[REDACTED_TOKEN]", t)
-    t = re.sub(r"(?i)\bBearer\s+[A-Za-z0-9._-]{20,}\b", "Bearer [REDACTED_TOKEN]", t)
-    t = re.sub(r"\b[A-Za-z0-9/_+=-]{64,}\b", "[REDACTED_SECRET]", t)
-    return t
+    from app.services.ai.chat.dlp import mask_sensitive_text
+
+    return _RE_LONG_OPAQUE_TOKEN.sub("[REDACTED_SECRET]", mask_sensitive_text(text))
 
 
 def scrub_pii_context(value: Any) -> Any:
@@ -153,13 +151,22 @@ def _finalize_indicator_action_links(html: str) -> str:
     )
 
 
-def format_ai_response_for_html(text: Optional[str], provenance_data: Optional[Dict[str, Any]] = None) -> str:
+def format_ai_response_for_html(
+    text: Optional[str],
+    provenance_data: Optional[Dict[str, Any]] = None,
+    sources: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     """
     Convert AI response text to HTML for display. XSS-hardened; allows only
     safe tags and internal links. Optionally appends a provenance block.
+
+    When ``sources`` is a structured list (title/detail/url/page), the Sources
+    block is rendered with data-* attributes for reliable client chip/modal UI.
     """
-    if not text:
+    if not text and not sources:
         return ""
+    if not text:
+        text = ""
 
     # Remove duplicate / code-like patterns
     try:
@@ -241,11 +248,35 @@ def format_ai_response_for_html(text: Optional[str], provenance_data: Optional[D
         logger.debug("markdown rendering failed: %s", e)
         html = esc(text).replace("\n", "<br>")
 
-    # Sources block: build with our own link conversion so relative URLs survive.
-    # Bleach with protocols=[] strips ALL href values (including relative); we inject
-    # Sources after bleach with links we validate ourselves (only allow paths starting with /).
+    # Sources block: prefer structured sources[] (data-* attrs). Else convert
+    # markdown ## Sources prose. Bleach with protocols=[] strips ALL href values
+    # (including relative); we inject Sources after bleach with validated paths.
     sources_safe_html = None
-    if sources_block_raw is not None:
+    structured_sources = sources if isinstance(sources, list) and sources else None
+    if structured_sources is None and sources_block_raw is not None:
+        try:
+            from app.utils.ai_sources_parser import merge_structured_sources
+            structured_sources = merge_structured_sources(answer="## Sources\n\n" + sources_block_raw)
+        except Exception as e:
+            logger.debug("format_ai_response_for_html: structured sources parse failed: %s", e)
+            structured_sources = None
+
+    if structured_sources:
+        try:
+            from app.utils.ai_sources_parser import render_sources_body_html
+            sources_body_safe = render_sources_body_html(structured_sources)
+            if sources_body_safe:
+                sources_safe_html = (
+                    '<details class="chat-response-sources mt-2 border border-gray-200 rounded p-2 bg-gray-50">'
+                    '<summary class="cursor-pointer font-medium text-gray-700">Sources</summary>'
+                    f'<div class="chat-response-sources-body mt-2 text-sm text-gray-600">{sources_body_safe}</div>'
+                    "</details>"
+                )
+        except Exception as e:
+            logger.debug("format_ai_response_for_html: structured sources render failed: %s", e)
+            sources_safe_html = None
+
+    if sources_safe_html is None and sources_block_raw is not None:
         try:
             sources_escaped = str(esc(sources_block_raw))
             # Convert [label](url) to <a> only when url is a safe relative path; do this
@@ -280,14 +311,20 @@ def format_ai_response_for_html(text: Optional[str], provenance_data: Optional[D
                 f'<div class="chat-response-sources-body mt-2 text-sm text-gray-600">{sources_body_esc}</div>'
                 "</details>"
             )
+
+    if sources_safe_html is not None:
         # Use a marker that will survive bleach (no links inside)
         sources_marker = "IFRC-SOURCES-MARKER-REPLACE-AFTER-BLEACH"
-        html = re.sub(
-            rf"(?is)<p>\s*{re.escape(sources_placeholder)}\s*</p>",
-            sources_marker,
-            html,
-        )
-        html = html.replace(sources_placeholder, sources_marker)
+        if sources_placeholder in (html or "") or sources_block_raw is not None:
+            html = re.sub(
+                rf"(?is)<p>\s*{re.escape(sources_placeholder)}\s*</p>",
+                sources_marker,
+                html or "",
+            )
+            html = html.replace(sources_placeholder, sources_marker)
+        else:
+            # Structured sources without a ## Sources section in the text
+            html = (html or "") + sources_marker
 
     # Append provenance block (HTML) if present.
     if provenance_data:

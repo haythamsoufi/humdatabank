@@ -1184,22 +1184,25 @@ class Config:
     # -------------------------------------------------------------------------
     # Best-effort protection against accidental sharing of obvious sensitive data
     # (emails, phone numbers, tokens, secrets, private keys, etc.) with external LLMs.
+    # Whatever is allowed through is masked ("[REDACTED_*]"), never forwarded raw.
     #
     # Modes:
-    # - warn: allow but do not require confirmation
-    # - confirm: require allow_sensitive=true unless no_external_llm=true (private/local-only mode)
-    # - block: always block when detected (configurable to also block local-only)
+    # - warn: mask every finding and send, without asking
+    # - confirm: mask AI_DLP_AUTO_MASK_KINDS findings without asking; any other finding needs
+    #   the user's "Mask & send" (allow_sensitive=true), otherwise the request is rejected
+    # - block: reject any message with a finding
     # NOTE: Hard-coded defaults by design (no environment variables).
     # If you need to change behavior, edit these constants in code.
     AI_DLP_ENABLED = True
     AI_DLP_MODE = "confirm"  # "warn" | "confirm" | "block"
-    # Must stay >= the largest per-message cap (see AI_FORM_BUILDER_MAX_MESSAGE_CHARS
-    # default of 16000 in chat/request.py and _fb_ai_config.html): evaluate_ai_message()
-    # truncates the message to this many characters *before* scanning, so anything beyond
-    # this window is invisible to DLP regardless of AI_DLP_MODE. Previously 12000 while the
-    # form-builder panel's message cap was a separate, larger 16000 — sensitive content
-    # (email/API key/etc.) in chars 12001-16000 of a form-builder paste could reach the LLM
-    # completely unscanned. Keep in sync if either limit changes.
+    # Finding kinds that "confirm" mode masks without asking. Kinds: email, phone, jwt,
+    # bearer_token, private_key, password, api_key_or_secret, iban, payment_card.
+    AI_DLP_AUTO_MASK_KINDS = ("email", "phone")
+    # Must stay >= the largest per-message cap (AI_FORM_BUILDER_MAX_MESSAGE_CHARS, default
+    # 16000 in chat/request.py and _fb_ai_config.html): the message is truncated to this many
+    # characters before scanning, so anything beyond the window is invisible to DLP. Form-builder
+    # messages are only exempt from the email/phone kinds, so a key pasted at the end of a long
+    # imported questionnaire must still be in range. Keep in sync if either limit changes.
     AI_DLP_MAX_SCAN_CHARS = 16000
 
     # Azure AD B2C Federation Login (OIDC)

@@ -29,7 +29,7 @@ Tus mensajes e historial de conversaciones pueden ser procesados por proveedores
 
 Las salvaguardas técnicas incluyen:
 
-- **Prevención de Pérdida de Datos (DLP)** — Escaneos que detectan y pueden bloquear o advertir sobre patrones sensibles antes de enviarlos.
+- **Prevención de Pérdida de Datos (DLP)** — Escaneos que detectan patrones sensibles antes del envío y los enmascaran, te piden confirmación o bloquean el mensaje.
 - **Limpieza de PII** — Reduce la exposición de datos personales antes de que el contenido llegue a proveedores externos.
 - **Registro de auditoría** — Los eventos de seguridad se registran (sin almacenar el contenido de tu mensaje).
 

@@ -3,6 +3,15 @@
  * @module chatbot/structured-payloads
  */
 
+import {
+    normalizeLineChartPayload,
+    normalizeBarChartPayload,
+    normalizePieChartPayload,
+    mountCompactLineChart,
+    mountCompactBarChart,
+    mountCompactPieChart,
+} from './chart-payloads.js';
+
 export function registerStructuredPayloadListener() {
     function isImmersivePage() {
         return !!(document.body && document.body.classList.contains('chat-immersive'));
@@ -114,7 +123,7 @@ export function registerStructuredPayloadListener() {
     // Render a compact data table card inside the floating chatbot.
     function renderFloatingTableCard(payload, contentEl) {
         if (!payload || !Array.isArray(payload.rows) || !payload.rows.length) return;
-        if (contentEl.querySelector('.chat-floating-payload-card')) return; // dedup
+        if (contentEl.querySelector('.chat-floating-table-card')) return; // dedup
 
         var columns = Array.isArray(payload.columns) ? payload.columns : [];
         var allRows = payload.rows.slice();
@@ -308,78 +317,114 @@ export function registerStructuredPayloadListener() {
         renderRows();
     }
 
-    // Render a summary card for maps and charts (need full page to show interactive viz).
-    function renderFloatingVizSummaryCard(payload, contentEl, type) {
-        if (contentEl.querySelector('.chat-floating-payload-card')) return; // dedup
+    function showChartLoadError(chartEl) {
+        if (!chartEl) return;
+        chartEl.textContent = 'Chart could not be loaded.';
+        chartEl.style.cssText += 'display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;';
+    }
 
-        var typeLabels = {
-            worldmap: 'World Map', world_map: 'World Map', choropleth: 'World Map',
-            line: 'Line Chart', linechart: 'Line Chart', timeseries: 'Line Chart',
-            bar: 'Bar Chart', barchart: 'Bar Chart',
-            pie: 'Pie Chart', donut: 'Donut Chart'
-        };
-        var typeIcons = {
-            worldmap: 'fa-globe', world_map: 'fa-globe', choropleth: 'fa-globe',
-            line: 'fa-chart-line', linechart: 'fa-chart-line', timeseries: 'fa-chart-line',
-            bar: 'fa-chart-bar', barchart: 'fa-chart-bar',
-            pie: 'fa-chart-pie', donut: 'fa-chart-pie'
-        };
-        var label = typeLabels[type] || 'Visualization';
-        var icon = typeIcons[type] || 'fa-chart-bar';
-        var title = payload.title || label;
+    function renderFloatingLineChartCard(payload, contentEl) {
+        var normalized = normalizeLineChartPayload(payload);
+        if (!normalized) return false;
+        if (contentEl.querySelector('.chat-floating-chart-card')) return true;
 
-        var card = makeCard('chat-floating-viz-card');
+        var card = makeCard('chat-floating-chart-card');
+        var hObj = makeCardHeader(normalized.title);
+        card.appendChild(hObj.header);
 
+        var chartEl = document.createElement('div');
+        chartEl.className = 'chat-floating-chart-inner';
+        chartEl.style.cssText = 'height:220px;width:100%;padding:4px 4px 8px;box-sizing:border-box;';
+        card.appendChild(chartEl);
+        contentEl.appendChild(card);
+
+        mountCompactLineChart(chartEl, normalized, { height: 210 }).catch(function () {
+            showChartLoadError(chartEl);
+        });
+        return true;
+    }
+
+    function renderFloatingBarChartCard(payload, contentEl) {
+        var normalized = normalizeBarChartPayload(payload);
+        if (!normalized) return false;
+        if (contentEl.querySelector('.chat-floating-bar-card')) return true;
+
+        var card = makeCard('chat-floating-bar-card');
+        var hObj = makeCardHeader(normalized.title);
+        card.appendChild(hObj.header);
+
+        var chartEl = document.createElement('div');
+        chartEl.style.cssText = 'width:100%;padding:4px 4px 8px;box-sizing:border-box;';
+        card.appendChild(chartEl);
+        contentEl.appendChild(card);
+
+        mountCompactBarChart(chartEl, normalized).catch(function () {
+            showChartLoadError(chartEl);
+        });
+        return true;
+    }
+
+    function renderFloatingPieChartCard(payload, contentEl) {
+        var normalized = normalizePieChartPayload(payload);
+        if (!normalized) return false;
+        if (contentEl.querySelector('.chat-floating-pie-card')) return true;
+
+        var card = makeCard('chat-floating-pie-card');
+        var hObj = makeCardHeader(normalized.title);
+        card.appendChild(hObj.header);
+
+        var chartEl = document.createElement('div');
+        chartEl.style.cssText = 'height:240px;width:100%;padding:4px 4px 8px;box-sizing:border-box;';
+        card.appendChild(chartEl);
+        contentEl.appendChild(card);
+
+        mountCompactPieChart(chartEl, normalized, { height: 230 }).catch(function () {
+            showChartLoadError(chartEl);
+        });
+        return true;
+    }
+
+    // Maps still use a compact summary (Leaflet is heavier); charts render inline.
+    function renderFloatingMapSummaryCard(payload, contentEl, type) {
+        if (contentEl.querySelector('.chat-floating-map-card')) return;
+
+        var title = payload.title || 'World Map';
+        var card = makeCard('chat-floating-map-card');
         var hObj = makeCardHeader(title);
         card.appendChild(hObj.header);
 
         var body = document.createElement('div');
         body.style.cssText = 'padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
 
-        // Brief metadata line
         var meta = document.createElement('div');
         meta.style.cssText = 'display:flex;align-items:center;gap:6px;color:var(--humdb-text-muted,#64748b);font-size:12px;';
         var iconEl = document.createElement('i');
-        iconEl.className = 'fas ' + icon;
+        iconEl.className = 'fas fa-globe';
         iconEl.setAttribute('aria-hidden', 'true');
         meta.appendChild(iconEl);
-
-        var metaText = document.createTextNode(label);
-        meta.appendChild(metaText);
-
+        meta.appendChild(document.createTextNode('World Map'));
         if (payload.metric) {
-            var sep = document.createTextNode(' \u00B7 ');
-            meta.appendChild(sep);
+            meta.appendChild(document.createTextNode(' \u00B7 '));
             var metricSpan = document.createElement('span');
             metricSpan.textContent = payload.metric;
             meta.appendChild(metricSpan);
         }
-
-        if (type === 'worldmap' || type === 'world_map' || type === 'choropleth') {
-            var countries = Array.isArray(payload.countries) ? payload.countries : [];
-            if (countries.length) {
-                var countEl = document.createTextNode(' \u00B7 ' + countries.length + ' countries');
-                meta.appendChild(countEl);
-            }
-        } else if (Array.isArray(payload.series)) {
-            var pts = document.createTextNode(' \u00B7 ' + payload.series.length + ' data points');
-            meta.appendChild(pts);
+        var countries = Array.isArray(payload.countries) ? payload.countries : [];
+        if (countries.length) {
+            meta.appendChild(document.createTextNode(' \u00B7 ' + countries.length + ' countries'));
         }
-
         body.appendChild(meta);
 
-        // "Open in full view" hint
         var immersiveUrl = (function () {
             try {
                 var el = document.querySelector('#aiChatWidget');
                 return el ? el.getAttribute('data-immersive-url') : null;
             } catch (_) { return null; }
         })();
-
         var hint = document.createElement('div');
         hint.style.cssText = 'font-size:12px;color:var(--humdb-text-muted,#64748b);';
         if (immersiveUrl) {
-            hint.appendChild(document.createTextNode('Interactive visualization available in '));
+            hint.appendChild(document.createTextNode('Interactive map available in '));
             var fullViewLink = document.createElement('a');
             fullViewLink.href = immersiveUrl;
             fullViewLink.target = '_blank';
@@ -389,10 +434,9 @@ export function registerStructuredPayloadListener() {
             hint.appendChild(fullViewLink);
             hint.appendChild(document.createTextNode('.'));
         } else {
-            hint.textContent = 'Open the full view to see the interactive visualization.';
+            hint.textContent = 'Open the full view to see the interactive map.';
         }
         body.appendChild(hint);
-
         card.appendChild(body);
         contentEl.appendChild(card);
     }
@@ -409,13 +453,14 @@ export function registerStructuredPayloadListener() {
 
             if (type === 'data_table') {
                 renderFloatingTableCard(payload, contentEl);
-            } else if (
-                type === 'worldmap' || type === 'world_map' || type === 'choropleth' ||
-                type === 'line' || type === 'linechart' || type === 'timeseries' ||
-                type === 'bar' || type === 'barchart' ||
-                type === 'pie' || type === 'donut'
-            ) {
-                renderFloatingVizSummaryCard(payload, contentEl, type);
+            } else if (type === 'line' || type === 'linechart' || type === 'timeseries') {
+                renderFloatingLineChartCard(payload, contentEl);
+            } else if (type === 'bar' || type === 'barchart') {
+                renderFloatingBarChartCard(payload, contentEl);
+            } else if (type === 'pie' || type === 'donut') {
+                renderFloatingPieChartCard(payload, contentEl);
+            } else if (type === 'worldmap' || type === 'world_map' || type === 'choropleth') {
+                renderFloatingMapSummaryCard(payload, contentEl, type);
             }
         } catch (e) { /* never break the chatbot */ }
     });

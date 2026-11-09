@@ -8,10 +8,12 @@ helpers it delegates to are pure functions and are covered here in isolation.
 import pytest
 
 from app.services.ai.chat.engine import (
+    _scrub_history_for_llm,
     _scrub_message_for_llm,
     _strip_form_builder_boilerplate,
     _strip_markdown_sources_section,
 )
+from app.services.ai.providers import scrub_pii_text
 
 pytestmark = [pytest.mark.unit]
 
@@ -58,6 +60,53 @@ class TestScrubMessageForLlm:
             assert _scrub_message_for_llm(None, form_builder_assistant=False) == ""
             assert _scrub_message_for_llm(None, form_builder_assistant=True) == ""
             assert _scrub_message_for_llm("", form_builder_assistant=True) == ""
+
+
+class TestScrubHistoryForLlm:
+    def test_scrubs_user_turns_in_both_history_shapes(self, app):
+        history = [
+            {"isUser": True, "message": "password: SuperSecret123"},
+            {"isUser": False, "message": "The focal point is jane@example.org"},
+            {"role": "user", "content": "mail jane@example.org"},
+            {"role": "assistant", "content": "Sure."},
+        ]
+        with app.app_context():
+            result = _scrub_history_for_llm(history, form_builder_assistant=False)
+        assert result == [
+            {"isUser": True, "message": "password: [REDACTED_PASSWORD]"},
+            history[1],
+            {"role": "user", "content": "mail [REDACTED_EMAIL]"},
+            history[3],
+        ]
+
+    def test_skips_form_builder_history(self, app):
+        history = [{"isUser": True, "message": "Contact field example: jane@example.com"}]
+        with app.app_context():
+            assert _scrub_history_for_llm(history, form_builder_assistant=True) == history
+
+    def test_handles_none_history(self, app):
+        with app.app_context():
+            assert _scrub_history_for_llm(None, form_builder_assistant=False) == []
+
+
+class TestScrubPiiText:
+    """scrub_pii_text() reuses the DLP patterns, so the two cannot disagree on what is sensitive."""
+
+    def test_masks_what_dlp_detects(self):
+        result = scrub_pii_text("password: SuperSecret123, mail a@b.com")
+        assert result == "password: [REDACTED_PASSWORD], mail [REDACTED_EMAIL]"
+
+    def test_leaves_figures_alone(self):
+        text = "Volunteers in 2019 2020 2021: 1 234 567 890"
+        assert scrub_pii_text(text) == text
+
+    def test_masks_long_opaque_tokens(self):
+        token = "A1b2" * 20
+        assert scrub_pii_text(f"token {token} end") == "token [REDACTED_SECRET] end"
+
+    def test_handles_empty_and_non_string_input(self):
+        assert scrub_pii_text("") == ""
+        assert scrub_pii_text(None) == ""
 
 
 class TestStripMarkdownSourcesSection:

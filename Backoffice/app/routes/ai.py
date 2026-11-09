@@ -65,7 +65,7 @@ from app.extensions import db, limiter
 from app.models.ai_chat import AIConversation, AIMessage
 from app.models import AIReasoningTrace
 from app.services.ai.chat.retention import delete_archive_object, load_archived_conversation
-from app.services.ai.chat.dlp import evaluate_ai_message, log_dlp_audit_event
+from app.services.ai.chat.dlp import screen_ai_message
 
 from app.services.ai.chat.fastpath import try_answer_value_question
 
@@ -779,6 +779,7 @@ def _persist_stream_conversation(
     map_payload: Optional[Dict[str, Any]] = None,
     chart_payload: Optional[Dict[str, Any]] = None,
     table_payload: Optional[Dict[str, Any]] = None,
+    sources: Optional[list] = None,
     trace_id: Optional[int] = None,
 ) -> None:
     """
@@ -847,6 +848,7 @@ def _persist_stream_conversation(
                 **({"map_payload": map_payload} if map_payload else {}),
                 **({"chart_payload": chart_payload} if chart_payload else {}),
                 **({"table_payload": table_payload} if table_payload else {}),
+                **({"sources": sources} if isinstance(sources, list) and sources else {}),
                 **({"in_reply_to_client_message_id": client_message_id} if client_message_id else {}),
             }
             if trace_id is not None:
@@ -1063,30 +1065,19 @@ def chat():
     allow_sensitive = bool(data.get("allow_sensitive"))
 
     # DLP: block/confirm before sending anything to external providers. When allowed
-    # through with findings present (warn mode, or confirm mode + allow_sensitive),
-    # dlp_message has every flagged span masked — see evaluate_ai_message's docstring.
-    # Form-builder panel requests are exempt (same as the PII-scrub exemption in
-    # AIChatEngine) — see evaluate_ai_message's form_builder_assistant docstring.
-    allowed, dlp_err, dlp_findings, dlp_message = evaluate_ai_message(
+    # through with findings present, dlp_message has every flagged span masked — see
+    # evaluate_ai_message's docstring (including the form-builder contact-detail exemption).
+    allowed, dlp_err, _dlp_findings, dlp_message = screen_ai_message(
         message=parsed.message,
         allow_sensitive=allow_sensitive,
         form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
+        user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
+        transport="http",
+        endpoint_path=(request.path or "/api/ai/v2/chat"),
+        client=str((data.get("client") or "unknown")),
+        conversation_id=(parsed.conversation_id or data.get("conversation_id")),
+        client_message_id=parsed.client_message_id,
     )
-    if dlp_findings:
-        log_dlp_audit_event(
-            user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
-            action=("blocked" if (not allowed and (dlp_err or {}).get("error_type") == "dlp_blocked") else
-                    "confirm_required" if (not allowed) else
-                    "sent_masked" if allow_sensitive else
-                    "allowed"),
-            transport="http",
-            endpoint_path=(request.path or "/api/ai/v2/chat"),
-            client=str((data.get("client") or "unknown")),
-            conversation_id=(parsed.conversation_id or data.get("conversation_id")),
-            client_message_id=parsed.client_message_id,
-            allow_sensitive=allow_sensitive,
-            findings=dlp_findings,
-        )
     if not allowed and dlp_err:
         err_msg = dlp_err.get("error", "Request blocked") if isinstance(dlp_err, dict) else "Request blocked"
         extra = {k: v for k, v in (dlp_err or {}).items() if k != "error"} if isinstance(dlp_err, dict) else {}
@@ -1331,6 +1322,7 @@ def chat():
                             **({"chart_payload": chart_payload} if chart_payload else {}),
                             **({"table_payload": table_payload} if table_payload else {}),
                             **({"in_reply_to_client_message_id": client_message_id} if client_message_id else {}),
+                            **({"trace_id": int(trace_id_for_feedback)} if trace_id_for_feedback else {}),
                         },
                     )
                 )
@@ -1584,31 +1576,21 @@ def chat_stream():
 
     allow_sensitive = bool(data.get("allow_sensitive"))
 
-    # DLP: for streaming, reply with a single SSE error event (200 OK) so the client
-    # can show a confirmation dialog and optionally resend with allow_sensitive/private mode.
+    # DLP: for streaming, reply with a single SSE error event (200 OK) so the client can
+    # show its dialog and, in confirm mode, resend with allow_sensitive ("Mask & send").
     # When allowed through with findings present, dlp_message has every flagged span
-    # masked — see evaluate_ai_message's docstring. Form-builder panel requests are
-    # exempt (same as the PII-scrub exemption in AIChatEngine).
-    allowed, dlp_err, dlp_findings, dlp_message = evaluate_ai_message(
+    # masked — see evaluate_ai_message's docstring.
+    allowed, dlp_err, _dlp_findings, dlp_message = screen_ai_message(
         message=parsed.message,
         allow_sensitive=allow_sensitive,
         form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
+        user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
+        transport="sse",
+        endpoint_path=(request.path or "/api/ai/v2/chat/stream"),
+        client=str((data.get("client") or "unknown")),
+        conversation_id=(parsed.conversation_id or data.get("conversation_id")),
+        client_message_id=parsed.client_message_id,
     )
-    if dlp_findings:
-        log_dlp_audit_event(
-            user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
-            action=("blocked" if (not allowed and (dlp_err or {}).get("error_type") == "dlp_blocked") else
-                    "confirm_required" if (not allowed) else
-                    "sent_masked" if allow_sensitive else
-                    "allowed"),
-            transport="sse",
-            endpoint_path=(request.path or "/api/ai/v2/chat/stream"),
-            client=str((data.get("client") or "unknown")),
-            conversation_id=(parsed.conversation_id or data.get("conversation_id")),
-            client_message_id=parsed.client_message_id,
-            allow_sensitive=allow_sensitive,
-            findings=dlp_findings,
-        )
     if not allowed and dlp_err:
         request_id = str(uuid.uuid4())
 
@@ -1937,6 +1919,21 @@ def chat_stream():
     def _on_step(step_message: Optional[str] = None, detail: Optional[str] = None) -> None:
         if cancelled.is_set():
             return
+        # Model-written "I'll look up…" sentence → normal chat text, not a progress step.
+        try:
+            from app.services.ai.runtime.step_ux import ASSISTANT_NARRATION_MARKER
+        except Exception:
+            ASSISTANT_NARRATION_MARKER = "__assistant_narration__"
+        if (
+            step_message
+            and detail is not None
+            and str(detail).strip() == ASSISTANT_NARRATION_MARKER
+        ):
+            text = str(step_message).strip()
+            if text:
+                logger.info("AI SSE[%s] emitting narration: %s", request_id, text[:120])
+                _emit({"type": "narration", "text": text})
+            return
         if step_message is None and detail is not None:
             logger.info("AI SSE[%s] emitting step_detail: %s", request_id, detail)
             _persist_inflight_update(kind="detail", detail=detail)
@@ -2063,6 +2060,7 @@ def chat_stream():
                     map_payload_result = getattr(result, "map_payload", None)
                     chart_payload_result = getattr(result, "chart_payload", None)
                     table_payload_result = getattr(result, "table_payload", None)
+                    sources_result = getattr(result, "sources", None)
                     # When agent returns only a map/chart/table (no text), we still want to persist the assistant message.
                     has_visual = bool(map_payload_result or chart_payload_result or table_payload_result)
                     persist_content = response_text or ""
@@ -2115,6 +2113,7 @@ def chat_stream():
                             "map_payload": map_payload_result,
                             "chart_payload": chart_payload_result,
                             "table_payload": table_payload_result,
+                            "sources": sources_result if isinstance(sources_result, list) else None,
                             "trace_id": trace_id_for_feedback,
                             "confidence": getattr(result, "confidence", None),
                             "grounding_score": getattr(result, "grounding_score", None),
@@ -2155,6 +2154,7 @@ def chat_stream():
                                 map_payload=map_payload_result,
                                 chart_payload=chart_payload_result,
                                 table_payload=table_payload_result,
+                                sources=sources_result if isinstance(sources_result, list) else None,
                                 trace_id=trace_id_for_feedback,
                             )
                             if stream_debug:

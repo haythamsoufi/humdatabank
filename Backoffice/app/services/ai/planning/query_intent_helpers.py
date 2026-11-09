@@ -227,9 +227,12 @@ def build_matrix_share_text_response(payload: Dict[str, Any]) -> str:
     line3 = f"Percentages use {denom_used}. Reporting periods vary by country — see the table for details."
 
     org = payload.get("organization_name") or "Humanitarian Databank"
-    source_line = f"- {org} — {template + ' ' if template else ''}{field} matrix (bulk query)"
+    source_block = (
+        f"- title: {org}\n"
+        f"  detail: {template + ' ' if template else ''}{field} matrix (bulk query)"
+    )
     parts = [p for p in (line1, line2, line3) if p]
-    return "\n\n".join(parts) + f"\n\n## Sources\n\n{source_line}"
+    return "\n\n".join(parts) + f"\n\n## Sources\n\n{source_block}"
 
 
 _BULK_DATABANK_TOOLS = frozenset({

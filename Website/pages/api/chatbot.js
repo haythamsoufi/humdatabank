@@ -70,6 +70,8 @@ export default async function handler(req, res) {
     if (!resp.ok) {
       return res.status(resp.status).json({
         error: data?.error || `Backoffice returned ${resp.status}`,
+        ...(data?.error_type ? { error_type: data.error_type } : {}),
+        ...(data?.dlp ? { dlp: data.dlp } : {}),
       });
     }
 

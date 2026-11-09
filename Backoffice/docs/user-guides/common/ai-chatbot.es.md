@@ -228,7 +228,7 @@ El chatbot muestra dos avisos importantes:
 
 La plataforma incluye varias capas de protección para reducir la exposición accidental de información sensible:
 
-- **Prevención de Pérdida de Datos (DLP)** — Los mensajes salientes se escanean en busca de patrones sensibles comunes (correos electrónicos, tokens, claves, números de tarjeta). Dependiendo de la configuración, el sistema puede avisarte, pedir confirmación o bloquear el mensaje.
+- **Prevención de Pérdida de Datos (DLP)** — Los mensajes salientes se escanean en busca de patrones sensibles comunes (correos electrónicos, números de teléfono, contraseñas, tokens, claves, números de cuenta bancaria y de tarjeta). Un valor detectado nunca se envía tal cual: los correos electrónicos y números de teléfono se sustituyen automáticamente por marcadores como `[REDACTED_EMAIL]`, y para credenciales o datos financieros eliges **Enmascarar y enviar** o **Cancelar** para editar tu mensaje. Según la configuración, esos mensajes pueden bloquearse en su lugar.
 - **Limpieza de PII** — Antes de que el contenido se envíe a proveedores externos, el sistema elimina información personal identificable detectada.
 - **Minimización del contexto de la página** — Cuando el chatbot envía el contexto de la página para ayudar a responder preguntas relacionadas con la interfaz, se eliminan campos de alto riesgo (como las URLs).
 
@@ -253,7 +253,7 @@ Para un resumen de uso aceptable y salvaguardas, consulte la [Política de Uso d
 | Assistant cannot find a document I uploaded | Check the document’s privacy settings on the assignment or form (whether it is marked searchable) and whether processing has finished. If it should be searchable and still does not appear, ask your administrator. |
 | El asistente devuelve datos del país equivocado | Reformula tu pregunta con el nombre completo del país. Comprueba que estás asignado a ese país. |
 | Límite de tasa alcanzado | Espera un minuto e inténtalo de nuevo. Si el problema persiste, contacta con tu administrador. |
-| Advertencia DLP en mi mensaje | El sistema detectó un patrón que parece datos sensibles. Elimina o reemplaza el contenido sensible y reenvía. |
+| Advertencia DLP en mi mensaje | El sistema detectó algo que parece una contraseña, clave, token o número de cuenta bancaria o de tarjeta. Elige **Cancelar**, elimínalo o reemplázalo (por ejemplo con `<TOKEN>`) y vuelve a enviar, o elige **Enmascarar y enviar** para enviarlo con el valor enmascarado. |
 | Falta el historial de conversaciones | Si usas el modo público/anónimo, las conversaciones no se guardan. Inicia sesión para mantener las conversaciones. |
 
 ## Relacionado

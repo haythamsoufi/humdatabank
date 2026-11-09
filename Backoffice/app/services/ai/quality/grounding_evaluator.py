@@ -192,6 +192,34 @@ def _build_llm_judge_prompt(
                 f"Do NOT penalise clarity or completeness for brevity when visual payloads carry the detail.\n"
             )
 
+    integrity_section = ""
+    if output_context:
+        failed = output_context.get("failed_tools")
+        if failed:
+            integrity_section += (
+                "\nTOOL FAILURES THIS TURN: " + ", ".join(str(f) for f in failed[:6]) + ".\n"
+                "If the ANSWER does not plainly tell the user that this lookup failed, or if it presents "
+                "generic reasoning as if it were based on those sources, set accuracy <= 4, verdict no higher "
+                "than \"poor\", and needs_review true.\n"
+            )
+        prior = output_context.get("prior_turn_record")
+        if prior:
+            integrity_section += (
+                "\nRECORD OF THE ASSISTANT'S TOOL ACTIVITY IN THE PREVIOUS TURN:\n"
+                f"{prior}\n"
+                "If the QUERY asks what the assistant did or checked earlier, the ANSWER must be consistent with this "
+                "record (e.g. it must not claim documents were checked when the record shows the search FAILED). "
+                "Contradicting the record is a serious accuracy error (accuracy <= 3, needs_review true). "
+                "Also penalise the ANSWER if it attributes the assistant's own earlier figures to the user.\n"
+            )
+        output_section += integrity_section
+    if not chunk_texts.strip():
+        chunk_texts = "(no document excerpts were retrieved this turn)"
+        output_section += (
+            "\nNOTE: No document excerpts were retrieved. If the ANSWER claims to have reviewed, checked or "
+            "quoted documents, that claim is unsupported (accuracy <= 4, needs_review true).\n"
+        )
+
     return (
         "You are a strict quality-assurance judge for an AI assistant. "
         "Given the user's QUERY, the AI-generated ANSWER, and the SOURCE documents the answer was based on, "

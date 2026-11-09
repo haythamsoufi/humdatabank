@@ -9,6 +9,11 @@ export const HtmlPipelineMixin = {
         return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
 
+    _safeCodePoint(cp, fallback) {
+        if (!Number.isFinite(cp) || cp < 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return fallback;
+        return String.fromCodePoint(cp);
+    },
+
     _safeSameOriginUrl(rawHref) {
         try {
             const href = String(rawHref == null ? '' : rawHref).trim();
@@ -38,8 +43,8 @@ export const HtmlPipelineMixin = {
             .replace(/&quot;/g, '"')
             .replace(/&#39;/g, "'")
             .replace(/&#x27;/g, "'")
-            .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
-            .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)));
+            .replace(/&#(\d+);/g, (m, n) => this._safeCodePoint(parseInt(n, 10), m))
+            .replace(/&#x([0-9a-fA-F]+);/g, (m, n) => this._safeCodePoint(parseInt(n, 16), m));
     },
     /**
      * Linkify markdown-style links [label](url) in cell content. Escapes HTML first, then
@@ -177,7 +182,6 @@ export const HtmlPipelineMixin = {
                     separator_line_raw_valid: separatorLineLooksValid(block[1] || ''),
                 };
                 this._warn('Markdown table block rejected:', rejectPayload);
-                this._warn('Markdown table reject payload JSON:', JSON.stringify(rejectPayload));
                 out.push(...block);
                 continue;
             }
@@ -221,11 +225,9 @@ export const HtmlPipelineMixin = {
         return out.join('\n');
     },
     /**
-     * If text contains "## Sources" (markdown), extract that section and replace it with
-     * the same <details class="chat-response-sources"> structure the backend uses.
-     * Ensures sources are always formatted whether response is HTML (from stream) or markdown (e.g. from DB on refresh).
+     * If text contains "## Sources" (markdown), wrap it in <details class="chat-response-sources">.
+     * Title/detail come from server data-* attrs or meta.sources — this only packages the block.
      */
-
     markdownSourcesToHtml(text) {
         if (typeof text !== 'string') return text;
         if (text.includes('chat-response-sources') && text.includes('chat-response-sources-body')) {
@@ -235,7 +237,7 @@ export const HtmlPipelineMixin = {
             return text;
         }
         const stopAt = '(?=\\n\\s*\\n\\s*(?:If you want, I can|If you\'d like|Which would you prefer\\?|Which format do you prefer\\?|\\*\\*Notes?\\s*\\/\\s*next steps\\b)|\\n\\s*(?:If you want, I can|If you\'d like)|$(?![\\s\\S]))';
-        const sourcesRegex = new RegExp('(?m)^((?:#{2,3}\\s*)?Sources\\s*:?\\s*)\\s*$(.+?)' + stopAt, 'is');
+        const sourcesRegex = new RegExp('^((?:#{2,3}\\s*)?Sources\\s*:?\\s*)\\s*$(.+?)' + stopAt, 'ims');
         const sourcesMatch = text.match(sourcesRegex);
         if (!sourcesMatch) return text;
         const sourcesBlockRaw = sourcesMatch[2].trim();
@@ -298,15 +300,14 @@ export const HtmlPipelineMixin = {
                 const attr = element.attributes[j];
                 const v = (attr.value || '').toLowerCase().trim();
                 if (!v) continue;
+                // Only URL-bearing attributes need protocol checks; the tag/attribute
+                // allowlist and link validation below do the rest.
+                const n = attr.name.toLowerCase();
                 if (
-                    v.includes('javascript:') ||
-                    v.includes('data:') ||
-                    v.includes('vbscript:') ||
-                    v.includes('file:') ||
-                    v.includes('about:')
+                    (n === 'href' || n === 'src' || n === 'xlink:href' || n === 'action' || n === 'formaction') &&
+                    /^\s*(?:javascript|data|vbscript|file|about):/i.test(v.replace(/[\u0000-\u001F\u007F\s]+/g, ''))
                 ) {
                     element.removeAttribute(attr.name);
-                    continue;
                 }
             }
 
@@ -383,6 +384,12 @@ export const HtmlPipelineMixin = {
                     el.removeAttribute('href');
                 } else {
                     el.setAttribute('href', safe);
+                }
+                if (el.hasAttribute('target')) {
+                    el.setAttribute('target', '_blank');
+                    el.setAttribute('rel', 'noopener noreferrer');
+                } else {
+                    el.removeAttribute('rel');
                 }
             }
         }
@@ -530,8 +537,8 @@ export const HtmlPipelineMixin = {
         headings.forEach((heading) => {
             const title = (heading.textContent || '').trim().toLowerCase();
             if (title !== 'sources') return;
-            let list = heading.nextElementSibling;
-            if (!list || !/^UL|OL$/i.test(list.tagName)) return;
+            const list = heading.nextElementSibling;
+            if (!list || !/^(?:UL|OL)$/i.test(list.tagName)) return;
             const items = Array.from(list.children).filter((c) => c.tagName === 'LI');
             if (!items.length) return;
             const wrapper = document.createElement('div');
@@ -548,8 +555,8 @@ export const HtmlPipelineMixin = {
         paragraphs.forEach((p) => {
             const title = (p.textContent || '').trim().toLowerCase().replace(/:$/, '');
             if (title !== 'sources') return;
-            let list = p.nextElementSibling;
-            if (!list || !/^UL|OL$/i.test(list.tagName)) return;
+            const list = p.nextElementSibling;
+            if (!list || !/^(?:UL|OL)$/i.test(list.tagName)) return;
             const items = Array.from(list.children).filter((c) => c.tagName === 'LI');
             if (!items.length) return;
             const wrapper = document.createElement('div');
@@ -561,212 +568,369 @@ export const HtmlPipelineMixin = {
         });
     },
 
+    _squashPlain(text) {
+        return String(text || '').replace(/\s+/g, ' ').trim();
+    },
+
+    _isAnswerVerificationCaveatText(plain) {
+        const t = this._squashPlain(plain).toLowerCase();
+        if (!t) return false;
+        if (t.includes('could not be verified against the available sources')) return true;
+        if ((t.startsWith('note:') || t.startsWith('> note:')) && t.includes('could not be verified')) return true;
+        return false;
+    },
+
+    /**
+     * When message meta includes structured sources[] but the HTML body lacks
+     * data-* attrs, rewrite the sources body so the chip can use attrs.
+     */
+    _injectStructuredSourcesFromMeta(container, sources) {
+        try {
+            if (!container || !Array.isArray(sources) || !sources.length) return;
+            if (container.querySelector('[data-source-title]')) return;
+
+            const escapeAttr = (v) => String(v ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            const escapeText = escapeAttr;
+
+            const lis = sources.map((raw) => {
+                if (!raw || typeof raw !== 'object') return '';
+                const title = String(raw.title || '').trim();
+                if (!title) return '';
+                const detail = String(raw.detail || raw.excerpt || '').trim();
+                const url = String(raw.url || '').trim();
+                const page = raw.page != null && raw.page !== '' ? String(raw.page) : '';
+                const kind = String(raw.kind || raw.type || 'other').trim() || 'other';
+                const attrs = [
+                    `data-source-title="${escapeAttr(title)}"`,
+                    `data-source-kind="${escapeAttr(kind)}"`,
+                ];
+                if (detail) attrs.push(`data-source-detail="${escapeAttr(detail)}"`);
+                if (url) attrs.push(`data-source-url="${escapeAttr(url)}"`);
+                if (page) attrs.push(`data-source-page="${escapeAttr(page)}"`);
+                let inner = escapeText(title);
+                if (page) inner += ` — page ${escapeText(page)}`;
+                if (detail) inner += `: ${escapeText(detail)}`;
+                if (url && url.startsWith('/')) {
+                    inner = `<a href="${escapeAttr(url)}" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener">${escapeText(title)}${page ? ` — page ${escapeText(page)}` : ''}</a>${detail ? `: ${escapeText(detail)}` : ''}`;
+                }
+                return `<li ${attrs.join(' ')}>${inner}</li>`;
+            }).filter(Boolean);
+            if (!lis.length) return;
+
+            const bodyHtml = `<ul class="chat-response-sources-list">${lis.join('')}</ul>`;
+            let details = container.querySelector('.chat-response-sources');
+            if (!details) {
+                details = document.createElement('details');
+                details.className = 'chat-response-sources mt-2 border border-gray-200 rounded p-2 bg-gray-50';
+                details.innerHTML = `<summary class="cursor-pointer font-medium text-gray-700">Sources</summary><div class="chat-response-sources-body mt-2 text-sm text-gray-600">${bodyHtml}</div>`;
+                container.appendChild(details);
+                return;
+            }
+            let body = details.querySelector('.chat-response-sources-body');
+            if (!body) {
+                body = document.createElement('div');
+                body.className = 'chat-response-sources-body mt-2 text-sm text-gray-600';
+                details.appendChild(body);
+            }
+            body.innerHTML = bodyHtml;
+        } catch (_) { /* never break rendering */ }
+    },
+
+    /**
+     * Prefer structured rows emitted by the server (`data-source-title`, etc.).
+     */
+    _parseStructuredSourceRows(bodyEl) {
+        const items = [];
+        if (!bodyEl || typeof bodyEl.querySelectorAll !== 'function') return items;
+        const rows = bodyEl.querySelectorAll('[data-source-title]');
+        if (!rows.length) return items;
+        rows.forEach((row) => {
+            const title = this._squashPlain(row.getAttribute('data-source-title') || '');
+            if (!title) return;
+            const detail = this._squashPlain(row.getAttribute('data-source-detail') || '');
+            const urlRaw = (row.getAttribute('data-source-url') || '').trim();
+            const pageRaw = (row.getAttribute('data-source-page') || '').trim();
+            let url = null;
+            if (urlRaw) {
+                url = this._safeSameOriginUrl(urlRaw) || (/^https?:\/\//i.test(urlRaw) ? urlRaw : null);
+            }
+            let page = null;
+            if (pageRaw) {
+                const n = Number(pageRaw);
+                page = Number.isFinite(n) ? String(Math.trunc(n)) : pageRaw;
+            }
+            items.push({
+                title,
+                page,
+                url,
+                excerpt: detail || null,
+            });
+        });
+        return items;
+    },
+
+    /**
+     * Parse .chat-response-sources-body from structured data-* rows only.
+     * Verification caveats may still appear as plain sibling lines.
+     */
+    _parseChatResponseSources(detailsEl) {
+        const items = [];
+        const notes = [];
+        if (!detailsEl) return { items, notes };
+        const bodyEl = detailsEl.querySelector('.chat-response-sources-body');
+        if (!bodyEl) return { items, notes };
+
+        const structured = this._parseStructuredSourceRows(bodyEl);
+        if (structured.length) {
+            // Pull verification caveats that sit outside structured rows.
+            bodyEl.querySelectorAll('li, p').forEach((el) => {
+                if (el.hasAttribute('data-source-title')) return;
+                const plain = this._squashPlain(el.textContent || '');
+                if (this._isAnswerVerificationCaveatText(plain)) {
+                    notes.push(plain.replace(/^>?\s*/, ''));
+                }
+            });
+            return { items: structured, notes };
+        }
+
+        // No structured attrs — leave empty so the chip is not built from prose.
+        return { items, notes };
+    },
+
+    _closeSourcesModal() {
+        const existing = document.getElementById('chatSourcesModalOverlay');
+        if (existing) existing.remove();
+        if (this._sourcesModalKeyHandler) {
+            document.removeEventListener('keydown', this._sourcesModalKeyHandler);
+            this._sourcesModalKeyHandler = null;
+        }
+    },
+
+    _openSourcesModal(parsed) {
+        this._closeSourcesModal();
+        const items = (parsed && parsed.items) || [];
+        const notes = (parsed && parsed.notes) || [];
+        const titleText = this._uiString('responseSources') || 'Sources';
+
+        const overlay = document.createElement('div');
+        overlay.id = 'chatSourcesModalOverlay';
+        overlay.className = 'chat-sources-modal-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', titleText);
+
+        const panel = document.createElement('div');
+        panel.className = 'chat-sources-modal-panel';
+
+        const header = document.createElement('div');
+        header.className = 'chat-sources-modal-header';
+        const heading = document.createElement('h2');
+        heading.className = 'chat-sources-modal-title';
+        heading.textContent = titleText;
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'chat-sources-modal-close';
+        closeBtn.setAttribute('aria-label', this._uiString('close') || 'Close');
+        closeBtn.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+        closeBtn.addEventListener('click', () => this._closeSourcesModal());
+        header.append(heading, closeBtn);
+
+        const list = document.createElement('div');
+        list.className = 'chat-sources-modal-list';
+
+        items.forEach((item, idx) => {
+            const row = document.createElement(item.url ? 'a' : 'div');
+            row.className = 'chat-sources-modal-item' + (item.url ? ' is-link' : '');
+            if (item.url) {
+                row.href = item.url;
+                row.target = '_blank';
+                row.rel = 'noopener';
+            }
+            const indexEl = document.createElement('span');
+            indexEl.className = 'chat-sources-modal-index';
+            indexEl.textContent = String(idx + 1);
+            const body = document.createElement('div');
+            body.className = 'chat-sources-modal-item-body';
+            const titleEl = document.createElement('div');
+            titleEl.className = 'chat-sources-modal-item-title';
+            titleEl.textContent = item.title;
+            body.appendChild(titleEl);
+            if (item.page) {
+                const pageEl = document.createElement('span');
+                pageEl.className = 'chat-sources-modal-page';
+                pageEl.textContent = 'p. ' + item.page;
+                body.appendChild(pageEl);
+            }
+            if (item.excerpt) {
+                const excerptEl = document.createElement('div');
+                excerptEl.className = 'chat-sources-modal-excerpt';
+                excerptEl.textContent = item.excerpt;
+                body.appendChild(excerptEl);
+            }
+            row.appendChild(indexEl);
+            row.appendChild(body);
+            if (item.url) {
+                const openIcon = document.createElement('i');
+                openIcon.className = 'fas fa-external-link-alt chat-sources-modal-open-icon';
+                openIcon.setAttribute('aria-hidden', 'true');
+                row.appendChild(openIcon);
+            }
+            list.appendChild(row);
+        });
+
+        notes.forEach((note) => {
+            const noteEl = document.createElement('div');
+            noteEl.className = 'chat-sources-modal-note';
+            noteEl.innerHTML = '<i class="fas fa-info-circle" aria-hidden="true"></i>';
+            const noteText = document.createElement('span');
+            noteText.textContent = note;
+            noteEl.appendChild(noteText);
+            list.appendChild(noteEl);
+        });
+
+        if (!items.length && !notes.length) {
+            const empty = document.createElement('div');
+            empty.className = 'chat-sources-modal-empty';
+            empty.textContent = this._uiString('noSourcesListed') || 'No sources listed.';
+            list.appendChild(empty);
+        }
+
+        panel.append(header, list);
+        overlay.appendChild(panel);
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) this._closeSourcesModal();
+        });
+        this._sourcesModalKeyHandler = (e) => {
+            if (e.key === 'Escape') this._closeSourcesModal();
+        };
+        document.addEventListener('keydown', this._sourcesModalKeyHandler);
+        document.body.appendChild(overlay);
+        try { closeBtn.focus(); } catch (_) { /* ignore */ }
+    },
+
+    _sourcesParsedToCopyText(parsed) {
+        const items = (parsed && parsed.items) || [];
+        const notes = (parsed && parsed.notes) || [];
+        const lines = [];
+        if (items.length || notes.length) {
+            lines.push((this._uiString('responseSources') || 'Sources') + ':');
+        }
+        items.forEach((item, idx) => {
+            let line = `${idx + 1}. ${item.title || ''}`;
+            if (item.page) line += ` (p. ${item.page})`;
+            if (item.url) line += ` — ${item.url}`;
+            if (item.excerpt) line += `\n   ${item.excerpt}`;
+            lines.push(line);
+        });
+        notes.forEach((note) => lines.push(String(note || '')));
+        return lines.join('\n').trim();
+    },
+
+    _buildSourcesChip(parsed) {
+        const items = (parsed && parsed.items) || [];
+        const count = items.length;
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chat-response-sources-chip';
+        chip.setAttribute('aria-label', (this._uiString('responseSources') || 'Sources') + (count ? ' (' + count + ')' : ''));
+        // Keep structured sources available for copy-to-clipboard after the details block is replaced.
+        chip.__humdbSourcesParsed = parsed;
+        chip.setAttribute('data-sources-copy', this._sourcesParsedToCopyText(parsed));
+
+        const bookIcon = document.createElement('i');
+        bookIcon.className = 'fas fa-book-open chat-response-sources-chip-icon';
+        bookIcon.setAttribute('aria-hidden', 'true');
+
+        const label = document.createElement('span');
+        label.className = 'chat-response-sources-chip-label';
+        label.textContent = this._uiString('responseSources') || 'Sources';
+
+        chip.append(bookIcon, label);
+        if (count > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'chat-response-sources-chip-count';
+            badge.textContent = String(count);
+            chip.appendChild(badge);
+        }
+        const chevron = document.createElement('i');
+        chevron.className = 'fas fa-chevron-right chat-response-sources-chip-chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+        chip.appendChild(chevron);
+
+        chip.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this._openSourcesModal(parsed);
+        });
+        return chip;
+    },
+
+    /**
+     * When charts/maps/tables are present, move the Sources chip into the action bar
+     * (mobile places Sources next to copy/like after structured visuals).
+     */
+    _relocateSourcesChipIfNeeded(wrapperOrContainer) {
+        try {
+            const wrapper = wrapperOrContainer?.closest
+                ? (wrapperOrContainer.classList?.contains('chat-message-wrapper')
+                    ? wrapperOrContainer
+                    : wrapperOrContainer.closest('.chat-message-wrapper'))
+                : null;
+            if (!wrapper) return;
+            const content = wrapper.querySelector('.chat-message-content');
+            const actionBar = wrapper.querySelector('.chat-message-actions');
+            if (!content || !actionBar) return;
+
+            const chip = content.querySelector('.chat-response-sources-chip')
+                || wrapper.querySelector('.chat-response-sources-chip');
+            if (!chip) return;
+
+            const hasStructuredVisuals = !!(
+                content.querySelector('.chat-ai-table, .chat-floating-payload-card, .chat-immersive-map-card, .chat-immersive-chart-card')
+                || (wrapper.__humdbStructuredPayloads && wrapper.__humdbStructuredPayloads.length)
+            );
+            if (!hasStructuredVisuals) return;
+            if (chip.parentElement === actionBar) return;
+
+            let sep = actionBar.querySelector('.chat-message-actions-sep');
+            if (!sep) {
+                sep = document.createElement('span');
+                sep.className = 'chat-message-actions-sep';
+                sep.setAttribute('aria-hidden', 'true');
+            }
+            chip.classList.add('chat-response-sources-chip--compact');
+            const bookIcon = chip.querySelector('.chat-response-sources-chip-icon');
+            if (bookIcon) bookIcon.remove();
+            actionBar.appendChild(sep);
+            actionBar.appendChild(chip);
+        } catch (_) { /* never break rendering */ }
+    },
+
+    /**
+     * Render Sources as a compact chip that opens a modal list (mobile parity),
+     * instead of an inline expandable details block.
+     */
     _formatChatResponseSources(container) {
         if (!container || typeof container.querySelector !== 'function') return;
         this._normalizeSourcesSection(container);
-        const isAnswerVerificationCaveatText = (plain) => {
-            const t = (plain || '')
-                .toLowerCase()
-                .replace(/\s+/g, ' ')
-                .trim();
-            if (!t) {
-                return false;
-            }
-            if (t.includes('could not be verified against the available sources')) {
-                return true;
-            }
-            if (t.startsWith('note:') && t.includes('could not be verified')) {
-                return true;
-            }
-            if (t.startsWith('> note:') && t.includes('could not be verified')) {
-                return true;
-            }
-            return false;
-        };
-        const countProbe = document.createElement('div');
         const sourcesBlocks = container.querySelectorAll('.chat-response-sources');
         sourcesBlocks.forEach((detailsEl) => {
-            const bodyEl = detailsEl.querySelector('.chat-response-sources-body');
-            if (!bodyEl) return;
-            let html = bodyEl.innerHTML.trim();
-            if (!html) return;
-            let segments = html.split(/\s*<br\s*\/?>\s*/i).map((s) => s.trim()).filter(Boolean);
-            if (segments.length <= 1 && bodyEl.querySelector('ul li, ol li')) {
-                const items = bodyEl.querySelectorAll('ul li, ol li');
-                const fromList = Array.from(items).map((li) => (li.innerHTML || li.textContent || '').trim()).filter(Boolean);
-                if (fromList.length > segments.length) segments = fromList;
-            }
-            if (!segments.length) return;
-            const sanitizeSegmentHtml = (html) => (window.sanitizeHtml ? window.sanitizeHtml(html) : this.escapeHtml(html));
-            let sourceCountForLabel = 0;
-            for (const segment of segments) {
-                countProbe.innerHTML = sanitizeSegmentHtml(segment);
-                const p = (countProbe.textContent || '').replace(/\s+/g, ' ').trim();
-                if (p && !isAnswerVerificationCaveatText(p)) {
-                    sourceCountForLabel += 1;
-                }
-            }
-            let summaryEl = detailsEl.querySelector('summary');
-            if (!summaryEl) {
-                summaryEl = document.createElement('summary');
-                detailsEl.insertBefore(summaryEl, bodyEl);
-            }
-            summaryEl.textContent = 'Sources (' + sourceCountForLabel + ')';
-            const resolveSourceIcon = (segmentHtml, plainText) => {
-                const probe = document.createElement('div');
-                probe.innerHTML = sanitizeSegmentHtml(segmentHtml);
-                const anchor = probe.querySelector('a[href]');
-                const href = (anchor?.getAttribute('href') || '').trim();
-                const label = ((anchor?.textContent || '') + ' ' + plainText).toLowerCase();
-                const hrefLower = href.toLowerCase();
-                const normalizedHref = hrefLower.split('#')[0];
-                const hrefNoQuery = normalizedHref.split('?')[0];
-                const pdfHints = hrefLower + ' ' + label;
-                const hasPageCitation = /\bpage\s+\d+\b/i.test(label);
-                const isInternalUploadedDoc =
-                    /\/ai\/documents(?:\/|$)/i.test(hrefNoQuery) ||
-                    /\/uploads\/ai_documents(?:\/|$)/i.test(hrefNoQuery) ||
-                    /\/documents\/view(?:\/|$)/i.test(hrefNoQuery);
-
-                const isLikelyLink = /^https?:\/\//i.test(href) || /\bhttps?:\/\//i.test(plainText);
-                const isDataRecord = /\b(country record|record:|databank|database|kpi|indicator)\b/i.test(label);
-                const isPdf =
-                    /\.pdf(\b|$)/i.test(hrefNoQuery) ||
-                    /(?:^|[?&])(format|mime|type|content_type)=application\/pdf(?:&|$)/i.test(hrefLower) ||
-                    /(?:^|[?&])(format|mime|type)=pdf(?:&|$)/i.test(hrefLower) ||
-                    /\/pdf(?:\/|$)/i.test(hrefNoQuery) ||
-                    /\bapplication\/pdf\b/i.test(pdfHints) ||
-                    (hasPageCitation && !isDataRecord) ||
-                    isInternalUploadedDoc ||
-                    /\bpdf\b/i.test(label);
-                if (isPdf) return { icon: 'fa-file-pdf', iconStyle: 'fas', type: 'pdf', title: 'PDF source' };
-
-                if (isDataRecord && !href) return { icon: 'fa-database', type: 'data', title: 'Data source' };
-
-                const isWord = /\.(doc|docx|odt|rtf)$/i.test(normalizedHref) || /\b(doc|docx|word)\b/i.test(label);
-                if (isWord) return { icon: 'fa-file-word', type: 'word', title: 'Document source' };
-
-                const isSheet = /\.(xls|xlsx|csv|ods)$/i.test(normalizedHref) || /\b(xls|xlsx|csv|excel|spreadsheet)\b/i.test(label);
-                if (isSheet) return { icon: 'fa-file-excel', type: 'sheet', title: 'Spreadsheet source' };
-
-                const isSlides = /\.(ppt|pptx|odp)$/i.test(normalizedHref) || /\b(ppt|pptx|powerpoint|slides)\b/i.test(label);
-                if (isSlides) return { icon: 'fa-file-powerpoint', type: 'slides', title: 'Presentation source' };
-
-                const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|tiff?)$/i.test(normalizedHref) || /\b(image|photo|png|jpg|jpeg|gif|webp|svg)\b/i.test(label);
-                if (isImage) return { icon: 'fa-file-image', type: 'image', title: 'Image source' };
-
-                if (isLikelyLink) return { icon: 'fa-link', type: 'link', title: 'Web source' };
-                return { icon: 'fa-file-lines', iconStyle: 'fas', type: 'file', title: 'Source file' };
-            };
-            const self = this;
-            const linkifySegment = (seg) => {
-                const hasLink = /<a\s[^>]*href\s*=/i.test(seg);
-                const hasMdLink = /\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/.test(seg);
-                if (hasLink) {
-                    return seg;
-                }
-                const out = seg.replace(/\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g, (_, label, href) => {
-                    const safe = self._safeSameOriginUrl(href);
-                    if (!safe) return self.escapeHtml(label || '');
-                    return '<a href="' + self.escapeHtml(safe) + '" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener">' + self.escapeHtml(label || '') + '</a>';
-                });
-                return out;
-            };
-            const fragment = document.createDocumentFragment();
-            const tempDiv = document.createElement('div');
-            segments.forEach((segment) => {
-                segment = linkifySegment(segment);
-                tempDiv.innerHTML = sanitizeSegmentHtml(segment);
-                const plainText = (tempDiv.textContent || '').trim();
-                const lineEl = document.createElement('div');
-                lineEl.className = 'chat-source-line';
-                const iconInfo = resolveSourceIcon(segment, plainText);
-                const iconSpan = document.createElement('span');
-                iconSpan.className = 'chat-source-line-icon chat-source-line-icon-' + iconInfo.type;
-                iconSpan.setAttribute('aria-hidden', 'true');
-                iconSpan.setAttribute('title', iconInfo.title);
-                const iconStyleClass = iconInfo.iconStyle || 'fas';
-                iconSpan.innerHTML = '<i class="' + iconStyleClass + ' ' + iconInfo.icon + '" aria-hidden="true"></i>';
-                const previewSpan = document.createElement('span');
-                previewSpan.className = 'chat-source-line-preview';
-                previewSpan.textContent = plainText || '\u00a0';
-                const toggleSpan = document.createElement('span');
-                toggleSpan.className = 'chat-source-line-toggle';
-                toggleSpan.setAttribute('aria-hidden', 'true');
-                toggleSpan.textContent = '\u203a';
-                const fullSpan = document.createElement('span');
-                fullSpan.className = 'chat-source-line-full';
-                fullSpan.innerHTML = sanitizeSegmentHtml(segment);
-                lineEl.appendChild(iconSpan);
-                lineEl.appendChild(previewSpan);
-                lineEl.appendChild(toggleSpan);
-                lineEl.appendChild(fullSpan);
-                lineEl.addEventListener('click', (e) => {
-                    const link = e.target.closest('a');
-                    const insideFull = e.target.closest('.chat-source-line-full');
-                    const isLinkClick = !!link;
-                    const isInsideExpandedContent = !!insideFull;
-                    const shouldNotToggle = isLinkClick || isInsideExpandedContent;
-                    if (shouldNotToggle) {
-                        if (isLinkClick) e.stopPropagation();
-                        return;
-                    }
-                    lineEl.classList.toggle('expanded');
-                    lineEl.setAttribute('aria-expanded', lineEl.classList.contains('expanded'));
-                });
-                lineEl.setAttribute('role', 'button');
-                lineEl.setAttribute('tabIndex', '0');
-                lineEl.setAttribute('aria-expanded', 'false');
-                lineEl.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        lineEl.classList.toggle('expanded');
-                        lineEl.setAttribute('aria-expanded', lineEl.classList.contains('expanded'));
-                    }
-                });
-                fragment.appendChild(lineEl);
-            });
-            bodyEl.innerHTML = '';
-            bodyEl.appendChild(fragment);
-
-            // Prevent link clicks from bubbling to the row (which would toggle expand/collapse)
-            if (!bodyEl.hasAttribute('data-sources-link-handler')) {
-                bodyEl.setAttribute('data-sources-link-handler', '1');
-                bodyEl.addEventListener('click', (e) => {
-                    const a = e.target.closest('a');
-                    const inSourceLine = a && a.closest('.chat-source-line');
-                    if (a && inSourceLine) {
-                        e.stopPropagation();
-                    }
-                }, true);
-            }
-
-            const sourceLines = bodyEl.querySelectorAll('.chat-source-line');
-            const DEFAULT_VISIBLE_SOURCES = 5;
-            if (sourceLines.length > DEFAULT_VISIBLE_SOURCES) {
-                for (let i = DEFAULT_VISIBLE_SOURCES; i < sourceLines.length; i++) {
-                    sourceLines[i].classList.add('chat-source-line-hidden');
-                }
-                const expandRow = document.createElement('div');
-                expandRow.className = 'chat-sources-expand-row';
-                expandRow.setAttribute('role', 'button');
-                expandRow.setAttribute('tabIndex', '0');
-                expandRow.setAttribute('aria-label', 'Show more sources');
-                expandRow.innerHTML = '<span class="chat-sources-expand-label">Show ' + (sourceLines.length - DEFAULT_VISIBLE_SOURCES) + ' more sources</span> <i class="fas fa-chevron-down chat-sources-expand-icon" aria-hidden="true"></i>';
-                expandRow.addEventListener('click', () => {
-                    bodyEl.querySelectorAll('.chat-source-line-hidden').forEach((el) => el.classList.remove('chat-source-line-hidden'));
-                    expandRow.remove();
-                    detailsEl.classList.add('chat-response-sources-expanded');
-                });
-                expandRow.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        expandRow.click();
-                    }
-                });
-                bodyEl.appendChild(expandRow);
-            }
+            if (detailsEl.getAttribute('data-sources-formatted') === '1') return;
+            const parsed = this._parseChatResponseSources(detailsEl);
+            if (!parsed.items.length && !parsed.notes.length) return;
+            const chip = this._buildSourcesChip(parsed);
+            const holder = document.createElement('div');
+            holder.className = 'chat-response-sources chat-response-sources--chip';
+            holder.setAttribute('data-sources-formatted', '1');
+            holder.appendChild(chip);
+            detailsEl.parentNode.insertBefore(holder, detailsEl);
+            detailsEl.remove();
         });
+        this._relocateSourcesChipIfNeeded(container);
     },
 
     _enhanceIndicatorActionLinks(root) {

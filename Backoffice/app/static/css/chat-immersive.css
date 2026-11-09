@@ -930,7 +930,7 @@ html[dir="rtl"] .chat-immersive-clear-all {
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
-/* Message bubbles */
+/* User messages keep bubbles; assistant replies are plain text */
 .chat-immersive .chat-message.user {
     background: #4b5563;
     color: #fff;
@@ -939,11 +939,14 @@ html[dir="rtl"] .chat-immersive-clear-all {
 }
 
 .chat-immersive .chat-message.bot {
-    background: var(--ci-bot-bubble);
+    background: transparent;
     color: var(--ci-bot-text);
     align-self: flex-start;
-    max-width: 85%;
-    border: 1px solid var(--ci-bot-border);
+    max-width: 100%;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 4px 0 8px;
 }
 
 .chat-immersive .chat-message.bot a {
@@ -962,13 +965,13 @@ html[dir="rtl"] .chat-immersive-clear-all {
     color: #f87171 !important;
 }
 
-/* Error message bubble – highlight and retry (immersive) */
+/* Error response – text emphasis only (immersive) */
 .chat-immersive .chat-message-wrapper-error .chat-message.bot.chat-message-error,
 .chat-immersive .chat-message.bot.chat-message-error {
-    background: #fef2f2;
-    border-color: #fecaca;
+    background: transparent;
+    border: none;
     color: #991b1b;
-    box-shadow: 0 1px 2px rgba(220, 38, 38, 0.08);
+    box-shadow: none;
 }
 .chat-immersive .chat-message-error .chat-message-content {
     color: #b91c1c;
@@ -1226,205 +1229,47 @@ html[dir="rtl"] .chat-immersive-clear-all {
     gap: 0.25rem;
 }
 
-/* Sources block at bottom of AI response: one line per source, truncated by bubble width; click to expand */
+/* Sources chip at bottom of AI response (opens modal; mobile parity) */
 .chat-immersive .chat-response-sources,
-.chat-response-sources {
+.chat-immersive .chat-response-sources--chip {
     margin-top: 0.75rem;
     border: none;
     background: transparent;
     box-shadow: none;
-    border-radius: 0;
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    overflow: visible;
 }
 
-.chat-immersive .chat-response-sources summary,
-.chat-response-sources summary {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.2rem 0.15rem 0.35rem;
-    margin: 0;
-    list-style: none;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    color: color-mix(in srgb, var(--ci-text, #0f172a) 78%, var(--ci-text-muted, #64748b) 22%);
-    cursor: pointer;
-    user-select: none;
+.chat-immersive .chat-response-sources-chip {
+    background: color-mix(in srgb, var(--ci-bg-raised, #f1f5f9) 92%, white 8%);
+    border-color: color-mix(in srgb, var(--ci-border, #e2e8f0) 90%, transparent);
+    color: var(--ci-text, #0f172a);
 }
 
-.chat-immersive .chat-response-sources summary::-webkit-details-marker,
-.chat-response-sources summary::-webkit-details-marker {
-    display: none;
+.chat-immersive .chat-response-sources-chip:hover {
+    background: color-mix(in srgb, var(--ci-hover, #e2e8f0) 88%, white 12%);
 }
 
-.chat-immersive .chat-response-sources summary::before,
-.chat-response-sources summary::before {
-    content: '';
-    width: 0.42rem;
-    height: 0.42rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ci-accent, #3b82f6) 75%, white 25%);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ci-accent, #3b82f6) 18%, transparent);
-}
-
-.chat-immersive .chat-response-sources .chat-response-sources-body,
-.chat-response-sources .chat-response-sources-body {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 0;
-    padding: 0.1rem 0;
-    max-width: 100%;
-    min-width: 0;
-}
-
-.chat-immersive .chat-source-line,
-.chat-source-line {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 6px 8px;
-    margin: 0;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
-    font-size: 0.8125rem;
+.chat-immersive .chat-response-sources-chip-icon,
+.chat-immersive .chat-response-sources-chip-chevron {
     color: var(--ci-text-muted, #64748b);
-    line-height: 1.4;
-    min-width: 0;
-    max-width: 100%;
-    width: 100%;
-    box-sizing: border-box;
 }
 
-.chat-immersive .chat-source-line .chat-source-line-icon,
-.chat-source-line .chat-source-line-icon {
-    flex: 0 0 auto;
-    width: 1rem;
-    margin-top: 1px;
-    font-size: 0.85rem;
-    color: var(--ci-text-subtle, #94a3b8);
-    text-align: center;
+.chat-immersive .chat-response-sources-chip-count {
+    background: color-mix(in srgb, var(--ci-accent, #3b82f6) 16%, transparent);
+    color: var(--ci-accent, #2563eb);
 }
 
-.chat-immersive .chat-source-line .chat-source-line-icon-pdf,
-.chat-source-line .chat-source-line-icon-pdf {
-    color: #dc2626;
+.chat-immersive .chat-response-sources-chip--compact {
+    background: transparent;
+    border: none;
+    color: var(--ci-text-muted, #64748b);
 }
 
-.chat-immersive .chat-source-line .chat-source-line-icon-word,
-.chat-source-line .chat-source-line-icon-word {
-    color: #2563eb;
-}
-
-.chat-immersive .chat-source-line .chat-source-line-icon-sheet,
-.chat-source-line .chat-source-line-icon-sheet {
-    color: #16a34a;
-}
-
-.chat-immersive .chat-source-line .chat-source-line-icon-slides,
-.chat-source-line .chat-source-line-icon-slides {
-    color: #ea580c;
-}
-
-.chat-immersive .chat-source-line .chat-source-line-icon-data,
-.chat-source-line .chat-source-line-icon-data {
-    color: #7c3aed;
-}
-
-.chat-immersive .chat-source-line:hover,
-.chat-source-line:hover {
-    background: var(--ci-hover, rgba(0, 0, 0, 0.04));
-}
-
-.chat-immersive .chat-source-line .chat-source-line-preview,
-.chat-source-line .chat-source-line-preview {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.chat-immersive .chat-source-line .chat-source-line-toggle,
-.chat-source-line .chat-source-line-toggle {
-    flex-shrink: 0;
-    font-size: 0.75rem;
-    color: var(--ci-text-subtle, #94a3b8);
-}
-
-.chat-immersive .chat-source-line .chat-source-line-full,
-.chat-source-line .chat-source-line-full {
-    display: none;
-    white-space: normal;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-    max-width: 100%;
-}
-
-.chat-immersive .chat-source-line.expanded .chat-source-line-preview,
-.chat-source-line.expanded .chat-source-line-preview {
-    display: none;
-}
-
-.chat-immersive .chat-source-line.expanded .chat-source-line-toggle,
-.chat-source-line.expanded .chat-source-line-toggle {
-    display: none;
-}
-
-.chat-immersive .chat-source-line.expanded .chat-source-line-full,
-.chat-source-line.expanded .chat-source-line-full {
-    display: block;
-    flex: 1;
-    min-width: 0;
-    max-width: 100%;
-}
-
-/* Collapsible sources: hide extra sources by default, show expand row at bottom (immersive only) */
-.chat-immersive .chat-source-line-hidden,
-.chat-source-line-hidden {
-    display: none !important;
-}
-.chat-immersive .chat-sources-expand-row,
-.chat-sources-expand-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 0.45rem 0.75rem;
-    margin-top: 0.25rem;
-    margin-left: 0.2rem;
-    margin-right: 0.2rem;
-    border-radius: 999px;
-    cursor: pointer;
-    background: color-mix(in srgb, var(--ci-bg, #f8fafc) 86%, white 14%);
-    border: 1px solid color-mix(in srgb, var(--ci-border, #e2e8f0) 86%, transparent);
-    color: color-mix(in srgb, var(--ci-text-muted, #64748b) 88%, #334155 12%);
-    font-size: 0.76rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    transition: background 0.15s, border-color 0.15s, transform 0.15s;
-    width: calc(100% - 0.4rem);
-    box-sizing: border-box;
-}
-.chat-immersive .chat-sources-expand-row:hover,
-.chat-sources-expand-row:hover {
-    background: color-mix(in srgb, var(--ci-hover, #f1f5f9) 80%, white 20%);
-    border-color: color-mix(in srgb, var(--ci-border, #e2e8f0) 70%, var(--ci-accent, #3b82f6) 30%);
-    transform: translateY(-1px);
-}
-.chat-immersive .chat-sources-expand-label,
-.chat-sources-expand-label {
-    opacity: 0.95;
-}
-.chat-immersive .chat-sources-expand-icon,
-.chat-sources-expand-icon {
-    font-size: 0.75rem;
-    opacity: 0.75;
+.chat-immersive .chat-message-actions .chat-response-sources-chip--compact {
+    /* Action-row placement when charts/maps/tables are present */
+    margin-inline-start: 0;
 }
 
 /* Input area – fixed at bottom, centered; pill shape with subtle shadow */
@@ -1590,8 +1435,10 @@ html[dir="rtl"] .chat-immersive-clear-all {
 
 /* Typing indicator and progress panel */
 .chat-immersive .typing-indicator {
-    background: var(--ci-bot-bubble);
-    border: 1px solid var(--ci-bot-border);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--ci-bot-text);
 }
 
 .chat-immersive .typing-indicator-text {

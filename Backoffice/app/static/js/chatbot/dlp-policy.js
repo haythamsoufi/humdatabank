@@ -5,6 +5,8 @@
 
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
+let _closeOpenDlpModal = null;
+
 export const DlpPolicyMixin = {
     _makeDlpError(dlpPayload) {
         const err = new Error((dlpPayload && (dlpPayload.error || dlpPayload.message)) || _t('Sensitive information detected'));
@@ -40,8 +42,10 @@ export const DlpPolicyMixin = {
         }
     },
 
-    _showDlpModal({ title, bodyLines, actions }) {
-        // Minimal custom modal (3-button) to avoid relying on global dialog helpers.
+    _showDlpModal({ title, intro, bodyLines, actions, onDismiss }) {
+        // Minimal custom modal to avoid relying on global dialog helpers. Clicking the
+        // backdrop or pressing Escape runs onDismiss, the same as the Cancel button.
+        if (_closeOpenDlpModal) _closeOpenDlpModal();
         try {
             const existing = document.querySelector('.humdb-dlp-modal-overlay');
             if (existing) existing.remove();
@@ -62,7 +66,7 @@ export const DlpPolicyMixin = {
         const body = document.createElement('div');
         body.className = 'humdb-dlp-modal-body';
         const p = document.createElement('p');
-        p.textContent = _t('Your message appears to include sensitive information. We can mask it before sending, or you can cancel and edit your message:');
+        p.textContent = intro || _t('Your message appears to include sensitive information. We can mask it before sending, or you can cancel and edit your message:');
         body.appendChild(p);
         if (Array.isArray(bodyLines) && bodyLines.length) {
             const ul = document.createElement('ul');
@@ -77,8 +81,17 @@ export const DlpPolicyMixin = {
         const actionsEl = document.createElement('div');
         actionsEl.className = 'humdb-dlp-modal-actions';
 
+        const onKeydown = (e) => {
+            if (e.key === 'Escape') dismiss();
+        };
         function close() {
+            document.removeEventListener('keydown', onKeydown);
+            if (_closeOpenDlpModal === close) _closeOpenDlpModal = null;
             try { overlay.remove(); } catch (_) {}
+        }
+        function dismiss() {
+            close();
+            try { if (typeof onDismiss === 'function') onDismiss(); } catch (_) {}
         }
 
         (actions || []).forEach(a => {
@@ -99,17 +112,42 @@ export const DlpPolicyMixin = {
         overlay.appendChild(modal);
 
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close();
+            if (e.target === overlay) dismiss();
         });
 
+        document.addEventListener('keydown', onKeydown);
+        _closeOpenDlpModal = close;
         document.body.appendChild(overlay);
+        const firstButton = actionsEl.querySelector('button');
+        if (firstButton) {
+            try { firstButton.focus(); } catch (_) {}
+        }
     },
 
     _handleDlpChallenge(originalMessage, sendOptions, dlpPayload) {
         const findings = this._formatDlpFindings(dlpPayload);
         const title = this._uiString('sensitiveInfoTitle') || _t('Sensitive information detected');
-        // `allow_sensitive: true` on resend no longer sends the raw text through — the
-        // server (evaluate_ai_message / mask_sensitive_text in app/services/ai/chat/dlp.py)
+        const restore = () => this._restoreUnsentMessage(sendOptions && sendOptions.dlpUnsent);
+
+        if (dlpPayload && dlpPayload.error_type === 'dlp_blocked') {
+            this._showDlpModal({
+                title,
+                intro: _t('Your message includes sensitive information that cannot be sent to the AI assistant. Remove it and send your message again:'),
+                bodyLines: findings,
+                actions: [
+                    {
+                        label: this._uiString('editMessage') || _t('Edit message'),
+                        variant: 'primary',
+                        onClick: restore
+                    }
+                ],
+                onDismiss: restore
+            });
+            return;
+        }
+
+        // `allow_sensitive: true` on resend does not send the raw text through — the
+        // server (screen_ai_message / mask_sensitive_text in app/services/ai/chat/dlp.py)
         // replaces every flagged span with a "[REDACTED_*]" placeholder before it reaches
         // the LLM or gets persisted. Label reflects that; the wire flag name is unchanged.
         const maskAndSend = this._uiString('maskAndSend') || _t('Mask & send');
@@ -122,7 +160,7 @@ export const DlpPolicyMixin = {
                 {
                     label: cancel,
                     variant: 'default',
-                    onClick: () => {}
+                    onClick: restore
                 },
                 {
                     label: maskAndSend,
@@ -132,8 +170,51 @@ export const DlpPolicyMixin = {
                         this.handleSendMessage(originalMessage, opts);
                     }
                 }
-            ]
+            ],
+            onDismiss: restore
         });
+    },
+
+    /**
+     * Cancel at the DLP dialog: the server rejected the message before storing it, so put the
+     * conversation back as it was before the send and hand the text back for editing. Otherwise
+     * the raw text would stay in local history (and localStorage) and be sent again with the
+     * next edit or retry.
+     */
+    _restoreUnsentMessage(unsent) {
+        if (!unsent || !Array.isArray(unsent.history)) return;
+        try {
+            this.loadConversation(unsent.history);
+            this.saveConversationHistory();
+            if (this._dispatchImmersiveUpdate) this._dispatchImmersiveUpdate();
+            const text = unsent.text || '';
+            if (!text) return;
+            if (typeof unsent.editIndex === 'number') {
+                const wrapper = this.elements.messages.querySelector(
+                    `.chat-message-wrapper.is-user[data-message-index="${unsent.editIndex}"]`
+                );
+                if (wrapper) {
+                    this.enterEditModeInBubble(wrapper, unsent.editIndex);
+                    const textarea = wrapper.querySelector('.chat-message-edit-textarea');
+                    if (textarea) {
+                        textarea.value = text;
+                        textarea.focus();
+                        // The immersive view re-pins the scroll to the bottom once the restored
+                        // messages are in the DOM; bring the edit box back into view after that.
+                        setTimeout(() => wrapper.scrollIntoView({ block: 'nearest' }), 0);
+                        return;
+                    }
+                }
+            }
+            const input = this.elements.input;
+            if (input && !input.value) {
+                input.value = text;
+                if (this._resizeChatInput) this._resizeChatInput();
+                input.focus();
+            }
+        } catch (e) {
+            if (this._warn) this._warn('Restoring the unsent message failed:', e);
+        }
     },
     /** Spotlight tooltip positions: max 10 entries in localStorage */
 

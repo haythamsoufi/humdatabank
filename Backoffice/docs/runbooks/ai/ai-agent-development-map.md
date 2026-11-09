@@ -42,3 +42,26 @@ Use this routing rule when extending the agent:
 
 - Avoid dumping large regex or prompt blocks into `ai_agent_executor.py`; add helpers in the owning module and import them.
 - Prefer module-level units (policy, inference, fast path) so changes stay testable before wiring into the executor.
+
+## Local prompt debugging
+
+Use the Flask CLI (same agent path as the UI; no browser needed):
+
+```bash
+# Single prompt
+flask ai-chat ask "Volunteers in Syria over time"
+
+# Multi-turn (repeat -m)
+flask ai-chat convo -m "Volunteers in Syria over time" -m "what documents did you check"
+
+# Scenario file
+flask ai-chat scenario scripts/ai/scenarios/syria-volunteers.json --json-out /tmp/syria.json
+
+# REPL
+flask ai-chat interactive --user admin
+
+# Inspect a stored reasoning trace
+flask ai-chat show-trace 597
+```
+
+`--user` accepts `admin` / `sys` / `focal`, an email, or a local-part. Progress steps stream to stderr; the answer and tool digest go to stdout. For golden-pair scoring (not interactive debugging) use `flask ai-regression`.

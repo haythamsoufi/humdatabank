@@ -228,7 +228,7 @@ Le chatbot affiche deux avis importants :
 
 La plateforme comprend plusieurs couches de protection pour réduire l’exposition accidentelle d’informations sensibles :
 
-- **Prévention de la perte de données (DLP)** — Les messages sortants sont scannés à la recherche de schémas sensibles courants (emails, jetons, clés, numéros de carte). Selon la configuration, le système peut vous avertir, demander une confirmation ou bloquer le message.
+- **Prévention de la perte de données (DLP)** — Les messages sortants sont scannés à la recherche de schémas sensibles courants (e-mails, numéros de téléphone, mots de passe, jetons, clés, numéros de compte bancaire et de carte). Une valeur détectée n’est jamais envoyée telle quelle : les e-mails et numéros de téléphone sont remplacés automatiquement par des substituts tels que `[REDACTED_EMAIL]`, et pour les identifiants ou données financières vous choisissez **Masquer et envoyer** ou **Annuler** pour modifier votre message. Selon la configuration, ces messages peuvent être bloqués à la place.
 - **Nettoyage des PII** — Avant que le contenu ne soit envoyé à des fournisseurs externes, le système expurge des informations personnelles identifiables détectées.
 - **Minimisation du contexte de la page** — Lorsque le chatbot envoie le contexte de la page pour aider à répondre à des questions liées à l’interface utilisateur, les champs à haut risque (comme les URL) sont supprimés.
 
@@ -253,7 +253,7 @@ Pour un résumé de l’utilisation acceptable et des garanties, voir la [Politi
 | L’assistant ne trouve pas un document que j’ai téléchargé | Vérifiez les paramètres de confidentialité du document sur la mission ou le formulaire (s’il est marqué comme consultable) et si le traitement est terminé. Si cela doit être consultable et que cela n’apparaît toujours pas, demandez à votre administrateur. |
 | L’assistant retourne les données du mauvais pays | Reformulez votre question avec le nom complet du pays. Vérifiez que vous êtes affecté à ce pays. |
 | Limite de taux atteinte | Attends une minute et essaie encore. Si le problème persiste, contactez votre administrateur. |
-| Avertissement DLP sur mon message | Le système a détecté un schéma qui ressemble à des données sensibles. Supprimez ou remplacez le contenu sensible et réenvoyez-le. |
+| Avertissement DLP sur mon message | Le système a détecté ce qui ressemble à un mot de passe, une clé, un jeton ou un numéro de compte bancaire ou de carte. Choisissez **Annuler**, supprimez-le ou remplacez-le (par exemple par `<TOKEN>`) et renvoyez le message, ou choisissez **Masquer et envoyer** pour l’envoyer avec la valeur masquée. |
 | L’historique des conversations manque | Si vous utilisez le mode public/anonyme, les conversations ne sont pas sauvegardées. Connectez-vous pour poursuivre les conversations. |
 
 ## Liés

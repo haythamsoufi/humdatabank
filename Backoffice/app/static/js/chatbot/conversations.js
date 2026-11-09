@@ -225,62 +225,59 @@ export const ConversationsMixin = {
             if (hash && this._inflightLastRendered === hash) return true;
             if (hash) this._inflightLastRendered = hash;
 
+            // Preserve expand/collapse; rebuild the step list + current summary line.
+            const wasExpanded = panel.dataset.expanded === 'true';
             stepsList.replaceChildren();
 
             const lastIdx = steps.length - 1;
+            let currentMessage = '';
             for (let i = 0; i < steps.length; i++) {
                 const s = steps[i] || {};
                 const msg = (typeof s === 'string') ? s : (s.message || '');
                 const message = String(msg || '').trim();
                 if (!message) continue;
 
-                const li = document.createElement('li');
                 const isLast = i === lastIdx;
-                li.className = 'chat-progress-step ' + (isLast ? 'chat-progress-step-active' : 'chat-progress-step-done');
-
-                const icon = document.createElement('i');
-                icon.className = isLast
-                    ? 'fas fa-spinner fa-spin chat-progress-step-icon'
-                    : 'fas fa-check chat-progress-step-icon chat-progress-step-done';
-                icon.setAttribute('aria-hidden', 'true');
-
-                const label = document.createElement('span');
-                label.className = 'chat-progress-step-label';
-                label.textContent = message;
-
                 const detailLines = (s && typeof s === 'object') ? (Array.isArray(s.detail_lines) ? s.detail_lines : []) : [];
                 const detailText = detailLines.map(x => String(x || '').trim()).filter(Boolean).join('\n');
-                if (detailText) {
-                    const row = document.createElement('div');
-                    row.className = 'chat-progress-step-row';
-                    row.append(icon, label);
-                    const toggleIcon = document.createElement('i');
-                    toggleIcon.className = 'fas fa-chevron-down chat-progress-step-detail-toggle';
-                    toggleIcon.setAttribute('aria-hidden', 'true');
-                    row.appendChild(toggleIcon);
-                    const detailEl = document.createElement('div');
-                    detailEl.className = 'chat-progress-step-detail';
-                    detailEl.textContent = detailText;
-                    li.append(row, detailEl);
-                    row.setAttribute('role', 'button');
-                    row.setAttribute('tabIndex', '0');
-                    row.setAttribute('aria-expanded', 'true');
-                    row.addEventListener('click', () => {
-                        li.classList.toggle('chat-progress-step-detail-collapsed');
-                        const collapsed = li.classList.contains('chat-progress-step-detail-collapsed');
-                        row.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-                        toggleIcon.className = collapsed ? 'fas fa-chevron-right chat-progress-step-detail-toggle' : 'fas fa-chevron-down chat-progress-step-detail-toggle';
-                    });
-                    row.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            row.click();
-                        }
-                    });
+                const buildLi = this._buildProgressStepLi
+                    ? this._buildProgressStepLi.bind(this)
+                    : null;
+                if (buildLi) {
+                    stepsList.appendChild(buildLi(message, detailText, isLast));
                 } else {
-                    li.append(icon, label);
+                    const li = document.createElement('li');
+                    li.className = 'chat-progress-step ' + (isLast ? 'chat-progress-step-active' : 'chat-progress-step-done');
+                    const icon = document.createElement('i');
+                    icon.className = isLast
+                        ? 'fas fa-spinner fa-spin chat-progress-step-icon'
+                        : 'fas fa-check chat-progress-step-icon chat-progress-step-done';
+                    icon.setAttribute('aria-hidden', 'true');
+                    const label = document.createElement('span');
+                    label.className = 'chat-progress-step-label';
+                    label.textContent = message;
+                    if (detailText) {
+                        const row = document.createElement('div');
+                        row.className = 'chat-progress-step-row';
+                        row.append(icon, label);
+                        const detailEl = document.createElement('div');
+                        detailEl.className = 'chat-progress-step-detail';
+                        detailEl.textContent = detailText;
+                        li.append(row, detailEl);
+                    } else {
+                        li.append(icon, label);
+                    }
+                    stepsList.appendChild(li);
                 }
-                stepsList.appendChild(li);
+                if (isLast) currentMessage = message;
+            }
+            if (currentMessage && this._updateProgressCurrentLabel) {
+                this._updateProgressCurrentLabel(panel, currentMessage);
+            }
+            if (this._setProgressExpanded) {
+                this._setProgressExpanded(panel, wasExpanded);
+            } else {
+                stepsList.classList.toggle('is-collapsed', !wasExpanded);
             }
             this.scrollToBottom();
             return true;
@@ -426,8 +423,11 @@ export const ConversationsMixin = {
                 this.conversationHistory = messages;
                 this.elements.messages.replaceChildren();
                 this.conversationHistory.forEach((entry, index) => {
-                    const opts = entry.isError ? { isError: true, retryMessage: entry.retryMessage || '' } : (entry.structuredPayload ? { structuredPayload: entry.structuredPayload } : {});
+                    const opts = entry.isError
+                        ? { isError: true, retryMessage: entry.retryMessage || '' }
+                        : (entry.structuredPayload ? { structuredPayload: entry.structuredPayload } : {});
                     if (entry.traceId != null) opts.traceId = entry.traceId;
+                    if (Array.isArray(entry.sources) && entry.sources.length) opts.sources = entry.sources;
                     this.addMessageToDOM(entry.message, entry.isUser, index, opts);
                 });
                 this.hideTypingIndicator();
@@ -499,6 +499,7 @@ export const ConversationsMixin = {
                             ? { structuredPayload: entry.structuredPayload }
                             : {};
                         if (entry.traceId != null) opts.traceId = entry.traceId;
+                        if (Array.isArray(entry.sources) && entry.sources.length) opts.sources = entry.sources;
                         this.addMessageToDOM(
                             entry.message,
                             entry.isUser,
@@ -580,8 +581,11 @@ export const ConversationsMixin = {
             this.conversationHistory = messages;
             this.elements.messages.replaceChildren();
             this.conversationHistory.forEach((entry, index) => {
-                const opts = entry.isError ? { isError: true, retryMessage: entry.retryMessage || '' } : (entry.structuredPayload ? { structuredPayload: entry.structuredPayload } : {});
+                const opts = entry.isError
+                    ? { isError: true, retryMessage: entry.retryMessage || '' }
+                    : (entry.structuredPayload ? { structuredPayload: entry.structuredPayload } : {});
                 if (entry.traceId != null) opts.traceId = entry.traceId;
+                if (Array.isArray(entry.sources) && entry.sources.length) opts.sources = entry.sources;
                 this.addMessageToDOM(entry.message, entry.isUser, index, opts);
             });
             if (this.conversationHistory.length === 0) {
@@ -765,6 +769,7 @@ export const ConversationsMixin = {
                         ? { isError: true, retryMessage: entry.retryMessage || '' }
                         : (entry.structuredPayload ? { structuredPayload: entry.structuredPayload } : {});
                     if (entry.traceId != null) opts.traceId = entry.traceId;
+                    if (Array.isArray(entry.sources) && entry.sources.length) opts.sources = entry.sources;
                     this.addMessageToDOM(entry.message, entry.isUser, index, opts);
                 });
         if (this.conversationHistory.length === 0) {
@@ -781,6 +786,9 @@ export const ConversationsMixin = {
             const tablePayload = meta.table_payload || m.table_payload;
             const chartPayload = meta.chart_payload || m.chart_payload;
             const mapPayload = meta.map_payload || m.map_payload;
+            const sources = Array.isArray(meta.sources)
+                ? meta.sources
+                : (Array.isArray(m.sources) ? m.sources : null);
             const structuredPayload = (tablePayload && typeof tablePayload === 'object') ? tablePayload
                 : ((chartPayload && typeof chartPayload === 'object') ? chartPayload
                 : ((mapPayload && typeof mapPayload === 'object') ? mapPayload : null));
@@ -792,6 +800,7 @@ export const ConversationsMixin = {
                 isUser: m.role === 'user',
                 timestamp: (m.created_at || new Date().toISOString()),
                 structuredPayload: structuredPayload,
+                sources: sources,
                 traceId: traceId,
                 isError: isError,
                 retryMessage: retryMessage
@@ -1073,6 +1082,7 @@ export const ConversationsMixin = {
 
     submitEditedMessage(messageIndex, newText) {
         if (typeof messageIndex !== 'number' || messageIndex < 0 || !newText || this.isTyping) return;
+        const historyBeforeEdit = this.conversationHistory.slice();
         const before = this.conversationHistory.slice(0, messageIndex);
         this.conversationHistory = before.concat([
             { message: newText, isUser: true, timestamp: new Date().toISOString() }
@@ -1081,11 +1091,16 @@ export const ConversationsMixin = {
         this.saveConversationHistory();
         this._dispatchImmersiveUpdate();
         // Submit with branch flag so backend discards later messages in this conversation
-        this.handleSendMessage(newText, { branchFromEdit: true, allowServerInflightBypass: true });
+        this.handleSendMessage(newText, {
+            branchFromEdit: true,
+            allowServerInflightBypass: true,
+            dlpUnsent: { history: historyBeforeEdit, text: newText, editIndex: messageIndex },
+        });
     },
 
     _retryFromUserMessage(wrapper, messageIndex, messageText) {
         if (this.isTyping || !wrapper || messageIndex < 0 || !messageText) return;
+        const historyBeforeRetry = this.conversationHistory.slice();
         const keepCount = messageIndex + 1;
         this.conversationHistory = this.conversationHistory.slice(0, keepCount);
         let next = wrapper.nextElementSibling;
@@ -1096,7 +1111,11 @@ export const ConversationsMixin = {
         }
         this.saveConversationHistory();
         this._dispatchImmersiveUpdate();
-        this.handleSendMessage(messageText, { branchFromEdit: true, allowServerInflightBypass: true });
+        this.handleSendMessage(messageText, {
+            branchFromEdit: true,
+            allowServerInflightBypass: true,
+            dlpUnsent: { history: historyBeforeRetry, text: '' },
+        });
     },
 
     _createMessageActionBar(messageDiv, isUser, getTextFn, messageIndex) {

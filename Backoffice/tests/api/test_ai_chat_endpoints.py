@@ -434,3 +434,119 @@ def test_ai_post_with_cookie_and_bearer_skips_csrf_but_cookie_only_does_not(app,
         headers={"Authorization": f"Bearer {token}"},
     )
     assert not _csrf_rejected(both), both.get_data(as_text=True)
+
+
+def _dlp_confirm_mode(app, monkeypatch):
+    monkeypatch.setitem(app.config, "AI_DLP_ENABLED", True)
+    monkeypatch.setitem(app.config, "AI_DLP_MODE", "confirm")
+    monkeypatch.setitem(app.config, "AI_DLP_AUTO_MASK_KINDS", ("email", "phone"))
+    monkeypatch.setitem(app.config, "AI_MAX_MESSAGE_CHARS", 4000)
+    monkeypatch.setitem(app.config, "OPENAI_API_KEY", "")
+
+
+@pytest.mark.api
+@pytest.mark.db
+def test_ai_chat_dlp_asks_before_sending_a_credential(client, app, db_session, monkeypatch):
+    """Confirm mode stops a credential before any provider call, naming only the finding kind."""
+    _dlp_confirm_mode(app, monkeypatch)
+    user = create_test_user(db_session, email="ai_dlp@test.local", name="AI DLP", role="user")
+    with app.app_context():
+        token = issue_ai_token(user_id=int(user.id), role="user")
+
+    resp = client.post(
+        "/api/ai/v2/chat",
+        json={"message": "password: SuperSecret123"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data["error_type"] == "dlp_requires_confirmation"
+    assert data["dlp"]["findings"] == [{"kind": "password", "count": 1}]
+    assert "SuperSecret123" not in resp.get_data(as_text=True)
+
+
+@pytest.mark.api
+@pytest.mark.db
+def test_ai_chat_edit_branch_persists_masked_history(client, app, db_session, monkeypatch):
+    """Regression: an edit/retry ("branch_from_edit") persisted the client's transcript
+    verbatim, so text that DLP had masked, or that the user cancelled at the DLP dialog,
+    still reached the database and the LLM."""
+    _dlp_confirm_mode(app, monkeypatch)
+    user = create_test_user(db_session, email="ai_dlp_edit@test.local", name="AI DLP Edit", role="user")
+    with app.app_context():
+        token = issue_ai_token(user_id=int(user.id), role="user")
+    convo_id = str(uuid.uuid4())
+
+    resp = client.post(
+        "/api/ai/v2/chat",
+        json={
+            "message": "and my api_key=Zq8vR2xL9mN4pT7w",
+            "conversation_id": convo_id,
+            "branch_from_edit": True,
+            "allow_sensitive": True,
+            "conversationHistory": [
+                {"isUser": True, "message": "mail me at jane@example.org"},
+                {"isUser": False, "message": "Noted."},
+                {"isUser": True, "message": "and my api_key=Zq8vR2xL9mN4pT7w"},
+            ],
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # No provider is configured: the branch is persisted, then the LLM call fails.
+    assert resp.status_code == 503
+    rows = AIMessage.query.filter_by(conversation_id=convo_id).order_by(AIMessage.id).all()
+    assert [(r.role, r.content) for r in rows] == [
+        ("user", "mail me at [REDACTED_EMAIL]"),
+        ("assistant", "Noted."),
+        ("user", "and my api_key=[REDACTED_API_KEY]"),
+    ]
+    assert db_session.get(AIConversation, convo_id).title == "mail me at [REDACTED_EMAIL]"
+
+
+@pytest.mark.api
+def test_ai_chat_edit_branch_appends_the_screened_message_after_an_assistant_turn(app, monkeypatch):
+    from app.services.ai.chat.request import ChatRequestParsed, _edit_branch_history
+
+    _dlp_confirm_mode(app, monkeypatch)
+    parsed = ChatRequestParsed(
+        message="try again for [REDACTED_EMAIL]",
+        page_context={},
+        conversation_id=None,
+        preferred_language="en",
+        conversation_history=[
+            {"isUser": True, "message": "mail a@b.com"},
+            {"isUser": False, "message": "Done."},
+        ],
+        client_message_id=None,
+        branch_from_edit=True,
+    )
+    with app.app_context():
+        history = _edit_branch_history(parsed)
+    assert history == [
+        {"isUser": True, "message": "mail [REDACTED_EMAIL]"},
+        {"isUser": False, "message": "Done."},
+        {"isUser": True, "message": "try again for [REDACTED_EMAIL]"},
+    ]
+
+
+@pytest.mark.api
+def test_ai_chat_anonymous_history_is_masked(app, monkeypatch):
+    """Anonymous history comes from the client and goes to the LLM, so its user turns are masked."""
+    from app.services.ai.chat.request import apply_anonymous_rules, parse_chat_request
+
+    _dlp_confirm_mode(app, monkeypatch)
+    with app.app_context():
+        parsed, _err, _code = parse_chat_request(
+            {
+                "message": "Hi",
+                "conversationHistory": [
+                    {"isUser": True, "message": "password: SuperSecret123"},
+                    {"isUser": False, "message": "I can't use that."},
+                ],
+            }
+        )
+        applied = apply_anonymous_rules(parsed)
+    assert applied.conversation_history == [
+        {"isUser": True, "message": "password: [REDACTED_PASSWORD]"},
+        {"isUser": False, "message": "I can't use that."},
+    ]

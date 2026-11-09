@@ -10,6 +10,7 @@ from app.services.ai.documents.access import (
     DocumentPrincipal,
     ai_document_read_filter,
     can_read_ai_document,
+    internal_document_access,
     principal_for_legacy_args,
     principal_for_user,
 )
@@ -49,7 +50,23 @@ class TestDocumentPrincipals:
     def test_legacy_bridge_denies_unknown_role_strings(self, app):
         with app.app_context():
             assert principal_for_legacy_args(None, "admin").is_anonymous
-            assert principal_for_legacy_args(None, "system_manager").is_internal
+            # The role string is never trusted; only the explicit context manager grants internal access.
+            assert principal_for_legacy_args(None, "system_manager").is_anonymous
+            with internal_document_access():
+                assert principal_for_legacy_args(None, None).is_internal
+            assert principal_for_legacy_args(None, None).is_anonymous
+
+    def test_public_tool_allowlist_exists_in_registry(self, app):
+        from app.services.ai.tools.registry import openapi_function_name
+        from app.services.ai.tools.registry import AIToolsRegistry
+
+        registry = AIToolsRegistry()
+        with app.test_request_context():
+            exposed = {openapi_function_name(td) for td in registry._build_tool_definitions_openai()}
+        # ``search_documents_hybrid`` is an internal method the LLM is not offered directly.
+        internal_only = {"search_documents_hybrid"}
+        assert PUBLIC_TOOL_ALLOWLIST - internal_only <= exposed
+        assert all(hasattr(registry, n) for n in PUBLIC_TOOL_ALLOWLIST)
 
     def test_legacy_bridge_ignores_claimed_role_for_real_user(self, app, test_user):
         with app.test_request_context():

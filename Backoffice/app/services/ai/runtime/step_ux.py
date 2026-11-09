@@ -242,6 +242,10 @@ TOOL_NARRATION_INSTRUCTION = (
 
 _MAX_NARRATION_CHARS = 240
 
+# Sentinel passed as on_step ``detail`` so SSE/WS emit a ``narration`` event
+# (normal assistant text) instead of a progress-panel step.
+ASSISTANT_NARRATION_MARKER = "__assistant_narration__"
+
 
 def clean_tool_narration(text: Optional[str]) -> str:
     """
@@ -277,13 +281,13 @@ def emit_tool_start_step(
     """
     Announce a tool call in the progress panel.
 
-    With a model-written ``thought`` the thought becomes the step headline and the concrete
-    action ("Reading … for Syria…") is listed beneath it, so the panel reads as reasoning
-    followed by what was actually done. Further tool calls from the same model turn
-    (``thought_open``) are appended under that headline. Without a thought the legacy
-    one-step-per-tool behaviour is kept.
+    With a model-written ``thought``, emit that sentence as assistant narration (normal chat
+    text via ``ASSISTANT_NARRATION_MARKER``) and keep the concrete tool action
+    ("Reading … for Syria…") as the progress step so thinking continues underneath.
+    Further tool calls from the same model turn (``thought_open``) are appended under the
+    current progress step. Without a thought the legacy one-step-per-tool behaviour is kept.
 
-    Returns True when a thought headline is open for subsequent tool calls in this turn.
+    Returns True when a thought narration was opened for subsequent tool calls in this turn.
     """
     if not callable(on_step_callback):
         return thought_open
@@ -291,7 +295,14 @@ def emit_tool_start_step(
     narration = clean_tool_narration(thought)
     try:
         if narration:
-            on_step_callback(narration, detail=action)
+            try:
+                on_step_callback(narration, detail=ASSISTANT_NARRATION_MARKER)
+            except TypeError:
+                on_step_callback(narration)
+            try:
+                on_step_callback(action)
+            except TypeError:
+                on_step_callback(action, None)
             return True
         if thought_open:
             on_step_callback(None, detail=action)

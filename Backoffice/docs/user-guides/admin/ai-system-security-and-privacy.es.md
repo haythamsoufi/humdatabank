@@ -9,9 +9,9 @@ Este documento explica cómo funciona el asistente de IA de backoffice, qué dat
 
 ## Arquitectura de alto nivel
 
-- **Frontend**: interfaz de chat (widget flotante + vista inmersiva) en `app/static/js/chatbot.js`.
+- **Frontend**: interfaz de chat (widget flotante + vista inmersiva) en `app/static/js/chatbot/` (módulos ES; diálogo DLP en `dlp-policy.js`).
 - **Backend**: Endpoints de Flask API para chat de IA en `app/routes/ai.py` (HTTP + SSE) y `app/routes/ai_ws.py` (WebSocket).
-- **Orquestación**: `app/services/ai_chat_engine.py` gestiona el flujo de chat (historial, recuperación, llamadas al proveedor).
+- **Orquestación**: `app/services/ai/chat/engine.py` gestiona el flujo de chat (historial, recuperación, llamadas al proveedor).
 - **Proveedores**: LLMs/embeddings externos (por ejemplo, OpenAI/Gemini/Azure OpenAI según el entorno) más componentes locales opcionales.
 
 ## Qué datos pueden enviarse a proveedores externos
@@ -32,23 +32,29 @@ Importante: algunas funciones de IA requieren llamadas externas a API (por ejemp
 Antes de que un mensaje pueda enviarse a un proveedor externo de IA, el backend ejecuta un escaneo DLP de mejor esfuerzo (basado en regex) para detectar patrones sensibles comunes, como:
 
 - correos electrónicos, números de teléfono
-- JWTs / Fichas portadoras
-- claves privadas
-- contraseñas / secretos / claves API
-- IBANs y números de tarjetas de pago (con el cheque Luhn para reducir falsos positivos)
+- JWTs / tokens Bearer / credenciales Basic auth
+- claves privadas (cualquier bloque de clave privada PEM o PGP, incluido un bloque pegado sin su línea END)
+- contraseñas / frases de contraseña, secretos / claves API — como asignaciones `clave: valor` o `CLAVE=valor` (archivos env, JSON, YAML, cadenas de conexión como `AccountKey=`), contraseñas en URL de conexión (`postgres://usuario:contraseña@host`) y formatos conocidos de claves de proveedores (por ejemplo OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
+- IBANs (con dígitos de control validados) y números de tarjetas de pago (validación Luhn) para reducir falsos positivos
+
+La detección de teléfonos omite las formas numéricas habituales en preguntas sobre datos: listas de años, cifras grandes o agrupadas por miles, fechas, direcciones IP y columnas de tablas.
 
 **Experiencia de usuario**
 
-- Si se detectan patrones sensibles, el asistente puede requerir **confirmación del usuario** ("Enviar de todos modos") o **bloquear** el mensaje dependiendo de la configuración.
-- La interfaz explica el riesgo y fomenta la eliminación del texto sensible.
+- Un mensaje nunca se envía ni se guarda con un valor detectado: cuando pasa, cada valor se sustituye por un marcador como `[REDACTED_EMAIL]`.
+- En el modo `confirm` (predeterminado), los correos electrónicos y números de teléfono se enmascaran automáticamente (configurable). Las credenciales, claves e identificadores financieros abren un diálogo: **Enmascarar y enviar** envía el mensaje enmascarado, **Cancelar** devuelve el mensaje al usuario para editarlo y no guarda nada.
+- En el modo `block`, el mensaje se rechaza sea cual sea su contenido; el diálogo solo ofrece editarlo.
+- Los clientes Website y móvil reciben un error que indica lo detectado (por ejemplo "Sensitive information detected (password). Remove it and send your message again.").
+- Los mensajes del panel de IA del constructor de formularios conservan sus direcciones de correo y números de teléfono (los cuestionarios importados los contienen legítimamente), pero se analizan para todos los demás tipos.
 
 **Implementación**
 
-- Lógica DLP: `app/services/ai_dlp.py` (`analyze_text`, `evaluate_ai_message`)
+- Lógica DLP: `app/services/ai/chat/dlp.py` (`screen_ai_message`, `evaluate_ai_message`, `mask_sensitive_text`, `mask_conversation_history`)
 - DLP se aplica de forma consistente entre los transportes:
   - Chat HTTP JSON
   - Transmisión SSE
   - Transmisión en WebSocket
+- El historial de conversación que envía el cliente (edición o reintento de un mensaje anterior, chat anónimo) se enmascara en el servidor antes de guardarse o enviarse a un proveedor.
 
 **Configuración**
 
@@ -56,24 +62,27 @@ DLP se configura directamente en código (no en variables de entorno):
 
 - `Backoffice/config/config.py`
   - `AI_DLP_ENABLED`
-  - `AI_DLP_MODE` (valores típicos: `warn`, `confirm`, `block`)
+  - `AI_DLP_MODE`: `warn` (enmascarar todo y enviar), `confirm` (predeterminado; ver arriba), `block`
+  - `AI_DLP_AUTO_MASK_KINDS`: tipos que el modo `confirm` enmascara sin preguntar (predeterminado: `email`, `phone`)
   - `AI_DLP_MAX_SCAN_CHARS`
 
 ### 2) Limpieza / redacción de la información personal antes de llamadas externas
 
-Además del DLP (que puede detener una solicitud), el sistema también aplica **filtrado de PII** (redacción) para reducir la exposición cuando el contenido debe enviarse externamente (por ejemplo, para ayudar al modelo a responder).
+Además del DLP (que puede detener una solicitud), el sistema también aplica **filtrado de PII** (redacción) para reducir la exposición cuando el contenido debe enviarse externamente (por ejemplo, para ayudar al modelo a responder). El filtrado usa los mismos patrones que el DLP, además de tokens opacos largos.
 
-El fregado se aplica a:
+El filtrado se aplica a:
 
 - texto de mensajes de usuario
-- Fragmentos de historial de conversaciones
+- los mensajes del usuario en el historial de conversación (las respuestas del asistente son la propia salida del modelo y se envían tal cual)
 - Contexto de página (recursivamente)
 - algunas entradas y registros que reescriben consultas
+
+Las solicitudes del panel de IA del constructor de formularios omiten este filtrado para que el texto de los cuestionarios importados se reproduzca fielmente; el DLP sigue analizándolas en busca de credenciales e identificadores financieros.
 
 Implementación:
 
 - `app/services/ai/providers/formatting.py`: `scrub_pii_text`, `scrub_pii_context`
-- `app/services/ai_chat_engine.py`: aplica el scrubbing antes de que el proveedor llame
+- `app/services/ai/chat/engine.py`: aplica el filtrado antes de las llamadas al proveedor
 
 ### 3) Minimización del contexto de la página
 
@@ -92,10 +101,12 @@ Propiedades de seguridad:
 
 - El evento de auditoría **no almacena el mensaje del usuario**.
 - Almacena solo **recuentos y tipos** de hallazgos (por ejemplo, `{"kind":"jwt","count":1}`), más metadatos como transporte, punto final e identificadores.
+- `context_data.action` registra lo ocurrido: `auto_masked` (enmascarado y enviado sin preguntar), `confirm_required` (se mostró el diálogo), `sent_masked` (el usuario eligió Enmascarar y enviar) o `blocked`.
+- La gravedad es `high` para credenciales, claves e identificadores financieros cuando se detuvo al usuario o este eligió enviar, y `medium` cuando se enmascararon automáticamente (por ejemplo en el modo `warn`). Los datos de contacto son `medium` y `low` con el mismo criterio.
 
 Implementación:
 
-- `app/services/ai_dlp.py`: `log_dlp_audit_event`
+- `app/services/ai/chat/dlp.py`: `log_dlp_audit_event`
 - Modelo: `app/models/system.py` (`SecurityEvent`, `context_data` JSON)
 - Interfaz de administración:
   - Panel de seguridad: `/admin/security/dashboard`
@@ -138,8 +149,9 @@ Para filtrar eventos DLP de IA, busca:
 |------|------|
 | Endpoints de chat de IA (HTTP + SSE) | `app/routes/ai.py` |
 | Endpoint de chat de IA (WebSocket) | `app/routes/ai_ws.py` |
-| Orquestación por chat | `app/services/ai_chat_engine.py` |
-| DLP guardia + eventos de auditoría | `app/services/ai_dlp.py` |
+| Orquestación por chat | `app/services/ai/chat/engine.py` |
+| DLP guardia + eventos de auditoría | `app/services/ai/chat/dlp.py` |
+| Diálogo DLP (interfaz de chat) | `app/static/js/chatbot/dlp-policy.js` |
 | Ayudantes de limpieza de información personal | `app/services/ai/providers/formatting.py` |
 | Modelo de eventos de seguridad | `app/models/system.py` |
 | Páginas de seguridad de administrador | `app/routes/admin/security_dashboard.py` |

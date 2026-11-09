@@ -69,6 +69,8 @@ class AiChatProvider with ChangeNotifier {
   List<AiChatAgentStep> _agentSteps = [];
   String? _lastPreparingQueryDetail;
   bool _wsUserCancelled = false;
+  /// After a `narration` event, insert a blank line once before the final answer deltas.
+  bool _pendingNarrationSeparator = false;
 
   /// Server `request_id` of the in-flight SSE stream (from the `meta` envelope); used so the stop
   /// button can ask the backend to cancel generation instead of only dropping the connection.
@@ -786,6 +788,22 @@ class AiChatProvider with ChangeNotifier {
       return;
     }
 
+    if (type == 'narration') {
+      // Model-written "I'll look up…" — show as normal assistant text; keep progress steps.
+      final text = data['text']?.toString()?.trim() ?? '';
+      if (text.isEmpty) return;
+      if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
+        final last = _messages.last;
+        final next = last.content.trim().isEmpty
+            ? text
+            : (last.content.contains(text) ? last.content : '${last.content}\n\n$text');
+        _messages[_messages.length - 1] = last.copyWith(content: next);
+        _pendingNarrationSeparator = true;
+      }
+      notifyListeners();
+      return;
+    }
+
     if (type == 'step_detail') {
       _applyWsStepDetail(data['detail']?.toString() ?? '');
       return;
@@ -817,7 +835,12 @@ class AiChatProvider with ChangeNotifier {
       }
       if (_messages.isNotEmpty) {
         final last = _messages.last;
-        _messages[_messages.length - 1] = last.copyWith(content: last.content + delta);
+        var next = last.content;
+        if (delta.isNotEmpty && _pendingNarrationSeparator && next.trim().isNotEmpty) {
+          next = '$next\n\n';
+          _pendingNarrationSeparator = false;
+        }
+        _messages[_messages.length - 1] = last.copyWith(content: next + delta);
       }
       return;
     }
@@ -1540,6 +1563,7 @@ class AiChatProvider with ChangeNotifier {
     // Add assistant placeholder for streaming
     _messages.add(AiChatMessage(role: 'assistant', content: ''));
     _isStreaming = true;
+    _pendingNarrationSeparator = false;
     notifyListeners();
 
     // Anonymous: just use HTTP fallback

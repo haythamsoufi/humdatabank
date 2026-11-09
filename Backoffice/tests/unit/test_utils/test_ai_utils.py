@@ -9,7 +9,13 @@ formBuilder.get("enabled"), so a sanitizer that always forces True would
 defeat a caller's explicit opt-out.
 """
 
-from app.utils.ai_utils import is_form_builder_assistant_context, sanitize_page_context
+import pytest
+
+from app.utils.ai_utils import (
+    is_form_builder_assistant_context,
+    is_user_history_entry,
+    sanitize_page_context,
+)
 
 
 class TestSanitizePageContextBasics:
@@ -85,8 +91,9 @@ class TestSanitizePageContextFormBuilderEnabled:
 
 class TestIsFormBuilderAssistantContext:
     """is_form_builder_assistant_context() is the single shared predicate every
-    form-builder exemption (PII scrubbing in AIChatEngine, the DLP mask-and-send
-    gate in evaluate_ai_message) agrees on — see its docstring."""
+    form-builder exemption (PII scrubbing in AIChatEngine, the DLP contact-detail
+    exemption in evaluate_ai_message / mask_conversation_history) agrees on — see its
+    docstring."""
 
     def test_true_when_enabled(self):
         assert is_form_builder_assistant_context({"formBuilder": {"enabled": True}}) is True
@@ -108,3 +115,22 @@ class TestIsFormBuilderAssistantContext:
         """Accepts the exact shape sanitize_page_context() produces."""
         sanitized = sanitize_page_context({"formBuilder": {"enabled": True, "template_id": 5}})
         assert is_form_builder_assistant_context(sanitized) is True
+
+
+class TestIsUserHistoryEntry:
+    @pytest.mark.parametrize(
+        "entry, expected",
+        [
+            ({"isUser": True, "message": "hi"}, True),
+            ({"isUser": False, "message": "hi"}, False),
+            ({"role": "user", "content": "hi"}, True),
+            ({"role": " User ", "content": "hi"}, True),
+            ({"role": "assistant", "content": "hi"}, False),
+            ({"isUser": False, "role": "user"}, False),
+            ({"message": "no role"}, False),
+            ("not a dict", False),
+            (None, False),
+        ],
+    )
+    def test_recognises_both_history_shapes(self, entry, expected):
+        assert is_user_history_entry(entry) is expected

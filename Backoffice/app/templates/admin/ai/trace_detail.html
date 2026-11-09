@@ -588,7 +588,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     lines.push('  Content: ' + content);
                 }
             } else {
-                if (content) lines.push('  Content: (' + content.length + ' chars, omitted)');
+                // Copy/export only: the agent received the full chunk text, not this shortened view.
+                if (content) lines.push('  Content (' + content.length + ' chars, shortened in this export only; model saw full text): ' + content.substring(0, 160).replace(/\s+/g, ' ') + '...');
             }
         });
 

@@ -52,7 +52,7 @@ from app.routes.ai import (
 )
 
 logger = logging.getLogger(__name__)
-from app.services.ai.chat.dlp import evaluate_ai_message, log_dlp_audit_event
+from app.services.ai.chat.dlp import screen_ai_message
 from app.services.ai.policies.access_policy import record_form_builder_authorization, set_request_policy
 from app.services.ai.policies.usage_budget import budget_exceeded_payload, check_daily_cost_budget
 from app.services.ai.chat.request import (
@@ -369,6 +369,7 @@ def _persist_ai_conversation_async(
     map_payload: Optional[Dict[str, Any]],
     chart_payload: Optional[Dict[str, Any]],
     table_payload: Optional[Dict[str, Any]] = None,
+    sources: Optional[list] = None,
     client_meta: str = "unknown",
     skip_user_message: bool = False,
     trace_id: Optional[int] = None,
@@ -434,6 +435,7 @@ def _persist_ai_conversation_async(
                 **({"map_payload": map_payload} if map_payload else {}),
                 **({"chart_payload": chart_payload} if chart_payload else {}),
                 **({"table_payload": table_payload} if table_payload else {}),
+                **({"sources": sources} if isinstance(sources, list) and sources else {}),
                 **({"in_reply_to_client_message_id": client_message_id} if client_message_id else {}),
             }
             if trace_id is not None:
@@ -846,29 +848,19 @@ def register_ai_ws(app) -> None:
 
                 # DLP guard (must run BEFORE any persistence). When allowed through with
                 # findings present, dlp_message has every flagged span masked — see
-                # evaluate_ai_message's docstring. Form-builder panel requests are exempt
-                # (same as the PII-scrub exemption in AIChatEngine).
+                # evaluate_ai_message's docstring.
                 allow_sensitive = bool(payload.get("allow_sensitive"))
-                allowed, dlp_err, dlp_findings, dlp_message = evaluate_ai_message(
+                allowed, dlp_err, _dlp_findings, dlp_message = screen_ai_message(
                     message=parsed.message,
                     allow_sensitive=allow_sensitive,
                     form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
+                    user_id=(int(identity.user.id) if getattr(identity, "is_authenticated", False) and getattr(identity, "user", None) else None),
+                    transport="ws",
+                    endpoint_path=(request.path or "/api/ai/v2/ws"),
+                    client=str((payload.get("client") or "unknown")),
+                    conversation_id=(getattr(parsed, "conversation_id", None) or payload.get("conversation_id")),
+                    client_message_id=getattr(parsed, "client_message_id", None),
                 )
-                if dlp_findings:
-                    log_dlp_audit_event(
-                        user_id=(int(identity.user.id) if getattr(identity, "is_authenticated", False) and getattr(identity, "user", None) else None),
-                        action=("blocked" if (not allowed and (dlp_err or {}).get("error_type") == "dlp_blocked") else
-                                "confirm_required" if (not allowed) else
-                                "sent_masked" if allow_sensitive else
-                                "allowed"),
-                        transport="ws",
-                        endpoint_path=(request.path or "/api/ai/v2/ws"),
-                        client=str((payload.get("client") or "unknown")),
-                        conversation_id=(getattr(parsed, "conversation_id", None) or payload.get("conversation_id")),
-                        client_message_id=getattr(parsed, "client_message_id", None),
-                        allow_sensitive=allow_sensitive,
-                        findings=dlp_findings,
-                    )
                 if not allowed and dlp_err:
                     # Ensure WS uses the standard streaming envelope: type=error + error_type + dlp object.
                     err_payload = dict(dlp_err)
@@ -1220,6 +1212,20 @@ def register_ai_ws(app) -> None:
                         if cancelled.is_set():
                             return
                         try:
+                            try:
+                                from app.services.ai.runtime.step_ux import ASSISTANT_NARRATION_MARKER
+                            except Exception:
+                                ASSISTANT_NARRATION_MARKER = "__assistant_narration__"
+                            if (
+                                step_message
+                                and detail is not None
+                                and str(detail).strip() == ASSISTANT_NARRATION_MARKER
+                            ):
+                                text = str(step_message).strip()
+                                if text and not ws_client_disconnected.is_set():
+                                    current_app.logger.debug("AI WS sending narration: %s", text[:120])
+                                    ws.send(json.dumps({"type": "narration", "text": text}))
+                                return
                             if step_message is None and detail is not None:
                                 _d = str(detail)
                                 if len(_d) > 500:
@@ -1306,6 +1312,7 @@ def register_ai_ws(app) -> None:
                     map_payload = getattr(result, "map_payload", None)
                     chart_payload = getattr(result, "chart_payload", None)
                     table_payload = getattr(result, "table_payload", None)
+                    sources_result = getattr(result, "sources", None)
                     has_visual = bool(map_payload or chart_payload or table_payload)
                     # When agent returns only map/chart/table (no text), use placeholder for persistence and UI.
                     persist_content = response_text or ""
@@ -1380,6 +1387,7 @@ def register_ai_ws(app) -> None:
                             map_payload=map_payload,
                             chart_payload=chart_payload,
                             table_payload=table_payload,
+                            sources=sources_result if isinstance(sources_result, list) else None,
                             client_meta=str(client_meta),
                             skip_user_message=branch_from_edit,
                             trace_id=int(tid_persist) if tid_persist is not None else None,

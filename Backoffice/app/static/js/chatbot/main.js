@@ -5,6 +5,9 @@
 
 import { HumDatabankChatbot } from './core.js';
 import { registerStructuredPayloadListener } from './structured-payloads.js';
+import { installChatChartHelpers } from './chart-payloads.js';
+
+installChatChartHelpers(window);
 
 const chatbot = new HumDatabankChatbot();
 

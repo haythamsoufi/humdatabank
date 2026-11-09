@@ -320,6 +320,18 @@ class TestAIAgentExecutor:
         assert agent.max_iterations > 0
         assert agent.cost_limit_usd is None or agent.cost_limit_usd > 0
 
+    def test_parse_react_output_handles_nested_json_args(self, agent):
+        out = agent._parse_react_output(
+            'Thought: x\nAction: search_documents\n'
+            'Action Input: {"query": "a", "filters": {"year": 2024, "tags": ["b"]}}\n'
+        )
+        assert out['type'] == 'action'
+        assert out['action_input'] == {"query": "a", "filters": {"year": 2024, "tags": ["b"]}}
+
+    def test_parse_react_output_rejects_non_object_args(self, agent):
+        out = agent._parse_react_output('Action: list_documents\nAction Input: [1, 2]')
+        assert out['action_input'] == {}
+
     def test_execute_simple_query(self, app):
         """Test execute() orchestration with mocked dependencies."""
         with app.app_context():

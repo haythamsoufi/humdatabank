@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Any, FrozenSet, Iterable, Optional
+from typing import Any, FrozenSet, Iterable, Iterator, Optional
 
 from sqlalchemy import Text, and_, bindparam, cast, exists, false, or_, select, text, true
 
@@ -59,7 +61,7 @@ def _role_tokens(user: Any, access_level: str) -> FrozenSet[str]:
     try:
         tokens.update(str(c).strip().lower() for c in AuthorizationService.get_role_codes(user) if c)
     except Exception as exc:
-        logger.debug("document principal role codes failed: %s", exc)
+        logger.warning("document principal role codes failed (roles dropped): %s", exc)
     tokens.discard("")
     return frozenset(tokens)
 
@@ -88,7 +90,7 @@ def principal_for_user(user: Any) -> DocumentPrincipal:
                 or AuthorizationService.has_rbac_permission(user, "admin.ai.manage")
             )
         except Exception as exc:
-            logger.debug("document admin permission check failed: %s", exc)
+            logger.warning("document admin permission check failed (treated as non-admin): %s", exc)
     data = build_data_access_policy(user)
     return DocumentPrincipal(
         user_id=uid,
@@ -114,12 +116,29 @@ def _request_cache() -> Optional[dict]:
         return None
 
 
+_internal_access: ContextVar[bool] = ContextVar("ai_doc_internal_access", default=False)
+
+
+@contextmanager
+def internal_document_access() -> Iterator[None]:
+    """Mark the enclosed *server-side* code as an internal job (reads every document).
+
+    Replaces the old ``user_role="system_manager"`` string marker, which any caller could forward from
+    request data. Only use from trusted background/job code that has no user.
+    """
+    token = _internal_access.set(True)
+    try:
+        yield
+    finally:
+        _internal_access.reset(token)
+
+
 def principal_for_legacy_args(user_id: Optional[int], user_role: Optional[str]) -> DocumentPrincipal:
     """Bridge for callers that still pass ``(user_id, user_role)``.
 
     When ``user_id`` resolves to a user the role string is ignored and everything is recomputed from the
-    database. Without a user id only the internal marker role ``system_manager`` (used by trusted
-    server-side jobs) is honoured; any other role string is treated as anonymous.
+    database. Without a user id the caller is anonymous unless running inside
+    :func:`internal_document_access`; ``user_role`` is never trusted.
     """
     if user_id:
         cache = _request_cache()
@@ -138,7 +157,7 @@ def principal_for_legacy_args(user_id: Optional[int], user_role: Optional[str]) 
         if cache is not None:
             cache[key] = principal
         return principal
-    if (user_role or "").strip().lower() == "system_manager":
+    if _internal_access.get():
         return INTERNAL_PRINCIPAL
     return ANONYMOUS_PRINCIPAL
 

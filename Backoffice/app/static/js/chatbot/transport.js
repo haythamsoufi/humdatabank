@@ -118,9 +118,9 @@ export const TransportMixin = {
         if (convId) payload.conversation_id = convId;
 
         // Privacy flags (server-side DLP)
-        // - allow_sensitive: user confirmed past the "sensitive information detected" dialog.
+        // - allow_sensitive: user chose "Mask & send" in the "sensitive information detected" dialog.
         //   Despite the name, the server does NOT forward the raw text as-is: it masks every
-        //   flagged span (email/phone/token/etc.) before sending to the LLM or persisting —
+        //   flagged span (token/password/key/etc.) before sending to the LLM or persisting —
         //   see mask_sensitive_text() in app/services/ai/chat/dlp.py. Kept for wire compatibility.
         if (sendOptions && sendOptions.allow_sensitive) payload.allow_sensitive = true;
 
@@ -340,6 +340,9 @@ export const TransportMixin = {
                 '.leaflet-control-attribution',
                 '.chat-ai-table-copy-btn',
                 '.chatbot-show-me-wrapper',
+                '.chat-response-sources-chip',
+                '.chat-response-sources--chip',
+                '.chat-confidence-badge',
             ];
             removeSelectors.forEach(sel => {
                 try { clone.querySelectorAll(sel).forEach(n => n.remove()); } catch (_) {}
@@ -467,6 +470,17 @@ export const TransportMixin = {
                     text = (text ? `${text}\n\n---\n\n` : '') + blocks.join('\n\n---\n\n');
                 }
             }
+            // Sources are rendered as a chip (modal), so pull plain text from data-sources-copy.
+            const root = wrapper || messageDiv;
+            if (root && root.querySelectorAll) {
+                const chips = root.querySelectorAll('.chat-response-sources-chip[data-sources-copy]');
+                const sourceBlocks = Array.from(chips)
+                    .map((chip) => (chip.getAttribute('data-sources-copy') || '').trim())
+                    .filter(Boolean);
+                if (sourceBlocks.length) {
+                    text = (text ? `${text}\n\n` : '') + sourceBlocks.join('\n\n');
+                }
+            }
             return (text || '').trim();
         } catch (e) {
             return '';
@@ -521,6 +535,7 @@ export const TransportMixin = {
         }
         if (!message) return;
 
+        const historyBeforeSend = Array.isArray(this.conversationHistory) ? this.conversationHistory.slice() : [];
         if (overrideMessage === undefined) {
             this.addMessage(displayMessage, true, userMsgOpts);
             this.elements.input.value = '';
@@ -540,6 +555,13 @@ export const TransportMixin = {
         const sendOptions = Object.assign({}, opts);
         if (!sendOptions.client_message_id) {
             sendOptions.client_message_id = this._generateClientMessageId();
+        }
+        if (!sendOptions.dlpUnsent) {
+            // What Cancel at the DLP dialog puts back (see _restoreUnsentMessage).
+            sendOptions.dlpUnsent = {
+                history: historyBeforeSend,
+                text: overrideMessage === undefined ? rawInput : '',
+            };
         }
         if (this._fbAiConfig && !this.getActiveConversationId()) {
             const cid = this._generateClientMessageId();
@@ -852,7 +874,7 @@ export const TransportMixin = {
         if (!msg || !msg.type || !ctx) return;
 
         if (msg.type !== 'delta' && msg.type !== 'step_detail' && msg.type !== 'pong'
-            && msg.type !== 'step' && msg.type !== 'meta' && msg.type !== 'done'
+            && msg.type !== 'step' && msg.type !== 'narration' && msg.type !== 'meta' && msg.type !== 'done'
             && msg.type !== 'error' && msg.type !== 'cancelled') {
             this._log('Stream Received:', msg.type, '');
         }
@@ -968,8 +990,37 @@ export const TransportMixin = {
                 }
                 break;
 
+            case 'narration':
+                // Model-written "I'll look up…" — show as normal assistant text while progress continues.
+                if (msg.text && String(msg.text).trim()) {
+                    const narration = String(msg.text).trim();
+                    this._log('NARRATION payload:', { text: narration });
+                    if (!ctx.messageElement) {
+                        ctx.messageElement = this.createStreamingMessageElement({ beforeProgress: true });
+                        ctx.contentElement = ctx.messageElement.querySelector('.chat-message-content');
+                    }
+                    if (!ctx.narrationText) {
+                        ctx.narrationText = narration;
+                        ctx.buffer = narration;
+                    } else if (!ctx.buffer.includes(narration)) {
+                        ctx.narrationText = `${ctx.narrationText}\n\n${narration}`;
+                        ctx.buffer = ctx.narrationText;
+                    }
+                    if (ctx.contentElement) {
+                        // Plain prose; keep progress panel visible (do not hideTypingIndicator).
+                        ctx.contentElement.textContent = ctx.buffer;
+                        ctx.contentElement.classList.remove('streaming-cursor');
+                    }
+                    this._ensureProgressPanelAfterMessage(ctx.messageElement);
+                    this.scrollToBottom();
+                }
+                break;
+
             case 'delta':
                 if (msg.text) {
+                    if (ctx.narrationText && ctx.buffer === ctx.narrationText) {
+                        ctx.buffer += '\n\n';
+                    }
                     ctx.buffer += msg.text;
 
                     this.hideTypingIndicator();
@@ -993,6 +1044,16 @@ export const TransportMixin = {
                 ctx._streamDone = true;
                 const rawFromServer = (msg.response != null && String(msg.response).trim() !== '') ? String(msg.response).trim() : '';
                 let finalResponse = rawFromServer || ctx.buffer || '';
+                // Keep interim model narration above the final answer when the server
+                // response is answer-only (narration is never part of the final model turn).
+                if (ctx.narrationText) {
+                    const n = String(ctx.narrationText).trim();
+                    if (n && finalResponse && !finalResponse.includes(n)) {
+                        finalResponse = n + '\n\n' + finalResponse;
+                    } else if (n && !finalResponse) {
+                        finalResponse = n;
+                    }
+                }
                 ctx.buffer = finalResponse;
 
                 if (!ctx.messageElement) {
@@ -1053,6 +1114,9 @@ export const TransportMixin = {
                         const actionBar = this._createMessageActionBar(ctx.messageElement, false, getTextFn);
                         wrapper.appendChild(actionBar);
                         wrapperEl = wrapper;
+                        if (this._relocateSourcesChipIfNeeded) {
+                            this._relocateSourcesChipIfNeeded(wrapper);
+                        }
                     }
 
                     this.scrollToBottom();
@@ -1079,6 +1143,9 @@ export const TransportMixin = {
                     }
                 }
                 ctx.structuredPayload = primaryCoerced;
+                if (wrapperEl && this._relocateSourcesChipIfNeeded) {
+                    requestAnimationFrame(() => this._relocateSourcesChipIfNeeded(wrapperEl));
+                }
 
                 if (msg.detected_language && msg.detected_language !== this.preferredLanguage) {
                     this._setPreferredLanguage(msg.detected_language);
@@ -1116,8 +1183,8 @@ export const TransportMixin = {
             }
 
             case 'error':
-                // DLP challenge is handled by the caller (handleSendMessage) so we can offer
-                // resend options (send anyway / private mode) without duplicating the user message.
+                // DLP challenge is handled by the caller (handleSendMessage), which shows the
+                // dialog (Mask & send / Cancel) without duplicating the user message.
                 if (msg.error_type && String(msg.error_type).startsWith('dlp_')) {
                     ctx._dlp_error = msg;
                     try {
@@ -1652,7 +1719,7 @@ export const TransportMixin = {
         });
     },
 
-    createStreamingMessageElement() {
+    createStreamingMessageElement(opts = {}) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'chat-message bot';
         messageDiv.setAttribute('dir', 'auto');
@@ -1666,10 +1733,26 @@ export const TransportMixin = {
         wrap.appendChild(content);
         messageDiv.appendChild(wrap);
 
-        this.elements.messages.appendChild(messageDiv);
+        const progress = opts.beforeProgress ? document.getElementById('typingIndicator') : null;
+        if (progress && progress.parentNode === this.elements.messages) {
+            this.elements.messages.insertBefore(messageDiv, progress);
+        } else {
+            this.elements.messages.appendChild(messageDiv);
+        }
         this.scrollToBottom();
 
         return messageDiv;
+    },
+
+    /** Keep the live progress panel below interim narration / streaming text. */
+    _ensureProgressPanelAfterMessage(messageElement) {
+        try {
+            const progress = document.getElementById('typingIndicator');
+            if (!progress || !messageElement || !this.elements?.messages) return;
+            if (progress.parentNode !== this.elements.messages) return;
+            if (messageElement.nextSibling === progress) return;
+            this.elements.messages.insertBefore(progress, messageElement.nextSibling);
+        } catch (_) { /* ignore */ }
     },
 
     getStreamingSafeHtml(html) {

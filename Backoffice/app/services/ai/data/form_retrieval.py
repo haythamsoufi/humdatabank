@@ -554,10 +554,42 @@ def get_indicator_timeseries(
             "series": series,
             "count": len(series),
             "aggregation": ("point_latest_per_year" if is_point_indicator else "sum_per_year"),
+            "data_quality_notes": _timeseries_data_quality_notes(series),
         }
     except Exception as e:
         logger.exception("get_indicator_timeseries error")
         return service_error(GENERIC_ERROR_MESSAGE, series=[], count=0)
+def _timeseries_data_quality_notes(series: List[Dict[str, Any]]) -> List[str]:
+    """Deterministic caveats the assistant should mention when describing a series."""
+    notes: List[str] = []
+    try:
+        for prev, cur in zip(series, series[1:]):
+            pv, cv = prev.get("value"), cur.get("value")
+            if pv is not None and pv == cv:
+                notes.append(
+                    f"Identical value {cv:g} in '{prev.get('period_name') or prev.get('year')}' and "
+                    f"'{cur.get('period_name') or cur.get('year')}' — possibly carried forward rather than newly reported."
+                )
+            elif pv and cv is not None and abs(cv - pv) / abs(pv) >= 0.25:
+                pct = (cv - pv) / abs(pv) * 100
+                notes.append(
+                    f"Large change {pct:+.0f}% from '{prev.get('period_name') or prev.get('year')}' "
+                    f"({pv:g}) to '{cur.get('period_name') or cur.get('year')}' ({cv:g})."
+                )
+        for row in series:
+            name = str(row.get("period_name") or "").strip()
+            if name and not (name.isdigit() and len(name) == 4):
+                notes.append(f"Period '{name}' is not a plain calendar year (e.g. partial year) — not directly comparable with full-year values.")
+        unsubmitted = [str(r.get("period_name") or r.get("year")) for r in series if r.get("data_status") == "saved"]
+        if unsubmitted:
+            notes.append(
+                f"{len(unsubmitted)} of {len(series)} points are saved/draft (not submitted): values may still change."
+            )
+    except Exception as exc:
+        logger.debug("timeseries data_quality_notes failed: %s", exc)
+    return notes[:12]
+
+
 def get_value_breakdown(
     country_id: int,
     indicator_identifier: Union[int, str],

@@ -809,6 +809,70 @@ export const WidgetUiMixin = {
         }
     },
 
+    /**
+     * Mobile-style progress: one current-step line (spinner + label + chevron);
+     * tap expands the full step list. Matches AiChatAgentProgressPanel.
+     */
+    _initialProgressLabel() {
+        return this._fbAiConfig
+            ? (this._uiString('preparingFormRequest') || 'Reading your request…')
+            : (this._uiString('preparingQuery') || 'Preparing query…');
+    },
+
+    _stripTrailingDots(text) {
+        return String(text || '').trimEnd().replace(/\.{1,3}$/, '').replace(/…$/, '');
+    },
+
+    _setProgressExpanded(panel, expanded) {
+        if (!panel) return;
+        const isExpanded = !!expanded;
+        panel.dataset.expanded = isExpanded ? 'true' : 'false';
+        const summary = panel.querySelector('.chat-progress-summary');
+        const stepsList = panel.querySelector('.chat-progress-steps');
+        const chevron = panel.querySelector('.chat-progress-summary-chevron');
+        if (summary) summary.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        if (stepsList) stepsList.classList.toggle('is-collapsed', !isExpanded);
+        if (chevron) {
+            chevron.classList.toggle('fa-chevron-up', isExpanded);
+            chevron.classList.toggle('fa-chevron-down', !isExpanded);
+        }
+    },
+
+    _updateProgressCurrentLabel(panel, message) {
+        if (!panel) return;
+        const labelEl = panel.querySelector('.chat-progress-current-label');
+        if (!labelEl) return;
+        const base = this._stripTrailingDots(message);
+        labelEl.textContent = base || String(message || '').trim();
+        labelEl.setAttribute('data-base-label', labelEl.textContent);
+    },
+
+    _buildProgressStepLi(message, detailText, isCurrent) {
+        const li = document.createElement('li');
+        li.className = 'chat-progress-step ' + (isCurrent ? 'chat-progress-step-active' : 'chat-progress-step-done');
+        const icon = document.createElement('i');
+        icon.className = isCurrent
+            ? 'fas fa-spinner fa-spin chat-progress-step-icon'
+            : 'fas fa-check chat-progress-step-icon chat-progress-step-done';
+        icon.setAttribute('aria-hidden', 'true');
+        const label = document.createElement('span');
+        label.className = 'chat-progress-step-label';
+        label.textContent = message;
+        const detail = String(detailText || '').trim();
+        if (detail) {
+            const row = document.createElement('div');
+            row.className = 'chat-progress-step-row';
+            row.append(icon, label);
+            const detailEl = document.createElement('div');
+            detailEl.className = 'chat-progress-step-detail';
+            detailEl.textContent = detail;
+            li.append(row, detailEl);
+        } else {
+            li.append(icon, label);
+        }
+        return li;
+    },
+
     showTypingIndicator() {
         if (document.getElementById('typingIndicator')) return; // Already showing
 
@@ -816,30 +880,48 @@ export const WidgetUiMixin = {
         typingDiv.className = 'chat-progress-panel';
         typingDiv.id = 'typingIndicator';
         typingDiv.setAttribute('aria-live', 'polite');
+        typingDiv.dataset.expanded = 'false';
+
+        const initialLabel = this._initialProgressLabel();
+        const summary = document.createElement('button');
+        summary.type = 'button';
+        summary.className = 'chat-progress-summary';
+        summary.setAttribute('aria-expanded', 'false');
+        summary.setAttribute('aria-label', this._uiString('stepsInProgress') || 'Steps in progress');
+
+        const summaryIcon = document.createElement('i');
+        summaryIcon.className = 'fas fa-spinner fa-spin chat-progress-summary-icon';
+        summaryIcon.setAttribute('aria-hidden', 'true');
+
+        const currentLabel = document.createElement('span');
+        currentLabel.className = 'chat-progress-current-label';
+        currentLabel.textContent = this._stripTrailingDots(initialLabel);
+        currentLabel.setAttribute('data-base-label', currentLabel.textContent);
+
+        const dots = document.createElement('span');
+        dots.className = 'chat-progress-running-dots';
+        dots.setAttribute('aria-hidden', 'true');
+
+        const chevron = document.createElement('i');
+        chevron.className = 'fas fa-chevron-down chat-progress-summary-chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+
+        summary.append(summaryIcon, currentLabel, dots, chevron);
+        summary.addEventListener('click', () => {
+            const expanded = typingDiv.dataset.expanded === 'true';
+            this._setProgressExpanded(typingDiv, !expanded);
+        });
 
         const stepsList = document.createElement('ul');
-        stepsList.className = 'chat-progress-steps';
-        stepsList.setAttribute('aria-live', 'polite');
+        stepsList.className = 'chat-progress-steps is-collapsed';
         stepsList.setAttribute('aria-label', this._uiString('stepsInProgress') || 'Steps in progress');
-
-        const initialLi = document.createElement('li');
-        initialLi.className = 'chat-progress-step chat-progress-step-active';
-        const initialIcon = document.createElement('i');
-        initialIcon.className = 'fas fa-spinner fa-spin chat-progress-step-icon';
-        initialIcon.setAttribute('aria-hidden', 'true');
-        const initialLabel = document.createElement('span');
-        initialLabel.className = 'chat-progress-step-label';
         // Form-builder AI panel: use form-appropriate wording instead of the generic
         // data-search "Preparing query…" (matches AIChatEngine's early server-side step
         // for form-builder requests so the two coalesce into a single progress line —
         // see addStepToProgress's exact-label-match check).
-        initialLabel.textContent = this._fbAiConfig
-            ? (this._uiString('preparingFormRequest') || 'Reading your request…')
-            : (this._uiString('preparingQuery') || 'Preparing query…');
-        initialLi.append(initialIcon, initialLabel);
-        stepsList.appendChild(initialLi);
+        stepsList.appendChild(this._buildProgressStepLi(initialLabel, '', true));
 
-        typingDiv.appendChild(stepsList);
+        typingDiv.append(summary, stepsList);
         this.elements.messages.appendChild(typingDiv);
         this.scrollToBottom();
     },
@@ -858,6 +940,7 @@ export const WidgetUiMixin = {
             if (detail && String(detail).trim()) {
                 this._updateStepDetail(lastItem, String(detail).trim());
             }
+            this._updateProgressCurrentLabel(typingIndicator, trimmed);
             return;
         }
         // If the backend streams progress ticks (e.g. "Processing documents: 10/64"),
@@ -875,11 +958,12 @@ export const WidgetUiMixin = {
                 if (detail && String(detail).trim()) {
                     this._updateStepDetail(lastItem, String(detail).trim());
                 }
+                this._updateProgressCurrentLabel(typingIndicator, trimmed);
                 this.scrollToBottom();
                 return;
             }
         }
-        // Mark previous step as done (check) and collapse its detail when next step is shown
+        // Mark previous step as done (check); keep detail visible in the expanded list
         if (lastItem) {
             const prevDetailEl = lastItem.querySelector('.chat-progress-step-detail');
             // If the previous step had no meaningful detail (empty or placeholder), show "Done." or refined query for "Preparing query…"
@@ -896,59 +980,25 @@ export const WidgetUiMixin = {
                         prevDetailEl.textContent = 'Done.';
                     }
                 }
+            } else if (this._lastPreparingQueryDetail) {
+                const prevLabel = (lastItem.querySelector('.chat-progress-step-label') || lastItem).textContent || '';
+                const preparingLabel = (this._uiString && this._uiString('preparingQuery')) || 'Preparing query…';
+                if (prevLabel.trim() === String(preparingLabel || '').trim()) {
+                    this._updateStepDetail(lastItem, String(this._lastPreparingQueryDetail).trim());
+                    this._lastPreparingQueryDetail = null;
+                }
             }
+            lastItem.classList.remove('chat-progress-step-active');
+            lastItem.classList.add('chat-progress-step-done');
             const prevIcon = lastItem.querySelector('.chat-progress-step-icon');
             if (prevIcon) {
                 prevIcon.className = 'fas fa-check chat-progress-step-icon chat-progress-step-done';
                 prevIcon.setAttribute('aria-hidden', 'true');
             }
-            if (lastItem.querySelector('.chat-progress-step-detail')) {
-                lastItem.classList.add('chat-progress-step-detail-collapsed');
-                const prevToggle = lastItem.querySelector('.chat-progress-step-detail-toggle');
-                const prevRow = lastItem.querySelector('.chat-progress-step-row');
-                if (prevToggle) prevToggle.className = 'fas fa-chevron-right chat-progress-step-detail-toggle';
-                if (prevRow) prevRow.setAttribute('aria-expanded', 'false');
-            }
         }
-        const li = document.createElement('li');
-        li.className = 'chat-progress-step chat-progress-step-active';
-        const stepIcon = document.createElement('i');
-        stepIcon.className = 'fas fa-spinner fa-spin chat-progress-step-icon';
-        stepIcon.setAttribute('aria-hidden', 'true');
-        const stepLabel = document.createElement('span');
-        stepLabel.className = 'chat-progress-step-label';
-        stepLabel.textContent = trimmed;
-        if (detail && String(detail).trim()) {
-            const row = document.createElement('div');
-            row.className = 'chat-progress-step-row';
-            row.append(stepIcon, stepLabel);
-            const toggleIcon = document.createElement('i');
-            toggleIcon.className = 'fas fa-chevron-down chat-progress-step-detail-toggle';
-            toggleIcon.setAttribute('aria-hidden', 'true');
-            row.appendChild(toggleIcon);
-            const detailEl = document.createElement('div');
-            detailEl.className = 'chat-progress-step-detail';
-            detailEl.textContent = String(detail).trim();
-            li.append(row, detailEl);
-            row.setAttribute('role', 'button');
-            row.setAttribute('tabIndex', '0');
-            row.setAttribute('aria-expanded', 'true');
-            row.addEventListener('click', () => {
-                li.classList.toggle('chat-progress-step-detail-collapsed');
-                const collapsed = li.classList.contains('chat-progress-step-detail-collapsed');
-                row.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-                toggleIcon.className = collapsed ? 'fas fa-chevron-right chat-progress-step-detail-toggle' : 'fas fa-chevron-down chat-progress-step-detail-toggle';
-            });
-            row.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    row.click();
-                }
-            });
-        } else {
-            li.append(stepIcon, stepLabel);
-        }
-        stepsList.appendChild(li);
+        const detailText = detail && String(detail).trim() ? String(detail).trim() : '';
+        stepsList.appendChild(this._buildProgressStepLi(trimmed, detailText, true));
+        this._updateProgressCurrentLabel(typingIndicator, trimmed);
         this.scrollToBottom();
     },
 
@@ -1011,32 +1061,14 @@ export const WidgetUiMixin = {
         const icon = stepLi.querySelector('.chat-progress-step-icon');
         const label = stepLi.querySelector('.chat-progress-step-label');
         if (!icon || !label) return;
+        // Rebuild as icon+label row + detail (no per-step toggle; panel summary expands the list)
         const row = document.createElement('div');
         row.className = 'chat-progress-step-row';
         row.append(icon, label);
-        const toggleIcon = document.createElement('i');
-        toggleIcon.className = 'fas fa-chevron-down chat-progress-step-detail-toggle';
-        toggleIcon.setAttribute('aria-hidden', 'true');
-        row.appendChild(toggleIcon);
         const detailElNew = document.createElement('div');
         detailElNew.className = 'chat-progress-step-detail';
         detailElNew.textContent = detailText;
-        stepLi.append(row, detailElNew);
-        row.setAttribute('role', 'button');
-        row.setAttribute('tabIndex', '0');
-        row.setAttribute('aria-expanded', 'true');
-        row.addEventListener('click', () => {
-            stepLi.classList.toggle('chat-progress-step-detail-collapsed');
-            const collapsed = stepLi.classList.contains('chat-progress-step-detail-collapsed');
-            row.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-            toggleIcon.className = collapsed ? 'fas fa-chevron-right chat-progress-step-detail-toggle' : 'fas fa-chevron-down chat-progress-step-detail-toggle';
-        });
-        row.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                row.click();
-            }
-        });
+        stepLi.replaceChildren(row, detailElNew);
     },
 
     updateTypingIndicator(message, detail) {

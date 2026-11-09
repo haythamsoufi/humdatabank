@@ -167,6 +167,7 @@ export const StateMixin = {
                 this.conversationHistory.forEach((entry, index) => {
                     const opts = entry.isError ? { isError: true, retryMessage: entry.retryMessage || '' } : {};
                     if (!entry.isError && entry.structuredPayload) opts.structuredPayload = entry.structuredPayload;
+                    if (!entry.isError && Array.isArray(entry.sources) && entry.sources.length) opts.sources = entry.sources;
                     if (entry.traceId != null) opts.traceId = entry.traceId;
                     this.addMessageToDOM(entry.message, entry.isUser, index, opts);
                 });

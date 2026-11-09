@@ -228,7 +228,7 @@ The chatbot displays two important notices:
 
 The platform includes several layers of protection to reduce accidental exposure of sensitive information:
 
-- **Data Loss Prevention (DLP)** — Outgoing messages are scanned for common sensitive patterns (emails, tokens, keys, card numbers). Depending on configuration, the system may warn you, ask for confirmation, or block the message.
+- **Data Loss Prevention (DLP)** — Outgoing messages are scanned for common sensitive patterns (emails, phone numbers, passwords, tokens, keys, bank and card numbers). A detected value is never sent as typed: emails and phone numbers are replaced with placeholders such as `[REDACTED_EMAIL]` automatically, and for credentials or financial details you choose **Mask & send** or **Cancel** to edit your message. Depending on configuration, such messages may be blocked instead.
 - **PII scrubbing** — Before content is sent to external providers, the system redacts detected personally identifiable information.
 - **Page context minimization** — When the chatbot sends page context to help answer UI-related questions, high-risk fields (such as URLs) are removed.
 
@@ -253,7 +253,7 @@ For a summary of acceptable use and safeguards, see the [AI Use Policy](ai-use-p
 | Assistant cannot find a document I uploaded | Check the document’s privacy settings on the assignment or form (whether it is marked searchable) and whether processing has finished. If it should be searchable and still does not appear, ask your administrator. |
 | Assistant returns data for the wrong country | Rephrase your question with the full country name. Check that you are assigned to that country. |
 | Rate limit reached | Wait a minute and try again. If the problem persists, contact your administrator. |
-| DLP warning on my message | The system detected a pattern that looks like sensitive data. Remove or replace the sensitive content and resend. |
+| DLP warning on my message | The system detected something that looks like a password, key, token or bank/card number. Choose **Cancel**, remove or replace it (for example with `<TOKEN>`) and send again, or choose **Mask & send** to send it with the value masked. |
 | Conversation history is missing | If you are using the public/anonymous mode, conversations are not saved. Log in to persist conversations. |
 
 ## Related

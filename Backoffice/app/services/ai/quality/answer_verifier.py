@@ -21,6 +21,38 @@ _NUMERIC_CLAIM_RE = re.compile(r"\b\d[\d,./\s%]+\b")
 _CAVEAT_MARKER = "\n\n> **Note:** Some details in this response could not be verified against the available sources. Please consult the original documents for confirmation."
 
 
+_MD_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_URL_RE = re.compile(r"(?:https?://|/)[^\s)\]]+")
+_LIST_PREFIX_RE = re.compile(r"(?m)^\s*\d+[.)]\s+")
+_PAGE_REF_RE = re.compile(r"(?i)\b(?:pages?|pp?\.)\s*\d+(?:\s*[-–]\s*\d+)?")
+_DOC_CODE_RE = re.compile(r"\b[A-Z]{2,}[-_][A-Z0-9_-]*\d[A-Z0-9_-]*\b")
+_YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
+_DIGIT_RUN_RE = re.compile(r"\d[\d,]*(?:\.\d+)?%?")
+
+
+def _extract_checkable_numbers(answer: str) -> List[str]:
+    """Numbers worth verifying against sources.
+
+    Excludes things that are not factual claims: URL/path fragments (e.g. ``/api/ai/documents/711/``),
+    list numbering, page references, document codes (``UPL-2024-MAASY002``) and calendar years.
+    Keeps quantities such as ``14,098`` or ``75%``.
+    """
+    text = _MD_LINK_RE.sub(r"\1", answer or "")
+    text = _URL_RE.sub(" ", text)
+    text = _LIST_PREFIX_RE.sub("", text)
+    text = _PAGE_REF_RE.sub(" ", text)
+    text = _DOC_CODE_RE.sub(" ", text)
+    text = _YEAR_RE.sub(" ", text)
+    out: List[str] = []
+    for tok in _DIGIT_RUN_RE.findall(text):
+        digits = re.sub(r"\D", "", tok)
+        # Ignore tiny integers (counts of list items, ranks) unless they are percentages.
+        if len(digits) < 3 and not tok.endswith("%"):
+            continue
+        out.append(tok.strip())
+    return out
+
+
 def _remove_unsupported_claims(answer: str, unsupported_claims: List[str]) -> str:
     """
     Remove sentences containing unsupported claims from the answer.
@@ -117,7 +149,7 @@ class AIAnswerVerifier:
                 logger.debug("Answer verifier: bulk databank check skipped: %s", exc)
 
         # Fast path: if answer has no numeric claims and is short, skip LLM check
-        has_numeric = bool(_NUMERIC_CLAIM_RE.search(answer))
+        has_numeric = bool(_extract_checkable_numbers(answer))
         if not has_numeric and len(answer) < 200:
             return answer, False, []
 
@@ -154,8 +186,8 @@ class AIAnswerVerifier:
             chunk_combined = " ".join(
                 (c.get("content") or "")[:500] for c in retrieved_chunks[:5]
             ).lower()
-            answer_nums = _NUMERIC_CLAIM_RE.findall(answer)
-            unverified = [n.strip() for n in answer_nums if n.strip().replace(",", "") not in chunk_combined]
+            answer_nums = _extract_checkable_numbers(answer)
+            unverified = [n for n in answer_nums if n.replace(",", "") not in chunk_combined]
             if len(unverified) > 2:
                 recommendation = "add_caveat"
                 unsupported = unverified[:5]

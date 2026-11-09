@@ -318,7 +318,8 @@ def compact_tool_observation_for_llm(
                 f"already covers all Unified Plans and is sufficient. FINISH NOW. "
                 f"Your ONLY job is to output: (1) a brief textual summary (total countries, "
                 f"common themes/terms, regional patterns, caveats about lexical matching), "
-                f"then (2) end with '## Sources' on its own line followed by a bullet list."
+                f"then (2) end with '## Sources' on its own line followed by labeled "
+                f"blocks (- title: … / detail: …)."
             )
             compact_fa = {
                 "success": True,
@@ -372,13 +373,15 @@ def compact_tool_observation_for_llm(
                     f"the ≥{min_pct}% threshold"
                     + (f" out of {scanned} with data" if isinstance(scanned, int) else "")
                     + ", (2) which source type matched (home/foreign), (3) one caveat about "
-                    "denominator or reporting periods. Then ## Sources with one databank bullet. "
+                    "denominator or reporting periods. Then ## Sources with one labeled "
+                    "databank block (- title: … / detail: …). "
                     "Do NOT list individual countries — the table shows them."
                 )
             elif tool_name == "get_form_field_values_for_all_countries":
                 _platform_note = (
                     f"CRITICAL — NO MARKDOWN TABLE when 15+ rows: For {_row_count} rows the platform "
-                    "renders an interactive table. Provide a brief summary and ## Sources only. "
+                    "renders an interactive table. Provide a brief summary and ## Sources "
+                    "(labeled - title: / detail: blocks) only. "
                     "For fewer than 15 rows, you MAY output one compact markdown table OR a short summary."
                 )
             else:
@@ -393,7 +396,7 @@ def compact_tool_observation_for_llm(
                     f"Your ONLY job is to output: (1) a brief textual summary (top 5 countries "
                     f"with values, bottom 5, total/sum, regional patterns, caveats about estimated "
                     f"data — all in prose, NOT in a table), then (2) end with '## Sources' on its "
-                    f"own line followed by a bullet list of sources. Nothing else."
+                    f"own line followed by labeled source blocks (- title: … / detail: …). Nothing else."
                 )
             if len(slim_rows) > max_rows:
                 compact_result["rows"] = slim_rows[:max_rows]

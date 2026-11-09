@@ -11,7 +11,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from flask import current_app
 from flask_babel import force_locale, gettext as _
 
-from app.utils.ai_utils import is_form_builder_assistant_context, openai_model_supports_sampling_params
+from app.utils.ai_utils import (
+    is_form_builder_assistant_context,
+    is_user_history_entry,
+    openai_model_supports_sampling_params,
+)
 from app.services.ai.chat.helpers import (
     build_lightweight_system_prompt,
     format_ai_response_for_html,
@@ -66,10 +70,11 @@ def _scrub_message_for_llm(message: Optional[str], *, form_builder_assistant: bo
     (sample contact fields, example emails/phone numbers from a source document) that
     the assistant must faithfully reproduce as labels/options in the generated
     template. Generic PII scrubbing would silently corrupt that content into
-    "[redacted]" placeholders. DLP (``evaluate_ai_message``, run upstream in the route
-    layer before ``AIChatEngine.run`` is invoked) already gates genuinely sensitive
-    pastes via its warn/confirm/block modes, so skipping this redundant,
-    fidelity-breaking redaction here is safe for form-builder messages specifically.
+    "[redacted]" placeholders. DLP (``screen_ai_message``, run upstream in the route
+    layer before ``AIChatEngine.run`` is invoked) only exempts the contact details of
+    form-builder messages — credentials and financial identifiers are still masked,
+    confirmed or blocked there — so skipping this fidelity-breaking redaction here is
+    safe for form-builder messages specifically.
     """
     text = (message or "").strip()
     if form_builder_assistant:
@@ -77,6 +82,29 @@ def _scrub_message_for_llm(message: Optional[str], *, form_builder_assistant: bo
     from app.services.ai.providers import scrub_pii_text
 
     return scrub_pii_text(text)
+
+
+def _scrub_history_for_llm(
+    conversation_history: Optional[List[Dict[str, Any]]],
+    *,
+    form_builder_assistant: bool,
+) -> List[Dict[str, Any]]:
+    """Redact obvious PII from the user turns of history the agent and rewriter send to an LLM.
+
+    Assistant turns stay verbatim: they are provider output, and follow-ups refer back to
+    details in them. Form-builder mode is exempt, as in _scrub_message_for_llm.
+    """
+    history = list(conversation_history or [])
+    if form_builder_assistant:
+        return history
+    from app.services.ai.providers import scrub_pii_text
+
+    return [
+        {k: scrub_pii_text(v) if k in ("message", "content") and isinstance(v, str) else v for k, v in entry.items()}
+        if is_user_history_entry(entry)
+        else entry
+        for entry in history
+    ]
 
 
 def _ai_debug_enabled() -> bool:
@@ -999,8 +1027,8 @@ class AIChatEngine:
         """
         conversation_history = conversation_history or []
 
-        # Privacy: minimize obvious PII before sending to third-party LLMs.
-        # (DB persistence still stores the original user message for authenticated users.)
+        # Privacy: minimize obvious PII before sending to third-party LLMs — a second, broader
+        # pass on top of the route's DLP gate, whose masked text is what gets persisted.
         from app.services.ai.providers import scrub_pii_context
 
         safe_page_context = scrub_pii_context(page_context or {})
@@ -1011,6 +1039,7 @@ class AIChatEngine:
             is_form_builder_assistant_context(safe_page_context) and trusted_form_builder_context() is not None
         )
         safe_message = _scrub_message_for_llm(message, form_builder_assistant=form_builder_assistant)
+        llm_history = _scrub_history_for_llm(conversation_history, form_builder_assistant=form_builder_assistant)
         locale_code = (preferred_language or "en").split("-")[0]
 
         def _is_cancelled() -> bool:
@@ -1073,7 +1102,7 @@ class AIChatEngine:
         from app.services.ai.planning.query_rewriter import classify_and_rewrite_user_message
         query_used, is_greeting, in_platform_scope = classify_and_rewrite_user_message(
             message,
-            conversation_history=conversation_history,
+            conversation_history=llm_history,
             preferred_language=preferred_language,
             page_context=safe_page_context,
         )
@@ -1247,14 +1276,14 @@ class AIChatEngine:
                         raise RuntimeError("AIChatIntegration not initialized")
                     response_text, model_name, function_calls_used, meta = ai.process_query(
                         message=safe_query_for_model,
-                        conversation_history=conversation_history,
+                        conversation_history=llm_history,
                         page_context=safe_page_context,
                         platform_context=platform_context,
                         preferred_language=preferred_language,
                         on_step=on_step,
                         map_requested=worldmap_requested,
                         chart_requested=chart_requested,
-                        original_message=(message or "").strip() or None,
+                        original_message=safe_message or None,
                         cancelled=cancelled,
                     )
                 map_payload = None
@@ -1336,7 +1365,19 @@ class AIChatEngine:
                                 (cleaned_response_text or "").rstrip()
                                 + f"\n\n[{link_label}]({edit_url})"
                             )
-                    html = format_ai_response_for_html(cleaned_response_text) if cleaned_response_text else ""
+                    sources_meta = (
+                        None
+                        if form_builder_assistant
+                        else (meta.get("sources") if isinstance(meta, dict) else None)
+                    )
+                    html = (
+                        format_ai_response_for_html(
+                            cleaned_response_text,
+                            sources=sources_meta if isinstance(sources_meta, list) else None,
+                        )
+                        if (cleaned_response_text or sources_meta)
+                        else ""
+                    )
                     if html:
                         _stream_html(html)
                     return ChatResult(
@@ -1355,7 +1396,7 @@ class AIChatEngine:
                         trace_id=meta.get("trace_id"),
                         confidence=meta.get("confidence"),
                         grounding_score=meta.get("grounding_score"),
-                        sources=None if form_builder_assistant else meta.get("sources"),
+                        sources=sources_meta if isinstance(sources_meta, list) else None,
                         form_builder_result=fb_result if isinstance(fb_result, dict) else None,
                     )
             except Exception as e:

@@ -29,7 +29,7 @@ Vos messages et l’historique de vos conversations peuvent être traités par d
 
 Les garanties techniques incluent :
 
-- **Prévention de la perte de données (DLP)** — Scans qui détectent et peuvent bloquer ou avertir de motifs sensibles avant l’envoi.
+- **Prévention de la perte de données (DLP)** — Scans qui détectent les motifs sensibles avant l’envoi et les masquent, vous demandent de confirmer ou bloquent le message.
 - **Nettoyage des PII** — Réduit l’exposition des données personnelles avant que le contenu n’atteigne des fournisseurs externes.
 - **Journalisation d’audit** — Les événements de sécurité sont enregistrés (sans stocker le contenu de votre message).
 

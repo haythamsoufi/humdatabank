@@ -40,9 +40,11 @@ def register_commands(app):
     from app.plugins.cli_discovery import register_plugin_cli_commands
     register_plugin_cli_commands(app)
 
-    # AI regression testing
+    # AI regression testing + interactive chat debugging
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)
+    from app.cli_commands.ai_chat_debug import register_ai_chat_commands
+    register_ai_chat_commands(app)
 
     @app.cli.command('sync-sector-logos-cdn')
     @with_appcontext

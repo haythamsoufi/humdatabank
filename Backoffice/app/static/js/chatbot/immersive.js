@@ -31,10 +31,14 @@
     var lastConversations = [];
     var leafletLoadPromise = null;
     var worldGeoJsonPromise = null;
-    var apexLoadPromise = null;
     var pendingMapRenderRetries = [];
     var hasLoadedConversationsOnce = false;
     var isRefreshingConversations = false;
+
+    /** Shared helpers from chatbot/chart-payloads.js (installed by main.js). */
+    function chatCharts() {
+        return (typeof window !== 'undefined' && window.HumdbChatCharts) ? window.HumdbChatCharts : null;
+    }
 
     /** Resolve a UI string: prefer server-injected CHAT_UI_STRINGS, then chatbot _uiString, then fallback */
     function t(key, fallback) {
@@ -144,6 +148,10 @@
     }
 
     function formatNumber(value) {
+        var api = chatCharts();
+        if (api && typeof api.formatChartNumber === 'function') {
+            return api.formatChartNumber(value);
+        }
         var n = Number(value);
         if (!isFinite(n)) return String(value == null ? '' : value);
         var isInt = Math.abs(n - Math.round(n)) < 1e-9;
@@ -153,7 +161,6 @@
                 minimumFractionDigits: 0
             }).format(n);
         } catch (e) {
-            // Fallback with commas (integer-ish)
             var s = isInt ? String(Math.round(n)) : String(n);
             return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
@@ -492,108 +499,35 @@
     }
 
     function ensureApexCharts() {
-        if (window.ApexCharts && typeof window.ApexCharts === 'function') return Promise.resolve(window.ApexCharts);
-        if (apexLoadPromise) return apexLoadPromise;
-        apexLoadPromise = new Promise(function (resolve, reject) {
-            var existing = document.querySelector('script[data-chat-immersive-apex]');
-            if (existing) {
-                existing.addEventListener('load', function () { resolve(window.ApexCharts); }, { once: true });
-                existing.addEventListener('error', function () { reject(new Error('ApexCharts failed to load')); }, { once: true });
-                return;
-            }
-            var script = document.createElement('script');
-            script.src = '/static/libs/apexcharts.min.js';
-            script.defer = true;
-            script.setAttribute('data-chat-immersive-apex', '1');
-            script.onload = function () { resolve(window.ApexCharts); };
-            script.onerror = function () { reject(new Error('ApexCharts failed to load')); };
-            document.head.appendChild(script);
-        });
-        return apexLoadPromise;
+        var api = chatCharts();
+        if (api && typeof api.ensureApexCharts === 'function') {
+            return api.ensureApexCharts();
+        }
+        return Promise.reject(new Error('HumdbChatCharts not loaded (chatbot/main.js must run first)'));
     }
 
     function normalizeChartPayload(payload) {
-        if (!payload || typeof payload !== 'object') return null;
-        var root = (payload.chart_payload && typeof payload.chart_payload === 'object') ? payload.chart_payload : payload;
-        if (!root || typeof root !== 'object') return null;
-        var type = String(root.type || root.chart_type || '').trim().toLowerCase();
-        var lineTypes = { '': true, 'line': true, 'linechart': true, 'timeseries': true };
-        if (!(type in lineTypes)) return null;
-        var rows = Array.isArray(root.series) ? root.series : (Array.isArray(root.data) ? root.data : (Array.isArray(root.points) ? root.points : []));
-        if (!rows.length) return null;
-        var pts = rows.map(function (r) {
-            if (!r || typeof r !== 'object') return null;
-            var x = r.x != null ? r.x : (r.year != null ? r.year : r.period);
-            var y = r.y != null ? r.y : r.value;
-            var xx = Number(x);
-            var yy = Number(y);
-            if (!isFinite(xx) || !isFinite(yy)) return null;
-            var year = Math.round(xx);
-            if (year < 1900 || year > 2100) return null;
-            return { x: year, y: yy, data_status: r.data_status || null, period_name: r.period_name || null };
-        }).filter(Boolean);
-        if (!pts.length) return null;
-        pts.sort(function (a, b) { return (a.x || 0) - (b.x || 0); });
-        var metric = String(root.metric || root.y_label || 'value').trim() || 'value';
-        var title = String(root.title || (metric + ' over time')).trim() || (metric + ' over time');
-        return {
-            type: 'line',
-            title: title,
-            metric: metric,
-            country: String(root.country || '').trim() || null,
-            series: pts
-        };
+        var api = chatCharts();
+        if (api && typeof api.normalizeLineChartPayload === 'function') {
+            return api.normalizeLineChartPayload(payload);
+        }
+        return null;
     }
 
     function normalizeBarChartPayload(payload) {
-        if (!payload || typeof payload !== 'object') return null;
-        var root = (payload.chart_payload && typeof payload.chart_payload === 'object') ? payload.chart_payload : payload;
-        if (!root || typeof root !== 'object') return null;
-        var type = String(root.type || root.chart_type || '').trim().toLowerCase();
-        if (type !== 'bar' && type !== 'barchart') return null;
-        var cats = Array.isArray(root.categories) ? root.categories : [];
-        if (!cats.length) return null;
-        var categories = cats.map(function (c) {
-            if (!c || typeof c !== 'object') return null;
-            var label = String(c.label || c.name || '').trim();
-            var value = Number(c.value);
-            if (!label || !isFinite(value)) return null;
-            return { label: label, value: value };
-        }).filter(Boolean);
-        if (categories.length < 2) return null;
-        var metric = String(root.metric || 'Value').trim() || 'Value';
-        var title = String(root.title || (metric + ' comparison')).trim();
-        var orientation = String(root.orientation || '').toLowerCase();
-        if (orientation !== 'horizontal' && orientation !== 'vertical') {
-            orientation = categories.length > 6 ? 'horizontal' : 'vertical';
+        var api = chatCharts();
+        if (api && typeof api.normalizeBarChartPayload === 'function') {
+            return api.normalizeBarChartPayload(payload);
         }
-        return {
-            type: 'bar',
-            title: title,
-            metric: metric,
-            categories: categories,
-            orientation: orientation
-        };
+        return null;
     }
 
     function normalizePieChartPayload(payload) {
-        if (!payload || typeof payload !== 'object') return null;
-        var root = (payload.chart_payload && typeof payload.chart_payload === 'object') ? payload.chart_payload : payload;
-        if (!root || typeof root !== 'object') return null;
-        var type = String(root.type || root.chart_type || '').trim().toLowerCase();
-        if (type !== 'pie' && type !== 'donut') return null;
-        var raw = Array.isArray(root.slices) ? root.slices : (Array.isArray(root.data) ? root.data : []);
-        if (raw.length < 2) return null;
-        var slices = raw.map(function (s) {
-            if (!s || typeof s !== 'object') return null;
-            var label = String(s.label || s.name || '').trim();
-            var value = Number(s.value);
-            if (!label || !isFinite(value) || value < 0) return null;
-            return { label: label, value: value };
-        }).filter(Boolean);
-        if (slices.length < 2) return null;
-        var title = String(root.title || 'Distribution').trim();
-        return { type: 'pie', title: title, slices: slices };
+        var api = chatCharts();
+        if (api && typeof api.normalizePieChartPayload === 'function') {
+            return api.normalizePieChartPayload(payload);
+        }
+        return null;
     }
 
     function fetchWorldGeoJson() {

@@ -584,6 +584,7 @@ export class HumDatabankChatbot {
             timestamp: new Date().toISOString()
         };
         if (!isUser && opts.structuredPayload) entry.structuredPayload = opts.structuredPayload;
+        if (!isUser && Array.isArray(opts.sources) && opts.sources.length) entry.sources = opts.sources;
         this.conversationHistory.push(entry);
 
         // Limit conversation history to prevent memory issues (immersive: keep full history for DB-backed convos)
@@ -787,6 +788,9 @@ export class HumDatabankChatbot {
                     console.debug('WorkflowTourParser error:', e);
                 }
             }
+            if (Array.isArray(opts.sources) && opts.sources.length && this._injectStructuredSourcesFromMeta) {
+                this._injectStructuredSourcesFromMeta(content, opts.sources);
+            }
             this._formatChatResponseSources(content);
             this._enhanceIndicatorActionLinks(content);
             this._addTableCopyButtons(content);
@@ -861,6 +865,10 @@ export class HumDatabankChatbot {
                     totalWrappers: this.elements.messages ? this.elements.messages.querySelectorAll('.chat-message-wrapper').length : 0
                 });
                 this._dispatchStructuredPayload(structuredPayload, messageDiv, wrapper);
+            }
+            // Structured cards inject async via chatbot-structured-response; re-place Sources chip after.
+            if (this._relocateSourcesChipIfNeeded) {
+                requestAnimationFrame(() => this._relocateSourcesChipIfNeeded(wrapper));
             }
         }
         this.scrollToBottom();
@@ -939,7 +947,11 @@ export class HumDatabankChatbot {
 
         const scoreText = groundingScore != null ? ` (${Math.round(groundingScore * 100)}%)` : '';
         badge.title = `Source grounding score${groundingScore != null ? `: ${Math.round(groundingScore * 100)}%` : ''}`;
-        badge.innerHTML = `<span aria-hidden="true" style="font-size:0.55rem">${cfg.icon}</span> ${cfg.label}${scoreText}`;
+        const iconEl = document.createElement('span');
+        iconEl.setAttribute('aria-hidden', 'true');
+        iconEl.style.fontSize = '0.55rem';
+        iconEl.textContent = cfg.icon;
+        badge.append(iconEl, document.createTextNode(` ${cfg.label}${scoreText}`));
         return badge;
     }
 

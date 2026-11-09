@@ -9,9 +9,9 @@ Ce document explique comment fonctionne l’assistant IA Backoffice, quelles don
 
 ## Architecture de haut niveau
 
-- **Frontend** : interface de chat (widget flottant + vue immersive) dans `app/static/js/chatbot.js`.
+- **Frontend** : interface de chat (widget flottant + vue immersive) dans `app/static/js/chatbot/` (modules ES ; boîte de dialogue DLP dans `dlp-policy.js`).
 - **Backend** : points de terminaison Flask API pour le chat IA dans `app/routes/ai.py` (HTTP + SSE) et `app/routes/ai_ws.py` (WebSocket).
-- **Orchestration** : `app/services/ai_chat_engine.py` gère le flux de discussion (historique, récupération, appels fournisseurs).
+- **Orchestration** : `app/services/ai/chat/engine.py` gère le flux de discussion (historique, récupération, appels fournisseurs).
 - **Providers** : LLM/embeddings externes (par exemple, OpenAI/Gemini/Azure OpenAI selon l’environnement) plus des composants locaux optionnels.
 
 ## Quelles données peuvent être envoyées à des fournisseurs externes
@@ -32,23 +32,29 @@ Important : certaines fonctionnalités d’IA nécessitent des appels API extern
 Avant qu’un message puisse être envoyé à un fournisseur d’IA externe, le backend exécute un scan DLP de meilleure volonté (basé sur des regex) pour détecter des motifs sensibles courants, tels que :
 
 - E-mails, numéros de téléphone
-- JWT / Jetons porteurs
-- clés privées
-- mots de passe / secrets / clés API
-- IBAN et numéros de carte de paiement (avec la vérification Luhn pour réduire les faux positifs)
+- JWT / jetons porteurs (Bearer) / identifiants Basic auth
+- clés privées (tout bloc de clé privée PEM ou PGP, y compris un bloc collé sans sa ligne END)
+- mots de passe / phrases secrètes, secrets / clés API — sous forme d’affectations `clé: valeur` ou `CLÉ=valeur` (fichiers env, JSON, YAML, chaînes de connexion comme `AccountKey=`), mots de passe dans les URL de connexion (`postgres://utilisateur:motdepasse@hôte`) et formats de clés de fournisseurs connus (par exemple OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
+- IBAN (somme de contrôle vérifiée) et numéros de carte de paiement (vérification Luhn) pour réduire les faux positifs
+
+La détection des numéros de téléphone ignore les formes de nombres courantes dans les questions sur les données : listes d’années, chiffres élevés ou groupés par milliers, dates, adresses IP et colonnes de tableaux.
 
 **Expérience utilisateur**
 
-- Si des motifs sensibles sont détectés, l’assistant peut exiger une **confirmation utilisateur** (« Envoyer quand même ») ou **bloquer** le message selon la configuration.
-- L’interface explique le risque et encourage la suppression du texte sensible.
+- Un message n’est jamais envoyé ni enregistré avec une valeur détectée : lorsqu’il passe, chaque valeur est remplacée par un substitut tel que `[REDACTED_EMAIL]`.
+- En mode `confirm` (par défaut), les e-mails et numéros de téléphone sont masqués automatiquement (configurable). Les identifiants, clés et identifiants financiers ouvrent une boîte de dialogue : **Masquer et envoyer** envoie le message masqué, **Annuler** rend le message à l’utilisateur pour modification et ne conserve rien.
+- En mode `block`, le message est rejeté quel que soit son contenu ; la boîte de dialogue propose seulement de le modifier.
+- Les clients Website et mobile reçoivent une erreur indiquant ce qui a été détecté (par exemple « Sensitive information detected (password). Remove it and send your message again. »).
+- Les messages du panneau IA du générateur de formulaires conservent leurs adresses e-mail et numéros de téléphone (les questionnaires importés en contiennent légitimement), mais sont analysés pour tous les autres types.
 
 **Implémentation**
 
-- Logique DLP : `app/services/ai_dlp.py` (`analyze_text`, `evaluate_ai_message`)
+- Logique DLP : `app/services/ai/chat/dlp.py` (`screen_ai_message`, `evaluate_ai_message`, `mask_sensitive_text`, `mask_conversation_history`)
 - DLP est appliqué de manière cohérente entre les transports :
   - Chat JSON HTTP
   - Streaming SSE
   - Streaming WebSocket
+- L’historique de conversation fourni par le client (modification ou relance d’un message précédent, chat anonyme) est masqué côté serveur avant d’être enregistré ou envoyé à un fournisseur.
 
 **Configuration**
 
@@ -56,24 +62,27 @@ DLP est configuré directement dans le code (et non dans les variables d’envir
 
 - `Backoffice/config/config.py`
   - `AI_DLP_ENABLED`
-  - `AI_DLP_MODE` (valeurs typiques : `warn`, `confirm`, `block`)
+  - `AI_DLP_MODE` : `warn` (tout masquer et envoyer), `confirm` (par défaut ; voir ci-dessus), `block`
+  - `AI_DLP_AUTO_MASK_KINDS` : types que le mode `confirm` masque sans demander (par défaut : `email`, `phone`)
   - `AI_DLP_MAX_SCAN_CHARS`
 
 ### 2) Nettoyage / expurgation des informations personnelles avant appels externes
 
-En plus du DLP (qui peut arrêter une requête), le système applique également un **nettoyage des PII** (censurage) pour réduire l’exposition lorsque le contenu doit être envoyé à l’extérieur (par exemple, pour aider le modèle à répondre).
+En plus du DLP (qui peut arrêter une requête), le système applique également un **nettoyage des PII** (censurage) pour réduire l’exposition lorsque le contenu doit être envoyé à l’extérieur (par exemple, pour aider le modèle à répondre). Le nettoyage utilise les mêmes motifs que le DLP, plus les longs jetons opaques.
 
-Le frottement s’applique à :
+Le nettoyage s’applique à :
 
 - texte des messages utilisateurs
-- Extraits d’historique de conversation
+- les messages de l’utilisateur dans l’historique de conversation (les réponses de l’assistant sont la sortie du modèle lui-même et sont envoyées telles quelles)
 - contexte de page (récursivement)
 - quelques entrées et journaux réécrivant les requêtes
+
+Les requêtes du panneau IA du générateur de formulaires ne passent pas par ce nettoyage, afin que le texte des questionnaires importés soit reproduit fidèlement ; le DLP continue de les analyser pour les identifiants et les identifiants financiers.
 
 Mise en œuvre :
 
 - `app/services/ai/providers/formatting.py` : `scrub_pii_text`, `scrub_pii_context`
-- `app/services/ai_chat_engine.py` : applique le nettoyage avant les appels du fournisseur
+- `app/services/ai/chat/engine.py` : applique le nettoyage avant les appels du fournisseur
 
 ### 3) Minimisation du contexte de la page
 
@@ -92,10 +101,12 @@ Propriétés de sécurité :
 
 - L’événement d’audit **ne stocke pas le message de l’utilisateur**.
 - Il ne stocke que les **comptes et types** de résultats (par exemple, `{"kind":"jwt","count":1}`), ainsi que des métadonnées telles que le transport, le point de terminaison et les identifiants.
+- `context_data.action` indique ce qui s’est passé : `auto_masked` (masqué et envoyé sans demander), `confirm_required` (la boîte de dialogue a été affichée), `sent_masked` (l’utilisateur a choisi Masquer et envoyer) ou `blocked`.
+- La gravité est `high` pour les identifiants, clés et identifiants financiers lorsque l’utilisateur a été arrêté ou a choisi d’envoyer, et `medium` lorsqu’ils ont été masqués automatiquement (par exemple en mode `warn`). Les coordonnées sont `medium` et `low` selon le même principe.
 
 Mise en œuvre :
 
-- `app/services/ai_dlp.py` : `log_dlp_audit_event`
+- `app/services/ai/chat/dlp.py` : `log_dlp_audit_event`
 - Modèle : `app/models/system.py` (`SecurityEvent`, `context_data` JSON)
 - Interface d’administration :
   - Tableau de bord de sécurité : `/admin/security/dashboard`
@@ -138,8 +149,9 @@ Pour filtrer les événements DLP liés à l’IA, recherchez :
 |------|------|
 | Points de terminaison de chat IA (HTTP + SSE) | `app/routes/ai.py` |
 | Point de terminaison de chat IA (WebSocket) | `app/routes/ai_ws.py` |
-| Orchestration par chat | `app/services/ai_chat_engine.py` |
-| DLP garde + événements d’audit | `app/services/ai_dlp.py` |
+| Orchestration par chat | `app/services/ai/chat/engine.py` |
+| DLP garde + événements d’audit | `app/services/ai/chat/dlp.py` |
+| Boîte de dialogue DLP (interface de chat) | `app/static/js/chatbot/dlp-policy.js` |
 | Aides à la récure des PII | `app/services/ai/providers/formatting.py` |
 | Modèle des événements de sécurité | `app/models/system.py` |
 | Pages de sécurité admin | `app/routes/admin/security_dashboard.py` |

@@ -239,6 +239,7 @@ def retrieve_target_excerpts(
     *,
     top_k: int = 5,
 ) -> Tuple[str, List[Dict[str, Any]]]:
+    from app.services.ai.documents.access import internal_document_access
     from app.services.ai.documents.vector_store import AIVectorStore, VectorStoreError
 
     hits: List[Dict[str, Any]] = []
@@ -246,14 +247,14 @@ def retrieve_target_excerpts(
     store = AIVectorStore()
     for doc_id in target_document_ids:
         try:
-            hits.extend(
-                store.search_similar(
-                    query_text=query,
-                    top_k=top_k,
-                    filters={"document_id": int(doc_id)},
-                    user_role="system_manager",
+            with internal_document_access():
+                hits.extend(
+                    store.search_similar(
+                        query_text=query,
+                        top_k=top_k,
+                        filters={"document_id": int(doc_id)},
+                    )
                 )
-            )
         except VectorStoreError:
             logger.info("glossary LLM vector retrieve failed for document %s", doc_id, exc_info=True)
         except Exception:

@@ -29,7 +29,7 @@ Your messages and conversation history may be processed by external AI providers
 
 Technical safeguards include:
 
-- **Data Loss Prevention (DLP)** — Scans that detect and may block or warn about sensitive patterns before sending.
+- **Data Loss Prevention (DLP)** — Scans that detect sensitive patterns before sending and mask them, ask you to confirm, or block the message.
 - **PII scrubbing** — Reduces exposure of personal data before content reaches external providers.
 - **Audit logging** — Security events are logged (without storing your message content).
 

@@ -1056,23 +1056,25 @@ body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
 }
 
 .chat-message.bot {
-    background: #ffffff;
+    /* Plain text in the thread — no bubble chrome */
+    background: transparent;
     color: #334155;
     align-self: flex-start;
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    border-bottom-left-radius: 4px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    max-width: 100%;
+    padding: 4px 0 8px;
     position: relative;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-    padding-bottom: 12px;
 }
 
-/* Error message bubble – highlight and retry */
+/* Error response – text emphasis only (still no bubble) */
 .chat-message-wrapper-error .chat-message.bot.chat-message-error,
 .chat-message.bot.chat-message-error {
-    background: #fef2f2;
-    border-color: #fecaca;
+    background: transparent;
+    border: none;
     color: #991b1b;
-    box-shadow: 0 1px 2px rgba(220, 38, 38, 0.08);
+    box-shadow: none;
 }
 .chat-message-wrapper-error .chat-message-error .chat-message-content,
 .chat-message-error .chat-message-content {
@@ -2186,24 +2188,25 @@ body.fb-ai-lightbox-open {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 14px;
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    border-radius: 14px;
+    padding: 4px 0 8px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
     align-self: flex-start;
-    max-width: var(--chat-message-max-width);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    max-width: 100%;
+    box-shadow: none;
+    color: #334155;
 }
 
-/* Progress steps: not a bubble, only final answer uses bubble */
+/* Progress steps: mobile-style collapsed current step; expand for full list */
 .chat-progress-panel {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
-    padding: 8px 0 8px 0;
+    padding: 4px 0 8px;
     min-width: 180px;
-    max-width: 100%;
+    max-width: 92%;
     background: transparent;
     border: none;
     border-radius: 0;
@@ -2211,22 +2214,98 @@ body.fb-ai-lightbox-open {
     align-self: flex-start;
 }
 
+.chat-progress-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin: 0;
+    padding: 4px 2px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 4px;
+}
+
+.chat-progress-summary:hover {
+    color: #475569;
+}
+
+.chat-progress-summary-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.chat-progress-current-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.chat-progress-running-dots {
+    flex-shrink: 0;
+    width: 1.1em;
+    overflow: hidden;
+    white-space: nowrap;
+    letter-spacing: 0.05em;
+}
+
+.chat-progress-running-dots::after {
+    content: '...';
+    display: inline-block;
+    animation: chatProgressDots 1.35s steps(4, end) infinite;
+    width: 0;
+    overflow: hidden;
+    vertical-align: bottom;
+}
+
+@keyframes chatProgressDots {
+    0% { width: 0; }
+    25% { width: 0.35em; }
+    50% { width: 0.7em; }
+    75%, 100% { width: 1.05em; }
+}
+
+.chat-progress-summary-chevron {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
 .chat-progress-steps {
     list-style: none;
-    margin: 0;
-    padding: 0 0 0 24px;
+    margin: 8px 0 0;
+    padding: 0 0 0 2px;
     width: 100%;
+}
+
+.chat-progress-steps.is-collapsed {
+    display: none;
 }
 
 .chat-progress-step {
     display: flex;
     flex-wrap: wrap;
-    /* Center icon + first-line label (fix spinner/text misalignment). */
-    align-items: center;
-    gap: 2px 8px;
-    font-size: 12px;
+    align-items: flex-start;
+    gap: 2px 6px;
+    font-size: 13px;
     color: #64748b;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     line-height: 1.35;
 }
 
@@ -2236,56 +2315,45 @@ body.fb-ai-lightbox-open {
 
 .chat-progress-step-icon {
     flex-shrink: 0;
-    width: 14px;
-    font-size: 10px;
+    width: 18px;
+    font-size: 12px;
     color: #64748b;
-    /* Font Awesome glyphs can appear slightly "top-aligned" in flex rows. */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
-    height: 1em;
+    height: 1.2em;
+    margin-top: 1px;
 }
 
 .chat-progress-step-label {
     flex: 1;
+    min-width: 0;
 }
 
 .chat-progress-step-row {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    width: fit-content;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
     max-width: 100%;
-    cursor: pointer;
     min-height: 20px;
 }
 
 .chat-progress-step-row .chat-progress-step-label {
-    flex: 0 1 auto;
-}
-
-.chat-progress-step-detail-toggle {
-    flex-shrink: 0;
-    font-size: 10px;
-    color: #94a3b8;
-    margin-left: 2px;
+    flex: 1 1 auto;
 }
 
 .chat-progress-step-detail {
     width: 100%;
-    font-size: 11px;
+    font-size: 12px;
     color: #94a3b8;
-    margin-top: 1px;
-    margin-left: 22px;
+    margin-top: 2px;
+    margin-left: 24px;
     padding-right: 8px;
-    line-height: 1.35;
+    line-height: 1.4;
     overflow-wrap: break-word;
     box-sizing: border-box;
-}
-
-.chat-progress-step-detail-collapsed .chat-progress-step-detail {
-    display: none;
 }
 
 .chat-progress-step-done.fa-check,
@@ -2374,66 +2442,264 @@ body.fb-ai-lightbox-open {
 
 /* Streaming cursor animation (content rules above) */
 
-/* Sources block: constrain to bubble width, preview truncates by width (not fixed chars) */
-.chat-response-sources {
+/* Sources chip (mobile parity): opens modal with parsed title / page / excerpt */
+.chat-response-sources,
+.chat-response-sources--chip {
     max-width: 100%;
     box-sizing: border-box;
+    margin-top: 0.5rem;
 }
-.chat-response-sources .chat-response-sources-body {
-    max-width: 100%;
-    min-width: 0;
+
+.chat-response-sources-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 7px 10px 7px 12px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
 }
-.chat-source-line {
-    min-width: 0;
-    max-width: 100%;
+
+.chat-response-sources-chip:hover {
+    background: #e2e8f0;
+    border-color: rgba(15, 23, 42, 0.18);
 }
-.chat-source-line .chat-source-line-preview {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
+
+.chat-response-sources-chip--compact {
+    padding: 6px 4px 6px 6px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: #475569;
+    font-weight: 600;
+}
+
+.chat-response-sources-chip--compact:hover {
+    background: rgba(15, 23, 42, 0.05);
+    border: none;
+}
+
+.chat-response-sources-chip-icon {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.chat-response-sources-chip-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    min-height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.chat-response-sources-chip-chevron {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.chat-message-actions-sep {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    margin: 0 4px;
+    background: rgba(15, 23, 42, 0.12);
+    align-self: center;
+}
+
+.chat-sources-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.chat-sources-modal-panel {
+    width: min(520px, 100%);
+    max-height: min(78vh, 640px);
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
     overflow: hidden;
-    text-overflow: ellipsis;
 }
-.chat-source-line .chat-source-line-toggle {
+
+@media (min-width: 769px) {
+    .chat-sources-modal-overlay {
+        align-items: center;
+        padding: 24px;
+    }
+    .chat-sources-modal-panel {
+        border-radius: 14px;
+        max-height: min(70vh, 560px);
+    }
+}
+
+.chat-sources-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.chat-sources-modal-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.chat-sources-modal-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.chat-sources-modal-close:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.chat-sources-modal-list {
+    overflow: auto;
+    padding: 8px 12px 20px;
+}
+
+.chat-sources-modal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 8px;
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.chat-sources-modal-item.is-link {
+    cursor: pointer;
+}
+
+.chat-sources-modal-item.is-link:hover {
+    background: #f8fafc;
+}
+
+.chat-sources-modal-index {
     flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
+    font-size: 0.75rem;
+    font-weight: 700;
 }
-.chat-source-line .chat-source-line-full {
-    display: none;
-    white-space: normal;
-    word-break: break-word;
-}
-.chat-source-line.expanded .chat-source-line-preview,
-.chat-source-line.expanded .chat-source-line-toggle {
-    display: none;
-}
-.chat-source-line.expanded .chat-source-line-full {
-    display: block;
+
+.chat-sources-modal-item-body {
     flex: 1;
     min-width: 0;
-    max-width: 100%;
+}
+
+.chat-sources-modal-item-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #0f172a;
+}
+
+.chat-sources-modal-page {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.07);
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.chat-sources-modal-excerpt {
+    margin-top: 6px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: #64748b;
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.chat-sources-modal-open-icon {
+    flex-shrink: 0;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #2563eb;
+}
+
+.chat-sources-modal-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 8px 0;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.chat-sources-modal-note i {
+    margin-top: 2px;
+    color: #94a3b8;
+}
+
+.chat-sources-modal-empty {
+    padding: 16px 8px;
+    color: #94a3b8;
+    font-size: 0.875rem;
 }
 
 /* ========================================
    RTL (Right-to-Left) Support for Chat Components
    ======================================== */
 
-/* Progress steps: flip indent */
-html[dir="rtl"] .chat-progress-steps {
-    padding: 0 24px 0 0;
-}
-
 /* Progress step detail: flip margin */
 html[dir="rtl"] .chat-progress-step-detail {
     margin-left: 0;
-    margin-right: 22px;
+    margin-right: 24px;
     padding-right: 0;
     padding-left: 8px;
 }
 
-/* Detail toggle chevron margin */
-html[dir="rtl"] .chat-progress-step-detail-toggle {
-    margin-left: 0;
-    margin-right: 2px;
+html[dir="rtl"] .chat-progress-summary {
+    text-align: right;
 }
 
 /* Streaming cursor: flip margin */

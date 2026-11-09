@@ -1084,11 +1084,11 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
         child: LayoutBuilder(
           builder: (context, constraints) {
             // Prefer inline progress (last row) over the top banner so the panel stays
-            // under the user message, same as while streaming.
+            // under the user message, same as while streaming (incl. interim narration).
             final hasInlineProgressSlot = ai.messages.isNotEmpty &&
                 ai.messages.last.role == 'assistant' &&
-                ai.messages.last.content.isEmpty &&
-                (ai.isStreaming || ai.inflightRestoreActive);
+                (ai.isStreaming || ai.inflightRestoreActive) &&
+                (ai.messages.last.content.isEmpty || ai.agentSteps.isNotEmpty);
             final showInflightBar = ai.inflightRestoreActive &&
                 ai.agentSteps.isNotEmpty &&
                 !hasInlineProgressSlot;
@@ -1364,10 +1364,15 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                               }
 
                               final isUser = m.role == 'user';
-                              final isLastAssistant = !isUser &&
+                              final isLiveAssistantTail = !isUser &&
                                   i == ai.messages.length - 1 &&
-                                  m.content.isEmpty &&
                                   (ai.isStreaming || ai.inflightRestoreActive);
+                              // Empty-content slot for progress-only; with interim narration we still
+                              // show the progress panel under the text while tools run.
+                              final isLastAssistant = isLiveAssistantTail && m.content.isEmpty;
+                              final showInlineProgress = isLiveAssistantTail &&
+                                  ai.agentSteps.isNotEmpty &&
+                                  m.content.trim().isNotEmpty;
 
                               // Defer only when structured cards render; otherwise keep Sources in the same bubble.
                               final hasStructuredVisuals = m.structuredPayloads.isNotEmpty;
@@ -1446,14 +1451,26 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                                         steps: ai.agentSteps,
                                                       )
                                                     : const _TypingIndicator())
-                                                : _buildAssistantMessageHtml(
-                                                    context,
-                                                    theme,
-                                                    _processHtmlForMobile(
-                                                      trimTrailingEmptyHtml(
-                                                        assistantBodySplit?.mainHtml ?? m.content,
+                                                : Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      _buildAssistantMessageHtml(
+                                                        context,
+                                                        theme,
+                                                        _processHtmlForMobile(
+                                                          trimTrailingEmptyHtml(
+                                                            assistantBodySplit?.mainHtml ?? m.content,
+                                                          ),
+                                                        ),
                                                       ),
-                                                    ),
+                                                      if (showInlineProgress) ...[
+                                                        const SizedBox(height: 8),
+                                                        AiChatAgentProgressPanel(
+                                                          steps: ai.agentSteps,
+                                                        ),
+                                                      ],
+                                                    ],
                                                   ),
                                       ),
                                       // Show structured payloads (maps/charts) even while the assistant row

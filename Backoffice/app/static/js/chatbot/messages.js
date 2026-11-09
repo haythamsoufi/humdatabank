@@ -38,6 +38,9 @@ const DEFAULT_UI_STRINGS = {
     // "Preparing query…" reads like a data-search assistant, not a form builder.
     preparingFormRequest: 'Reading your request…',
     stepsInProgress: 'Steps in progress',
+    responseSources: 'Sources',
+    noSourcesListed: 'No sources listed.',
+    close: 'Close',
     endTour: 'End Tour',
     serverError: 'Server error',
     requestCancelled: 'Request cancelled',

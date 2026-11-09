@@ -10,6 +10,7 @@ reads oddly for a template create/edit action next to "Working on your form…"
 """
 
 from app.services.ai.runtime.step_ux import (
+    ASSISTANT_NARRATION_MARKER,
     clean_tool_narration,
     emit_tool_start_step,
     format_tool_result_summary,
@@ -97,12 +98,15 @@ class TestEmitToolStartStep:
 
         return calls, cb
 
-    def test_thought_becomes_headline_with_action_detail(self):
+    def test_thought_is_narration_then_action_is_progress_step(self):
         calls, cb = self._collector()
         args = {"country_identifier": "Syria", "indicator_name": "Volunteers"}
         opened = emit_tool_start_step(cb, "get_indicator_timeseries", args, thought="I'll pull the yearly volunteer counts.")
         assert opened is True
-        assert calls == [("I'll pull the yearly volunteer counts.", "Reading Volunteers over time for Syria…")]
+        assert calls == [
+            ("I'll pull the yearly volunteer counts.", ASSISTANT_NARRATION_MARKER),
+            ("Reading Volunteers over time for Syria…", None),
+        ]
 
     def test_follow_up_tool_in_same_turn_is_detail_only(self):
         calls, cb = self._collector()

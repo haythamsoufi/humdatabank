@@ -38,13 +38,6 @@ class ChatResponseSourcesParsed {
   final List<String> notes;
 }
 
-final RegExp _bulletRe = RegExp(r'^\s*(?:[-*•–]|\d{1,3}[.)])\s+');
-final RegExp _pageRe = RegExp(
-  r'[\s,;(\-–—]*\b(?:pages?|pp?\.)\s*(\d+(?:\s*[-–]\s*\d+)?)\)?\s*$',
-  caseSensitive: false,
-);
-final RegExp _lineBreakRe = RegExp(r'<br\s*/?>', caseSensitive: false);
-
 String _squash(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
 
 /// [Backoffice] `ai_answer_verifier.py` appends a caveat that may sit in the sources list.
@@ -56,56 +49,30 @@ bool _isAnswerVerificationCaveat(String plain) {
           t.contains('could not be verified'));
 }
 
-String _stripQuotes(String s) =>
-    s.replaceAll(RegExp(r'^["“”«\s]+|["“”»\s]+$'), '').trim();
-
-ChatResponseSourceItem? _itemFromFragment(String segmentHtml) {
-  final fragment = html_parser.parseFragment(segmentHtml);
-  var plain = _squash(fragment.text ?? '');
-  plain = plain.replaceFirst(_bulletRe, '').trim();
-  if (plain.isEmpty) return null;
-
-  String title;
-  String? excerpt;
-  String? url;
-
-  final anchors = fragment.querySelectorAll('a');
-  final link = anchors.isEmpty ? null : anchors.first;
-  final label = link == null ? '' : _squash(link.text);
-
-  if (link != null && label.isNotEmpty) {
-    url = link.attributes['href']?.trim();
-    title = label;
-    final at = plain.indexOf(label);
-    final rest = at >= 0 ? plain.substring(at + label.length) : '';
-    final cleaned = _stripQuotes(rest.replaceFirst(RegExp(r'^[\s:–—\-]+'), ''));
-    if (cleaned.isNotEmpty) excerpt = cleaned;
-  } else {
-    title = plain;
-    final split = RegExp(r':\s+').firstMatch(plain);
-    if (split != null && plain.length - split.end > 40) {
-      title = plain.substring(0, split.start).trim();
-      excerpt = _stripQuotes(plain.substring(split.end));
-    }
-  }
-
-  String? page;
-  final pm = _pageRe.firstMatch(title);
-  if (pm != null && pm.start > 0) {
-    page = pm.group(1)!.replaceAll(RegExp(r'\s+'), '');
-    title = title.substring(0, pm.start).replaceAll(RegExp(r'[\s,;(\-–—]+$'), '');
-  }
+ChatResponseSourceItem? _itemFromDataAttrs(html.Element el) {
+  final title = _squash(el.attributes['data-source-title'] ?? '');
   if (title.isEmpty) return null;
-
+  final detail = _squash(el.attributes['data-source-detail'] ?? '');
+  final urlRaw = (el.attributes['data-source-url'] ?? '').trim();
+  final pageRaw = (el.attributes['data-source-page'] ?? '').trim();
   return ChatResponseSourceItem(
     title: title,
-    page: page,
-    url: (url == null || url.isEmpty) ? null : url,
-    excerpt: (excerpt == null || excerpt.isEmpty) ? null : excerpt,
+    page: pageRaw.isEmpty ? null : pageRaw,
+    url: urlRaw.isEmpty ? null : urlRaw,
+    excerpt: detail.isEmpty ? null : detail,
   );
 }
 
-/// Parses `.chat-response-sources-body`: prefers `<li>`; otherwise segments split on `<br>`.
+List<ChatResponseSourceItem> _parseStructuredSourceRows(html.Element body) {
+  final items = <ChatResponseSourceItem>[];
+  for (final el in body.querySelectorAll('[data-source-title]')) {
+    final item = _itemFromDataAttrs(el);
+    if (item != null) items.add(item);
+  }
+  return items;
+}
+
+/// Parses `.chat-response-sources-body` from structured `data-source-*` rows only.
 ChatResponseSourcesParsed parseChatResponseSources(html.Element? details) {
   final items = <ChatResponseSourceItem>[];
   final notes = <String>[];
@@ -114,33 +81,19 @@ ChatResponseSourcesParsed parseChatResponseSources(html.Element? details) {
   if (bodies.isEmpty) return ChatResponseSourcesParsed(items, notes);
   final body = bodies.first;
 
-  final lis = body.getElementsByTagName('li');
-  final fromList = lis.isNotEmpty;
-  final segments = fromList
-      ? lis.map((li) => li.innerHtml).toList()
-      : body.innerHtml.split(_lineBreakRe);
+  final structured = _parseStructuredSourceRows(body);
+  if (structured.isEmpty) {
+    return ChatResponseSourcesParsed(items, notes);
+  }
 
-  final anyBullet = !fromList &&
-      segments.any(
-        (s) => _bulletRe.hasMatch(_squash(html_parser.parseFragment(s).text ?? '')),
-      );
-
-  for (final seg in segments) {
-    final plain = _squash(html_parser.parseFragment(seg).text ?? '');
-    if (plain.isEmpty) continue;
+  for (final el in body.querySelectorAll('li, p')) {
+    if (el.attributes.containsKey('data-source-title')) continue;
+    final plain = _squash(el.text);
     if (_isAnswerVerificationCaveat(plain)) {
       notes.add(plain.replaceFirst(RegExp(r'^>?\s*'), ''));
-      continue;
     }
-    // In a bulleted list, unbulleted lines continue the previous entry's excerpt.
-    if (anyBullet && !_bulletRe.hasMatch(plain) && items.isNotEmpty) {
-      items[items.length - 1] = items.last.withExcerpt(_stripQuotes(plain));
-      continue;
-    }
-    final item = _itemFromFragment(seg);
-    if (item != null) items.add(item);
   }
-  return ChatResponseSourcesParsed(items, notes);
+  return ChatResponseSourcesParsed(structured, notes);
 }
 
 bool _isEnglishSourcesSummary(String plain) {

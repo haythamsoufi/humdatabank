@@ -148,13 +148,22 @@ def is_form_builder_assistant_context(page_context: Any) -> bool:
 
     Shared predicate so every exemption that treats form-builder messages
     differently (PII scrubbing before the LLM call in AIChatEngine, and the DLP
-    mask-and-send gate in evaluate_ai_message) agrees on the same definition —
-    computed straight from `page_context` since the request-scoped
-    `g.ai_form_builder_ctx` set by AIAgentExecutor.execute() isn't populated yet
-    at these earlier points in the request lifecycle.
+    contact-detail exemption in evaluate_ai_message / mask_conversation_history)
+    agrees on the same definition — computed straight from `page_context` since the
+    request-scoped `g.ai_form_builder_ctx` set by AIAgentExecutor.execute() isn't
+    populated yet at these earlier points in the request lifecycle.
     """
     fb_page = page_context.get("formBuilder") if isinstance(page_context, dict) else None
     return bool(isinstance(fb_page, dict) and fb_page.get("enabled"))
+
+
+def is_user_history_entry(entry: Any) -> bool:
+    """True for a user turn in either history shape: {"isUser": ...} or {"role": "user"}."""
+    if not isinstance(entry, dict):
+        return False
+    if "isUser" in entry:
+        return bool(entry.get("isUser"))
+    return str(entry.get("role") or "").strip().lower() == "user"
 
 
 def normalize_language_code(

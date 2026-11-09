@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../config/app_config.dart';
 import '../../config/routes.dart';
@@ -16,7 +17,6 @@ import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
-import '../../widgets/shimmer_list_placeholder.dart';
 
 class CountriesScreen extends StatefulWidget {
   const CountriesScreen({super.key});
@@ -66,23 +66,6 @@ class _CountriesScreenState extends State<CountriesScreen> {
     if (localized != null && localized.isNotEmpty) return localized;
     final name = (country['national_society_name'] as String?)?.trim();
     return (name != null && name.isNotEmpty) ? name : null;
-  }
-
-  /// Converts an ISO 3166-1 alpha-2 code into its flag emoji, or null when the
-  /// code is missing or malformed.
-  static String? _flagEmoji(String? iso2) {
-    if (iso2 == null || iso2.length != 2) return null;
-    final code = iso2.toUpperCase();
-    final first = code.codeUnitAt(0);
-    final second = code.codeUnitAt(1);
-    const a = 0x41;
-    const z = 0x5A;
-    if (first < a || first > z || second < a || second > z) return null;
-    const regionalIndicatorA = 0x1F1E6;
-    return String.fromCharCodes([
-      regionalIndicatorA + first - a,
-      regionalIndicatorA + second - a,
-    ]);
   }
 
   Future<void> _loadCountries({bool refresh = false}) async {
@@ -244,11 +227,7 @@ class _CountriesScreenState extends State<CountriesScreen> {
     if (_isLoading) {
       return Semantics(
         label: localizations.countriesLoading,
-        child: ShimmerListPlaceholder(
-          itemCount: 8,
-          itemSpacing: 10,
-          itemBuilder: (_) => const ShimmerCardPlaceholder(height: 72),
-        ),
+        child: const _CountriesGridShimmer(),
       );
     }
 
@@ -433,9 +412,10 @@ class _CountriesScreenState extends State<CountriesScreen> {
     final filtered = _getFilteredCountries();
     final textScaler = MediaQuery.textScalerOf(context);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // Two text lines for the country name, one for the national society.
     final cardExtent = math.max(
-      72.0,
-      textScaler.scale(15) * 1.35 + textScaler.scale(12.5) * 1.35 + 34,
+      76.0,
+      textScaler.scale(15) * 1.3 * 2 + textScaler.scale(12.5) * 1.3 + 28,
     );
 
     return RefreshIndicator(
@@ -512,8 +492,8 @@ class _CountriesScreenState extends State<CountriesScreen> {
             SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 24),
               sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 440,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
                   mainAxisExtent: cardExtent,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
@@ -527,7 +507,6 @@ class _CountriesScreenState extends State<CountriesScreen> {
                     return _CountryCard(
                       name: name,
                       subtitle: nationalSociety,
-                      flag: _flagEmoji(country['iso2'] as String?),
                       onTap: iso3 != null
                           ? () => _navigateToCountry(iso3, name)
                           : null,
@@ -543,17 +522,53 @@ class _CountriesScreenState extends State<CountriesScreen> {
   }
 }
 
+class _CountriesGridShimmer extends StatelessWidget {
+  const _CountriesGridShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark
+        ? const Color(AppConstants.semanticShimmerBaseDark)
+        : const Color(AppConstants.semanticShimmerBaseLight);
+    final highlight = isDark
+        ? const Color(AppConstants.semanticShimmerHighlightDark)
+        : const Color(AppConstants.semanticShimmerHighlightLight);
+
+    return Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: highlight,
+      period: const Duration(milliseconds: 1400),
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisExtent: 76,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: 12,
+        itemBuilder: (_, _) => Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CountryCard extends StatelessWidget {
   const _CountryCard({
     required this.name,
     required this.onTap,
     this.subtitle,
-    this.flag,
   });
 
   final String name;
   final String? subtitle;
-  final String? flag;
   final VoidCallback? onTap;
 
   @override
@@ -576,62 +591,35 @@ class _CountryCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: context.navyBackgroundColor(opacity: 0.07),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: flag != null
-                      ? Text(flag!, style: const TextStyle(fontSize: 24))
-                      : Icon(
-                          Icons.public_rounded,
-                          size: 22,
-                          color: context.navyIconColor,
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                          color: context.textColor,
-                        ),
-                      ),
-                      if (subtitle != null)
-                        Text(
-                          subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 12.5,
-                            height: 1.3,
-                            color: context.textSecondaryColor,
-                          ),
-                        ),
-                    ],
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                    color: context.textColor,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 22,
-                  color: context.textSecondaryColor.withValues(alpha: 0.7),
-                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12.5,
+                      height: 1.3,
+                      color: context.textSecondaryColor,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

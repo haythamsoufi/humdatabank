@@ -180,6 +180,30 @@ def _load_supported_languages_from_settings(default_languages):
         normalized.insert(0, 'en')
     return normalized
 
+# Built-in document-type catalog. Used when system settings have no types
+# (missing or an empty list). Admins can replace this from Settings.
+DEFAULT_DOCUMENT_TYPES = [
+    "Annual Report",
+    "Audited Financial Statement",
+    "Unaudited Financial Statement",
+    "Strategic Plan",
+    "Operational Plan",
+    "Evaluation Report",
+    "Policy Document",
+    "Unified Network Plan",
+    "Unified Network Annual Report",
+    "Unified Network Midyear Report",
+    "Legal Document",
+    "Statutes in Force",
+    "Red Cross Law",
+    "Emblem Law",
+    "Picture of the Year",
+    "Cover Image",
+    "Agreement",
+    "Other",
+]
+
+
 def _load_document_types_from_settings(default_document_types):
     """Return default document types.
 
@@ -858,8 +882,9 @@ class Config:
     # Units that support disaggregation (case-sensitive)
     DISAGGREGATION_ALLOWED_UNITS = ["People", "Volunteers", "Staff"]
 
-    # Document Types for upload dropdown (loaded from settings; empty list if missing)
-    DOCUMENT_TYPES = _load_document_types_from_settings([])
+    # Document types for upload dropdowns. Replaced from settings when that list
+    # is non-empty; otherwise the built-in catalog above is kept.
+    DOCUMENT_TYPES = _load_document_types_from_settings(DEFAULT_DOCUMENT_TYPES)
 
     # Entity type groups enabled across admin experiences
     DEFAULT_ENABLED_ENTITY_TYPES = ['countries', 'projects', 'ns_structure', 'secretariat']

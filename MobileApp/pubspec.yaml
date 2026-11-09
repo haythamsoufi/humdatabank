@@ -78,8 +78,8 @@ dependencies:
   pdfrx: 2.2.24
   # File sharing (share sheet) and temp-directory access for PDF share
   share_plus: ^10.0.0
-  # System document picker for replacing a repository attachment
-  file_selector: ^1.0.3
+  # Repository attachment replace (works with iOS scene / implicit engine embedding)
+  file_picker: ^8.1.7
   path_provider: ^2.1.0
 
   # Wide range so both Flutter SDK pins resolve (e.g. 0.19.x vs 0.20.x via flutter_localizations)

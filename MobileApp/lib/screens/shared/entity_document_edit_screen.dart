@@ -1,6 +1,7 @@
+import 'dart:io' show File;
 import 'dart:typed_data';
 
-import 'package:file_selector/file_selector.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,6 +10,7 @@ import '../../models/shared/document.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/entity_document_repository_provider.dart';
 import '../../utils/constants.dart';
+import '../../utils/debug_logger.dart';
 import '../../utils/ios_constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
@@ -33,58 +35,6 @@ const Set<String> _allowedExtensions = {
   'gif',
   'webp',
 };
-
-/// Extensions for Windows, MIME types for Android, UTIs for iOS.
-/// A group that sets only extensions throws on iOS before the picker opens.
-const XTypeGroup _replacementTypeGroup = XTypeGroup(
-  label: 'documents',
-  extensions: [
-    'pdf',
-    'doc',
-    'docx',
-    'xls',
-    'xlsx',
-    'ppt',
-    'pptx',
-    'txt',
-    'csv',
-    'jpg',
-    'jpeg',
-    'png',
-    'gif',
-    'webp',
-  ],
-  mimeTypes: [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain',
-    'text/csv',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'application/octet-stream',
-  ],
-  uniformTypeIdentifiers: [
-    'public.data',
-    'public.content',
-    'com.adobe.pdf',
-    'public.image',
-    'public.plain-text',
-    'public.comma-separated-values-text',
-    'com.microsoft.word.doc',
-    'org.openxmlformats.wordprocessingml.document',
-    'com.microsoft.excel.xls',
-    'org.openxmlformats.spreadsheetml.sheet',
-    'com.microsoft.powerpoint.ppt',
-    'org.openxmlformats.presentationml.presentation',
-  ],
-);
 
 class EntityDocumentEditScreen extends StatefulWidget {
   final Document document;
@@ -177,11 +127,16 @@ class _EntityDocumentEditScreenState extends State<EntityDocumentEditScreen> {
 
   Future<void> _pickReplacement(AppLocalizations loc) async {
     try {
-      final file = await openFile(
-        acceptedTypeGroups: const [_replacementTypeGroup],
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _allowedExtensions.toList()..sort(),
+        allowMultiple: false,
+        withData: true,
       );
-      if (file == null || !mounted) return;
-      final name = _attachmentName(file);
+      if (result == null || result.files.isEmpty || !mounted) return;
+
+      final picked = result.files.single;
+      final name = _attachmentName(picked);
       final dot = name.lastIndexOf('.');
       final ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
       if (!_allowedExtensions.contains(ext)) {
@@ -190,7 +145,15 @@ class _EntityDocumentEditScreenState extends State<EntityDocumentEditScreen> {
         );
         return;
       }
-      final bytes = await file.readAsBytes();
+
+      Uint8List? bytes = picked.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        final path = picked.path;
+        if (path == null || path.isEmpty) {
+          throw StateError('Picked file has no bytes or path');
+        }
+        bytes = await File(path).readAsBytes();
+      }
       if (!mounted) return;
       if (bytes.length > _maxAttachmentBytes) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -202,7 +165,11 @@ class _EntityDocumentEditScreenState extends State<EntityDocumentEditScreen> {
         _replacementBytes = bytes;
         _replacementName = name;
       });
-    } catch (_) {
+    } catch (e, stackTrace) {
+      DebugLogger.logErrorWithTag(
+        'ENTITY_DOC_EDIT',
+        'Replace attachment file picker failed: $e\n$stackTrace',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.couldNotOpenFiles)),
@@ -210,9 +177,9 @@ class _EntityDocumentEditScreenState extends State<EntityDocumentEditScreen> {
     }
   }
 
-  String _attachmentName(XFile file) {
+  String _attachmentName(PlatformFile file) {
     final fromName = file.name.trim();
-    final raw = fromName.isNotEmpty ? fromName : file.path.trim();
+    final raw = fromName.isNotEmpty ? fromName : (file.path ?? '').trim();
     final parts = raw.split(RegExp(r'[\\/]'));
     final base = parts.isEmpty ? raw : parts.last.trim();
     return base.isEmpty ? 'document' : base;
@@ -395,6 +362,7 @@ class _EntityDocumentEditScreenState extends State<EntityDocumentEditScreen> {
                 validator: (value) => null,
                 onPick: () => _pickChoice(
                   title: loc.documentStatus,
+                  searchable: false,
                   options: [
                     (value: 'pending', label: loc.pendingReview, hint: ''),
                     (value: 'approved', label: loc.approved, hint: ''),
@@ -552,6 +520,7 @@ class _EntityDocumentEditScreenState extends State<EntityDocumentEditScreen> {
   Future<String?> _pickChoice({
     required String title,
     required List<({String value, String label, String hint})> options,
+    bool searchable = true,
   }) {
     final loc = AppLocalizations.of(context)!;
     return showModalBottomSheet<String>(
@@ -559,16 +528,16 @@ class _EntityDocumentEditScreenState extends State<EntityDocumentEditScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       builder: (sheetContext) {
-        final height = MediaQuery.sizeOf(sheetContext).height * 0.85;
-        return SizedBox(
-          height: height,
-          child: _OptionPickerSheet(
-            title: title,
-            searchHint: loc.searchPlaceholder,
-            emptyLabel: loc.noResultsFound,
-            options: options,
-          ),
+        final sheet = _OptionPickerSheet(
+          title: title,
+          searchHint: loc.searchPlaceholder,
+          emptyLabel: loc.noResultsFound,
+          options: options,
+          searchable: searchable,
         );
+        if (!searchable) return sheet;
+        final height = MediaQuery.sizeOf(sheetContext).height * 0.85;
+        return SizedBox(height: height, child: sheet);
       },
     );
   }
@@ -579,12 +548,14 @@ class _OptionPickerSheet extends StatefulWidget {
   final String searchHint;
   final String emptyLabel;
   final List<({String value, String label, String hint})> options;
+  final bool searchable;
 
   const _OptionPickerSheet({
     required this.title,
     required this.searchHint,
     required this.emptyLabel,
     required this.options,
+    required this.searchable,
   });
 
   @override
@@ -602,7 +573,7 @@ class _OptionPickerSheetState extends State<_OptionPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final needle = _query.text.trim().toLowerCase();
+    final needle = widget.searchable ? _query.text.trim().toLowerCase() : '';
     final visible = needle.isEmpty
         ? widget.options
         : widget.options.where((option) {
@@ -611,44 +582,52 @@ class _OptionPickerSheetState extends State<_OptionPickerSheet> {
                 option.value.toLowerCase().contains(needle);
           }).toList();
 
+    final list = visible.isEmpty
+        ? Center(child: Text(widget.emptyLabel))
+        : ListView.builder(
+            shrinkWrap: !widget.searchable,
+            itemCount: visible.length,
+            itemBuilder: (context, index) {
+              final option = visible[index];
+              final theme = Theme.of(context);
+              final showSubtitle = option.hint.isNotEmpty &&
+                  option.hint.toLowerCase() != option.label.toLowerCase();
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                visualDensity: VisualDensity.compact,
+                minVerticalPadding: 0,
+                dense: true,
+                titleTextStyle: theme.textTheme.bodyLarge,
+                subtitleTextStyle: theme.textTheme.bodySmall,
+                title: Text(option.label),
+                subtitle: showSubtitle ? Text(option.hint) : null,
+                onTap: () => Navigator.of(context).pop(option.value),
+              );
+            },
+          );
+
     return Column(
+      mainAxisSize: widget.searchable ? MainAxisSize.max : MainAxisSize.min,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: TextField(
-            controller: _query,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: widget.searchHint,
-              prefixIcon: const Icon(Icons.search),
-              border: const OutlineInputBorder(),
-              isDense: true,
+        if (widget.searchable)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              controller: _query,
+              decoration: InputDecoration(
+                hintText: widget.searchHint,
+                prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (_) => setState(() {}),
             ),
-            onChanged: (_) => setState(() {}),
           ),
-        ),
-        Expanded(
-          child: visible.isEmpty
-              ? Center(child: Text(widget.emptyLabel))
-              : ListView.builder(
-                  itemCount: visible.length,
-                  itemBuilder: (context, index) {
-                    final option = visible[index];
-                    return ListTile(
-                      title: Text(option.label),
-                      subtitle: option.hint.isNotEmpty &&
-                              option.hint.toLowerCase() != option.label.toLowerCase()
-                          ? Text(option.hint)
-                          : null,
-                      onTap: () => Navigator.of(context).pop(option.value),
-                    );
-                  },
-                ),
-        ),
+        if (widget.searchable) Expanded(child: list) else list,
       ],
     );
   }

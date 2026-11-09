@@ -49,6 +49,9 @@
 {% endif %}
 <meta name="language" content="{{ _lang_for_meta }}">
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/dashboard-styles.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/ui-style-ifrc.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/ui-style-erp.css') }}">
 {% for asset in plugin_form_assets if asset.kind == 'stylesheet' %}
 <link rel="stylesheet" href="{{ asset.url }}">
 {% endfor %}
@@ -64,7 +67,29 @@
 {% endblock %}
 
 {% block content %}
-<div class="entry-form-root w-full max-w-full mx-auto px-0 sm:px-2 pb-4 sm:pb-6 min-w-0" data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}" data-public-token="{{ public_token if is_public_submission else '' }}">
+<div id="entry-form-root"
+     class="entry-form-root ui-style-root w-full max-w-full mx-auto px-0 sm:px-2 pb-4 sm:pb-6 min-w-0"
+     data-ui-style="ifrc"
+     data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}"
+     data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}"
+     data-public-token="{{ public_token if is_public_submission else '' }}">
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var root = document.getElementById('entry-form-root');
+    if (!root) return;
+    var preview = root.getAttribute('data-style-preview') === '1';
+    var allowed = ['ifrc', 'erp', 'legacy'];
+    var style = 'ifrc';
+    if (preview) {
+        try {
+            var stored = window.localStorage.getItem('uiStylePreview');
+            if (stored == null) stored = window.localStorage.getItem('dashboardStylePreview');
+            if (allowed.indexOf(stored) !== -1) style = stored;
+        } catch (e) { /* ignore */ }
+    }
+    root.setAttribute('data-ui-style', style);
+})();
+</script>
 
     {# Template Preview Mode banner (with "view as" + period builder controls) #}
     {% if is_preview_mode %}
@@ -1384,7 +1409,7 @@
 
                                                                     {% if field.indirect_reach %}
                                                                     {# Indirect reach with calculated total displayed adjacent #}
-                                                                    <div class="mt-3">
+                                                                    <div class="mt-3 indirect-reach-row">
                                                                         <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                             <div class="flex flex-wrap items-center gap-3">
                                                                                 <label for="dynamic-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
@@ -1525,7 +1550,7 @@
 
                                                                     {% if field.indirect_reach %}
                                                                     {# Indirect reach with calculated total displayed adjacent #}
-                                                                    <div class="mt-3">
+                                                                    <div class="mt-3 indirect-reach-row">
                                                                         <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                             <div class="flex flex-wrap items-center gap-3">
                                                                                 <label for="indicator-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
@@ -1678,7 +1703,7 @@
 
                                                                     {% if field.indirect_reach %}
                                                                     {# Indirect reach with calculated total displayed adjacent #}
-                                                                    <div class="mt-3">
+                                                                    <div class="mt-3 indirect-reach-row">
                                                                         <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                             <div class="flex flex-wrap items-center gap-3">
                                                                                 <label for="indicator-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
@@ -2411,7 +2436,7 @@
                                                                         </table>
                                                                     </div>
                                                                     {% if field.indirect_reach %}
-                                                                    <div class="mt-3">
+                                                                    <div class="mt-3 indirect-reach-row">
                                                                         <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                             <div class="flex flex-wrap items-center gap-3">
                                                                                 <label for="indicator-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
@@ -2432,7 +2457,7 @@
                                                                     </div>
                                                                     {% if field.indirect_reach %}
                                                                     {# Indirect reach with calculated total displayed adjacent #}
-                                                                    <div class="mt-3">
+                                                                    <div class="mt-3 indirect-reach-row">
                                                                         <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                         <div class="flex flex-wrap items-center gap-3">
                                                                             <label for="indicator-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
@@ -2518,7 +2543,7 @@
 
                                                                     {% if field.indirect_reach %}
                                                                     {# Indirect reach with calculated total displayed adjacent #}
-                                                                    <div class="mt-3">
+                                                                    <div class="mt-3 indirect-reach-row">
                                                                         <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                             <div class="flex flex-wrap items-center gap-3">
                                                                                 <label for="dynamic-indirect-reach-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Indirect reach:') }}</label>
@@ -3245,9 +3270,26 @@
     </div>
     {% endif %}
 
+{% if show_ui_style_preview|default(false) %}
+<aside id="ui-style-preview"
+       class="dashboard-style-preview"
+       aria-label="{{ _('UI style preview')|forceescape }}">
+    <p class="dashboard-style-preview__label">{{ _('Style preview') }}</p>
+    <div class="dashboard-style-preview__options" role="group" aria-label="{{ _('UI styles')|forceescape }}">
+        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="ifrc" aria-pressed="false">IFRC</button>
+        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="erp" aria-pressed="false">ERP</button>
+        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="legacy" aria-pressed="false">Legacy</button>
+    </div>
+    <p class="dashboard-style-preview__hint">{{ _('Dev only · saved in this browser') }}</p>
+</aside>
+{% endif %}
+
+</div>{# /#entry-form-root #}
+
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ static_url('js/core/dashboard-style-preview.js') }}"></script>
 <script src="{{ static_url('js/forms/validation-questions-panel.js') }}"></script>
 {% if show_upr_assets %}
 <script src="{{ upr_static_url('js/upr-shared.js') }}"></script>

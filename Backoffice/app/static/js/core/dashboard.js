@@ -42,6 +42,39 @@ function sanitizeTextContent(text) {
 
 const DASHBOARD_CARD_ACTIONS_OVERFLOW_BTN_WIDTH = 40;
 
+function getDashboardStyleId() {
+    const root = document.getElementById('dashboard-root') || document.querySelector('.ui-style-root');
+    return (root && root.getAttribute('data-ui-style')) || 'ifrc';
+}
+
+/** Chart / pillar colors: purple only for legacy preview; otherwise CSS tokens. */
+function getDashboardDqAccentColors() {
+    const styleId = getDashboardStyleId();
+    if (styleId === 'legacy') {
+        return {
+            solid: 'rgb(124, 58, 237)',
+            solidStrong: 'rgb(147, 51, 234)',
+            solidSoft: 'rgb(168, 85, 247)',
+            fillSoft: 'rgba(124, 58, 237, 0.08)',
+            iconDefault: '#6d28d9',
+            iconBgDefault: '#f5f3ff',
+        };
+    }
+    const root = document.getElementById('dashboard-root');
+    const cs = root ? window.getComputedStyle(root) : null;
+    const ring = ((cs && cs.getPropertyValue('--dash-dq-ring')) || '#0d9488').trim();
+    const accent = ((cs && cs.getPropertyValue('--dash-dq-accent')) || '#0f3d6e').trim();
+    const soft = ((cs && cs.getPropertyValue('--dash-dq-accent-soft')) || '#eef4fa').trim();
+    return {
+        solid: ring,
+        solidStrong: accent,
+        solidSoft: ring,
+        fillSoft: soft,
+        iconDefault: accent,
+        iconBgDefault: soft,
+    };
+}
+
 function closeDashboardCardActionsOverflowMenus(exceptMenu) {
     document.querySelectorAll('.dashboard-card-actions-overflow-menu').forEach((menu) => {
         if (menu === exceptMenu) {
@@ -256,14 +289,15 @@ function renderDataQualityChart() {
         return;
     }
 
+    const dqColors = getDashboardDqAccentColors();
     // Fake data for demonstration
     const data = {
         labels: ['Period 1', 'Period 2', 'Period 3', 'Period 4', 'Period 5'], // Example periods
         datasets: [{
             label: getSecureConfirmMessage('dataQualityIndex', 'Data Quality Index'),
             data: [7.5, 8.0, 8.5, 8.8, 9.1], // Example quality scores (out of 10)
-            backgroundColor: 'rgb(168, 85, 247)', // Purple color
-            borderColor: 'rgb(147, 51, 234)', // Darker purple
+            backgroundColor: dqColors.solidSoft,
+            borderColor: dqColors.solidStrong,
             borderWidth: 1
         }]
     };
@@ -752,8 +786,9 @@ function renderDataQualityPillarCard(key, meta, pillars, weightLabel, subDetail,
     const barWidth = hasScore ? Math.max(0, Math.min(100, score)) : 0;
     const scoreColor = hasScore ? scoreHexColor(score) : '#9ca3af';
     const barColor = hasScore ? scoreHexColor(score) : '#d1d5db';
-    const iconColor = meta.color || '#6d28d9';
-    const iconBg = meta.bg || '#f5f3ff';
+    const dqAccent = getDashboardDqAccentColors();
+    const iconColor = meta.color || dqAccent.iconDefault;
+    const iconBg = meta.bg || dqAccent.iconBgDefault;
     const subPillarsHtml = renderDataQualitySubPillars(key, subDetail, pillarComponentDetails);
 
     return `
@@ -843,7 +878,7 @@ function getDataQualityPillarMeta() {
 function buildDataQualityTrendDatasets(trend, mode, pillarMeta) {
     if (mode === 'pillars') {
         return Object.keys(pillarMeta).map((key) => {
-            const lineColor = pillarMeta[key].color || '#6d28d9';
+            const lineColor = pillarMeta[key].color || getDashboardDqAccentColors().iconDefault;
             return {
                 label: pillarMeta[key].label,
                 data: trend.map((entry) => {
@@ -865,9 +900,9 @@ function buildDataQualityTrendDatasets(trend, mode, pillarMeta) {
     return [{
         label: getSecureConfirmMessage('dataQualityIndex', 'Data Quality Index'),
         data: trend.map((entry) => formatDataQualityOverallPct(entry.overall_pct)),
-        borderColor: 'rgb(124, 58, 237)',
-        backgroundColor: 'rgba(124, 58, 237, 0.08)',
-        pointBackgroundColor: 'rgb(124, 58, 237)',
+        borderColor: getDashboardDqAccentColors().solid,
+        backgroundColor: getDashboardDqAccentColors().fillSoft,
+        pointBackgroundColor: getDashboardDqAccentColors().solid,
         pointRadius: 4,
         pointHoverRadius: 5,
         tension: 0.25,

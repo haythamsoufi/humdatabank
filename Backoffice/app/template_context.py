@@ -157,6 +157,17 @@ def register_template_context(app, config_class):
             return {"show_staging_banner": False}
 
     @app.context_processor
+    def inject_ui_style_preview():
+        """Dev-only IFRC/Legacy style switcher (loopback + DEBUG)."""
+        try:
+            from app.utils.ui_style_preview import show_ui_style_preview
+
+            return {"show_ui_style_preview": show_ui_style_preview()}
+        except Exception as e:
+            current_app.logger.debug("inject_ui_style_preview failed: %s", e)
+            return {"show_ui_style_preview": False}
+
+    @app.context_processor
     def inject_mobile_webview_embed():
         """Expose whether the Humanitarian Databank mobile app WebView is embedding this page."""
         if not has_request_context():

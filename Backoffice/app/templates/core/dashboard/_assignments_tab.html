@@ -9,7 +9,7 @@
             </h2>
                     {# Loop through the current assignments list #}
         {% if current_assignments %}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="dashboard-assignments-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {% for item in current_assignments %}
                     {% if item.type == 'project_group' %}
                         {% include "core/dashboard/_project_group_card.html" %}
@@ -48,7 +48,7 @@
 
         {# Past Assignments Section: Closed/cancelled; Approved older than 2 months; Pending/In Progress older than 1 year #}
         {% if past_assignments %}
-            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
+            <div id="past-assignments-section" class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
                 <div
                     class="flex justify-between items-center cursor-pointer group rounded-md px-2 py-1 -mx-2 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2"
                     id="approved-assignments-header"

@@ -9,6 +9,9 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ static_url('css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/dashboard-styles.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/ui-style-ifrc.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/ui-style-erp.css') }}">
 <link rel="stylesheet" href="{{ static_url('css/enhanced-search-dropdown.css') }}">
 <style nonce="{{ csp_nonce() }}">
     /* Critical: keep country/entity header controls aligned before external CSS finishes loading */
@@ -52,34 +55,34 @@
 {% endblock %}
 
 {% block content %}
-<div class="sharp-ui {% if not user_countries %}dashboard-no-access dashboard-no-access-bleed{% else %}py-2{% endif %}">
+{% set _dash_header_controls = (show_entity_select and user_entities) or (show_country_select and user_countries) or ((selected_entity or selected_country) and self_report_templates) %}
+<div id="dashboard-root"
+     class="ui-style-root sharp-ui {% if not user_countries %}dashboard-no-access dashboard-no-access-bleed{% else %}py-2{% endif %}"
+     data-ui-style="ifrc"
+     data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}">
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var root = document.getElementById('dashboard-root');
+    if (!root) return;
+    var preview = root.getAttribute('data-style-preview') === '1';
+    var allowed = ['ifrc', 'erp', 'legacy'];
+    var style = 'ifrc';
+    if (preview) {
+        try {
+            var stored = window.localStorage.getItem('uiStylePreview');
+            if (stored == null) stored = window.localStorage.getItem('dashboardStylePreview');
+            if (allowed.indexOf(stored) !== -1) style = stored;
+        } catch (e) { /* ignore */ }
+    }
+    root.setAttribute('data-ui-style', style);
+})();
+</script>
 
-    {# Executive Dashboard Header - Professional Corporate Style #}
-    <div class="executive-page-header executive-dashboard-header">
-        <div class="header-background-pattern"></div>
-        <div class="header-content-wrapper">
-            <div class="header-main-content">
-                {# Left side: Title section with professional branding #}
-                <div class="title-section">
-                    <div class="brand-icon-wrapper">
-                        <div class="brand-icon">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3 4C3 3.44772 3.44772 3 4 3H20C20.5523 3 21 3.44772 21 4V8C21 8.55228 20.5523 9 20 9H4C3.44772 9 3 8.55228 3 8V4Z" stroke="currentColor" stroke-width="2"/>
-                                <path d="M3 12C3 11.4477 3.44772 11 4 11H20C20.5523 11 21 11.4477 21 12V16C21 16.5523 20.5523 17 20 17H4C3.44772 17 3 16.5523 3 16V12Z" stroke="currentColor" stroke-width="2"/>
-                                <path d="M3 20C3 19.4477 3.44772 19 4 19H12C12.5523 19 13 19.4477 13 20V20C13 20.5523 12.5523 21 12 21H4C3.44772 21 3 20.5523 3 20V20Z" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="title-text-group">
-                        <h1 class="main-title">{{ title }}</h1>
-                    </div>
-            </div>
-
-                {# Right side: Professional action controls #}
-                <div class="action-controls">
-                {% if show_entity_select and user_entities %}
-                        <div class="control-group">
-                            <div class="control-wrapper">
+    {% if _dash_header_controls %}
+    {% call page_header(title=title, icon='fas fa-th-list') %}
+        {% if show_entity_select and user_entities %}
+            <div class="control-group">
+                <div class="control-wrapper">
                     {% with
                         form_action=url_for('main.dashboard'),
                         user_entities=user_entities,
@@ -89,55 +92,47 @@
                     %}
                         {% include 'components/entity_dropdown.html' %}
                     {% endwith %}
-                            </div>
-                        </div>
-
-                {% elif show_country_select and user_countries %}
-                        <div class="control-group">
-                            <div class="control-wrapper">
-                    {% with
-                        form_action=url_for('main.dashboard')
-                    %}
+                </div>
+            </div>
+        {% elif show_country_select and user_countries %}
+            <div class="control-group">
+                <div class="control-wrapper">
+                    {% with form_action=url_for('main.dashboard') %}
                         {% include 'components/country_dropdown.html' %}
                     {% endwith %}
-                            </div>
-                        </div>
-
-                {% elif user_countries %}
-                        {# User has countries but no dropdown shown (single country or other reason) - request access moved to profile menu #}
-                {% endif %}
-
-                {% if (selected_entity or selected_country) and self_report_templates %}
-                        <div class="relative">
-                    <button type="button"
-                            id="self-report-templates-button"
-                            aria-haspopup="true"
-                            aria-expanded="false"
-                            class="btn btn-ghost-danger btn-sm">
-                        <i class="fas fa-plus-circle mr-2"></i>{{ _('Create a Report') }}
-                    </button>
-                            {# Dropdown positioned relative to this button #}
-            <div id="self-report-templates-dropdown"
-                                 class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-50"
-                 role="menu" aria-orientation="vertical" aria-labelledby="self-report-templates-button">
-                <div class="py-1" role="none">
-                    {% for template in self_report_templates %}
-                        <form method="POST" action="{{ url_for('main.dashboard') }}" class="block w-full text-left">
-                            <input type="hidden" name="self_report_template_id" value="{{ template.id }}">
-                            <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
-                                {{ get_localized_template_name(template) }}
-                            </button>
-                        </form>
-                    {% endfor %}
                 </div>
             </div>
-        </div>
+        {% endif %}
+
+        {% if (selected_entity or selected_country) and self_report_templates %}
+            <div class="relative">
+                <button type="button"
+                        id="self-report-templates-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        class="btn btn-ghost-danger btn-sm">
+                    <i class="fas fa-plus-circle mr-2"></i>{{ _('Create a Report') }}
+                </button>
+                <div id="self-report-templates-dropdown"
+                     class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-50"
+                     role="menu" aria-orientation="vertical" aria-labelledby="self-report-templates-button">
+                    <div class="py-1" role="none">
+                        {% for template in self_report_templates %}
+                            <form method="POST" action="{{ url_for('main.dashboard') }}" class="block w-full text-left">
+                                <input type="hidden" name="self_report_template_id" value="{{ template.id }}">
+                                <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
+                                    {{ get_localized_template_name(template) }}
+                                </button>
+                            </form>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endcall %}
+    {% else %}
+    {{ page_header(title=title, icon='fas fa-th-list') }}
     {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
 
     {# Flash messages are handled in layout.html #}
 
@@ -1256,6 +1251,22 @@
 
 {% include 'components/_profile_completion_modal.html' %}
 
+{% if show_ui_style_preview|default(false) %}
+<aside id="ui-style-preview"
+       class="dashboard-style-preview"
+       aria-label="{{ _('UI style preview')|forceescape }}">
+    <p class="dashboard-style-preview__label">{{ _('Style preview') }}</p>
+    <div class="dashboard-style-preview__options" role="group" aria-label="{{ _('UI styles')|forceescape }}">
+        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="ifrc" aria-pressed="false">IFRC</button>
+        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="erp" aria-pressed="false">ERP</button>
+        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="legacy" aria-pressed="false">Legacy</button>
+    </div>
+    <p class="dashboard-style-preview__hint">{{ _('Dev only · saved in this browser') }}</p>
+</aside>
+{% endif %}
+
+</div>{# /#dashboard-root #}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -1264,6 +1275,7 @@
 
 {# Include Enhanced Search Dropdown Component #}
 <script src="{{ static_url('js/components/enhanced-search-dropdown.js') }}"></script>
+<script src="{{ static_url('js/core/dashboard-style-preview.js') }}"></script>
 
 <!-- Store translated messages in data attributes -->
 <div id="translations-data"

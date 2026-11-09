@@ -3629,3 +3629,16 @@ a.btn.entry-form-doc-library-btn {
     max-width: 100%;
     border-radius: 0.375rem;
 }
+
+/* Total-only mode: keep Total Direct and Indirect reach / Total on one line */
+.disaggregation-inputs[data-mode="total"]:not([style*="display: none"]) {
+  display: inline-block !important;
+  vertical-align: top;
+  margin-right: 1.5rem;
+  padding-bottom: 0;
+}
+.disaggregation-inputs[data-mode="total"]:not([style*="display: none"]) ~ .indirect-reach-row {
+  display: inline-block;
+  vertical-align: top;
+  margin-top: 0;
+}

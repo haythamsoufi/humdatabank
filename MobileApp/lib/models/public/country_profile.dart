@@ -48,6 +48,9 @@ class CountryInfo {
   final String? nationalSocietyName;
   final String? logoUrl;
 
+  /// True when the country is assigned UPR PNS plan/report templates (22/23).
+  final bool isPns;
+
   const CountryInfo({
     required this.id,
     required this.name,
@@ -56,6 +59,7 @@ class CountryInfo {
     this.region,
     this.nationalSocietyName,
     this.logoUrl,
+    this.isPns = false,
   });
 
   factory CountryInfo.fromJson(Map<String, dynamic> json) {
@@ -67,6 +71,7 @@ class CountryInfo {
       region: json['region']?.toString(),
       nationalSocietyName: json['national_society_name']?.toString(),
       logoUrl: json['logo_url']?.toString(),
+      isPns: json['is_pns'] == true,
     );
   }
 }

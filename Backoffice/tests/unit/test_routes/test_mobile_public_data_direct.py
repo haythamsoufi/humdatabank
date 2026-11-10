@@ -573,6 +573,7 @@ class TestMobileCountryProfile:
         assert status == 200
         data = body.get_json()['data']
         assert data['country']['iso3'] == 'PRF'
+        assert data['country']['is_pns'] is False
         assert data['periods'] == ['2024']
         assert len(data['indicators']) == 1
         entry = data['indicators'][0]
@@ -581,6 +582,77 @@ class TestMobileCountryProfile:
         assert entry['series'] == [{'period': '2024', 'value': 40}]
         assert data['documents'] == []
         assert data['cover_images'] == []
+
+
+class TestMobileCountryInternational:
+    def test_invalid_iso3_returns_400(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_international
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/12/international', method='GET',
+        ):
+            resp = mobile_country_international('12')
+
+        _, status = _parse(resp)
+        assert status == 400
+
+    def test_unknown_country_returns_404(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_international
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/ZZZ/international', method='GET',
+        ):
+            resp = mobile_country_international('ZZZ')
+
+        _, status = _parse(resp)
+        assert status == 404
+
+    def test_returns_international_payload(self, app, db_session, monkeypatch):
+        from app.routes.api.mobile.public_data import mobile_country_international
+        from tests.factories import create_test_country
+
+        create_test_country(db_session, name="Hostland", iso3="HST")
+
+        def fake_build(iso3):
+            return {
+                'iso3': iso3,
+                'is_pns': False,
+                'role': 'host',
+                'has_support': False,
+                'years': [2026],
+                'summary': {
+                    'year': 2026,
+                    'countries_supported': None,
+                    'supporting_partners': 0,
+                    'staff_presence': 0,
+                    'funding': 0,
+                    'requirement': 0,
+                    'expenditure': 0,
+                },
+                'partners': [],
+                'staff_presence': {'year': 2026, 'count': 0, 'entries': []},
+                'embeds': {
+                    'primary': f'/upr/support-flow?recipient={iso3}',
+                    'flow': f'/upr/support-flow?recipient={iso3}',
+                },
+            }
+
+        monkeypatch.setattr(
+            'plugins.upr.analysis.country_international.build_country_international',
+            fake_build,
+        )
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/hst/international', method='GET',
+        ):
+            resp = mobile_country_international('hst')
+
+        body, status = _parse(resp)
+        assert status == 200
+        data = body.get_json()['data']
+        assert data['iso3'] == 'HST'
+        assert data['is_pns'] is False
+        assert data['embeds']['primary'].endswith('recipient=HST')
 
 
 class TestMobileCountryGoDocuments:

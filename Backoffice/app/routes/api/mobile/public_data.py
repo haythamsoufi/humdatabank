@@ -5,6 +5,7 @@ Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
     indicator-suggestions, data/periods, data/fdrs-overview, data/fdrs-reach-indicators, data/country-profile/<iso3>,
     data/country-profile/<iso3>/go-documents, data/go-documents, data/country-profile/<iso3>/operations,
+    data/country-profile/<iso3>/international,
     data/offline-home, data/offline-countries,
     data/region-profile/<slug>, data/region-profile/<slug>/operations,
     data/disaggregation-overview
@@ -385,6 +386,15 @@ def mobile_country_go_documents(iso3):
 def mobile_country_operations(iso3):
     """Active GO emergencies for one country (counts, funding, and operations)."""
     from plugins.fdrs.mobile import country_operations as _impl
+
+    return _impl(iso3)
+
+
+@mobile_bp.route('/data/country-profile/<iso3>/international', methods=['GET'])
+@mobile_rate_limit(requests_per_minute=60)
+def mobile_country_international(iso3):
+    """International bilateral support for one country (PNS outbound or host inbound)."""
+    from plugins.fdrs.mobile import country_international as _impl
 
     return _impl(iso3)
 

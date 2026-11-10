@@ -961,9 +961,7 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
         final thumbLeft = isRtl
             ? (isDomestic ? segmentW : 0.0)
             : (isDomestic ? 0.0 : segmentW);
-        final trackColor = isDark
-            ? theme.colorScheme.surfaceContainerLow
-            : const Color(0xFFE8E8ED);
+        final trackColor = theme.colorScheme.surfaceContainerLow;
         final thumbColor = isDark
             ? theme.colorScheme.surfaceContainerHigh
             : theme.colorScheme.surface;
@@ -1027,8 +1025,9 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(
-                            alpha: isDark ? 0.35 : 0.1,
+                          color: theme.ambientShadow(
+                            lightOpacity: 0.1,
+                            darkOpacity: 0.35,
                           ),
                           blurRadius: 6,
                           offset: const Offset(0, 2),

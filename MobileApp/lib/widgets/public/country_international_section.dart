@@ -326,9 +326,12 @@ class _SupportEmbedWebViewState extends State<_SupportEmbedWebView> {
                 },
               ),
               if (_loading)
-                const ColoredBox(
-                  color: Color(0x66FFFFFF),
-                  child: Center(
+                ColoredBox(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surface
+                      .withValues(alpha: 0.4),
+                  child: const Center(
                     child: SizedBox(
                       width: 28,
                       height: 28,

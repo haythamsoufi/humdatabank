@@ -603,6 +603,29 @@ def country_profile(iso3):
         return mobile_server_error('Failed to load country profile.')
 
 
+def country_projects(iso3):
+    """Active projects for one country (Open or Active), public fields only.
+
+    Includes NSD and any other portfolio stored on the core project registry.
+    Contacts, expected spending, and the internal plan are not included.
+    """
+    code = (iso3 or '').strip().upper()
+    if len(code) != 3 or not code.isalpha():
+        return mobile_bad_request('iso3 must be a 3-letter country code')
+
+    try:
+        from app.models import Country
+        from app.services.projects.service import public_active_projects
+
+        country = Country.query.filter(db.func.upper(Country.iso3) == code).first()
+        if country is None:
+            return mobile_not_found('Country not found')
+        return mobile_ok(data={'projects': public_active_projects(country.id)})
+    except Exception as e:
+        current_app.logger.error('mobile_country_projects: %s', e, exc_info=True)
+        return mobile_server_error('Failed to load projects.')
+
+
 def country_international(iso3):
     """International bilateral support for one country (PNS outbound or host inbound).
 

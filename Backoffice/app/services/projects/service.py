@@ -302,6 +302,47 @@ def get_projects_for_country(country_id: int) -> List[Project]:
     )
 
 
+def _public_text(value: Optional[str]) -> Optional[str]:
+    text = (value or "").strip()
+    return text or None
+
+
+def _public_amount(value) -> Optional[float]:
+    if value is None:
+        return None
+    return float(value)
+
+
+def public_project_payload(project: Project) -> Dict[str, Any]:
+    """Fields safe to show on the public country profile.
+
+    Omits contacts, expected spending, and the internal plan (logframe).
+    """
+    return {
+        "reference": project.reference,
+        "title": _public_text(project.title),
+        "portfolio": _public_text(project.portfolio),
+        "fund": _public_text(project.fund),
+        "status": (project.status or "Open").strip() or "Open",
+        "organization_name": _public_text(project.organization_name),
+        "funding_modality": _public_text(project.funding_modality),
+        "categories": _public_text(project.categories),
+        "start_date": project.start_date.isoformat() if project.start_date else None,
+        "end_date": project.end_date.isoformat() if project.end_date else None,
+        "amount_granted": _public_amount(project.amount_granted),
+        "planned_overview": _public_text(project.planned_overview),
+    }
+
+
+def public_active_projects(country_id: int) -> List[Dict[str, Any]]:
+    """Open and Active projects for one country, oldest reference first."""
+    return [
+        public_project_payload(project)
+        for project in get_projects_for_country(country_id)
+        if project.is_open
+    ]
+
+
 def project_to_admin_dict(p: Project) -> Dict[str, Any]:
     return {
         "id": p.id,

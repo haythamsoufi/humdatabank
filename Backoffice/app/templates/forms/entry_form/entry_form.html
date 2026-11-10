@@ -69,7 +69,7 @@
 {% block content %}
 <div id="entry-form-root"
      class="entry-form-root ui-style-root w-full max-w-full mx-auto px-0 sm:px-2 pb-4 sm:pb-6 min-w-0"
-     data-ui-style="ifrc"
+     data-ui-style="legacy"
      data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}"
      data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}"
      data-public-token="{{ public_token if is_public_submission else '' }}">
@@ -79,7 +79,8 @@
     if (!root) return;
     var preview = root.getAttribute('data-style-preview') === '1';
     var allowed = ['ifrc', 'erp', 'legacy'];
-    var style = 'ifrc';
+    /* Shipped default stays legacy until a style is chosen for production. */
+    var style = 'legacy';
     if (preview) {
         try {
             var stored = window.localStorage.getItem('uiStylePreview');

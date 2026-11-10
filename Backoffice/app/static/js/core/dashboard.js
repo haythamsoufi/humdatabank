@@ -44,7 +44,7 @@ const DASHBOARD_CARD_ACTIONS_OVERFLOW_BTN_WIDTH = 40;
 
 function getDashboardStyleId() {
     const root = document.getElementById('dashboard-root') || document.querySelector('.ui-style-root');
-    return (root && root.getAttribute('data-ui-style')) || 'ifrc';
+    return (root && root.getAttribute('data-ui-style')) || 'legacy';
 }
 
 /** Chart / pillar colors: purple only for legacy preview; otherwise CSS tokens. */

@@ -8,13 +8,13 @@ concurrency:
 
 # Simulator builds are always JIT debug (Flutter has no release/profile for iphonesimulator).
 run-name: >-
-  ${{ format('iOS Build — {0} | {1} | {2} ({3})', inputs.build_target || 'device', inputs.build_target == 'simulator' && 'debug' || inputs.build_mode || 'release', inputs.organization_config || 'ifrc', inputs.backend_url) }}
+  ${{ format('iOS Build — {0} | {1} | {2} ({3}){4}', inputs.build_target || 'device', inputs.build_target == 'simulator' && 'debug' || inputs.build_mode || 'release', inputs.organization_config || 'ifrc', inputs.backend_url, inputs.sign_app && ' | signed' || '') }}
 
 on:
   workflow_dispatch:
     inputs:
       backend_url:
-        description: 'Backend URL (profile: databank.ifrc.org → production; *.fly.dev → Humanitarian Databank demo; IFRC *-stage.ifrc.org → staging; localhost → development). Demo uses MOBILE_APP_API_KEY_LOCAL_DEV and bundle Humanitarian Databank (Demo).'
+        description: 'Backend. ifrc.org = production, fly.dev = demo, -stage = staging, localhost = development.'
         required: true
         type: choice
         options:
@@ -25,7 +25,7 @@ on:
           - https://databank.ifrc.org
         default: 'https://databank.ifrc.org'
       organization_config:
-        description: 'Organization configuration (determines branding and app name)'
+        description: 'Branding and app name'
         required: true
         type: choice
         options:
@@ -33,7 +33,7 @@ on:
           - ''
         default: 'ifrc'
       build_target:
-        description: 'device = iphoneos .app + unsigned IPA (install via AltStore/Sideloadly); simulator = debug ARM sim .app zipped as Runner.zip for Appetize.io (upload the inner Runner.zip, not device .ipa)'
+        description: 'device = IPA; simulator = Appetize zip'
         required: true
         type: choice
         options:
@@ -41,7 +41,7 @@ on:
           - simulator
         default: 'device'
       build_mode:
-        description: 'Build mode for device target. profile = AOT + debug banner visible + works with AltStore/Sideloadly (recommended for on-device debugging without a paid developer account). release = smallest/fastest. debug = requires a paid developer provisioning profile — will crash at launch with ad-hoc/AltStore signing.'
+        description: 'Device only. release, profile (AltStore), or debug (paid Apple account).'
         required: false
         type: choice
         options:
@@ -49,8 +49,13 @@ on:
           - profile
           - debug
         default: 'release'
+      sign_app:
+        description: 'Sign the device IPA (Apple certificate)'
+        required: false
+        type: boolean
+        default: false
       run_flutter_analyze:
-        description: 'Run flutter analyze before CocoaPods / Xcode (saves ~30–40s when disabled)'
+        description: 'Run flutter analyze before the build'
         required: false
         type: boolean
         default: true
@@ -146,6 +151,10 @@ jobs:
           fi
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
           echo "Resolved iOS build target: $TARGET"
+          if [ "${{ inputs.sign_app }}" = "true" ] && [ "$TARGET" = "simulator" ]; then
+            echo "Signing is for device IPAs. Set build_target to device." >&2
+            exit 1
+          fi
 
       - name: Resolve build profile from backend URL
         id: resolve_env
@@ -283,13 +292,20 @@ jobs:
           # Update URL scheme to avoid conflicts (optional - comment out if you want same scheme)
           # /usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 'ifrcdatabankci'" ios/Runner/Info.plist
 
-      - name: Build iOS (no codesign)
+      - name: Import code signing certificate
+        if: inputs.sign_app && steps.ios_target.outputs.target == 'device'
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+
+      - name: Build iOS
         working-directory: ${{ steps.flutter_path.outputs.path }}
         env:
           IFRC_API_USER: ${{ secrets.IFRC_API_USER }}
           IFRC_API_PASSWORD: ${{ secrets.IFRC_API_PASSWORD }}
         run: |
-          # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step)
+          # Compile-time flag must match .env (derived from BACKEND_URL in resolve_env step).
           case "${{ steps.resolve_env.outputs.profile }}" in
             production) ENV_FLAG="PRODUCTION=true" ;;
             staging)    ENV_FLAG="STAGING=true" ;;
@@ -297,70 +313,48 @@ jobs:
             *)          ENV_FLAG="DEVELOPMENT=true" ;;
           esac
 
-          # Build with organization config if specified
-          ORG_CONFIG=""
+          # --no-pub: dependencies already resolved (pub get + pod install).
+          DEFINES=(
+            --dart-define="$ENV_FLAG"
+            --dart-define=BACKEND_URL="${{ inputs.backend_url }}"
+            --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL"
+            --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}"
+            --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}"
+            --dart-define=IFRC_API_USER="$IFRC_API_USER"
+            --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD"
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+          )
           if [ -n "${{ inputs.organization_config }}" ]; then
-            ORG_CONFIG="--dart-define=ORGANIZATION_CONFIG=${{ inputs.organization_config }}"
+            DEFINES+=(--dart-define=ORGANIZATION_CONFIG="${{ inputs.organization_config }}")
           fi
 
-          # Simulator: Flutter does not support release or profile for iphonesimulator (JIT debug only).
+          case "${{ inputs.build_mode }}" in
+            profile) MODE_FLAG="--profile" ;;
+            debug)   MODE_FLAG="--debug" ;;
+            *)       MODE_FLAG="--release" ;;
+          esac
+
+          # Simulator: Flutter has no release/profile for iphonesimulator (JIT debug only).
           if [ "${{ steps.ios_target.outputs.target }}" = "simulator" ]; then
-            # --no-pub: dependencies already resolved (pub get + pod install).
-            flutter build ios --simulator --debug --no-codesign --no-pub \
-              --dart-define=$ENV_FLAG \
-              --dart-define=BACKEND_URL="${{ inputs.backend_url }}" \
-              --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \
-              $ORG_CONFIG \
-              --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
-              --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}" \
-              --dart-define=IFRC_API_USER="$IFRC_API_USER" \
-              --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
-              --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+            flutter build ios --simulator --debug --no-codesign --no-pub "${DEFINES[@]}"
+          elif [ "${{ inputs.sign_app }}" = "true" ]; then
+            flutter build ipa $MODE_FLAG --no-pub "${DEFINES[@]}"
           else
-            # Device builds: release by default; debug mode shows the debug banner,
-            # enables asserts, and gives full stack traces — useful for on-device debugging
-            # (e.g. session invalidation root-cause). Install the unsigned IPA via
-            # AltStore or Sideloadly (free Apple ID, 7-day cert).
-            # profile = AOT-compiled + profiling hooks; kReleaseMode is false so debug
-            # banners show. Works with AltStore/Sideloadly (no get-task-allow entitlement).
-            # debug  = requires a real developer provisioning profile; crashes at launch
-            #          with ad-hoc re-signing (AltStore/Sideloadly) — avoid without a
-            #          paid Apple Developer account.
-            BUILD_MODE="${{ inputs.build_mode }}"
-            if [ "$BUILD_MODE" = "profile" ]; then
-              MODE_FLAG="--profile"
-            elif [ "$BUILD_MODE" = "debug" ]; then
-              MODE_FLAG="--debug"
-            else
-              MODE_FLAG="--release"
-            fi
-            flutter build ios $MODE_FLAG --no-codesign --no-pub \
-              --dart-define=$ENV_FLAG \
-              --dart-define=BACKEND_URL="${{ inputs.backend_url }}" \
-              --dart-define=FRONTEND_URL="$MOBILE_FRONTEND_URL" \
-              $ORG_CONFIG \
-              --dart-define=MOBILE_APP_API_KEY="${{ steps.env_secrets.outputs.api_key }}" \
-              --dart-define=MAPBOX_ACCESS_TOKEN="${{ secrets.MAPBOX_ACCESS_TOKEN }}" \
-              --dart-define=IFRC_API_USER="$IFRC_API_USER" \
-              --dart-define=IFRC_API_PASSWORD="$IFRC_API_PASSWORD" \
-              --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+            flutter build ios $MODE_FLAG --no-codesign --no-pub "${DEFINES[@]}"
           fi
 
       - name: Create unsigned IPA
-        if: steps.ios_target.outputs.target == 'device'
+        if: steps.ios_target.outputs.target == 'device' && inputs.sign_app == false
         working-directory: ${{ steps.flutter_path.outputs.path }}
         run: |
-          # Create a temporary directory for the IPA
           mkdir -p build/ios/ipa/Payload
-          # Copy the app bundle
           cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
-          # Create the IPA archive with alternate bundle identifier name
           cd build/ios/ipa
           zip -r databank.ipa Payload
           cd ../../..
 
       - name: Archive iOS build artifacts (device)
-        if: steps.ios_target.outputs.target == 'device'
+        if: steps.ios_target.outputs.target == 'device' && inputs.sign_app == false
         uses: actions/upload-artifact@v6
         with:
           name: ios-build-ci-${{ inputs.build_mode == 'profile' && 'profile' || inputs.build_mode == 'debug' && 'debug' || 'release' }}
@@ -368,6 +362,23 @@ jobs:
             ${{ steps.flutter_path.outputs.path }}/build/ios/iphoneos/Runner.app
             ${{ steps.flutter_path.outputs.path }}/build/ios/ipa/*.ipa
           retention-days: 30
+
+      - name: Archive signed IPA
+        if: steps.ios_target.outputs.target == 'device' && inputs.sign_app
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-ipa-${{ github.run_number }}
+          path: ${{ steps.flutter_path.outputs.path }}/build/ios/ipa/*.ipa
+          retention-days: 90
+
+      - name: Upload build logs
+        if: failure() && inputs.sign_app
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-logs
+          path: |
+            ${{ steps.flutter_path.outputs.path }}/build/ios/**/*.log
+          retention-days: 7
 
       # Appetize.io requires a .zip (or .tar.gz) of the .app — not a raw folder upload.
       # https://appetize.io/docs#section-ios — ARM simulator build (macos-latest) is recommended.
@@ -392,30 +403,3 @@ jobs:
           name: ios-simulator-ci
           path: ${{ steps.flutter_path.outputs.path }}/build/ios/iphonesimulator/Runner.zip
           retention-days: 30
-
-      # Optional: Build IPA with code signing (requires Apple Developer account)
-      # Uncomment and configure the following steps if you have signing certificates
-      # - name: Setup Xcode
-      #   uses: maxim-lobanov/setup-xcode@v1
-      #   with:
-      #     xcode-version: latest-stable
-      #
-      # - name: Import Code Signing Certificate
-      #   uses: apple-actions/import-codesign-certs@v2
-      #   with:
-      #     p12-file-base64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-      #     p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
-      #
-      # - name: Build IPA
-      #   working-directory: MobileApp
-      #   run: |
-      #     # Use same profile as BACKEND_URL (see Resolve build profile from backend URL step)
-      #     flutter build ipa --release --dart-define=PRODUCTION=true
-      #     # or STAGING=true / DEVELOPMENT=true
-      #
-      # - name: Upload IPA
-      #   uses: actions/upload-artifact@v6
-      #   with:
-      #     name: ios-ipa
-      #     path: MobileApp/build/ios/ipa/*.ipa
-      #     retention-days: 30

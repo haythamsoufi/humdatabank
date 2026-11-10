@@ -560,6 +560,14 @@ class AppLocalizations {
       'due_date': 'Due Date',
       'no_due_date': 'No due date',
       'overdue': 'Overdue',
+      'reporting_cycle': 'Reporting cycle',
+      'cycles': 'Cycles',
+      'reporting_cycles': 'Reporting cycles',
+      'cycle_current': 'Current',
+      'cycle_upcoming': 'Upcoming',
+      'cycle_past': 'Past',
+      'cycle_fallback': 'Cycle',
+      'browse_reporting_cycles': 'Browse reporting cycles',
       'latest_submission': 'Latest Submission',
       'submitted_through_public_link': 'Submitted through public link',
       'submission': 'submission',
@@ -1148,9 +1156,46 @@ class AppLocalizations {
           'Countries with staff present',
       'country_detail_international_staff_host':
           'PNSs with staff present',
+      'country_detail_international_staff_present': 'Staff present',
       'country_detail_international_staff_count': '%s staff',
+      'country_detail_international_flow_year': 'Year',
+      'country_detail_international_flow_pns': 'Supporting society (PNS)',
+      'country_detail_international_flow_recipient': 'Recipient country',
+      'country_detail_international_flow_all': 'All',
+      'country_detail_international_flow_clear': 'Clear filters',
+      'country_detail_international_flow_reset': 'Reset view',
+      'country_detail_international_flow_legend_donor': 'Supporting society (PNS)',
+      'country_detail_international_flow_legend_host': 'Receiving country',
+      'country_detail_international_flow_empty':
+          'No bilateral support between National Societies has been reported yet for this selection.',
+      'country_detail_international_flow_donors': 'Societies supporting',
+      'country_detail_international_flow_hosts': 'Societies receiving',
+      'country_detail_international_flow_requirement_total': 'Funding requirement',
+      'country_detail_international_flow_funding_total': 'Bilateral funding',
+      'country_detail_international_flow_expenditure_total': 'Expenditure',
+      'country_detail_international_flow_areas':
+          'Bilateral funding by strategic priority',
+      'country_detail_international_flow_area_empty':
+          'No bilateral funding figures for this selection.',
+      'country_detail_international_flow_sent': 'Bilateral funding sent',
+      'country_detail_international_flow_received': 'Bilateral funding received',
+      'country_detail_international_flow_rankings': 'Bilateral funding rankings',
+      'country_detail_international_flow_bar_empty': 'No partners for this filter.',
+      'country_detail_international_flow_coverage':
+          'Funding requirement coverage by INFORM risk',
+      'country_detail_international_flow_coverage_empty':
+          'No bilateral funding requirement reported for this year.',
+      'country_detail_international_coverage_low': 'Low',
+      'country_detail_international_coverage_medium': 'Medium',
+      'country_detail_international_coverage_high': 'High',
+      'country_detail_international_coverage_very_high': 'Very high',
       'country_detail_international_unavailable':
           'International support could not be loaded',
+      'country_detail_projects': 'Projects',
+      'country_detail_projects_unavailable': 'Projects could not be loaded',
+      'country_detail_project_amount': 'Amount granted',
+      'country_detail_project_status_active': 'Active',
+      'country_detail_project_status_open': 'Open',
       'country_detail_key_indicators': 'Key indicators',
       'country_detail_top_sectors': 'Top sectors',
       'country_detail_documents': 'Documents',
@@ -1857,6 +1902,14 @@ class AppLocalizations {
       'due_date': 'Fecha de Vencimiento',
       'no_due_date': 'Sin fecha de vencimiento',
       'overdue': 'Vencido',
+      'reporting_cycle': 'Ciclo de reporte',
+      'cycles': 'Ciclos',
+      'reporting_cycles': 'Ciclos de reporte',
+      'cycle_current': 'Actual',
+      'cycle_upcoming': 'Próximo',
+      'cycle_past': 'Anterior',
+      'cycle_fallback': 'Ciclo',
+      'browse_reporting_cycles': 'Ver ciclos de reporte',
       'latest_submission': 'Último Envío',
       'submitted_through_public_link': 'Enviado a través de enlace público',
       'submission': 'envío',
@@ -2899,6 +2952,14 @@ class AppLocalizations {
       'due_date': 'Date d\'Échéance',
       'no_due_date': 'Aucune date d\'échéance',
       'overdue': 'En Retard',
+      'reporting_cycle': 'Cycle de rapport',
+      'cycles': 'Cycles',
+      'reporting_cycles': 'Cycles de rapport',
+      'cycle_current': 'En cours',
+      'cycle_upcoming': 'À venir',
+      'cycle_past': 'Passé',
+      'cycle_fallback': 'Cycle',
+      'browse_reporting_cycles': 'Parcourir les cycles de rapport',
       'latest_submission': 'Dernière Soumission',
       'submitted_through_public_link': 'Soumis via lien public',
       'submission': 'soumission',
@@ -3931,6 +3992,14 @@ class AppLocalizations {
       'due_date': 'تاريخ الاستحقاق',
       'no_due_date': 'لا يوجد تاريخ استحقاق',
       'overdue': 'متأخر',
+      'reporting_cycle': 'دورة الإبلاغ',
+      'cycles': 'الدورات',
+      'reporting_cycles': 'دورات الإبلاغ',
+      'cycle_current': 'الحالي',
+      'cycle_upcoming': 'القادم',
+      'cycle_past': 'السابق',
+      'cycle_fallback': 'دورة',
+      'browse_reporting_cycles': 'استعراض دورات الإبلاغ',
       'latest_submission': 'آخر تقديم',
       'submitted_through_public_link': 'تم التقديم من خلال رابط عام',
       'submission': 'تقديم',
@@ -4940,6 +5009,14 @@ class AppLocalizations {
       'due_date': 'नियत तारीख',
       'no_due_date': 'कोई नियत तारीख नहीं',
       'overdue': 'अतिदेय',
+      'reporting_cycle': 'रिपोर्टिंग चक्र',
+      'cycles': 'चक्र',
+      'reporting_cycles': 'रिपोर्टिंग चक्र',
+      'cycle_current': 'वर्तमान',
+      'cycle_upcoming': 'आगामी',
+      'cycle_past': 'पिछला',
+      'cycle_fallback': 'चक्र',
+      'browse_reporting_cycles': 'रिपोर्टिंग चक्र देखें',
       'latest_submission': 'नवीनतम सबमिशन',
       'submitted_through_public_link': 'सार्वजनिक लिंक के माध्यम से प्रस्तुत',
       'submission': 'सबमिशन',
@@ -5974,6 +6051,14 @@ class AppLocalizations {
       'due_date': 'Срок Выполнения',
       'no_due_date': 'Нет срока выполнения',
       'overdue': 'Просрочено',
+      'reporting_cycle': 'Отчётный цикл',
+      'cycles': 'Циклы',
+      'reporting_cycles': 'Отчётные циклы',
+      'cycle_current': 'Текущий',
+      'cycle_upcoming': 'Предстоящий',
+      'cycle_past': 'Прошлый',
+      'cycle_fallback': 'Цикл',
+      'browse_reporting_cycles': 'Просмотр циклов отчётности',
       'latest_submission': 'Последняя Отправка',
       'submitted_through_public_link': 'Отправлено через публичную ссылку',
       'submission': 'отправка',
@@ -6981,6 +7066,14 @@ class AppLocalizations {
       'due_date': '截止日期',
       'no_due_date': '无截止日期',
       'overdue': '逾期',
+      'reporting_cycle': '报告周期',
+      'cycles': '周期',
+      'reporting_cycles': '报告周期',
+      'cycle_current': '当前',
+      'cycle_upcoming': '即将开始',
+      'cycle_past': '以往',
+      'cycle_fallback': '周期',
+      'browse_reporting_cycles': '浏览报告周期',
       'latest_submission': '最新提交',
       'submitted_through_public_link': '通过公开链接提交',
       'submission': '提交',
@@ -8300,6 +8393,14 @@ class AppLocalizations {
   String get dueDate => translate('due_date');
   String get noDueDate => translate('no_due_date');
   String get overdue => translate('overdue');
+  String get reportingCycle => translate('reporting_cycle');
+  String get cycles => translate('cycles');
+  String get reportingCycles => translate('reporting_cycles');
+  String get cycleCurrent => translate('cycle_current');
+  String get cycleUpcoming => translate('cycle_upcoming');
+  String get cyclePast => translate('cycle_past');
+  String get cycleFallback => translate('cycle_fallback');
+  String get browseReportingCycles => translate('browse_reporting_cycles');
   String get latestSubmission => translate('latest_submission');
   String get submittedThroughPublicLink =>
       translate('submitted_through_public_link');
@@ -8939,11 +9040,74 @@ class AppLocalizations {
       translate('country_detail_international_staff_pns');
   String get countryDetailInternationalStaffHost =>
       translate('country_detail_international_staff_host');
+  String get countryDetailInternationalStaffPresent =>
+      translate('country_detail_international_staff_present');
+  String get countryDetailInternationalFlowYear =>
+      translate('country_detail_international_flow_year');
+  String get countryDetailInternationalFlowPns =>
+      translate('country_detail_international_flow_pns');
+  String get countryDetailInternationalFlowRecipient =>
+      translate('country_detail_international_flow_recipient');
+  String get countryDetailInternationalFlowAll =>
+      translate('country_detail_international_flow_all');
+  String get countryDetailInternationalFlowClear =>
+      translate('country_detail_international_flow_clear');
+  String get countryDetailInternationalFlowReset =>
+      translate('country_detail_international_flow_reset');
+  String get countryDetailInternationalFlowLegendDonor =>
+      translate('country_detail_international_flow_legend_donor');
+  String get countryDetailInternationalFlowLegendHost =>
+      translate('country_detail_international_flow_legend_host');
+  String get countryDetailInternationalFlowEmpty =>
+      translate('country_detail_international_flow_empty');
+  String get countryDetailInternationalFlowDonors =>
+      translate('country_detail_international_flow_donors');
+  String get countryDetailInternationalFlowHosts =>
+      translate('country_detail_international_flow_hosts');
+  String get countryDetailInternationalFlowRequirementTotal =>
+      translate('country_detail_international_flow_requirement_total');
+  String get countryDetailInternationalFlowFundingTotal =>
+      translate('country_detail_international_flow_funding_total');
+  String get countryDetailInternationalFlowExpenditureTotal =>
+      translate('country_detail_international_flow_expenditure_total');
+  String get countryDetailInternationalFlowAreas =>
+      translate('country_detail_international_flow_areas');
+  String get countryDetailInternationalFlowAreaEmpty =>
+      translate('country_detail_international_flow_area_empty');
+  String get countryDetailInternationalFlowSent =>
+      translate('country_detail_international_flow_sent');
+  String get countryDetailInternationalFlowReceived =>
+      translate('country_detail_international_flow_received');
+  String get countryDetailInternationalFlowRankings =>
+      translate('country_detail_international_flow_rankings');
+  String get countryDetailInternationalFlowBarEmpty =>
+      translate('country_detail_international_flow_bar_empty');
+  String get countryDetailInternationalFlowCoverage =>
+      translate('country_detail_international_flow_coverage');
+  String get countryDetailInternationalFlowCoverageEmpty =>
+      translate('country_detail_international_flow_coverage_empty');
+  String get countryDetailInternationalCoverageLow =>
+      translate('country_detail_international_coverage_low');
+  String get countryDetailInternationalCoverageMedium =>
+      translate('country_detail_international_coverage_medium');
+  String get countryDetailInternationalCoverageHigh =>
+      translate('country_detail_international_coverage_high');
+  String get countryDetailInternationalCoverageVeryHigh =>
+      translate('country_detail_international_coverage_very_high');
   String countryDetailInternationalStaffCount(String count) =>
       translate('country_detail_international_staff_count')
           .replaceAll('%s', count);
   String get countryDetailInternationalUnavailable =>
       translate('country_detail_international_unavailable');
+  String get countryDetailProjects => translate('country_detail_projects');
+  String get countryDetailProjectsUnavailable =>
+      translate('country_detail_projects_unavailable');
+  String get countryDetailProjectAmount =>
+      translate('country_detail_project_amount');
+  String get countryDetailProjectStatusActive =>
+      translate('country_detail_project_status_active');
+  String get countryDetailProjectStatusOpen =>
+      translate('country_detail_project_status_open');
   String get countryDetailKeyIndicators =>
       translate('country_detail_key_indicators');
   String get countryDetailTopSectors => translate('country_detail_top_sectors');

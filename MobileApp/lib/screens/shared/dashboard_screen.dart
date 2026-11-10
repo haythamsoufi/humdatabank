@@ -17,6 +17,7 @@ import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
+import '../../models/shared/project_dashboard_group.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart';
 import '../../widgets/app_bar.dart';
@@ -648,8 +649,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       return true;
     }
 
-    // For focal points (assignment_editor_submitter): same statuses as Backoffice template
+    // For focal points (assignment_editor_submitter): same statuses as Backoffice template.
+    // A closed project round offers View on the web, not Enter Data.
     if (userRole == 'focal_point') {
+      if (assignment.isRoundClosed) {
+        return false;
+      }
       final statusLower = assignment.status.toLowerCase();
       return statusLower != 'submitted' &&
           statusLower != 'approved' &&
@@ -760,7 +765,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     required AppLocalizations localizations,
   }) {
     final assignments = provider.currentAssignments;
+    final cards = groupProjectDashboardCards(assignments);
     final scheme = Theme.of(context).colorScheme;
+    final role = authProvider.user?.role;
+    final canDownloadNow =
+        offlineProvider.isOnline && !shouldDeferRemoteFetch;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -770,7 +779,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
           child: DashboardSectionLabel(
             title: localizations.currentAssignments,
-            count: assignments.length,
+            count: cards.length,
           ),
         ),
         if (assignments.isEmpty)
@@ -799,13 +808,46 @@ class _DashboardScreenState extends State<DashboardScreen>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
-            children: assignments.asMap().entries.map((entry) {
+            children: cards.asMap().entries.map((entry) {
               final index = entry.key;
-              final assignment = entry.value;
-              final showEnter = _shouldShowEnterDataButton(
-                authProvider.user?.role,
-                assignment,
-              );
+              final card = entry.value;
+              final project = card.project;
+              if (project != null) {
+                return AppFadeInUp(
+                  staggerIndex: index,
+                  child: DashboardProjectGroupCard(
+                    group: project,
+                    enterDataButtonText: localizations.enterData,
+                    showEnterDataButton: (assignment) =>
+                        _shouldShowEnterDataButton(role, assignment),
+                    onOpen: (assignment) {
+                      HapticFeedback.lightImpact();
+                      unawaited(_openAssignmentForm(context, assignment));
+                    },
+                    onEnterData: (assignment) {
+                      HapticFeedback.mediumImpact();
+                      unawaited(_openAssignmentForm(context, assignment));
+                    },
+                    canSaveOffline: (assignment) =>
+                        _canSaveOffline(role, assignment) && canDownloadNow,
+                    onDownloadForOffline: _saveForOffline,
+                    onOfflineBundleDetails: (assignment) {
+                      HapticFeedback.lightImpact();
+                      unawaited(
+                        _showOfflineBundleDetailsSheet(context, assignment),
+                      );
+                    },
+                    hasOfflineFormSnapshot: (assignment) =>
+                        _offlineForms.statusFor(assignment.id).available,
+                    offlineBundleOutdated: (assignment) =>
+                        _offlineForms.statusFor(assignment.id).outdated,
+                    isDownloadingOfflineForm: (assignment) =>
+                        _offlineForms.isBusy(assignment.id),
+                  ),
+                );
+              }
+              final assignment = card.assignment!;
+              final showEnter = _shouldShowEnterDataButton(role, assignment);
               final offlineStatus = _offlineForms.statusFor(assignment.id);
               final hasBundle = offlineStatus.available;
               return AppFadeInUp(
@@ -823,9 +865,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     unawaited(_openAssignmentForm(context, assignment));
                   },
                   onDownloadForOffline:
-                      _canSaveOffline(authProvider.user?.role, assignment) &&
-                          offlineProvider.isOnline &&
-                          !shouldDeferRemoteFetch
+                      _canSaveOffline(role, assignment) && canDownloadNow
                       ? () => _saveForOffline(assignment)
                       : null,
                   onOfflineBundleDetails: hasBundle

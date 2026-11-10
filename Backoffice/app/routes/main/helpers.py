@@ -2054,6 +2054,45 @@ def _dashboard_item_is_project_assignment(item: dict) -> bool:
     return bool(aes and getattr(aes, "entity_type", None) == EntityType.project.value)
 
 
+def dashboard_assignment_entity_filter(entity_type: str, entity_id: int):
+    """Assignments shown for one dashboard entity.
+
+    A country dashboard also includes project-entity rows for projects in that
+    country. Those rows are collapsed into one project card per project.
+    """
+    from sqlalchemy import and_, or_
+
+    from app import db
+
+    clause = and_(
+        AssignmentEntityStatus.entity_type == entity_type,
+        AssignmentEntityStatus.entity_id == entity_id,
+    )
+    if entity_type != EntityType.country.value:
+        return clause
+    try:
+        from app.models.projects import Project
+
+        project_ids = [
+            pid
+            for (pid,) in db.session.query(Project.id)
+            .filter(Project.country_id == entity_id)
+            .all()
+        ]
+    except Exception as e:
+        current_app.logger.debug("Project dashboard filter skipped: %s", e)
+        return clause
+    if not project_ids:
+        return clause
+    return or_(
+        clause,
+        and_(
+            AssignmentEntityStatus.entity_type == EntityType.project.value,
+            AssignmentEntityStatus.entity_id.in_(project_ids),
+        ),
+    )
+
+
 def group_dashboard_project_assignments(items, current_date):
     """Collapse project entity AES rows into one dashboard card with cycle dropdown."""
     from collections import defaultdict

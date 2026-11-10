@@ -41,7 +41,10 @@ from app.utils.dashboard_focal_points import (
     get_focal_points_for_country,
 )
 from app.utils.request_validation import enforce_csrf_json
-from app.routes.main.helpers import DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+from app.routes.main.helpers import (
+    DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES,
+    dashboard_assignment_entity_filter,
+)
 from app.static_version import deploy_asset_version
 from app import db
 
@@ -539,8 +542,29 @@ def _collect_user_entities(user):
     return user_entities, entities_json, allowed_entity_types
 
 
+def _project_dashboard_fields(projects_by_id, aes):
+    """Project card fields for a project-entity assignment. Empty for other entities."""
+    if getattr(aes, "entity_type", None) != EntityType.project.value:
+        return {}
+    project = projects_by_id.get(aes.entity_id)
+    return {
+        "entity_type": aes.entity_type,
+        "entity_id": aes.entity_id,
+        "project_id": aes.entity_id,
+        "project_reference": project.reference if project else f"#{aes.entity_id}",
+        "project_title": (project.title or "") if project else "",
+        "project_status": (project.status or "") if project else "",
+        "project_closed": bool(project and not project.is_open),
+    }
+
+
 def _build_entity_assignments(selected_entity_type, selected_entity_id, only_template_ids=None):
     """Current and past assignments of one entity, in the dashboard payload shape.
+
+    A country includes the reporting cycles of projects in that country. Each
+    project cycle carries ``project_id`` / title / reference / ``project_closed``
+    so the mobile dashboard can collapse them into one card. Past rows stay
+    flat, matching the web dashboard.
 
     ``only_template_ids`` limits the result to assignments of those form templates.
     """
@@ -566,8 +590,7 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
             joinedload(AssignmentEntityStatus.approved_by_user),
         )
         .filter(
-            AssignmentEntityStatus.entity_type == selected_entity_type,
-            AssignmentEntityStatus.entity_id == selected_entity_id,
+            dashboard_assignment_entity_filter(selected_entity_type, selected_entity_id),
             AF.is_active == True,
         )
     )
@@ -583,6 +606,19 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
     )
     if not assigned_forms_statuses:
         return current_assignments, past_assignments
+
+    project_ids = [
+        aes.entity_id
+        for aes in assigned_forms_statuses
+        if aes.entity_type == EntityType.project.value
+    ]
+    projects_by_id = {}
+    if project_ids:
+        from app.models.projects import Project
+
+        projects_by_id = {
+            p.id: p for p in Project.query.filter(Project.id.in_(set(project_ids))).all()
+        }
 
     plugin_manager = getattr(current_app, 'plugin_manager', None)
     badges_by_aes = plugin_manager.get_assignment_badges(assigned_forms_statuses) if plugin_manager else {}
@@ -608,8 +644,8 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
                 func.max(EntityActivityLog.timestamp).label('max_ts'),
             )
             .filter(
-                EntityActivityLog.entity_type == selected_entity_type,
-                EntityActivityLog.entity_id == selected_entity_id,
+                # Assignment ids already scope the rows. A country dashboard also
+                # includes project cycles, whose activity is stored on the project.
                 EntityActivityLog.assignment_id.in_(aes_ids),
                 EntityActivityLog.activity_type.notin_(
                     DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
@@ -625,8 +661,6 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
                 and_(
                     EntityActivityLog.assignment_id == subq.c.aid,
                     EntityActivityLog.timestamp == subq.c.max_ts,
-                    EntityActivityLog.entity_type == selected_entity_type,
-                    EntityActivityLog.entity_id == selected_entity_id,
                 ),
             )
             .all()
@@ -653,8 +687,6 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
                 func.max(EntityActivityLog.timestamp).label('last_ts'),
             )
             .filter(
-                EntityActivityLog.entity_type == selected_entity_type,
-                EntityActivityLog.entity_id == selected_entity_id,
                 EntityActivityLog.assignment_id.in_(aes_ids),
                 EntityActivityLog.user_id.isnot(None),
                 EntityActivityLog.activity_type.notin_(
@@ -730,6 +762,10 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
         effectively_closed = bool(
             assigned_form and getattr(assigned_form, "is_effectively_closed", False)
         )
+        try:
+            round_closed = bool(aes.is_round_closed_for_entity())
+        except (AttributeError, TypeError):
+            round_closed = effectively_closed
 
         last_user = last_modified_user_by_assignment.get(aes.id)
         contributors = contributors_by_assignment.get(aes.id, [])
@@ -798,6 +834,8 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
             'template_name': localized_template_name,
             'period_name': period_name,
             'is_effectively_closed': effectively_closed,
+            'is_round_closed': round_closed,
+            **_project_dashboard_fields(projects_by_id, aes),
             'assigned_at': assigned_form.assigned_at.isoformat()
             if assigned_form and assigned_form.assigned_at
             else None,
@@ -822,10 +860,12 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
             ),
         }
 
-        # Categorize as current or past (same rules as main.dashboard)
-        # Closed -> past; Approved older than 2 months -> past;
-        # Pending/In Progress older than 1 year -> past; other statuses -> current
-        if effectively_closed:
+        # Categorize as current or past (same rules as main.dashboard).
+        # Closed rounds and closed non-cycle projects -> past; Approved older than
+        # 2 months -> past; Pending/In Progress older than 1 year -> past.
+        # A closed project whose cycles are their own assignments stays current;
+        # project_closed only changes how the card is drawn.
+        if round_closed:
             past_assignments.append(assignment_data)
             continue
 
@@ -951,6 +991,12 @@ def get_dashboard():
                 "template_name": string | null,
                 "period_name": string | null,
                 "is_effectively_closed": bool,
+                "is_round_closed": bool,
+                "project_id": int,            // project-entity rows only
+                "project_reference": string,
+                "project_title": string,
+                "project_status": string,
+                "project_closed": bool,
                 "assigned_at": ISO datetime string | null,
                 "last_modified_user_name": string | null,
                 "contributor_names": [string, ...],

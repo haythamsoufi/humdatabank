@@ -38,6 +38,20 @@ class Assignment {
   /// Missing on older payloads, which keep the previous always-on behavior.
   final bool enableOfflineDownload;
 
+  /// True when the round is closed for this entity, including a closed project
+  /// that still shares one assignment (see AssignedForm.is_project_cycle).
+  /// Focal points cannot enter data while this is true. Per-cycle project
+  /// assignments stay open until that cycle's form is closed.
+  final bool isRoundClosed;
+
+  /// Set on project-entity rows so the dashboard can collapse a project's
+  /// reporting cycles into one card. Null for country and other assignments.
+  final int? projectId;
+  final String? projectTitle;
+  final String? projectReference;
+  final String? projectStatus;
+  final bool projectClosed;
+
   Assignment({
     required this.id,
     required this.name,
@@ -62,6 +76,12 @@ class Assignment {
     this.staticVersion,
     this.dataVersion,
     this.enableOfflineDownload = true,
+    this.isRoundClosed = false,
+    this.projectId,
+    this.projectTitle,
+    this.projectReference,
+    this.projectStatus,
+    this.projectClosed = false,
   });
 
   factory Assignment.fromJson(Map<String, dynamic> json) {
@@ -112,6 +132,12 @@ class Assignment {
       enableOfflineDownload: json.containsKey('enable_offline_download')
           ? json['enable_offline_download'] == true
           : true,
+      isRoundClosed: json['is_round_closed'] == true,
+      projectId: (json['project_id'] as num?)?.toInt(),
+      projectTitle: json['project_title']?.toString(),
+      projectReference: json['project_reference']?.toString(),
+      projectStatus: json['project_status']?.toString(),
+      projectClosed: json['project_closed'] == true,
     );
   }
 
@@ -142,6 +168,12 @@ class Assignment {
       'static_version': staticVersion,
       'data_version': dataVersion,
       'enable_offline_download': enableOfflineDownload,
+      'is_round_closed': isRoundClosed,
+      'project_id': projectId,
+      'project_title': projectTitle,
+      'project_reference': projectReference,
+      'project_status': projectStatus,
+      'project_closed': projectClosed,
     };
   }
 

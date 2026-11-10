@@ -655,6 +655,103 @@ class TestMobileCountryInternational:
         assert data['embeds']['primary'].endswith('recipient=HST')
 
 
+class TestMobileCountryProjects:
+    def test_invalid_iso3_returns_400(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_projects
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/12/projects', method='GET',
+        ):
+            resp = mobile_country_projects('12')
+
+        _, status = _parse(resp)
+        assert status == 400
+
+    def test_unknown_country_returns_404(self, app, db_session):
+        from app.routes.api.mobile.public_data import mobile_country_projects
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/ZZZ/projects', method='GET',
+        ):
+            resp = mobile_country_projects('ZZZ')
+
+        _, status = _parse(resp)
+        assert status == 404
+
+    def test_returns_open_projects_without_contacts(self, app, db_session):
+        from datetime import date
+
+        from app.models.projects import Project
+        from app.routes.api.mobile.public_data import mobile_country_projects
+        from tests.factories import create_test_country
+
+        country = create_test_country(db_session, name="Projectland", iso3="PRJ")
+        other = create_test_country(db_session, name="Otherland", iso3="OTH")
+        db_session.add_all([
+            Project(
+                reference="PRJ-NSD-1",
+                title="Youth branches",
+                portfolio="NSD",
+                fund="CBF",
+                country_id=country.id,
+                status="Active",
+                organization_name="Projectland Red Cross",
+                funding_modality="Grant",
+                categories="Youth, Volunteering",
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 12, 31),
+                amount_granted=150000,
+                planned_overview="Strengthen youth branches.",
+                focal_name="Secret Focal",
+                focal_email="secret@example.org",
+                manager_email="pm@example.org",
+            ),
+            Project(
+                reference="PRJ-NSD-OPEN",
+                title="Open initiative",
+                portfolio="NSD",
+                country_id=country.id,
+                status="Open",
+            ),
+            Project(
+                reference="PRJ-NSD-CLOSED",
+                title="Finished",
+                country_id=country.id,
+                status="Closed",
+            ),
+            Project(
+                reference="OTH-NSD-1",
+                title="Elsewhere",
+                country_id=other.id,
+                status="Active",
+            ),
+        ])
+        db_session.commit()
+
+        with app.test_request_context(
+            '/api/mobile/v1/data/country-profile/prj/projects', method='GET',
+        ):
+            resp = mobile_country_projects('prj')
+
+        body, status = _parse(resp)
+        assert status == 200
+        projects = body.get_json()['data']['projects']
+        assert [row['reference'] for row in projects] == ['PRJ-NSD-1', 'PRJ-NSD-OPEN']
+        row = projects[0]
+        assert row['title'] == 'Youth branches'
+        assert row['portfolio'] == 'NSD'
+        assert row['fund'] == 'CBF'
+        assert row['status'] == 'Active'
+        assert row['organization_name'] == 'Projectland Red Cross'
+        assert row['start_date'] == '2024-01-01'
+        assert row['end_date'] == '2026-12-31'
+        assert row['amount_granted'] == 150000
+        assert row['planned_overview'] == 'Strengthen youth branches.'
+        assert 'focal_email' not in row
+        assert 'manager_email' not in row
+        assert 'plan_data' not in row
+
+
 class TestMobileCountryGoDocuments:
     def test_invalid_iso3_returns_400(self, app, db_session):
         from app.routes.api.mobile.public_data import mobile_country_go_documents

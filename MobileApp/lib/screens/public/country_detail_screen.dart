@@ -15,6 +15,7 @@ import '../../di/service_locator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/public/country_international_support.dart';
 import '../../models/public/country_profile.dart';
+import '../../models/public/country_project.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/offline_cache_service.dart';
@@ -28,6 +29,8 @@ import '../../widgets/loading_indicator.dart';
 import '../../widgets/mobile_screen_scaffold.dart';
 import '../../widgets/network_logo_image.dart';
 import '../../widgets/public/country_international_section.dart';
+import '../../widgets/public/support_flow_panel.dart';
+import '../../widgets/public/country_projects_section.dart';
 import '../../widgets/public/go_operations_section.dart';
 import '../../widgets/public/indicator_trend.dart';
 
@@ -102,6 +105,10 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
   bool _internationalFailed = false;
   bool _internationalLoading = false;
   int _internationalRequest = 0;
+  List<CountryProject>? _projects;
+  bool _projectsFailed = false;
+  int _projectsRequest = 0;
+  int _flowMapPointers = 0;
 
   @override
   void initState() {
@@ -149,6 +156,8 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
       _international = null;
       _internationalFailed = false;
       _internationalLoading = false;
+      _projects = null;
+      _projectsFailed = false;
     });
 
     try {
@@ -194,6 +203,7 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
       _restartCoverTimer(profile.coverImages.length);
       _loadGoDocuments();
       _loadOperations();
+      _loadProjects();
       if (_institutionalScope == _internationalScope) {
         _loadInternational(force: true);
       }
@@ -301,6 +311,31 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
     } catch (_) {
       if (!mounted || request != _operationsRequest) return;
       setState(() => _operationsFailed = true);
+    }
+  }
+
+  Future<void> _loadProjects() async {
+    final request = ++_projectsRequest;
+    try {
+      final response = await _apiService.get(
+        '${AppConfig.mobileCountryProfileEndpoint}/${Uri.encodeComponent(widget.iso3.trim())}/projects',
+        includeAuth: false,
+        cacheTtl: OfflineCacheService.publicBrowseTtl,
+      );
+      if (!mounted || request != _projectsRequest) return;
+      final decoded = response.statusCode == 200 ? jsonDecode(response.body) : null;
+      final data = decoded is Map ? decoded['data'] : null;
+      if (data is! Map) {
+        setState(() => _projectsFailed = true);
+        return;
+      }
+      setState(() {
+        _projects = countryProjectsFromPayload(Map<String, dynamic>.from(data));
+        _projectsFailed = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _projectsRequest) return;
+      setState(() => _projectsFailed = true);
     }
   }
 
@@ -488,10 +523,18 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
   Widget _buildContent(
       BuildContext context, ThemeData theme, AppLocalizations loc) {
     final profile = _profile!;
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      children: [
+    return NotificationListener<InternationalMapPointerNotification>(
+      onNotification: (notification) {
+        if (_flowMapPointers == notification.activePointerCount) return true;
+        setState(() => _flowMapPointers = notification.activePointerCount);
+        return true;
+      },
+      child: ListView(
+        physics: _flowMapPointers > 0
+            ? const NeverScrollableScrollPhysics()
+            : const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: [
         _buildHero(context, profile),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
@@ -531,6 +574,11 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
                   const SizedBox(height: 24),
                   _buildTrend(context, theme, loc, profile),
                   ..._buildTopSectors(context, theme, loc, profile),
+                  CountryProjectsSection(
+                    projects: _projects,
+                    failed: _projectsFailed,
+                    onRetry: _loadProjects,
+                  ),
                   const SizedBox(height: 24),
                   ..._buildDocuments(
                     context,
@@ -545,6 +593,7 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
           ),
         ),
       ],
+      ),
     );
   }
 

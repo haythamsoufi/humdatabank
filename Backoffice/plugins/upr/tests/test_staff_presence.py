@@ -79,6 +79,7 @@ def test_build_staff_presence_pns_lists_host_countries():
 
     assert payload["year"] == 2026
     assert payload["count"] == 2
+    assert payload["staff_total"] == 6
     assert [row["iso3"] for row in payload["entries"]] == ["SYR", "UKR"]
     assert payload["entries"][0]["staff"] == 4
 
@@ -117,6 +118,7 @@ def test_build_staff_presence_host_lists_pns():
         payload = build_staff_presence(iso3="syr", is_pns=False, preferred_year=2026)
 
     assert payload["count"] == 2
+    assert payload["staff_total"] == 11
     assert payload["entries"][0]["iso3"] == "DNK"
     assert payload["entries"][0]["name"] == "Danish Red Cross"
     assert payload["entries"][1]["iso3"] == "NOR"

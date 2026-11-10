@@ -117,11 +117,15 @@ class CountryInternationalPartner {
 class CountryInternationalStaffPresence {
   final int? year;
   final int count;
+
+  /// Headcount summed across every society, including rows past any old cap.
+  final double staffTotal;
   final List<CountryInternationalStaffEntry> entries;
 
   const CountryInternationalStaffPresence({
     this.year,
     this.count = 0,
+    this.staffTotal = 0,
     this.entries = const [],
   });
 
@@ -129,12 +133,86 @@ class CountryInternationalStaffPresence {
     final entries = _mapList(json['entries'])
         .map(CountryInternationalStaffEntry.fromJson)
         .toList(growable: false);
+    final summed = entries.fold<double>(0, (sum, entry) => sum + entry.staff);
     return CountryInternationalStaffPresence(
       year: (json['year'] as num?)?.toInt(),
       count: (json['count'] as num?)?.toInt() ?? entries.length,
+      staffTotal: (json['staff_total'] as num?)?.toDouble() ?? summed,
       entries: entries,
     );
   }
+}
+
+/// One society or country on the consolidated funding list.
+class InternationalFundingBar {
+  final String? iso3;
+  final String name;
+  final double funding;
+  final double staff;
+
+  const InternationalFundingBar({
+    required this.name,
+    this.iso3,
+    this.funding = 0,
+    this.staff = 0,
+  });
+}
+
+String _fundingBarKey(String? iso3, String name) {
+  final code = iso3?.trim().toUpperCase() ?? '';
+  if (code.length == 3 && RegExp(r'^[A-Z]{3}$').hasMatch(code)) return code;
+  return name.trim().toLowerCase();
+}
+
+/// Partners with funding, plus staff presence on the same row when it exists.
+List<InternationalFundingBar> mergeInternationalFundingBars({
+  required List<CountryInternationalPartner> partners,
+  required List<CountryInternationalStaffEntry> staff,
+}) {
+  final merged = <String, InternationalFundingBar>{};
+  for (final partner in partners) {
+    final name = partner.name.trim();
+    if (name.isEmpty && (partner.iso3 ?? '').trim().isEmpty) continue;
+    final key = _fundingBarKey(partner.iso3, name);
+    merged[key] = InternationalFundingBar(
+      iso3: partner.iso3,
+      name: name.isEmpty ? (partner.iso3 ?? key) : name,
+      funding: partner.funding ?? 0,
+      staff: 0,
+    );
+  }
+  for (final entry in staff) {
+    final name = entry.name.trim();
+    if (name.isEmpty && (entry.iso3 ?? '').trim().isEmpty) continue;
+    final key = _fundingBarKey(entry.iso3, name);
+    final existing = merged[key];
+    if (existing == null) {
+      merged[key] = InternationalFundingBar(
+        iso3: entry.iso3,
+        name: name.isEmpty ? (entry.iso3 ?? key) : name,
+        funding: 0,
+        staff: entry.staff,
+      );
+      continue;
+    }
+    merged[key] = InternationalFundingBar(
+      iso3: existing.iso3 ?? entry.iso3,
+      name: existing.name,
+      funding: existing.funding,
+      staff: existing.staff + entry.staff,
+    );
+  }
+  final rows = merged.values
+      .where((row) => row.funding > 0 || row.staff > 0)
+      .toList(growable: true);
+  rows.sort((a, b) {
+    final byFunding = b.funding.compareTo(a.funding);
+    if (byFunding != 0) return byFunding;
+    final byStaff = b.staff.compareTo(a.staff);
+    if (byStaff != 0) return byStaff;
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  });
+  return rows;
 }
 
 class CountryInternationalStaffEntry {

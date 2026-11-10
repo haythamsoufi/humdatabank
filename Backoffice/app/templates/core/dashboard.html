@@ -58,7 +58,7 @@
 {% set _dash_header_controls = (show_entity_select and user_entities) or (show_country_select and user_countries) or ((selected_entity or selected_country) and self_report_templates) %}
 <div id="dashboard-root"
      class="ui-style-root sharp-ui {% if not user_countries %}dashboard-no-access dashboard-no-access-bleed{% else %}py-2{% endif %}"
-     data-ui-style="ifrc"
+     data-ui-style="legacy"
      data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}">
 <script nonce="{{ csp_nonce() }}">
 (function () {
@@ -66,7 +66,8 @@
     if (!root) return;
     var preview = root.getAttribute('data-style-preview') === '1';
     var allowed = ['ifrc', 'erp', 'legacy'];
-    var style = 'ifrc';
+    /* Shipped default stays legacy until a style is chosen for production. */
+    var style = 'legacy';
     if (preview) {
         try {
             var stored = window.localStorage.getItem('uiStylePreview');

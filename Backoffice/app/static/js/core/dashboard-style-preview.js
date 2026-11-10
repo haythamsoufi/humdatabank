@@ -8,7 +8,8 @@
     var STORAGE_KEY = 'uiStylePreview';
     var LEGACY_STORAGE_KEY = 'dashboardStylePreview';
     var ALLOWED = ['ifrc', 'erp', 'legacy'];
-    var DEFAULT_STYLE = 'ifrc';
+    /* Production/staging always use legacy until a shipped style is chosen. */
+    var DEFAULT_STYLE = 'legacy';
 
     function normalizeStyle(value) {
         return ALLOWED.indexOf(value) !== -1 ? value : DEFAULT_STYLE;

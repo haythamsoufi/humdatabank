@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hum_databank_app/l10n/app_localizations.dart';
 import 'package:hum_databank_app/models/shared/assignment.dart';
+import 'package:hum_databank_app/models/shared/project_dashboard_group.dart';
 import 'package:hum_databank_app/models/shared/focal_point_contact.dart';
 import 'package:hum_databank_app/theme/grouped_dashboard_palette.dart';
 import 'package:hum_databank_app/widgets/dashboard_focal_points_section.dart';
@@ -239,5 +240,106 @@ void main() {
       paints.where((paint) => paint.painter != null).length,
       greaterThan(0),
     );
+  });
+
+  ProjectDashboardGroup projectGroup({
+    required bool closed,
+    required List<Assignment> cycles,
+    int active = 0,
+  }) {
+    return ProjectDashboardGroup(
+      projectId: 7,
+      reference: 'NSD-7',
+      title: 'Health systems',
+      projectStatus: closed ? 'Closed' : 'Open',
+      projectClosed: closed,
+      activeCycleIndex: active,
+      cycles: cycles,
+    );
+  }
+
+  Assignment cycle(int id, String period, DateTime due) {
+    return Assignment(
+      id: id,
+      name: '$period - Quarterly',
+      status: 'in_progress',
+      completionRate: 40,
+      templateName: 'Quarterly',
+      periodName: period,
+      dueDate: due,
+      projectId: 7,
+      projectTitle: 'Health systems',
+      projectReference: 'NSD-7',
+    );
+  }
+
+  testWidgets('project card shows the project and the active cycle', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardProjectGroupCard(
+        group: projectGroup(
+          closed: false,
+          active: 1,
+          cycles: [
+            cycle(1, 'Y1Q1', DateTime(2026, 3, 1)),
+            cycle(2, 'Y1Q2', DateTime(2026, 8, 1)),
+          ],
+        ),
+      ),
+    );
+
+    expect(find.text('Health systems'), findsOneWidget);
+    expect(find.text('NSD-7'), findsOneWidget);
+    expect(find.text('Reporting cycle: Y1Q2'), findsOneWidget);
+    expect(find.text('Quarterly — Y1Q2'), findsNothing);
+    expect(find.text('Cycles'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('a closed project is not marked overdue', (tester) async {
+    await _pump(
+      tester,
+      DashboardProjectGroupCard(
+        group: projectGroup(
+          closed: true,
+          cycles: [cycle(1, 'Y1Q1', DateTime(2020, 1, 1))],
+        ),
+      ),
+    );
+
+    expect(find.text('Overdue'), findsNothing);
+    expect(find.text('In Progress'), findsOneWidget);
+
+    final colors = tester
+        .widgetList<Material>(find.byType(Material))
+        .map((material) => material.color);
+    expect(colors, isNot(contains(GroupedDashboardPalette.danger.background)));
+  });
+
+  testWidgets('choosing another cycle updates the reporting line', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardProjectGroupCard(
+        group: projectGroup(
+          closed: false,
+          active: 0,
+          cycles: [
+            cycle(1, 'Y1Q1', DateTime(2026, 3, 1)),
+            cycle(2, 'Y1Q2', DateTime(2026, 8, 1)),
+          ],
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Cycles'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Y1Q2'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reporting cycle: Y1Q2'), findsOneWidget);
   });
 }

@@ -269,7 +269,7 @@ def build_country_international(iso3: str) -> dict[str, Any]:
         "has_support": has_support,
         "years": flows.get("years") or [],
         "summary": summary,
-        "partners": partners[:25],
+        "partners": partners,
         "staff_presence": staff_presence,
         "embeds": _embed_urls(is_pns=is_pns, iso3=code, year=year),
     }

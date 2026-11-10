@@ -283,8 +283,10 @@ def build_staff_presence(
         merged.values(),
         key=lambda row: (-float(row.get("staff") or 0), str(row.get("name") or "").lower()),
     )
+    staff_total = round(sum(float(row.get("staff") or 0) for row in ordered), 2)
     return {
         "year": year,
         "count": len(ordered),
-        "entries": ordered[:25],
+        "staff_total": staff_total,
+        "entries": ordered,
     }

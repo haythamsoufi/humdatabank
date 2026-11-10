@@ -1,18 +1,14 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:intl/intl.dart';
 
-import '../../config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/public/country_international_support.dart';
-import '../../services/webview_service.dart';
+import '../../models/public/support_flow.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import 'indicator_trend.dart';
+import 'support_flow_panel.dart';
 
-/// Institutional → International: UPR bilateral support embeds + summary.
+/// Institutional → International: bilateral support, staff, and a native flow map.
 class CountryInternationalSection extends StatelessWidget {
   const CountryInternationalSection({
     super.key,
@@ -73,7 +69,13 @@ class CountryInternationalSection extends StatelessWidget {
 
     final isPns = data.isPns || isPnsHint;
     final summary = data.summary;
-    final embedUrl = _absoluteEmbedUrl(data.primaryEmbedPath);
+    final bars = mergeInternationalFundingBars(
+      partners: data.partners,
+      staff: data.staffPresence.entries,
+    );
+    final maxFunding = bars.fold<double>(0, (max, row) {
+      return row.funding > max ? row.funding : max;
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,8 +110,12 @@ class CountryInternationalSection extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 14),
-        _SummaryGrid(isPns: isPns, summary: summary),
-        if (data.partners.isNotEmpty) ...[
+        _SummaryGrid(
+          isPns: isPns,
+          summary: summary,
+          staffTotal: data.staffPresence.staffTotal,
+        ),
+        if (bars.isNotEmpty) ...[
           const SizedBox(height: 20),
           Text(
             isPns
@@ -121,67 +127,49 @@ class CountryInternationalSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          for (final partner in data.partners.take(8))
-            _PartnerRow(partner: partner),
-        ],
-        if (data.staffPresence.entries.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text(
-            isPns
-                ? loc.countryDetailInternationalStaffPns
-                : loc.countryDetailInternationalStaffHost,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: context.navyTextColor,
+          for (final row in bars)
+            _FundingBar(
+              row: row,
+              maxFunding: maxFunding,
+              staffLabel: row.staff > 0
+                  ? loc.countryDetailInternationalStaffCount(
+                      formatStaffCount(row.staff),
+                    )
+                  : null,
             ),
-          ),
-          const SizedBox(height: 8),
-          for (final entry in data.staffPresence.entries.take(8))
-            _StaffRow(entry: entry),
         ],
-        if (!data.hasSupport && embedUrl == null) ...[
+        if (!data.hasSupport && bars.isEmpty) ...[
           const SizedBox(height: 16),
           Text(
             loc.countryDetailInternationalEmpty,
             style: TextStyle(color: context.textSecondaryColor),
           ),
         ],
-        if (embedUrl != null) ...[
-          const SizedBox(height: 20),
-          Text(
-            isPns
-                ? loc.countryDetailInternationalVisualsPns
-                : loc.countryDetailInternationalVisualsHost,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: context.navyTextColor,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _SupportEmbedWebView(
-            url: embedUrl,
-            tall: isPns,
-          ),
-        ],
+        const SizedBox(height: 20),
+        SupportFlowPanel(
+          title: isPns
+              ? loc.countryDetailInternationalVisualsPns
+              : loc.countryDetailInternationalVisualsHost,
+          initialYear: summary.year,
+          initialPns: isPns ? data.iso3 : null,
+          initialRecipient: isPns ? null : data.iso3,
+          showNetworkCharts: isPns,
+        ),
       ],
     );
-  }
-
-  static String? _absoluteEmbedUrl(String? path) {
-    final raw = path?.trim();
-    if (raw == null || raw.isEmpty) return null;
-    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-    final base = AppConfig.backendUrl.replaceAll(RegExp(r'/$'), '');
-    if (raw.startsWith('/')) return '$base$raw';
-    return '$base/$raw';
   }
 }
 
 class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({required this.isPns, required this.summary});
+  const _SummaryGrid({
+    required this.isPns,
+    required this.summary,
+    required this.staffTotal,
+  });
 
   final bool isPns;
   final CountryInternationalSummary summary;
+  final double staffTotal;
 
   @override
   Widget build(BuildContext context) {
@@ -192,6 +180,12 @@ class _SummaryGrid extends StatelessWidget {
     final partnerValue = isPns
         ? (summary.countriesSupported?.toString() ?? '—')
         : (summary.supportingPartners?.toString() ?? '—');
+    final staffLabel = isPns
+        ? loc.countryDetailInternationalStaffPns
+        : loc.countryDetailInternationalStaffPresent;
+    final staffValue = isPns
+        ? (summary.staffPresence > 0 ? summary.staffPresence.toString() : '—')
+        : (staffTotal > 0 ? formatStaffCount(staffTotal) : '—');
 
     Widget tile(String label, String value) => Expanded(
           child: KeyFigureTile(label: label, value: value),
@@ -205,7 +199,7 @@ class _SummaryGrid extends StatelessWidget {
             const SizedBox(width: 10),
             tile(
               loc.countryDetailInternationalFunding,
-              _compactMoney(summary.funding),
+              formatSupportAmount(summary.funding),
             ),
           ],
         ),
@@ -214,26 +208,19 @@ class _SummaryGrid extends StatelessWidget {
           children: [
             tile(
               loc.countryDetailInternationalRequirement,
-              _compactMoney(summary.requirement),
+              formatSupportAmount(summary.requirement),
             ),
             const SizedBox(width: 10),
             tile(
               loc.countryDetailInternationalExpenditure,
-              _compactMoney(summary.expenditure),
+              formatSupportAmount(summary.expenditure),
             ),
           ],
         ),
         const SizedBox(height: 10),
         Row(
           children: [
-            tile(
-              isPns
-                  ? loc.countryDetailInternationalStaffPns
-                  : loc.countryDetailInternationalStaffHost,
-              summary.staffPresence > 0
-                  ? summary.staffPresence.toString()
-                  : '—',
-            ),
+            tile(staffLabel, staffValue),
           ],
         ),
       ],
@@ -241,207 +228,80 @@ class _SummaryGrid extends StatelessWidget {
   }
 }
 
-class _PartnerRow extends StatelessWidget {
-  const _PartnerRow({required this.partner});
-
-  final CountryInternationalPartner partner;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final funding = partner.funding;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: publicCardDecoration(context),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              partner.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          if (funding != null && funding > 0) ...[
-            const SizedBox(width: 8),
-            Text(
-              _compactMoney(funding),
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Color(AppConstants.ifrcRed),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StaffRow extends StatelessWidget {
-  const _StaffRow({required this.entry});
-
-  final CountryInternationalStaffEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: publicCardDecoration(context),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              entry.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          if (entry.staff > 0) ...[
-            const SizedBox(width: 8),
-            Text(
-              loc.countryDetailInternationalStaffCount(_staffCountLabel(entry.staff)),
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Color(AppConstants.ifrcRed),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportEmbedWebView extends StatefulWidget {
-  const _SupportEmbedWebView({
-    required this.url,
-    required this.tall,
+class _FundingBar extends StatelessWidget {
+  const _FundingBar({
+    required this.row,
+    required this.maxFunding,
+    required this.staffLabel,
   });
 
-  final String url;
-  final bool tall;
-
-  @override
-  State<_SupportEmbedWebView> createState() => _SupportEmbedWebViewState();
-}
-
-class _SupportEmbedWebViewState extends State<_SupportEmbedWebView> {
-  bool _loading = true;
-  bool _failed = false;
+  final InternationalFundingBar row;
+  final double maxFunding;
+  final String? staffLabel;
 
   @override
   Widget build(BuildContext context) {
-    final height = widget.tall ? 720.0 : 520.0;
-    final settings = WebViewService.defaultSettings(allowMixedContent: true);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: DecoratedBox(
-        decoration: publicCardDecoration(context),
-        child: SizedBox(
-          height: height,
-          width: double.infinity,
-          child: Stack(
+    final theme = Theme.of(context);
+    final fraction = maxFunding <= 0 ? 0.0 : (row.funding / maxFunding).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              InAppWebView(
-                initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-                initialSettings: settings,
-                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                  Factory<OneSequenceGestureRecognizer>(
-                    () => EagerGestureRecognizer(),
+              Expanded(
+                child: Text(
+                  row.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                },
-                shouldOverrideUrlLoading: (controller, action) async {
-                  final uri = action.request.url;
-                  if (uri != null && WebViewService.isUrlAllowed(uri)) {
-                    return NavigationActionPolicy.ALLOW;
-                  }
-                  return NavigationActionPolicy.CANCEL;
-                },
-                onLoadStart: (controller, url) {
-                  if (!mounted) return;
-                  setState(() {
-                    _loading = true;
-                    _failed = false;
-                  });
-                },
-                onLoadStop: (controller, url) async {
-                  if (!mounted) return;
-                  setState(() => _loading = false);
-                  await WebViewService.applyPostCreationSettings(
-                    controller,
-                    allowMixedContent: true,
-                  );
-                },
-                onReceivedError: (controller, request, error) {
-                  if (!mounted) return;
-                  if (request.isForMainFrame ?? true) {
-                    setState(() {
-                      _loading = false;
-                      _failed = true;
-                    });
-                  }
-                },
+                ),
               ),
-              if (_loading)
-                ColoredBox(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withValues(alpha: 0.4),
-                  child: const Center(
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    ),
+              if (row.funding > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                  formatSupportAmount(row.funding),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(AppConstants.ifrcRed),
                   ),
                 ),
-              if (_failed)
-                ColoredBox(
-                  color: context.cardColor,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        AppLocalizations.of(context)!
-                            .countryDetailInternationalUnavailable,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: context.textSecondaryColor),
-                      ),
-                    ),
-                  ),
-                ),
+              ],
             ],
           ),
-        ),
+          if (row.funding > 0) ...[
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 10,
+                child: Stack(
+                  children: [
+                    const Positioned.fill(child: ColoredBox(color: Color(0x14011E41))),
+                    FractionallySizedBox(
+                      widthFactor: fraction <= 0 ? 0 : (fraction < 0.04 ? 0.04 : fraction),
+                      child: ColoredBox(color: Color(AppConstants.ifrcRed)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (staffLabel != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              staffLabel!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: context.textSecondaryColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
-}
-
-String _compactMoney(double value) {
-  if (value <= 0) return '—';
-  return NumberFormat.compactCurrency(symbol: '', decimalDigits: 1)
-      .format(value)
-      .trim();
-}
-
-String _staffCountLabel(double value) {
-  if (value <= 0) return '0';
-  if (value == value.roundToDouble()) {
-    return value.round().toString();
-  }
-  return NumberFormat.compact().format(value).trim();
 }

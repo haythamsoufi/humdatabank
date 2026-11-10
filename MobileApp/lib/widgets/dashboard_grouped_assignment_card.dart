@@ -125,29 +125,31 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            _StatusChip(label: tone.label, tone: tone),
-                            if (overdue) ...[
-                              const SizedBox(height: 4),
-                              _StatusChip(
-                                label: localizations.overdue,
-                                tone: _danger(context),
-                              ),
-                            ],
-                          ],
-                        ),
+                        _StatusChip(label: tone.label, tone: tone),
                       ],
                     ),
                     if (_dueLine(context, localizations, assignment)
                         case final dueLine?) ...[
                       const SizedBox(height: 6),
-                      Text(
-                        dueLine,
-                        style: IOSTextStyle.footnote(
-                          context,
-                        ).copyWith(color: metaColor, height: 1.3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              dueLine,
+                              style: IOSTextStyle.footnote(
+                                context,
+                              ).copyWith(color: metaColor, height: 1.3),
+                            ),
+                          ),
+                          if (overdue) ...[
+                            const SizedBox(width: 8),
+                            _StatusChip(
+                              label: localizations.overdue,
+                              tone: _danger(context),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                     const SizedBox(height: 8),

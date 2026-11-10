@@ -34,7 +34,7 @@ Avant qu’un message puisse être envoyé à un fournisseur d’IA externe, le 
 - E-mails, numéros de téléphone
 - JWT / jetons porteurs (Bearer) / identifiants Basic auth
 - clés privées (tout bloc de clé privée PEM ou PGP, y compris un bloc collé sans sa ligne END)
-- mots de passe / phrases secrètes, secrets / clés API — sous forme d’affectations `clé: valeur` ou `CLÉ=valeur` (fichiers env, JSON, YAML, chaînes de connexion comme `AccountKey=`), mots de passe dans les URL de connexion (`postgres://utilisateur:motdepasse@hôte`) et formats de clés de fournisseurs connus (par exemple OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
+- mots de passe / phrases secrètes, secrets / clés API — sous forme d’affectations `clé: valeur` ou `CLÉ=valeur` (fichiers env, JSON, YAML, chaînes de connexion comme `AccountKey=`), mots de passe intégrés dans les URL de connexion aux bases de données (par exemple une URL postgres avec des identifiants utilisateur) et formats de clés de fournisseurs connus (par exemple OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
 - IBAN (somme de contrôle vérifiée) et numéros de carte de paiement (vérification Luhn) pour réduire les faux positifs
 
 La détection des numéros de téléphone ignore les formes de nombres courantes dans les questions sur les données : listes d’années, chiffres élevés ou groupés par milliers, dates, adresses IP et colonnes de tableaux.

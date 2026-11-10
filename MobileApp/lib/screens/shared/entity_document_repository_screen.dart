@@ -236,7 +236,7 @@ class _EntityDocumentTile extends StatelessWidget {
     final subtitle = [
       if (document.documentType != null && document.documentType!.isNotEmpty)
         document.documentType!,
-      if (uploaded != null) uploaded,
+      ?uploaded,
     ].join(' · ');
 
     return ListTile(

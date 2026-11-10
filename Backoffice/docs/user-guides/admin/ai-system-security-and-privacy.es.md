@@ -34,7 +34,7 @@ Antes de que un mensaje pueda enviarse a un proveedor externo de IA, el backend 
 - correos electrónicos, números de teléfono
 - JWTs / tokens Bearer / credenciales Basic auth
 - claves privadas (cualquier bloque de clave privada PEM o PGP, incluido un bloque pegado sin su línea END)
-- contraseñas / frases de contraseña, secretos / claves API — como asignaciones `clave: valor` o `CLAVE=valor` (archivos env, JSON, YAML, cadenas de conexión como `AccountKey=`), contraseñas en URL de conexión (`postgres://usuario:contraseña@host`) y formatos conocidos de claves de proveedores (por ejemplo OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
+- contraseñas / frases de contraseña, secretos / claves API — como asignaciones `clave: valor` o `CLAVE=valor` (archivos env, JSON, YAML, cadenas de conexión como `AccountKey=`), contraseñas incrustadas en URL de conexión a bases de datos (por ejemplo una URL de postgres con credenciales de usuario) y formatos conocidos de claves de proveedores (por ejemplo OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
 - IBANs (con dígitos de control validados) y números de tarjetas de pago (validación Luhn) para reducir falsos positivos
 
 La detección de teléfonos omite las formas numéricas habituales en preguntas sobre datos: listas de años, cifras grandes o agrupadas por miles, fechas, direcciones IP y columnas de tablas.

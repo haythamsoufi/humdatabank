@@ -76,6 +76,12 @@ class TestPnsCountryIso3s:
         clear_pns_country_iso3s_cache()
 
 
+def _staff_presence(**overrides):
+    base = {"year": 2026, "count": 0, "entries": []}
+    base.update(overrides)
+    return base
+
+
 class TestBuildCountryInternational:
     def test_pns_payload_uses_overview_embed(self, app):
         with app.app_context():
@@ -85,6 +91,12 @@ class TestBuildCountryInternational:
             ), patch(
                 "plugins.upr.analysis.flow.build_support_flows",
                 return_value=_flows(),
+            ), patch(
+                "plugins.upr.analysis.staff_presence.build_staff_presence",
+                return_value=_staff_presence(
+                    count=1,
+                    entries=[{"iso3": "SYR", "name": "Syria", "staff": 4}],
+                ),
             ):
                 payload = build_country_international("NOR")
 
@@ -93,7 +105,9 @@ class TestBuildCountryInternational:
         assert payload["has_support"] is True
         assert payload["summary"]["countries_supported"] == 1
         assert payload["summary"]["funding"] == 1_500_000
+        assert payload["summary"]["staff_presence"] == 1
         assert payload["partners"][0]["iso3"] == "SYR"
+        assert payload["staff_presence"]["entries"][0]["iso3"] == "SYR"
         assert "pns=NOR" in payload["embeds"]["primary"]
         assert payload["embeds"]["primary"].startswith("/upr/support-overview")
 
@@ -105,12 +119,41 @@ class TestBuildCountryInternational:
             ), patch(
                 "plugins.upr.analysis.flow.build_support_flows",
                 return_value=_flows(),
+            ), patch(
+                "plugins.upr.analysis.staff_presence.build_staff_presence",
+                return_value=_staff_presence(
+                    count=1,
+                    entries=[{"iso3": "NOR", "name": "Norwegian Red Cross", "staff": 4}],
+                ),
             ):
                 payload = build_country_international("SYR")
 
         assert payload["is_pns"] is False
         assert payload["role"] == "host"
         assert payload["summary"]["supporting_partners"] == 1
+        assert payload["summary"]["staff_presence"] == 1
         assert payload["partners"][0]["iso3"] == "NOR"
+        assert payload["staff_presence"]["entries"][0]["iso3"] == "NOR"
         assert "recipient=SYR" in payload["embeds"]["primary"]
         assert payload["embeds"]["primary"].startswith("/upr/support-flow")
+
+    def test_staff_presence_alone_marks_has_support(self, app):
+        with app.app_context():
+            with patch(
+                "plugins.upr.analysis.country_international.country_is_pns",
+                return_value=True,
+            ), patch(
+                "plugins.upr.analysis.flow.build_support_flows",
+                return_value=_flows(edges=[], funding=[], figures=[]),
+            ), patch(
+                "plugins.upr.analysis.staff_presence.build_staff_presence",
+                return_value=_staff_presence(
+                    count=1,
+                    entries=[{"iso3": "SYR", "name": "Syria", "staff": 2}],
+                ),
+            ):
+                payload = build_country_international("NOR")
+
+        assert payload["has_support"] is True
+        assert payload["partners"] == []
+        assert payload["staff_presence"]["count"] == 1

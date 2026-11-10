@@ -624,11 +624,13 @@ class TestMobileCountryInternational:
                     'year': 2026,
                     'countries_supported': None,
                     'supporting_partners': 0,
+                    'staff_presence': 0,
                     'funding': 0,
                     'requirement': 0,
                     'expenditure': 0,
                 },
                 'partners': [],
+                'staff_presence': {'year': 2026, 'count': 0, 'entries': []},
                 'embeds': {
                     'primary': f'/upr/support-flow?recipient={iso3}',
                     'flow': f'/upr/support-flow?recipient={iso3}',

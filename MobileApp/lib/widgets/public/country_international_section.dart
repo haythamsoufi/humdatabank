@@ -124,6 +124,21 @@ class CountryInternationalSection extends StatelessWidget {
           for (final partner in data.partners.take(8))
             _PartnerRow(partner: partner),
         ],
+        if (data.staffPresence.entries.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          Text(
+            isPns
+                ? loc.countryDetailInternationalStaffPns
+                : loc.countryDetailInternationalStaffHost,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: context.navyTextColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final entry in data.staffPresence.entries.take(8))
+            _StaffRow(entry: entry),
+        ],
         if (!data.hasSupport && embedUrl == null) ...[
           const SizedBox(height: 16),
           Text(
@@ -208,6 +223,19 @@ class _SummaryGrid extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            tile(
+              isPns
+                  ? loc.countryDetailInternationalStaffPns
+                  : loc.countryDetailInternationalStaffHost,
+              summary.staffPresence > 0
+                  ? summary.staffPresence.toString()
+                  : '—',
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -242,6 +270,47 @@ class _PartnerRow extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               _compactMoney(funding),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(AppConstants.ifrcRed),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StaffRow extends StatelessWidget {
+  const _StaffRow({required this.entry});
+
+  final CountryInternationalStaffEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: publicCardDecoration(context),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              entry.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (entry.staff > 0) ...[
+            const SizedBox(width: 8),
+            Text(
+              loc.countryDetailInternationalStaffCount(_staffCountLabel(entry.staff)),
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 color: Color(AppConstants.ifrcRed),
@@ -367,4 +436,12 @@ String _compactMoney(double value) {
   return NumberFormat.compactCurrency(symbol: '', decimalDigits: 1)
       .format(value)
       .trim();
+}
+
+String _staffCountLabel(double value) {
+  if (value <= 0) return '0';
+  if (value == value.roundToDouble()) {
+    return value.round().toString();
+  }
+  return NumberFormat.compact(decimalDigits: 1).format(value).trim();
 }

@@ -217,6 +217,7 @@ def _embed_urls(*, is_pns: bool, iso3: str, year: int | None) -> dict[str, str]:
 def build_country_international(iso3: str) -> dict[str, Any]:
     """Payload for the mobile country International institutional sub-tab."""
     from plugins.upr.analysis.flow import build_support_flows
+    from plugins.upr.analysis.staff_presence import build_staff_presence
 
     code = (iso3 or "").strip().upper()
     is_pns = country_is_pns(code)
@@ -252,7 +253,15 @@ def build_country_international(iso3: str) -> dict[str, Any]:
         }
         role = "host"
 
-    has_support = bool(partners) or bool(summary.get("funding")) or bool(summary.get("requirement"))
+    staff_presence = build_staff_presence(iso3=code, is_pns=is_pns, preferred_year=year)
+    summary["staff_presence"] = int(staff_presence.get("count") or 0)
+
+    has_support = (
+        bool(partners)
+        or bool(summary.get("funding"))
+        or bool(summary.get("requirement"))
+        or bool(staff_presence.get("count"))
+    )
     return {
         "iso3": code,
         "is_pns": is_pns,
@@ -261,5 +270,6 @@ def build_country_international(iso3: str) -> dict[str, Any]:
         "years": flows.get("years") or [],
         "summary": summary,
         "partners": partners[:25],
+        "staff_presence": staff_presence,
         "embeds": _embed_urls(is_pns=is_pns, iso3=code, year=year),
     }

@@ -1144,6 +1144,11 @@ class AppLocalizations {
           'Support flow map',
       'country_detail_international_empty':
           'No bilateral support data is available for this country yet.',
+      'country_detail_international_staff_pns':
+          'Countries with staff present',
+      'country_detail_international_staff_host':
+          'PNSs with staff present',
+      'country_detail_international_staff_count': '%s staff',
       'country_detail_international_unavailable':
           'International support could not be loaded',
       'country_detail_key_indicators': 'Key indicators',
@@ -8930,6 +8935,13 @@ class AppLocalizations {
       translate('country_detail_international_visuals_host');
   String get countryDetailInternationalEmpty =>
       translate('country_detail_international_empty');
+  String get countryDetailInternationalStaffPns =>
+      translate('country_detail_international_staff_pns');
+  String get countryDetailInternationalStaffHost =>
+      translate('country_detail_international_staff_host');
+  String countryDetailInternationalStaffCount(String count) =>
+      translate('country_detail_international_staff_count')
+          .replaceAll('%s', count);
   String get countryDetailInternationalUnavailable =>
       translate('country_detail_international_unavailable');
   String get countryDetailKeyIndicators =>

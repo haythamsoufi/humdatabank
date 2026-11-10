@@ -41,6 +41,13 @@ void main() {
           {'iso3': 'NOR', 'name': 'Norwegian Red Cross', 'funding': 1000000},
           {'iso3': 'DNK', 'name': 'Danish Red Cross', 'funding': 500000},
         ],
+        'staff_presence': {
+          'year': 2026,
+          'count': 1,
+          'entries': [
+            {'iso3': 'NOR', 'name': 'Norwegian Red Cross', 'staff': 4},
+          ],
+        },
         'embeds': {
           'primary': '/upr/support-flow?recipient=SYR',
           'flow': '/upr/support-flow?recipient=SYR',
@@ -50,6 +57,8 @@ void main() {
       expect(support.isPns, isFalse);
       expect(support.summary.supportingPartners, 2);
       expect(support.partners, hasLength(2));
+      expect(support.staffPresence.count, 1);
+      expect(support.staffPresence.entries.first.iso3, 'NOR');
       expect(support.primaryEmbedPath, '/upr/support-flow?recipient=SYR');
     });
 
@@ -64,10 +73,19 @@ void main() {
           'year': 2026,
           'countries_supported': 3,
           'funding': 4000000,
+          'staff_presence': 2,
         },
         'partners': [
           {'iso3': 'SYR', 'name': 'Syria', 'funding': 1500000},
         ],
+        'staff_presence': {
+          'year': 2026,
+          'count': 2,
+          'entries': [
+            {'iso3': 'SYR', 'name': 'Syria', 'staff': 4},
+            {'iso3': 'UKR', 'name': 'Ukraine', 'staff': 2},
+          ],
+        },
         'embeds': {
           'primary': '/upr/support-overview?pns=NOR',
           'flow': '/upr/support-flow?pns=NOR',
@@ -78,6 +96,8 @@ void main() {
 
       expect(support.isPns, isTrue);
       expect(support.summary.countriesSupported, 3);
+      expect(support.summary.staffPresence, 2);
+      expect(support.staffPresence.entries, hasLength(2));
       expect(support.primaryEmbedPath, '/upr/support-overview?pns=NOR');
     });
   });

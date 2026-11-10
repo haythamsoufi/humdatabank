@@ -8,6 +8,7 @@ class CountryInternationalSupport {
   final List<int> years;
   final CountryInternationalSummary summary;
   final List<CountryInternationalPartner> partners;
+  final CountryInternationalStaffPresence staffPresence;
   final Map<String, String> embeds;
 
   const CountryInternationalSupport({
@@ -18,6 +19,7 @@ class CountryInternationalSupport {
     required this.years,
     required this.summary,
     required this.partners,
+    required this.staffPresence,
     required this.embeds,
   });
 
@@ -43,6 +45,9 @@ class CountryInternationalSupport {
       partners: _mapList(json['partners'])
           .map(CountryInternationalPartner.fromJson)
           .toList(growable: false),
+      staffPresence: CountryInternationalStaffPresence.fromJson(
+        Map<String, dynamic>.from(json['staff_presence'] as Map? ?? const {}),
+      ),
       embeds: embeds,
     );
   }
@@ -61,6 +66,7 @@ class CountryInternationalSummary {
   final int? year;
   final int? countriesSupported;
   final int? supportingPartners;
+  final int staffPresence;
   final double funding;
   final double requirement;
   final double expenditure;
@@ -69,6 +75,7 @@ class CountryInternationalSummary {
     this.year,
     this.countriesSupported,
     this.supportingPartners,
+    this.staffPresence = 0,
     this.funding = 0,
     this.requirement = 0,
     this.expenditure = 0,
@@ -79,6 +86,7 @@ class CountryInternationalSummary {
       year: (json['year'] as num?)?.toInt(),
       countriesSupported: (json['countries_supported'] as num?)?.toInt(),
       supportingPartners: (json['supporting_partners'] as num?)?.toInt(),
+      staffPresence: (json['staff_presence'] as num?)?.toInt() ?? 0,
       funding: (json['funding'] as num?)?.toDouble() ?? 0,
       requirement: (json['requirement'] as num?)?.toDouble() ?? 0,
       expenditure: (json['expenditure'] as num?)?.toDouble() ?? 0,
@@ -102,6 +110,49 @@ class CountryInternationalPartner {
       iso3: json['iso3']?.toString(),
       name: json['name']?.toString() ?? '',
       funding: (json['funding'] as num?)?.toDouble(),
+    );
+  }
+}
+
+class CountryInternationalStaffPresence {
+  final int? year;
+  final int count;
+  final List<CountryInternationalStaffEntry> entries;
+
+  const CountryInternationalStaffPresence({
+    this.year,
+    this.count = 0,
+    this.entries = const [],
+  });
+
+  factory CountryInternationalStaffPresence.fromJson(Map<String, dynamic> json) {
+    final entries = _mapList(json['entries'])
+        .map(CountryInternationalStaffEntry.fromJson)
+        .toList(growable: false);
+    return CountryInternationalStaffPresence(
+      year: (json['year'] as num?)?.toInt(),
+      count: (json['count'] as num?)?.toInt() ?? entries.length,
+      entries: entries,
+    );
+  }
+}
+
+class CountryInternationalStaffEntry {
+  final String? iso3;
+  final String name;
+  final double staff;
+
+  const CountryInternationalStaffEntry({
+    required this.name,
+    this.iso3,
+    this.staff = 0,
+  });
+
+  factory CountryInternationalStaffEntry.fromJson(Map<String, dynamic> json) {
+    return CountryInternationalStaffEntry(
+      iso3: json['iso3']?.toString(),
+      name: json['name']?.toString() ?? '',
+      staff: (json['staff'] as num?)?.toDouble() ?? 0,
     );
   }
 }

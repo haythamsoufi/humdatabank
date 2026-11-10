@@ -552,7 +552,7 @@ class AppLocalizations {
       'focal_points_for': 'Focal Points for',
       'national_society_focal_points': 'National Society Focal Points',
       'ifrc_focal_points': 'IFRC Focal Points',
-      'fds_member': 'FDS Member',
+      'fds_member': 'FDS admin',
       'no_focal_points_assigned_to': 'No focal points assigned to',
       'your_user_account_not_associated':
           'Your user account is not associated with any countries.',

@@ -719,6 +719,61 @@ class AssignmentCompletionService:
         return filled
 
     @staticmethod
+    def _filled_document_item_ids(
+        assignment_entity_status_id: int,
+        published_filters,
+        visibility_filters=(),
+    ) -> set[int]:
+        """Document fields filled on this assignment, including repository reuse.
+
+        A field with ``cross_assignment_period_reuse`` is filled when a document
+        on another assignment of the same entity and template has a period that
+        covers this assignment.
+        """
+        local_ids = {
+            item_id
+            for (item_id,) in (
+                db.session.query(SubmittedDocument.form_item_id)
+                .join(FormItem, SubmittedDocument.form_item_id == FormItem.id)
+                .join(FormSection, FormItem.section_id == FormSection.id)
+                .filter(
+                    SubmittedDocument.assignment_entity_status_id == assignment_entity_status_id,
+                    *published_filters,
+                    *visibility_filters,
+                    FormItem.item_type == 'document_field',
+                    _countable_form_item_filter(),
+                )
+                .distinct()
+                .all()
+            )
+            if item_id is not None
+        }
+        aes = db.session.get(AssignmentEntityStatus, assignment_entity_status_id)
+        if aes is None:
+            return local_ids
+        from app.utils.assignment_document_carryover import repository_satisfied_field_ids
+
+        extra = repository_satisfied_field_ids(aes)
+        if not extra:
+            return local_ids
+        countable = {
+            item_id
+            for (item_id,) in (
+                db.session.query(FormItem.id)
+                .join(FormSection, FormItem.section_id == FormSection.id)
+                .filter(
+                    FormItem.id.in_(list(extra)),
+                    *published_filters,
+                    *visibility_filters,
+                    FormItem.item_type == 'document_field',
+                    _countable_form_item_filter(),
+                )
+                .all()
+            )
+        }
+        return local_ids | countable
+
+    @staticmethod
     def _count_filled_items(
         assignment_entity_status_id: int,
         template_id: int,
@@ -746,19 +801,14 @@ class AssignmentCompletionService:
         )
 
         # One upload per document field is enough; max_documents is a cap, not a requirement.
-        filled_documents = (
-            db.session.query(func.count(func.distinct(SubmittedDocument.form_item_id)))
-            .join(FormItem, SubmittedDocument.form_item_id == FormItem.id)
-            .join(FormSection, FormItem.section_id == FormSection.id)
-            .filter(
-                SubmittedDocument.assignment_entity_status_id == assignment_entity_status_id,
-                *published_filters,
-                *visibility_filters,
-                FormItem.item_type == 'document_field',
-                _countable_form_item_filter(),
+        # A document stored on another assignment counts when its period covers this one.
+        filled_documents = len(
+            AssignmentCompletionService._filled_document_item_ids(
+                assignment_entity_status_id,
+                published_filters,
+                visibility_filters,
             )
-            .scalar()
-        ) or 0
+        )
 
         return int(filled_non_matrix) + filled_matrices + int(filled_documents)
 
@@ -969,22 +1019,11 @@ class AssignmentCompletionService:
         filled_matrix = {
             item_id for item_id, state in matrix_fill_state.items() if state.get('filled')
         }
-        filled_documents = {
-            item_id for (item_id,) in (
-                db.session.query(SubmittedDocument.form_item_id)
-                .join(FormItem, SubmittedDocument.form_item_id == FormItem.id)
-                .join(FormSection, FormItem.section_id == FormSection.id)
-                .filter(
-                    SubmittedDocument.assignment_entity_status_id == assignment_entity_status_id,
-                    *published_filters,
-                    *visibility_filters,
-                    FormItem.item_type == 'document_field',
-                    _countable_form_item_filter(),
-                )
-                .distinct()
-                .all()
-            )
-        }
+        filled_documents = AssignmentCompletionService._filled_document_item_ids(
+            assignment_entity_status_id,
+            published_filters,
+            visibility_filters,
+        )
 
         missing: list[MissingCompletionItem] = []
         for form_item_id, section_id, item_type, label, question_type in rows:

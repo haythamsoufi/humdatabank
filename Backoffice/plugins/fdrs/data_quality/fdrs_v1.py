@@ -131,6 +131,22 @@ class FdrsV1Methodology:
         return []
 
     def _documents_score(self, aes_id: int, template_id: int) -> tuple[float, dict]:
+        covered_ids: set[int] | None = None
+
+        def _repository_field_ids(assignment_id: int) -> set[int]:
+            nonlocal covered_ids
+            if covered_ids is None:
+                from app.utils.assignment_document_carryover import repository_satisfied_field_ids
+
+                aes = db.session.get(AssignmentEntityStatus, assignment_id)
+                covered_ids = repository_satisfied_field_ids(aes) if aes is not None else set()
+            return covered_ids
+
+        def _reuse_config_enabled(cfg: dict) -> bool:
+            from app.utils.assignment_document_carryover import _config_bool_true
+
+            return _config_bool_true(cfg.get("cross_assignment_period_reuse"))
+
         doc_items = (
             FormItem.query.filter(
                 FormItem.template_id == template_id,
@@ -150,6 +166,9 @@ class FdrsV1Methodology:
                         ).count()
                         > 0
                     )
+                    cfg = item.config if isinstance(item.config, dict) else {}
+                    if not has_doc and _reuse_config_enabled(cfg):
+                        has_doc = item.id in _repository_field_ids(aes_id)
                     if has_doc:
                         found_types.add(doc_type)
                     break

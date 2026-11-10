@@ -109,7 +109,9 @@ def test_list_missing_items_returns_unfilled_only():
         AssignmentCompletionService,
         '_empty_option_list_ids_for_assignment',
         return_value=frozenset(),
-    ), patch('app.services.assignments.completion_service.db.session.query', return_value=query):
+    ), patch('app.services.assignments.completion_service.db.session.query', return_value=query), patch(
+        'app.services.assignments.completion_service.db.session.get', return_value=None,
+    ):
         missing = AssignmentCompletionService.list_missing_items(5, 21, 99)
 
     assert [item.form_item_id for item in missing] == [2, 3]
@@ -144,7 +146,9 @@ def test_list_missing_items_excludes_hidden_fields():
         AssignmentCompletionService,
         '_empty_option_list_ids_for_assignment',
         return_value=frozenset(),
-    ), patch('app.services.assignments.completion_service.db.session.query', return_value=query):
+    ), patch('app.services.assignments.completion_service.db.session.query', return_value=query), patch(
+        'app.services.assignments.completion_service.db.session.get', return_value=None,
+    ):
         missing = AssignmentCompletionService.list_missing_items(
             5, 21, 99, hidden_field_ids={2},
         )
@@ -891,7 +895,9 @@ def test_list_missing_items_skips_empty_option_list_matrices():
         AssignmentCompletionService,
         '_empty_option_list_ids_for_assignment',
         return_value=frozenset({960}),
-    ), patch('app.services.assignments.completion_service.db.session.query', return_value=query):
+    ), patch('app.services.assignments.completion_service.db.session.query', return_value=query), patch(
+        'app.services.assignments.completion_service.db.session.get', return_value=None,
+    ):
         missing = AssignmentCompletionService.list_missing_items(4397, 24, 99)
 
     assert [item.form_item_id for item in missing] == [2]

@@ -389,6 +389,17 @@ def _compute_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         if doc_key:
             doc_lookup.add((doc.assignment_entity_status_id, doc_key))
 
+    if reverse_item_key:
+        from app.utils.assignment_document_carryover import repository_satisfied_field_ids_by_assignment
+
+        for aes_id, field_ids in repository_satisfied_field_ids_by_assignment(
+            list(aes_by_country.values())
+        ).items():
+            for field_id in field_ids:
+                doc_key = reverse_item_key.get(field_id)
+                if doc_key:
+                    doc_lookup.add((aes_id, doc_key))
+
     rows: list[dict[str, Any]] = []
     map_countries: list[dict[str, Any]] = []
     status_counts: dict[str, int] = {}

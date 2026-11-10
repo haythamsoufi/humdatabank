@@ -638,6 +638,9 @@ class TestComputeEntryFormProgressMetrics:
                 "app.routes.forms.helpers.build_submitted_documents_dict",
                 return_value={},
             ), patch(
+                "app.utils.assignment_document_carryover.merge_carryover_into_submitted_documents_dict",
+                return_value=set(),
+            ), patch(
                 "app.routes.forms.helpers.calculate_section_completion_status",
                 return_value={"Governance": "in_progress"},
             ), patch(
@@ -672,6 +675,9 @@ class TestComputeEntryFormProgressMetrics:
             ), patch(
                 "app.routes.forms.helpers.build_submitted_documents_dict",
                 return_value={},
+            ), patch(
+                "app.utils.assignment_document_carryover.merge_carryover_into_submitted_documents_dict",
+                return_value=set(),
             ), patch(
                 "app.routes.forms.helpers.calculate_section_completion_status",
                 return_value={},

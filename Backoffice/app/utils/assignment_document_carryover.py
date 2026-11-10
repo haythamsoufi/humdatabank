@@ -13,7 +13,8 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable
 
-from sqlalchemy.orm import joinedload
+from sqlalchemy import tuple_
+from sqlalchemy.orm import contains_eager, joinedload
 
 from app.models import AssignedForm, AssignmentEntityStatus, FormItem, SubmittedDocument
 
@@ -306,3 +307,118 @@ def merge_carryover_into_submitted_documents_dict(
         _merge_docs_for_key(key, carry, existing_submitted_documents_dict)
 
     return carryover_ids
+
+
+def repository_satisfied_field_ids_by_assignment(
+    assignments: list[AssignmentEntityStatus],
+) -> dict[int, set[int]]:
+    """Form fields each assignment already satisfies from another assignment.
+
+    A field counts when ``cross_assignment_period_reuse`` is on and a document
+    stored for this entity on the same template has a period that covers every
+    year of this assignment. The returned ids are the current field ids.
+    """
+    satisfied: dict[int, set[int]] = {}
+    rows = [aes for aes in assignments or [] if getattr(aes, "id", None) and getattr(aes, "assigned_form_id", None)]
+    if not rows:
+        return satisfied
+
+    form_ids = {int(aes.assigned_form_id) for aes in rows}
+    forms = {
+        form.id: form
+        for form in AssignedForm.query.filter(AssignedForm.id.in_(form_ids)).all()
+    }
+    by_template: dict[int, list[AssignmentEntityStatus]] = {}
+    for aes in rows:
+        form = forms.get(int(aes.assigned_form_id))
+        if form is None or form.template_id is None:
+            continue
+        by_template.setdefault(int(form.template_id), []).append(aes)
+    if not by_template:
+        return satisfied
+
+    fields = (
+        FormItem.query.filter(
+            FormItem.template_id.in_(list(by_template)),
+            FormItem.item_type == "document_field",
+            FormItem.archived.is_(False),
+        ).all()
+    )
+    reuse_by_template: dict[int, list[FormItem]] = {}
+    for field in fields:
+        cfg = field.config or {}
+        if _config_bool_true(cfg.get("cross_assignment_period_reuse")):
+            reuse_by_template.setdefault(int(field.template_id), []).append(field)
+    if not reuse_by_template:
+        return satisfied
+
+    for template_id, template_assignments in by_template.items():
+        reuse_fields = reuse_by_template.get(template_id) or []
+        if not reuse_fields:
+            continue
+        entities = {(aes.entity_type, int(aes.entity_id)) for aes in template_assignments}
+        candidates = (
+            SubmittedDocument.query.options(contains_eager(SubmittedDocument.assignment_entity_status))
+            .join(AssignmentEntityStatus, SubmittedDocument.assignment_entity_status_id == AssignmentEntityStatus.id)
+            .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+            .filter(
+                AssignedForm.template_id == template_id,
+                SubmittedDocument.form_item_id.isnot(None),
+                tuple_(
+                    AssignmentEntityStatus.entity_type,
+                    AssignmentEntityStatus.entity_id,
+                ).in_(list(entities)),
+            )
+            .all()
+        )
+        grouped: dict[tuple, list[SubmittedDocument]] = {}
+        for doc in candidates:
+            owner = doc.assignment_entity_status
+            if owner is None:
+                continue
+            key = (owner.entity_type, int(owner.entity_id))
+            if key not in entities:
+                continue
+            grouped.setdefault(key, []).append(doc)
+
+        source_ids = {
+            doc.form_item_id
+            for docs in grouped.values()
+            for doc in docs
+            if doc.form_item_id
+        }
+        source_items: dict[int, FormItem] = {}
+        if source_ids:
+            for item in FormItem.query.filter(FormItem.id.in_(source_ids)).all():
+                source_items[item.id] = item
+
+        for aes in template_assignments:
+            form = forms.get(int(aes.assigned_form_id))
+            target_years = assignment_target_years(form.period_name if form else None)
+            if not target_years:
+                continue
+            entity_docs = grouped.get((aes.entity_type, int(aes.entity_id)), [])
+            hit_ids: set[int] = set()
+            for field in reuse_fields:
+                cfg = field.config or {}
+                for doc in entity_docs:
+                    owner_id = doc.assignment_entity_status_id
+                    if owner_id == aes.id:
+                        continue
+                    if not _document_matches_carryover_field(doc, field, cfg, source_items):
+                        continue
+                    if not document_covers_assignment_years(doc.period, target_years):
+                        continue
+                    hit_ids.add(int(field.id))
+                    break
+            if hit_ids:
+                satisfied[int(aes.id)] = hit_ids
+    return satisfied
+
+
+def repository_satisfied_field_ids(assignment_entity_status: AssignmentEntityStatus) -> set[int]:
+    """Field ids this one assignment satisfies from another assignment's documents."""
+    if assignment_entity_status is None or not getattr(assignment_entity_status, "id", None):
+        return set()
+    found = repository_satisfied_field_ids_by_assignment([assignment_entity_status])
+    return found.get(int(assignment_entity_status.id), set())

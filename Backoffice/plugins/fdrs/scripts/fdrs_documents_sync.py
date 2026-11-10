@@ -3,10 +3,15 @@ FDRS documents API → SubmittedDocument import (metadata + file bytes when URL 
 
 GET https://data-api.ifrc.org/api/documents?apiKey=...&showunpublished=true&force=true[&year=YYYY]
 
-Questionnaire document types map onto FDRS template document fields. All other
-National Society catalog types (Other, statutes/laws, Picture of the Year, …)
-are imported as library rows on the same country assignment
-(``form_item_id=None``). Global publication types are left to resource sync.
+Every National Society catalog file is imported. Questionnaire types map onto
+the FDRS template document fields and keep their own language, period, and
+approval status. A multi-year file is stored on the first year of its period
+when that assignment exists, otherwise on the API year it was uploaded through.
+Later assignments satisfy the field from that row when the period covers them.
+Other catalog types (Other, statutes/laws, Picture of the Year, …) are library
+rows on the same assignment (``form_item_id=None``). Global publication types
+are left to resource sync. Problems are recorded on the plan summary ``issues``
+list and are not silently dropped onto a later year.
 
 Public document URLs must be percent-encoded (spaces in paths). Use GET (HEAD is unreliable).
 HTTP 200/206 → save to submission storage and clear ``file_pending``.
@@ -41,7 +46,6 @@ from fdrs_sync_constants import (
     FdrsSyncCancelled,
     fdrs_approval_is_importable,
     fdrs_clean_approval_text,
-    fdrs_document_approval_rank,
     fdrs_document_config_label,
     fdrs_document_form_item_id,
     fdrs_document_is_public_visibility,
@@ -75,12 +79,14 @@ def _format_documents_done_message(doc_stats: Dict[str, Any]) -> str:
     status_pending = doc_stats.get("status_pending", 0)
     status_rejected = doc_stats.get("status_rejected", 0)
     removed = doc_stats.get("removed", 0)
+    issues = doc_stats.get("issue_count", 0)
     return (
         f"FDRS documents complete: {inserted} inserted, {updated} updated, {removed} removed; "
         f"status approved={status_approved} pending={status_pending} rejected={status_rejected} "
         f"changed={doc_stats.get('status_changed', 0)}; "
         f"files saved: {downloaded}, awaiting IFRC file download: {pending}, "
-        f"unreachable URLs: {url_unreachable}, download errors: {download_errors}"
+        f"unreachable URLs: {url_unreachable}, download errors: {download_errors}; "
+        f"issues flagged: {issues}"
     )
 _FDRS_DOC_USER_AGENT = "HumanitarianDatabank-FDRS-sync/1.0"
 _DEFAULT_DOWNLOAD_TIMEOUT = 120
@@ -324,30 +330,101 @@ def _parse_year_text_bounds(year_text: Any) -> Tuple[Optional[int], Optional[int
     return min(nums), max(nums)
 
 
+def _parse_api_year(raw: Any) -> Optional[int]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    match = _YEAR_IN_TEXT_RE.search(text)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
 def _resolve_document_assignment_year(
     doc: Dict[str, Any],
     iso3: str,
     assignment_by_key: Dict[Tuple[str, str], int],
-) -> Optional[str]:
+) -> Tuple[Optional[str], str]:
     """
-    Map a FDRS document row to an assignment period_name (reporting year string).
+    Map a FDRS document row to the assignment it is stored on.
 
-    YearText ranges such as ``2021-2024`` are indexed under ``year=2021`` in the API
-    but belong on the latest assignment year in the range (here 2024).
+    A range such as ``2020-2030`` is stored on the first year when that
+    assignment exists. There is often no assignment for the final year yet.
+    If the first year has no assignment, the file stays on the API ``year``
+    (the assignment it was uploaded through). It is not attached to a later
+    year in the range just because that assignment exists.
+
+    Returns ``(period_name, placement)``. ``placement`` is ``range_start``,
+    ``upload_year``, ``upload_year_fallback``, or ``no_assignment``.
     """
+    start, _end = _parse_year_text_bounds(doc.get("YearText"))
+    upload_year = _parse_api_year(doc.get("year"))
+
+    if start is not None and (str(start), iso3) in assignment_by_key:
+        return str(start), "range_start"
+    if upload_year is not None and (str(upload_year), iso3) in assignment_by_key:
+        if start is not None and start != upload_year:
+            return str(upload_year), "upload_year_fallback"
+        return str(upload_year), "upload_year"
+    return None, "no_assignment"
+
+
+def _document_in_sync_scope(
+    doc: Dict[str, Any],
+    storage_year: str,
+    sync_year_set: Optional[Set[int]],
+) -> bool:
+    """True when this sync should write the file onto its home assignment.
+
+    A 2024 sync still stores a ``2021-2024`` file on 2021, because 2024 is
+    satisfied from that row. A file whose period does not meet the synced
+    years is left for a sync of its own year.
+    """
+    if not sync_year_set:
+        return True
+    try:
+        if int(storage_year) in sync_year_set:
+            return True
+    except (TypeError, ValueError):
+        return False
     start, end = _parse_year_text_bounds(doc.get("YearText"))
-    if end is not None:
-        floor = start if start is not None else end
-        for candidate in range(end, floor - 1, -1):
-            year_str = str(candidate)
-            if (year_str, iso3) in assignment_by_key:
-                return year_str
-    raw_year = doc.get("year")
-    if raw_year is not None:
-        year_str = str(raw_year).strip()
-        if year_str and (year_str, iso3) in assignment_by_key:
-            return year_str
-    return None
+    if start is None or end is None:
+        return False
+    return any(start <= year <= end for year in sync_year_set)
+
+
+_MAX_IMPORT_ISSUES = 100
+
+
+def _record_import_issue(
+    summary: Dict[str, Any],
+    doc: Dict[str, Any],
+    *,
+    code: str,
+    detail: str,
+    **extra: Any,
+) -> None:
+    summary["issue_count"] = int(summary.get("issue_count") or 0) + 1
+    by_code = summary.setdefault("issues_by_code", {})
+    by_code[code] = int(by_code.get(code) or 0) + 1
+    issues = summary.setdefault("issues", [])
+    if len(issues) >= _MAX_IMPORT_ISSUES:
+        return
+    issues.append(
+        {
+            "code": code,
+            "iso3": (doc.get("iso3") or "").strip(),
+            "filename": (doc.get("name") or "").strip(),
+            "document_type": (doc.get("document_type") or "").strip(),
+            "api_year": doc.get("year"),
+            "period": clean_fdrs_document_period(doc.get("YearText") or ""),
+            "language": (doc.get("LangCode") or "").strip(),
+            "detail": detail,
+            **extra,
+        }
+    )
 
 
 def fetch_fdrs_documents_api(
@@ -362,8 +439,9 @@ def fetch_fdrs_documents_api(
 
     The API ``year`` query param only matches the numeric ``year`` field on each
     document, not YearText ranges (e.g. Bahrain annual report ``2021-2024`` has
-    ``year=2021``). We always fetch the full catalog; ``build_document_import_plan``
-    filters by resolved assignment year when ``sync_years`` is set.
+    ``year=2021``). We always fetch the full catalog. ``build_document_import_plan``
+    stores a range on its first year and still includes it when a synced year
+    falls inside that range.
     """
     from fdrs_data_fetcher import fetch_country_map
 
@@ -410,18 +488,6 @@ def _doc_public_raw(doc: Dict[str, Any]) -> Any:
     if doc.get("Public") not in (None, ""):
         return doc.get("Public")
     return doc.get("public")
-
-
-def _doc_score(doc: Dict[str, Any]) -> Tuple[int, str]:
-    """Higher is better for dedupe within (iso3, year, document_type)."""
-    approval_raw = _doc_approval_raw(doc)
-    public_raw = _doc_public_raw(doc)
-    public_i = fdrs_public_code(public_raw)
-    approval_rank = fdrs_document_approval_rank(approval_raw, public_code=public_raw)
-    public_rank = 2 if public_i == 1 else 1 if public_i in (0, 2, 3, 4) else 0
-    lang_rank = 1 if (doc.get("LangCode") or "").strip().lower() == "en" else 0
-    modified = (doc.get("ModifiedAt") or "")[:19]
-    return (approval_rank, public_rank, lang_rank, modified)
 
 
 def _fdrs_document_import_key(doc: Dict[str, Any]) -> str:
@@ -481,12 +547,14 @@ def build_document_import_plan(
     sync_years: Optional[List[int]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Select importable FDRS documents and map to assignment (+ form_item_id when known).
+    Select importable FDRS documents and map each file to its home assignment.
 
-    Questionnaire slot types (Annual Report, financials, Strategic Plan) keep one
-    winner per (iso3, year, type). All other National Society document types are
-    imported as library rows on the assignment (``form_item_id=None``), one row per
-    catalog file. Global publication types are skipped (resource sync owns those).
+    Every catalog file is kept, including several languages or parts of the same
+    document type. Each row keeps its language, period, and approval status.
+    A multi-year file is stored on the first year of ``YearText`` when that
+    assignment exists, otherwise on the API year it was uploaded through.
+    Issues (no home assignment, missing language, a range start with no
+    assignment, duplicate catalog rows) are listed on ``summary["issues"]``.
 
     Returns (plan_rows, summary).
     """
@@ -511,16 +579,15 @@ def build_document_import_plan(
         "status_approved": 0,
         "status_pending": 0,
         "status_rejected": 0,
+        "issue_count": 0,
+        "issues_by_code": {},
+        "issues": [],
     }
-    # Every importable document that maps onto a synced assignment, including
-    # files that lose the one-per-type dedupe. Removal uses this set so a
-    # second real file is kept. Popped before the summary is stored on the job.
+    # Import keys written or retained by this catalog. Removal uses this set.
+    # Popped before the summary is stored on the job.
     present_import_keys: Set[str] = set()
 
-    # Questionnaire slots: best doc per (iso3, reporting_year, document_type)
-    best_slots: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
-    # Library types: every catalog file (countries often upload several "Other" docs)
-    library_candidates: List[Tuple[str, str, str, Dict[str, Any]]] = []
+    candidates: List[Tuple[str, str, str, Dict[str, Any]]] = []
 
     for doc in documents:
         doc_type = (doc.get("document_type") or "").strip()
@@ -537,23 +604,60 @@ def build_document_import_plan(
         if not iso3:
             summary["skipped_no_iso3"] += 1
             continue
-        year_str = _resolve_document_assignment_year(doc, iso3, assignment_by_key)
+        if not (doc.get("LangCode") or "").strip():
+            _record_import_issue(
+                summary,
+                doc,
+                code="missing_language",
+                detail="Catalog row has no LangCode; the file is still imported with language en.",
+            )
+        start_year, end_year = _parse_year_text_bounds(doc.get("YearText"))
+        upload_year = _parse_api_year(doc.get("year"))
+        if (
+            start_year is not None
+            and end_year is not None
+            and upload_year is not None
+            and (upload_year < start_year or upload_year > end_year)
+        ):
+            _record_import_issue(
+                summary,
+                doc,
+                code="upload_year_outside_period",
+                detail=(
+                    f"API year {upload_year} is outside the document period "
+                    f"{start_year}-{end_year}."
+                ),
+            )
+        year_str, placement = _resolve_document_assignment_year(doc, iso3, assignment_by_key)
         if not year_str:
             summary["skipped_no_assignment"] += 1
+            _record_import_issue(
+                summary,
+                doc,
+                code="no_home_assignment",
+                detail=(
+                    "No assignment for the first year of the period or for the "
+                    "year the file was uploaded through. It was not attached to a later year."
+                ),
+            )
             continue
-        if sync_year_set is not None and int(year_str) not in sync_year_set:
+        if placement == "upload_year_fallback":
+            _record_import_issue(
+                summary,
+                doc,
+                code="stored_on_upload_year",
+                detail=(
+                    f"The period starts in {start_year}, which has no assignment. "
+                    f"The file is stored on {year_str}, the year it was uploaded through."
+                ),
+                storage_year=year_str,
+            )
+        if not _document_in_sync_scope(doc, year_str, sync_year_set):
             summary["skipped_sync_year"] += 1
             continue
 
         present_import_keys.add(_fdrs_document_import_key(doc))
-        form_item_id = fdrs_document_form_item_id(doc_type)
-        if form_item_id is not None:
-            key = (iso3, year_str, doc_type)
-            prev = best_slots.get(key)
-            if prev is None or _doc_score(doc) > _doc_score(prev):
-                best_slots[key] = doc
-        else:
-            library_candidates.append((iso3, year_str, doc_type, doc))
+        candidates.append((iso3, year_str, doc_type, doc))
 
     plan: List[Dict[str, Any]] = []
     seen_keys: set = set()
@@ -562,6 +666,12 @@ def build_document_import_plan(
         import_key = _fdrs_document_import_key(doc)
         if import_key in seen_keys:
             summary["skipped_duplicate"] += 1
+            _record_import_issue(
+                summary,
+                doc,
+                code="duplicate_catalog_row",
+                detail="The same donor, API year, document type, and filename appeared more than once.",
+            )
             return
         seen_keys.add(import_key)
         aes_id = assignment_by_key[(year_str, iso3)]
@@ -584,10 +694,13 @@ def build_document_import_plan(
         else:
             summary["status_pending"] += 1
 
-    for (iso3, year_str, doc_type), doc in sorted(best_slots.items()):
+    for iso3, year_str, doc_type, doc in candidates:
         _append_plan_doc(iso3, year_str, doc_type, doc)
-    for iso3, year_str, doc_type, doc in library_candidates:
-        _append_plan_doc(iso3, year_str, doc_type, doc)
+    if summary["issue_count"]:
+        logger.warning(
+            "FDRS document import issues: %s",
+            summary.get("issues_by_code"),
+        )
 
     summary["planned"] = len(plan)
     summary["present_import_keys"] = present_import_keys
@@ -945,9 +1058,12 @@ def upsert_fdrs_document_metadata(
     progress_start_pct: float = 82.0,
     progress_end_pct: float = 94.0,
 ) -> Dict[str, int]:
-    """Insert or update SubmittedDocument rows; download file bytes when the FDRS URL responds 200/206."""
-    from collections import defaultdict
+    """Insert or update SubmittedDocument rows; download file bytes when the FDRS URL responds 200/206.
 
+    Each catalog file is its own row, matched by ``fdrs_import_key``. A second
+    language or part is inserted beside the first. An existing row is moved
+    when the plan now stores that file on a different assignment.
+    """
     from app.extensions import db
     from app.models.assignments import AssignmentEntityStatus
     from app.models.documents import SubmittedDocument
@@ -967,6 +1083,7 @@ def upsert_fdrs_document_metadata(
         "status_pending": 0,
         "status_rejected": 0,
         "status_changed": 0,
+        "reassigned": 0,
     }
     if not plan_rows:
         return stats
@@ -1023,22 +1140,6 @@ def upsert_fdrs_document_metadata(
         for aes in AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all():
             aes_by_id[aes.id] = aes
 
-    item_ids = {
-        int(r["form_item_id"])
-        for r in plan_rows
-        if r.get("form_item_id") is not None
-    }
-    # Questionnaire slots only — library imports (form_item_id=None) are keyed solely
-    # by fdrs_import_key and never adopt a sibling slot row.
-    slots: Dict[Tuple[int, int], List[SubmittedDocument]] = defaultdict(list)
-    if aes_ids and item_ids:
-        for doc in SubmittedDocument.query.filter(
-            SubmittedDocument.assignment_entity_status_id.in_(aes_ids),
-            SubmittedDocument.form_item_id.in_(item_ids),
-            SubmittedDocument.fdrs_import_key.isnot(None),
-        ).all():
-            slots[(int(doc.assignment_entity_status_id), int(doc.form_item_id))].append(doc)
-
     def _record_status(old_status: Optional[str], new_status: str, source: Dict[str, Any]) -> None:
         if dry_run or change_recorder is None or old_status == new_status:
             return
@@ -1068,20 +1169,7 @@ def upsert_fdrs_document_metadata(
         try:
             form_item_raw = row.get("form_item_id")
             form_item_id = int(form_item_raw) if form_item_raw is not None else None
-            if form_item_id is not None:
-                slot_key: Optional[Tuple[int, int]] = (
-                    int(row["assignment_entity_status_id"]),
-                    form_item_id,
-                )
-                slot_rows = slots.get(slot_key, [])
-            else:
-                slot_key = None
-                slot_rows = []
-            existing, adopted = select_fdrs_document_for_upsert(
-                existing_by_key.get(import_key),
-                slot_rows,
-                filename=row.get("filename"),
-            )
+            existing = existing_by_key.get(import_key)
             previous_status = stored_document_status(existing.status) if existing is not None else None
             modified_at = _parse_fdrs_modified_at(row.get("modified_at"))
             from app.utils.datetime_helpers import utcnow
@@ -1178,8 +1266,6 @@ def upsert_fdrs_document_metadata(
             if source_url_http_status is not None and not fdrs_url_is_downloadable(source_url_http_status):
                 stats["url_unreachable"] += 1
 
-            siblings = fdrs_pending_slot_siblings(existing, slot_rows, doc_status)
-
             def _count_document_status() -> None:
                 if doc_status == DocumentStatus.APPROVED:
                     stats["status_approved"] += 1
@@ -1189,7 +1275,6 @@ def upsert_fdrs_document_metadata(
                     stats["status_pending"] += 1
                 if existing is not None and previous_status != doc_status:
                     stats["status_changed"] += 1
-                stats["status_changed"] += len(siblings)
 
             if dry_run:
                 if existing:
@@ -1199,18 +1284,17 @@ def upsert_fdrs_document_metadata(
                 _count_document_status()
                 continue
 
-            if adopted and existing is not None:
-                old_key = existing.fdrs_import_key
-                if old_key and old_key != import_key:
-                    existing_by_key.pop(old_key, None)
-                existing.fdrs_import_key = import_key
-                existing_by_key[import_key] = existing
-
             if existing:
                 # Field updates flush via ORM; linked AIDocument privacy/metadata/searchable
                 # sync automatically (SubmittedDocument before_flush hook in app.models.documents).
                 # Status is the string value ('approved' / 'pending' / 'rejected'), same as the
                 # document review routes, so a later sync replaces a stale pending row.
+                # Each catalog file keeps its own status. A second language is a new row.
+                new_aes_id = int(row["assignment_entity_status_id"])
+                if existing.assignment_entity_status_id != new_aes_id:
+                    existing.assignment_entity_status_id = new_aes_id
+                    stats["reassigned"] += 1
+                existing.form_item_id = form_item_id
                 existing.filename = row["filename"]
                 existing.source_url = row.get("source_url")
                 existing.thumbnail_source_url = row.get("thumbnail_url")
@@ -1248,22 +1332,8 @@ def upsert_fdrs_document_metadata(
                 )
                 db.session.add(entry)
                 existing_by_key[import_key] = entry
-                if slot_key is not None:
-                    slots.setdefault(slot_key, []).append(entry)
                 stats["inserted"] += 1
 
-            for sibling in siblings:
-                old_status = stored_document_status(sibling.status)
-                sibling.status = doc_status
-                db.session.add(sibling)
-                _record_status(
-                    old_status,
-                    doc_status,
-                    {
-                        **row,
-                        "filename": getattr(sibling, "filename", None) or row.get("filename"),
-                    },
-                )
             _count_document_status()
 
             if batch_size and i % batch_size == 0:
@@ -1355,12 +1425,14 @@ def run_fdrs_documents_sync(
         )
         doc_stats["removed"] = removed
         doc_stats["errors"] = int(doc_stats.get("errors") or 0) + removal_errors
+        doc_stats["issue_count"] = int(summary.get("issue_count") or 0)
     except FdrsSyncCancelled:
         raise
     except Exception as exc:
         logger.error("FDRS document removal failed: %s", exc, exc_info=True)
         doc_stats["removed"] = 0
         doc_stats["errors"] = int(doc_stats.get("errors") or 0) + 1
+        doc_stats["issue_count"] = int(summary.get("issue_count") or 0)
     _progress(
         stage="documents_done",
         message=_format_documents_done_message(doc_stats),

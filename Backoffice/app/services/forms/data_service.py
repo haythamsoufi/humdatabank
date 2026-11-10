@@ -58,6 +58,23 @@ from app.services.forms.processors._common import (  # noqa: F401 re-export
     MatrixJsonDecodeError,
 )
 
+
+def _document_field_satisfied_by_repository(field, assignment_entity_status) -> bool:
+    """True when another assignment already holds a document whose period covers this one."""
+    cfg = field.config if isinstance(getattr(field, "config", None), dict) else {}
+    from app.utils.assignment_document_carryover import (
+        _config_bool_true,
+        repository_satisfied_field_ids,
+    )
+
+    if not _config_bool_true(cfg.get("cross_assignment_period_reuse")):
+        return False
+    field_id = getattr(field, "id", None)
+    if not field_id:
+        return False
+    return int(field_id) in repository_satisfied_field_ids(assignment_entity_status)
+
+
 class FormDataService(
     PluginProcessorMixin,
     IndicatorProcessorMixin,
@@ -1608,6 +1625,8 @@ class FormDataService(
                     assignment_entity_status_id=assignment_entity_status.id,
                     form_item_id=field.id
                 ).first()
+            if not submitted_doc and _document_field_satisfied_by_repository(field, assignment_entity_status):
+                submitted_doc = True
             if not submitted_doc:
                 return {
                     'is_valid': False,

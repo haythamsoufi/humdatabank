@@ -326,9 +326,9 @@ def test_catalog_keeps_every_importable_key_including_deduped_files():
     ]
     plan, summary = build_document_import_plan(documents, assignment_rows, sync_years=[2024])
     present = summary["present_import_keys"]
-    assert summary["planned"] == 1
-    assert plan[0]["filename"] == "new-report.pdf"
-    assert plan[0]["fdrs_import_key"] in present
+    assert summary["planned"] == 2
+    assert {row["filename"] for row in plan} == {"old-report.pdf", "new-report.pdf"}
+    assert all(row["fdrs_import_key"] in present for row in plan)
     older = [doc for doc in documents if doc["name"] == "old-report.pdf"][0]
     assert _fdrs_document_import_key(older) in present
     assert len(present) == 2
@@ -485,7 +485,7 @@ def test_build_document_import_plan_maps_rejected_status():
     assert plan[0]["form_item_id"] == 933
 
 
-def test_build_document_import_plan_prefers_validated_over_rejected():
+def test_build_document_import_plan_keeps_validated_and_rejected_files():
     documents = [
         {
             "don_code": "DGA001",
@@ -520,12 +520,14 @@ def test_build_document_import_plan_prefers_validated_over_rejected():
         {"period_name": "2024", "iso3": "GAB", "assignment_entity_status_id": 77},
     ]
     plan, summary = build_document_import_plan(documents, assignment_rows)
-    assert summary["planned"] == 1
-    assert plan[0]["status"] == "approved"
-    assert plan[0]["source_url"].endswith("validated.pdf")
+    assert summary["planned"] == 2
+    by_name = {row["filename"]: row for row in plan}
+    assert by_name["audited Financial Statement_Gabon_2024.pdf"]["status"] == "approved"
+    assert by_name["audited Financial Statement_Gabon_2024_rejected.pdf"]["status"] == "rejected"
+    assert by_name["audited Financial Statement_Gabon_2024.pdf"]["language"] == "fr"
 
 
-def test_build_document_import_plan_maps_multi_year_annual_report_to_end_year():
+def test_build_document_import_plan_maps_multi_year_annual_report_to_first_year():
     documents = [
         {
             "don_code": "DBH001",
@@ -549,9 +551,100 @@ def test_build_document_import_plan_maps_multi_year_annual_report_to_end_year():
     plan, summary = build_document_import_plan(documents, assignment_rows, sync_years=[2024])
     assert summary["planned"] == 1
     assert plan[0]["form_item_id"] == 923
-    assert plan[0]["assignment_entity_status_id"] == 386
-    assert plan[0]["year"] == "2024"
+    assert plan[0]["assignment_entity_status_id"] == 100
+    assert plan[0]["year"] == "2021"
     assert plan[0]["period"] == "2021-2024"
+    assert plan[0]["language"] == "ar"
+
+
+def test_multi_year_plan_is_not_stored_on_a_later_existing_year():
+    documents = [
+        {
+            "don_code": "DKE001",
+            "iso3": "KEN",
+            "document_type": "Our Strategic Plan",
+            "document_typeId": 12,
+            "year": 2020,
+            "YearText": "2020-2030",
+            "name": "Strategic Plan_Kenya_2020-2030_en.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+        {
+            "don_code": "DKE001",
+            "iso3": "KEN",
+            "document_type": "Our Strategic Plan",
+            "document_typeId": 12,
+            "year": 2020,
+            "YearText": "2020-2030",
+            "name": "Strategic Plan_Kenya_2020-2030_fr.pdf",
+            "LangCode": "fr",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        },
+    ]
+    assignment_rows = [
+        {"period_name": "2020", "iso3": "KEN", "assignment_entity_status_id": 20},
+        {"period_name": "2025", "iso3": "KEN", "assignment_entity_status_id": 25},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows, sync_years=[2025])
+    assert summary["planned"] == 2
+    assert {row["assignment_entity_status_id"] for row in plan} == {20}
+    assert {row["year"] for row in plan} == {"2020"}
+    assert {row["language"] for row in plan} == {"en", "fr"}
+    assert {row["period"] for row in plan} == {"2020-2030"}
+    assert summary["issue_count"] == 0
+
+
+def test_range_without_start_assignment_is_stored_on_the_upload_year():
+    documents = [
+        {
+            "don_code": "DKE001",
+            "iso3": "KEN",
+            "document_type": "Our Strategic Plan",
+            "document_typeId": 12,
+            "year": 2022,
+            "YearText": "2020-2030",
+            "name": "Strategic Plan_Kenya_2020-2030_en.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        }
+    ]
+    assignment_rows = [
+        {"period_name": "2022", "iso3": "KEN", "assignment_entity_status_id": 22},
+        {"period_name": "2025", "iso3": "KEN", "assignment_entity_status_id": 25},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 1
+    assert plan[0]["assignment_entity_status_id"] == 22
+    assert plan[0]["year"] == "2022"
+    assert summary["issues_by_code"]["stored_on_upload_year"] == 1
+
+
+def test_range_with_no_home_assignment_is_flagged_and_not_attached_later():
+    documents = [
+        {
+            "don_code": "DKE001",
+            "iso3": "KEN",
+            "document_type": "Our Strategic Plan",
+            "document_typeId": 12,
+            "year": 2020,
+            "YearText": "2020-2030",
+            "name": "Strategic Plan_Kenya_2020-2030_en.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+        }
+    ]
+    assignment_rows = [
+        {"period_name": "2025", "iso3": "KEN", "assignment_entity_status_id": 25},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert plan == []
+    assert summary["skipped_no_assignment"] == 1
+    assert summary["issues_by_code"]["no_home_assignment"] == 1
 
 
 def test_same_year_period_range_is_stored_as_the_year():

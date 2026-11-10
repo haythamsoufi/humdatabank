@@ -650,6 +650,13 @@ def compute_entry_form_progress_metrics(
     existing_submitted_documents_dict = build_submitted_documents_dict(
         assignment_entity_status.id
     )
+    from app.utils.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
+
+    merge_carryover_into_submitted_documents_dict(
+        existing_submitted_documents_dict,
+        assignment_entity_status,
+        all_sections,
+    )
     skip_field_ids = set(hidden_field_ids or ())
     published_version_id = getattr(form_template, 'published_version_id', None)
     if getattr(assignment_entity_status, 'id', None) and published_version_id:

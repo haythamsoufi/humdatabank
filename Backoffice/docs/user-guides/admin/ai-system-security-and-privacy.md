@@ -34,7 +34,7 @@ Before a message can be sent to an external AI provider, the backend runs a best
 - emails, phone numbers
 - JWTs / Bearer tokens / Basic auth credentials
 - private keys (any PEM or PGP private key block, including a block pasted without its END line)
-- passwords / passphrases, secrets / API keys — as `key: value` or `KEY=value` assignments (env files, JSON, YAML, connection strings such as `AccountKey=`), passwords in connection URLs (`postgres://user:password@host`), and well-known provider key formats (for example OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
+- passwords / passphrases, secrets / API keys — as `key: value` or `KEY=value` assignments (env files, JSON, YAML, connection strings such as `AccountKey=`), passwords in connection URLs (`postgres://…@host` with an embedded password), and well-known provider key formats (for example OpenAI `sk-…`, AWS `AKIA…`, GitHub `ghp_…`)
 - IBANs (checksum-validated) and payment card numbers (Luhn-validated) to reduce false positives
 
 Phone detection skips number shapes that are common in data questions: lists of years, large or thousands-grouped figures, dates, IP addresses and table columns.

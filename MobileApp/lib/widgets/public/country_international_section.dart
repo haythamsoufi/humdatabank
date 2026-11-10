@@ -443,5 +443,5 @@ String _staffCountLabel(double value) {
   if (value == value.roundToDouble()) {
     return value.round().toString();
   }
-  return NumberFormat.compact(decimalDigits: 1).format(value).trim();
+  return NumberFormat.compact().format(value).trim();
 }

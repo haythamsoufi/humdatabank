@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-11-10 19:21+0000\n"
+"POT-Creation-Date: 2026-11-10 19:40+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -12260,8 +12260,11 @@ msgstr ""
 #: app/templates/admin/user_management/users.html:379
 #: app/templates/admin/validation_dashboard.html:114
 #: app/templates/admin/validation_dashboard.html:471
-#: app/templates/core/dashboard/_admin_panel.html:637
 msgid "FDS Member"
+msgstr ""
+
+#: app/templates/core/dashboard/_admin_panel.html:637
+msgid "FDS admin"
 msgstr ""
 
 #: app/templates/admin/user_management/access_requests.html:277

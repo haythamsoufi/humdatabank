@@ -1124,6 +1124,28 @@ class AppLocalizations {
       'countries_count': '%s countries',
       'country_detail_key_figures': 'Key figures',
       'country_detail_institutional': 'Institutional',
+      'country_detail_domestic': 'Domestic',
+      'country_detail_international': 'International',
+      'country_detail_international_pns_title': 'Bilateral support provided',
+      'country_detail_international_host_title': 'Bilateral support received',
+      'country_detail_international_pns_lead':
+          'Participating National Society outbound support from Unified Planning and Reporting.',
+      'country_detail_international_host_lead':
+          'Participating National Societies supporting this country bilaterally.',
+      'country_detail_international_year': 'Latest year: %s',
+      'country_detail_international_countries_supported': 'Countries supported',
+      'country_detail_international_supporting_pns': 'Supporting PNSs',
+      'country_detail_international_funding': 'Funding',
+      'country_detail_international_requirement': 'Requirement',
+      'country_detail_international_expenditure': 'Expenditure',
+      'country_detail_international_visuals_pns':
+          'Network bilateral support and funding',
+      'country_detail_international_visuals_host':
+          'Support flow map',
+      'country_detail_international_empty':
+          'No bilateral support data is available for this country yet.',
+      'country_detail_international_unavailable':
+          'International support could not be loaded',
       'country_detail_key_indicators': 'Key indicators',
       'country_detail_top_sectors': 'Top sectors',
       'country_detail_documents': 'Documents',
@@ -8879,6 +8901,37 @@ class AppLocalizations {
   String get countryDetailKeyFigures => translate('country_detail_key_figures');
   String get countryDetailInstitutional =>
       translate('country_detail_institutional');
+  String get countryDetailDomestic => translate('country_detail_domestic');
+  String get countryDetailInternational =>
+      translate('country_detail_international');
+  String get countryDetailInternationalPnsTitle =>
+      translate('country_detail_international_pns_title');
+  String get countryDetailInternationalHostTitle =>
+      translate('country_detail_international_host_title');
+  String get countryDetailInternationalPnsLead =>
+      translate('country_detail_international_pns_lead');
+  String get countryDetailInternationalHostLead =>
+      translate('country_detail_international_host_lead');
+  String countryDetailInternationalYear(int year) =>
+      translate('country_detail_international_year').replaceAll('%s', '$year');
+  String get countryDetailInternationalCountriesSupported =>
+      translate('country_detail_international_countries_supported');
+  String get countryDetailInternationalSupportingPns =>
+      translate('country_detail_international_supporting_pns');
+  String get countryDetailInternationalFunding =>
+      translate('country_detail_international_funding');
+  String get countryDetailInternationalRequirement =>
+      translate('country_detail_international_requirement');
+  String get countryDetailInternationalExpenditure =>
+      translate('country_detail_international_expenditure');
+  String get countryDetailInternationalVisualsPns =>
+      translate('country_detail_international_visuals_pns');
+  String get countryDetailInternationalVisualsHost =>
+      translate('country_detail_international_visuals_host');
+  String get countryDetailInternationalEmpty =>
+      translate('country_detail_international_empty');
+  String get countryDetailInternationalUnavailable =>
+      translate('country_detail_international_unavailable');
   String get countryDetailKeyIndicators =>
       translate('country_detail_key_indicators');
   String get countryDetailTopSectors => translate('country_detail_top_sectors');

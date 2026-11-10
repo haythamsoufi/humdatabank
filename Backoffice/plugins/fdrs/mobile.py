@@ -420,6 +420,7 @@ def _assemble_country_profile(
     banks_by_id,
     sector_names,
     period_order=None,
+    pns_iso3s=None,
 ):
     """One country profile payload.
 
@@ -429,6 +430,14 @@ def _assemble_country_profile(
     from app.utils.sector_logo_urls import country_ns_logo_url
 
     national_society = country.primary_national_society
+    iso3 = (country.iso3 or '').strip().upper()
+    if pns_iso3s is None:
+        try:
+            from plugins.upr.analysis.country_international import pns_country_iso3s
+
+            pns_iso3s = pns_country_iso3s()
+        except Exception:
+            pns_iso3s = frozenset()
     country_payload = {
         'id': country.id,
         'name': country.get_name_translation(locale) if locale != 'en' else country.name,
@@ -437,6 +446,8 @@ def _assemble_country_profile(
         'region': country.region,
         'national_society_name': national_society.name if national_society else None,
         'logo_url': country_ns_logo_url(national_society, country.iso3),
+        # True when this country is assigned UPR PNS plan/report templates (22/23).
+        'is_pns': iso3 in pns_iso3s,
     }
 
     totals = {
@@ -590,6 +601,29 @@ def country_profile(iso3):
     except Exception as e:
         current_app.logger.error('mobile_country_profile: %s', e, exc_info=True)
         return mobile_server_error('Failed to load country profile.')
+
+
+def country_international(iso3):
+    """International bilateral support for one country (PNS outbound or host inbound).
+
+    Powers the Institutional → International sub-tab on the mobile country
+    profile. Uses the same public UPR flow figures as the Embed Content visuals.
+    """
+    code = (iso3 or '').strip().upper()
+    if len(code) != 3 or not code.isalpha():
+        return mobile_bad_request('iso3 must be a 3-letter country code')
+
+    try:
+        from app.models import Country
+        from plugins.upr.analysis.country_international import build_country_international
+
+        country = Country.query.filter(db.func.upper(Country.iso3) == code).first()
+        if country is None:
+            return mobile_not_found('Country not found')
+        return mobile_ok(data=build_country_international(code))
+    except Exception as e:
+        current_app.logger.error('mobile_country_international: %s', e, exc_info=True)
+        return mobile_server_error('Failed to load international support.')
 
 
 def go_documents_all():
@@ -1130,6 +1164,12 @@ def offline_countries():
             period_names.update(data['by_period'])
         from app.services.forms.reporting_period_service import sort_period_names
         period_order = sort_period_names(list(period_names))
+        try:
+            from plugins.upr.analysis.country_international import pns_country_iso3s
+
+            pns_iso3s = pns_country_iso3s()
+        except Exception:
+            pns_iso3s = frozenset()
 
         profiles = {}
         for country in countries:
@@ -1145,6 +1185,7 @@ def offline_countries():
                 banks_by_id=banks_by_id,
                 sector_names=sector_names,
                 period_order=period_order,
+                pns_iso3s=pns_iso3s,
             )
 
         try:

@@ -13,6 +13,7 @@ import '../../config/app_config.dart';
 import '../../config/routes.dart';
 import '../../di/service_locator.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/public/country_international_support.dart';
 import '../../models/public/country_profile.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../services/api_service.dart';
@@ -26,6 +27,7 @@ import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/mobile_screen_scaffold.dart';
 import '../../widgets/network_logo_image.dart';
+import '../../widgets/public/country_international_section.dart';
 import '../../widgets/public/go_operations_section.dart';
 import '../../widgets/public/indicator_trend.dart';
 
@@ -53,6 +55,8 @@ const _heroTextShadows = [
 const _initialDocumentYears = 3;
 const _institutionalSection = 'institutional';
 const _emergenciesSection = 'emergencies';
+const _domesticScope = 'domestic';
+const _internationalScope = 'international';
 
 /// Hosts the Backoffice PDF thumbnail endpoint is willing to fetch.
 const _pdfThumbnailHosts = {
@@ -83,6 +87,7 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
 
   String? _selectedKey;
   String _section = _institutionalSection;
+  String _institutionalScope = _domesticScope;
   String? _documentType;
   bool _showAllDocumentYears = false;
   bool _documentTiles = true;
@@ -93,6 +98,10 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
   GoOperationsSnapshot? _operations;
   bool _operationsFailed = false;
   int _operationsRequest = 0;
+  CountryInternationalSupport? _international;
+  bool _internationalFailed = false;
+  bool _internationalLoading = false;
+  int _internationalRequest = 0;
 
   @override
   void initState() {
@@ -137,6 +146,9 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
       _goFailed = false;
       _operations = null;
       _operationsFailed = false;
+      _international = null;
+      _internationalFailed = false;
+      _internationalLoading = false;
     });
 
     try {
@@ -182,6 +194,9 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
       _restartCoverTimer(profile.coverImages.length);
       _loadGoDocuments();
       _loadOperations();
+      if (_institutionalScope == _internationalScope) {
+        _loadInternational(force: true);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -286,6 +301,45 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
     } catch (_) {
       if (!mounted || request != _operationsRequest) return;
       setState(() => _operationsFailed = true);
+    }
+  }
+
+  Future<void> _loadInternational({bool force = false}) async {
+    if (!force && (_international != null || _internationalLoading)) return;
+    final request = ++_internationalRequest;
+    setState(() {
+      _internationalLoading = true;
+      _internationalFailed = false;
+    });
+    try {
+      final response = await _apiService.get(
+        '${AppConfig.mobileCountryProfileEndpoint}/${Uri.encodeComponent(widget.iso3.trim())}/international',
+        includeAuth: false,
+        cacheTtl: OfflineCacheService.publicBrowseTtl,
+      );
+      if (!mounted || request != _internationalRequest) return;
+      final decoded = response.statusCode == 200 ? jsonDecode(response.body) : null;
+      final data = decoded is Map ? decoded['data'] : null;
+      if (data is! Map) {
+        setState(() {
+          _internationalLoading = false;
+          _internationalFailed = true;
+        });
+        return;
+      }
+      setState(() {
+        _international = CountryInternationalSupport.fromJson(
+          Map<String, dynamic>.from(data),
+        );
+        _internationalLoading = false;
+        _internationalFailed = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _internationalRequest) return;
+      setState(() {
+        _internationalLoading = false;
+        _internationalFailed = true;
+      });
     }
   }
 
@@ -462,18 +516,30 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
                   operations: true,
                 ),
               ] else ...[
-                _buildKeyFigures(context, theme, loc, profile),
-                const SizedBox(height: 24),
-                _buildTrend(context, theme, loc, profile),
-                ..._buildTopSectors(context, theme, loc, profile),
-                const SizedBox(height: 24),
-                ..._buildDocuments(
-                  context,
-                  theme,
-                  loc,
-                  profile,
-                  operations: false,
-                ),
+                _buildInstitutionalScopeToggle(loc),
+                const SizedBox(height: 20),
+                if (_institutionalScope == _internationalScope)
+                  CountryInternationalSection(
+                    support: _international,
+                    loading: _internationalLoading,
+                    failed: _internationalFailed,
+                    isPnsHint: profile.country.isPns,
+                    onRetry: () => _loadInternational(force: true),
+                  )
+                else ...[
+                  _buildKeyFigures(context, theme, loc, profile),
+                  const SizedBox(height: 24),
+                  _buildTrend(context, theme, loc, profile),
+                  ..._buildTopSectors(context, theme, loc, profile),
+                  const SizedBox(height: 24),
+                  ..._buildDocuments(
+                    context,
+                    theme,
+                    loc,
+                    profile,
+                    operations: false,
+                  ),
+                ],
               ],
             ],
           ),
@@ -881,6 +947,125 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
     );
   }
 
+  Widget _buildInstitutionalScopeToggle(AppLocalizations loc) {
+    final theme = Theme.of(context);
+    final isDark = context.isDarkTheme;
+    final brandRed = Color(AppConstants.ifrcRed);
+    final isDomestic = _institutionalScope == _domesticScope;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const outerPad = 4.0;
+        final segmentW = (constraints.maxWidth - outerPad * 2) / 2;
+        final isRtl = Directionality.of(context) == TextDirection.rtl;
+        final thumbLeft = isRtl
+            ? (isDomestic ? segmentW : 0.0)
+            : (isDomestic ? 0.0 : segmentW);
+        final trackColor = isDark
+            ? theme.colorScheme.surfaceContainerLow
+            : const Color(0xFFE8E8ED);
+        final thumbColor = isDark
+            ? theme.colorScheme.surfaceContainerHigh
+            : theme.colorScheme.surface;
+
+        Widget segment({
+          required bool selected,
+          required String label,
+          required VoidCallback onTap,
+        }) {
+          return Expanded(
+            child: Semantics(
+              button: true,
+              selected: selected,
+              label: label,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    if (selected) return;
+                    HapticFeedback.selectionClick();
+                    onTap();
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Center(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: selected ? brandRed : context.textSecondaryColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: 46,
+          child: Container(
+            padding: const EdgeInsets.all(outerPad),
+            decoration: BoxDecoration(
+              color: trackColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  left: thumbLeft,
+                  top: 0,
+                  width: segmentW,
+                  height: 38,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: thumbColor,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.35 : 0.1,
+                          ),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    segment(
+                      selected: isDomestic,
+                      label: loc.countryDetailDomestic,
+                      onTap: () => setState(
+                        () => _institutionalScope = _domesticScope,
+                      ),
+                    ),
+                    segment(
+                      selected: !isDomestic,
+                      label: loc.countryDetailInternational,
+                      onTap: () {
+                        setState(
+                          () => _institutionalScope = _internationalScope,
+                        );
+                        _loadInternational();
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // ── Documents ──────────────────────────────────────────────────────────────
 
   List<Widget> _buildDocuments(
@@ -1116,6 +1301,10 @@ class _CountryDetailScreenState extends State<CountryDetailScreen>
       _documentType = null;
       _showAllDocumentYears = false;
     });
+    if (section == _institutionalSection &&
+        _institutionalScope == _internationalScope) {
+      _loadInternational();
+    }
   }
 
   Widget _buildDocumentList(List<CountryDocument> docs) {

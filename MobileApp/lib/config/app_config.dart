@@ -355,6 +355,7 @@ class AppConfig {
   static const String mobileCountryMapEndpoint = '$mobileApiPrefix/data/countrymap';
 
   /// Append `/{iso3}`; public country profile (key figures, indicators, documents).
+  /// International bilateral support: append `/{iso3}/international`.
   static const String mobileCountryProfileEndpoint = '$mobileApiPrefix/data/country-profile';
 
   /// Append `/{slug}`; regional analysis (summed key indicators, top countries).

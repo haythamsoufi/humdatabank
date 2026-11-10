@@ -680,6 +680,15 @@ MOBILE_ENDPOINT_REGISTRY = [
          'funding, and the active operations. data.available is false when GO could not be reached.'
      ),
      'flutter': 'CountryDetailScreen'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/country-profile/<iso3>/international', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'description': (
+         'International bilateral support for one country. '
+         'PNS countries (UPR templates 22/23) get outbound support embeds and partners supported; '
+         'other countries get inbound flow-map embeds and PNSs supporting them. '
+         'Includes summary figures and relative /upr/support-* embed paths.'
+     ),
+     'flutter': 'CountryDetailScreen'},
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/region-profile/<slug>', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': True,
      'description': (

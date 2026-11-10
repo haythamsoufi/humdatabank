@@ -406,107 +406,96 @@ class AiChatService {
     }
   }
 
-  /// List conversations (logged-in only)
-  Future<List<dynamic>> listConversations() async {
-    String? token = await getCachedToken();
-    final headers = <String, String>{};
-    if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
-    final resp = await _api.get(
-      AppConfig.aiV2ConversationsEndpoint,
-      includeAuth: true,
-      useCache: false,
-      queryParams: {'limit': '50'},
-      additionalHeaders: headers.isEmpty ? null : headers,
-    );
-    final data = jsonDecode(resp.body);
-    if (resp.statusCode == 401 || resp.statusCode == 403) {
-      await clearToken();
-      token = await fetchAndCacheToken();
-      if (token != null && token.isNotEmpty) {
-        final retryResp = await _api.get(
-          AppConfig.aiV2ConversationsEndpoint,
-          includeAuth: true,
-          useCache: false,
-          queryParams: {'limit': '50'},
-          additionalHeaders: {'Authorization': 'Bearer $token'},
-        );
-        final retryData = jsonDecode(retryResp.body);
-        if (retryResp.statusCode == 200) {
-          return (retryData['conversations'] as List?) ?? [];
+  /// Bearer retry shared by conversation reads and writes.
+  ///
+  /// A stale AI token is not always a 401: the backend falls back to the session cookie and
+  /// then rejects the write with HTTP 400 `CSRF validation failed`. Chat POST/SSE already
+  /// refresh once in that case; list/get/delete/import/feedback/clear-inflight must too.
+  /// The body is only parsed after the status is known, so an HTML 401/502 cannot skip the retry.
+  Future<T> _withFreshAiToken<T>({
+    required Future<T> Function(Map<String, String>? headers) send,
+    required int Function(T response) statusCode,
+    required String Function(T response) body,
+  }) async {
+    Map<String, String>? authHeaders(String? token) =>
+        (token != null && token.isNotEmpty) ? {'Authorization': 'Bearer $token'} : null;
+
+    var token = await getCachedToken();
+    var resp = await send(authHeaders(token));
+    final code = statusCode(resp);
+    if (code == 401 || code == 403 || _isCsrfRejection(code, body(resp))) {
+      DebugLogger.logWarn('AI', 'AI request HTTP $code; refreshing token and retrying once');
+      try {
+        await clearToken();
+        final refreshed = await fetchAndCacheToken();
+        if (refreshed != null && refreshed.isNotEmpty) {
+          resp = await send(authHeaders(refreshed));
         }
-        throw Exception(retryData['error']?.toString() ?? 'Failed to load conversations');
+      } on AiChatHttpException {
+        rethrow;
+      } catch (e) {
+        DebugLogger.logWarn('AI', 'AI token refresh retry failed: $e');
       }
     }
-    if (resp.statusCode != 200) {
-      throw Exception(data['error']?.toString() ?? 'Failed to load conversations');
+    return resp;
+  }
+
+  Map<String, dynamic> _requireJsonObject(String raw, {required int statusCode}) {
+    if (statusCode < 200 || statusCode >= 300) {
+      throw AiChatHttpException.fromResponse(statusCode, raw);
     }
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw const FormatException('Unexpected response format');
+    }
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  /// List conversations (logged-in only)
+  Future<List<dynamic>> listConversations() async {
+    final resp = await _withFreshAiToken(
+      send: (headers) => _api.get(
+        AppConfig.aiV2ConversationsEndpoint,
+        includeAuth: true,
+        useCache: false,
+        queryParams: {'limit': '50'},
+        additionalHeaders: headers,
+      ),
+      statusCode: (r) => r.statusCode,
+      body: (r) => r.body,
+    );
+    final data = _requireJsonObject(resp.body, statusCode: resp.statusCode);
     return (data['conversations'] as List?) ?? [];
   }
 
   Future<Map<String, dynamic>> getConversation(String conversationId) async {
-    String? token = await getCachedToken();
-    final headers = <String, String>{};
-    if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
-    final resp = await _api.get(
-      '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
-      includeAuth: true,
-      useCache: false,
-      queryParams: {'limit': '200'},
-      additionalHeaders: headers.isEmpty ? null : headers,
+    final resp = await _withFreshAiToken(
+      send: (headers) => _api.get(
+        '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
+        includeAuth: true,
+        useCache: false,
+        queryParams: {'limit': '200'},
+        additionalHeaders: headers,
+      ),
+      statusCode: (r) => r.statusCode,
+      body: (r) => r.body,
     );
-    final data = jsonDecode(resp.body);
-    if (resp.statusCode == 401 || resp.statusCode == 403) {
-      await clearToken();
-      token = await fetchAndCacheToken();
-      if (token != null && token.isNotEmpty) {
-        final retryResp = await _api.get(
-          '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
-          includeAuth: true,
-          useCache: false,
-          queryParams: {'limit': '200'},
-          additionalHeaders: {'Authorization': 'Bearer $token'},
-        );
-        final retryData = jsonDecode(retryResp.body);
-        if (retryResp.statusCode == 200) {
-          return Map<String, dynamic>.from(retryData);
-        }
-        throw Exception(retryData['error']?.toString() ?? 'Failed to load conversation');
-      }
-    }
-    if (resp.statusCode != 200) {
-      throw Exception(data['error']?.toString() ?? 'Failed to load conversation');
-    }
-    return Map<String, dynamic>.from(data);
+    return _requireJsonObject(resp.body, statusCode: resp.statusCode);
   }
 
   /// Delete a conversation (logged-in only)
   Future<void> deleteConversation(String conversationId) async {
-    String? token = await getCachedToken();
-    final headers = <String, String>{};
-    if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
-    final resp = await _api.delete(
-      '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
-      includeAuth: true,
-      additionalHeaders: headers.isEmpty ? null : headers,
+    final resp = await _withFreshAiToken(
+      send: (headers) => _api.delete(
+        '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
+        includeAuth: true,
+        additionalHeaders: headers,
+      ),
+      statusCode: (r) => r.statusCode,
+      body: (r) => r.body,
     );
-    final data = jsonDecode(resp.body);
-    if (resp.statusCode == 401 || resp.statusCode == 403) {
-      await clearToken();
-      token = await fetchAndCacheToken();
-      if (token != null && token.isNotEmpty) {
-        final retryResp = await _api.delete(
-          '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
-          includeAuth: true,
-          additionalHeaders: {'Authorization': 'Bearer $token'},
-        );
-        final retryData = jsonDecode(retryResp.body);
-        if (retryResp.statusCode == 200 || retryResp.statusCode == 204) return;
-        throw Exception(retryData['error']?.toString() ?? 'Failed to delete conversation');
-      }
-    }
-    if (resp.statusCode != 200 && resp.statusCode != 204) {
-      throw Exception(data['error']?.toString() ?? 'Failed to delete conversation');
-    }
+    if (resp.statusCode == 200 || resp.statusCode == 204) return;
+    throw AiChatHttpException.fromResponse(resp.statusCode, resp.body);
   }
 
   /// Import offline/local-only messages into a server conversation (logged-in only).
@@ -515,42 +504,22 @@ class AiChatService {
     required String conversationId,
     required List<Map<String, dynamic>> messages,
   }) async {
-    String? token = await getCachedToken();
-    final headers = <String, String>{};
-    if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
-
-    final resp = await _api.post(
-      '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/import',
-      includeAuth: true,
-      body: {
-        'messages': messages,
-        'client': 'mobile',
-      },
-      additionalHeaders: headers.isEmpty ? null : headers,
+    final payload = {
+      'messages': messages,
+      'client': 'mobile',
+    };
+    final resp = await _withFreshAiToken(
+      send: (headers) => _api.post(
+        '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/import',
+        includeAuth: true,
+        body: payload,
+        additionalHeaders: headers,
+      ),
+      statusCode: (r) => r.statusCode,
+      body: (r) => r.body,
     );
-
-    final data = jsonDecode(resp.body);
-    if (resp.statusCode == 401 || resp.statusCode == 403) {
-      await clearToken();
-      token = await fetchAndCacheToken();
-      if (token != null && token.isNotEmpty) {
-        final retryResp = await _api.post(
-          '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/import',
-          includeAuth: true,
-          body: {
-            'messages': messages,
-            'client': 'mobile',
-          },
-          additionalHeaders: {'Authorization': 'Bearer $token'},
-        );
-        final retryData = jsonDecode(retryResp.body);
-        if (retryResp.statusCode == 200) return;
-        throw Exception(retryData['error']?.toString() ?? 'Failed to import conversation messages');
-      }
-    }
-    if (resp.statusCode != 200) {
-      throw Exception(data['error']?.toString() ?? 'Failed to import conversation messages');
-    }
+    if (resp.statusCode == 200) return;
+    throw AiChatHttpException.fromResponse(resp.statusCode, resp.body);
   }
 
   /// Like/dislike for a trace (same as web immersive chat).
@@ -558,29 +527,19 @@ class AiChatService {
     final r = rating.trim().toLowerCase();
     if (r != 'like' && r != 'dislike') return false;
     try {
-      String? token = await getCachedToken();
-      final headers = <String, String>{};
-      if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
-      Future<dynamic> postFeedbackRequest(String? t) async {
-        final h = <String, String>{};
-        if (t != null && t.isNotEmpty) h['Authorization'] = 'Bearer $t';
-        return _api.post(
+      final resp = await _withFreshAiToken(
+        send: (headers) => _api.post(
           AppConfig.aiV2FeedbackEndpoint,
           includeAuth: true,
           body: {'trace_id': traceId, 'rating': r},
-          additionalHeaders: h.isEmpty ? null : h,
-        );
-      }
-
-      var resp = await postFeedbackRequest(token);
-      if (resp.statusCode == 401 || resp.statusCode == 403) {
-        await clearToken();
-        token = await fetchAndCacheToken();
-        if (token != null && token.isNotEmpty) {
-          resp = await postFeedbackRequest(token);
-        }
-      }
+          additionalHeaders: headers,
+        ),
+        statusCode: (response) => response.statusCode,
+        body: (response) => response.body,
+      );
       return resp.statusCode == 200;
+    } on AiChatHttpException {
+      rethrow;
     } catch (_) {
       return false;
     }
@@ -589,27 +548,16 @@ class AiChatService {
   /// Clears server-side inflight progress (Backoffice immersive / chatbot.js parity).
   Future<void> clearConversationInflight(String conversationId) async {
     try {
-      String? token = await getCachedToken();
-      final headers = <String, String>{};
-      if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
-      final resp = await _api.post(
-        '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/clear-inflight',
-        includeAuth: true,
-        body: const <String, dynamic>{},
-        additionalHeaders: headers.isEmpty ? null : headers,
+      await _withFreshAiToken(
+        send: (headers) => _api.post(
+          '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/clear-inflight',
+          includeAuth: true,
+          body: const <String, dynamic>{},
+          additionalHeaders: headers,
+        ),
+        statusCode: (r) => r.statusCode,
+        body: (r) => r.body,
       );
-      if (resp.statusCode == 401 || resp.statusCode == 403) {
-        await clearToken();
-        token = await fetchAndCacheToken();
-        if (token != null && token.isNotEmpty) {
-          await _api.post(
-            '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/clear-inflight',
-            includeAuth: true,
-            body: const <String, dynamic>{},
-            additionalHeaders: {'Authorization': 'Bearer $token'},
-          );
-        }
-      }
     } catch (_) {
       // best-effort
     }

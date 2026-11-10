@@ -153,8 +153,12 @@ import re as _re
 # Methods Flask adds to every route that we never want to surface
 _SKIP_METHODS = frozenset({'HEAD', 'OPTIONS'})
 
-# Prefixes we care about
-_API_PREFIXES = ('/api/v1/', '/api/mobile/v1/', '/api/ai/v2/', '/api/ai/')
+# Decision Maker JSON API (IFRC plugin). Paths sit under /api/ but not /api/v1.
+_DECISION_API_PREFIXES = (
+    '/api/decisions',
+    '/api/decision-',
+    '/api/metric-definitions',
+)
 
 # Indicator Bank app routes live at the site root, not under /api.
 _INDICATOR_BANK_APP_ENDPOINT_PREFIX = 'indicator_bank_compat.'
@@ -178,8 +182,13 @@ def _normalize_path(path: str) -> str:
 
 
 def _is_scanned_api_rule(path: str, endpoint: str | None = None) -> bool:
-    """Routes the registry compares against the live url_map."""
-    if any(path.startswith(prefix) for prefix in _API_PREFIXES):
+    """Routes the registry compares against the live url_map.
+
+    Every ``/api/…`` route is included, not only ``/api/v1``, mobile, and AI.
+    Indicator Bank app routes and the FDRS CSV export live outside that prefix
+    and are picked up by view-function name.
+    """
+    if path.startswith('/api/'):
         return True
     return bool(
         endpoint
@@ -200,6 +209,8 @@ def _surface_for_path(path: str, endpoint: str | None = None) -> str:
         return 'ai'
     if path.startswith('/api/v1/'):
         return 'v1'
+    if any(path.startswith(prefix) for prefix in _DECISION_API_PREFIXES):
+        return 'decisions'
     return 'other'
 
 
@@ -262,7 +273,7 @@ def scan_flask_routes(app) -> dict:
 
     Returns a dict with:
       live          – list of dicts for every tracked route found in url_map
-                      (/api/* plus Indicator Bank app routes)
+                      (every /api/ route, plus Indicator Bank and FDRS CSV routes)
       undocumented  – routes in url_map but NOT in the registry
       stale         – registry entries whose path is NOT in url_map
       coverage_pct  – float (0–100)
@@ -355,6 +366,8 @@ def _ep_surface_filter_disabled(grid_rows: list[dict]) -> dict[str, bool]:
         'ai',
         'indicator_bank',
         'fdrs_public',
+        'decisions',
+        'other',
         'flagged',
         'overlap',
         'has_stats',
@@ -385,6 +398,10 @@ def _endpoint_registry_grid_rows(all_endpoints: list[dict]) -> list[dict]:
             group_label = grp or 'Indicator Bank app'
         elif surf == 'fdrs_public':
             group_label = grp or 'FDRS public frontend'
+        elif surf == 'decisions':
+            group_label = grp or 'Decision Maker'
+        elif surf == 'other':
+            group_label = grp or 'Other API'
         else:
             group_label = grp or '—'
         desc = ep.get('description') or ''
@@ -398,7 +415,17 @@ def _endpoint_registry_grid_rows(all_endpoints: list[dict]) -> list[dict]:
             'surface': surf,
             'path': path,
             'pathLower': path.lower(),
-            'pathSearch': f'{path.lower()} {desc.lower()} {grp.lower()} {consumers.lower()}',
+            'pathSearch': ' '.join((
+                path.lower(),
+                desc.lower(),
+                grp.lower(),
+                group_label.lower(),
+                consumers.lower(),
+                ', '.join(methods).lower(),
+                (ep.get('auth') or '').lower(),
+                (ep.get('permission') or '').lower(),
+                surf,
+            )),
             'description': desc,
             'methods': methods,
             'methodsStr': ', '.join(methods),
@@ -493,6 +520,8 @@ def api_management():
         'mobile':          _surface_summary('mobile'),
         'indicator_bank':  _surface_summary('indicator_bank'),
         'fdrs_public':     _surface_summary('fdrs_public'),
+        'decisions':       _surface_summary('decisions'),
+        'other':           _surface_summary('other'),
     }
     surface_summary['all'] = {
         'total':          len(all_endpoints),

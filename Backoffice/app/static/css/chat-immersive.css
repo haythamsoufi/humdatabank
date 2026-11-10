@@ -1229,6 +1229,10 @@ html[dir="rtl"] .chat-immersive-clear-all {
     gap: 0.25rem;
 }
 
+.chat-immersive .chat-message-actions:has(.chat-response-sources-chip) {
+    flex-wrap: nowrap;
+}
+
 /* Sources chip at bottom of AI response (opens modal; mobile parity) */
 .chat-immersive .chat-response-sources,
 .chat-immersive .chat-response-sources--chip {

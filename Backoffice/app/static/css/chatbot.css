@@ -2520,6 +2520,16 @@ body.fb-ai-lightbox-open {
     margin: 0 4px;
     background: rgba(15, 23, 42, 0.12);
     align-self: center;
+    flex-shrink: 0;
+}
+
+.chat-message-actions:has(.chat-response-sources-chip) {
+    flex-wrap: nowrap;
+}
+
+.chat-message-actions .chat-response-sources-chip {
+    margin: 0;
+    flex-shrink: 0;
 }
 
 .chat-sources-modal-overlay {

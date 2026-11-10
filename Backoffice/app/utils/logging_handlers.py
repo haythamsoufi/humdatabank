@@ -13,6 +13,7 @@ from org_logging import (  # noqa: F401
     OrgTimezoneFormatter,
     configure_process_org_timezone,
     create_app_log_formatter,
+    install_org_timezone_werkzeug_access_log,
 )
 
 

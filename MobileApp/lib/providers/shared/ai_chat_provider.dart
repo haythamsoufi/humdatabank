@@ -71,6 +71,14 @@ class AiChatProvider with ChangeNotifier {
   bool _wsUserCancelled = false;
   /// After a `narration` event, insert a blank line once before the final answer deltas.
   bool _pendingNarrationSeparator = false;
+  /// Narration for the current turn, kept separate so `done.response` can replace the delta buffer.
+  String? _turnNarration;
+  /// `client_message_id` of the user row for this turn, so a DLP mask can update that SQLite row.
+  String? _activeClientMessageId;
+
+  /// How long to follow a server run that outlived its stream before giving up the progress UI.
+  static const Duration _inflightPollInterval = Duration(seconds: 2);
+  static const int _inflightMaxPolls = 600; // 20 minutes
 
   /// Server `request_id` of the in-flight SSE stream (from the `meta` envelope); used so the stop
   /// button can ask the backend to cancel generation instead of only dropping the connection.
@@ -135,11 +143,14 @@ class AiChatProvider with ChangeNotifier {
 
   /// Sub-step lines from [Backoffice] databank tools (`data_retrieval_form` progress)
   /// and similar: update the same detail line in the UI instead of stacking six lines.
-  /// Matches English msgids; other locales may append until patterns are extended.
+  /// English prefixes are recognized directly; any other locale's status line is recognized
+  /// by its trailing ellipsis so it replaces in place too.
   static final RegExp _pipelineProgressDetailRe = RegExp(
     r'^(Loading countries|Resolving indicator|Selecting indicator|Querying form data|Building results|Scanning your access|Preparing the databank query)\b',
     caseSensitive: false,
   );
+
+  static bool _endsWithStatusEllipsis(String t) => t.endsWith('…') || t.endsWith('...');
 
   static bool _isPipelineProgressDetailLine(String s) {
     final t = s.trim();
@@ -149,8 +160,62 @@ class AiChatProvider with ChangeNotifier {
     if (RegExp(r'^Retrieving up to\b', caseSensitive: false).hasMatch(t)) {
       return true;
     }
+    // Translated status lines keep the trailing ellipsis ("Chargement des pays…").
+    // Treating those as the in-flight line replaces them in place instead of stacking one per tick.
+    if (_endsWithStatusEllipsis(t)) return true;
     return false;
   }
+
+  /// Server `done.response` is the HTML that gets persisted. Prefer it over the delta buffer,
+  /// and keep model narration above that answer when the server text does not already include it.
+  @visibleForTesting
+  static String composeDoneContent({
+    required String buffer,
+    required String response,
+    required String narration,
+  }) {
+    final content = response.trim().isNotEmpty ? response : buffer;
+    final n = narration.trim();
+    if (n.isEmpty) return content;
+    if (content.trim().isEmpty) return n;
+    if (content.contains(n)) return content;
+    return '$n\n\n$content';
+  }
+
+  /// Body to store locally so it matches the server row (narration is display-only).
+  /// Visual-only turns use the same placeholders Backoffice persists.
+  @visibleForTesting
+  static String persistedAssistantContent({
+    required String response,
+    required List<Map<String, dynamic>> structured,
+  }) {
+    if (response.trim().isNotEmpty) return response;
+    final types = <String>{
+      for (final p in structured) (p['type'] ?? '').toString().toLowerCase(),
+    };
+    final hasMap = types.contains('worldmap');
+    final hasChart = types.contains('line') || types.contains('bar') || types.contains('pie');
+    final hasTable = types.contains('data_table');
+    if (hasMap && hasChart) return '[Map and chart visualization]';
+    if (hasMap) return '[Map visualization]';
+    if (hasTable) return '[Data table]';
+    if (hasChart) return '[Chart visualization]';
+    return '';
+  }
+
+  /// Keep a rewritten or server-refined title. [fallback] is only for a chat that has none yet.
+  @visibleForTesting
+  static String? titleAfterTurn({String? existingTitle, String? fallback}) {
+    final existing = existingTitle?.trim() ?? '';
+    if (existing.isNotEmpty) return existing;
+    final fb = (fallback ?? '').trim();
+    if (fb.isEmpty) return null;
+    if (fb.length > 80) return '${fb.substring(0, 80)}...';
+    return fb;
+  }
+
+  @visibleForTesting
+  static bool isPipelineProgressDetail(String s) => _isPipelineProgressDetailLine(s);
 
   bool get isLoading => _isLoading;
   bool get isStreaming => _isStreaming;
@@ -308,10 +373,11 @@ class AiChatProvider with ChangeNotifier {
         _sourcesSelected = [..._sourcesSelected, key];
       }
     } else {
-      _sourcesSelected = _sourcesSelected.where((k) => k != key).toList();
-    }
-    if (_sourcesSelected.isEmpty) {
-      _sourcesSelected = ['historical', 'system_documents', 'upr_documents'];
+      final remaining = _sourcesSelected.where((k) => k != key).toList();
+      // The backend needs at least one source. Leave the last toggle on instead of
+      // silently turning the other two back on.
+      if (remaining.isEmpty) return;
+      _sourcesSelected = remaining;
     }
     await _storage.init();
     await _storage.setString(
@@ -342,6 +408,8 @@ class AiChatProvider with ChangeNotifier {
     }
     _clearAgentProgress();
     _streamStatusHint = null;
+    _turnNarration = null;
+    _activeClientMessageId = null;
     _inflightRestoreActive = false;
     _inflightPollEpoch++;
     _navigationEpoch++;
@@ -360,6 +428,39 @@ class AiChatProvider with ChangeNotifier {
     if (_agentSteps.isEmpty) {
       _agentSteps = [const AiChatAgentStep(message: _preparingQueryLabel)];
     }
+  }
+
+  String? _firstUserMessageText() {
+    for (final m in _messages) {
+      if (m.role == 'user' && m.content.trim().isNotEmpty) return m.content;
+    }
+    return null;
+  }
+
+  /// Replace the optimistic user bubble when DLP masked the text the server actually stored.
+  void _applyMaskedUserMessage(String masked) {
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i].role != 'user') continue;
+      if (_messages[i].content == masked) return;
+      _messages[i] = _messages[i].copyWith(content: masked);
+      final localId = _activeClientMessageId;
+      if (localId != null && localId.isNotEmpty) {
+        unawaited(_persistence.updateMessageContentByLocalId(
+          localMessageId: localId,
+          content: masked,
+        ));
+      }
+      return;
+    }
+  }
+
+  void _beginAssistantTurn({String? clientMessageId}) {
+    _turnNarration = null;
+    _pendingNarrationSeparator = false;
+    _activeClientMessageId = clientMessageId;
+    // A previous Stop/Edit sets this so the dying socket does not resubmit. The next turn
+    // must start clear, because that socket's onDone often loses the race and never resets it.
+    _wsUserCancelled = false;
   }
 
   String _truncateConversationTitle(String? text) {
@@ -676,8 +777,8 @@ class AiChatProvider with ChangeNotifier {
 
   Future<void> _pollServerInflight(String conversationId, int epoch, bool isAuthenticated) async {
     if (!isAuthenticated) return;
-    for (var i = 0; i < 120; i++) {
-      await Future.delayed(const Duration(seconds: 2));
+    for (var i = 0; i < _inflightMaxPolls; i++) {
+      await Future.delayed(_inflightPollInterval);
       if (epoch != _inflightPollEpoch || _conversationId != conversationId) return;
       try {
         final data = await _service.getConversation(conversationId);
@@ -726,6 +827,8 @@ class AiChatProvider with ChangeNotifier {
     _inflightRestoreActive = false;
     _navigationEpoch++;
     _streamStatusHint = null;
+    _turnNarration = null;
+    _activeClientMessageId = null;
     await _disconnectWs();
     _isStreaming = false;
     _clearAgentProgress();
@@ -788,6 +891,10 @@ class AiChatProvider with ChangeNotifier {
         });
       }
       _wsStreamConversationId = _conversationId;
+      final masked = data['masked_user_message']?.toString().trim() ?? '';
+      if (masked.isNotEmpty) {
+        _applyMaskedUserMessage(masked);
+      }
       return;
     }
 
@@ -806,6 +913,11 @@ class AiChatProvider with ChangeNotifier {
       // Model-written "I'll look up…" — show as normal assistant text; keep progress steps.
       final text = data['text']?.toString().trim() ?? '';
       if (text.isEmpty) return;
+      if (_turnNarration == null || _turnNarration!.isEmpty) {
+        _turnNarration = text;
+      } else if (!_turnNarration!.contains(text)) {
+        _turnNarration = '${_turnNarration}\n\n$text';
+      }
       if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
         final last = _messages.last;
         final next = last.content.trim().isEmpty
@@ -865,14 +977,15 @@ class AiChatProvider with ChangeNotifier {
       _isStreaming = false;
       _inflightRestoreActive = false;
       _wsStreamConversationId = null;
+      final response = data['response']?.toString() ?? '';
 
       if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
         final last = _messages.last;
-        final response = data['response']?.toString() ?? '';
-        var content = last.content;
-        if (content.trim().isEmpty && response.trim().isNotEmpty) {
-          content = response;
-        }
+        final content = composeDoneContent(
+          buffer: last.content,
+          response: response,
+          narration: _turnNarration ?? '',
+        );
         final structured = _mergeStructuredPayloads(last.structuredPayloads, coerceStructuredFromEnvelope(data));
         final traceId = _parseTraceId(data['trace_id']) ?? last.traceId;
         var conf = last.confidence;
@@ -882,6 +995,8 @@ class AiChatProvider with ChangeNotifier {
           final mm = Map<String, dynamic>.from(metaMap);
           conf = _parseDouble(mm['confidence']) ?? conf;
           grounding = _parseDouble(mm['grounding_score']) ?? grounding;
+          final masked = mm['masked_user_message']?.toString().trim() ?? '';
+          if (masked.isNotEmpty) _applyMaskedUserMessage(masked);
         }
         conf = _parseDouble(data['confidence']) ?? conf;
         grounding = _parseDouble(data['grounding_score']) ?? grounding;
@@ -894,6 +1009,7 @@ class AiChatProvider with ChangeNotifier {
           groundingScore: grounding,
         );
       }
+      _turnNarration = null;
 
       if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
         final last = _messages.last;
@@ -904,19 +1020,26 @@ class AiChatProvider with ChangeNotifier {
 
       if (_conversationId != null && _messages.isNotEmpty) {
         final lastMsg = _messages.last;
+        final storedContent = persistedAssistantContent(
+          response: response,
+          structured: lastMsg.structuredPayloads,
+        );
+        final contentToStore = storedContent.isNotEmpty ? storedContent : lastMsg.content;
         if (lastMsg.role == 'assistant' &&
-            (lastMsg.content.isNotEmpty || lastMsg.structuredPayloads.isNotEmpty)) {
+            (contentToStore.isNotEmpty || lastMsg.structuredPayloads.isNotEmpty)) {
           await _persistence.saveMessage(
             conversationId: _conversationId!,
             role: 'assistant',
-            content: lastMsg.content,
+            content: contentToStore,
             localMessageId: _uuid.v4(),
             syncState: AiChatPersistenceService.syncStatePendingServer,
             meta: _assistantPersistMeta(lastMsg),
           );
-          final title = _messages.isNotEmpty
-              ? (_messages.first.content.length > 80 ? '${_messages.first.content.substring(0, 80)}...' : _messages.first.content)
-              : null;
+          final titleIdx = _conversations.indexWhere((c) => c.id == _conversationId);
+          final title = titleAfterTurn(
+            existingTitle: titleIdx >= 0 ? _conversations[titleIdx].title : null,
+            fallback: _firstUserMessageText(),
+          );
           final convo = AiConversationSummary(
             id: _conversationId!,
             title: title,
@@ -941,11 +1064,14 @@ class AiChatProvider with ChangeNotifier {
       if (_conversationId != null) {
         unawaited(_syncConversationFromServer(_conversationId!));
       }
+      _activeClientMessageId = null;
       return;
     }
 
     if (type == 'error') {
       final message = data['message']?.toString() ?? 'Chat failed';
+      _turnNarration = null;
+      _activeClientMessageId = null;
       if (AiChatHttpException.textDeniesBetaAccess(message)) {
         _clearAgentProgress();
         _isStreaming = false;
@@ -1050,6 +1176,7 @@ class AiChatProvider with ChangeNotifier {
         _messages.removeLast();
       }
       _clearAgentProgress();
+      _turnNarration = null;
       await _sendHttpIntoLastAssistant(
         message,
         isAuthenticated: isAuthenticated,
@@ -1096,6 +1223,7 @@ class AiChatProvider with ChangeNotifier {
       (data) async {
         try {
           if (streamGeneration != _wsConnectionSession) return;
+          if (httpFallbackStarted || recoveryStarted) return;
           if (data['type'] == 'meta') serverAcceptedStream = true;
           // The stream worker reports any unclassified server exception as error_type "Error".
           // Retry those once over plain HTTP (the long-standing path) instead of surfacing a
@@ -1151,14 +1279,14 @@ class AiChatProvider with ChangeNotifier {
         generation != _wsConnectionSession || _conversationId != conversationId;
 
     var unreachable = 0;
-    for (var i = 0; i < 150; i++) {
+    for (var i = 0; i < _inflightMaxPolls; i++) {
       if (superseded()) return true;
       Map<String, dynamic> data;
       try {
         data = await _service.getConversation(conversationId);
       } catch (_) {
         if (++unreachable >= 5) break;
-        await Future.delayed(const Duration(seconds: 2));
+        await Future.delayed(_inflightPollInterval);
         continue;
       }
       if (superseded()) return true;
@@ -1178,7 +1306,7 @@ class AiChatProvider with ChangeNotifier {
       if (active != null) {
         _applyInflightSnapshot(active);
         notifyListeners();
-        await Future.delayed(const Duration(seconds: 2));
+        await Future.delayed(_inflightPollInterval);
         continue;
       }
 
@@ -1224,6 +1352,8 @@ class AiChatProvider with ChangeNotifier {
     _wsStreamConversationId = _conversationId;
     final wsListenGeneration = _wsConnectionSession;
     var httpFallbackStarted = false;
+    var serverAcceptedStream = false;
+    var recoveryStarted = false;
     Future<void> fallbackToHttp() async {
       if (httpFallbackStarted) return;
       httpFallbackStarted = true;
@@ -1233,6 +1363,7 @@ class AiChatProvider with ChangeNotifier {
         _messages.removeLast();
       }
       _clearAgentProgress();
+      _turnNarration = null;
       await _sendHttpIntoLastAssistant(
         message,
         isAuthenticated: isAuthenticated,
@@ -1241,6 +1372,21 @@ class AiChatProvider with ChangeNotifier {
         branchFromEdit: _wsBranchFromEdit,
         branchConversationHistory: _wsBranchConversationHistory,
       );
+    }
+
+    // Same rule as SSE: after `meta`, the server keeps running. Poll for the stored reply
+    // instead of starting a second agent run.
+    Future<void> recoverOrFallbackToHttp() async {
+      final cid = _conversationId;
+      if (!serverAcceptedStream || !isAuthenticated || cid == null || cid.isEmpty) {
+        await fallbackToHttp();
+        return;
+      }
+      if (httpFallbackStarted || recoveryStarted) return;
+      recoveryStarted = true;
+      DebugLogger.logWarn('AI', 'WebSocket closed after the server accepted the turn; waiting for the stored reply');
+      final recovered = await _recoverStreamedTurnFromServer(cid, wsListenGeneration);
+      if (!recovered) await fallbackToHttp();
     }
 
     _channel = await _service.connectWebSocket();
@@ -1255,9 +1401,11 @@ class AiChatProvider with ChangeNotifier {
       (event) async {
         try {
           if (wsListenGeneration != _wsConnectionSession) return;
+          if (httpFallbackStarted || recoveryStarted) return;
           final decoded = jsonDecode(event.toString());
           if (decoded is! Map) return;
           final data = Map<String, dynamic>.from(decoded);
+          if (data['type'] == 'meta') serverAcceptedStream = true;
 
           // When the backend sends auth_required through the WS protocol and the
           // user is authenticated, the bearer token is stale or was never obtained.
@@ -1271,6 +1419,7 @@ class AiChatProvider with ChangeNotifier {
             httpFallbackStarted = true;
             _clearAgentProgress();
             _streamStatusHint = null;
+            _turnNarration = null;
             notifyListeners();
             unawaited(_disconnectWs());
             await _service.clearToken();
@@ -1298,12 +1447,12 @@ class AiChatProvider with ChangeNotifier {
           _wsUserCancelled = false;
           return;
         }
-        DebugLogger.logWarn('AI', 'WS error, falling back to HTTP: $e');
+        DebugLogger.logWarn('AI', 'WS error: $e');
         if (AiChatHttpException.errorDeniesBetaAccess(e)) {
           _noteBetaAccessDenial(e);
           return;
         }
-        await fallbackToHttp();
+        await recoverOrFallbackToHttp();
       },
       onDone: () async {
         if (wsListenGeneration != _wsConnectionSession) return;
@@ -1312,11 +1461,10 @@ class AiChatProvider with ChangeNotifier {
           return;
         }
         // A normal completion ('done' / 'error' envelopes) already cleared [_isStreaming].
-        // Still streaming here means the socket closed without a final envelope (proxy or
-        // server dropped it); retry over HTTP instead of silently resetting the composer.
+        // Still streaming here means the socket closed without a final envelope.
         if (!_isStreaming) return;
-        DebugLogger.logWarn('AI', 'WS closed before completion, falling back to HTTP');
-        await fallbackToHttp();
+        DebugLogger.logWarn('AI', 'WS closed before completion');
+        await recoverOrFallbackToHttp();
       },
     );
   }
@@ -1377,10 +1525,13 @@ class AiChatProvider with ChangeNotifier {
       notifyListeners();
       return;
     }
-    _isLoading = true;
-    notifyListeners();
+    if (_conversations.isEmpty) {
+      _isLoading = true;
+      notifyListeners();
+    }
     try {
-      // Load from local DB first (fast)
+      // Load from local DB first (fast). Drop the spinner as soon as there is something to show
+      // so the drawer is not blank for the whole server sync.
       _conversations = await _persistence.getAllConversations();
       // Sort by most recent first
       _conversations.sort((a, b) {
@@ -1388,6 +1539,7 @@ class AiChatProvider with ChangeNotifier {
         final bTime = b.lastMessageAt ?? b.updatedAt ?? DateTime(0);
         return bTime.compareTo(aTime);
       });
+      if (_conversations.isNotEmpty) _isLoading = false;
       notifyListeners();
 
       // Then sync from server (skip when offline — avoids timeouts)
@@ -1431,7 +1583,6 @@ class AiChatProvider with ChangeNotifier {
   }
 
   Future<void> openConversation({required bool isAuthenticated, required String conversationId}) async {
-    _isLoading = true;
     _error = null;
     notifyListeners();
     try {
@@ -1455,7 +1606,6 @@ class AiChatProvider with ChangeNotifier {
       _noteBetaAccessDenial(e);
       _error = e.toString();
     } finally {
-      _isLoading = false;
       notifyListeners();
     }
   }
@@ -1600,7 +1750,7 @@ class AiChatProvider with ChangeNotifier {
     // Add assistant placeholder for streaming
     _messages.add(AiChatMessage(role: 'assistant', content: ''));
     _isStreaming = true;
-    _pendingNarrationSeparator = false;
+    _beginAssistantTurn();
     notifyListeners();
 
     // Anonymous: just use HTTP fallback
@@ -1628,7 +1778,7 @@ class AiChatProvider with ChangeNotifier {
 
   /// Get message content for editing (doesn't clear messages yet)
   /// Messages will be cleared when sendEditedMessage is called
-  String? editMessageAt(int messageIndex) {
+  String? editMessageAt(int messageIndex, {bool isAuthenticated = true}) {
     if (messageIndex < 0 || messageIndex >= _messages.length) return null;
     final message = _messages[messageIndex];
     if (message.role != 'user') return null;
@@ -1636,14 +1786,34 @@ class AiChatProvider with ChangeNotifier {
     // Don't clear messages yet - just return the content for editing
     // Messages will be cleared when sendEditedMessage is called
 
-    // Clear any streaming state
+    // Stop the in-flight server run as well as the local socket. The stream is opened with
+    // keep_running_on_disconnect, so dropping the socket alone lets the old worker persist
+    // after branch_from_edit has replaced the thread. Bump the navigation epoch so an HTTP
+    // fallback already in flight cannot write into this conversation.
+    final cid = _conversationId;
+    final cancelRequestId = _streamRequestId;
+    if (_isStreaming || _inflightRestoreActive) {
+      _wsUserCancelled = true;
+    }
+    _navigationEpoch++;
+    _inflightPollEpoch++;
+    _inflightRestoreActive = false;
     _isStreaming = false;
     _error = null;
     _errorType = null;
     _retryDelay = null;
     _failedMessage = null;
+    _streamStatusHint = null;
+    _turnNarration = null;
+    _activeClientMessageId = null;
     _clearAgentProgress();
+    if (cancelRequestId != null && cancelRequestId.isNotEmpty) {
+      unawaited(_service.cancelChatStream(cancelRequestId));
+    }
     unawaited(_disconnectWs());
+    if (isAuthenticated && cid != null && cid.isNotEmpty) {
+      unawaited(_service.clearConversationInflight(cid));
+    }
 
     notifyListeners();
     return message.content;
@@ -1757,6 +1927,7 @@ class AiChatProvider with ChangeNotifier {
       AiChatMessage(role: 'assistant', content: ''),
     ];
     _isStreaming = true;
+    _beginAssistantTurn(clientMessageId: userLocalId);
     notifyListeners();
 
     try {
@@ -1797,6 +1968,7 @@ class AiChatProvider with ChangeNotifier {
     _failedMessage = null; // Clear any previous failed message
     final cid = await _ensureLocalConversationId(initialTitle: message);
     final userLocalId = _uuid.v4();
+    _beginAssistantTurn(clientMessageId: userLocalId);
     _messages.add(AiChatMessage(role: 'user', content: message));
     _messages.add(AiChatMessage(role: 'assistant', content: '')); // placeholder to stream into
     _isStreaming = true;
@@ -1897,6 +2069,8 @@ class AiChatProvider with ChangeNotifier {
         final mm = Map<String, dynamic>.from(metaTop);
         conf = _parseDouble(mm['confidence']);
         grounding = _parseDouble(mm['grounding_score']);
+        final masked = mm['masked_user_message']?.toString().trim() ?? '';
+        if (masked.isNotEmpty) _applyMaskedUserMessage(masked);
       }
       final asstMsg = AiChatMessage(
         role: 'assistant',
@@ -1924,10 +2098,17 @@ class AiChatProvider with ChangeNotifier {
         if (_conversationId != null) {
           // Save user message (optional - callers may already have persisted it)
           if (persistUserMessage) {
+            var userContent = message;
+            for (var i = _messages.length - 1; i >= 0; i--) {
+              if (_messages[i].role == 'user') {
+                userContent = _messages[i].content;
+                break;
+              }
+            }
             await _persistence.saveMessage(
               conversationId: _conversationId!,
               role: 'user',
-              content: message,
+              content: userContent,
               localMessageId: _uuid.v4(),
               syncState: isAuthenticated ? AiChatPersistenceService.syncStatePendingServer : AiChatPersistenceService.syncStateLocalOnly,
             );
@@ -1941,11 +2122,12 @@ class AiChatProvider with ChangeNotifier {
             syncState: isAuthenticated ? AiChatPersistenceService.syncStatePendingServer : AiChatPersistenceService.syncStateLocalOnly,
             meta: _assistantPersistMeta(asstMsg),
           );
-          // Update conversation summary (edits: keep title from first user turn when unchanged)
-          final titleSrc = branchFromEdit && _messages.isNotEmpty
-              ? _messages.first.content
-              : message;
-          final title = titleSrc.length > 80 ? '${titleSrc.substring(0, 80)}...' : titleSrc;
+          // Keep a rewritten or already-refined title. Only name a chat that has none yet.
+          final titleIdx = _conversations.indexWhere((c) => c.id == _conversationId);
+          final title = titleAfterTurn(
+            existingTitle: titleIdx >= 0 ? _conversations[titleIdx].title : null,
+            fallback: _firstUserMessageText() ?? message,
+          );
           final convo = AiConversationSummary(
             id: _conversationId!,
             title: title,
@@ -2044,6 +2226,18 @@ class AiChatProvider with ChangeNotifier {
         conversationId: conversationId,
         serverMessages: serverMessages,
       );
+      if (_conversationId == conversationId) {
+        for (final m in _messages) {
+          if (m.role != 'assistant' || m.traceId == null) continue;
+          final rating = m.userRating;
+          if (rating != 'like' && rating != 'dislike') continue;
+          await _persistence.updateAssistantRating(
+            conversationId: conversationId,
+            traceId: m.traceId!,
+            userRating: rating!,
+          );
+        }
+      }
       return data;
     } catch (e) {
       DebugLogger.logWarn('AI', 'Failed to sync conversation from server: $e');
@@ -2102,9 +2296,23 @@ class AiChatProvider with ChangeNotifier {
     if (m.role != 'assistant' || m.traceId == null) return;
     final r = rating.trim().toLowerCase();
     if (r != 'like' && r != 'dislike') return;
-    final ok = await _service.submitFeedback(traceId: m.traceId!, rating: r);
+    bool ok;
+    try {
+      ok = await _service.submitFeedback(traceId: m.traceId!, rating: r);
+    } on AiChatHttpException catch (e) {
+      _noteBetaAccessDenial(e);
+      return;
+    }
     if (!ok) return;
     _messages[messageIndex] = m.copyWith(userRating: r);
+    final cid = _conversationId;
+    if (cid != null && cid.isNotEmpty) {
+      await _persistence.updateAssistantRating(
+        conversationId: cid,
+        traceId: m.traceId!,
+        userRating: r,
+      );
+    }
     notifyListeners();
   }
 

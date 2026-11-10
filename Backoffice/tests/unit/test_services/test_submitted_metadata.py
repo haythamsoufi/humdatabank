@@ -46,6 +46,11 @@ def test_map_fdrs_document_types_to_categories():
     assert map_document_type_label_to_category("Annual Report") == "report"
     assert map_document_type_label_to_category("Strategic Plan") == "strategic_plan"
     assert map_document_type_label_to_category("Audited Financial Statement") == "report"
+    assert map_document_type_label_to_category("DREF Operation Final Report") == "dref"
+    assert map_document_type_label_to_category("Emergency Appeal") == "emergency_appeal"
+    assert map_document_type_label_to_category("Operations Update") == "operations_update"
+    assert map_document_type_label_to_category("Situation Reports") == "sitrep"
+    assert map_document_type_label_to_category("Plan") is None
 
 
 def test_fdrs_hints_set_source_organization_and_category():

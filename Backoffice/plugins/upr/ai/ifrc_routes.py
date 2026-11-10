@@ -234,6 +234,12 @@ def _process_ifrc_job_item_sync(app, *, job_id: str, item_id: int) -> None:
                 existing.processing_status = "pending"
                 existing.processing_error = None
                 existing.storage_path = temp_path
+                from app.services.ai.documents.emergency_catalogue import remember_ifrc_document_type
+
+                remember_ifrc_document_type(
+                    existing,
+                    payload.get("document_type") if isinstance(payload, dict) else None,
+                )
                 if previous_source_url and previous_source_url != url:
                     logger.info(
                         "Bulk IFRC import dedupe collision: job=%s item=%s doc_id=%s existing_url=%s new_url=%s",
@@ -265,6 +271,12 @@ def _process_ifrc_job_item_sync(app, *, job_id: str, item_id: int) -> None:
                     searchable=True,
                     country_id=int(country_id) if country_id is not None else None,
                     country_name=country_name or None,
+                )
+                from app.services.ai.documents.emergency_catalogue import remember_ifrc_document_type
+
+                remember_ifrc_document_type(
+                    doc,
+                    payload.get("document_type") if isinstance(payload, dict) else None,
                 )
                 db.session.add(doc)
                 db.session.flush()
@@ -761,6 +773,9 @@ def import_ifrc_api_document():
                 existing.total_embeddings = 0
                 existing.processing_status = 'pending'
                 existing.processing_error = None
+                from app.services.ai.documents.emergency_catalogue import remember_ifrc_document_type
+
+                remember_ifrc_document_type(existing, data.get("document_type") or data.get("type"))
                 db.session.commit()
                 _run_import_process_in_thread(
                     current_app._get_current_object(), existing.id, temp_path, filename
@@ -799,6 +814,9 @@ def import_ifrc_api_document():
                 country_name=detected_country_name,
                 geographic_scope=detected_scope,
             )
+            from app.services.ai.documents.emergency_catalogue import remember_ifrc_document_type
+
+            remember_ifrc_document_type(doc, data.get("document_type") or data.get("type"))
             db.session.add(doc)
             db.session.flush()
 
@@ -932,6 +950,7 @@ def import_ifrc_api_documents_bulk():
                     "is_public": is_public,
                     "country_id": country_id_val,
                     "country_name": country_name_val,
+                    "document_type": (it.get("document_type") or it.get("type") or None),
                 },
             )
             db.session.add(job_item)

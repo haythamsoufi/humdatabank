@@ -274,24 +274,31 @@ def databank_search_public_documents(
 @mcp.tool()
 def databank_get_documents_catalog(
     document_type: str = "",
+    q: str = "",
     year: Optional[int] = None,
     country_id: Optional[int] = None,
     country_name: str = "",
     file_type: str = "",
     include_documents: bool = False,
 ) -> str:
-    """Inventory public documents by type/year/country — counts, not semantic search.
+    """Look up public documents by metadata (type, country, year, title). Not a text search.
 
-    Answers "how many countries submitted an annual report (FDRS) or a Unified Plan
-    (UPR) for 2024, or across all years?" directly from document metadata — much
-    cheaper than databank_search_public_documents for counting questions.
-    document_type is one of annual_report, unified_plan, midyear_report, other
-    (omit for all types). Set include_documents=false for counts only (by_type,
-    by_year, countries_count) without the per-country document listing.
+    Use this for "which documents exist" and for "how many countries have a document".
+    document_type: annual_report, unified_plan, midyear_report, emergency
+    (DREF + Emergency Appeal + operations updates + situation reports), dref,
+    emergency_appeal, operations_update, sitrep, other. Omit for every type.
+    q is a title/filename fragment (MDRSY014, UPL-2026) or a collection name
+    (emergency, dref, unified plan) when document_type is omitted.
+    For a list of files, set include_documents=true and read by_country[].documents
+    (title, document_type, document_date, document_url). For a count only, leave
+    include_documents=false and read total_documents, countries_count, by_type, by_year.
+    Example: emergency files for Syria → document_type=emergency, country_name=Syria,
+    include_documents=true.
     """
     try:
         result = get_public_documents_catalog(
             document_type=document_type.strip(),
+            q=q.strip(),
             year=year,
             country_id=country_id,
             country_name=country_name.strip(),
@@ -565,6 +572,7 @@ def databank_api_info() -> str:
                 "find_country": "databank_resolve_country(query='Kenya')",
                 "count_submissions": "databank_get_submission_coverage(template_id=21, period_name='Annual 2024')",
                 "count_documents": "databank_get_documents_catalog(document_type='annual_report', year=2024)",
+                "list_emergency_documents": "databank_get_documents_catalog(document_type='emergency', country_name='Syria', include_documents=true)",
                 "upr_documents": "databank_search_public_documents(query='Syria unified plan 2026')",
                 "one_document": "databank_get_public_document(document_id=UUID)",
                 "raw_rows": "databank_get_public_data(indicator_bank_id=ID, include_dimensions=false)",

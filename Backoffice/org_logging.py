@@ -63,6 +63,30 @@ def configure_process_org_timezone() -> str:
     return ORG_TIMEZONE_NAME
 
 
+def install_org_timezone_werkzeug_access_log() -> bool:
+    """Make the Werkzeug dev-server access line use the org timezone.
+
+    Werkzeug stamps ``127.0.0.1 - - [dd/Mon/yyyy HH:MM:SS]`` with ``time.localtime()``. On Windows
+    ``time.tzset`` does not exist and the CRT does not understand the IANA name we put in ``TZ``,
+    so those lines come out in UTC while app lines (``OrgTimezoneFormatter``) show Geneva time.
+    Idempotent. Returns True when the patch is (already) installed.
+    """
+    try:
+        from werkzeug.serving import WSGIRequestHandler
+    except Exception:
+        return False
+    if getattr(WSGIRequestHandler.log_date_time_string, "_org_timezone", False):
+        return True
+
+    def log_date_time_string(self) -> str:  # noqa: ARG001 - signature mandated by http.server
+        now = datetime.now(timezone.utc).astimezone(get_org_timezone())
+        return now.strftime("%d/%b/%Y %H:%M:%S %Z")
+
+    log_date_time_string._org_timezone = True  # type: ignore[attr-defined]
+    WSGIRequestHandler.log_date_time_string = log_date_time_string  # type: ignore[method-assign]
+    return True
+
+
 def create_app_log_formatter(
     fmt: str,
     datefmt: str = DEFAULT_LOG_DATEFMT,

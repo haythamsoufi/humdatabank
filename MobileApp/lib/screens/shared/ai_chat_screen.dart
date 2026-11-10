@@ -2015,7 +2015,10 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   void _showEditMessageDialog(BuildContext context, int messageIndex, String messageContent) {
     // Get the message content for editing (messages won't be cleared until send)
     final provider = context.read<AiChatProvider>();
-    final editedContent = provider.editMessageAt(messageIndex);
+    final editedContent = provider.editMessageAt(
+      messageIndex,
+      isAuthenticated: context.read<AuthProvider>().isAuthenticated,
+    );
     if (editedContent != null) {
       setState(() {
         _editingMessageIndex = messageIndex;
@@ -2197,7 +2200,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
             ),
           // Conversations List (offline-first: show local conversations even when logged out)
           Expanded(
-              child: ai.isLoading
+              child: ai.isLoading && ai.conversations.isEmpty
                   ? const AppLoadingIndicator()
                   : ai.conversations.isEmpty
                       ? Center(

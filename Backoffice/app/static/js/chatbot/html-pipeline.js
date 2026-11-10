@@ -225,8 +225,39 @@ export const HtmlPipelineMixin = {
         return out.join('\n');
     },
     /**
-     * If text contains "## Sources" (markdown), wrap it in <details class="chat-response-sources">.
-     * Title/detail come from server data-* attrs or meta.sources — this only packages the block.
+     * Turn one markdown source line into a structured <li data-source-*>.
+     * The chip is the only Sources UI; prose is never left as a disclosure.
+     */
+    _sourceLineToListItemHtml(line) {
+        const raw = String(line || '').replace(/^\s*(?:[-*•]|\d{1,3}[.)])\s+/, '').trim();
+        if (!raw || /^(?:#{1,6}\s*)?sources\s*:?$/i.test(raw)) return '';
+        let title = raw;
+        let url = '';
+        let detail = '';
+        const link = raw.match(/\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/);
+        if (link) {
+            title = (link[1] || '').trim() || raw;
+            const safe = this._safeSameOriginUrl(link[2]);
+            url = safe || '';
+            detail = raw.slice(link.index + link[0].length).replace(/^[\s:—–-]+/, '').trim();
+        }
+        const attrs = [
+            `data-source-title="${this.escapeHtml(title)}"`,
+            'data-source-kind="other"',
+        ];
+        if (detail) attrs.push(`data-source-detail="${this.escapeHtml(detail)}"`);
+        if (url) attrs.push(`data-source-url="${this.escapeHtml(url)}"`);
+        const label = this.escapeHtml(title);
+        const inner = url
+            ? `<a href="${this.escapeHtml(url)}" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener">${label}</a>`
+            : label;
+        const withDetail = detail ? `${inner}: ${this.escapeHtml(detail)}` : inner;
+        return `<li ${attrs.join(' ')}>${withDetail}</li>`;
+    },
+
+    /**
+     * If text contains a Sources heading, package it as structured rows.
+     * Title/detail come from these data-* attrs or meta.sources.
      */
     markdownSourcesToHtml(text) {
         if (typeof text !== 'string') return text;
@@ -242,22 +273,15 @@ export const HtmlPipelineMixin = {
         if (!sourcesMatch) return text;
         const sourcesBlockRaw = sourcesMatch[2].trim();
         const mainPart = text.slice(0, sourcesMatch.index).trim();
-        const placeholder = '__HUMDATABANK_AI_SOURCES__';
-        let combined = mainPart + '\n\n' + placeholder;
-        // Escape and format sources block: newlines -> <br>, markdown links -> <a>
-        let sourcesEsc = this.escapeHtml(sourcesBlockRaw);
-        sourcesEsc = sourcesEsc.replace(/\n+/g, '<br>').replace(/(<br>){2,}/g, '<br><br>');
-        sourcesEsc = sourcesEsc.replace(/\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g, (_, label, href) => {
-            const safe = this._safeSameOriginUrl(href);
-            if (!safe) return this.escapeHtml(label || '');
-            return '<a href="' + this.escapeHtml(safe) + '" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener">' + this.escapeHtml(label || '') + '</a>';
-        });
+        const lis = sourcesBlockRaw.split(/\n+/).map((line) => this._sourceLineToListItemHtml(line)).filter(Boolean);
+        if (!lis.length) return mainPart;
         const sourcesHtml = (
-            '<details class="chat-response-sources mt-2 border border-gray-200 rounded p-2 bg-gray-50">' +
-            '<summary class="cursor-pointer font-medium text-gray-700">Sources</summary>' +
-            '<div class="chat-response-sources-body mt-2 text-sm text-gray-600">' + sourcesEsc + '</div></details>'
+            '<div class="chat-response-sources">' +
+            '<div class="chat-response-sources-body">' +
+            `<ul class="chat-response-sources-list">${lis.join('')}</ul>` +
+            '</div></div>'
         );
-        return combined.replace(placeholder, sourcesHtml);
+        return mainPart + '\n\n' + sourcesHtml;
     },
 
     // Enhanced HTML sanitization for AI responses
@@ -356,6 +380,18 @@ export const HtmlPipelineMixin = {
             summary: new Set(['class']),
             div: new Set(['class']),
             span: new Set(['class']),
+            ul: new Set(['class']),
+            ol: new Set(['class']),
+            // Structured source rows. Without these, the chip formatter cannot
+            // see titles and leaves the native <details> disclosure in place.
+            li: new Set([
+                'class',
+                'data-source-title',
+                'data-source-kind',
+                'data-source-detail',
+                'data-source-url',
+                'data-source-page',
+            ]),
         };
         const allTags2 = tempDiv.getElementsByTagName('*');
         for (let i = allTags2.length - 1; i >= 0; i--) {
@@ -624,9 +660,9 @@ export const HtmlPipelineMixin = {
             const bodyHtml = `<ul class="chat-response-sources-list">${lis.join('')}</ul>`;
             let details = container.querySelector('.chat-response-sources');
             if (!details) {
-                details = document.createElement('details');
-                details.className = 'chat-response-sources mt-2 border border-gray-200 rounded p-2 bg-gray-50';
-                details.innerHTML = `<summary class="cursor-pointer font-medium text-gray-700">Sources</summary><div class="chat-response-sources-body mt-2 text-sm text-gray-600">${bodyHtml}</div>`;
+                details = document.createElement('div');
+                details.className = 'chat-response-sources';
+                details.innerHTML = `<div class="chat-response-sources-body">${bodyHtml}</div>`;
                 container.appendChild(details);
                 return;
             }
@@ -674,19 +710,58 @@ export const HtmlPipelineMixin = {
     },
 
     /**
-     * Parse .chat-response-sources-body from structured data-* rows only.
-     * Verification caveats may still appear as plain sibling lines.
+     * Older replies stored a Sources body as prose or <br> lines with no data-* attrs.
+     * Each line becomes one chip item so the disclosure style cannot remain.
+     */
+    _plainSourceItemsFromBody(bodyEl) {
+        const items = [];
+        const notes = [];
+        if (!bodyEl) return { items, notes };
+        const push = (plain, url) => {
+            const title = this._squashPlain(plain).replace(/^(?:[-*•]|\d{1,3}[.)])\s+/, '').trim();
+            if (!title || /^sources:?$/i.test(title)) return;
+            if (this._isAnswerVerificationCaveatText(title)) {
+                notes.push(title.replace(/^>?\s*/, ''));
+                return;
+            }
+            let safeUrl = null;
+            if (url) {
+                safeUrl = this._safeSameOriginUrl(url) || (/^https?:\/\//i.test(url) ? url : null);
+            }
+            items.push({ title, page: null, url: safeUrl, excerpt: null });
+        };
+        const lis = bodyEl.querySelectorAll('li');
+        if (lis.length) {
+            lis.forEach((li) => {
+                if (li.hasAttribute('data-source-title')) return;
+                const link = li.querySelector('a[href]');
+                push(li.textContent, link ? link.getAttribute('href') : null);
+            });
+            return { items, notes };
+        }
+        const parts = (bodyEl.innerHTML || '').split(/<br\s*\/?>/i);
+        parts.forEach((part) => {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = part;
+            const link = tmp.querySelector('a[href]');
+            push(tmp.textContent, link ? link.getAttribute('href') : null);
+        });
+        return { items, notes };
+    },
+
+    /**
+     * Parse .chat-response-sources-body. Prefer data-source-* rows, then any remaining text.
+     * Verification caveats stay as notes on the chip modal.
      */
     _parseChatResponseSources(detailsEl) {
         const items = [];
         const notes = [];
         if (!detailsEl) return { items, notes };
-        const bodyEl = detailsEl.querySelector('.chat-response-sources-body');
+        const bodyEl = detailsEl.querySelector('.chat-response-sources-body') || detailsEl;
         if (!bodyEl) return { items, notes };
 
         const structured = this._parseStructuredSourceRows(bodyEl);
         if (structured.length) {
-            // Pull verification caveats that sit outside structured rows.
             bodyEl.querySelectorAll('li, p').forEach((el) => {
                 if (el.hasAttribute('data-source-title')) return;
                 const plain = this._squashPlain(el.textContent || '');
@@ -697,8 +772,7 @@ export const HtmlPipelineMixin = {
             return { items: structured, notes };
         }
 
-        // No structured attrs — leave empty so the chip is not built from prose.
-        return { items, notes };
+        return this._plainSourceItemsFromBody(bodyEl);
     },
 
     _closeSourcesModal() {
@@ -870,8 +944,8 @@ export const HtmlPipelineMixin = {
     },
 
     /**
-     * When charts/maps/tables are present, move the Sources chip into the action bar
-     * (mobile places Sources next to copy/like after structured visuals).
+     * Place the Sources chip on the action row, after the copy/like icons,
+     * with a vertical divider between those icons and the chip.
      */
     _relocateSourcesChipIfNeeded(wrapperOrContainer) {
         try {
@@ -881,20 +955,11 @@ export const HtmlPipelineMixin = {
                     : wrapperOrContainer.closest('.chat-message-wrapper'))
                 : null;
             if (!wrapper) return;
-            const content = wrapper.querySelector('.chat-message-content');
             const actionBar = wrapper.querySelector('.chat-message-actions');
-            if (!content || !actionBar) return;
+            if (!actionBar) return;
 
-            const chip = content.querySelector('.chat-response-sources-chip')
-                || wrapper.querySelector('.chat-response-sources-chip');
+            const chip = wrapper.querySelector('.chat-response-sources-chip');
             if (!chip) return;
-
-            const hasStructuredVisuals = !!(
-                content.querySelector('.chat-ai-table, .chat-floating-payload-card, .chat-immersive-map-card, .chat-immersive-chart-card')
-                || (wrapper.__humdbStructuredPayloads && wrapper.__humdbStructuredPayloads.length)
-            );
-            if (!hasStructuredVisuals) return;
-            if (chip.parentElement === actionBar) return;
 
             let sep = actionBar.querySelector('.chat-message-actions-sep');
             if (!sep) {
@@ -902,17 +967,18 @@ export const HtmlPipelineMixin = {
                 sep.className = 'chat-message-actions-sep';
                 sep.setAttribute('aria-hidden', 'true');
             }
-            chip.classList.add('chat-response-sources-chip--compact');
-            const bookIcon = chip.querySelector('.chat-response-sources-chip-icon');
-            if (bookIcon) bookIcon.remove();
+            const holder = chip.closest('.chat-response-sources--chip');
             actionBar.appendChild(sep);
             actionBar.appendChild(chip);
+            if (holder && holder !== actionBar && !holder.querySelector('.chat-response-sources-chip')) {
+                holder.remove();
+            }
         } catch (_) { /* never break rendering */ }
     },
 
     /**
-     * Render Sources as a compact chip that opens a modal list (mobile parity),
-     * instead of an inline expandable details block.
+     * Render Sources only as a chip that opens the modal. Any leftover
+     * disclosure or prose block is replaced or removed.
      */
     _formatChatResponseSources(container) {
         if (!container || typeof container.querySelector !== 'function') return;
@@ -920,14 +986,18 @@ export const HtmlPipelineMixin = {
         const sourcesBlocks = container.querySelectorAll('.chat-response-sources');
         sourcesBlocks.forEach((detailsEl) => {
             if (detailsEl.getAttribute('data-sources-formatted') === '1') return;
+            if (detailsEl.querySelector('.chat-response-sources-chip')) return;
             const parsed = this._parseChatResponseSources(detailsEl);
-            if (!parsed.items.length && !parsed.notes.length) return;
+            if (!parsed.items.length && !parsed.notes.length) {
+                detailsEl.remove();
+                return;
+            }
             const chip = this._buildSourcesChip(parsed);
             const holder = document.createElement('div');
             holder.className = 'chat-response-sources chat-response-sources--chip';
             holder.setAttribute('data-sources-formatted', '1');
             holder.appendChild(chip);
-            detailsEl.parentNode.insertBefore(holder, detailsEl);
+            if (detailsEl.parentNode) detailsEl.parentNode.insertBefore(holder, detailsEl);
             detailsEl.remove();
         });
         this._relocateSourcesChipIfNeeded(container);

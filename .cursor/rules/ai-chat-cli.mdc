@@ -1,0 +1,21 @@
+---
+description: Send chatbot prompts through flask ai-chat, the same agent path as the UI
+alwaysApply: true
+---
+
+# Chatbot CLI
+
+To send a message through the live chatbot (same agent, tools, and traces as the UI), use `flask ai-chat` from `Backoffice/`. Do not POST `/api/ai/v2/chat`, script a dev-act-as login, or write a one-off HTTP client. The CLI boots its own app context; the dev server on port 5000 does not need to be running.
+
+```powershell
+cd Backoffice
+$env:FLASK_APP = "run.py"
+python -m flask ai-chat ask "what emergency documents you have on syria" --quiet-steps
+```
+
+- `--user` is `admin` (default `test_admin@…`), `sys`, `focal`, an email, or a local-part.
+- `convo -m "…" -m "…"` is a multi-turn conversation. `show-trace <id>` prints a stored trace. `interactive` is a REPL.
+- Progress steps go to stderr. `--quiet-steps` prints the answer and tool digest only. `--as-json` prints the full result.
+- Golden-pair scoring is `flask ai-regression`, not this CLI.
+
+Command list: `Backoffice/docs/runbooks/ai/ai-agent-development-map.md` (Local prompt debugging). Implementation: `Backoffice/app/cli_commands/ai_chat_debug.py`.

@@ -222,15 +222,16 @@ public surface (anti-enumeration).
 
 ### `GET /public/documents/catalog`
 
-Inventories public documents by **type / year / country** — counts from
-document metadata, not semantic search. Answers "how many countries
-submitted an annual report / Unified Plan for `<year>`, or across all
-years?" much more cheaply than paginating `/public/documents/search`. Same
-visibility scope as document search.
+Metadata lookup for public documents — type, country, year, and title —
+not a text search. Use it for "which documents exist" and for "how many
+countries submitted an annual report / Unified Plan / emergency operation".
+Same visibility as document search. Read document text with
+`/public/documents/search`.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `document_type` | string | `annual_report`, `unified_plan`, `midyear_report`, `other`; omit for all |
+| `document_type` | string | `annual_report`, `unified_plan`, `midyear_report`, `emergency` (DREF + Emergency Appeal + operations updates + situation reports), `dref`, `emergency_appeal`, `operations_update`, `sitrep`, `emergency_operation`, `other`; omit for all |
+| `q` | string | Title/filename fragment (`MDRSY014`, `UPL-2026`) or a collection name (`emergency`, `unified plan`) when `document_type` is omitted |
 | `year` | int | Omit for a `by_year[]` breakdown across all years |
 | `country_id`, `country_name` | — | Narrow to one country |
 | `file_type` | string | e.g. `pdf` |

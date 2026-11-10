@@ -66,6 +66,18 @@ export const ConversationsMixin = {
         }
     },
 
+    /**
+     * Drop the floating widget's browser copy of the open thread.
+     * The transcript (`humdb_chatbot_conversation`) and the active id are
+     * localStorage, separate from the immersive page, so a server-side delete
+     * has to clear them explicitly or the next page paints the deleted chat.
+     */
+    _clearFloatingBrowserCache() {
+        try { localStorage.removeItem(this.storageKey); } catch (_) { /* ignore */ }
+        this._clearFloatingInflight();
+        this._setFloatingConversationId(null);
+    },
+
     _updateImmersiveLinkHref() {
         if (this._isImmersive() || !this.elements.immersiveBtn || !this.elements.widget) return;
         let url = this.elements.widget.getAttribute('data-immersive-url') || '/chat';
@@ -366,9 +378,64 @@ export const ConversationsMixin = {
         }
     },
 
+    _markFloatingInflight(conversationId, requestId) {
+        if (this._isImmersive() || !conversationId) return;
+        try {
+            localStorage.setItem(this.floatingInflightKey, JSON.stringify({
+                conversation_id: String(conversationId),
+                request_id: requestId ? String(requestId) : null,
+                ts: Date.now(),
+            }));
+        } catch (_) { /* ignore */ }
+    },
+
+    _clearFloatingInflight() {
+        try { localStorage.removeItem(this.floatingInflightKey); } catch (_) { /* ignore */ }
+    },
+
+    /**
+     * Floating widget: after a refresh/navigation the server run keeps going. If a marker says a run
+     * was in flight for the active conversation, reload it from the server, re-render progress and poll
+     * until the reply is persisted.
+     */
+    async _recoverFloatingInflight() {
+        if (this._isImmersive()) return;
+        let marker = null;
+        try {
+            marker = JSON.parse(localStorage.getItem(this.floatingInflightKey) || 'null');
+        } catch (_) { marker = null; }
+        if (!marker || !marker.conversation_id) return;
+        const cid = String(marker.conversation_id);
+        const activeId = this._getFloatingConversationId();
+        const ageMs = Date.now() - (Number(marker.ts) || 0);
+        if (!activeId || String(activeId) !== cid || ageMs > 30 * 60 * 1000) {
+            this._clearFloatingInflight();
+            return;
+        }
+        try {
+            const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}`);
+            if (String(this._getFloatingConversationId() || '') !== cid) return;
+            if (res.status === 404) {
+                this._clearFloatingBrowserCache();
+                this.loadConversation([]);
+                return;
+            }
+            if (!res.ok) return;
+            const data = await res.json();
+            this.loadConversation(this._mapApiMessages(data.messages || []));
+            const restored = this._maybeRestoreInflightFromConversationResponse(data, cid);
+            if (!restored) {
+                // Run already finished while the page was gone: the reply is in the server history.
+                this._clearFloatingInflight();
+                this.saveConversationHistory();
+            }
+        } catch (e) {
+            this._warn('Floating inflight recovery failed:', e);
+        }
+    },
+
     _startInflightPoll(conversationId, requestId) {
         if (!conversationId) return;
-        if (!this._isImmersive() && !this._fbAiConfig) return;
 
         // Already polling this request
         if (this._inflightPollConversationId === conversationId && this._inflightPollRequestId === requestId && this._inflightPollTimer) {
@@ -436,6 +503,10 @@ export const ConversationsMixin = {
                 this._updateImmersiveQuickPromptsVisibility();
                 this.scrollToBottom();
                 this._stopInflightPoll();
+                if (!this._isImmersive()) {
+                    this._clearFloatingInflight();
+                    this.saveConversationHistory();
+                }
                 // Refresh the sidebar list once so spinners clear after page-reload recovery.
                 this._dispatchImmersiveUpdate();
             } catch (e) {
@@ -701,7 +772,13 @@ export const ConversationsMixin = {
             return;
         }
         try {
-            const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}`);
+            const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}?limit=1`);
+            if (String(this._getFloatingConversationId() || '') !== String(cid)) return;
+            if (res.status === 404) {
+                this._clearFloatingBrowserCache();
+                this.loadConversation([]);
+                return;
+            }
             if (!res.ok) return;
             const data = await res.json();
             const t = data && data.conversation && data.conversation.title != null
@@ -778,6 +855,7 @@ export const ConversationsMixin = {
         this._updateImmersiveQuickPromptsVisibility();
         this._updateAiNoticeVisibility();
         this.scrollToBottom();
+        if (!this._isImmersive()) this.saveConversationHistory();
     },
 
     _mapApiMessages(rawMessages) {
@@ -824,7 +902,7 @@ export const ConversationsMixin = {
             this._updateImmersiveUrl(true);
             return;
         }
-        this._setFloatingConversationId(null);
+        this._clearFloatingBrowserCache();
         this._clearFormBuilderAttachment?.();
         this.loadConversation([]);
         if (this.elements.floatingChatList) this._renderFloatingConversationList();
@@ -865,7 +943,6 @@ export const ConversationsMixin = {
                 : '';
             this._setFloatingConversationId(chatId);
             if (convTitle) this._applyFloatingHeaderTitleText(convTitle);
-            this.saveConversationHistory();
             this.loadConversation(messages);
             if (this.elements.floatingChatList) this._renderFloatingConversationList();
         } catch (e) {
@@ -879,18 +956,23 @@ export const ConversationsMixin = {
                 const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(chatId)}`, { method: 'DELETE' });
                 if (!res.ok) return;
                 const wasActive = this.activeConversationId === chatId;
+                const deletedFloating = String(this._getFloatingConversationId() || '') === String(chatId);
                 const listRes = await this._apiFetch('/api/ai/v2/conversations');
                 if (!listRes.ok) {
                     if (wasActive) {
                         this._setImmersiveActiveId(null);
                         this.loadConversation([]);
                     }
+                    if (deletedFloating) this._clearFloatingBrowserCache();
                     this._dispatchImmersiveUpdate();
                     this._updateImmersiveUrl(true);
                     return;
                 }
                 const listData = await listRes.json();
                 const conversations = listData.conversations || [];
+                if (conversations.length === 0 || deletedFloating) {
+                    this._clearFloatingBrowserCache();
+                }
                 if (conversations.length === 0) {
                     this._setImmersiveActiveId(null);
                     this.loadConversation([]);
@@ -916,9 +998,9 @@ export const ConversationsMixin = {
         try {
             const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(chatId)}`, { method: 'DELETE' });
             if (!res.ok) return;
-            const wasActive = this._getFloatingConversationId() === chatId;
+            const wasActive = String(this._getFloatingConversationId() || '') === String(chatId);
             if (wasActive) {
-                this._setFloatingConversationId(null);
+                this._clearFloatingBrowserCache();
                 this.loadConversation([]);
             }
             if (this.elements.floatingChatList) this._renderFloatingConversationList();
@@ -938,6 +1020,7 @@ export const ConversationsMixin = {
                     return;
                 }
                 this._setImmersiveActiveId(null);
+                this._clearFloatingBrowserCache();
                 this.loadConversation([]);
                 this._dispatchImmersiveUpdate();
                 this._updateImmersiveUrl(true);
@@ -954,7 +1037,7 @@ export const ConversationsMixin = {
                 console.warn('deleteAllChats: server returned', res.status);
                 return;
             }
-            this._setFloatingConversationId(null);
+            this._clearFloatingBrowserCache();
             this.loadConversation([]);
             if (this.elements.floatingChatList) this._renderFloatingConversationList();
         } catch (e) {

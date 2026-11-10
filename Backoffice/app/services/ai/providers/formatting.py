@@ -151,6 +151,25 @@ def _finalize_indicator_action_links(html: str) -> str:
     )
 
 
+def _render_structured_sources_block(sources: Optional[List[Dict[str, Any]]]) -> Optional[str]:
+    """Sources HTML is always a structured list. The client renders only the chip."""
+    if not sources:
+        return None
+    try:
+        from app.utils.ai_sources_parser import render_sources_body_html
+        body = render_sources_body_html(sources)
+    except Exception as e:
+        logger.debug("format_ai_response_for_html: structured sources render failed: %s", e)
+        return None
+    if not body:
+        return None
+    return (
+        '<div class="chat-response-sources">'
+        f'<div class="chat-response-sources-body">{body}</div>'
+        "</div>"
+    )
+
+
 def format_ai_response_for_html(
     text: Optional[str],
     provenance_data: Optional[Dict[str, Any]] = None,
@@ -248,69 +267,19 @@ def format_ai_response_for_html(
         logger.debug("markdown rendering failed: %s", e)
         html = esc(text).replace("\n", "<br>")
 
-    # Sources block: prefer structured sources[] (data-* attrs). Else convert
-    # markdown ## Sources prose. Bleach with protocols=[] strips ALL href values
-    # (including relative); we inject Sources after bleach with validated paths.
-    sources_safe_html = None
+    # Sources are always structured rows with data-* attributes. Bleach strips
+    # hrefs, so this block is injected after bleach. There is no prose <details> fallback.
     structured_sources = sources if isinstance(sources, list) and sources else None
-    if structured_sources is None and sources_block_raw is not None:
-        try:
-            from app.utils.ai_sources_parser import merge_structured_sources
-            structured_sources = merge_structured_sources(answer="## Sources\n\n" + sources_block_raw)
-        except Exception as e:
-            logger.debug("format_ai_response_for_html: structured sources parse failed: %s", e)
-            structured_sources = None
-
-    if structured_sources:
-        try:
-            from app.utils.ai_sources_parser import render_sources_body_html
-            sources_body_safe = render_sources_body_html(structured_sources)
-            if sources_body_safe:
-                sources_safe_html = (
-                    '<details class="chat-response-sources mt-2 border border-gray-200 rounded p-2 bg-gray-50">'
-                    '<summary class="cursor-pointer font-medium text-gray-700">Sources</summary>'
-                    f'<div class="chat-response-sources-body mt-2 text-sm text-gray-600">{sources_body_safe}</div>'
-                    "</details>"
-                )
-        except Exception as e:
-            logger.debug("format_ai_response_for_html: structured sources render failed: %s", e)
-            sources_safe_html = None
-
+    sources_safe_html = _render_structured_sources_block(structured_sources)
     if sources_safe_html is None and sources_block_raw is not None:
         try:
-            sources_escaped = str(esc(sources_block_raw))
-            # Convert [label](url) to <a> only when url is a safe relative path; do this
-            # before markdown/bleach so our links are never touched by bleach.
-            def _safe_link(m: re.Match) -> str:
-                label, url = m.group(1) or "", (m.group(2) or "").strip()
-                path_part = url.split("#")[0].split("?")[0]
-                if url.startswith("/") and "//" not in path_part:
-                    return f'<a href="{escape(url)}" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener">{escape(label)}</a>'
-                return escape(label)
-            sources_with_links = re.sub(
-                r"\[([^\]]*)\]\((https?://[^)\s]+|/[^)\s]*)\)",
-                _safe_link,
-                sources_escaped,
-                flags=re.IGNORECASE,
-            )
-            # Strip markdown bold ** so the first source is not emphasized
-            sources_with_links = sources_with_links.replace("**", "")
-            sources_body_safe = sources_with_links.replace("\n", "<br>")
-            sources_safe_html = (
-                '<details class="chat-response-sources mt-2 border border-gray-200 rounded p-2 bg-gray-50">'
-                '<summary class="cursor-pointer font-medium text-gray-700">Sources</summary>'
-                f'<div class="chat-response-sources-body mt-2 text-sm text-gray-600">{sources_body_safe}</div>'
-                "</details>"
+            from app.utils.ai_sources_parser import merge_structured_sources
+            sources_safe_html = _render_structured_sources_block(
+                merge_structured_sources(answer="## Sources\n\n" + sources_block_raw)
             )
         except Exception as e:
-            logger.debug("format_ai_response_for_html: sources block link conversion failed: %s", e)
-            sources_body_esc = esc(sources_block_raw).replace("**", "").replace("\n", "<br>")
-            sources_safe_html = (
-                '<details class="chat-response-sources mt-2 border border-gray-200 rounded p-2 bg-gray-50">'
-                '<summary class="cursor-pointer font-medium text-gray-700">Sources</summary>'
-                f'<div class="chat-response-sources-body mt-2 text-sm text-gray-600">{sources_body_esc}</div>'
-                "</details>"
-            )
+            logger.debug("format_ai_response_for_html: structured sources parse failed: %s", e)
+            sources_safe_html = None
 
     if sources_safe_html is not None:
         # Use a marker that will survive bleach (no links inside)

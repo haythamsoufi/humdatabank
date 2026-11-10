@@ -1328,7 +1328,7 @@ def register_ai_ws(app) -> None:
                         else:
                             persist_content = "[Visualization]"
 
-                    if cancelled.is_set():
+                    if cancelled.is_set() or getattr(result, "error_type", None) == "cancelled":
                         _ws_send_json(ws, {"type": "cancelled"})
                         _clear_inflight_snapshot()
                         continue
@@ -1427,6 +1427,8 @@ def register_ai_ws(app) -> None:
                         grounding_score = getattr(result, "grounding_score", None)
                         if grounding_score is not None:
                             done_payload["grounding_score"] = grounding_score
+                        if isinstance(sources_result, list) and sources_result:
+                            done_payload["sources"] = sources_result
                         _ws_send_json(ws, done_payload)
                     _clear_inflight_snapshot()
                 except QuotaExceededError as e:

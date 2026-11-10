@@ -317,12 +317,16 @@ def public_documents_catalog():
     """
     Inventory public documents by type / year / country — counts, not semantic search.
 
-    Answers "how many countries submitted an annual report (FDRS) or a Unified Plan
-    (UPR) for 2024, or across all years?" directly from document metadata. Use
-    ``/public/documents/search`` instead for narrative Q&A over document content.
+    Metadata inventory for public documents: annual reports, Unified Plans, and
+    IFRC emergency operations (DREF, Emergency Appeal, operations updates,
+    situation reports). ``document_type=emergency`` is the whole operation
+    collection. ``q`` is a title/filename fragment (``MDRSY014``, ``UPL-2026``)
+    or a collection name (``emergency``, ``dref``, ``unified plan``).
+    Use ``/public/documents/search`` to read document text.
     """
     try:
         document_type = request.args.get("document_type", default="", type=str).strip()
+        q = request.args.get("q", default="", type=str).strip()
         year = request.args.get("year", type=int)
         country_id = request.args.get("country_id", type=int)
         country_name = request.args.get("country_name", default="", type=str).strip() or None
@@ -332,6 +336,7 @@ def public_documents_catalog():
 
         payload = catalog_public_documents(
             document_type=document_type,
+            q=q,
             year=year,
             country_id=country_id,
             country_name=country_name,

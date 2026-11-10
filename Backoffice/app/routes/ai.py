@@ -566,6 +566,43 @@ def _run_conversation_title_refine_background(
     threading.Thread(target=_job, daemon=True, name=f"ai-title-{conversation_id[:8]}").start()
 
 
+def _mark_running_trace_cancelled(*, user_id: int, conversation_id: str) -> bool:
+    """Set the newest running trace for this conversation to cancelled.
+
+    Stop used to leave the row ``running`` until the worker finished the provider
+    call, the tool, and a follow-up summary. The traces page reads this column.
+    """
+    from app.models.enums import AIReasoningTraceStatusValue
+
+    try:
+        trace = (
+            AIReasoningTrace.query.filter_by(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                status=AIReasoningTraceStatusValue.running.value,
+            )
+            .order_by(AIReasoningTrace.id.desc())
+            .first()
+        )
+        if trace is None:
+            return False
+        trace.status = AIReasoningTraceStatusValue.cancelled.value
+        if not (trace.error_message or "").strip():
+            trace.error_message = "Cancelled by user"
+        db.session.commit()
+        logger.info(
+            "Marked reasoning trace id=%s cancelled (conversation_id=%s)",
+            trace.id,
+            conversation_id,
+        )
+        return True
+    except Exception as e:
+        logger.warning("Failed to mark running trace cancelled: %s", e, exc_info=True)
+        with suppress(Exception):
+            db.session.rollback()
+        return False
+
+
 @ai_bp.route("/chat/cancel", methods=["POST"])
 @limiter.limit(_ai_cancel_limit)
 def cancel_chat_stream():
@@ -600,7 +637,18 @@ def cancel_chat_stream():
                 logger.warning("Failed to set cancel event: %s", e, exc_info=True)
                 cancelled = False
 
-    return json_ok(cancelled=cancelled)
+    # Flip the trace off "running" immediately. The worker may still be inside the
+    # provider call for a moment; it finalizes the same row as cancelled and does
+    # not persist a reply.
+    conversation_id = (data.get("conversation_id") or "").strip()
+    trace_marked = False
+    if conversation_id and identity.user:
+        trace_marked = _mark_running_trace_cancelled(
+            user_id=int(identity.user.id),
+            conversation_id=conversation_id,
+        )
+
+    return json_ok(cancelled=cancelled, trace_marked=trace_marked)
 
 
 def _build_access_context(identity) -> Dict[str, Any]:
@@ -1628,7 +1676,17 @@ def chat_stream():
     client_message_id = parsed.client_message_id
     branch_from_edit = parsed.branch_from_edit
 
-    keep_running_on_disconnect = bool(data.get("keep_running_on_disconnect"))
+    # Generation is server-side work: a refresh / navigation / dropped connection must NOT cancel it.
+    # The worker keeps running, persists the reply, and clears conversation.meta.inflight; the client
+    # recovers by polling GET /conversations/<id>. Only an explicit POST /chat/cancel (Stop) cancels.
+    # Anonymous requests have no persisted conversation to recover, so those still cancel on disconnect.
+    # Clients may opt out explicitly with keep_running_on_disconnect=false.
+    keep_running_on_disconnect = bool(
+        identity.is_authenticated
+        and identity.user
+        and conversation_id
+        and data.get("keep_running_on_disconnect", True)
+    )
 
     # Ensure the conversation row exists immediately for new chats so the immersive UI can
     # refresh the sidebar list right away (stream persistence happens async later).
@@ -2056,6 +2114,15 @@ def chat_stream():
                         on_delta=_on_delta,
                         cancelled=cancelled,
                     )
+                    if getattr(result, "error_type", None) == "cancelled":
+                        current_app.logger.info(
+                            "AI SSE[%s] cancelled by user; not persisting a reply conversation_id=%s",
+                            request_id,
+                            conversation_id,
+                        )
+                        _emit({"type": "cancelled", "message": "Request cancelled"})
+                        _clear_inflight_snapshot()
+                        return
                     response_text = result.response_html or ("".join(delta_accum) if delta_accum else "")
                     map_payload_result = getattr(result, "map_payload", None)
                     chart_payload_result = getattr(result, "chart_payload", None)
@@ -2347,6 +2414,8 @@ def chat_stream():
                         done_payload["grounding_score"] = item.get("grounding_score")
                     if item.get("form_builder_result"):
                         done_payload["form_builder_result"] = item.get("form_builder_result")
+                    if isinstance(item.get("sources"), list) and item.get("sources"):
+                        done_payload["sources"] = item.get("sources")
                     yield f"data: {json.dumps(done_payload)}\n\n"
                     break
 

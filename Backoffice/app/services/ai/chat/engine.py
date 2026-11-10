@@ -1286,6 +1286,23 @@ class AIChatEngine:
                         original_message=safe_message or None,
                         cancelled=cancelled,
                     )
+                if isinstance(meta, dict) and meta.get("status") == "cancelled":
+                    # Do not revise, stream, or persist the partial text. Stop already
+                    # discarded it; a follow-up rewrite would be another model call.
+                    fb_result = meta.get("form_builder_result") if isinstance(meta.get("form_builder_result"), dict) else None
+                    return ChatResult(
+                        success=False,
+                        response_html="",
+                        provider=(meta.get("provider") or "agent"),
+                        model=model_name,
+                        function_calls_used=function_calls_used or [],
+                        used_agent=True,
+                        streamed=False,
+                        error_type="cancelled",
+                        error_message="Cancelled by user",
+                        trace_id=meta.get("trace_id"),
+                        form_builder_result=fb_result,
+                    )
                 map_payload = None
                 chart_payload = None
                 table_payload = None

@@ -35,6 +35,7 @@
     #epRegistryGrid .ag-header-viewport { overflow-x: hidden !important; }
     #epRegistryGrid .ag-body-horizontal-scroll { display: none !important; }
     /* Endpoint registry filter chips — tooltip is a sibling of <button>, not inside it (valid HTML). */
+    #epRegistrySearch::-webkit-search-cancel-button { display: none; }
     #epSurfaceBtns .ep-filter-wrap {
         position: relative;
         display: inline-block;
@@ -313,6 +314,18 @@
                 </p>
             </div>
 
+            <div class="relative w-full max-w-xl">
+                <label for="epRegistrySearch" class="sr-only">{{ _('Search endpoints') }}</label>
+                <i class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" aria-hidden="true"></i>
+                <input type="search" id="epRegistrySearch" autocomplete="off" enterkeyhint="search"
+                       placeholder="{{ _('Search path, description, method, or auth')|forceescape }}"
+                       class="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 py-2 pl-9 pr-9">
+                <button type="button" id="epRegistrySearchClear" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 px-1"
+                        aria-label="{{ _('Clear search')|forceescape }}">
+                    <i class="fas fa-times text-xs" aria-hidden="true"></i>
+                </button>
+            </div>
+
             <!-- Surface filter chips + grid actions (column visibility, clear filters) on one row -->
             <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 min-w-0 w-full">
                 <div class="flex flex-wrap gap-1 min-w-0 flex-1 basis-0" id="epSurfaceBtns">
@@ -322,7 +335,7 @@
                         </button>
                         <span class="ep-filter-tip" role="tooltip">
                             <span class="ep-filter-tip-inner">
-                                <span class="ep-filter-tip-line">{{ _('Show every endpoint in the registry: External /v1, Mobile, AI, the Indicator Bank app, and the FDRS public frontend.') }}</span>
+                                <span class="ep-filter-tip-line">{{ _('Show every catalogued endpoint and every other live /api route, including ones not in the catalog yet.') }}</span>
                                 <span class="ep-filter-tip-line">{{ _('No filter — the complete list.') }}</span>
                             </span>
                         </span>
@@ -381,6 +394,28 @@
                             <span class="ep-filter-tip-inner">
                                 <span class="ep-filter-tip-line">{{ _('Legacy data.ifrc.org paths: /api/data, /api/entities/ns, /api/KpiImputedValue, /csv/export, and the rest of that contract.') }}</span>
                                 <span class="ep-filter-tip-line">{{ _('API key with content:read. The site sends ?apiKey=, which needs “allow API key in query string” on the key. Bearer and X-API-Key also work.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="decisions" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-none border"{% if ep_surface_filter_disabled['decisions'] %} disabled{% endif %}>
+                            <i class="fas fa-balance-scale mr-1"></i>{{ _('Decision Maker') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.decisions.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Decision Maker JSON API: /api/decisions, flags, evidence, metrics, and methodologies. Session auth.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="other" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-none border"{% if ep_surface_filter_disabled['other'] %} disabled{% endif %}>
+                            <i class="fas fa-code mr-1"></i>{{ _('Other /api') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.other.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Live /api routes outside the catalogued surfaces (form entry, notifications, and similar). Shown here even when they are not in the static registry yet.') }}</span>
                             </span>
                         </span>
                     </span>
@@ -1069,7 +1104,7 @@ try {
         const periodSelector = document.getElementById('periodSelector');
         const endpointSelector = document.getElementById('endpointSelector');
 
-        window.__apiMgmtUrlExtra = window.__apiMgmtUrlExtra || { surface: 'all', ep_f: '', vol_p: 'daily', vol_e: 'all' };
+        window.__apiMgmtUrlExtra = window.__apiMgmtUrlExtra || { surface: 'all', ep_f: '', q: '', vol_p: 'daily', vol_e: 'all' };
         function persistVolumeToUrl() {
             window.__apiMgmtUrlExtra.vol_p = periodSelector ? periodSelector.value : 'daily';
             window.__apiMgmtUrlExtra.vol_e = endpointSelector ? endpointSelector.value : 'all';

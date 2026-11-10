@@ -306,6 +306,7 @@ def get_chunk_context(chunk_id: str, *, before: int = 1, after: int = 1) -> Dict
 def get_public_documents_catalog(
     *,
     document_type: str = "",
+    q: str = "",
     year: Optional[int] = None,
     country_id: Optional[int] = None,
     country_name: str = "",
@@ -316,6 +317,8 @@ def get_public_documents_catalog(
     params: Dict[str, Any] = {"include_documents": "true" if include_documents else "false"}
     if document_type.strip():
         params["document_type"] = document_type.strip()
+    if q.strip():
+        params["q"] = q.strip()
     if year is not None:
         params["year"] = int(year)
     if country_id is not None:

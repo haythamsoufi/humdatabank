@@ -663,12 +663,6 @@ def _unified_preflight_llm(
 
     strict_substantive = _heuristic_cannot_be_greeting_only(raw) or _is_clearly_substantive_data_query(raw)
 
-    rewrite_rules = (
-        'When intent is "data_query", set rewritten_query to the user message verbatim (trim outer whitespace only) '
-        "- do NOT expand, rephrase, or reinterpret substantive questions.\n"
-        "Follow-up expansion is handled separately before this call.\n"
-    )
-
     scope_rules = ""
     if enforce_scope:
         scope_rules = (
@@ -702,7 +696,8 @@ def _unified_preflight_llm(
         "You preprocess a single user message for the Humanitarian Databank RCRC assistant.\n"
         "Return JSON ONLY matching this schema (no prose):\n"
         '{ "intent": "greeting_only" | "data_query" | "out_of_platform_scope", '
-        '"rewritten_query": "<string>", "confidence": <number between 0 and 1> }\n'
+        '"confidence": <number between 0 and 1> }\n'
+        "Do NOT echo or rewrite the user message; the classification alone is used.\n"
         "\n"
         '"intent":\n'
         '- "greeting_only" — ONLY a greeting/thanks/closing/social line with NO data or task '
@@ -713,10 +708,7 @@ def _unified_preflight_llm(
         "\n"
         f"{scope_rules}"
         "\n"
-        f"{rewrite_rules}"
-        "\n"
         f"{substantive_bias}"
-        "- For greeting_only, set rewritten_query to the user\'s wording unchanged.\n"
     )
 
     import json as _json
@@ -816,16 +808,18 @@ def classify_and_rewrite_user_message(
         logger.debug("classify_and_rewrite: OPENAI_API_KEY not set; skipping LLMs")
         return raw, False, True
 
-    # Rewrite OFF + no heuristic need for classify: skip LLM (matches legacy latency).
+    # The model call below only decides greeting_only / out_of_platform_scope: substantive queries are
+    # always returned verbatim (see the module docstring), so a "rewrite" never changes the text.
+    # Skip the round trip (typically 2-10s) whenever the heuristics already settle both questions,
+    # regardless of AI_QUERY_REWRITE_ENABLED.
     maybe_greeting = (
         len(raw) <= 128
         and not _heuristic_cannot_be_greeting_only(raw)
         and not _is_clearly_substantive_data_query(raw)
     )
     needs_scope_llm = enforce and not heuristic_likely_in_platform_scope(raw)
-    if not rewrite_enabled:
-        if not maybe_greeting and not needs_scope_llm:
-            return raw, False, True
+    if not maybe_greeting and not needs_scope_llm:
+        return raw, False, True
 
     return _unified_preflight_llm(
         raw,

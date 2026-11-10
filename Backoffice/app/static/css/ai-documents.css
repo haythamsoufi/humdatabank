@@ -180,6 +180,18 @@
     border-bottom-right-radius: 0.375rem;
     background-color: #fff;
 }
+/* Phone: dropdown is position:fixed so the scrolling tab panel does not clip it.
+   The list then fills whatever vertical room is left under the trigger. */
+#ifrcTypeFilterDropdown.ifrc-type-dd--viewport {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#ifrcTypeFilterDropdown.ifrc-type-dd--viewport #ifrcTypeFilterList.ifrc-type-filter-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
 
 /* Markdown formatting styles */
 .ai-answer-markdown {
@@ -640,6 +652,77 @@
     #importContent .flex.gap-3 > *,
     #ifrcApiContent .flex.gap-3 > * {
         width: 100%;
+    }
+}
+
+/*
+ * Phone / short window: stacked Type, Year, and Country filters are flex-shrink:0
+ * and used to crush #ifrcApiScrollArea to a few pixels, so the document list
+ * never appeared and had no usable scrollbar. Scroll the whole IFRC panel
+ * (filters + list) and give the grid a real height inside that scroller.
+ */
+@media (max-width: 767px), (max-height: 720px) {
+    #uploadImportModal #ifrcApiContent,
+    #uploadImportModal #ifrcApiContent.ifrc-api-tab--expanded {
+        flex: 1 1 0%;
+        min-height: 0;
+        min-width: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: #64748b #f1f5f9;
+    }
+
+    #uploadImportModal.upload-import-modal--ifrc-idle #ifrcApiContent {
+        flex: 0 1 auto;
+        max-height: calc(100dvh - 8.5rem);
+    }
+
+    #uploadImportModal #ifrcApiScrollArea {
+        flex: 0 0 auto;
+        min-height: auto;
+        overflow: visible;
+    }
+
+    #uploadImportModal #ifrcDocumentsGridShell {
+        flex: 0 0 auto;
+        height: min(22rem, 52vh);
+        min-height: 14rem;
+        max-height: none;
+    }
+
+    #uploadImportModal #ifrcApiContent::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    #uploadImportModal #ifrcApiContent::-webkit-scrollbar-track {
+        background: #f1f5f9;
+    }
+
+    #uploadImportModal #ifrcApiContent::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 999px;
+    }
+
+    #uploadImportModal .scroll-tab-bar__track {
+        overflow-x: scroll;
+        scrollbar-width: thin;
+        scrollbar-color: #64748b #e5e7eb;
+    }
+
+    #uploadImportModal .scroll-tab-bar__track::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    #uploadImportModal .scroll-tab-bar__track::-webkit-scrollbar-track {
+        background: #e5e7eb;
+    }
+
+    #uploadImportModal .scroll-tab-bar__track::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 999px;
     }
 }
 

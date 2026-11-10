@@ -236,9 +236,19 @@ def scoped_import_map(app, origin: str, trees, extra_absolute_modules=()) -> dic
     return result
 
 
+# Knowledge Base page replaces the layout map, so it must keep chatbot/lib
+# and add the ai-documents module graph under js/admin/.
+KNOWLEDGE_BASE_IMPORT_TREES = ("js/admin",) + LAYOUT_IMPORT_TREES
+
+
 def layout_import_map(app, origin: str) -> dict:
     """Import map for modules loaded by the base layout (chatbot) on every page."""
     return scoped_import_map(app, origin, LAYOUT_IMPORT_TREES)
+
+
+def knowledge_base_import_map(app, origin: str) -> dict:
+    """Import map for the AI Knowledge Base module graph under ``js/admin/``."""
+    return scoped_import_map(app, origin, KNOWLEDGE_BASE_IMPORT_TREES)
 
 
 def forms_module_import_map(app, origin: str) -> dict:

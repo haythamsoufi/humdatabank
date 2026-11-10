@@ -144,6 +144,10 @@ export const StateMixin = {
                 this._dispatchImmersiveUpdate();
                 return;
             }
+            if (!this.conversationHistory || !this.conversationHistory.length) {
+                localStorage.removeItem(this.storageKey);
+                return;
+            }
             localStorage.setItem(this.storageKey, JSON.stringify(this.conversationHistory));
         } catch (error) {
             console.warn('Failed to save conversation history:', error);
@@ -154,6 +158,16 @@ export const StateMixin = {
         try {
             if (this._isImmersive()) {
                 this._loadImmersiveConversation();
+                return;
+            }
+            const conversationId = this._getFloatingConversationId();
+            if (!conversationId) {
+                // Transcript without an id is leftover from a deleted or closed thread.
+                // The next send would start a new server conversation, so don't replay it.
+                try { localStorage.removeItem(this.storageKey); } catch (_) { /* ignore */ }
+                this._clearFloatingInflight();
+                this.conversationHistory = [];
+                this._updateAiNoticeVisibility();
                 return;
             }
             const saved = localStorage.getItem(this.storageKey);
@@ -174,6 +188,12 @@ export const StateMixin = {
             }
             // Don't show welcome message automatically on page load
             this._updateAiNoticeVisibility();
+            // Confirm the cached id still exists. A delete from /chat leaves this
+            // key behind; 404 drops the transcript before the widget is opened.
+            this._floatingTitleLoaded = true;
+            void this._refreshFloatingHeaderTitleFromServer();
+            // Re-attach to a server-side run that was still going when the page was refreshed/left.
+            void this._recoverFloatingInflight();
         } catch (error) {
             console.warn('Failed to load conversation history:', error);
             // Don't show welcome message as fallback on page load

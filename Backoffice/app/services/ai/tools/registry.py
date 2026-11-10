@@ -37,7 +37,6 @@ from plugins.upr.ai.data_retrieval import (
 )
 from plugins.upr.ai.tool_specs import UPR_TOOL_SPECS, UPR_KPI_TOOL_NAMES, UPR_CACHEABLE_TOOLS
 from app.services.ai.data.form_retrieval import resolve_indicator_to_primary_id
-from app.utils.sql_utils import safe_ilike_pattern
 from app.services.ai.documents.vector_store import AIVectorStore
 
 from app.services.ai.tools._cache import tool_cache_get, tool_cache_set
@@ -1052,97 +1051,101 @@ class AIToolsRegistry:
         status: Optional[str] = None,
         file_type: Optional[str] = None,
         country_identifier: Optional[str] = None,
+        document_category: Optional[str] = None,
+        year: Optional[int] = None,
         include_metadata: bool = False,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """
-        List AI-processed documents (metadata only).
+        List public knowledge-base documents by metadata.
 
-        Use this when the user is asking *which documents exist* (e.g. "Which countries have UPL-2026 PDFs?")
-        rather than asking questions that require reading document text (use search_documents for that).
+        Calls the same inventory as GET /public/documents/catalog. Use for which
+        documents exist (Unified Plans, annual reports, DREF, appeals, situation
+        reports). Use search_documents to read document text.
         """
         kwargs.pop("_progress_callback", None)  # executor may pass it; we don't use it
+        del include_metadata  # The catalog returns titles, types, dates, and links only.
 
-        from sqlalchemy import or_
-        from app.models.embeddings import AIDocument
+        from app.services.ai.documents.emergency_catalogue import EMERGENCY_CATEGORY_VALUES
+        from app.services.public.document_service import catalog_public_documents
 
-        q = (query or "").strip()
-        status = (status or "").strip() or None
-        file_type = (file_type or "").strip() or None
         country_hint = (country_identifier or "").strip() or None
-
-        from app.services.ai.documents.access import apply_document_read_filter
-        from app.services.ai.policies.access_policy import resolve_ai_access_policy
-
-        docs_query = apply_document_read_filter(
-            AIDocument.query.filter(AIDocument.searchable == True),
-            resolve_ai_access_policy().documents,
-        )
-
-        # Filters.
-        if status:
-            docs_query = docs_query.filter(AIDocument.processing_status == status)
-        if file_type:
-            docs_query = docs_query.filter(AIDocument.file_type == file_type)
-
+        country_id = None
+        country_name = None
         if country_hint:
             try:
                 country = resolve_country(country_hint)
                 if country and getattr(country, "id", None):
-                    docs_query = docs_query.filter(
-                        or_(
-                            AIDocument.country_id == int(country.id),
-                            AIDocument.country_name == str(getattr(country, "name", "")).strip(),
-                        )
-                    )
+                    country_id = int(country.id)
                 else:
-                    docs_query = docs_query.filter(AIDocument.country_name.ilike(safe_ilike_pattern(country_hint)))
+                    country_name = country_hint
             except Exception as e:
                 logger.debug("country filter failed: %s", e)
-                docs_query = docs_query.filter(AIDocument.country_name.ilike(safe_ilike_pattern(country_hint)))
+                country_name = country_hint
 
-        if q:
-            pattern = safe_ilike_pattern(q or "")
-            docs_query = docs_query.filter(
-                or_(
-                    AIDocument.title.ilike(pattern),
-                    AIDocument.filename.ilike(pattern),
-                )
-            )
-
-        # Pagination caps (avoid huge tool payloads).
-        limit = max(1, min(int(limit), 500))
-        offset = max(0, int(offset))
-
-        total = docs_query.count()
-        docs = (
-            docs_query.order_by(AIDocument.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
+        catalog_year = int(year) if year else None
+        payload = catalog_public_documents(
+            document_type=(document_category or "").strip(),
+            q=(query or "").strip(),
+            year=catalog_year,
+            country_id=country_id,
+            country_name=country_name,
+            file_type=(file_type or "").strip(),
+            include_documents=True,
         )
 
-        from plugins.upr.ai.document_identity import extract_upl_year_from_title
-
         rows: List[Dict[str, Any]] = []
-        for d in docs or []:
-            payload = d.to_dict()
-            # Add consistent download URL field (mirrors search_documents).
-            payload["document_url"] = f"/api/ai/documents/{int(d.id)}/download"
-            # Expose plan year from UPL-style titles so the agent can build "most recent UPL year" tables/maps.
-            plan_year = extract_upl_year_from_title(getattr(d, "title", None) or payload.get("title") or "")
-            if plan_year is not None:
-                payload["plan_year"] = plan_year
-            if not include_metadata:
-                payload.pop("metadata", None)
-            rows.append(payload)
+        for bucket in payload.get("by_country") or []:
+            if not isinstance(bucket, dict):
+                continue
+            place = (bucket.get("country") or "").strip()
+            for entry in bucket.get("documents") or []:
+                if not isinstance(entry, dict):
+                    continue
+                doc_type = entry.get("document_type") or ""
+                row = {
+                    "title": entry.get("document_title"),
+                    "filename": entry.get("filename"),
+                    "document_category": doc_type,
+                    "document_date": entry.get("document_date"),
+                    "document_url": entry.get("document_url") or entry.get("download_url"),
+                    "country_name": place or (entry.get("countries") or [None])[0],
+                    "country_iso3": entry.get("country_iso3"),
+                    "country_region": entry.get("country_region"),
+                    "public_id": entry.get("document_id"),
+                }
+                if doc_type in EMERGENCY_CATEGORY_VALUES:
+                    row["operation_kind"] = doc_type
+                if doc_type == "unified_plan" and entry.get("year"):
+                    row["plan_year"] = entry.get("year")
+                countries = entry.get("countries") or []
+                if isinstance(countries, list) and len(countries) > 1:
+                    row["countries"] = [{"name": name} for name in countries if name]
+                rows.append(row)
 
-        return {
-            "total": int(total),
-            "limit": int(limit),
-            "offset": int(offset),
-            "documents": rows,
+        limit = max(1, min(int(limit), 500))
+        offset = max(0, int(offset))
+        total = int(payload.get("total_documents") or len(rows))
+        page = rows[offset:offset + limit]
+        applied = payload.get("filters_applied") or {}
+        match = applied.get("document_type")
+        result: Dict[str, Any] = {
+            "source": "public_documents_catalog",
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "documents": page,
+            "by_type": payload.get("by_type") or {},
+            "countries_count": payload.get("countries_count"),
+            "notes": payload.get("notes") or [],
         }
+        if match and match != "all":
+            result["match"] = "emergency_operations" if match == "emergency" else match
+        if status and str(status).strip().lower() not in ("", "completed"):
+            result["notes"] = list(result["notes"]) + [
+                "The public catalog includes completed documents only."
+            ]
+        return result
 
     @tool_wrapper
     def analyze_unified_plans_focus_areas(
@@ -2035,13 +2038,21 @@ class AIToolsRegistry:
                 "type": "function",
                 "function": {
                     "name": "list_documents",
-                    "description": "List AI-processed documents by metadata (title/filename/country). Use when the user asks which documents exist (e.g. 'which countries have UPL-2026 PDFs?'). The 'query' parameter is matched as a single substring (contains) on title and filename — do NOT use 'OR' or multiple terms; use one term e.g. 'UPL-' or 'Unified Plan'. For Unified Plan documents use 'UPL-' or 'Unified Plan' (not 'UPR'). This is cheaper and more reliable than chunk search for inventory. Do NOT use when you need to read document text (use search_documents for that). When presenting results, ALWAYS include total count (result.total) and a numbered list (1., 2., 3., …). If total > limit, say you're showing a subset (e.g. 'Showing 200 of 374').",
+                    "description": "Look up which public documents exist, using the public documents catalog (metadata only: type, country, year, title). Use this for inventory questions. document_category or query selects the type: unified_plan, annual_report, midyear_report, emergency (DREF + Emergency Appeal + operations updates + situation reports), dref, emergency_appeal, operations_update, sitrep. 'emergency' matches appeal codes (MDR…) and disaster-named files such as 'Floods', not only titles that contain the word emergency. Pass country_identifier for one country and year when the user names one. Use query as a title fragment only for a specific code such as 'UPL-2026' or 'MDRSY014'. List every returned document (title, operation_kind or document_category, date, document_url) and result.total. Do not answer with only a country count. Do NOT use when you need to read document text (use search_documents).",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "query": {
                                 "type": "string",
-                                "description": "Optional text to match in document title/filename (e.g. 'UPL-2026', 'Unified Plan 2026')."
+                                "description": "Catalog type or title fragment. Types: emergency, dref, appeal, sitrep, unified plan, annual report. Title fragments: 'UPL-2026', 'MDRSY014'. Do not pass a full sentence."
+                            },
+                            "document_category": {
+                                "type": "string",
+                                "description": "Catalog document_type: emergency, dref, emergency_appeal, operations_update, sitrep, emergency_operation, unified_plan, annual_report, midyear_report, other."
+                            },
+                            "year": {
+                                "type": "integer",
+                                "description": "Optional calendar year. Omit to include every year."
                             },
                             "country_identifier": {
                                 "type": "string",

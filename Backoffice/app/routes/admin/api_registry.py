@@ -14,6 +14,8 @@ get_endpoint_registry() in api_management merges those rows with ENDPOINT_REGIST
 #   'ai'              – AI chat + documents (/api/ai/v2/* and /api/ai/documents/*)
 #   'indicator_bank'  – Indicator Bank app routes (/Indicator, /Sector, /list-home, …)
 #   'fdrs_public'     – data.ifrc.org legacy contract (/api/data, /api/entities/ns, /csv/export, …)
+#   'decisions'       – Decision Maker JSON API (/api/decisions, /api/decision-flags, …)
+#   'other'           – any other live /api/ route not in the catalog above
 #
 # auth values (consistent vocabulary across surfaces):
 #   'public'             – no auth required
@@ -343,10 +345,12 @@ EXTERNAL_API_REGISTRY = [
     {'group': 'Public API', 'path': '/api/v1/public/documents/catalog', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': True, 'paginated': False,
      'consumers': 'Custom GPT, Website, MCP',
-     'description': 'Count public documents by type, year, and country. This is an inventory, not a text search.',
+     'description': 'Look up public documents by type, country, year, and title. Inventory, not a text search. Includes emergency operations (DREF, appeals, situation reports).',
      'query_params': [
-         {'name': 'document_type', 'type': 'text', 'placeholder': 'annual_report',
-          'description': 'Document type, such as annual_report or unified_plan.'},
+         {'name': 'document_type', 'type': 'text', 'placeholder': 'emergency',
+          'description': 'annual_report, unified_plan, midyear_report, emergency, dref, emergency_appeal, operations_update, sitrep, or other.'},
+         {'name': 'q', 'type': 'text', 'placeholder': 'MDRSY014',
+          'description': 'Title or filename fragment, or a collection name such as emergency.'},
          {'name': 'year', 'type': 'number', 'placeholder': '2024',
           'description': 'Calendar year. Omit for every year.'},
          {'name': 'country_id', 'type': 'number', 'placeholder': '1',

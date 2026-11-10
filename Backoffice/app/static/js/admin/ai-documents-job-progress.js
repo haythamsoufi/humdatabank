@@ -952,6 +952,13 @@
     }
   }
 
+  function untrackDoc(docId) {
+    stopDocPoll(docId);
+    var id = Number(docId);
+    if (Number.isFinite(id)) state.trackedDocs.delete(id);
+    renderFromState();
+  }
+
   function startDocPoll(docId) {
     var key = String(docId);
     if (state.docPollers.has(key)) return;
@@ -1209,6 +1216,7 @@
     updateDoc: updateDocEntry,
     startDocPoll: startDocPoll,
     stopDocPoll: stopDocPoll,
+    untrackDoc: untrackDoc,
     showBanner: showBanner,
     hideBanner: hideBanner,
     render: renderFromState,

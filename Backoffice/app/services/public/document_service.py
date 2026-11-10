@@ -597,6 +597,19 @@ def _apply_scope_filters_to_query(query, filters: Dict[str, Any] | None):
         query = query.filter(AIVectorStore._country_name_filter(filters["country_name"]))
     if filters.get("file_type"):
         query = query.filter(AIDocument.file_type == filters["file_type"])
+    title_query = (filters.get("title_query") or "").strip()
+    if title_query:
+        from sqlalchemy import or_
+
+        from app.utils.sql_utils import safe_ilike_pattern
+
+        pattern = safe_ilike_pattern(title_query)
+        query = query.filter(
+            or_(
+                AIDocument.title.ilike(pattern),
+                AIDocument.filename.ilike(pattern),
+            )
+        )
     if filters.get("user_id"):
         query = query.filter(AIDocument.user_id == filters["user_id"])
     if "is_api_import" in filters:
@@ -648,13 +661,24 @@ def _document_year(document: AIDocument) -> int:
 
 
 def _document_type_key(document: AIDocument, query: str) -> str:
-    title = (document.title or "").lower()
-    filename = (document.filename or "").lower()
+    """Catalog type for one public document.
+
+    Emergency operations (DREF, Emergency Appeal, operations update, situation
+    report, appeal code) are decided before annual-report and Unified Plan
+    rules, so a DREF final report is not counted as an annual report.
+    """
+    title = document.title or ""
+    filename = document.filename or ""
     category = (document.document_category or "").lower()
     extra = document.extra_metadata if isinstance(document.extra_metadata, dict) else {}
-    label = str(extra.get("document_type_label") or "").lower()
-    combined = f"{title} {filename} {label} {category}"
+    ifrc_label = str(extra.get("ifrc_document_type") or extra.get("document_type_label") or "")
+    from app.services.ai.documents.emergency_catalogue import operation_kind
 
+    kind = operation_kind(title, f"{filename} {ifrc_label}", category)
+    if kind:
+        return kind
+
+    combined = f"{title} {filename} {ifrc_label} {category}".lower()
     if re.search(r"\bmid[-\s]?year|\bmyr\b", combined, re.IGNORECASE):
         return "midyear_report"
     if re.search(r"\bannual\s+report|\bar\b", combined, re.IGNORECASE):
@@ -666,8 +690,6 @@ def _document_type_key(document: AIDocument, query: str) -> str:
         return upr_type
     if query_prefers_upr_documents(query):
         return "unified_plan"
-    if category:
-        return category
     return "other"
 
 
@@ -765,8 +787,62 @@ def list_public_documents_in_scope(filters: Dict[str, Any] | None) -> List[AIDoc
     return query.order_by(AIDocument.title).all()
 
 
-DOCUMENT_TYPE_CHOICES = ("annual_report", "unified_plan", "midyear_report", "other")
+# ``emergency`` is a filter over the operation types, not a stored key.
+_CATALOG_TEXT_ALIASES = {
+    "unified plan": "unified_plan",
+    "unified plans": "unified_plan",
+    "upl": "unified_plan",
+    "annual report": "annual_report",
+    "annual reports": "annual_report",
+    "midyear report": "midyear_report",
+    "mid-year report": "midyear_report",
+    "mid year report": "midyear_report",
+}
+
+
+def catalog_type_choices() -> tuple[str, ...]:
+    from app.services.ai.documents.emergency_catalogue import EMERGENCY_CATEGORY_VALUES
+
+    return (
+        "annual_report",
+        "unified_plan",
+        "midyear_report",
+        "emergency",
+        *EMERGENCY_CATEGORY_VALUES,
+        "other",
+    )
+
+
+DOCUMENT_TYPE_CHOICES = catalog_type_choices()
 PUBLIC_DOC_CATALOG_MAX_DOCS = 2000
+
+
+def resolve_catalog_query(document_type: str = "", q: str = "") -> tuple[str, str]:
+    """Split a catalog request into a type filter and a title/filename substring.
+
+    ``emergency``, ``dref``, ``appeal``, and ``sitrep`` are collection names.
+    ``unified plan`` and ``annual report`` are too. A code fragment such as
+    ``UPL-2026`` or ``MDRSY014`` stays a title substring.
+    """
+    from app.services.ai.documents.emergency_catalogue import resolve_inventory_query
+
+    inventory = resolve_inventory_query(q, document_type)
+    doc_type = inventory.scope or inventory.category or ""
+    text = inventory.text or ""
+    alias = _CATALOG_TEXT_ALIASES.get(text)
+    if alias and not inventory.scope:
+        return alias, ""
+    return doc_type, text
+
+
+def _catalog_matches_type(type_key: str, requested: str) -> bool:
+    if not requested:
+        return True
+    if requested == "emergency":
+        from app.services.ai.documents.emergency_catalogue import EMERGENCY_CATEGORY_VALUES
+
+        return type_key in EMERGENCY_CATEGORY_VALUES
+    return type_key == requested
 
 
 def _catalog_scope_filters(
@@ -774,6 +850,7 @@ def _catalog_scope_filters(
     country_id: Optional[int] = None,
     country_name: Optional[str] = None,
     file_type: Optional[str] = None,
+    title_query: Optional[str] = None,
 ) -> Dict[str, Any] | None:
     filters: Dict[str, Any] = {}
     if country_id:
@@ -782,7 +859,25 @@ def _catalog_scope_filters(
         filters["country_name"] = country_name.strip()
     if file_type:
         filters["file_type"] = file_type.strip().lower()
+    if title_query and title_query.strip():
+        filters["title_query"] = title_query.strip()
     return filters or None
+
+
+def _catalog_place(document: AIDocument) -> tuple[Optional[str], Optional[str]]:
+    """ISO3 and operational region from the document's primary country."""
+    country = getattr(document, "country", None)
+    if country is None:
+        try:
+            linked = list(document.countries or [])
+        except Exception:
+            linked = []
+        country = linked[0] if linked else None
+    if country is None:
+        return None, None
+    iso3 = getattr(country, "iso3", None)
+    region = getattr(country, "region", None)
+    return (str(iso3).strip() or None) if iso3 else None, (str(region).strip() or None) if region else None
 
 
 def _catalog_document_entry(
@@ -793,12 +888,18 @@ def _catalog_document_entry(
     include_links: bool = True,
 ) -> Dict[str, Any]:
     opaque_id = _opaque_document_id(document)
+    iso3, region = _catalog_place(document)
+    published = document.document_date.isoformat() if document.document_date else None
     entry: Dict[str, Any] = {
         "document_id": opaque_id,
         "document_title": document.title,
+        "filename": document.filename,
         "document_type": type_key,
+        "document_date": published,
         "year": year or None,
         "countries": _document_country_names(document),
+        "country_iso3": iso3,
+        "country_region": region,
     }
     if include_links:
         source_url = _document_source_url(document)
@@ -818,6 +919,7 @@ def _catalog_document_entry(
 def catalog_public_documents(
     *,
     document_type: str = "",
+    q: str = "",
     year: Optional[int] = None,
     country_id: Optional[int] = None,
     country_name: Optional[str] = None,
@@ -825,25 +927,31 @@ def catalog_public_documents(
     include_documents: bool = True,
 ) -> Dict[str, Any]:
     """
-    Inventory public documents by type / year / country — counts, not semantic search.
+    Inventory public documents by type / year / country — metadata, not semantic search.
 
-    Answers questions like "how many countries submitted an annual report (FDRS) or a
-    Unified Plan (UPR) for 2024, or across all years?" directly from document metadata,
-    without running vector search. Scope is identical to :func:`search_public_documents`:
-    only documents with ``is_public=True``, ``searchable=True`` and
-    ``processing_status=completed`` are counted (see :func:`list_public_documents_in_scope`).
-    Use :func:`search_public_documents` instead for narrative Q&A over document content.
+    This is the lookup for "which documents exist": annual reports, Unified Plans,
+    and IFRC emergency operations (DREF, Emergency Appeal, operations updates,
+    situation reports). ``q`` is a title/filename fragment (``UPL-2026``,
+    ``MDRSY014``) or a collection name (``emergency``, ``dref``, ``unified plan``).
+    Scope matches :func:`search_public_documents`: ``is_public=True``,
+    ``searchable=True``, ``processing_status=completed``.
+    Use :func:`search_public_documents` to read document text.
     """
-    normalized_type = (document_type or "").strip().lower()
+    normalized_type, title_query = resolve_catalog_query(document_type, q)
     if normalized_type in ("", "all"):
         normalized_type = ""
     elif normalized_type not in DOCUMENT_TYPE_CHOICES:
         raise ClientInputError(
-            f"Unknown document_type {document_type!r}. "
+            f"Unknown document_type {normalized_type!r}. "
             f"Use one of: {', '.join(DOCUMENT_TYPE_CHOICES)}, or omit for all types."
         )
 
-    filters = _catalog_scope_filters(country_id=country_id, country_name=country_name, file_type=file_type)
+    filters = _catalog_scope_filters(
+        country_id=country_id,
+        country_name=country_name,
+        file_type=file_type,
+        title_query=title_query or None,
+    )
     documents = list_public_documents_in_scope(filters)
 
     if len(documents) > PUBLIC_DOC_CATALOG_MAX_DOCS:
@@ -855,7 +963,7 @@ def catalog_public_documents(
     entries: List[Dict[str, Any]] = []
     for doc in documents:
         type_key = _document_type_key(doc, "")
-        if normalized_type and type_key != normalized_type:
+        if not _catalog_matches_type(type_key, normalized_type):
             continue
         doc_year = _document_year(doc)
         if year and doc_year != int(year):
@@ -905,8 +1013,10 @@ def catalog_public_documents(
     notes = [
         "Counts only documents marked public in the AI Knowledge Base "
         "(is_public=True, searchable=True, processing_status=completed).",
-        "document_type is inferred from title/filename/category — use searchPublicDocuments "
-        "to verify ambiguous cases from the document text itself.",
+        "document_type is inferred from title, filename, and IFRC type. "
+        "emergency covers DREF, Emergency Appeal, operations updates, and situation reports "
+        "(including appeal codes such as MDRSY014). "
+        "Use searchPublicDocuments to read document text.",
         "A country is counted once per year it has a matching public document, even if it "
         "also appears in other years (see by_year for the yearly breakdown).",
     ]
@@ -918,6 +1028,7 @@ def catalog_public_documents(
     payload: Dict[str, Any] = {
         "filters_applied": {
             "document_type": normalized_type or "all",
+            "q": title_query or None,
             "year": year,
             "country_id": country_id,
             "country_name": country_name,

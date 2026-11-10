@@ -25,6 +25,8 @@ export class HumDatabankChatbot {
         this.immersiveActiveIdKey = 'humdb_chatbot_immersive_active_id';
         this.sourcesStorageKey = 'humdb_chatbot_sources';
         this.floatingConversationIdKey = 'humdb_chatbot_floating_conversation_id';
+        // Marker set while a floating-widget run is in flight so a page refresh can re-attach to it.
+        this.floatingInflightKey = 'humdb_chatbot_floating_inflight';
         this.expandStorageKey = 'humdb_chatbot_expanded';
         this.aiPolicyAckStorageKey = 'humdb_chatbot_ai_policy_acknowledged';
         this.activeConversationId = null;
@@ -278,8 +280,8 @@ export class HumDatabankChatbot {
                 this._setupVisibilityChangeHandler();
             } else {
                 this._updateImmersiveLinkHref();
-                // Floating conversation title is fetched on first actual chat open
-                // (see widget-ui.js#toggleChat), not here on every page load.
+                // Floating title + deleted-conversation check run from
+                // loadConversationHistory (only when a conversation id is cached).
             }
             this.isInitialized = true;
         }

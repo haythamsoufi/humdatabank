@@ -58,9 +58,15 @@ class DebugManager:
 
         self.verbose_debug = bool(log_level <= logging.DEBUG)
 
-        from app.utils.logging_handlers import configure_process_org_timezone, create_app_log_formatter
+        from app.utils.logging_handlers import (
+            configure_process_org_timezone,
+            create_app_log_formatter,
+            install_org_timezone_werkzeug_access_log,
+        )
 
         configure_process_org_timezone()
+        # Werkzeug access lines use time.localtime(); on Windows that ignores the IANA TZ and prints UTC.
+        install_org_timezone_werkzeug_access_log()
 
         formatter = create_app_log_formatter(
             '[%(asctime)s] %(levelname)s in %(name)s: %(message)s',

@@ -207,8 +207,8 @@ paths:
   /public/documents/catalog:
     get:
       operationId: getPublicDocumentsCatalog
-      summary: Count/list public documents by type, year, country
-      description: Inventories public documents (counts, not text search). Use for "how many countries submitted an annual report or Unified Plan" instead of searchPublicDocuments. Omit year for a breakdown across all years.
+      summary: Look up public documents by type, country, year, and title
+      description: Metadata inventory, not a text search. Use for which documents exist and for how many countries have an annual report, Unified Plan, or emergency operation (DREF, Emergency Appeal, operations update, situation report). document_type=emergency is the whole operation collection. q is a title fragment (MDRSY014, UPL-2026) or a collection name. Use searchPublicDocuments to read document text. Omit year for a breakdown across all years. Set include_documents=true to list files.
       parameters:
         - name: document_type
           in: query
@@ -219,8 +219,20 @@ paths:
               - annual_report
               - unified_plan
               - midyear_report
+              - emergency
+              - dref
+              - emergency_appeal
+              - operations_update
+              - sitrep
+              - emergency_operation
               - other
-          description: Omit for all types
+          description: Omit for all types. emergency is DREF, Emergency Appeal, operations updates, and situation reports.
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Title/filename fragment (MDRSY014, UPL-2026) or a collection name (emergency, dref, unified plan) when document_type is omitted.
         - name: year
           in: query
           required: false

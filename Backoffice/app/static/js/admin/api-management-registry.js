@@ -41,8 +41,12 @@
     var loadingEl = document.getElementById('epRegistryGrid-loading');
     var containerEl = document.getElementById('epRegistryGrid-container');
 
-    window.__apiMgmtUrlExtra = window.__apiMgmtUrlExtra || { surface: 'all', ep_f: '', vol_p: 'daily', vol_e: 'all' };
+    window.__apiMgmtUrlExtra = window.__apiMgmtUrlExtra || { surface: 'all', ep_f: '', q: '', vol_p: 'daily', vol_e: 'all' };
     var activeSurface = window.__apiMgmtUrlExtra.surface || 'all';
+    var searchTokens = [];
+    var searchInput = document.getElementById('epRegistrySearch');
+    var searchClearBtn = document.getElementById('epRegistrySearchClear');
+    var searchUrlTimer = null;
     var epFilterUrlTimer = null;
     /** False until post-init timeout applies URL column filters (avoids clobbering `ep_f` on load). */
     var epRegistryFilterUrlSyncReady = false;
@@ -65,6 +69,8 @@
         ai: 'AI /api/ai/v2',
         indicator_bank: 'Indicator Bank app',
         fdrs_public: 'FDRS public frontend',
+        decisions: 'Decision Maker',
+        other: 'Other /api',
     };
 
     function styleActiveBtn(activeBtn) {
@@ -75,6 +81,8 @@
             ai: ['bg-purple-100', 'text-purple-700', 'border-purple-300'],
             indicator_bank: ['bg-amber-100', 'text-amber-800', 'border-amber-300'],
             fdrs_public: ['bg-orange-100', 'text-orange-800', 'border-orange-300'],
+            decisions: ['bg-indigo-100', 'text-indigo-700', 'border-indigo-200'],
+            other: ['bg-gray-100', 'text-gray-700', 'border-gray-300'],
             flagged: ['bg-red-100', 'text-red-700', 'border-red-200'],
             has_stats: ['bg-green-100', 'text-green-700', 'border-green-200'],
             overlap: ['bg-indigo-100', 'text-indigo-700', 'border-indigo-200'],
@@ -142,10 +150,25 @@
         }
     }
 
-    function rowPassesSurfaceFilter(d) {
-        if (!d) return true;
-        if (d.__epGroupHeader) return false;
-        return rowMatchesSurface(d, activeSurface);
+    function setSearchTokens(raw) {
+        var q = String(raw || '').trim().toLowerCase();
+        searchTokens = q ? q.split(/\s+/).filter(Boolean) : [];
+        if (searchClearBtn) searchClearBtn.classList.toggle('hidden', !searchTokens.length);
+    }
+
+    function rowPassesSearch(d) {
+        if (!searchTokens.length) return true;
+        var hay = (d && d.pathSearch) || '';
+        for (var i = 0; i < searchTokens.length; i++) {
+            if (hay.indexOf(searchTokens[i]) === -1) return false;
+        }
+        return true;
+    }
+
+    /** Surface chip and the search box. Group-header rows are handled by the caller. */
+    function rowPassesRegistryFilter(d) {
+        if (!d || d.__epGroupHeader) return false;
+        return rowMatchesSurface(d, activeSurface) && rowPassesSearch(d);
     }
 
     /** AG Grid v31+ passes `{ node }` to `doesExternalFilterPass`; older builds pass the node directly. */
@@ -164,11 +187,11 @@
                 var r = src[i];
                 if (r.__epGroupHeader) continue;
                 if (r.registryGroup !== key) continue;
-                if (rowPassesSurfaceFilter(r)) return true;
+                if (rowPassesRegistryFilter(r)) return true;
             }
             return false;
         }
-        return rowPassesSurfaceFilter(d);
+        return rowPassesRegistryFilter(d);
     }
 
     /** Synthetic full-width header rows; real endpoint rows stay in epRegistryAllRows / __epRegistryAllRows only. */
@@ -246,6 +269,7 @@
             var row = src[j];
             if (row.__epGroupHeader) continue;
             if (String(row.registryGroup || '') !== label) continue;
+            if (!rowPassesRegistryFilter(row)) continue;
             n += 1;
         }
         var wrap = document.createElement('div');
@@ -269,7 +293,16 @@
     };
 
     function isExternalFilterPresent() {
-        return activeSurface !== 'all';
+        return activeSurface !== 'all' || searchTokens.length > 0;
+    }
+
+    function redrawGroupHeaders() {
+        if (!epRegistryGridApi || typeof epRegistryGridApi.redrawRows !== 'function') return;
+        var nodes = [];
+        epRegistryGridApi.forEachNodeAfterFilter(function (node) {
+            if (node.data && node.data.__epGroupHeader) nodes.push(node);
+        });
+        if (nodes.length) epRegistryGridApi.redrawRows({ rowNodes: nodes });
     }
 
     function refreshExternalFilter() {
@@ -283,6 +316,7 @@
         } else if (typeof epRegistryGridApi.refreshClientSideRowModel === 'function') {
             epRegistryGridApi.refreshClientSideRowModel('filter');
         }
+        redrawGroupHeaders();
         updateFooterAndEmpty();
     }
 
@@ -767,6 +801,8 @@
         if (s === 'ai') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-purple-100 text-purple-700 font-semibold">ai</span>';
         if (s === 'indicator_bank') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-amber-100 text-amber-800 font-semibold">bank</span>';
         if (s === 'fdrs_public') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-orange-100 text-orange-800 font-semibold">fdrs</span>';
+        if (s === 'decisions') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-indigo-100 text-indigo-700 font-semibold">dec</span>';
+        if (s === 'other') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700 font-semibold">api</span>';
         return AgGridRenderers.escapeHtml(s || '');
     }
 
@@ -821,7 +857,7 @@
         });
         var flagged = eps.filter(function (e) { return e.flagged; });
         var overlapPairs = buildUniqueOverlapPairs(eps);
-        var bySurface = { v1: eps.filter(function (e) { return e.surface === 'v1'; }), mobile: eps.filter(function (e) { return e.surface === 'mobile'; }), ai: eps.filter(function (e) { return e.surface === 'ai'; }), indicator_bank: eps.filter(function (e) { return e.surface === 'indicator_bank'; }), fdrs_public: eps.filter(function (e) { return e.surface === 'fdrs_public'; }) };
+        var bySurface = { v1: eps.filter(function (e) { return e.surface === 'v1'; }), mobile: eps.filter(function (e) { return e.surface === 'mobile'; }), ai: eps.filter(function (e) { return e.surface === 'ai'; }), indicator_bank: eps.filter(function (e) { return e.surface === 'indicator_bank'; }), fdrs_public: eps.filter(function (e) { return e.surface === 'fdrs_public'; }), decisions: eps.filter(function (e) { return e.surface === 'decisions'; }), other: eps.filter(function (e) { return e.surface === 'other'; }) };
         function authOf(e) { return AUTH_LABELS[e.auth] || e.auth; }
         function surfOf(e) { return SURFACE_LABELS[e.surface] || e.surface; }
         function esc(s) {
@@ -834,7 +870,7 @@
         }
         var md = '# API Endpoint Registry — Audit Report\nGenerated: ' + now + '\n\n---\n\n## Summary\n\n| | Count |\n|---|---:|\n';
         md += '| **Total endpoints** | **' + eps.length + '** |\n';
-        md += '| External `/api/v1` | ' + bySurface.v1.length + ' |\n| Mobile `/api/mobile/v1` | ' + bySurface.mobile.length + ' |\n| AI `/api/ai/v2` | ' + bySurface.ai.length + ' |\n| Indicator Bank app | ' + bySurface.indicator_bank.length + ' |\n| FDRS public frontend | ' + bySurface.fdrs_public.length + ' |\n';
+        md += '| External `/api/v1` | ' + bySurface.v1.length + ' |\n| Mobile `/api/mobile/v1` | ' + bySurface.mobile.length + ' |\n| AI `/api/ai/v2` | ' + bySurface.ai.length + ' |\n| Indicator Bank app | ' + bySurface.indicator_bank.length + ' |\n| FDRS public frontend | ' + bySurface.fdrs_public.length + ' |\n| Decision Maker | ' + bySurface.decisions.length + ' |\n| Other `/api` | ' + bySurface.other.length + ' |\n';
         md += '| ⚠️ Flagged issues | **' + flagged.length + '** |\n| 🔁 Cross-surface overlaps | ' + overlapPairs.length + ' |\n';
         md += '| 📊 Endpoints with usage stats | ' + eps.filter(function (e) { return e.requests > 0; }).length + ' |\n';
         md += '| 👻 Undocumented | ' + rows.filter(function (r) { return r.undocumented; }).length + ' |\n';
@@ -1117,6 +1153,43 @@
     if (clearColFiltersBtn) {
         clearColFiltersBtn.addEventListener('click', function () {
             clearEpRegistryColumnFilters();
+        });
+    }
+
+    function commitSearchFromInput(syncNow) {
+        var value = searchInput ? searchInput.value : '';
+        setSearchTokens(value);
+        window.__apiMgmtUrlExtra.q = String(value || '').trim();
+        refreshExternalFilter();
+        if (searchUrlTimer) clearTimeout(searchUrlTimer);
+        if (syncNow) {
+            if (typeof window.apiMgmtSyncUrl === 'function') window.apiMgmtSyncUrl();
+            return;
+        }
+        searchUrlTimer = setTimeout(function () {
+            searchUrlTimer = null;
+            if (typeof window.apiMgmtSyncUrl === 'function') window.apiMgmtSyncUrl();
+        }, 250);
+    }
+
+    if (searchInput) {
+        var initialQ = (window.__apiMgmtUrlExtra && window.__apiMgmtUrlExtra.q) || '';
+        if (initialQ && searchInput.value !== initialQ) searchInput.value = initialQ;
+        setSearchTokens(searchInput.value);
+        searchInput.addEventListener('input', function () { commitSearchFromInput(false); });
+        searchInput.addEventListener('search', function () { commitSearchFromInput(true); });
+        searchInput.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape') {
+                searchInput.value = '';
+                commitSearchFromInput(true);
+            }
+        });
+    }
+    if (searchClearBtn) {
+        searchClearBtn.addEventListener('click', function () {
+            if (searchInput) searchInput.value = '';
+            commitSearchFromInput(true);
+            if (searchInput) searchInput.focus();
         });
     }
 

@@ -88,3 +88,23 @@ class TestOrgTimezoneLogging:
         tz = configure_process_org_timezone()
         assert tz == "Europe/Zurich"
         assert os.environ.get("TZ") == "Europe/Zurich"
+
+    def test_werkzeug_access_log_time_uses_org_timezone(self):
+        from datetime import datetime, timezone
+
+        from app.utils.logging_handlers import install_org_timezone_werkzeug_access_log
+        from werkzeug.serving import WSGIRequestHandler
+
+        assert install_org_timezone_werkzeug_access_log() is True
+        # Idempotent: a second call must not stack another wrapper.
+        patched = WSGIRequestHandler.log_date_time_string
+        assert install_org_timezone_werkzeug_access_log() is True
+        assert WSGIRequestHandler.log_date_time_string is patched
+
+        stamp = WSGIRequestHandler.log_date_time_string(object())
+        assert stamp.endswith(("CET", "CEST"))
+        # Must agree with the app formatter's clock, not UTC.
+        expected_hour = datetime.now(timezone.utc).astimezone(
+            __import__("org_logging").get_org_timezone()
+        ).strftime("%H")
+        assert f" {expected_hour}:" in stamp

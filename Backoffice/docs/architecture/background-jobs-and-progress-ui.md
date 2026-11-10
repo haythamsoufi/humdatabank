@@ -253,7 +253,7 @@ Page load may call `_auto_recover_stale_processing_documents()` for batch self-h
 |------|------|
 | `app/static/js/admin/ai-documents-job-progress.js` | Generic banner: job polling, per-entity polling, localStorage resume, cancel UX |
 | `app/static/js/core/floating-progress-banner.js` | Presentational banner shell |
-| Page JS (e.g. `ai-documents.js`) | `registerJobSpec`, wire buttons, start polling |
+| Page JS (e.g. `ai-documents.js` and `js/admin/ai-documents/`) | `registerJobSpec`, wire buttons, start polling |
 
 ### Job spec registration
 
@@ -369,7 +369,7 @@ Use this as a step-by-step when moving an existing feature to this stack.
 | Single upload/reprocess | `Backoffice/app/routes/ai_documents/upload.py` |
 | Heartbeat migration | `Backoffice/migrations/versions/add_ai_document_processing_heartbeat.py` |
 | Progress banner JS | `Backoffice/app/static/js/admin/ai-documents-job-progress.js` |
-| Page wiring | `Backoffice/app/static/js/admin/ai-documents.js` |
+| Page wiring | `Backoffice/app/static/js/admin/ai-documents.js` (modules under `js/admin/ai-documents/`) |
 | Template bootstrap | `Backoffice/app/templates/admin/ai/knowledge_base.html` |
 | Runner tests | `Backoffice/tests/unit/test_services/test_ai_job_runner.py` |
 | FDRS data sync job | `Backoffice/app/services/imports/fdrs_data_sync_job.py` |

@@ -114,7 +114,7 @@ Once JSON is pasted, analyze immediately — group, sum, chart, compare.
 | `/public/submissions/coverage` | Count countries with public data by template/period (preferred for counting) |
 | `/public/countries/resolve` | Map country name/ISO code/id → reference fields |
 | `/public/documents/search` | Public document chunks (UPR plans/reports) |
-| `/public/documents/catalog` | Count/list public documents by type/year/country (preferred for counting) |
+| `/public/documents/catalog` | Look up public documents by type/country/year/title (inventory, including emergency operations) |
 | `/public/documents/<id>` | One public document's metadata |
 | `/indicator-bank` | Indicator catalogue + search |
 | `/indicator-bank/<id>` | One indicator's metadata |

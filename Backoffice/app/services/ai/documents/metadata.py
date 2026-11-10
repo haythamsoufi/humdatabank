@@ -15,6 +15,10 @@ import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.services.ai.documents.emergency_catalogue import (
+    CATEGORY_LABELS as EMERGENCY_CATEGORY_LABELS,
+    classify_operation_category,
+)
 from plugins.upr.ai.document_identity import extract_upl_year_from_title
 
 logger = logging.getLogger(__name__)
@@ -58,6 +62,10 @@ DOCUMENT_CATEGORIES: List[str] = [
     "strategic_plan",
     "work_plan",
     "plan",
+    "dref",
+    "emergency_appeal",
+    "operations_update",
+    "emergency_operation",
     "sitrep",
     "report",
     "assessment",
@@ -76,6 +84,10 @@ CATEGORY_LABELS: dict = {
     "strategic_plan": "Strategic Plan",
     "work_plan":      "Work Plan",
     "plan":           "Plan",
+    "dref":           EMERGENCY_CATEGORY_LABELS["dref"],
+    "emergency_appeal": EMERGENCY_CATEGORY_LABELS["emergency_appeal"],
+    "operations_update": EMERGENCY_CATEGORY_LABELS["operations_update"],
+    "emergency_operation": EMERGENCY_CATEGORY_LABELS["emergency_operation"],
     "sitrep":         "Situation Report",
     "report":         "Report",
     "assessment":     "Assessment",
@@ -220,6 +232,10 @@ def classify_document_category(title: str, filename: str, text_sample: str) -> s
 
     Returns one of the values in DOCUMENT_CATEGORIES.
     """
+    operation = classify_operation_category(title, filename)
+    if operation:
+        return operation
+
     title_combined = f"{title} {filename}".lower()
     body_combined = text_sample[:1000].lower()
 

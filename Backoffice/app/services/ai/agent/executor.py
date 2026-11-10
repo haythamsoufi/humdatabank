@@ -12,6 +12,7 @@ The agent can iteratively:
 import json
 import logging
 import re
+import threading
 import time
 from typing import Callable, Dict, Any, List, Optional, Set, Tuple
 from math import isfinite
@@ -308,6 +309,78 @@ def _record_agent_dedupe_cache_hit(tool_name: str) -> None:
 class AgentExecutionError(Exception):
     """Raised when agent execution fails."""
     pass
+
+
+class AgentCancelled(Exception):
+    """User stop aborted this run. Callers must not start another model or tool call."""
+
+
+def _cancel_is_set(cancelled: Optional[Any]) -> bool:
+    try:
+        return bool(cancelled is not None and cancelled.is_set())
+    except Exception:
+        return False
+
+
+def _cancelled_loop_result(
+    *,
+    steps: List[Dict[str, Any]],
+    total_cost: float,
+    total_input_tokens: int,
+    total_output_tokens: int,
+    iterations: int,
+    tool_call_count: int,
+) -> Dict[str, Any]:
+    """Stop without another model call.
+
+    ``synthesize_partial_answer`` would start a fresh completion. On Stop that
+    both keeps the trace ``running`` and can invent an answer from a key-only digest.
+    """
+    return {
+        "success": False,
+        "error": "Cancelled by user",
+        "status": "cancelled",
+        "steps": steps,
+        "answer": "",
+        "total_cost": total_cost,
+        "total_input_tokens": total_input_tokens,
+        "total_output_tokens": total_output_tokens,
+        "iterations": iterations,
+        "tool_calls": tool_call_count,
+    }
+
+
+def _invoke_until_cancelled(cancelled: Optional[Any], call: Callable[[], Any], close: Callable[[], None]) -> Any:
+    """Run ``call``. When ``cancelled`` is set, ``close`` is invoked until ``call`` returns."""
+    if cancelled is None:
+        return call()
+    if _cancel_is_set(cancelled):
+        raise AgentCancelled()
+    finished = threading.Event()
+
+    def _watch() -> None:
+        while not finished.is_set():
+            if cancelled.wait(0.2):
+                while not finished.is_set():
+                    try:
+                        close()
+                    except Exception:
+                        pass
+                    if finished.wait(0.05):
+                        return
+                return
+
+    threading.Thread(target=_watch, name="ai-cancel-watch", daemon=True).start()
+    try:
+        return call()
+    except AgentCancelled:
+        raise
+    except Exception:
+        if _cancel_is_set(cancelled):
+            raise AgentCancelled() from None
+        raise
+    finally:
+        finished.set()
 
 
 class AIAgentExecutor:
@@ -959,11 +1032,46 @@ class AIAgentExecutor:
             self.model, self.http_timeout_sec, self.max_completion_tokens, self.timeout_seconds,
         )
 
-    def _agent_chat_completion(self, **kwargs: Any) -> Any:
-        """Route agent chat completions through :class:`OpenAIChatCompletionProvider`."""
+    def _agent_chat_completion(self, cancelled: Optional[Any] = None, **kwargs: Any) -> Any:
+        """Route agent chat completions through :class:`OpenAIChatCompletionProvider`.
+
+        When ``cancelled`` is set, the in-flight HTTP call is closed so Stop does not
+        wait out the provider timeout before the loop can exit.
+        """
         messages = kwargs.pop("messages")
         model = kwargs.pop("model", self.model)
-        return self.chat_completion_provider.create(messages=messages, model=model, **kwargs)
+        if cancelled is None:
+            return self.chat_completion_provider.create(messages=messages, model=model, **kwargs)
+
+        holder: Dict[str, Any] = {}
+
+        def _create() -> Any:
+            import httpx
+            from openai import OpenAI
+
+            api_key = current_app.config.get("OPENAI_API_KEY")
+            http_client = httpx.Client(timeout=self.http_timeout_sec)
+            holder["client"] = http_client
+            local = OpenAI(
+                api_key=api_key,
+                timeout=self.http_timeout_sec,
+                max_retries=0,
+                http_client=http_client,
+            )
+            try:
+                return local.chat.completions.create(messages=messages, model=model, **kwargs)
+            finally:
+                try:
+                    http_client.close()
+                except Exception:
+                    pass
+
+        def _close() -> None:
+            client = holder.get("client")
+            if client is not None:
+                client.close()
+
+        return _invoke_until_cancelled(cancelled, _create, _close)
 
     def _unified_plans_focus_fastpath(
         self,
@@ -1054,11 +1162,10 @@ class AIAgentExecutor:
             language: Response language
             on_step_callback: Optional callback(message: str) invoked before each tool run with a user-facing step message.
             original_message: User's raw message before query rewriting (stored in trace when different from query).
-            cancelled: Optional threading.Event checked between tool-call iterations (same
-                cadence as the wall-clock timeout below). This is a best-effort, cooperative
-                cancel: it stops the loop from starting a *new* tool call once set, but cannot
-                interrupt a single tool call/LLM request already in flight — there is no
-                cancellable transport threaded through the underlying HTTP clients. Any write
+            cancelled: Optional threading.Event. Checked before each model call and again
+                before each tool call. An in-flight chat completion is closed when the event
+                is set so Stop does not wait for that request to finish and then keep going.
+                A tool call already inside ``execute_tool`` still runs to completion. Any write
                 that already committed on a prior iteration is still surfaced via
                 form_builder_result (see extract_form_builder_result_from_steps below).
 
@@ -1466,6 +1573,15 @@ class AIAgentExecutor:
                 platform_context=user_context if isinstance(user_context, dict) else None,
             )
 
+            if result.get("status") == "cancelled":
+                # Do not run answer verification or the quality judge: both make more
+                # model calls after the user has already stopped.
+                logger.info(
+                    "Agent cancelled in %sms; skipping verification and quality judge",
+                    execution_time,
+                )
+                return result
+
             # Build structured sources (labeled ## Sources + tool synthesis).
             # Form-builder assistant: tool actions are not databank/document evidence.
             try:
@@ -1746,25 +1862,17 @@ class AIAgentExecutor:
                     'tool_calls': tool_call_count,
                 }
 
-            # Cooperative cancel: stop before starting another tool call. Checked once per
-            # iteration (same cadence as the timeout above) — cannot abort a call already
-            # in flight, but bounds how many *more* side-effecting tool calls a
-            # cancelled-but-still-running request can make. form_builder_result for any
-            # write that already committed on a prior iteration is still recovered by the
-            # caller via extract_form_builder_result_from_steps(steps).
-            if cancelled is not None and cancelled.is_set():
-                return {
-                    'success': False,
-                    'error': 'Cancelled by user',
-                    'status': 'cancelled',
-                    'steps': steps,
-                    'answer': _synthesize_partial_answer(steps, self.client, self.model),
-                    'total_cost': total_cost,
-                    'total_input_tokens': total_input_tokens,
-                    'total_output_tokens': total_output_tokens,
-                    'iterations': iterations,
-                    'tool_calls': tool_call_count,
-                }
+            # Stop before another model or tool call. The in-flight completion is closed
+            # by _agent_chat_completion; this check covers a cancel that landed between calls.
+            if _cancel_is_set(cancelled):
+                return _cancelled_loop_result(
+                    steps=steps,
+                    total_cost=total_cost,
+                    total_input_tokens=total_input_tokens,
+                    total_output_tokens=total_output_tokens,
+                    iterations=iterations,
+                    tool_call_count=tool_call_count,
+                )
 
             # Check limits
             if tool_call_count >= self.max_tools_per_query:
@@ -1822,7 +1930,28 @@ class AIAgentExecutor:
                     self.http_timeout_sec,
                 )
                 _llm_call_start = time.time()
-                response = self._agent_chat_completion(**native_kwargs)
+                try:
+                    response = self._agent_chat_completion(cancelled=cancelled, **native_kwargs)
+                except AgentCancelled:
+                    logger.info("Agent LLM call aborted: iteration=%s (user stop)", iterations)
+                    return _cancelled_loop_result(
+                        steps=steps,
+                        total_cost=total_cost,
+                        total_input_tokens=total_input_tokens,
+                        total_output_tokens=total_output_tokens,
+                        iterations=iterations,
+                        tool_call_count=tool_call_count,
+                    )
+                if _cancel_is_set(cancelled):
+                    logger.info("Agent LLM call finished after stop; not running tools")
+                    return _cancelled_loop_result(
+                        steps=steps,
+                        total_cost=total_cost,
+                        total_input_tokens=total_input_tokens,
+                        total_output_tokens=total_output_tokens,
+                        iterations=iterations,
+                        tool_call_count=tool_call_count,
+                    )
 
                 # Track cost and token counts
                 usage = response.usage
@@ -1972,6 +2101,16 @@ class AIAgentExecutor:
                 thought_open = False
 
                 for tool_call in message.tool_calls:
+                    if _cancel_is_set(cancelled):
+                        logger.info("Agent stop observed before tool %s; ending run", tool_call.function.name)
+                        return _cancelled_loop_result(
+                            steps=steps,
+                            total_cost=total_cost,
+                            total_input_tokens=total_input_tokens,
+                            total_output_tokens=total_output_tokens,
+                            iterations=iterations,
+                            tool_call_count=tool_call_count,
+                        )
                     tool_name = tool_call.function.name
                     if tool_call_count >= self.max_tools_per_query:
                         # A single assistant turn may carry many parallel tool calls; the per-query cap
@@ -2382,7 +2521,27 @@ class AIAgentExecutor:
                     messages.append({"role": "user", "content": reminder})
                     _progress_reminder_added = True
 
+            except AgentCancelled:
+                logger.info("Agent native loop aborted by user stop (iteration=%s)", iterations)
+                return _cancelled_loop_result(
+                    steps=steps,
+                    total_cost=total_cost,
+                    total_input_tokens=total_input_tokens,
+                    total_output_tokens=total_output_tokens,
+                    iterations=iterations,
+                    tool_call_count=tool_call_count,
+                )
             except Exception as e:
+                if _cancel_is_set(cancelled):
+                    logger.info("Agent native loop error after user stop; not retrying (iteration=%s)", iterations)
+                    return _cancelled_loop_result(
+                        steps=steps,
+                        total_cost=total_cost,
+                        total_input_tokens=total_input_tokens,
+                        total_output_tokens=total_output_tokens,
+                        iterations=iterations,
+                        tool_call_count=tool_call_count,
+                    )
                 _llm_elapsed_ms = int((time.time() - _llm_call_start) * 1000) if '_llm_call_start' in locals() else None
                 _log_openai_loop_error(
                     f"OpenAI API error in native agent loop "
@@ -2517,20 +2676,16 @@ class AIAgentExecutor:
                     'tool_calls': tool_call_count,
                 }
 
-            # Cooperative cancel — see matching comment in _execute_openai_native.
-            if cancelled is not None and cancelled.is_set():
-                return {
-                    'success': False,
-                    'error': 'Cancelled by user',
-                    'status': 'cancelled',
-                    'steps': steps,
-                    'answer': _synthesize_partial_answer(steps, self.client, self.model),
-                    'total_cost': total_cost,
-                    'total_input_tokens': total_input_tokens,
-                    'total_output_tokens': total_output_tokens,
-                    'iterations': iterations,
-                    'tool_calls': tool_call_count,
-                }
+            # Stop before another model or tool call. See _execute_openai_native.
+            if _cancel_is_set(cancelled):
+                return _cancelled_loop_result(
+                    steps=steps,
+                    total_cost=total_cost,
+                    total_input_tokens=total_input_tokens,
+                    total_output_tokens=total_output_tokens,
+                    iterations=iterations,
+                    tool_call_count=tool_call_count,
+                )
 
             # Check limits
             if tool_call_count >= self.max_tools_per_query:
@@ -2583,7 +2738,28 @@ class AIAgentExecutor:
                     len(current_messages), _react_msg_chars, self.http_timeout_sec,
                 )
                 _react_call_start = time.time()
-                response = self._agent_chat_completion(**kwargs)
+                try:
+                    response = self._agent_chat_completion(cancelled=cancelled, **kwargs)
+                except AgentCancelled:
+                    logger.info("ReAct LLM call aborted: iteration=%s (user stop)", iterations)
+                    return _cancelled_loop_result(
+                        steps=steps,
+                        total_cost=total_cost,
+                        total_input_tokens=total_input_tokens,
+                        total_output_tokens=total_output_tokens,
+                        iterations=iterations,
+                        tool_call_count=tool_call_count,
+                    )
+                if _cancel_is_set(cancelled):
+                    logger.info("ReAct LLM call finished after stop; not running tools")
+                    return _cancelled_loop_result(
+                        steps=steps,
+                        total_cost=total_cost,
+                        total_input_tokens=total_input_tokens,
+                        total_output_tokens=total_output_tokens,
+                        iterations=iterations,
+                        tool_call_count=tool_call_count,
+                    )
 
                 usage = response.usage
                 total_input_tokens += getattr(usage, 'prompt_tokens', 0) or 0
@@ -2680,6 +2856,16 @@ class AIAgentExecutor:
                     return result
 
                 elif parsed['type'] == 'action':
+                    if _cancel_is_set(cancelled):
+                        logger.info("ReAct stop observed before tool %s; ending run", parsed.get('action'))
+                        return _cancelled_loop_result(
+                            steps=steps,
+                            total_cost=total_cost,
+                            total_input_tokens=total_input_tokens,
+                            total_output_tokens=total_output_tokens,
+                            iterations=iterations,
+                            tool_call_count=tool_call_count,
+                        )
                     # Execute the action
                     tool_name = parsed['action']
                     tool_args = parsed.get('action_input', {})
@@ -3007,7 +3193,27 @@ class AIAgentExecutor:
                         'tool_calls': tool_call_count
                     }
 
+            except AgentCancelled:
+                logger.info("ReAct loop aborted by user stop (iteration=%s)", iterations)
+                return _cancelled_loop_result(
+                    steps=steps,
+                    total_cost=total_cost,
+                    total_input_tokens=total_input_tokens,
+                    total_output_tokens=total_output_tokens,
+                    iterations=iterations,
+                    tool_call_count=tool_call_count,
+                )
             except Exception as e:
+                if _cancel_is_set(cancelled):
+                    logger.info("ReAct loop error after user stop; not retrying (iteration=%s)", iterations)
+                    return _cancelled_loop_result(
+                        steps=steps,
+                        total_cost=total_cost,
+                        total_input_tokens=total_input_tokens,
+                        total_output_tokens=total_output_tokens,
+                        iterations=iterations,
+                        tool_call_count=tool_call_count,
+                    )
                 _react_elapsed_ms = int((time.time() - _react_call_start) * 1000) if '_react_call_start' in locals() else None
                 _log_openai_loop_error(
                     f"ReAct LLM error "

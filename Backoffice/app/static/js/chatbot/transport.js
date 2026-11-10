@@ -22,7 +22,9 @@ export const TransportMixin = {
     },
 
     _keepsRunningOnDisconnect() {
-        return this._isImmersive() || !!this._fbAiConfig;
+        // Generation is server-side: refresh / navigation must never cancel it. Every surface
+        // (immersive, floating widget, form-builder panel) recovers via conversation.meta.inflight + polling.
+        return true;
     },
 
     _isRecoverableStreamFailure(error) {
@@ -90,11 +92,9 @@ export const TransportMixin = {
             payload.sources = sources;
         }
 
-        // In immersive view, allow the backend to keep running if the page refreshes mid-stream.
+        // The backend keeps running if the page refreshes mid-stream (all surfaces).
         // The UI will restore progress via conversation.meta.inflight + polling.
-        if (this._isImmersive()) {
-            payload.keep_running_on_disconnect = true;
-        }
+        payload.keep_running_on_disconnect = true;
 
         if (sendOptions && sendOptions.client_message_id) {
             payload.client_message_id = String(sendOptions.client_message_id).slice(0, 64);
@@ -570,7 +570,7 @@ export const TransportMixin = {
             } catch (_) { /* ignore */ }
             this._fbAiConversationId = cid;
         }
-        const trackInflight = this._isImmersive() || !!this._fbAiConfig;
+        const trackInflight = true;
         const inflightKey = this._isImmersive()
             ? this._getActiveConversationKey()
             : (this.getActiveConversationId() || null);
@@ -780,6 +780,8 @@ export const TransportMixin = {
             this._currentAbort = null;
             const keepPollingUi = !!(inflightState && inflightState.detached && this._keepsRunningOnDisconnect());
             if (!keepPollingUi) {
+                // Run finished (or was stopped) in this page: nothing left to re-attach to after a refresh.
+                try { this._clearFloatingInflight(); } catch (_) { /* ignore */ }
                 this.isTyping = false;
                 this._setSendButtonStop(false);
                 this._log('Send button reset to ready');
@@ -945,6 +947,10 @@ export const TransportMixin = {
                     try {
                         this._queueConversationTitleBurst(String(msg.conversation_id));
                     } catch (_) { /* ignore */ }
+                    // Floating widget: remember the run so a page refresh can re-attach to it.
+                    try {
+                        this._markFloatingInflight(String(msg.conversation_id), msg.request_id || null);
+                    } catch (_) { /* ignore */ }
                 }
                 break;
 
@@ -1086,6 +1092,12 @@ export const TransportMixin = {
                         } catch (e) {
                             console.debug('WorkflowTourParser error:', e);
                         }
+                    }
+                    const liveSources = (msg.meta && Array.isArray(msg.meta.sources) && msg.meta.sources.length)
+                        ? msg.meta.sources
+                        : (Array.isArray(msg.sources) ? msg.sources : null);
+                    if (liveSources && liveSources.length && this._injectStructuredSourcesFromMeta) {
+                        this._injectStructuredSourcesFromMeta(ctx.contentElement, liveSources);
                     }
                     this._formatChatResponseSources(ctx.contentElement);
                     this._enhanceIndicatorActionLinks(ctx.contentElement);

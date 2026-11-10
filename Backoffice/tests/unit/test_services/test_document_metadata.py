@@ -4,7 +4,11 @@ from datetime import date, datetime
 
 import pytest
 
-from app.services.ai.documents.metadata import extract_document_date, enrich_document_metadata
+from app.services.ai.documents.metadata import (
+    classify_document_category,
+    enrich_document_metadata,
+    extract_document_date,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -95,6 +99,43 @@ class TestExtractDocumentDateFallbacks:
 
     def test_returns_none_when_no_signals(self):
         assert extract_document_date("Notes", "notes.pdf", "No dates here.") is None
+
+
+class TestEmergencyOperationCategory:
+    def test_dref_final_report_is_not_a_generic_report(self):
+        assert classify_document_category(
+            "Burkina Faso - Floods final report (MDRBF019)",
+            "MDRBF019do.pdf",
+            "This annual report mentions volunteers.",
+        ) == "dref"
+
+    def test_flash_update_is_a_sitrep(self):
+        assert classify_document_category(
+            "Syria - Complex Emergency (MDRSY014)",
+            "MDRSY014 Flash Update#1.pdf",
+            "",
+        ) == "sitrep"
+
+    def test_appeal_code_without_a_type_word_is_an_emergency_operation(self):
+        assert classify_document_category(
+            "Syria - Complex Emergency (MDRSY014)",
+            "download.pdf",
+            "",
+        ) == "emergency_operation"
+
+    def test_preparedness_policy_stays_a_policy(self):
+        assert classify_document_category(
+            "Emergency preparedness policy",
+            "policy.pdf",
+            "",
+        ) == "policy"
+
+    def test_unified_plan_is_not_an_emergency_operation(self):
+        assert classify_document_category(
+            "Syria 2026 Unified Plan (UPL-2026-MAASY002)",
+            "Syria_INP_2026.pdf",
+            "emergency response is one chapter",
+        ) == "plan"
 
 
 class TestEnrichDocumentMetadataUsesPlanYear:

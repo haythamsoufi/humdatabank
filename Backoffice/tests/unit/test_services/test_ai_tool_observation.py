@@ -171,6 +171,60 @@ class TestFormTemplateWriteToolCompaction:
         json.loads(observation)
 
 
+class TestListDocumentsInventoryCompaction:
+    def test_keeps_titles_and_tells_the_model_to_list_them(self, app):
+        with app.app_context():
+            observation = compact_tool_observation_for_llm(
+                tool_name="list_documents",
+                tool_result={
+                    "success": True,
+                    "result": {
+                        "total": 2,
+                        "offset": 0,
+                        "match": "emergency_operations",
+                        "documents": [
+                            {
+                                "id": 1303,
+                                "title": "Syria - Complex Emergency (MDRSY014)",
+                                "filename": "MDRSY014 Flash Update#1.pdf",
+                                "operation_kind": "sitrep",
+                                "document_category": "sitrep",
+                                "document_date": "2026-01-01",
+                                "document_url": "/api/ai/documents/1303/download",
+                                "country_name": "Syrian Arab Republic",
+                                "country_iso3": "SYR",
+                                "country_region": "MENA",
+                                "content_hash": "da474acd",
+                                "total_tokens": 99999,
+                                "countries": [{"iso3": "SYR", "name": "Syrian Arab Republic", "region": "MENA"}],
+                            },
+                            {
+                                "id": 1294,
+                                "title": "Syria - Complex Emergency (MDRSY014)",
+                                "filename": "MDRSY014do.pdf",
+                                "operation_kind": "dref",
+                                "document_category": "other",
+                                "document_url": "/api/ai/documents/1294/download",
+                                "country_iso3": "SYR",
+                                "country_name": "Syrian Arab Republic",
+                                "countries": [{"iso3": "SYR", "name": "Syrian Arab Republic", "region": "MENA"}],
+                            },
+                        ],
+                    },
+                },
+            )
+        parsed = json.loads(observation)
+        assert parsed["total"] == 2
+        assert parsed["documents_listed"] == 2
+        assert parsed["match"] == "emergency_operations"
+        titles = [row["filename"] for row in parsed["documents"]]
+        assert titles == ["MDRSY014 Flash Update#1.pdf", "MDRSY014do.pdf"]
+        assert parsed["documents"][1]["operation_kind"] == "dref"
+        assert "content_hash" not in observation
+        assert "list every row" in parsed["note"]
+        assert "only a country count" in parsed["note"]
+
+
 class TestStripFormBuilderSnapshotsForTrace:
     """Covers the AIReasoningTrace.steps persistence path (separate sink from the
     LLM-observation compaction above — see strip_form_builder_snapshots_for_trace's

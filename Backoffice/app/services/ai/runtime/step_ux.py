@@ -56,6 +56,19 @@ def step_display_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
             return _("Searching reports and plans for '%(query)s'…", query=short)
         return _("Searching reports and plans…")
     if tool_name == "list_documents":
+        from app.services.ai.documents.emergency_catalogue import resolve_inventory_query
+
+        scope = resolve_inventory_query(args.get("query"), args.get("document_category")).scope
+        if scope == "emergency":
+            return _("Browsing emergency operations (DREF, appeals, situation reports)…")
+        if scope == "dref":
+            return _("Browsing DREF documents…")
+        if scope == "emergency_appeal":
+            return _("Browsing Emergency Appeal documents…")
+        if scope == "operations_update":
+            return _("Browsing operations updates…")
+        if scope == "sitrep":
+            return _("Browsing situation reports…")
         query = args.get("query") or ""
         if query:
             short = document_query_for_display(query) or _short_label(query, 50)

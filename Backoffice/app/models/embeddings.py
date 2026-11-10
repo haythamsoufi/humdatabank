@@ -375,7 +375,7 @@ class AIReasoningTrace(db.Model):
         nullable=False,
         index=True,
     )
-    # Status values: running, completed, timeout, error, cost_limit_exceeded, max_iterations_exceeded
+    # Status values: running, completed, cancelled, timeout, error, cost_limit_exceeded, max_iterations_exceeded
 
     error_message = Column(Text, nullable=True)
 

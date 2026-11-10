@@ -274,12 +274,27 @@ class TestApiManagementHelpers:
         assert _normalize_path("/api/v1/items/<int:item_id>") == "/api/v1/items/<item_id>"
         assert _normalize_path("/api/v1/data") == "/api/v1/data"
 
+    def test_is_scanned_api_rule_includes_every_api_path(self):
+        from app.routes.admin.api_management import _is_scanned_api_rule
+        assert _is_scanned_api_rule("/api/v1/data") is True
+        assert _is_scanned_api_rule("/api/forms/session/keepalive") is True
+        assert _is_scanned_api_rule("/api/notifications") is True
+        assert _is_scanned_api_rule("/api/decisions") is True
+        assert _is_scanned_api_rule("/api-docs/") is False
+        assert _is_scanned_api_rule("/csv/export") is False
+        assert _is_scanned_api_rule("/csv/export", "fdrs.fdrs_public_compat_proxy_csv_export") is True
+        assert _is_scanned_api_rule("/Indicator", "indicator_bank_compat.indicator_list") is True
+
     def test_surface_for_path(self):
         from app.routes.admin.api_management import _surface_for_path
         assert _surface_for_path("/api/mobile/v1/auth/token") == "mobile"
         assert _surface_for_path("/api/ai/v2/chat") == "ai"
         assert _surface_for_path("/api/v1/data") == "v1"
         assert _surface_for_path("/api/other") == "other"
+        assert _surface_for_path("/api/decisions") == "decisions"
+        assert _surface_for_path("/api/decision-flags/<flag_id>") == "decisions"
+        assert _surface_for_path("/api/metric-definitions") == "decisions"
+        assert _surface_for_path("/api/forms/session/keepalive") == "other"
         assert _surface_for_path("/some/other") == "other"
         assert _surface_for_path("/Indicator", "indicator_bank_compat.indicator_list") == "indicator_bank"
         assert _surface_for_path("/Indicator") == "other"
@@ -448,6 +463,24 @@ class TestApiManagementHelpers:
         live = [r["path"] for r in scan["live"]]
         assert "/api/v1/fdrs/published-data" in live
         assert "/api/v1/fdrs/published-data" not in undoc
+
+    def test_scan_lists_uncatalogued_api_routes_and_live_decisions(self, app):
+        from app.routes.admin.api_management import scan_flask_routes
+
+        with app.app_context():
+            scan = scan_flask_routes(app)
+        live = {r["path"]: r for r in scan["live"]}
+        undoc = {r["path"] for r in scan["undocumented"]}
+        stale = {ep["path"] for ep in scan["stale"]}
+        assert "/api/forms/session/keepalive" in live
+        assert live["/api/forms/session/keepalive"]["surface"] == "other"
+        assert "/api/forms/session/keepalive" in undoc
+        assert "/api/notifications" in undoc
+        assert "/api-docs/" not in live
+        assert "/api/decisions" in live
+        assert live["/api/decisions"]["surface"] == "decisions"
+        assert "/api/decisions" not in stale
+        assert "/api/decisions" not in undoc
 
     def test_scan_documents_fdrs_public_frontend(self, app):
         from app.routes.admin.api_management import get_endpoint_registry, scan_flask_routes

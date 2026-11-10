@@ -280,6 +280,24 @@ class AiChatPersistenceService {
     try {
       final db = await database;
       await db.transaction((txn) async {
+        // Server snapshots do not echo like/dislike. Keep ratings already stored locally.
+        final priorRatings = <int, String>{};
+        final existing = await txn.query(
+          'ai_messages',
+          columns: ['meta'],
+          where: 'conversation_id = ?',
+          whereArgs: [conversationId],
+        );
+        for (final row in existing) {
+          final meta = _metaMapFromServerField(row['meta']);
+          if (meta == null) continue;
+          final rating = meta['user_rating']?.toString();
+          if (rating != 'like' && rating != 'dislike') continue;
+          final raw = meta['trace_id'];
+          final id = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+          if (id != null) priorRatings[id] = rating!;
+        }
+
         await txn.delete(
           'ai_messages',
           where: 'conversation_id = ? AND sync_state = ?',
@@ -317,6 +335,13 @@ class AiChatPersistenceService {
           }
           if (clientMessageId != null && clientMessageId.isNotEmpty) {
             metaMap['client_message_id'] = clientMessageId;
+          }
+          final keptRating = metaMap['user_rating']?.toString();
+          if (keptRating != 'like' && keptRating != 'dislike') {
+            final rawTrace = metaMap['trace_id'];
+            final traceId = rawTrace is int ? rawTrace : int.tryParse(rawTrace?.toString() ?? '');
+            final prior = traceId != null ? priorRatings[traceId] : null;
+            if (prior != null) metaMap['user_rating'] = prior;
           }
           await txn.insert(
             'ai_messages',
@@ -412,6 +437,60 @@ class AiChatPersistenceService {
       DebugLogger.logError('Failed to get local-only messages: $e');
       DebugLogger.logError('Stack trace: $stackTrace');
       return [];
+    }
+  }
+
+  /// Rewrite a locally inserted row after the server masks the user text (DLP).
+  Future<void> updateMessageContentByLocalId({
+    required String localMessageId,
+    required String content,
+  }) async {
+    if (localMessageId.isEmpty) return;
+    try {
+      final db = await database;
+      await db.update(
+        'ai_messages',
+        {'content': content},
+        where: 'local_message_id = ?',
+        whereArgs: [localMessageId],
+      );
+    } catch (e, stackTrace) {
+      DebugLogger.logError('Failed to update message content: $e');
+      DebugLogger.logError('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Stores like/dislike on every local row for this trace so a later server snapshot can keep it.
+  Future<void> updateAssistantRating({
+    required String conversationId,
+    required int traceId,
+    required String userRating,
+  }) async {
+    if (userRating != 'like' && userRating != 'dislike') return;
+    try {
+      final db = await database;
+      final rows = await db.query(
+        'ai_messages',
+        columns: ['id', 'meta'],
+        where: 'conversation_id = ? AND role = ?',
+        whereArgs: [conversationId, 'assistant'],
+      );
+      for (final row in rows) {
+        final meta = _metaMapFromServerField(row['meta']) ?? <String, dynamic>{};
+        final raw = meta['trace_id'];
+        final id = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+        if (id != traceId) continue;
+        meta['user_rating'] = userRating;
+        await db.update(
+          'ai_messages',
+          {'meta': jsonEncode(meta)},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+    } catch (e, stackTrace) {
+      DebugLogger.logError('Failed to store message rating: $e');
+      DebugLogger.logError('Stack trace: $stackTrace');
     }
   }
 

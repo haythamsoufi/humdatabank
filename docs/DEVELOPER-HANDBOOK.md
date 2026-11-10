@@ -151,6 +151,17 @@ npm run build
 npm run lint
 ```
 
+### Chatbot CLI (`flask ai-chat`)
+
+Send a prompt through the same agent path as the UI. Run it from `Backoffice/` with `FLASK_APP=run.py`. It does not need the dev server, and it is the way to try a chatbot message — do not script `POST /api/ai/v2/chat`.
+
+```powershell
+$env:FLASK_APP = "run.py"
+python -m flask ai-chat ask "what emergency documents you have on syria" --quiet-steps
+```
+
+`--user` accepts `admin` (default), `sys`, `focal`, an email, or a local-part. Also: `convo -m "…" -m "…"`, `show-trace <id>`, `interactive`. Full command list: [AI agent development map](../Backoffice/docs/runbooks/ai/ai-agent-development-map.md#local-prompt-debugging). Agent reminder: `.cursor/rules/ai-chat-cli.mdc`.
+
 ### Playwright MCP (browser testing)
 - **Project config:** `.cursor/mcp.json` runs with `--isolated` (fresh browser context each session — no stale cookies, HTTP cache, or service workers) and `--output-dir` `.playwright-mcp/screenshots/` (parent `.playwright-mcp/` is gitignored). Screenshots and related artifacts should land there, not in the repository root.
 - **Dev login:** Backoffice at `http://127.0.0.1:5000/login` — yellow **Act as (dev only)** preset buttons when `DEBUG=true` and request is loopback. See `.cursor/rules/playwright-browser-testing.mdc`.

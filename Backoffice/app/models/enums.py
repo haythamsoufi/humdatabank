@@ -355,6 +355,7 @@ class AIDocumentProcessingStatusValue(str, enum.Enum):
 class AIReasoningTraceStatusValue(str, enum.Enum):
     running = 'running'
     completed = 'completed'
+    cancelled = 'cancelled'
     timeout = 'timeout'
     error = 'error'
     cost_limit_exceeded = 'cost_limit_exceeded'

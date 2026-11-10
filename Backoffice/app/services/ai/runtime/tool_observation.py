@@ -60,6 +60,33 @@ from app.services.ai.tools.form_template_specs import (
 _FORM_TEMPLATE_SNAPSHOT_KEYS = ("undo_structure", "redo_structure")
 
 _SENTENCE_END_RE = __import__("re").compile(r"[.!?]\s")
+_LIST_DOCUMENTS_MAX_ROWS = 40
+_LIST_DOCUMENT_KEYS = (
+    "title",
+    "filename",
+    "operation_kind",
+    "document_category",
+    "document_date",
+    "document_url",
+    "country_name",
+    "country_iso3",
+    "country_region",
+    "plan_year",
+)
+
+
+def _slim_listed_documents(docs: List[Any]) -> List[Dict[str, Any]]:
+    """Keep the fields an inventory answer needs. Drop file hashes and embeddings."""
+    listed: List[Dict[str, Any]] = []
+    for doc in docs:
+        if not isinstance(doc, dict):
+            continue
+        slim = {key: doc.get(key) for key in _LIST_DOCUMENT_KEYS if doc.get(key) not in (None, "")}
+        if not slim.get("title") and doc.get("filename"):
+            slim["title"] = doc.get("filename")
+        if slim.get("title"):
+            listed.append(slim)
+    return listed
 
 
 def _truncate_at_sentence_boundary(text: str, max_chars: int) -> str:
@@ -260,17 +287,50 @@ def compact_tool_observation_for_llm(
                     if info.get("latest_plan_year") is not None:
                         entry["latest_plan_year"] = info["latest_plan_year"]
                     countries_by_region[r].append(entry)
+                listed = _slim_listed_documents(docs)
+                shown = listed[:_LIST_DOCUMENTS_MAX_ROWS]
+                listed_count = len(shown)
+                complete = listed_count >= len(docs) and (int(result.get("offset") or 0) + len(docs)) >= int(total or 0)
+                note = (
+                    "documents[] is the inventory. When the user asked which documents exist, "
+                    "list every row: title, operation_kind or document_category, document_date, document_url. "
+                    "Do not answer with only a country count. Do not offer to fetch titles already listed. "
+                    "countries_by_region is only for which-countries maps (latest_plan_year is the newest UPL year). "
+                    + (
+                        "This page is complete."
+                        if complete
+                        else "documents_listed is a subset of total; call list_documents with a higher offset for the rest."
+                    )
+                )
                 compact_ld = {
                     "success": bool(payload.get("success", True)),
+                    "source": result.get("source") or "public_documents_catalog",
                     "total": total,
+                    "match": result.get("match"),
+                    "by_type": result.get("by_type") or {},
+                    "documents_listed": listed_count,
+                    "documents": shown,
                     "regions_present": regions_present,
                     "countries_by_region": countries_by_region,
                     "unique_countries_count": len(by_iso3),
-                    "note": "Use regions_present and countries_by_region to filter by region (e.g. MENA). Each country may include latest_plan_year (most recent UPL year). Do not call list_documents again; produce your answer and map from this summary.",
+                    "note": note,
                 }
+                if not compact_ld["match"]:
+                    compact_ld.pop("match")
                 s_ld = _dumps(compact_ld)
+                while len(s_ld) > limit and shown:
+                    shown = shown[:-1]
+                    compact_ld["documents"] = shown
+                    compact_ld["documents_listed"] = len(shown)
+                    compact_ld["note"] = (
+                        "documents[] was shortened to fit. List the rows you have and say the total. "
+                        "countries_by_region is only for which-countries maps."
+                    )
+                    s_ld = _dumps(compact_ld)
                 if len(s_ld) <= limit:
                     return s_ld
+                compact_ld["documents"] = []
+                compact_ld["documents_listed"] = 0
                 compact_ld["countries_by_region"] = {r: len(cs) for r, cs in countries_by_region.items()}
                 compact_ld["note"] = "Regions and country counts above. Filter by the user's region (e.g. MENA); the backend will build the map from the full result."
                 return _dumps(compact_ld)[:limit]

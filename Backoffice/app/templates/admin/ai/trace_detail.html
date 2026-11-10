@@ -95,29 +95,47 @@ function toggleInput(btn) {
     }
 }
 
-// Convert a markdown table block to HTML (same logic as ai.providers.formatting._markdown_table_to_html)
-function traceMarkdownTableToHtml(block) {
+function traceSplitTableRow(line) {
+    var parts = String(line).split('|').map(function(c) { return c.trim(); });
+    if (parts.length && parts[0] === '') parts.shift();
+    if (parts.length && parts[parts.length - 1] === '') parts.pop();
+    return parts;
+}
+
+// GFM delimiter cell: --- , :--- , ---: , :---: (at least three dashes).
+function traceIsSeparatorCell(cell) {
+    return /^:?-{3,}:?$/.test(String(cell || '').trim());
+}
+
+function traceIsSeparatorRow(cells, expectedCols) {
+    if (!cells || cells.length < 2) return false;
+    if (expectedCols && cells.length !== expectedCols) return false;
+    for (var i = 0; i < cells.length; i++) {
+        if (!traceIsSeparatorCell(cells[i])) return false;
+    }
+    return true;
+}
+
+// A prose line can contain pipes ("(title | kind | date | link)") without being a row.
+// Leading "|" is always a row; otherwise require at least two pipes.
+function traceLooksLikeTableLine(line) {
+    var trimmed = String(line || '').trim();
+    if (!trimmed) return false;
+    if (trimmed.charAt(0) === '|') return true;
+    var pipes = trimmed.match(/\|/g);
+    return !!(pipes && pipes.length >= 2);
+}
+
+// Header is the row immediately above a delimiter row. Lines before that stay prose.
+function traceMarkdownTableToHtml(headerRow, bodyRows) {
     function esc(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
-    var lines = block.trim().split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    if (!lines.length) return '';
-    var rows = [];
-    for (var i = 0; i < lines.length; i++) {
-        var parts = lines[i].split('|').map(function(c) { return c.trim(); });
-        if (parts[0] === '') parts.shift();
-        if (parts[parts.length - 1] === '') parts.pop();
-        if (parts.length < 2) return '';
-        rows.push(parts);
-    }
-    if (!rows.length) return '';
-    var isSep = rows.length > 1 && rows[1].every(function(c) { return /^:?-+:?$/.test((c || '').trim()); });
-    var headerRow = rows[0];
-    var bodyRows = isSep && rows.length > 2 ? rows.slice(2) : rows.slice(1);
+    if (!headerRow || headerRow.length < 2) return '';
     var out = ['<table class="chat-ai-table">', '<thead><tr>'];
     headerRow.forEach(function(cell) { out.push('<th>' + esc(cell) + '</th>'); });
     out.push('</tr></thead>');
-    if (bodyRows.length) {
+    if (bodyRows && bodyRows.length) {
         out.push('<tbody>');
         bodyRows.forEach(function(row) {
             out.push('<tr>');
@@ -133,16 +151,45 @@ function traceMarkdownTableToHtml(block) {
 // Find markdown table blocks and replace with placeholders; return { text, placeholders }
 function traceReplaceMarkdownTables(text) {
     if (!text || typeof text !== 'string') return { text: String(text || ''), placeholders: [] };
+    var lines = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    var out = [];
     var placeholders = [];
-    var tableRe = /((?:(?:^\|[^\n]*)|(?:^[^\n]*\|[^\n]*\|[^\n]*))\s*(?:\n|$))+/gm;
-    var newText = text.replace(tableRe, function(block) {
-        var html = traceMarkdownTableToHtml(block);
-        if (!html) return block;
+    var i = 0;
+    while (i < lines.length) {
+        if (!traceLooksLikeTableLine(lines[i])) {
+            out.push(lines[i]);
+            i++;
+            continue;
+        }
+        var blockStart = i;
+        while (i < lines.length && traceLooksLikeTableLine(lines[i])) i++;
+        var block = lines.slice(blockStart, i);
+        var rows = [];
+        for (var r = 0; r < block.length; r++) rows.push(traceSplitTableRow(block[r]));
+        var sepIndex = -1;
+        for (var s = 1; s < rows.length; s++) {
+            var prev = rows[s - 1];
+            if (prev.length >= 2 && traceIsSeparatorRow(rows[s], prev.length)) {
+                sepIndex = s;
+                break;
+            }
+        }
+        if (sepIndex < 1) {
+            out.push.apply(out, block);
+            continue;
+        }
+        // Pipe-containing preface (the inventory sentence) is not the header row.
+        if (sepIndex > 1) out.push.apply(out, block.slice(0, sepIndex - 1));
+        var html = traceMarkdownTableToHtml(rows[sepIndex - 1], rows.slice(sepIndex + 1));
+        if (!html) {
+            out.push.apply(out, block);
+            continue;
+        }
         var token = '__TRACE_TABLE_' + placeholders.length + '__';
         placeholders.push(html);
-        return '\n' + token + '\n';
-    });
-    return { text: newText.trim(), placeholders: placeholders };
+        out.push(token);
+    }
+    return { text: out.join('\n').trim(), placeholders: placeholders };
 }
 
 // Format final answer like chatbot.js: render markdown then sanitize HTML

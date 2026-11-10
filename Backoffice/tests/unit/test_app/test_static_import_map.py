@@ -5,10 +5,12 @@ from pathlib import Path
 
 from app.static_import_map import (
     FORM_BUILDER_TEMPLATE_MODULES,
+    KNOWLEDGE_BASE_IMPORT_TREES,
     build_scoped_import_map,
     clear_import_map_cache,
     form_builder_import_map,
     forms_module_import_map,
+    knowledge_base_import_map,
 )
 
 BACKOFFICE = Path(__file__).resolve().parents[3]
@@ -204,6 +206,7 @@ def test_page_maps_include_layout_trees():
     for tree in LAYOUT_IMPORT_TREES:
         assert tree in FORMS_IMPORT_TREES
         assert tree in FORM_BUILDER_IMPORT_TREES
+        assert tree in KNOWLEDGE_BASE_IMPORT_TREES
 
 
 def test_pages_with_own_import_map_opt_out_of_layout_map():
@@ -211,8 +214,14 @@ def test_pages_with_own_import_map_opt_out_of_layout_map():
     assert "layout_import_map()" in layout
     assert "page_import_map" in layout.split("{% block head %}", 1)[0]
     entry_form = (BACKOFFICE / "app" / "templates" / "forms" / "entry_form" / "entry_form.html").read_text(encoding="utf-8")
-    for html in (entry_form, FORM_BUILDER_TEMPLATE.read_text(encoding="utf-8")):
+    knowledge_base = (BACKOFFICE / "app" / "templates" / "admin" / "ai" / "knowledge_base.html").read_text(encoding="utf-8")
+    for html in (entry_form, FORM_BUILDER_TEMPLATE.read_text(encoding="utf-8"), knowledge_base):
         assert "{% set page_import_map = true %}" in html
+    assert "knowledge_base_import_map()" in knowledge_base
+    assert 'type="module"' in knowledge_base
+    head = knowledge_base.split("{% block head %}", 1)[1].split("{% endblock %}", 1)[0]
+    assert 'type="importmap"' in head
+    assert head.index('type="importmap"') < head.index("{{ super() }}")
 
 
 def test_layout_renders_exactly_one_import_map_before_modules(app):
@@ -226,3 +235,22 @@ def test_layout_renders_exactly_one_import_map_before_modules(app):
         )
     assert html.count('type="importmap"') == 1
     assert html.index('type="importmap"') < html.index('type="module"')
+
+
+def test_knowledge_base_import_map_versions_admin_modules(app):
+    clear_import_map_cache()
+    app.config["STATIC_CDN_URL"] = ""
+    app.config["ASSET_VERSION"] = "kbdeploy"
+    with app.test_request_context("/"):
+        result = knowledge_base_import_map(app, "http://localhost:5000/")
+
+    scope = result["scopes"]["http://localhost:5000/static/js/admin/"]
+    entry = "http://localhost:5000/static/js/admin/ai-documents/grid.js"
+    assert entry in scope
+    assert scope[entry].startswith(entry + "?v=kbdeploy.")
+    nested = result["scopes"]["http://localhost:5000/static/js/admin/ai-documents/"]
+    shared = "http://localhost:5000/static/js/admin/ai-documents/shared.js"
+    assert shared in nested
+    assert nested[shared].startswith(shared + "?v=kbdeploy.")
+    chatbot = result["scopes"]["http://localhost:5000/static/js/chatbot/"]
+    assert "http://localhost:5000/static/js/chatbot/core.js" in chatbot

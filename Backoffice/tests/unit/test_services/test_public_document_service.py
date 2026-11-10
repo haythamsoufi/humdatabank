@@ -1183,6 +1183,49 @@ class TestCatalogPublicDocuments:
         assert _document_type_key(upl, "") == "unified_plan"
         assert _document_type_key(other, "") == "other"
 
+    def test_emergency_catalog_lists_dref_and_sitrep_for_a_country(self, app, db_session):
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Syria - Complex Emergency (MDRSY014)",
+                filename="MDRSY014do.pdf",
+                country_name="Syria",
+                document_date=datetime.date(2026, 1, 1),
+            )
+            self._doc(
+                db_session,
+                title="Syria - Complex Emergency (MDRSY014)",
+                filename="MDRSY014 Flash Update#1.pdf",
+                country_name="Syria",
+                document_date=datetime.date(2026, 1, 2),
+            )
+            self._doc(
+                db_session,
+                title="Syria Unified Plan 2026",
+                filename="syria_upl.pdf",
+                country_name="Syria",
+                document_date=datetime.date(2026, 1, 1),
+            )
+
+            emergency = catalog_public_documents(q="emergency", country_name="Syria")
+            dref_only = catalog_public_documents(document_type="dref", country_name="Syria")
+            by_code = catalog_public_documents(q="MDRSY014", country_name="Syria")
+
+        kinds = sorted(
+            doc["document_type"]
+            for country in emergency["by_country"]
+            for doc in country["documents"]
+        )
+        assert emergency["total_documents"] == 2
+        assert kinds == ["dref", "sitrep"]
+        assert {doc["filename"] for country in emergency["by_country"] for doc in country["documents"]} == {
+            "MDRSY014do.pdf",
+            "MDRSY014 Flash Update#1.pdf",
+        }
+        assert dref_only["total_documents"] == 1
+        assert by_code["total_documents"] == 2
+        assert "unified_plan" not in emergency["by_type"]
+
 
 class TestPublicDocumentSearchFixes:
     def test_dedupe_rows_by_chunk_id_keeps_highest_score(self):

@@ -193,6 +193,50 @@ def parse_legacy_source_bullets(answer: str) -> List[Dict[str, Any]]:
     return items
 
 
+_PLAIN_LINE_PREFIX_RE = re.compile(r"^(?:[-*•]\s+|\d{1,3}[\.\)]\s+)")
+
+
+def parse_plain_source_lines(answer: str) -> List[Dict[str, Any]]:
+    """
+    Last-resort structure for a ## Sources body that is not labeled or bulleted.
+
+    A zero-hit search often ends as one sentence under ## Sources. That used to
+    be wrapped as plain HTML with no data-source-* attributes. Every non-empty
+    line becomes one source item so the chip always has a title.
+    """
+    body = extract_sources_section(answer)
+    if not body:
+        return []
+    items: List[Dict[str, Any]] = []
+    for raw in re.split(r"\n+", body):
+        line = _PLAIN_LINE_PREFIX_RE.sub("", (raw or "").strip()).strip()
+        if not line or re.match(r"(?i)^#{0,6}\s*sources\s*:?\s*$", line):
+            continue
+        link = _MD_LINK_IN_TEXT_RE.search(line)
+        if link:
+            link_text = link.group(1).strip()
+            url = link.group(2).strip()
+            page = None
+            page_match = re.search(r"(?:page|p\.)\s*(\d+)", link_text, re.IGNORECASE)
+            title = link_text
+            if page_match:
+                page = int(page_match.group(1))
+                title = link_text[: page_match.start()].strip(" -,")
+            rest = (line[link.end() :] or "").lstrip(" :–—-").strip()
+            item = _normalize_item({
+                "title": title or line,
+                "url": url,
+                "page": page,
+                "detail": _strip_quotes(rest) or None,
+                "kind": "document",
+            })
+        else:
+            item = _normalize_item({"title": line, "kind": "other"})
+        if item:
+            items.append(item)
+    return items
+
+
 def _series_year_span(series: Iterable[Dict[str, Any]]) -> Optional[str]:
     years: List[Any] = []
     for row in series or []:
@@ -400,6 +444,7 @@ def merge_structured_sources(
     2. Labeled ## Sources blocks from the answer
     3. Legacy markdown / citation parser (documents)
     4. Legacy freeform bullets
+    5. Any remaining ## Sources lines, one item per line
     """
     merged: List[Dict[str, Any]] = []
     seen: set = set()
@@ -453,6 +498,8 @@ def merge_structured_sources(
 
     if not merged:
         _extend(parse_legacy_source_bullets(answer))
+    if not merged:
+        _extend(parse_plain_source_lines(answer))
 
     return merged
 

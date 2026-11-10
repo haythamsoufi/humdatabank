@@ -24,8 +24,12 @@ numbers via indicator tools.
 databank_get_documents_catalog (documents) — not manual counting
 4. **Country/period detail** → databank_get_public_data (page, per_page; never include_dimensions=true)
 5. **Resolve country name** → databank_resolve_country (id, iso2, iso3, region)
-6. **Plan/report text** → databank_search_public_documents
-7. **Indicator metadata** → databank_get_indicator or databank_search_indicators with search + limit
+6. **Which documents exist** (type, country, year, title) → databank_get_documents_catalog \
+with include_documents=true. Emergency operations (DREF, Emergency Appeal, operations \
+updates, situation reports) → document_type=emergency (or dref / emergency_appeal / \
+operations_update / sitrep) and country_name. Do not use search for an inventory.
+7. **Plan/report text** → databank_search_public_documents
+8. **Indicator metadata** → databank_get_indicator or databank_search_indicators with search + limit
 
 ## Data rules
 
@@ -76,6 +80,8 @@ abort), but still failed, so prefer country_ids batched search over parallel bro
 **Count countries (data):** databank_get_submission_coverage(template_id=21, period_name='Annual 2024')
 
 **Count countries (documents):** databank_get_documents_catalog(document_type='annual_report', year=2024)
+
+**Which emergency documents exist:** databank_get_documents_catalog(document_type='emergency', country_name='Syria', include_documents=true)
 
 **UPR plan (one country):** databank_search_public_documents with country + year + "unified plan"
 

@@ -512,7 +512,45 @@ class TestAIAgentExecutor:
 
         assert result["success"] is False
         assert result["status"] == "cancelled"
-        assert "answer" in result  # synthesized partial answer, never None/missing
+        assert result.get("answer") == ""  # no follow-up synthesis call
+
+    def test_native_loop_cancel_during_llm_does_not_run_tools(self, agent):
+        """Stop that lands while the model call is in flight must not execute the
+        tool call that call returns, and must not start a summary completion."""
+        cancelled = threading.Event()
+
+        tool_call = type("ToolCall", (), {})()
+        tool_call.id = "call_1"
+        tool_call.function = type("Fn", (), {"name": "get_indicator_timeseries", "arguments": "{}"})()
+        message = type("Msg", (), {"content": None, "tool_calls": [tool_call]})()
+        choice = type("Choice", (), {"message": message})()
+        usage = type("Usage", (), {"prompt_tokens": 3, "completion_tokens": 2})()
+        response = type("Resp", (), {"choices": [choice], "usage": usage})()
+
+        def _finish_after_stop(**kwargs):
+            cancelled.set()
+            return response
+
+        with (
+            patch.object(agent, "_agent_chat_completion", side_effect=_finish_after_stop),
+            patch.object(agent.tools_registry, "execute_tool", side_effect=AssertionError("tool must not run after stop")),
+            patch(
+                "app.services.ai.agent.executor._synthesize_partial_answer",
+                side_effect=AssertionError("stop must not synthesize another answer"),
+            ),
+        ):
+            result = agent._execute_openai_native(
+                query="Volunteers in Syria over time",
+                conversation_history=None,
+                user_context={},
+                language="en",
+                cancelled=cancelled,
+            )
+
+        assert result["success"] is False
+        assert result["status"] == "cancelled"
+        assert result.get("answer") == ""
+        assert result.get("tool_calls") == 0
 
     def test_react_loop_cancelled_before_first_iteration_makes_no_llm_call(self, agent):
         """Same regression coverage as the native-loop test above, for the non-OpenAI-
@@ -534,7 +572,37 @@ class TestAIAgentExecutor:
 
         assert result["success"] is False
         assert result["status"] == "cancelled"
-        assert "answer" in result
+        assert result.get("answer") == ""
+
+    def test_cancelled_trace_status_is_not_rewritten_to_completed(self):
+        from app.services.ai.quality.reasoning_trace import _normalize_trace_status
+
+        assert _normalize_trace_status("cancelled") == "cancelled"
+
+    def test_in_flight_completion_is_closed_when_cancelled(self):
+        from app.services.ai.agent.executor import AgentCancelled, _invoke_until_cancelled
+
+        cancelled = threading.Event()
+        started = threading.Event()
+        closed = threading.Event()
+
+        def _call():
+            started.set()
+            if not closed.wait(2):
+                raise AssertionError("in-flight call was not closed")
+            raise ConnectionError("socket closed")
+
+        def _close():
+            closed.set()
+
+        def _stop_once_started():
+            assert started.wait(2)
+            cancelled.set()
+
+        threading.Thread(target=_stop_once_started, daemon=True).start()
+        with pytest.raises(AgentCancelled):
+            _invoke_until_cancelled(cancelled, _call, _close)
+        assert closed.is_set()
 
     def test_native_loop_not_cancelled_reaches_llm(self, agent):
         """Sanity counterpart: an unset (or absent) cancel event must not block normal

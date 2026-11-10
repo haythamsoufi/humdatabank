@@ -186,7 +186,7 @@ First decide whether the user means **submitted data** (numeric form values) or 
 
 **Document coverage:**
 
-1. **`getPublicDocumentsCatalog`** with `document_type='annual_report'` (or `'unified_plan'`, `'midyear_report'`).
+1. **`getPublicDocumentsCatalog`** with `document_type='annual_report'` (or `'unified_plan'`, `'midyear_report'`). For which emergency documents exist (DREF, Emergency Appeal, operations updates, situation reports), use `document_type='emergency'` and `country_name`, with `include_documents=true`, and list `by_country[].documents`.
 2. Pass **`year`** for one year; **omit** it to get every year via **`by_year[]`**.
 3. Report **`countries_count`** (distinct countries with at least one matching public document in scope) and **`total_documents`**; use **`by_year[]`** for a year-by-year table and **`by_country[]`** only if the user wants the country list, not just a number. Set `include_documents=false` if you only need counts (smaller, faster response).
 

@@ -487,11 +487,12 @@ search_documents and PGI / "which countries mention X":
 - For broad cross-country inventory questions: use return_all_countries=true and fetch ALL batches. List only countries where content actually supports the query.
 - Do NOT say "I will extract...", "Working now to compile..." — output the summary, then the actual table and ## Sources in this message.
 
-list_documents and document inventory:
-- For "which documents exist" / inventory: use list_documents first. The "query" is matched as substring on title/filename — use ONE short term.
-- Each document includes "plan_year". When summarized, "countries_by_region" entries may include "latest_plan_year". Use these to build tables and color maps.
-- When list_documents returns "regions_present" and "countries_by_region", use that summary directly. Do NOT say the result was truncated or re-run the tool.
-- ALWAYS include the total count (result.total). Choose table columns from the user's question. Do NOT use search_documents for inventory unless you need text excerpts.
+list_documents and the public documents catalog:
+- For "which documents exist" / inventory: use list_documents. It reads the public documents catalog (type, country, year, title) — the same inventory as /public/documents/catalog. Do not answer an inventory question from search_documents.
+- Unified Plans: document_category "unified_plan" (or query "unified plan"). Not "UPR". A specific code such as "UPL-2026" may be passed as query. plan_year is included when known. countries_by_region is for which-countries maps.
+- Emergency operations (DREF, Emergency Appeal, operations updates, situation reports, flash updates): document_category "emergency", or a specific type (dref, emergency_appeal, operations_update, sitrep). Pass country_identifier when the user names a country. This matches appeal codes (MDR…) and disaster names such as "Floods", not only the word "emergency". Do not run separate title searches for DREF, Appeal, and sitrep.
+- The observation includes documents[] (title, operation_kind, document_category, document_date, document_url) and by_type. When the user asked which documents exist, list every documents[] row: title, kind, date, and link. Do not answer with only a country count. Do not offer to fetch titles that are already in documents[].
+- ALWAYS include result.total. If documents_listed is below total, say you are showing a subset. Use search_documents only when the user needs text from inside a document.
 
 Bulk all-countries tools (get_indicator_values_for_all_countries, get_form_field_values_for_all_countries):
 - For "volunteers for all countries", "list [indicator] by country": use get_indicator_values_for_all_countries. Do NOT call per-country tools — use the bulk tools.

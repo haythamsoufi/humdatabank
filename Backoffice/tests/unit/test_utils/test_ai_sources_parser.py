@@ -105,6 +105,46 @@ def test_render_sources_body_html_has_data_attrs():
     assert "chat-response-sources-list" in html
 
 
+def test_plain_sources_sentence_is_structured():
+    """A zero-hit search often writes one sentence under ## Sources, not labeled fields."""
+    answer = """
+I searched uploaded document titles for "emergency" in Syria.
+Result: 0 documents found.
+
+## Sources
+
+Uploaded document titles for Syria contained no "emergency" match.
+"""
+    items = merge_structured_sources(answer=answer)
+    assert len(items) == 1
+    assert items[0]["title"].startswith("Uploaded document titles for Syria")
+    assert items[0]["kind"] == "other"
+
+
+def test_numbered_source_lines_are_structured():
+    answer = """
+## Sources
+
+1. Syria Unified Plan 2024
+2. Contingency plan
+"""
+    items = merge_structured_sources(answer=answer)
+    assert [i["title"] for i in items] == ["Syria Unified Plan 2024", "Contingency plan"]
+
+
+def test_format_sources_html_is_structured_chip_data_only():
+    from app.services.ai.providers.formatting import format_ai_response_for_html
+
+    html = format_ai_response_for_html(
+        'No emergency documents matched.\n\n## Sources\n\n'
+        'Uploaded document titles for Syria contained no "emergency" match.\n'
+    )
+    assert "data-source-title=" in html
+    assert "Uploaded document titles for Syria" in html
+    assert "<details" not in html.lower()
+    assert "<summary" not in html.lower()
+
+
 def test_legacy_prose_bullet_still_usable():
     answer = """
 ## Sources

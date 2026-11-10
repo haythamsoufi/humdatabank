@@ -46,6 +46,11 @@ def map_document_type_label_to_category(label: str) -> Optional[str]:
     key = (label or "").strip().lower()
     if not key:
         return None
+    from app.services.ai.documents.emergency_catalogue import classify_operation_category
+
+    operation = classify_operation_category(key, "")
+    if operation:
+        return operation
     if key in _DOCUMENT_TYPE_LABEL_TO_CATEGORY:
         return _DOCUMENT_TYPE_LABEL_TO_CATEGORY[key]
     for pattern, category in _DOCUMENT_TYPE_LABEL_TO_CATEGORY.items():
@@ -215,6 +220,11 @@ def enrich_ai_document_metadata_from_content(
     submitted_doc = getattr(ai_doc, "submitted_document", None)
     if submitted_doc is not None:
         enriched = merge_submitted_metadata_hints(submitted_doc, enriched)
+    from app.services.ai.documents.emergency_catalogue import category_from_stored_ifrc_type
+
+    ifrc_category = category_from_stored_ifrc_type(ai_doc)
+    if ifrc_category:
+        enriched["document_category"] = ifrc_category
     return enriched
 
 

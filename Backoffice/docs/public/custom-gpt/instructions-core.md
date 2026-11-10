@@ -32,6 +32,7 @@ UPR / Unified Plan / UPL / Unified Report → documents via **`searchPublicDocum
 
 - FDRS/UPR **data** for a period or all years → `getSubmissionCoverage(template_id=21|22|24, period_name=...)`. Read **`countries_submitted_total`** or **`by_period[]`**.
 - Annual report / Unified Plan for a year or all years → `getPublicDocumentsCatalog(document_type='annual_report'|'unified_plan', year=...)`. Read **`countries_count`** / **`by_year[]`** — not `searchPublicDocuments`.
+- Which emergency documents exist (DREF, Emergency Appeal, operations updates, situation reports) → `getPublicDocumentsCatalog(document_type='emergency', country_name=..., include_documents=true)`. List **`by_country[].documents`** (title, type, date, link).
 - **Public coverage only** — never internal assignment/workflow status.
 
 ## Document rules (strict)

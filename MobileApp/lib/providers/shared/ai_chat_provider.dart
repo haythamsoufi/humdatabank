@@ -804,7 +804,7 @@ class AiChatProvider with ChangeNotifier {
 
     if (type == 'narration') {
       // Model-written "I'll look up…" — show as normal assistant text; keep progress steps.
-      final text = data['text']?.toString()?.trim() ?? '';
+      final text = data['text']?.toString().trim() ?? '';
       if (text.isEmpty) return;
       if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
         final last = _messages.last;

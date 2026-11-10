@@ -372,14 +372,20 @@ class _DashboardScreenState extends State<DashboardScreen>
     required DashboardProvider provider,
   }) {
     final scheme = Theme.of(context).colorScheme;
+    final hairline = GroupedSheetStyle.hairline(context);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 2, 8, 0),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(0, 2, 0, 0),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: hairline, width: 0.5),
+          bottom: BorderSide(color: hairline, width: 0.5),
+        ),
+      ),
       child: InkWell(
         onTap: () => _openEntityDocumentRepository(context, provider),
-        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Row(
             children: [
               Icon(

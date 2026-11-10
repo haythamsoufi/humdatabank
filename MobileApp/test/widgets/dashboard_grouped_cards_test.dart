@@ -104,6 +104,14 @@ void main() {
     expect(colors, contains(GroupedDashboardPalette.danger.background));
     expect(find.text('Overdue'), findsOneWidget);
     expect(find.text('In Progress'), findsOneWidget);
+
+    final dueDate = tester.getRect(find.textContaining('Due Date'));
+    final overdueBadge = tester.getRect(find.text('Overdue'));
+    final statusBadge = tester.getRect(find.text('In Progress'));
+    // Overdue sits on the due-date line, not stacked under the status chip.
+    expect((dueDate.center.dy - overdueBadge.center.dy).abs(), lessThan(8));
+    expect(overdueBadge.left, greaterThan(dueDate.right));
+    expect(statusBadge.bottom, lessThan(overdueBadge.top));
   });
 
   testWidgets('completion rate sits above a bar filled to that rate', (

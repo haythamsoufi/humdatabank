@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_inappwebview_platform_interface/flutter_inappwebview_platform_interface.dart';
@@ -16,6 +18,10 @@ import 'package:provider/provider.dart';
 class _CountingChat extends AiChatProvider {
   int sends = 0;
   final List<String> sent = [];
+
+  /// When set, each send waits here so a second keyboard action can arrive
+  /// before the composer is cleared.
+  Completer<void>? hold;
 
   @override
   Future<void> loadChatUiPrefs() async {}
@@ -37,6 +43,8 @@ class _CountingChat extends AiChatProvider {
   }) async {
     sends++;
     sent.add(message);
+    final pending = hold;
+    if (pending != null) await pending.future;
   }
 }
 
@@ -111,7 +119,7 @@ void main() {
     await pumpChat(tester);
     final field = tester.widget<TextField>(composer);
 
-    expect(field.keyboardType, TextInputType.text);
+    expect(field.keyboardType, TextInputType.multiline);
     expect(field.textInputAction, TextInputAction.send);
     expect(field.maxLines, 6);
     expect(field.inputFormatters, anyOf(isNull, isEmpty));
@@ -151,6 +159,35 @@ void main() {
 
     expect(chat.sends, 2);
     expect(chat.sent, ['How many volunteers in Kenya?', 'And in Uganda?']);
+    await tester.pump(const Duration(milliseconds: 150));
+  });
+
+  testWidgets('a newline plus the send key is still one submit', (tester) async {
+    await pumpChat(tester);
+    await tester.enterText(composer, 'find evidence from documents on the peaks\n');
+    await tester.pump();
+
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+
+    expect(chat.sends, 1);
+    expect(chat.sent, ['find evidence from documents on the peaks']);
+    await tester.pump(const Duration(milliseconds: 150));
+  });
+
+  testWidgets('two send actions are two submits', (tester) async {
+    chat.hold = Completer<void>();
+    await pumpChat(tester);
+    await tester.enterText(composer, 'And in Uganda?');
+    await tester.pump();
+
+    final field = tester.widget<TextField>(composer);
+    field.onSubmitted!(field.controller!.text);
+    field.onSubmitted!(field.controller!.text);
+    expect(chat.sends, 2);
+
+    chat.hold!.complete();
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
   });
 

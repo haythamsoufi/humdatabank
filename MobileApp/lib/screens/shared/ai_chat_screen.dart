@@ -104,12 +104,6 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   /// Last UI locale language code applied to [AiChatProvider] (API + alignment with settings).
   String? _appliedLocaleLangCode;
 
-  /// One accepted composer submit. The multiline field keeps focus after the first
-  /// message, and the keyboard then often delivers both the send action and a
-  /// newline. Each path calls [_send]; without this, that second call starts
-  /// another agent run (a second reply and a second reasoning trace).
-  bool _sendInFlight = false;
-
   /// Global density scale for the chat UI (~12% tighter).
   static const double _kUiScale = 0.88;
   /// Main chat column horizontal rhythm (8pt grid–aligned).
@@ -1812,6 +1806,11 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                     maxLines: 6,
                                     maxLength: 4000,
                                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                    // maxLines > 1 otherwise selects a multiline keyboard, so Enter
+                                    // inserts a newline and TextInputAction.send also submits.
+                                    // That was two sends for one keypress. Text keeps the send
+                                    // key as a single action; the field still wraps to [maxLines].
+                                    keyboardType: TextInputType.text,
                                     textInputAction: TextInputAction.send,
                                     onSubmitted: (_) => _send(context, isAuthed),
                                     textAlignVertical: TextAlignVertical.center,
@@ -1821,11 +1820,6 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                       color: _chatBody(theme),
                                     ),
                                     cursorColor: ChatImmersivePalette.sendGreen,
-                                    inputFormatters: [
-                                      _EnterToSendFormatter(
-                                        onEnterPressed: () => _send(context, isAuthed),
-                                      ),
-                                    ],
                                     decoration: InputDecoration(
                                       hintText: policyBlocksInput
                                           ? localizations.aiInputPolicyRequired
@@ -1967,13 +1961,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   }
 
   Future<void> _send(BuildContext context, bool isAuthenticated) async {
-    // Duplicate keypresses arrive synchronously, before the provider marks the
-    // turn as streaming. Claim the composer first so the second call is a no-op.
-    if (_sendInFlight) return;
     final auth = context.read<AuthProvider>();
     final chat = context.read<AiChatProvider>();
     if (auth.user?.aiBetaAccessLocked == true || chat.betaAccessDenied) return;
-    if (chat.isStreaming || chat.inflightRestoreActive) return;
     final msg = _controller.text.trim();
     if (msg.isEmpty) return;
 
@@ -1986,36 +1976,33 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       return;
     }
     if (_redirectToLoginIfGuest(context, isAuthenticated)) return;
-
-    _sendInFlight = true;
     final wasEditing = _editingMessageIndex != null;
     final editIndex = _editingMessageIndex;
-    _editingMessageIndex = null;
-    // Drop the draft before the first await. A second send (Enter formatter
-    // post-frame, or a repeated onSubmitted) then sees an empty field.
-    _controller.clear();
-    final lang = Localizations.localeOf(context).languageCode;
 
-    try {
-      if (wasEditing && editIndex != null) {
-        await provider.sendEditedMessage(
-          message: msg,
-          editIndex: editIndex,
-          isAuthenticated: isAuthenticated,
-        );
-      } else {
-        await provider.sendMessageStreaming(
-          message: msg,
-          isAuthenticated: isAuthenticated,
-          preferredLanguageCode: lang,
-        );
-      }
-    } finally {
-      _sendInFlight = false;
+    // Clear editing state before sending
+    _editingMessageIndex = null;
+
+    // Check if we're editing a message
+    if (wasEditing && editIndex != null) {
+      await provider.sendEditedMessage(
+        message: msg,
+        editIndex: editIndex,
+        isAuthenticated: isAuthenticated,
+      );
+    } else {
+      final lang = Localizations.localeOf(context).languageCode;
+      await provider.sendMessageStreaming(
+        message: msg,
+        isAuthenticated: isAuthenticated,
+        preferredLanguageCode: lang,
+      );
     }
 
-    // If a quota error occurs, restore the message to the controller.
-    // Wait a bit for the provider to process the error.
+    // Clear the controller - if it's a quota error, the provider will restore it
+    _controller.clear();
+
+    // If a quota error occurs, restore the message to the controller
+    // Wait a bit for the provider to process the error
     Future.delayed(const Duration(milliseconds: 100), () {
       if (!context.mounted) return;
       final ai = context.read<AiChatProvider>();
@@ -3106,39 +3093,3 @@ class _TypingIndicatorState extends State<_TypingIndicator> with TickerProviderS
   }
 }
 
-/// TextInputFormatter that intercepts Enter key presses and triggers send
-/// instead of creating a newline.
-class _EnterToSendFormatter extends TextInputFormatter {
-  final VoidCallback onEnterPressed;
-
-  _EnterToSendFormatter({required this.onEnterPressed});
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    // Check if exactly one character was added (likely Enter key press)
-    // This distinguishes Enter key from paste operations
-    final lengthDiff = newValue.text.length - oldValue.text.length;
-
-    if (lengthDiff == 1 && newValue.text.endsWith('\n') && !oldValue.text.endsWith('\n')) {
-      // Enter was pressed - remove the newline and trigger send
-      final textWithoutNewline = oldValue.text; // Keep the old text (without newline)
-      if (textWithoutNewline.trim().isNotEmpty) {
-        // Schedule the callback to run after the current frame
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          onEnterPressed();
-        });
-      }
-
-      // Return the value without the newline
-      return TextEditingValue(
-        text: textWithoutNewline,
-        selection: TextSelection.collapsed(offset: textWithoutNewline.length),
-      );
-    }
-
-    return newValue;
-  }
-}

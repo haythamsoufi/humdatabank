@@ -107,55 +107,59 @@ void main() {
     (widget) => widget is TextField && widget.decoration?.hintText == 'Message',
   );
 
-  Future<void> submitTwice(WidgetTester tester, String text) async {
-    expect(composer, findsOneWidget);
-    await tester.enterText(composer, text);
-    await tester.pump();
+  testWidgets('the composer keyboard has a single send action', (tester) async {
+    await pumpChat(tester);
     final field = tester.widget<TextField>(composer);
-    field.onSubmitted!(text);
-    field.onSubmitted!(text);
-    await tester.pump();
-  }
 
-  testWidgets('a repeated keyboard submit sends the message once', (
+    expect(field.keyboardType, TextInputType.text);
+    expect(field.textInputAction, TextInputAction.send);
+    expect(field.maxLines, 6);
+    expect(field.inputFormatters, anyOf(isNull, isEmpty));
+  });
+
+  testWidgets('a newline does not submit, and the send key submits once', (
     tester,
   ) async {
     await pumpChat(tester);
-    await submitTwice(tester, 'How many volunteers in Kenya?');
+    await tester.enterText(composer, 'How many volunteers?\n');
+    await tester.pump();
+
+    expect(chat.sends, 0);
+    expect(
+      tester.widget<TextField>(composer).controller!.text,
+      'How many volunteers?\n',
+    );
+
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
 
     expect(chat.sends, 1);
-    expect(chat.sent, ['How many volunteers in Kenya?']);
-    expect(tester.widget<TextField>(composer).controller!.text, isEmpty);
+    expect(chat.sent, ['How many volunteers?']);
     await tester.pump(const Duration(milliseconds: 150));
   });
 
-  testWidgets(
-    'the following message still sends once after a duplicate submit',
-    (tester) async {
-      await pumpChat(tester);
-      await submitTwice(tester, 'How many volunteers in Kenya?');
-      await submitTwice(tester, 'And in Uganda?');
+  testWidgets('the next message is its own single send', (tester) async {
+    await pumpChat(tester);
 
-      expect(chat.sends, 2);
-      expect(chat.sent, ['How many volunteers in Kenya?', 'And in Uganda?']);
-      await tester.pump(const Duration(milliseconds: 150));
-    },
-  );
+    await tester.enterText(composer, 'How many volunteers in Kenya?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
 
-  testWidgets('tapping send twice submits once', (tester) async {
+    await tester.enterText(composer, 'And in Uganda?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+
+    expect(chat.sends, 2);
+    expect(chat.sent, ['How many volunteers in Kenya?', 'And in Uganda?']);
+    await tester.pump(const Duration(milliseconds: 150));
+  });
+
+  testWidgets('the send button submits the draft once', (tester) async {
     await pumpChat(tester);
     await tester.enterText(composer, 'Show the latest appeal');
     await tester.pump();
 
-    final sendIcon = find.byIcon(Icons.arrow_upward_rounded);
-    expect(sendIcon, findsOneWidget);
-    final onTap = tester
-        .widget<InkWell>(
-          find.ancestor(of: sendIcon, matching: find.byType(InkWell)).first,
-        )
-        .onTap!;
-    onTap();
-    onTap();
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
     await tester.pump();
 
     expect(chat.sends, 1);

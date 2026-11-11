@@ -420,7 +420,7 @@ class AiChatService {
     Map<String, String>? authHeaders(String? token) =>
         (token != null && token.isNotEmpty) ? {'Authorization': 'Bearer $token'} : null;
 
-    var token = await getCachedToken();
+    final token = await getCachedToken();
     var resp = await send(authHeaders(token));
     final code = statusCode(resp);
     if (code == 401 || code == 403 || _isCsrfRejection(code, body(resp))) {

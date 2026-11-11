@@ -1806,6 +1806,11 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                     maxLines: 6,
                                     maxLength: 4000,
                                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                    // maxLines > 1 otherwise selects a multiline keyboard, so Enter
+                                    // inserts a newline and TextInputAction.send also submits.
+                                    // That was two sends for one keypress. Text keeps the send
+                                    // key as a single action; the field still wraps to [maxLines].
+                                    keyboardType: TextInputType.text,
                                     textInputAction: TextInputAction.send,
                                     onSubmitted: (_) => _send(context, isAuthed),
                                     textAlignVertical: TextAlignVertical.center,
@@ -1815,11 +1820,6 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                       color: _chatBody(theme),
                                     ),
                                     cursorColor: ChatImmersivePalette.sendGreen,
-                                    inputFormatters: [
-                                      _EnterToSendFormatter(
-                                        onEnterPressed: () => _send(context, isAuthed),
-                                      ),
-                                    ],
                                     decoration: InputDecoration(
                                       hintText: policyBlocksInput
                                           ? localizations.aiInputPolicyRequired
@@ -3093,39 +3093,3 @@ class _TypingIndicatorState extends State<_TypingIndicator> with TickerProviderS
   }
 }
 
-/// TextInputFormatter that intercepts Enter key presses and triggers send
-/// instead of creating a newline.
-class _EnterToSendFormatter extends TextInputFormatter {
-  final VoidCallback onEnterPressed;
-
-  _EnterToSendFormatter({required this.onEnterPressed});
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    // Check if exactly one character was added (likely Enter key press)
-    // This distinguishes Enter key from paste operations
-    final lengthDiff = newValue.text.length - oldValue.text.length;
-
-    if (lengthDiff == 1 && newValue.text.endsWith('\n') && !oldValue.text.endsWith('\n')) {
-      // Enter was pressed - remove the newline and trigger send
-      final textWithoutNewline = oldValue.text; // Keep the old text (without newline)
-      if (textWithoutNewline.trim().isNotEmpty) {
-        // Schedule the callback to run after the current frame
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          onEnterPressed();
-        });
-      }
-
-      // Return the value without the newline
-      return TextEditingValue(
-        text: textWithoutNewline,
-        selection: TextSelection.collapsed(offset: textWithoutNewline.length),
-      );
-    }
-
-    return newValue;
-  }
-}

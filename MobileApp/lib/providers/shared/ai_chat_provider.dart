@@ -916,7 +916,7 @@ class AiChatProvider with ChangeNotifier {
       if (_turnNarration == null || _turnNarration!.isEmpty) {
         _turnNarration = text;
       } else if (!_turnNarration!.contains(text)) {
-        _turnNarration = '${_turnNarration}\n\n$text';
+        _turnNarration = '$_turnNarration\n\n$text';
       }
       if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
         final last = _messages.last;

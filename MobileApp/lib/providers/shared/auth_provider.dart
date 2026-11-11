@@ -28,6 +28,14 @@ class AuthProvider with ChangeNotifier {
   String? _sessionInvalidationReason;
 
   User? get user => _user;
+
+  /// Seeds the signed-in user for widget tests. Production login still goes
+  /// through [checkAuthStatus] / the auth service.
+  @visibleForTesting
+  set debugSeedUser(User? user) {
+    _user = user;
+  }
+
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _user != null;

@@ -104,6 +104,12 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   /// Last UI locale language code applied to [AiChatProvider] (API + alignment with settings).
   String? _appliedLocaleLangCode;
 
+  /// One accepted composer submit. The multiline field keeps focus after the first
+  /// message, and the keyboard then often delivers both the send action and a
+  /// newline. Each path calls [_send]; without this, that second call starts
+  /// another agent run (a second reply and a second reasoning trace).
+  bool _sendInFlight = false;
+
   /// Global density scale for the chat UI (~12% tighter).
   static const double _kUiScale = 0.88;
   /// Main chat column horizontal rhythm (8pt grid–aligned).
@@ -1961,9 +1967,13 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   }
 
   Future<void> _send(BuildContext context, bool isAuthenticated) async {
+    // Duplicate keypresses arrive synchronously, before the provider marks the
+    // turn as streaming. Claim the composer first so the second call is a no-op.
+    if (_sendInFlight) return;
     final auth = context.read<AuthProvider>();
     final chat = context.read<AiChatProvider>();
     if (auth.user?.aiBetaAccessLocked == true || chat.betaAccessDenied) return;
+    if (chat.isStreaming || chat.inflightRestoreActive) return;
     final msg = _controller.text.trim();
     if (msg.isEmpty) return;
 
@@ -1976,33 +1986,36 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       return;
     }
     if (_redirectToLoginIfGuest(context, isAuthenticated)) return;
+
+    _sendInFlight = true;
     final wasEditing = _editingMessageIndex != null;
     final editIndex = _editingMessageIndex;
-
-    // Clear editing state before sending
     _editingMessageIndex = null;
+    // Drop the draft before the first await. A second send (Enter formatter
+    // post-frame, or a repeated onSubmitted) then sees an empty field.
+    _controller.clear();
+    final lang = Localizations.localeOf(context).languageCode;
 
-    // Check if we're editing a message
-    if (wasEditing && editIndex != null) {
-      await provider.sendEditedMessage(
-        message: msg,
-        editIndex: editIndex,
-        isAuthenticated: isAuthenticated,
-      );
-    } else {
-      final lang = Localizations.localeOf(context).languageCode;
-      await provider.sendMessageStreaming(
-        message: msg,
-        isAuthenticated: isAuthenticated,
-        preferredLanguageCode: lang,
-      );
+    try {
+      if (wasEditing && editIndex != null) {
+        await provider.sendEditedMessage(
+          message: msg,
+          editIndex: editIndex,
+          isAuthenticated: isAuthenticated,
+        );
+      } else {
+        await provider.sendMessageStreaming(
+          message: msg,
+          isAuthenticated: isAuthenticated,
+          preferredLanguageCode: lang,
+        );
+      }
+    } finally {
+      _sendInFlight = false;
     }
 
-    // Clear the controller - if it's a quota error, the provider will restore it
-    _controller.clear();
-
-    // If a quota error occurs, restore the message to the controller
-    // Wait a bit for the provider to process the error
+    // If a quota error occurs, restore the message to the controller.
+    // Wait a bit for the provider to process the error.
     Future.delayed(const Duration(milliseconds: 100), () {
       if (!context.mounted) return;
       final ai = context.read<AiChatProvider>();

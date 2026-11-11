@@ -1959,6 +1959,10 @@ class AiChatProvider with ChangeNotifier {
     required bool isAuthenticated,
     String? preferredLanguageCode,
   }) async {
+    // Claim the turn before any await. A second call (duplicate keyboard submit)
+    // used to pass this gap, append another user row, and start a second run.
+    if (_isStreaming || _inflightRestoreActive) return;
+    if (message.trim().isEmpty) return;
     if (preferredLanguageCode != null && preferredLanguageCode.isNotEmpty) {
       setPreferredLanguageCode(preferredLanguageCode);
     }
@@ -1966,7 +1970,6 @@ class AiChatProvider with ChangeNotifier {
     _errorType = null;
     _retryDelay = null;
     _failedMessage = null; // Clear any previous failed message
-    final cid = await _ensureLocalConversationId(initialTitle: message);
     final userLocalId = _uuid.v4();
     _beginAssistantTurn(clientMessageId: userLocalId);
     _messages.add(AiChatMessage(role: 'user', content: message));
@@ -1974,40 +1977,55 @@ class AiChatProvider with ChangeNotifier {
     _isStreaming = true;
     notifyListeners();
 
-    // Persist user message immediately (offline-first)
-    await _persistence.saveMessage(
-      conversationId: cid,
-      role: 'user',
-      content: message,
-      localMessageId: userLocalId,
-      syncState: isAuthenticated ? AiChatPersistenceService.syncStatePendingServer : AiChatPersistenceService.syncStateLocalOnly,
-    );
-
-    // Anonymous: just use HTTP fallback (no persistence anyway)
-    if (!isAuthenticated) {
-      await _sendHttpIntoLastAssistant(message, isAuthenticated: false, persistUserMessage: false);
-      return;
-    }
-
-    _clearAgentProgress();
-    _initAgentProgressIfNeeded();
     try {
-      await _runStream(
-        message: message,
-        isAuthenticated: isAuthenticated,
-        clientMessageId: userLocalId,
+      final cid = await _ensureLocalConversationId(initialTitle: message);
+
+      // Persist user message immediately (offline-first)
+      await _persistence.saveMessage(
+        conversationId: cid,
+        role: 'user',
+        content: message,
+        localMessageId: userLocalId,
+        syncState: isAuthenticated ? AiChatPersistenceService.syncStatePendingServer : AiChatPersistenceService.syncStateLocalOnly,
       );
+
+      // Anonymous: just use HTTP fallback (no persistence anyway)
+      if (!isAuthenticated) {
+        await _sendHttpIntoLastAssistant(message, isAuthenticated: false, persistUserMessage: false);
+        return;
+      }
+
+      _clearAgentProgress();
+      _initAgentProgressIfNeeded();
+      notifyListeners();
+      try {
+        await _runStream(
+          message: message,
+          isAuthenticated: isAuthenticated,
+          clientMessageId: userLocalId,
+        );
+      } catch (e) {
+        DebugLogger.logWarn('AI', 'Stream start failed, falling back to HTTP: $e');
+        _isStreaming = false;
+        _clearAgentProgress();
+        notifyListeners();
+        await _sendHttpIntoLastAssistant(
+          message,
+          isAuthenticated: isAuthenticated,
+          persistUserMessage: false,
+          clientMessageId: userLocalId,
+        );
+      }
     } catch (e) {
-      DebugLogger.logWarn('AI', 'Stream start failed, falling back to HTTP: $e');
+      DebugLogger.logWarn('AI', 'Send failed before the reply started: $e');
       _isStreaming = false;
       _clearAgentProgress();
+      if (_messages.isNotEmpty &&
+          _messages.last.role == 'assistant' &&
+          _messages.last.content.isEmpty) {
+        _messages.removeLast();
+      }
       notifyListeners();
-      await _sendHttpIntoLastAssistant(
-        message,
-        isAuthenticated: isAuthenticated,
-        persistUserMessage: false,
-        clientMessageId: userLocalId,
-      );
     }
   }
 

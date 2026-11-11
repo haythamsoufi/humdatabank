@@ -1806,11 +1806,15 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                     maxLines: 6,
                                     maxLength: 4000,
                                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                                    // maxLines > 1 otherwise selects a multiline keyboard, so Enter
-                                    // inserts a newline and TextInputAction.send also submits.
-                                    // That was two sends for one keypress. Text keeps the send
-                                    // key as a single action; the field still wraps to [maxLines].
-                                    keyboardType: TextInputType.text,
+                                    // One keypress must produce one submit.
+                                    //
+                                    // A non-multiline input type makes Android turn the Enter
+                                    // key into an editor action, and the IME also delivers
+                                    // TextInputAction.send, so one press starts two runs.
+                                    // Multiline keeps Enter as a newline (trimmed on send) and
+                                    // leaves the send key as the only action. A formatter that
+                                    // also called send on that newline was the other double path.
+                                    keyboardType: TextInputType.multiline,
                                     textInputAction: TextInputAction.send,
                                     onSubmitted: (_) => _send(context, isAuthed),
                                     textAlignVertical: TextAlignVertical.center,

@@ -375,7 +375,13 @@
     document.getElementById('dec-method').onclick = showMethodology;
 
     var scope = s.scope || {};
-    var scopeText = [scope.round || '', scope.region || '', scope.country || ''].filter(Boolean).join(' | ') || '-';
+    var scopeText = [
+      scope.round ? t('planScope') + ' ' + scope.round : '',
+      scope.reporting ? t('reportingScope') + ' ' + scope.reporting : '',
+      scope.fdrs ? t('fdrsScope') + ' ' + String(scope.fdrs).replace(/^FDRS\s+/i, '') : '',
+      scope.region || '',
+      scope.country || ''
+    ].filter(Boolean).join(' | ') || '-';
     var cov = s.coverage || {};
     var mix = (s.data_quality && s.data_quality.validation_mix) || {};
     var meta = document.getElementById('dec-meta');

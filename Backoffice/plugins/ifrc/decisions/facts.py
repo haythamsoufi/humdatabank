@@ -34,6 +34,19 @@ _STALLED_STATUSES = frozenset({"submitted", "sent_for_review"})
 _OPEN_STATUSES = frozenset({"pending", "in_progress", "requires_revision"})
 _SUBMITTED_STATUSES = frozenset({"submitted", "sent_for_review", "approved"})
 _HEADLINE_ATTRIBUTES = frozenset({"total", "row_total"})
+_PLAN_FUNDING_INDICATORS = frozenset({"funding", "funding requirement", "funding requirements"})
+_INCOME_INDICATORS = frozenset({"funding", "funding (chf)"})
+_EXPENDITURE_INDICATORS = frozenset({"expenditure"})
+_PLAN_SOURCES = frozenset({"Unified Planning", "PNS Planning"})
+_REPORT_SOURCES = frozenset({"Unified Reporting", "PNS Reporting"})
+_FDRS_SOURCE = "FDRS"
+_NS_TOTAL_ENTITIES = frozenset({"national society"})
+_NS_MEASURES = (
+    ("volunteers", "Volunteers"),
+    ("paid_staff", "Staff"),
+    ("branches", "Branches"),
+    ("local_units", "LocalUnits"),
+)
 VALIDATION_FILTERS = (VALIDATED, PROVISIONAL, DRAFT)
 
 
@@ -122,6 +135,8 @@ class DecisionData:
     built_at: str | None = None
     today: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
     notes: list[str] = field(default_factory=list)
+    reporting_period: str | None = None
+    fdrs_period: str | None = None
 
     def obs(self, metric_id: str) -> list[Observation]:
         return self.observations.get(metric_id, [])
@@ -187,6 +202,19 @@ def _unavailable_label(label: Any) -> bool:
     return "data not available" in str(label or "").lower()
 
 
+def _headline_attribute(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    return text in _HEADLINE_ATTRIBUTES or text.startswith("total")
+
+
+def _plan_funding_indicator(value: Any) -> bool:
+    return str(value or "").strip().lower() in _PLAN_FUNDING_INDICATORS
+
+
+def _status_token(label: Any) -> str:
+    return str(label or "").strip().lower().replace(" ", "_")
+
+
 def _not_applicable_label(label: Any) -> bool:
     return str(label or "").strip().lower() == "not applicable"
 
@@ -220,7 +248,7 @@ def _funding_observations(
     breakdown: list[Observation] = []
     emergency: list[Observation] = []
     for row in facts:
-        if row.get("Section") != "Funding" or row.get("Indicator") != "Funding":
+        if row.get("Section") != "Funding" or not _plan_funding_indicator(row.get("Indicator")):
             continue
         entity = row.get("Entity")
         if entity not in _FUNDING_ENTITIES:
@@ -310,7 +338,7 @@ def _people_observations(
         label = row.get("Applicable/Data not available")
         number = row.get("ValueNum")
         if isinstance(number, (int, float)) and not isinstance(number, bool):
-            if str(row.get("Attribute") or "").lower() in _HEADLINE_ATTRIBUTES:
+            if _headline_attribute(row.get("Attribute")):
                 key = (sid, row.get("Year"))
                 if key not in best or number > best[key]["ValueNum"]:
                     best[key] = row
@@ -557,6 +585,150 @@ def _unavailable_observations(
     return out
 
 
+def _money_preference(source: str, round_code: Any) -> tuple[int, int]:
+    """FDRS, then the annual report, then the mid-year report. Lower sorts first."""
+    if source == _FDRS_SOURCE:
+        return (0, 0)
+    code = str(round_code or "").upper()
+    if code.startswith("AR"):
+        return (1, 0)
+    if code.startswith("MYR"):
+        return (1, 1)
+    return (2, 0)
+
+
+def _cross_source_money(
+    facts: Iterable[dict[str, Any]],
+    metric_id: str,
+    indicators: frozenset[str],
+    subs: dict[Any, Submission],
+    built_at: str | None,
+) -> list[Observation]:
+    """One National Society total per country and year.
+
+    FDRS wins over Unified Reporting for that year. The annual report wins over the mid-year
+    report. Partner (PNS) rows and funding-source rows are not added to the total.
+    """
+    candidates: dict[tuple, tuple[tuple, Observation]] = {}
+    for row in facts:
+        source = str(row.get("Data source") or "")
+        if source not in (_FDRS_SOURCE, "Unified Reporting"):
+            continue
+        if str(row.get("Indicator") or "").strip().lower() not in indicators:
+            continue
+        if row.get("Section") != "Funding":
+            continue
+        if str(row.get("Entity") or "").strip().lower() not in _NS_TOTAL_ENTITIES:
+            continue
+        if str(row.get("Attribute") or "") != "Total":
+            continue
+        number = row.get("ValueNum")
+        if not isinstance(number, (int, float)) or isinstance(number, bool):
+            continue
+        iso3 = str(row.get("ISO3") or "")
+        if not iso3:
+            continue
+        sid = row.get("submission_id")
+        round_code = row.get("Round")
+        year = row.get("Year") if isinstance(row.get("Year"), int) else _round_year(round_code)
+        sub = subs.get(sid)
+        validation = sub.validation_state if sub else validation_state_for(_status_token(row.get("Data status")))
+        quality = {VALIDATED: 0, PROVISIONAL: 1, DRAFT: 2}.get(validation, 3)
+        preference = (_money_preference(source, round_code), quality, -(sid if isinstance(sid, int) else 0))
+        observation = Observation(
+            metric_id=metric_id,
+            entity_id=iso3,
+            entity_name=str(row.get("Country") or iso3),
+            region=row.get("Region"),
+            round=round_code,
+            year=year,
+            state=REPORTED,
+            value=float(number),
+            validation_state=validation,
+            submission_id=sid if isinstance(sid, int) else None,
+            status=sub.status if sub else _status_token(row.get("Data status")) or None,
+            unit="CHF",
+            currency="CHF",
+            evidence_id=evidence_id_for(metric_id, sid, year),
+            extra={
+                "source_system": "ifrc_databank",
+                "dataset": "fdrs" if source == _FDRS_SOURCE else "unified_reporting",
+                "data_source": source,
+                "submission_id": sid,
+                "visibility": "ifrc_internal",
+                "synchronized_at": built_at,
+            },
+        )
+        key = (iso3, year)
+        current = candidates.get(key)
+        if current is None or preference < current[0]:
+            candidates[key] = (preference, observation)
+    return [item[1] for item in candidates.values()]
+
+
+def _ns_key_observations(
+    rows: Iterable[dict[str, Any]],
+    subs: list[Submission],
+    built_at: str | None,
+) -> dict[str, list[Observation]]:
+    """Volunteers, staff, branches and local units. The row's Source already applied FDRS-first precedence."""
+    region_by_iso = {sub.iso3: sub.region for sub in subs if sub.region}
+    out: dict[str, list[Observation]] = {metric_id: [] for metric_id, _column in _NS_MEASURES}
+    for row in rows:
+        iso3 = str(row.get("ISO3") or "").upper()
+        if not iso3:
+            continue
+        year = row.get("Year")
+        source = str(row.get("Source") or "")
+        for metric_id, column in _NS_MEASURES:
+            number = row.get(column)
+            if not isinstance(number, (int, float)) or isinstance(number, bool):
+                continue
+            out[metric_id].append(
+                Observation(
+                    metric_id=metric_id,
+                    entity_id=iso3,
+                    entity_name=str(row.get("Country") or iso3),
+                    region=region_by_iso.get(iso3),
+                    round=None,
+                    year=year if isinstance(year, int) else None,
+                    state=REPORTED,
+                    value=float(number),
+                    validation_state=VALIDATED,
+                    submission_id=None,
+                    status="approved",
+                    unit="count",
+                    label=source or None,
+                    evidence_id=evidence_id_for(metric_id, iso3, year),
+                    extra={
+                        "source_system": "ifrc_databank",
+                        "dataset": "fdrs" if source.startswith("FDRS") else "unified_plan_or_report",
+                        "data_source": source,
+                        "visibility": "ifrc_internal",
+                        "synchronized_at": built_at,
+                    },
+                )
+            )
+    return out
+
+
+def _report_period(subs: list[Submission]) -> str | None:
+    reports = [sub for sub in subs if sub.kind == "report" and sub.round]
+    if not reports:
+        return None
+
+    def rank(sub: Submission) -> tuple:
+        annual = 1 if sub.round.startswith("AR") else 0
+        return (_round_year(sub.round) or 0, annual, sub.round)
+
+    return max(reports, key=rank).round
+
+
+def _fdrs_period(rows: Iterable[dict[str, Any]]) -> str | None:
+    years = [row.get("Year") for row in rows if str(row.get("Source") or "").startswith("FDRS") and isinstance(row.get("Year"), int)]
+    return f"FDRS {max(years)}" if years else None
+
+
 def _workflow_observations(subs: list[Submission], today: date, built_at: str | None) -> list[Observation]:
     out = []
     for sub in subs:
@@ -611,6 +783,9 @@ def build_decision_data(
 
     plan_rows = access.filter_rows(extract.get("plan_submissions") or [])
     report_rows = access.filter_rows(extract.get("report_submissions") or [])
+    report_fact_rows = access.filter_rows(extract.get("report_facts") or [])
+    fdrs_fact_rows = access.filter_rows(extract.get("fdrs_facts") or [])
+    ns_key_rows = access.filter_rows(extract.get("ns_key_rows") or [])
     subs: list[Submission] = []
     for kind, rows in (("plan", plan_rows), ("report", report_rows)):
         for row in rows:
@@ -640,6 +815,29 @@ def build_decision_data(
     unavailable = _unavailable_observations(facts, subs_by_id, built_at)
     workflow = _workflow_observations(subs, today, built_at)
 
+    cross_facts = []
+    for kind, rows in (("report", report_fact_rows), ("fdrs", fdrs_fact_rows)):
+        for row in rows:
+            if _matches(filters, iso3=row.get("ISO3"), region=row.get("Region"), round_code=row.get("Round")):
+                cross_facts.append(row)
+    if filters.year:
+        cross_facts = [row for row in cross_facts if row.get("Year") == filters.year]
+    all_by_id = {s.submission_id: s for s in subs}
+    income = _cross_source_money(cross_facts, "income", _INCOME_INDICATORS, all_by_id, built_at)
+    expenditure = _cross_source_money(cross_facts, "expenditure", _EXPENDITURE_INDICATORS, all_by_id, built_at)
+    region_by_iso = {sub.iso3: sub.region for sub in subs}
+    kept_keys = [
+        row for row in ns_key_rows
+        if _matches(
+            filters,
+            iso3=row.get("ISO3"),
+            region=region_by_iso.get(str(row.get("ISO3") or "").upper()),
+            round_code=None,
+        )
+        and (not filters.year or row.get("Year") == filters.year)
+    ]
+    ns_key = _ns_key_observations(kept_keys, subs, built_at)
+
     def keep(observations: list[Observation]) -> list[Observation]:
         out = []
         for obs in observations:
@@ -668,9 +866,17 @@ def build_decision_data(
             "indicators_data_unavailable": keep(unavailable),
             "submissions_stalled_days": keep([o for o in workflow if o.metric_id == "submissions_stalled_days"]),
             "submissions_overdue_days": keep([o for o in workflow if o.metric_id == "submissions_overdue_days"]),
+            "income": keep(income),
+            "expenditure": keep(expenditure),
+            "volunteers": keep(ns_key["volunteers"]),
+            "paid_staff": keep(ns_key["paid_staff"]),
+            "branches": keep(ns_key["branches"]),
+            "local_units": keep(ns_key["local_units"]),
         },
         built_at=built_at,
         today=today,
+        reporting_period=_report_period(subs),
+        fdrs_period=_fdrs_period(kept_keys),
     )
     if not plan_rows and not report_rows:
         data.notes.append("No submissions are available in your scope.")
@@ -678,18 +884,33 @@ def build_decision_data(
 
 
 def load_extract() -> tuple[dict[str, Any], bool]:
-    """Source facts for all rounds and countries, cached against the database revision (no user data in the key)."""
+    """Plan, reporting and FDRS facts, cached against the database revision (no user data in the key).
+
+    Planning facts stay on their own so a funding requirement is never added to reported income.
+    Reporting and FDRS share the overall extract: when both reported an indicator, FDRS wins.
+    Volunteers, staff, branches and local units use the National Society key-figure precedence
+    (FDRS, then annual reporting, then mid-year, then planning).
+    """
     from plugins.upr.extracts.api_cache import get_or_build_upr_payload
-    from plugins.upr.extracts.upr_data import build_upr_data, build_upr_submissions
+    from plugins.upr.extracts.ns_key_data import load_ns_key_rows
+    from plugins.upr.extracts.overall_data import build_overall_data
+    from plugins.upr.extracts.upr_data import build_upr_submissions
+
+    def _by_source(rows: list[dict[str, Any]], sources: frozenset[str]) -> list[dict[str, Any]]:
+        return [row for row in rows if row.get("Data source") in sources]
 
     def build() -> dict[str, Any]:
-        plan = build_upr_data(template="plan")
+        overall = build_overall_data()["data"]
+        plan = build_upr_submissions(template="plan")
         report = build_upr_submissions(template="report")
         return {
-            "plan_facts": plan["data"],
-            "plan_submissions": plan["submissions"],
+            "plan_facts": _by_source(overall, _PLAN_SOURCES),
+            "report_facts": _by_source(overall, _REPORT_SOURCES),
+            "fdrs_facts": _by_source(overall, frozenset({_FDRS_SOURCE})),
+            "ns_key_rows": load_ns_key_rows(),
+            "plan_submissions": plan["data"],
             "report_submissions": report["data"],
             "built_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    return get_or_build_upr_payload("decisions-extract", {"generation": 1}, build)
+    return get_or_build_upr_payload("decisions-extract", {"generation": 2}, build)

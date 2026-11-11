@@ -694,6 +694,12 @@ _DEFAULT_DECISIONS.update(
                     "people_targeted",
                     "pns_support_count",
                     "core_indicators_reported",
+                    "income",
+                    "expenditure",
+                    "volunteers",
+                    "paid_staff",
+                    "branches",
+                    "local_units",
                     "submission_coverage",
                 ],
                 [
@@ -708,8 +714,10 @@ _DEFAULT_DECISIONS.update(
                     "Society capacity indicators with a reported value.\n\n"
                     "**Read with coverage.** Totals only cover submissions received. Check coverage and the validation "
                     "mix before quoting a network-wide figure.\n\n"
-                    "**Not covered yet.** Membership, volunteers, staff and branch counts are not part of the Unified Plan "
-                    "extract. Income and expenditure are not read from Unified Reports.\n\n"
+                    "**Also read.** Volunteers, paid staff, branches and local units come from the latest approved "
+                    "figure for each country: FDRS first, then the annual report, then the mid-year report, then the "
+                    "plan. Income and expenditure come from FDRS when it has the figure, otherwise from the Unified "
+                    "Report. They are not added to the funding requirement.\n\n"
                     "**Provisional.** Thresholds are examples pending FDS approval."
                 ),
             ),
@@ -896,6 +904,12 @@ _DEFAULT_DECISIONS.update(
                     "emergency_people_targeted",
                     "pns_support_count",
                     "core_indicators_reported",
+                    "income",
+                    "expenditure",
+                    "volunteers",
+                    "paid_staff",
+                    "branches",
+                    "local_units",
                     "submission_coverage",
                 ],
                 [
@@ -909,8 +923,9 @@ _DEFAULT_DECISIONS.update(
                     "grouped queries (for example funding by Strategic Priority and region) and cite the evidence.\n\n"
                     "**Comparable by design.** Every metric has one registered definition, unit, source precedence and set "
                     "of valid dimensions, so the same number is used in the page, exports and the assistant.\n\n"
-                    "**Not covered yet.** Questions that need data outside Unified Plans and Reports (GO, ERP, FDRS) cannot "
-                    "be answered here until those sources are integrated.\n\n"
+                    "**Also read.** The same view includes FDRS and Unified Reporting for income, expenditure, "
+                    "volunteers, staff, branches and local units. FDRS wins when it and a report both have the "
+                    "indicator. GO and ERP are not integrated.\n\n"
                     "**Provisional.** Thresholds are examples pending FDS approval."
                 ),
             ),

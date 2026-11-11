@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from plugins.ifrc.decisions import config, rules
+from plugins.ifrc.decisions import config, rules, service
 from plugins.ifrc.decisions.access import DENIED, AccessContext
 from plugins.ifrc.decisions.facts import Filters, build_decision_data
 from plugins.ifrc.decisions.metrics import (
@@ -556,3 +556,76 @@ def test_priority_threshold_is_configurable():
         rule_overrides={"RULE-PRIORITY-COUNTRY": {"condition": {**config.default_rules()["RULE-PRIORITY-COUNTRY"]["condition"], "value": 3}}},
     )
     assert [f["entity_id"] for f in _by_rule(flags, "RULE-PRIORITY-COUNTRY")] == ["AAA"]
+
+
+def test_reporting_and_fdrs_stay_separate_from_the_plan_requirement():
+    extract = _extract(
+        [_fact("AAA", "Alpha", "P27", 2027, 100, 1)],
+        [_sub("AAA", "Alpha", "P27", 1)],
+        [_sub("AAA", "Alpha", "AR25", 9)],
+    )
+    extract["report_facts"] = [
+        {
+            "Round": "AR25", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "National Society", "Attribute": "Total",
+            "Indicator": "Funding", "ValueNum": 40, "Year": 2025, "submission_id": 9,
+            "Data source": "Unified Reporting", "Data status": "Approved",
+        },
+        {
+            "Round": "MYR25", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "National Society", "Attribute": "Total",
+            "Indicator": "Funding", "ValueNum": 15, "Year": 2025, "submission_id": 10,
+            "Data source": "Unified Reporting", "Data status": "Approved",
+        },
+        {
+            "Round": "AR25", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "PNS", "Attribute": "Total",
+            "Indicator": "Funding", "ValueNum": 999, "Year": 2025, "submission_id": 12,
+            "Data source": "PNS Reporting", "Data status": "Approved",
+        },
+        {
+            "Round": "MYR23", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "National Society", "Attribute": "Total",
+            "Indicator": "Funding", "ValueNum": 12, "Year": 2023, "submission_id": 8,
+            "Data source": "Unified Reporting", "Data status": "Approved",
+        },
+        {
+            "Round": "MYR24", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "National Society", "Attribute": "Total",
+            "Indicator": "Expenditure", "ValueNum": 5, "Year": 2024, "submission_id": 14,
+            "Data source": "Unified Reporting", "Data status": "Approved",
+        },
+    ]
+    extract["fdrs_facts"] = [
+        {
+            "Round": "FDRS24", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "National Society", "Attribute": "Total",
+            "Indicator": "Funding (CHF)", "ValueNum": 80, "Year": 2024, "submission_id": 11,
+            "Data source": "FDRS", "Data status": "Approved",
+        },
+        {
+            "Round": "FDRS25", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "National Society", "Attribute": "Total",
+            "Indicator": "Funding (CHF)", "ValueNum": 50, "Year": 2025, "submission_id": 13,
+            "Data source": "FDRS", "Data status": "Approved",
+        },
+        {
+            "Round": "FDRS24", "ISO3": "AAA", "Country": "Alpha", "Region": "Testregion",
+            "Section": "Funding", "Entity": "National Society", "Attribute": "Total",
+            "Indicator": "Expenditure", "ValueNum": 70, "Year": 2024, "submission_id": 11,
+            "Data source": "FDRS", "Data status": "Approved",
+        },
+    ]
+    extract["ns_key_rows"] = [
+        {"ISO3": "AAA", "Country": "Alpha", "Year": 2023, "Source": "Annual reporting 2023", "Volunteers": 5, "Staff": 1, "Branches": 2, "LocalUnits": 3},
+        {"ISO3": "AAA", "Country": "Alpha", "Year": 2024, "Source": "FDRS", "Volunteers": 9, "Staff": 4, "Branches": 6, "LocalUnits": 8},
+    ]
+    data = build_decision_data(extract, ADMIN, Filters(), today=TODAY)
+    assert aggregate(data.obs("funding_requirement"))[0]["value"] == 100
+    assert {(o.year, o.value) for o in data.obs("income")} == {(2023, 12.0), (2025, 50.0), (2024, 80.0)}
+    assert {(o.year, o.value) for o in data.obs("expenditure")} == {(2024, 70.0)}
+    assert {(o.year, o.value) for o in data.obs("volunteers")} == {(2023, 5.0), (2024, 9.0)}
+    assert [o.value for o in service._latest_year_per_country(data.obs("income"))] == [50.0]
+    assert [o.value for o in service._latest_year_per_country(data.obs("volunteers"))] == [9.0]
+    assert data.reporting_period == "AR25"
+    assert data.fdrs_period == "FDRS 2024"

@@ -41,6 +41,10 @@ _PLAN_METRICS = frozenset(
         "core_indicators_reported",
     }
 )
+# Reporting and FDRS figures: each country keeps its latest year. Years are not summed.
+_LATEST_YEAR_METRICS = frozenset(
+    {"income", "expenditure", "volunteers", "paid_staff", "branches", "local_units"}
+)
 
 
 class NotFound(LookupError):
@@ -233,11 +237,30 @@ def _sources(data: DecisionData) -> list[dict[str, Any]]:
     return [
         {
             "source_system": "ifrc_databank",
-            "dataset": "Unified Plan and Report assignments",
+            "dataset": "Unified Planning",
             "owner": "FDS",
             "synchronized_at": data.built_at,
-            "note": "Read from the Databank's own submissions; GO and ERP are not yet integrated.",
-        }
+            "note": "Funding requirements and people to be reached. The headline uses the latest plan round.",
+        },
+        {
+            "source_system": "ifrc_databank",
+            "dataset": "Unified Reporting",
+            "owner": "FDS",
+            "synchronized_at": data.built_at,
+            "period": data.reporting_period,
+            "note": "Income and expenditure from annual and mid-year reports when FDRS has no figure.",
+        },
+        {
+            "source_system": "ifrc_databank",
+            "dataset": "FDRS",
+            "owner": "FDS",
+            "synchronized_at": data.built_at,
+            "period": data.fdrs_period,
+            "note": (
+                "Approved FDRS values take priority over Unified Reporting for the same indicator. "
+                "Volunteers, staff, branches and local units use FDRS, then annual reporting, then mid-year, then planning."
+            ),
+        },
     ]
 
 
@@ -262,7 +285,13 @@ def _envelope(
         )
     return {
         "data": payload,
-        "scope": {**filters.as_scope(), "round": round_code, "decision_id": decision["id"] if decision else None},
+        "scope": {
+            **filters.as_scope(),
+            "round": round_code,
+            "reporting": data.reporting_period,
+            "fdrs": data.fdrs_period,
+            "decision_id": decision["id"] if decision else None,
+        },
         "coverage": cov,
         "data_quality": {
             "readiness": readiness_for(cov),
@@ -443,6 +472,21 @@ def decision_metrics(
     return _envelope(out, decision=decision, filters=filters, data=data, access=access, round_code=round_code, observations=observations)
 
 
+def _latest_year_per_country(observations: list[Observation]) -> list[Observation]:
+    """Keep each country's newest year. Different countries may keep different years."""
+    latest: dict[str, int] = {}
+    for obs in observations:
+        year = obs.year if isinstance(obs.year, int) else None
+        if year is None:
+            continue
+        current = latest.get(obs.entity_id)
+        if current is None or year > current:
+            latest[obs.entity_id] = year
+    if not latest:
+        return observations
+    return [obs for obs in observations if latest.get(obs.entity_id) == obs.year]
+
+
 def _metric_result(
     metric_id: str,
     data: DecisionData,
@@ -458,6 +502,8 @@ def _metric_result(
         result["groups"] = _coverage_groups(data, group_by, round_code)
         return result
     observations = list(data.obs(metric_id))
+    if metric_id in _LATEST_YEAR_METRICS and "year" not in group_by and not filters.year:
+        observations = _latest_year_per_country(observations)
     plan_metric = metric_id in _PLAN_METRICS
     if plan_metric and round_code:
         observations = [o for o in observations if o.round == round_code]

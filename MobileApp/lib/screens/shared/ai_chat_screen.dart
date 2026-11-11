@@ -24,6 +24,8 @@ import '../../utils/constants.dart';
 import '../../utils/accessibility_helper.dart';
 import '../../utils/ai_chat_plain_text.dart';
 import '../../utils/ai_chat_message_html_split.dart';
+import '../../utils/ai_chat_html_tables.dart';
+import '../../widgets/ai_chat_html_table_view.dart';
 import '../../widgets/chat_response_sources_details_extension.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
@@ -737,7 +739,53 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
   }
 
   /// Shared HTML + styles for assistant narrative and for [trailing sources] after charts.
+  ///
+  /// `flutter_html` 3.x does not render `<table>` unless a separate extension is
+  /// registered. We lift tables into [AiChatHtmlTableView] so inventory answers
+  /// (e.g. emergency documents) stay visible on mobile.
   Widget _buildAssistantMessageHtml(BuildContext context, ThemeData theme, String processedData) {
+    final segments = splitAssistantHtmlTables(processedData);
+    if (segments.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (segments.length == 1 && segments.first is AiChatHtmlMarkupSegment) {
+      return _buildAssistantHtmlFragment(
+        context,
+        theme,
+        (segments.first as AiChatHtmlMarkupSegment).html,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final segment in segments) ...[
+          if (segment is AiChatHtmlMarkupSegment)
+            _buildAssistantHtmlFragment(context, theme, segment.html)
+          else if (segment is AiChatHtmlTableSegment)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: AiChatHtmlTableView(
+                table: segment.table,
+                onLinkTap: (url, {linkText}) {
+                  _handleLinkTap(context, url, linkText: linkText);
+                },
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAssistantHtmlFragment(
+    BuildContext context,
+    ThemeData theme,
+    String processedData,
+  ) {
+    if (processedData.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Html(
       data: processedData,
       extensions: [

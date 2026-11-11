@@ -151,6 +151,59 @@ def _finalize_indicator_action_links(html: str) -> str:
     )
 
 
+_DEFAULT_CHAT_DOCUMENT_HOSTS = (
+    "api.ifrc.org",
+    "go.ifrc.org",
+    "go-api.ifrc.org",
+    "ifrc.org",
+    "prddsgolocstor01.blob.core.windows.net",
+)
+
+
+def _chat_document_allowed_hosts() -> List[str]:
+    """Hosts whose https document links may survive chat HTML sanitization."""
+    try:
+        from flask import current_app, has_app_context
+
+        if has_app_context():
+            configured = current_app.config.get("IFRC_DOCUMENT_ALLOWED_HOSTS") or []
+            hosts = [str(h).strip().lower().strip(".") for h in configured if str(h).strip()]
+            if hosts:
+                return hosts
+    except Exception as e:
+        logger.debug("chat document allowed hosts: app config unavailable: %s", e)
+    return list(_DEFAULT_CHAT_DOCUMENT_HOSTS)
+
+
+def _is_preserved_chat_href(url: str) -> bool:
+    """True for relative app paths or allowlisted https document hosts."""
+    u = (url or "").strip()
+    if not u:
+        return False
+    path_part = u.split("#")[0].split("?")[0]
+    if u.startswith("/") and "//" not in path_part:
+        return True
+    if not u.lower().startswith("https://"):
+        return False
+    try:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(u)
+        if (parsed.scheme or "").lower() != "https":
+            return False
+        if parsed.port not in (None, 443):
+            return False
+        host = (parsed.hostname or "").lower().strip(".")
+        if not host:
+            return False
+        for allowed in _chat_document_allowed_hosts():
+            if host == allowed or host.endswith("." + allowed):
+                return True
+    except Exception as e:
+        logger.debug("preserved chat href parse failed: %s", e)
+    return False
+
+
 def _render_structured_sources_block(sources: Optional[List[Dict[str, Any]]]) -> Optional[str]:
     """Sources HTML is always a structured list. The client renders only the chip."""
     if not sources:
@@ -299,22 +352,23 @@ def format_ai_response_for_html(
     if provenance_data:
         html = (html or "") + "<br><br>" + format_provenance_block(provenance_data)
 
-    # Table links: bleach with protocols=[] strips all href values. Extract <a href="/path">content</a>
-    # (safe relative paths only) and replace with placeholders; re-inject after bleach.
-    table_link_placeholders = []
+    # Table/download links: bleach with protocols=[] strips all href values.
+    # Extract safe relative paths and allowlisted IFRC document https URLs, then
+    # re-inject after bleach so emergency-document Download cells stay clickable
+    # on web and mobile.
+    table_link_placeholders: List[tuple[str, str]] = []
 
     def _replace_table_links(m: re.Match) -> str:
         url = (m.group(1) or "").strip()
-        path_part = url.split("#")[0].split("?")[0]
-        if url.startswith("/") and "//" not in path_part:
-            inner = m.group(2) or ""
-            idx = len(table_link_placeholders)
-            table_link_placeholders.append((url, inner))
-            return f"IFRC-TABLE-LINK-{idx}-END"
-        return m.group(0)
+        if not _is_preserved_chat_href(url):
+            return m.group(0)
+        inner = m.group(2) or ""
+        idx = len(table_link_placeholders)
+        table_link_placeholders.append((url, inner))
+        return f"IFRC-TABLE-LINK-{idx}-END"
 
     html = re.sub(
-        r'<a\s+href="(/[^"]*)"[^>]*>([\s\S]*?)</a>',
+        r'<a\s+href="((?:/|https://)[^"]*)"[^>]*>([\s\S]*?)</a>',
         _replace_table_links,
         html or "",
         flags=re.IGNORECASE,

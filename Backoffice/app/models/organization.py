@@ -6,7 +6,7 @@ from sqlalchemy import Column, Integer, Float, ForeignKey, String, Text, DateTim
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, backref, validates
 from ..extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 NS_STATUS_ACTIVE = "Active"

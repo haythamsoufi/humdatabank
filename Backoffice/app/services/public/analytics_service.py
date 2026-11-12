@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app
-from app.utils.api_errors import ClientInputError
+from app.utils.api.api_errors import ClientInputError
 
 from app.services.indicators.bank_service import IndicatorBankFilters, get_indicator_list
 
@@ -395,7 +395,7 @@ def resolve_country_query(query: str, *, limit: int = 5) -> Dict[str, Any]:
     id here avoids paginating a full dimension table just to look up one country.
     """
     from app.models import Country
-    from app.utils.api_serialization import format_country_info_minimal
+    from app.utils.api.api_serialization import format_country_info_minimal
 
     raw = (query or "").strip()
     if not raw:

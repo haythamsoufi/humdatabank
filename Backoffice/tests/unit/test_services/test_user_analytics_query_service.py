@@ -7,7 +7,7 @@ import pytest
 
 from app.models import UserActivityLog, UserLoginLog
 from app.services.platform import user_analytics_query_service as query_svc
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 pytestmark = [pytest.mark.unit]

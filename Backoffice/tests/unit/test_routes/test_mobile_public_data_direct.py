@@ -281,7 +281,7 @@ class TestSubmitIndicatorSuggestion:
         ):
             from app import db as _db
             with patch.object(_db.session, 'add', side_effect=RuntimeError('db fail')), \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 resp = submit_indicator_suggestion()
 
         _, status = _parse(resp)
@@ -360,7 +360,7 @@ class TestMobilePeriods:
             db_session.commit()
             fdrs_id = fdrs_tmpl.id
 
-        with patch('app.utils.data_quality_constants.FDRS_TEMPLATE_ID', fdrs_id):
+        with patch('app.utils.indicators.data_quality_constants.FDRS_TEMPLATE_ID', fdrs_id):
             with app.test_request_context('/api/mobile/v1/data/periods', method='GET'):
                 resp = mobile_periods()
 
@@ -1155,7 +1155,7 @@ class TestUnifiedPlanningThumbnail:
             data=json.dumps({}),
             content_type='application/json',
         ):
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = unified_planning_thumbnail()
 
         _, status = _parse(resp)
@@ -1174,7 +1174,7 @@ class TestUnifiedPlanningThumbnail:
             data=json.dumps({'url_b64': url_b64}),
             content_type='application/json',
         ):
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = unified_planning_thumbnail()
 
         _, status = _parse(resp)
@@ -1204,7 +1204,7 @@ class TestUnifiedPlanningThumbnail:
                 data=json.dumps({'url_b64': url_b64}),
                 content_type='application/json',
             ):
-                with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+                with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                      patch(
                          'app.routes.ai_documents.helpers._validate_ifrc_fetch_url',
                          return_value=(True, ''),

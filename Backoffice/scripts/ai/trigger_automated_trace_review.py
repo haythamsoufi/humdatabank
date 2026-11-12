@@ -31,7 +31,7 @@ if _ROOT not in sys.path:
 from app import create_app
 from app.extensions import db
 from app.models.embeddings import AITraceReview
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 VALID_STATUSES = {"pending", "in_review", "completed", "dismissed", "all"}

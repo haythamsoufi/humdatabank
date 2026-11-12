@@ -39,12 +39,12 @@ from app.routes.admin.shared import (
     permission_required,
     permission_required_any,
 )
-from app.utils.request_utils import is_json_request
-from app.utils.entity_groups import get_enabled_entity_groups
-from app.utils.transactions import no_auto_transaction, request_transaction_rollback
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_formatting import choices_from_query
-from app.utils.api_responses import (
+from app.utils.http.request_utils import is_json_request
+from app.utils.organization.entity_groups import get_enabled_entity_groups
+from app.utils.database.transactions import no_auto_transaction, request_transaction_rollback
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_formatting import choices_from_query
+from app.utils.api.api_responses import (
     json_bad_request,
     json_error,
     json_form_errors,
@@ -54,8 +54,8 @@ from app.utils.api_responses import (
     require_json_data,
     require_json_keys,
 )
-from app.utils.sector_logo_urls import ns_logo_url
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.branding.sector_logo_urls import ns_logo_url
+from app.utils.common.error_handling import handle_json_view_exception
 from config.config import Config
 from app.forms.organization import (
     CountryForm,
@@ -775,7 +775,7 @@ def api_update_ns_part_of(ns_id):
 
 
 def _part_of_category_payload():
-    from app.utils.country_utils import collect_part_of_category_definitions
+    from app.utils.organization.country_utils import collect_part_of_category_definitions
 
     nss = NationalSociety.query.filter(NationalSociety.part_of.isnot(None)).all()
     definitions = collect_part_of_category_definitions(nss)
@@ -806,7 +806,7 @@ def api_get_part_of_programs():
 def api_add_part_of_program():
     """API endpoint to add a new category to the available list."""
     try:
-        from app.utils.country_utils import PART_OF_CATEGORY_TYPES, remember_part_of_category
+        from app.utils.organization.country_utils import PART_OF_CATEGORY_TYPES, remember_part_of_category
 
         data = get_json_safe()
         category_name = (data.get('category_name') or data.get('program_name') or '').strip()
@@ -882,7 +882,7 @@ def api_update_part_of_program_type(program_name):
     """Change a category between tick boxes and text."""
     try:
         from urllib.parse import unquote
-        from app.utils.country_utils import (
+        from app.utils.organization.country_utils import (
             PART_OF_CATEGORY_TYPES,
             load_part_of_category_catalog,
             update_part_of_category_type,
@@ -930,7 +930,7 @@ def api_remove_part_of_program(program_name):
     """API endpoint to remove a category from all NSs and the available list."""
     try:
         from urllib.parse import unquote
-        from app.utils.country_utils import forget_part_of_category
+        from app.utils.organization.country_utils import forget_part_of_category
 
         category_name = unquote(program_name).strip()
 

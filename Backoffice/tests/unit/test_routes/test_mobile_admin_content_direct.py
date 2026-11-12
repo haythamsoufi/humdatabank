@@ -59,7 +59,7 @@ class TestDeleteTemplate:
             '/api/mobile/v1/admin/content/templates/99999/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = delete_template(99999)
 
         _, status = _parse(resp)
@@ -75,7 +75,7 @@ class TestDeleteTemplate:
             f'/api/mobile/v1/admin/content/templates/{template.id}/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = delete_template(template.id)
 
@@ -92,10 +92,10 @@ class TestDeleteTemplate:
             f'/api/mobile/v1/admin/content/templates/{template.id}/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action',
                        side_effect=RuntimeError('db error')), \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 resp = delete_template(template.id)
 
         _, status = _parse(resp)
@@ -182,7 +182,7 @@ class TestDeleteAssignment:
             '/api/mobile/v1/admin/content/assignments/99999/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = delete_assignment(99999)
 
         _, status = _parse(resp)
@@ -203,7 +203,7 @@ class TestDeleteAssignment:
             f'/api/mobile/v1/admin/content/assignments/{af.id}/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = delete_assignment(af.id)
 
@@ -225,10 +225,10 @@ class TestDeleteAssignment:
             f'/api/mobile/v1/admin/content/assignments/{af.id}/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action',
                        side_effect=RuntimeError('db error')), \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 resp = delete_assignment(af.id)
 
         _, status = _parse(resp)
@@ -247,7 +247,7 @@ class TestTogglePublicAccess:
             '/api/mobile/v1/admin/content/assignments/99999/toggle-public', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = toggle_public_access(99999)
 
         _, status = _parse(resp)
@@ -270,7 +270,7 @@ class TestTogglePublicAccess:
             f'/api/mobile/v1/admin/content/assignments/{af.id}/toggle-public', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = toggle_public_access(af.id)
 
         _, status = _parse(resp)
@@ -289,7 +289,7 @@ class TestGeneratePublicUrl:
             '/api/mobile/v1/admin/content/assignments/99999/generate-url', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = generate_public_url(99999)
 
         _, status = _parse(resp)
@@ -310,7 +310,7 @@ class TestGeneratePublicUrl:
             f'/api/mobile/v1/admin/content/assignments/{af.id}/generate-url', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = generate_public_url(af.id)
 
         _, status = _parse(resp)
@@ -493,7 +493,7 @@ class TestDeleteDocument:
             '/api/mobile/v1/admin/content/documents/99999/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = delete_document(99999)
 
         _, status = _parse(resp)
@@ -512,7 +512,7 @@ class TestDeleteDocument:
             f'/api/mobile/v1/admin/content/documents/{doc.id}/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = delete_document(doc.id)
 
@@ -532,10 +532,10 @@ class TestDeleteDocument:
             f'/api/mobile/v1/admin/content/documents/{doc.id}/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action',
                        side_effect=RuntimeError('db error')), \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 resp = delete_document(doc.id)
 
         _, status = _parse(resp)
@@ -602,7 +602,7 @@ class TestDeleteResource:
             '/api/mobile/v1/admin/content/resources/99999/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = delete_resource(99999)
 
         _, status = _parse(resp)
@@ -741,7 +741,7 @@ class TestEditIndicator:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = edit_indicator(99999)
 
         _, status = _parse(resp)
@@ -760,7 +760,7 @@ class TestDeleteIndicator:
             '/api/mobile/v1/admin/content/indicators/99999/delete', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = delete_indicator(99999)
 
         _, status = _parse(resp)
@@ -779,7 +779,7 @@ class TestArchiveIndicator:
             '/api/mobile/v1/admin/content/indicators/99999/archive', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = archive_indicator(99999)
 
         _, status = _parse(resp)
@@ -852,7 +852,7 @@ class TestUpdateTranslation:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_translation(1)
 
         body, status = _parse(resp)

@@ -16,8 +16,8 @@ from sqlalchemy import and_, func, or_
 
 from app import db
 from app.models import IndicatorBank, IndicatorBankType, IndicatorBankUnit, Sector, SubSector
-from app.utils.form_localization import get_localized_indicator_type, get_localized_indicator_unit
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.forms.form_localization import get_localized_indicator_type, get_localized_indicator_unit
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 _SECTOR_LEVELS = ('primary', 'secondary', 'tertiary')
 

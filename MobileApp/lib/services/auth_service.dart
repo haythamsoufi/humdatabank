@@ -921,7 +921,7 @@ class AuthService {
   //     so [AuthErrorHandler] does not trigger a destructive logout.
   //
   // The request is sent exactly once.  Refresh tokens are one-time-use on
-  // the server (see Backoffice/app/utils/mobile_jwt.py + auth.py "Refresh
+  // the server (see Backoffice/app/utils/mobile/mobile_jwt.py and app/utils/auth/auth.py "Refresh
   // token reuse detected"): the first time the server processes our request
   // it consumes the JTI and blacklists the JWT session.  If we then re-send
   // the same refresh token (e.g. after a TLS reset on the response, a 504

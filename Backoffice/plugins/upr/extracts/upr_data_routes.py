@@ -15,16 +15,16 @@ from __future__ import annotations
 
 from flask import request
 
-from app.utils.api_helpers import (
+from app.utils.api.api_helpers import (
     GENERIC_ERROR_MESSAGE,
     api_error,
     json_response,
 )
-from app.utils.api_data_filters import parse_assignment_id_filters
-from app.utils.auth import require_api_key_or_session
+from app.utils.api.api_data_filters import parse_assignment_id_filters
+from app.utils.auth.auth import require_api_key_or_session
 from app.services.security.api_key_permissions import DATA_READ
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.security.rate_limiting import api_rate_limit
 from plugins.upr import bp
 from plugins.upr.extracts.api_cache import get_or_build_upr_payload
 from plugins.upr.extracts.ns_key_data import NS_KEY_COLUMNS, load_ns_key_rows

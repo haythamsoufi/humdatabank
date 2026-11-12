@@ -8,8 +8,8 @@ from flask import current_app
 from flask.cli import with_appcontext
 
 from app.extensions import db
-from app.utils.datetime_helpers import ensure_utc, naive_utc, utcnow
-from app.utils.transactions import atomic
+from app.utils.common.datetime_helpers import ensure_utc, naive_utc, utcnow
+from app.utils.database.transactions import atomic
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ def register_dev_tools_commands(app):
         """Create the first admin user."""
         from app.models import Country, User
 
-        from app.utils.password_validator import validate_password_strength
+        from app.utils.auth.password_validator import validate_password_strength
 
         email = click.prompt("Admin email")
         password = click.prompt("Admin password", hide_input=True, confirmation_prompt=True)

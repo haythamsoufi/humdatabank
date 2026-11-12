@@ -9,16 +9,16 @@ from sqlalchemy import desc, inspect
 from sqlalchemy.orm import joinedload, contains_eager
 
 from app import db
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import (
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_not_found,
     mobile_server_error, mobile_paginated,
 )
-from app.utils.rate_limiting import mobile_rate_limit
-from app.utils.sql_utils import safe_ilike_pattern
-from app.utils.datetime_helpers import utcnow
+from app.utils.security.rate_limiting import mobile_rate_limit
+from app.utils.database.sql_utils import safe_ilike_pattern
+from app.utils.common.datetime_helpers import utcnow
 from app.routes.api.mobile import mobile_bp
 from app.services.audit.details_service import format_activity_log_details
 from app.services.audit.trail_display_service import (
@@ -162,7 +162,7 @@ def session_logs():
 @mobile_auth_required(permission='admin.system.maintain')
 def end_session(session_id):
     """End a user session and blacklist it (admin)."""
-    from app.utils.transactions import request_transaction_rollback
+    from app.utils.database.transactions import request_transaction_rollback
 
     try:
         result = execute_end_session(
@@ -310,7 +310,7 @@ def audit_trail():
 @mobile_auth_required(permission='admin.communication.manage')
 def admin_send_notification():
     """Send push/email notification to selected users (admin)."""
-    from app.utils.notification_push import (
+    from app.utils.notifications.notification_push import (
         is_notifications_push_enabled,
         PUSH_NOT_ENABLED_CODE,
     )

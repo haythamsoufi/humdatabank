@@ -1641,7 +1641,7 @@ class TestGetLocalizedFieldNameById:
             mock_item.indicator_bank_id = 1
 
             with patch("app.routes.main.helpers.FormItem.query") as mock_q, \
-                 patch("app.utils.form_localization.get_localized_indicator_name", return_value="Indicator Name"):
+                 patch("app.utils.forms.form_localization.get_localized_indicator_name", return_value="Indicator Name"):
                 mock_q.get.return_value = mock_item
                 result = get_localized_field_name_by_id(1)
             assert result == "Indicator Name"
@@ -1746,7 +1746,7 @@ class TestGetLocalizedIndicatorBankNameById:
             mock_indicator = MagicMock()
             mock_indicator.name = "Pop Indicator"
             with patch("app.models.IndicatorBank") as mock_ib_cls, \
-                 patch("app.utils.form_localization.get_localized_indicator_name", return_value="Localized Pop"):
+                 patch("app.utils.forms.form_localization.get_localized_indicator_name", return_value="Localized Pop"):
                 mock_ib_cls.query.get.return_value = mock_indicator
                 result = _get_localized_indicator_bank_name_by_id(1)
             assert isinstance(result, str)

@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from app.extensions import db
 from app.middleware.transaction_middleware import init_transaction_middleware
-from app.utils.transactions import no_auto_transaction
+from app.utils.database.transactions import no_auto_transaction
 
 
 @pytest.fixture

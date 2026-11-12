@@ -105,7 +105,7 @@ class TestResolveStoragePath:
                     side_effect=AssertionError("should not be called"),
                 ):
                     with patch(
-                        "app.utils.file_paths.resolve_admin_document",
+                        "app.utils.files.file_paths.resolve_admin_document",
                         return_value=expected,
                     ) as mock_admin:
                         result = DocumentService._resolve_storage_path(rel_path)

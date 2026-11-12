@@ -11,9 +11,9 @@ from flask import current_app
 
 from app import db
 from app.models import UserSessionLog
-from app.utils.constants import DEFAULT_OAUTH_CALLBACK_LOCK_ID_BASE
-from app.utils.datetime_helpers import utcnow
-from app.utils.pg_advisory_lock import acquire_transaction_advisory_lock
+from app.utils.common.constants import DEFAULT_OAUTH_CALLBACK_LOCK_ID_BASE
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.database.pg_advisory_lock import acquire_transaction_advisory_lock
 
 if TYPE_CHECKING:
     from app.models import User

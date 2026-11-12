@@ -111,7 +111,7 @@ def _translation_public_url(translation) -> str | None:
     """YouTube (or other allowlisted) link for a translation that has no uploaded file."""
     if translation is None:
         return None
-    from app.utils.external_url_validation import safe_resource_external_url
+    from app.utils.http.external_url_validation import safe_resource_external_url
 
     raw = getattr(translation, "external_url", None)
     if not isinstance(raw, str):

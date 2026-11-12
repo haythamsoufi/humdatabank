@@ -2,7 +2,7 @@
 Unit tests for country utility functions.
 """
 import pytest
-from app.utils.country_utils import (
+from app.utils.organization.country_utils import (
     resolve_country_from_iso,
     get_countries_by_region,
     get_countries_by_region_with_part_of,
@@ -160,7 +160,7 @@ class TestGetCountriesByRegionWithPartOf:
 
     def test_catalog_category_is_listed_before_any_society_is_checked(self, db_session, app):
         with app.app_context():
-            from app.utils.country_utils import (
+            from app.utils.organization.country_utils import (
                 collect_part_of_category_definitions,
                 collect_part_of_category_names,
                 forget_part_of_category,
@@ -187,7 +187,7 @@ def test_text_category_values_group_under_their_title(db_session, app):
     with app.app_context():
         from tests.factories import create_test_country
         from app.models import NationalSociety
-        from app.utils.country_utils import (
+        from app.utils.organization.country_utils import (
             forget_part_of_category,
             part_of_text_filter_key,
             remember_part_of_category,

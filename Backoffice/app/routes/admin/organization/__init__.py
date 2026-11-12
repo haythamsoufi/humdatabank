@@ -9,7 +9,7 @@ This blueprint provides CRUD operations for:
 from flask import Blueprint, flash, redirect, url_for, request
 from flask_login import current_user
 
-from app.utils.api_responses import json_error
+from app.utils.api.api_responses import json_error
 
 bp = Blueprint('organization', __name__, url_prefix='/admin/organization')
 

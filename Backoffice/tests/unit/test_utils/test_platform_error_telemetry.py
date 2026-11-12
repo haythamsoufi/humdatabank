@@ -11,7 +11,7 @@ import importlib.util
 from pathlib import Path
 
 BACKOFFICE = Path(__file__).resolve().parents[3]
-TELEMETRY_PY = BACKOFFICE / "app" / "utils" / "platform_error_telemetry.py"
+TELEMETRY_PY = BACKOFFICE / "app" / "utils" / "monitoring" / "platform_error_telemetry.py"
 
 
 def _load():

@@ -14,13 +14,13 @@ from app.models import (
     FormTemplate, AssignedForm, Country, FormItem, FormData, AIFormDataValidation,
     AssignmentEntityStatus, FormSection, FormPage, PublicSubmission
 )
-from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
-from app.utils.redirect_utils import get_current_relative_url
-from app.utils.request_utils import is_json_request
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.http.redirect_utils import get_current_relative_url
+from app.utils.http.request_utils import is_json_request
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.services.security.api_authentication import get_user_allowed_template_ids, _get_user_allowed_country_ids
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.data_explorer import (
     CORE_DATA_EXPLORER_PERMISSIONS,
@@ -33,7 +33,7 @@ from app.plugins.data_explorer import (
 )
 from app.plugins.manager import PluginManager
 from app.services.data_quality.helpers import list_exploration_period_names
-from app.utils.country_utils import exclude_sandbox_countries
+from app.utils.organization.country_utils import exclude_sandbox_countries
 from flask_babel import gettext as _
 from markupsafe import Markup
 import json

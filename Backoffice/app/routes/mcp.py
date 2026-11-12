@@ -25,7 +25,7 @@ Access control — intentionally public. Do not default this back to a key.
 
 Only an allow-list of MCP protocol headers is forwarded upstream; inbound cookies, Authorization
 and API-key material never leave this process. The upstream host is validated with
-``app.utils.outbound_url`` (https, no private / link-local / metadata addresses unless listed in
+``app.utils.http.outbound_url`` (https, no private / link-local / metadata addresses unless listed in
 ``MCP_UPSTREAM_ALLOWED_NETWORKS``) and redirects are never followed.
 """
 
@@ -39,10 +39,10 @@ import requests
 from flask import Blueprint, Response, abort, current_app, jsonify, request
 from flask_login import current_user
 
-from app.utils.request_validation import enforce_api_or_csrf_protection
+from app.utils.http.request_validation import enforce_api_or_csrf_protection
 
 from app.extensions import limiter
-from app.utils.outbound_url import (
+from app.utils.http.outbound_url import (
     is_local_dev_environment,
     parse_network_allowlist,
     validate_outbound_url,

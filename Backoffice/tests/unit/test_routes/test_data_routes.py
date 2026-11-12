@@ -15,7 +15,7 @@ def _mock_full_dimension_tables():
 
 
 _API_HEADERS = {"Authorization": "Bearer test-key-123"}
-_API_KEY_PATCH = "app.utils.auth.authenticate_db_api_key_only"
+_API_KEY_PATCH = "app.utils.auth.auth.authenticate_db_api_key_only"
 
 
 class _FakeKey:
@@ -264,7 +264,7 @@ class TestGetData:
              patch("app.routes.api.data.apply_user_template_scoping", return_value=MagicMock()), \
              patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                    return_value=False), \
-             patch("app.utils.country_utils.resolve_country_from_iso", return_value=(1, None)):
+             patch("app.utils.organization.country_utils.resolve_country_from_iso", return_value=(1, None)):
             resp = client.get(f"{self.URL}?country_iso2=AF")
         assert resp.status_code == 200
 
@@ -502,9 +502,9 @@ class TestGetDataDynamicFields:
                  patch.object(FormSection, 'query') as mock_section_q, \
                  patch.object(RepeatGroupInstance, 'query') as mock_instance_q, \
                  patch("app.models.forms.DynamicSectionContext") as mock_ctx_model, \
-                 patch("app.utils.api_serialization._country_for_aes",
+                 patch("app.utils.api.api_serialization._country_for_aes",
                        return_value=MagicMock(iso2='AF', iso3='AFG')), \
-                 patch("app.utils.api_serialization.format_country_info", return_value={'id': 7}):
+                 patch("app.utils.api.api_serialization.format_country_info", return_value={'id': 7}):
                 mock_section_q.filter.return_value.all.return_value = [section]
                 inst = MagicMock()
                 inst.id = 901
@@ -556,12 +556,12 @@ class TestGetDataDynamicFields:
                   return_value={'assigned': mock_assigned_q, 'public': None}),
             patch("app.routes.api.data.query_repeat_group_data",
                   return_value={'assigned': None, 'public': None}),
-            patch("app.utils.api_serialization.build_dynamic_serialization_context",
+            patch("app.utils.api.api_serialization.build_dynamic_serialization_context",
                   return_value={'section_by_id': {55: dynamic_row.section}, 'repeat_instance_id_by_key': {}}),
-            patch("app.utils.api_serialization.fetch_dynamic_section_contexts", return_value=[]),
-            patch("app.utils.api_serialization._country_for_aes",
+            patch("app.utils.api.api_serialization.fetch_dynamic_section_contexts", return_value=[]),
+            patch("app.utils.api.api_serialization._country_for_aes",
                   return_value=MagicMock(iso2='AF', iso3='AFG')),
-            patch("app.utils.api_serialization.format_country_info", return_value={'id': 7}),
+            patch("app.utils.api.api_serialization.format_country_info", return_value={'id': 7}),
         ])
 
         from contextlib import ExitStack
@@ -598,12 +598,12 @@ class TestGetDataDynamicFields:
                   return_value={'assigned': mock_assigned_q, 'public': None}),
             patch("app.routes.api.data.query_repeat_group_data",
                   return_value={'assigned': None, 'public': None}),
-            patch("app.utils.api_serialization.build_dynamic_serialization_context",
+            patch("app.utils.api.api_serialization.build_dynamic_serialization_context",
                   return_value={'section_by_id': {55: dynamic_row.section}, 'repeat_instance_id_by_key': {}}),
-            patch("app.utils.api_serialization.fetch_dynamic_section_contexts", return_value=[]),
-            patch("app.utils.api_serialization._country_for_aes",
+            patch("app.utils.api.api_serialization.fetch_dynamic_section_contexts", return_value=[]),
+            patch("app.utils.api.api_serialization._country_for_aes",
                   return_value=MagicMock(iso2='AF', iso3='AFG')),
-            patch("app.utils.api_serialization.format_country_info", return_value={'id': 7}),
+            patch("app.utils.api.api_serialization.format_country_info", return_value={'id': 7}),
             patch("app.routes.api.data._load_full_countries_table", return_value=[]),
             patch("app.routes.api.data._load_full_indicator_bank_table", return_value=[]),
             patch("app.services.CountryService.get_all_with_national_societies",
@@ -674,7 +674,7 @@ class TestDataHelpers:
         assert result["values"] == {}
 
     def test_build_matrix_cells_from_data_rows(self, app):
-        from app.utils.api_serialization import (
+        from app.utils.api.api_serialization import (
             build_matrix_cells_from_data_rows,
             enrich_matrix_cells,
         )
@@ -718,7 +718,7 @@ class TestDataHelpers:
         """A matrix item can show totals on-screen (show_row_totals/show_column_totals)
         while excluding calculated totals from matrix_cells[] via the decoupled
         include_calculated_totals_in_api flag."""
-        from app.utils.api_serialization import build_matrix_cells_from_data_rows
+        from app.utils.api.api_serialization import build_matrix_cells_from_data_rows
 
         form_items = [{
             'id': 9,
@@ -744,7 +744,7 @@ class TestDataHelpers:
         assert not any(c.get('is_calculated_total') for c in cells)
 
     def test_strip_matrix_values_from_data_rows(self, app):
-        from app.utils.api_serialization import strip_matrix_values_from_data_rows
+        from app.utils.api.api_serialization import strip_matrix_values_from_data_rows
         rows = [{
             'id': 1,
             'disaggregation_data': {
@@ -765,7 +765,7 @@ class TestDataHelpers:
         assert rows[0]['prefilled_disaggregation_data']['values'] == {'male': 5}
 
     def test_resolve_matrix_join_metadata_country_map(self, app):
-        from app.utils.api_serialization import resolve_matrix_join_metadata
+        from app.utils.api.api_serialization import resolve_matrix_join_metadata
         meta = resolve_matrix_join_metadata({
             'row_mode': 'list_library',
             'lookup_list_id': 'country_map',
@@ -911,10 +911,10 @@ class TestDataHelpers:
         assert q.filter.called
 
     def test_build_star_uses_assignment_statuses_override(self, app):
-        from app.utils.api_serialization import build_star_schema_tables
+        from app.utils.api.api_serialization import build_star_schema_tables
         pending = [{'id': 7, 'type': 'assigned', 'status': 'pending'}]
-        with patch("app.utils.api_serialization.AssignmentEntityStatus") as mock_aes, \
-             patch("app.utils.api_serialization.PublicSubmission") as mock_ps:
+        with patch("app.utils.api.api_serialization.AssignmentEntityStatus") as mock_aes, \
+             patch("app.utils.api.api_serialization.PublicSubmission") as mock_ps:
             mock_aes.query.filter.return_value.all.return_value = []
             mock_ps.query.filter.return_value.all.return_value = []
             tables = build_star_schema_tables(

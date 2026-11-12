@@ -13,7 +13,7 @@ from .enums import (
     EmailDeliveryStatusValue,
 )
 from app.models.enum_columns import pg_str_enum_column
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class CountryAccessRequest(db.Model):

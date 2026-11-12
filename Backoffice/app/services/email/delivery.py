@@ -8,7 +8,7 @@ from typing import Dict, Optional, List
 from flask import current_app
 from app import db
 from app.models import EmailDeliveryLog
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 SKIP_ERROR_PREFIX = '[Skipped] '

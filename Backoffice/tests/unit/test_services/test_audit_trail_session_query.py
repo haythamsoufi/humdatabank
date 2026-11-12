@@ -46,7 +46,7 @@ class TestApplyAuditTrailNoiseFilters:
 
     def test_excludes_wizard_endpoint_but_keeps_profile_update(self, app, db_session):
         from app.models import UserActivityLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         user = create_test_user(db_session)
@@ -80,7 +80,7 @@ class TestApplyAuditTrailNoiseFilters:
     def test_excludes_login_and_logout(self, app, db_session):
         """login/logout rows are omitted from audit trail queries."""
         from app.models import UserActivityLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         user = create_test_user(db_session)
@@ -116,7 +116,7 @@ class TestApplyAuditTrailNoiseFilters:
     def test_null_description_stays_visible(self, app, db_session):
         """NULL descriptions must not be dropped by the legacy-noise IN() filter."""
         from app.models import UserActivityLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         user = create_test_user(db_session)
@@ -185,7 +185,7 @@ class TestCountAuditVisibleEntriesForSession:
     def test_valid_session_with_db(self, app, db_session):
         """When a valid session exists, count returns a non-negative integer."""
         from app.models import UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         now = utcnow()
@@ -208,7 +208,7 @@ class TestCountAuditVisibleEntriesForSession:
     def test_session_end_before_start_uses_utcnow(self, app, db_session):
         """When session_end < session_start the function falls back to utcnow."""
         from app.models import UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         now = utcnow()
@@ -230,7 +230,7 @@ class TestCountAuditVisibleEntriesForSession:
     def test_session_without_end_uses_utcnow(self, app, db_session):
         """When session_end is None, utcnow() is used as the window end."""
         from app.models import UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         now = utcnow()
@@ -252,7 +252,7 @@ class TestCountAuditVisibleEntriesForSession:
     def test_count_includes_activity_and_admin_rows(self, app, db_session):
         """Activity + admin action counts are summed."""
         from app.models import UserActivityLog, AdminActionLog, UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         now = utcnow()
@@ -300,7 +300,7 @@ class TestCountAuditVisibleEntriesForSession:
     def test_login_logout_not_counted(self, app, db_session):
         """login/logout activity types should be excluded from the count."""
         from app.models import UserActivityLog, UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         user = create_test_user(db_session)
@@ -335,7 +335,7 @@ class TestCountAuditVisibleEntriesForSession:
     def test_noise_endpoints_not_counted(self, app, db_session):
         """Heartbeat/noise endpoints should be filtered out."""
         from app.models import UserActivityLog, UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         user = create_test_user(db_session)
@@ -369,7 +369,7 @@ class TestCountAuditVisibleEntriesForSession:
 
     def test_wizard_endpoints_not_counted_form_saved_is(self, app, db_session):
         from app.models import UserActivityLog, UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         user = create_test_user(db_session)
@@ -441,7 +441,7 @@ class TestCountAuditVisibleEntriesForSessionsBatch:
     def test_batch_matches_single_session(self, app, db_session):
         """Batch helper returns the same count as the single-session helper."""
         from app.models import UserActivityLog, UserSessionLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from tests.factories import create_test_user
 
         now = utcnow()

@@ -16,7 +16,7 @@ from typing import List, Optional
 from flask import Flask, current_app, g, request
 
 from app.services.monitoring.system import _is_long_lived_connection_request
-from app.utils.request_utils import is_static_asset_request
+from app.utils.http.request_utils import is_static_asset_request
 
 _enabled = False
 _threshold_seconds = 30.0

@@ -41,7 +41,7 @@ KEYWORDS = [
     "_ngettext",
     "babel_",
     "babel_ngettext",
-    # app.utils.notifications.translate_notification_message — dict literals are NOT extracted
+    # app.services.notification.core.translate_notification_message — dict literals are NOT extracted
     "_notification_msgid:1",
 ]
 

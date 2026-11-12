@@ -5,8 +5,8 @@ import json as _json
 
 from flask import Response
 from app.routes.api.mobile import mobile_bp
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import mobile_ok, mobile_server_error
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import mobile_ok, mobile_server_error
 from app.routes.api.users import get_dashboard, get_dashboard_offline_entities
 
 
@@ -23,7 +23,7 @@ def _wrap_inner(inner, error_fallback):
         data = resp_obj
 
     if status != 200:
-        from app.utils.mobile_responses import mobile_error
+        from app.utils.mobile.mobile_responses import mobile_error
         return mobile_error(data.get('error', error_fallback), int(status))
 
     return mobile_ok(data=data)

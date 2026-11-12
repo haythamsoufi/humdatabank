@@ -20,9 +20,9 @@ from datetime import datetime
 from typing import Optional
 
 from flask import current_app, request
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
-from app.utils.constants import (
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_responses import json_bad_request, json_error, json_ok, json_server_error
+from app.utils.common.constants import (
     MAX_CLIENT_ERROR_MESSAGE_CHARS,
     MAX_CLIENT_ERROR_SOURCE_CHARS,
     MAX_CLIENT_ERROR_STACK_CHARS,
@@ -44,8 +44,8 @@ from app.services.monitoring.worker_investigation import (
     schedule_504_investigation,
 )
 from app.extensions import limiter
-from app.utils.datetime_helpers import utcnow
-from app.utils.platform_error_telemetry import (  # noqa: F401
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.monitoring.platform_error_telemetry import (  # noqa: F401
     clamp_optional_int as _clamp_optional_int,
     format_platform_error_description_extras,
     sanitize_ajax_save_telemetry,

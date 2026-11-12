@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 from flask import current_app, request
 from app.models import db, FormItem
-from app.utils.plugin_data_processor import plugin_data_processor
+from app.utils.forms.plugin_data_processor import plugin_data_processor
 from app.services.forms.processors._common import (
     get_english_field_name,
     read_waf_protected_form_value,

@@ -9,7 +9,7 @@ any row/column pairing, so it's invisible in the UI and excluded from totals,
 but it lingers in the JSON blob (see form_data.id=286867 for a concrete case
 found in Jan-Jun 2026 country reporting data).
 
-New saves are already protected — see ``app.utils.api_serialization.
+New saves are already protected — see ``app.utils.api.api_serialization.
 prune_stale_matrix_cell_keys``, wired into ``FormDataService._process_matrix_data``
 and ``RepeatGroupProcessorMixin._store_repeat_data_entry``. This script is the
 one-off cleanup for rows written *before* that fix shipped.
@@ -75,7 +75,7 @@ def main() -> int:
     from app import create_app
     from app.extensions import db
     from app.models import FormData, FormItem, RepeatGroupData
-    from app.utils.api_serialization import prune_stale_matrix_cell_keys
+    from app.utils.api.api_serialization import prune_stale_matrix_cell_keys
 
     app = create_app()
     with app.app_context():

@@ -64,7 +64,7 @@ def _load_spef_catalog_rows():
 
 def _spef_catalog_icon_url(row) -> str:
     """Browser URL used by the indicator bank and assignment Visuals."""
-    from app.utils.sector_logo_urls import spef_icon_url
+    from app.utils.branding.sector_logo_urls import spef_icon_url
 
     try:
         return spef_icon_url(row, via_api=True) or spef_icon_url(row) or ""
@@ -161,7 +161,7 @@ def _ns_logo_src(ns, iso3: str, *, inline: bool = False) -> str:
             return data_uri
     if ns:
         try:
-            from app.utils.sector_logo_urls import ns_logo_url
+            from app.utils.branding.sector_logo_urls import ns_logo_url
 
             url = ns_logo_url(ns, via_api=True) or ns_logo_url(ns)
             if url:
@@ -169,7 +169,7 @@ def _ns_logo_src(ns, iso3: str, *, inline: bool = False) -> str:
         except Exception:
             logger.debug("UPR: NS logo URL via API failed", exc_info=True)
             try:
-                from app.utils.sector_logo_urls import ns_logo_url
+                from app.utils.branding.sector_logo_urls import ns_logo_url
 
                 url = ns_logo_url(ns) or ""
                 if url:
@@ -177,7 +177,7 @@ def _ns_logo_src(ns, iso3: str, *, inline: bool = False) -> str:
             except Exception:
                 logger.debug("UPR: NS logo URL fallback failed", exc_info=True)
     try:
-        from app.utils.sector_logo_urls import github_ns_logo_url
+        from app.utils.branding.sector_logo_urls import github_ns_logo_url
 
         return github_ns_logo_url(iso3) or ""
     except Exception:

@@ -3,7 +3,7 @@ Unit tests for request_utils (is_json_request).
 """
 import pytest
 
-from app.utils.request_utils import is_json_request, is_top_level_navigation
+from app.utils.http.request_utils import is_json_request, is_top_level_navigation
 
 
 @pytest.mark.unit

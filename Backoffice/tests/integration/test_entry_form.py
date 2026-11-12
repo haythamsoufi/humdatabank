@@ -1435,7 +1435,7 @@ class TestDocumentService:
             import tempfile
             from werkzeug.datastructures import FileStorage
 
-            from app.utils.file_paths import save_submission_document, resolve_submitted_document_file
+            from app.utils.files.file_paths import save_submission_document, resolve_submitted_document_file
 
             with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
                 # Point uploads to temp dir
@@ -1486,7 +1486,7 @@ class TestFormLocalization:
     def test_get_translation_key_default(self, db_session, app):
         """Test getting translation key with default locale."""
         with app.app_context():
-            from app.utils.form_localization import get_translation_key
+            from app.utils.forms.form_localization import get_translation_key
 
             key = get_translation_key()
             # get_translation_key() now returns ISO codes (en, fr, es, ar, ru, zh, hi)
@@ -1495,7 +1495,7 @@ class TestFormLocalization:
     def test_get_translation_key_specific_locale(self, db_session, app):
         """Test getting translation key for specific locale."""
         with app.app_context():
-            from app.utils.form_localization import get_translation_key
+            from app.utils.forms.form_localization import get_translation_key
 
             key = get_translation_key('fr')
             assert key == 'fr'
@@ -1509,7 +1509,7 @@ class TestFormLocalization:
     def test_get_localized_indicator_type(self, db_session, app):
         """Test getting localized indicator type."""
         with app.app_context():
-            from app.utils.form_localization import get_localized_indicator_type
+            from app.utils.forms.form_localization import get_localized_indicator_type
 
             result = get_localized_indicator_type('number')
             assert result is not None
@@ -1521,7 +1521,7 @@ class TestFormLocalization:
     def test_get_localized_indicator_type_empty(self, db_session, app):
         """Test getting localized indicator type with empty input."""
         with app.app_context():
-            from app.utils.form_localization import get_localized_indicator_type
+            from app.utils.forms.form_localization import get_localized_indicator_type
 
             result = get_localized_indicator_type('')
             assert result == ''
@@ -1532,7 +1532,7 @@ class TestFormLocalization:
     def test_get_localized_country_name(self, db_session, app):
         """Test getting localized country name."""
         with app.app_context():
-            from app.utils.form_localization import get_localized_country_name
+            from app.utils.forms.form_localization import get_localized_country_name
 
             country = create_test_country(db_session, name="Test Country")
 
@@ -1660,7 +1660,7 @@ class TestFormAuthorization:
     def test_check_assignment_edit_access_submitted(self, db_session, app, test_user):
         """Test edit access check when assignment is submitted."""
         with app.app_context():
-            from app.utils.form_authorization import can_edit_assignment
+            from app.utils.forms.form_authorization import can_edit_assignment
 
             country = create_test_country(db_session)
             test_user.countries.append(country)
@@ -1978,7 +1978,7 @@ class TestPluginDataProcessor:
     def test_plugin_data_processor_process_basic(self, db_session, app):
         """Test basic plugin data processing."""
         with app.app_context():
-            from app.utils.plugin_data_processor import plugin_data_processor
+            from app.utils.forms.plugin_data_processor import plugin_data_processor
 
             # Mock plugin data
             plugin_data = {
@@ -1994,7 +1994,7 @@ class TestPluginDataProcessor:
     def test_plugin_data_processor_validate(self, db_session, app):
         """Test plugin data validation."""
         with app.app_context():
-            from app.utils.plugin_data_processor import plugin_data_processor
+            from app.utils.forms.plugin_data_processor import plugin_data_processor
 
             # Mock plugin data
             plugin_data = {

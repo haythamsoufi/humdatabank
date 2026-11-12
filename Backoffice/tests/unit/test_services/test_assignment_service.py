@@ -248,7 +248,7 @@ class TestBuildStatusOverview:
         from datetime import timedelta
 
         from app.models import AssignmentEntityStatus
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             country_a = create_test_country(db_session)
@@ -288,7 +288,7 @@ class TestBuildStatusOverview:
     def test_due_soon_not_overdue(self, db_session, app):
         from datetime import timedelta
 
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             aes = create_test_assignment_entity_status(db_session, status="in_progress")
@@ -303,7 +303,7 @@ class TestBuildStatusOverview:
     def test_submitted_past_due_is_not_overdue(self, db_session, app):
         from datetime import timedelta
 
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             aes = create_test_assignment_entity_status(db_session, status="submitted")
@@ -318,7 +318,7 @@ class TestBuildStatusOverview:
     def test_lifecycle_inactive_and_closed(self, db_session, app):
         from datetime import timedelta
 
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             aes = create_test_assignment_entity_status(
@@ -363,7 +363,7 @@ class TestBuildStatusOverview:
         from datetime import timedelta
 
         from app.models import AssignmentEntityStatus
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             country_a = create_test_country(db_session)

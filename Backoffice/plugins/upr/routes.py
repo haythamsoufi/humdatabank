@@ -60,11 +60,11 @@ from plugins.upr.dashboards.library import (
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_required, permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.api_responses import GENERIC_ERROR_MESSAGE, json_accepted, json_bad_request, json_ok
-from app.utils.client_ip import get_client_ip
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.rate_limiting import rate_limit
-from app.utils.session_persistence import suppress_session_cookie_for_request
+from app.utils.api.api_responses import GENERIC_ERROR_MESSAGE, json_accepted, json_bad_request, json_ok
+from app.utils.security.client_ip import get_client_ip
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.security.rate_limiting import rate_limit
+from app.utils.auth.session_persistence import suppress_session_cookie_for_request
 
 MAX_BULK_AES_IDS = 250
 MAX_BULK_DASHBOARDS = 20

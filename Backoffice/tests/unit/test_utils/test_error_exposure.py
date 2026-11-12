@@ -17,7 +17,7 @@ def _offenders():
     for base in ("app", "plugins"):
         for path in (ROOT / base).rglob("*.py"):
             rel = path.relative_to(ROOT).as_posix()
-            if "/tests/" in rel or rel in _ALLOWLIST or rel == "app/utils/api_errors.py":
+            if "/tests/" in rel or rel in _ALLOWLIST or rel == "app/utils/api/api_errors.py":
                 continue
             lines = path.read_text(encoding="utf-8").splitlines()
             for idx, line in enumerate(lines):

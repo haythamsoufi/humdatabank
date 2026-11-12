@@ -7,13 +7,13 @@ from flask import request, current_app, session
 from flask_login import current_user, login_user, logout_user
 
 from app import db
-from app.utils.api_helpers import get_json_safe
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import (
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import (
     mobile_ok, mobile_error, mobile_bad_request,
     mobile_auth_error, mobile_forbidden, mobile_server_error,
 )
-from app.utils.rate_limiting import auth_rate_limit, mobile_rate_limit
+from app.utils.security.rate_limiting import auth_rate_limit, mobile_rate_limit
 from app.routes.api.mobile import mobile_bp
 
 
@@ -45,7 +45,7 @@ def _record_failed_login(email, reason):
     >= 400 response, which would otherwise discard the record of the failed attempt.
     """
     from app.services.platform.user_analytics_service import log_login_attempt
-    from app.utils.login_security import record_login_failure
+    from app.utils.auth.login_security import record_login_failure
 
     record_login_failure(email)
     log_login_attempt(email, success=False, failure_reason=reason)
@@ -66,13 +66,13 @@ def _store_unavailable():
 def issue_tokens():
     """Issue JWT access + refresh tokens for mobile clients."""
     import uuid as _uuid
-    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_jwt import issue_token_pair
     from app.services.platform.user_analytics_service import (
         log_login_attempt, start_user_session, log_user_activity,
         get_client_info, end_other_active_sessions_for_device,
     )
     from app.services import UserService
-    from app.utils.login_security import burn_password_check, clear_login_failures, is_login_locked_out
+    from app.utils.auth.login_security import burn_password_check, clear_login_failures, is_login_locked_out
 
     data = get_json_safe()
     email = (data.get('email') or '').strip().lower()
@@ -128,8 +128,8 @@ def refresh_token():
     the rotation response, and in both cases forcing a fresh login is the safe outcome.
     """
     import uuid as _uuid
-    from app.utils.auth_state import AuthStateUnavailable
-    from app.utils.mobile_jwt import (
+    from app.utils.auth.auth_state import AuthStateUnavailable
+    from app.utils.mobile.mobile_jwt import (
         consume_refresh_token, decode_mobile_token, is_token_family_revoked,
         issue_token_pair, revoke_session_id, revoke_token_family,
     )
@@ -215,9 +215,9 @@ def exchange_oauth_code():
     """
     from app.models import User
     from app.services.platform.user_analytics_service import should_block_mobile_jwt_session
-    from app.utils.auth_state import AuthStateUnavailable
-    from app.utils.mobile_jwt import issue_token_pair
-    from app.utils.mobile_oauth_code import redeem_oauth_code
+    from app.utils.auth.auth_state import AuthStateUnavailable
+    from app.utils.mobile.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_oauth_code import redeem_oauth_code
 
     data = get_json_safe()
     code = str(data.get('code') or '').strip()
@@ -252,8 +252,8 @@ def exchange_session_for_tokens():
     long-lived refresh token for itself.
     """
     import uuid as _uuid
-    from app.utils.mobile_auth import request_authenticated_by_jwt
-    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_auth import request_authenticated_by_jwt
+    from app.utils.mobile.mobile_jwt import issue_token_pair
     from app.services.platform.user_analytics_service import start_user_session, log_user_activity
     from flask import session as flask_session
 
@@ -313,7 +313,7 @@ def mobile_logout():
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
         if token:
-            from app.utils.mobile_jwt import decode_mobile_token, decode_mobile_token_ignoring_expiry
+            from app.utils.mobile.mobile_jwt import decode_mobile_token, decode_mobile_token_ignoring_expiry
             try:
                 claims = decode_mobile_token(token, expected_type="access")
                 jwt_sid = claims.sid
@@ -335,7 +335,7 @@ def mobile_logout():
     # Blacklist the JWT session so any outstanding tokens for this session are rejected.
     if jwt_sid:
         with suppress(Exception):
-            from app.utils.mobile_jwt import revoke_token_family
+            from app.utils.mobile.mobile_jwt import revoke_token_family
             revoke_token_family(jwt_sid)
         try:
             add_session_to_blacklist(jwt_sid)
@@ -405,7 +405,7 @@ def mobile_change_password():
     if not current_user.check_password(current_password):
         return mobile_auth_error('Current password is incorrect.')
 
-    from app.utils.password_validator import validate_password_strength
+    from app.utils.auth.password_validator import validate_password_strength
     is_valid, errors = validate_password_strength(
         new_password,
         user_email=current_user.email,
@@ -427,7 +427,7 @@ def mobile_change_password():
         return mobile_ok(message='Password changed successfully.', requires_reauth=True)
     except Exception as e:
         current_app.logger.error("Password change failed: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error('Could not change password. Please try again.')
 
@@ -489,6 +489,6 @@ def mobile_update_profile():
         return mobile_ok(message='Profile updated successfully.')
     except Exception as e:
         current_app.logger.error("Profile update failed: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error('Could not update profile. Please try again.')

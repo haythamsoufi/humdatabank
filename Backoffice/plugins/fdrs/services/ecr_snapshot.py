@@ -20,7 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.utils.datetime_helpers import ensure_utc, naive_utc, utcnow
+from app.utils.common.datetime_helpers import ensure_utc, naive_utc, utcnow
 from plugins.fdrs.models import EveryoneCountsSnapshot
 
 logger = logging.getLogger(__name__)

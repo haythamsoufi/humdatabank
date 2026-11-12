@@ -19,7 +19,7 @@ from app.services.email.fds_access_request_digest import (
     send_fds_access_request_digest_email,
     send_fds_access_request_digests,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from tests.factories import create_test_country, create_test_user
 
 pytestmark = [pytest.mark.unit]

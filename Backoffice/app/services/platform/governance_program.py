@@ -33,7 +33,7 @@ from app.models import (
 )
 from app.models.enums import AssignmentEntityStatusValue
 from app.services.platform.governance_metrics_service import get_governance_metrics
-from app.utils.datetime_helpers import ensure_utc, naive_utc, utcnow
+from app.utils.common.datetime_helpers import ensure_utc, naive_utc, utcnow
 
 logger = logging.getLogger(__name__)
 

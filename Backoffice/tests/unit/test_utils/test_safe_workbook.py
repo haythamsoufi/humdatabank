@@ -5,7 +5,7 @@ import openpyxl
 import pytest
 from werkzeug.datastructures import FileStorage
 
-from app.utils.file_parsing import (
+from app.utils.files.file_parsing import (
     MAX_CSV_ROWS,
     UploadLimitError,
     load_json_upload,
@@ -13,7 +13,7 @@ from app.utils.file_parsing import (
     parse_excel_to_rows,
     read_stream_capped,
 )
-from app.utils.safe_workbook import (
+from app.utils.files.safe_workbook import (
     UnsafeWorkbookError,
     WorkbookLimits,
     inspect_xlsx,
@@ -202,7 +202,7 @@ def test_read_stream_capped_and_json_upload():
 
 
 _TRUSTED_WORKBOOK_READERS = {
-    "app/utils/safe_workbook.py",
+    "app/utils/files/safe_workbook.py",
     "plugins/fdrs/scripts/import_fdrs_form_data.py",
     "plugins/upr/scripts/upr_country_reporting_excel_template.py",
     "plugins/upr/scripts/unified_country_plan_excel_template.py",
@@ -231,7 +231,7 @@ def test_no_unguarded_workbook_loaders_in_upload_paths():
                     continue
                 if pattern.search(line) and "load_workbook_safe(" not in line:
                     offenders.append(f"{rel}:{lineno}")
-    assert not offenders, "Use app.utils.safe_workbook for untrusted workbooks: " + ", ".join(offenders)
+    assert not offenders, "Use app.utils.files.safe_workbook for untrusted workbooks: " + ", ".join(offenders)
 
 
 def test_path_sources_are_rejected_by_the_loader(tmp_path):

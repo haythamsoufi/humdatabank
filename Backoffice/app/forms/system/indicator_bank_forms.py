@@ -6,7 +6,7 @@ These forms are grouped together as they are all related to indicator bank funct
 
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from app.utils.request_utils import get_request_data
+from app.utils.http.request_utils import get_request_data
 from wtforms import StringField, TextAreaField, SubmitField, SelectField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Optional, Length, ValidationError
 from sqlalchemy.orm.attributes import flag_modified

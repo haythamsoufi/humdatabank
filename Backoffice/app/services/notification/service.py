@@ -11,7 +11,7 @@ This service handles:
 - Updating notification preferences
 """
 # ========== Notification Service ==========
-from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.common.datetime_helpers import utcnow, ensure_utc
 
 from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime, timedelta
@@ -110,7 +110,7 @@ class NotificationService:
             # to ensure we use the session locale
             try:
                 from flask_babel import force_locale
-                from app.utils.form_localization import get_translation_key
+                from app.utils.forms.form_localization import get_translation_key
 
                 locale_to_use = get_translation_key()
                 if locale_to_use:
@@ -133,7 +133,7 @@ class NotificationService:
     @staticmethod
     def _serialize_actor_user(user: User) -> Dict[str, Any]:
         """Build JSON-safe actor payload for notification UIs (initials + colour)."""
-        from app.utils.profile_utils import generate_color_from_email, display_initials
+        from app.utils.profiles.profile_utils import generate_color_from_email, display_initials
         name = (user.name or user.email or '').strip()
         initials = display_initials(name=user.name, email=user.email)
         color = user.profile_color if user.profile_color and user.profile_color != '#3B82F6' else None
@@ -587,7 +587,7 @@ class NotificationService:
 
         try:
             from app.models import Country
-            from app.utils.form_localization import get_localized_country_name
+            from app.utils.forms.form_localization import get_localized_country_name
             from flask_babel import force_locale
 
             country = Country.query.get(entity_id)
@@ -637,7 +637,7 @@ class NotificationService:
 
         try:
             from app.services.notification.core import translate_notification_message
-            from app.utils.form_localization import get_translation_key
+            from app.utils.forms.form_localization import get_translation_key
 
             locale_to_use = get_translation_key()
 
@@ -734,7 +734,7 @@ class NotificationService:
                     if message_params and 'template' in message_params:
                         try:
                             from app.models import AssignedForm, FormTemplate, PublicSubmission
-                            from app.utils.form_localization import get_localized_template_name
+                            from app.utils.forms.form_localization import get_localized_template_name
 
                             template = None
 
@@ -955,7 +955,7 @@ class NotificationService:
                                 if country:
                                     country_name = country.name  # Default to base name
                                     try:
-                                        from app.utils.form_localization import get_localized_country_name
+                                        from app.utils.forms.form_localization import get_localized_country_name
                                         country_name = get_localized_country_name(country)
                                     except (ImportError, AttributeError):
                                         country_name = country.name
@@ -1869,7 +1869,7 @@ class NotificationService:
         try:
             preferences = cls.get_notification_preferences(user_id)
 
-            from app.utils.notification_push import strip_push_preference_kwargs
+            from app.utils.notifications.notification_push import strip_push_preference_kwargs
             push_updates = strip_push_preference_kwargs({
                 'push_notifications': push_notifications,
                 'push_notification_types_enabled': push_notification_types_enabled,

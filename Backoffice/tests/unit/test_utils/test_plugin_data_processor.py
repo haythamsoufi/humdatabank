@@ -1,16 +1,16 @@
 """
-Unit tests for app/utils/plugin_data_processor.py – 100% coverage target.
+Unit tests for app/utils/forms/plugin_data_processor.py – 100% coverage target.
 """
 import json
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.utils.plugin_data_processor import (
+from app.utils.forms.plugin_data_processor import (
     PluginDataProcessor,
     process_form_plugin_data,
     plugin_data_processor,
 )
-from app.utils.schema_validation import SchemaValidationError
+from app.utils.forms.schema_validation import SchemaValidationError
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ class TestExtractEssentialPluginData:
         assert err == "rows must be a list"
 
     def test_oversized_raw_value_is_rejected_before_parsing(self):
-        from app.utils.plugin_data_processor import MAX_RAW_PLUGIN_VALUE_BYTES
+        from app.utils.forms.plugin_data_processor import MAX_RAW_PLUGIN_VALUE_BYTES
 
         proc = _make_processor()
         with patch.object(proc, '_get_plugin_type_for_field', return_value='custom'):
@@ -287,9 +287,9 @@ class TestProcessGenericPluginData:
             'data_storage_config': {'schema': schema}
         }
         proc.initialize(pm)
-        with patch('app.utils.plugin_data_processor.validate_plugin_data',
+        with patch('app.utils.forms.plugin_data_processor.validate_plugin_data',
                    side_effect=SchemaValidationError('bad')), \
-             patch('app.utils.plugin_data_processor.sanitize_plugin_data',
+             patch('app.utils.forms.plugin_data_processor.sanitize_plugin_data',
                    return_value={'name': 'clean'}) as mock_sanitize:
             ok, val, err = proc._process_generic_plugin_data({'name': 123}, 'custom', {})
         assert ok is True

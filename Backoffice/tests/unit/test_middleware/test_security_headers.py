@@ -140,7 +140,7 @@ class TestAddSecurityHeaders:
     def test_csp_nonce_failure_falls_back_gracefully(self, app):
         """When get_csp_nonce() raises, CSP header is still set (without nonce)."""
         with app.test_request_context("/dashboard"):
-            with patch("app.utils.csp_nonce.get_csp_nonce",
+            with patch("app.utils.security.csp_nonce.get_csp_nonce",
                        side_effect=Exception("nonce service down")):
                 from flask import make_response
                 result = add_security_headers(make_response("ok", 200))

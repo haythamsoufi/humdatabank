@@ -33,25 +33,25 @@ from app.routes.admin.shared import (
     get_localized_subsector_name,
     check_template_access,
 )
-from app.utils.request_utils import is_json_request
+from app.utils.http.request_utils import is_json_request
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.services.platform.user_analytics_service import log_admin_action
 from app.services.templates.excel_service import TemplateExcelService
 from app.services.imports.kobo_xls_import_service import KoboXlsImportService
 from app.services.imports.kobo_data_import_service import KoboDataImportService
-from app.utils.error_handling import handle_view_exception, handle_json_view_exception
+from app.utils.common.error_handling import handle_view_exception, handle_json_view_exception
 from app.services.forms.section_duplication_service import SectionDuplicationService
 from app.services.forms.item_duplication_service import ItemDuplicationService
 from flask import send_file
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, cast, String, select, inspect, literal
 from config.config import Config
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error, json_form_errors
-from app.utils.transactions import request_transaction_rollback
-from app.utils.datetime_helpers import utcnow
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.file_parsing import EXCEL_EXTENSIONS
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error, json_form_errors
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.files.file_parsing import EXCEL_EXTENSIONS
 from datetime import datetime
 import json
 import re

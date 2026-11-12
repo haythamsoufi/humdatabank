@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from flask import current_app
 from flask_babel import force_locale, gettext as _
 
-from app.utils.ai_utils import (
+from app.utils.ai.ai_utils import (
     is_form_builder_assistant_context,
     is_user_history_entry,
     openai_model_supports_sampling_params,
@@ -734,7 +734,7 @@ def _build_focal_orientation_fallback(
     pending_details: list,
 ) -> str:
     """Template fallback used only when the LLM is unavailable."""
-    from app.utils.datetime_helpers import parse_iso_utc, utcnow
+    from app.utils.common.datetime_helpers import parse_iso_utc, utcnow
 
     ns_phrase = f" for **{ns_label}**" if ns_label else ""
     lines = [
@@ -786,8 +786,8 @@ def _generate_focal_orientation_reply(
     from platform_context, with a small fast model and a tight system prompt
     that enforces the correct response format.
     """
-    from app.utils.datetime_helpers import parse_iso_utc, utcnow
-    from app.utils.ai_utils import openai_model_supports_sampling_params
+    from app.utils.common.datetime_helpers import parse_iso_utc, utcnow
+    from app.utils.ai.ai_utils import openai_model_supports_sampling_params
 
     lang = (preferred_language or "en").split("-")[0]
 

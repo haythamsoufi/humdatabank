@@ -86,7 +86,7 @@ class TestTransactionBeforeRequest:
 
     def test_opted_out_view_not_managed(self, app, client):
         """Views decorated with @no_auto_transaction skip transaction management."""
-        from app.utils.transactions import no_auto_transaction
+        from app.utils.database.transactions import no_auto_transaction
 
         with app.test_request_context("/test_opted_out"):
             with patch("app.middleware.transaction_middleware._get_view_func") as mock_gvf, \
@@ -380,7 +380,7 @@ class TestTransactionRegisteredHooks:
             assert g._auto_txn_managed is False
 
     def test_before_request_opted_out_view(self, app):
-        from app.utils.transactions import no_auto_transaction
+        from app.utils.database.transactions import no_auto_transaction
 
         @no_auto_transaction
         def opted_out():

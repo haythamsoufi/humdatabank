@@ -13,7 +13,7 @@ from flask import current_app
 from sqlalchemy import Index, UniqueConstraint, update, text
 from sqlalchemy.orm import sessionmaker
 from typing import Any, Dict, List, Optional, Tuple
-from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.common.datetime_helpers import utcnow, ensure_utc
 from app.services.security.api_key_permissions import (
     DATA_READ,
     KeyPermissions,

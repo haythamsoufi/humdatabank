@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def estimate_openai_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     """Estimate OpenAI API call cost using centralized pricing (config or defaults)."""
-    from app.utils.ai_pricing import estimate_chat_cost
+    from app.utils.ai.ai_pricing import estimate_chat_cost
     return estimate_chat_cost(model, input_tokens, output_tokens)
 
 

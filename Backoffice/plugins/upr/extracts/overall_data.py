@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.upr.dashboards.catalog import REPORT_ITEM_FALLBACKS, REPORT_TEMPLATE_ID
 from plugins.upr.dashboards.formatters import to_number
 from plugins.upr.dashboards.matrix import _funding_entity

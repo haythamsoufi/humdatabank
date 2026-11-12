@@ -10,11 +10,11 @@ from flask import request, current_app
 from flask_login import current_user
 
 from app import db
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.sql_utils import safe_ilike_pattern
-from app.utils.mobile_responses import (
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.database.sql_utils import safe_ilike_pattern
+from app.utils.mobile.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_not_found, mobile_forbidden,
     mobile_server_error, mobile_paginated, mobile_error,
 )
@@ -68,7 +68,7 @@ def _get_subsector_dict():
 def list_templates():
     """List form templates."""
     from app.models import FormTemplate
-    from app.utils.form_localization import get_localized_template_name
+    from app.utils.forms.form_localization import get_localized_template_name
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
 
@@ -114,7 +114,7 @@ def delete_template(template_id):
         return mobile_ok(message='Template deleted')
     except Exception as e:
         current_app.logger.error("delete_template: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -128,7 +128,7 @@ def delete_template(template_id):
 def list_assignments():
     """List form assignments (paginated)."""
     from app.models import AssignedForm, PublicSubmission
-    from app.utils.api_pagination import validate_pagination_params
+    from app.utils.api.api_pagination import validate_pagination_params
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
 
@@ -296,7 +296,7 @@ def delete_assignment(assignment_id):
         return mobile_ok(message='Assignment deleted')
     except Exception as e:
         current_app.logger.error("delete_assignment: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -325,7 +325,7 @@ def toggle_public_access(assignment_id):
         )
     except Exception as e:
         current_app.logger.error("toggle_public_access: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -353,7 +353,7 @@ def generate_public_url(assignment_id):
         )
     except Exception as e:
         current_app.logger.error("generate_public_url: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -517,7 +517,7 @@ def delete_document(document_id):
         return mobile_ok(message='Document deleted')
     except Exception as e:
         current_app.logger.error("delete_document: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -650,7 +650,7 @@ def delete_resource(resource_id):
         return mobile_ok(message='Resource deleted')
     except Exception as e:
         current_app.logger.error("delete_resource: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -982,7 +982,7 @@ def edit_indicator(indicator_id):
         return mobile_ok(message='Indicator updated')
     except Exception as e:
         current_app.logger.error("edit_indicator: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -1021,7 +1021,7 @@ def delete_indicator(indicator_id):
         return mobile_ok(message='Indicator deleted')
     except Exception as e:
         current_app.logger.error("delete_indicator: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -1045,7 +1045,7 @@ def archive_indicator(indicator_id):
         )
     except Exception as e:
         current_app.logger.error("archive_indicator: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 

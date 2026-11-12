@@ -5,7 +5,7 @@ from markupsafe import escape
 from app.models.assignments import AssignmentEntityStatus
 from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.form_integration import EntryRenderRequestError, parse_entry_render_args
-from app.utils.form_authorization import redirect_if_assignment_entry_blocked
+from app.utils.forms.form_authorization import redirect_if_assignment_entry_blocked
 
 
 bp = Blueprint("plugins_api", __name__, url_prefix="/api/plugins")

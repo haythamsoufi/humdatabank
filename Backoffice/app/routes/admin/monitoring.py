@@ -7,9 +7,9 @@ from flask import Blueprint, render_template, request, current_app, send_file, a
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 from app.routes.admin.shared import admin_required, admin_permission_required, system_manager_required
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_error, json_error_handler, json_not_found, json_ok, json_server_error
-from app.utils.constants import MAX_LOG_ROTATION_KEEP_LINES, MAX_LOG_TAIL_LINES
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_error, json_error_handler, json_not_found, json_ok, json_server_error
+from app.utils.common.constants import MAX_LOG_ROTATION_KEEP_LINES, MAX_LOG_TAIL_LINES
 from app.services.monitoring.memory import memory_monitor
 from app.services.monitoring.system import system_monitor
 from app.services.security.monitoring import SecurityMonitor
@@ -227,7 +227,7 @@ def get_monitoring_logs():
         get_monitoring_logs._last_rotation_check = current_time
 
     # Get query parameters
-    from app.utils.api_pagination import validate_pagination_params
+    from app.utils.api.api_pagination import validate_pagination_params
     page, per_page = validate_pagination_params(request.args, default_per_page=100, max_per_page=500)
     search = request.args.get('search', '').strip()
     log_source = request.args.get('log_source', 'all')  # all, memory, system, application
@@ -513,7 +513,7 @@ def get_system_logs():
         )
 
     # Get query parameters
-    from app.utils.api_pagination import validate_pagination_params
+    from app.utils.api.api_pagination import validate_pagination_params
     page, per_page = validate_pagination_params(request.args, default_per_page=100, max_per_page=500)
     search = request.args.get('search', '').strip()
 
@@ -569,7 +569,7 @@ def test_error_notification():
     Only use this for testing the notification system.
     """
     from app.models import User
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     try:
         from app.models.rbac import RbacUserRole, RbacRole
@@ -578,7 +578,7 @@ def test_error_notification():
         RbacRole = None
 
     # Get request method to determine response format
-    from app.utils.request_utils import is_json_request
+    from app.utils.http.request_utils import is_json_request
     is_json = is_json_request() or request.args.get('format') == 'json'
 
     # Create test error message

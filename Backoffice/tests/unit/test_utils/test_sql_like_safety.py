@@ -1,5 +1,5 @@
 """
-Unit tests for LIKE/ILIKE safety primitives in ``app/utils/sql_utils.py`` plus a
+Unit tests for LIKE/ILIKE safety primitives in ``app/utils/database/sql_utils.py`` plus a
 source-tree scan that fails when a new ``.ilike()`` / ``.like()`` / ``.contains()``
 call interpolates a non-constant value without escaping.
 """
@@ -13,7 +13,7 @@ from sqlalchemy import Column, String
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import declarative_base
 
-from app.utils.sql_utils import (
+from app.utils.database.sql_utils import (
     contains_literal,
     escape_like_wildcards,
     ilike_contains,
@@ -320,7 +320,7 @@ def test_no_unescaped_like_patterns_in_source_tree():
             except SyntaxError:
                 continue
     assert not findings, (
-        "Unescaped LIKE/ILIKE/contains pattern (use app.utils.sql_utils helpers: "
+        "Unescaped LIKE/ILIKE/contains pattern (use app.utils.database.sql_utils helpers: "
         "ilike_contains, like_contains, safe_ilike_pattern, or contains(..., autoescape=True)):\n"
         + "\n".join(findings)
     )

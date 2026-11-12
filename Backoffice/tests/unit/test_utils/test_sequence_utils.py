@@ -1,5 +1,5 @@
 """
-Unit tests for app/utils/sequence_utils.py – 100% coverage target.
+Unit tests for app/utils/database/sequence_utils.py – 100% coverage target.
 
 Database interactions are fully mocked via SQLAlchemy engine patches
 so no live database is needed.
@@ -7,7 +7,7 @@ so no live database is needed.
 import pytest
 from unittest.mock import MagicMock, patch, call
 
-from app.utils.sequence_utils import (
+from app.utils.database.sequence_utils import (
     _valid_identifier,
     get_tables_with_id_column,
     reset_table_sequence,
@@ -79,7 +79,7 @@ class TestGetTablesWithIdColumn:
             mock_result.fetchall.return_value = [('users',), ('organizations',)]
             conn.execute.return_value = mock_result
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 result = get_tables_with_id_column()
             assert 'users' in result
@@ -92,7 +92,7 @@ class TestGetTablesWithIdColumn:
             mock_result.fetchall.return_value = [('users',), ('bad-table',), (None,)]
             conn.execute.return_value = mock_result
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 result = get_tables_with_id_column()
             assert 'users' in result
@@ -100,7 +100,7 @@ class TestGetTablesWithIdColumn:
 
     def test_exception_returns_empty(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.side_effect = Exception('connection failed')
                 result = get_tables_with_id_column()
             assert result == []
@@ -127,7 +127,7 @@ class TestResetTableSequence:
             # to_regclass returns False (table not found)
             conn.execute.return_value.scalar.return_value = False
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 ok, reason = reset_table_sequence('ghost_table')
             assert ok is False
@@ -142,7 +142,7 @@ class TestResetTableSequence:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 ok, reason = reset_table_sequence('users')
             assert ok is False
@@ -158,7 +158,7 @@ class TestResetTableSequence:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 ok, reason = reset_table_sequence('users')
             assert ok is False
@@ -176,7 +176,7 @@ class TestResetTableSequence:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 ok, reason = reset_table_sequence('users')
             assert ok is True
@@ -195,14 +195,14 @@ class TestResetTableSequence:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 ok, reason = reset_table_sequence('users')
             assert ok is True
 
     def test_exception_returns_false_error(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.side_effect = Exception('boom')
                 ok, reason = reset_table_sequence('users')
             assert ok is False
@@ -227,7 +227,7 @@ class TestCheckSequenceStatus:
             ctx, conn = _make_conn_ctx()
             conn.execute.return_value.scalar.return_value = False
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('ghost')
             assert status == 'skip'
@@ -241,7 +241,7 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('users')
             assert status == 'skip'
@@ -256,7 +256,7 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('users')
             assert status == 'skip'
@@ -273,7 +273,7 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('users')
             assert status == 'skip'
@@ -290,7 +290,7 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('users')
             assert status == 'ok'
@@ -307,7 +307,7 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('users')
             assert status == 'needs_reset'
@@ -325,7 +325,7 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('users')
             assert status == 'ok'
@@ -342,7 +342,7 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, detail = check_sequence_status('users')
             assert status == 'needs_reset'
@@ -360,14 +360,14 @@ class TestCheckSequenceStatus:
             ]
             conn.execute.side_effect = exec_results
 
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.return_value = ctx
                 status, _ = check_sequence_status('users')
             assert status == 'ok'
 
     def test_exception_returns_skip(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.db') as mock_db:
+            with patch('app.utils.database.sequence_utils.db') as mock_db:
                 mock_db.engine.connect.side_effect = Exception('crash')
                 status, detail = check_sequence_status('users')
             assert status == 'skip'
@@ -381,8 +381,8 @@ class TestCheckSequenceStatus:
 class TestScanSequencesStatus:
     def test_returns_list_of_tuples(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.get_tables_with_id_column', return_value=['users', 'orgs']), \
-                 patch('app.utils.sequence_utils.check_sequence_status', return_value=('ok', 'ok')):
+            with patch('app.utils.database.sequence_utils.get_tables_with_id_column', return_value=['users', 'orgs']), \
+                 patch('app.utils.database.sequence_utils.check_sequence_status', return_value=('ok', 'ok')):
                 result = scan_sequences_status()
             assert isinstance(result, list)
             assert len(result) == 2
@@ -391,7 +391,7 @@ class TestScanSequencesStatus:
 
     def test_empty_tables_returns_empty_list(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.get_tables_with_id_column', return_value=[]):
+            with patch('app.utils.database.sequence_utils.get_tables_with_id_column', return_value=[]):
                 result = scan_sequences_status()
             assert result == []
 
@@ -403,14 +403,14 @@ class TestScanSequencesStatus:
 class TestResetUserSequence:
     def test_delegates_to_reset_table_sequence(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.reset_table_sequence', return_value=(True, 'reset')) as mock_reset:
+            with patch('app.utils.database.sequence_utils.reset_table_sequence', return_value=(True, 'reset')) as mock_reset:
                 result = reset_user_sequence()
             mock_reset.assert_called_once_with('user', schema='public')
             assert result is True
 
     def test_returns_false_on_failure(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.reset_table_sequence', return_value=(False, 'error')):
+            with patch('app.utils.database.sequence_utils.reset_table_sequence', return_value=(False, 'error')):
                 result = reset_user_sequence()
             assert result is False
 
@@ -422,14 +422,14 @@ class TestResetUserSequence:
 class TestScanAndResetAllSequences:
     def test_returns_list_of_tuples(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.get_tables_with_id_column', return_value=['users']), \
-                 patch('app.utils.sequence_utils.reset_table_sequence', return_value=(True, 'reset')):
+            with patch('app.utils.database.sequence_utils.get_tables_with_id_column', return_value=['users']), \
+                 patch('app.utils.database.sequence_utils.reset_table_sequence', return_value=(True, 'reset')):
                 result = scan_and_reset_all_sequences()
             assert result == [('users', True, 'reset')]
 
     def test_empty_tables_returns_empty(self, app):
         with app.app_context():
-            with patch('app.utils.sequence_utils.get_tables_with_id_column', return_value=[]):
+            with patch('app.utils.database.sequence_utils.get_tables_with_id_column', return_value=[]):
                 result = scan_and_reset_all_sequences()
             assert result == []
 
@@ -437,8 +437,8 @@ class TestScanAndResetAllSequences:
         with app.app_context():
             tables = ['users', 'orgs', 'assignments']
             side_effects = [(True, 'reset'), (False, 'error'), (True, 'reset')]
-            with patch('app.utils.sequence_utils.get_tables_with_id_column', return_value=tables), \
-                 patch('app.utils.sequence_utils.reset_table_sequence', side_effect=side_effects):
+            with patch('app.utils.database.sequence_utils.get_tables_with_id_column', return_value=tables), \
+                 patch('app.utils.database.sequence_utils.reset_table_sequence', side_effect=side_effects):
                 result = scan_and_reset_all_sequences()
             assert len(result) == 3
             assert result[0] == ('users', True, 'reset')

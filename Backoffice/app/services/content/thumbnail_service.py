@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urlparse
 from flask import current_app
 
 from app.services.platform import storage_service as storage
-from app.utils.safe_image import clamp_render_scale, open_image_safe, render_page_size
+from app.utils.files.safe_image import clamp_render_scale, open_image_safe, render_page_size
 
 _OFFICE_MEDIA = ("word/media/", "ppt/media/", "xl/media/")
 _YOUTUBE_IMAGE_HOSTS = ("img.youtube.com", "i.ytimg.com")
@@ -335,7 +335,7 @@ class ThumbnailService:
 
     @staticmethod
     def _cover_hosts() -> tuple:
-        from app.utils.external_url_validation import resource_link_hosts
+        from app.utils.http.external_url_validation import resource_link_hosts
 
         hosts = list(resource_link_hosts())
         if "data-api.ifrc.org" not in hosts:
@@ -347,7 +347,7 @@ class ThumbnailService:
         import urllib.parse
         import urllib.request
 
-        from app.utils.outbound_url import validate_outbound_url
+        from app.utils.http.outbound_url import validate_outbound_url
 
         parts = urllib.parse.urlsplit(url)
         url = urllib.parse.urlunsplit((

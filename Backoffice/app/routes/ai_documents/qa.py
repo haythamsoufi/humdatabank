@@ -15,10 +15,10 @@ from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk
 from app.services.ai.documents.vector_store import AIVectorStore
 from plugins.upr.ai import document_answering as upr_doc_answering
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_responses import json_ok, json_bad_request, json_server_error
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_responses import json_ok, json_bad_request, json_server_error
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 from . import ai_docs_bp
 from .helpers import (
@@ -702,7 +702,7 @@ def _llm_extract_requested_years(*, client, model_name: str, query: str) -> list
     if years:
         return years
     try:
-        from app.utils.ai_utils import openai_model_supports_sampling_params
+        from app.utils.ai.ai_utils import openai_model_supports_sampling_params
 
         create_fn = client.chat.completions.create
         system_prompt = (
@@ -777,7 +777,7 @@ def _llm_select_document_ids(
     if len(cand_ids) <= max_docs and cand_ids:
         return cand_ids[:max_docs]
     try:
-        from app.utils.ai_utils import openai_model_supports_sampling_params
+        from app.utils.ai.ai_utils import openai_model_supports_sampling_params
 
         create_fn = client.chat.completions.create
         system_prompt = (

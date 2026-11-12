@@ -24,7 +24,7 @@ from app.models.enums import (
     AITraceReviewVerdictValue,
 )
 from app.models.enum_columns import pg_str_enum_column
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 # Many-to-many association table: AI documents ↔ countries
 ai_document_countries = db.Table(

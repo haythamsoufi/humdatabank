@@ -11,32 +11,32 @@ from flask import request, flash, redirect, url_for, current_app, render_templat
 from flask_login import current_user
 from flask_babel import _, ngettext
 from openpyxl import Workbook
-from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
+from app.utils.files.safe_workbook import load_workbook_safe, safe_iter_rows
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side, Protection
 from openpyxl.utils import get_column_letter
 from werkzeug.utils import secure_filename
 
 from app.forms.content import TranslationForm
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
-from app.utils.request_utils import is_json_request, get_request_data
+from app.utils.http.request_utils import is_json_request, get_request_data
 from app.services.translation.auto_translator import translate_text as auto_translate_text
 from app.services.translation.placeholder_validator import validate_placeholders_if_present, localized_validation_message
 from app.extensions import limiter
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_ok, json_server_error, require_json_data, require_json_keys
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_responses import json_bad_request, json_error, json_forbidden, json_ok, json_server_error, require_json_data, require_json_keys
 
 from app.routes.admin.utilities import bp
 from app.routes.admin.utilities.helpers import _translations_dir, _translations_po_path, _translations_pot_path, _entry_to_display_msgstr, _extract_page_name
-from app.utils.po_lock import po_file_lock, touch_translation_sentinel
-from app.utils.po_persistence import finalize_translation_writes
+from app.utils.i18n.po_lock import po_file_lock, touch_translation_sentinel
+from app.utils.i18n.po_persistence import finalize_translation_writes
 
 logger = logging.getLogger(__name__)
 
 
 def _language_display_name(lang_code):
     """Human-readable label for a locale code (for flash messages)."""
-    from app.utils.language_labels import language_display_name
+    from app.utils.i18n.language_labels import language_display_name
 
     return language_display_name(lang_code, fallback=str(lang_code).upper())
 
@@ -176,7 +176,7 @@ def _decode_translation_payload(data):
         return data, None
 
     try:
-        from app.utils.request_utils import _JsonFormProxy
+        from app.utils.http.request_utils import _JsonFormProxy
         import base64 as _b64
 
         decoded = _b64.b64decode(str(payload)).decode("utf-8")
@@ -704,7 +704,7 @@ def export_translations():
         logger.debug("translation export auto_filter failed: %s", e)
 
     out = io.BytesIO()
-    from app.utils.export_safety import sanitize_workbook
+    from app.utils.files.export_safety import sanitize_workbook
     sanitize_workbook(wb)
     wb.save(out)
     out.seek(0)
@@ -835,7 +835,7 @@ def import_translations():
         temp_dir = None
         try:
             filename = secure_filename(file.filename)
-            from app.utils.file_paths import get_temp_upload_path
+            from app.utils.files.file_paths import get_temp_upload_path
 
             temp_dir = get_temp_upload_path()
             os.makedirs(temp_dir, exist_ok=True)
@@ -970,7 +970,7 @@ def import_translations():
         temp_path = None
         try:
             filename = secure_filename(file.filename)
-            from app.utils.file_paths import get_temp_upload_path
+            from app.utils.files.file_paths import get_temp_upload_path
 
             temp_dir = get_temp_upload_path()
             os.makedirs(temp_dir, exist_ok=True)

@@ -2,9 +2,9 @@ import json
 import base64
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, g
-from app.utils.api_helpers import get_json_safe, GENERIC_ERROR_MESSAGE
-from app.utils.request_utils import get_request_data
-from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_ok, json_server_error
+from app.utils.api.api_helpers import get_json_safe, GENERIC_ERROR_MESSAGE
+from app.utils.http.request_utils import get_request_data
+from app.utils.api.api_responses import json_bad_request, json_error, json_forbidden, json_ok, json_server_error
 from flask_login import login_required, current_user
 from app.routes.admin.shared import admin_required, admin_permission_required
 from config import Config
@@ -528,7 +528,7 @@ def _manage_settings_form_baseline(
         key = nt.value
         base[f"notification_priority_{key}"] = (notification_priorities or {}).get(key) or "normal"
 
-    from app.utils.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
+    from app.utils.notifications.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
 
     merged_aud = merged_notification_audience_rules or {}
     for spec in NOTIFICATION_TYPE_REGISTRY_SPECS:
@@ -632,7 +632,7 @@ def _format_manage_settings_audit_description(detail):
 
 def _notification_audience_rules_from_post(data) -> dict:
     """Build notification_audience_rules from POST keys ``na_fp_<type>``, ``na_au_<type>``, ``na_sm_<type>``."""
-    from app.utils.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
+    from app.utils.notifications.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
 
     def _truthy(val):
         if val is None:
@@ -773,7 +773,7 @@ def manage_settings():
         except (TypeError, ValueError):
             return 90
 
-    from app.utils.notification_registry import build_notification_settings_delivery_rows
+    from app.utils.notifications.notification_registry import build_notification_settings_delivery_rows
 
     notification_delivery_catalog = build_notification_settings_delivery_rows(
         _manage_settings_ttl_resolve,
@@ -802,7 +802,7 @@ def manage_settings():
         #     we merge them on top of a baseline mirroring the rendered form so that
         #     unconditional sections below (languages, document types, audience rules…)
         #     don't overwrite untouched settings with empty values.
-        from app.utils.request_utils import _JsonFormProxy  # local import to avoid API surface changes
+        from app.utils.http.request_utils import _JsonFormProxy  # local import to avoid API surface changes
 
         def _truthy_flag(val):
             if isinstance(val, bool):
@@ -1275,7 +1275,7 @@ def manage_settings():
                 # Prefetch language flags ONLY when supported languages change.
                 with suppress(Exception):
                     if bool(current_app.config.get('SHOW_LANGUAGE_FLAGS', True)):
-                        from app.utils.language_flags import prefetch_language_flags_to_local_cache
+                        from app.utils.i18n.language_flags import prefetch_language_flags_to_local_cache
                         saved_supported = list(current_app.config.get('SUPPORTED_LANGUAGES') or [])
                         newly_added = sorted(set(saved_supported) - previous_supported)
                         if newly_added:
@@ -1334,8 +1334,8 @@ def manage_settings():
     _primary_lang_disp = getattr(Config, "LANGUAGE_DISPLAY_NAMES", None) or {}
     merged_language_display_names = {**_all_lang_disp, **_primary_lang_disp}
 
-    from app.utils.branding_visual_assets import branding_visual_assets_ui_context, branding_visual_upload_available
-    from app.utils.security_startup import deployment_security_flag_codes
+    from app.utils.branding.branding_visual_assets import branding_visual_assets_ui_context, branding_visual_upload_available
+    from app.utils.security.security_startup import deployment_security_flag_codes
 
     _branding_visual_ui = branding_visual_assets_ui_context()
 
@@ -1384,7 +1384,7 @@ def manage_settings():
 @admin_permission_required("admin.settings.manage")
 def branding_assets_upload():
     """Multipart upload for org logo/favicon before the JSON settings save. Azure Blob only."""
-    from app.utils.branding_visual_assets import (
+    from app.utils.branding.branding_visual_assets import (
         branding_visual_upload_available,
         delete_branding_object_if_present,
         upload_organization_favicon,
@@ -1883,7 +1883,7 @@ def api_languages_settings():
             # Prefetch flags ONLY if new languages were added.
             with suppress(Exception):
                 if bool(get_show_language_flags(default=True)):
-                    from app.utils.language_flags import prefetch_language_flags_to_local_cache
+                    from app.utils.i18n.language_flags import prefetch_language_flags_to_local_cache
                     saved_supported = list(current_app.config.get('SUPPORTED_LANGUAGES') or [])
                     newly_added = sorted(set(saved_supported) - previous_supported)
                     if newly_added:

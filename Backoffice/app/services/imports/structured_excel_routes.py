@@ -14,8 +14,8 @@ from app.services.monitoring.memory import memory_tracker
 from app.services.notification.core import log_entity_activity
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.platform.user_analytics_service import log_user_activity
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
-from app.utils.request_utils import is_json_request
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
+from app.utils.http.request_utils import is_json_request
 
 # Plugin-owned (predicate, build_workbook) pairs. Email snapshots and any
 # later caller walk this list instead of naming template ids.

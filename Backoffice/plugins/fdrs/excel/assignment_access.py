@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
 
 def _template_id(assigned_form) -> int:

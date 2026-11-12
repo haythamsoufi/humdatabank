@@ -20,10 +20,10 @@ from flask import request
 
 from app.extensions import db
 from app.models import AssignedForm, Country, FormData, FormItem
-from app.utils.api_serialization import _wrap_disagg_dict
+from app.utils.api.api_serialization import _wrap_disagg_dict
 from app.models.assignments import AssignmentEntityStatus
 from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
-from app.utils.api_helpers import (
+from app.utils.api.api_helpers import (
     DEFAULT_PAGE,
     DEFAULT_PER_PAGE,
     GENERIC_ERROR_MESSAGE,
@@ -31,10 +31,10 @@ from app.utils.api_helpers import (
     api_error,
     json_data_response,
 )
-from app.utils.auth import require_api_key_or_session
+from app.utils.auth.auth import require_api_key_or_session
 from app.services.security.api_key_permissions import CONTENT_READ
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.common.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
 
 # Owned by this plugin — PluginManager merges these into API Management.

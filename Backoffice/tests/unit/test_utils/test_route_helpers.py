@@ -1,10 +1,10 @@
 """
-Unit tests for app/utils/route_helpers.py – 100% coverage target.
+Unit tests for app/utils/http/route_helpers.py – 100% coverage target.
 """
 import pytest
 from unittest.mock import MagicMock
 
-from app.utils.route_helpers import (
+from app.utils.http.route_helpers import (
     normalize_value_for_display,
     get_unified_form_url,
     get_unified_form_item_id,

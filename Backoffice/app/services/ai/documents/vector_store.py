@@ -20,7 +20,7 @@ from app.extensions import db
 from app.models import AIDocument, AIDocumentChunk, AIEmbedding, Country
 from app.models.embeddings import ai_document_countries
 from app.services.ai.documents.embedding import AIEmbeddingService, EmbeddingCache
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ import pytest
 from flask import Flask
 from werkzeug.datastructures import FileStorage
 
-from app.utils.file_scanning import FileScanError, scan_file_for_viruses
+from app.utils.files.file_scanning import FileScanError, scan_file_for_viruses
 
 
 @pytest.fixture()

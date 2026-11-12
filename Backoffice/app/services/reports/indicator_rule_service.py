@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Country, IndicatorBank
-from app.utils.sql_utils import ilike_contains
+from app.utils.database.sql_utils import ilike_contains
 
 
 def _normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:

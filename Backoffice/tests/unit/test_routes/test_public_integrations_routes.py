@@ -125,7 +125,7 @@ class TestPublicErrorExposure:
         assert "secret.py" not in body and "psycopg2" not in body
 
     def test_client_input_error_message_is_preserved(self, client):
-        from app.utils.api_errors import ClientInputError
+        from app.utils.api.api_errors import ClientInputError
 
         with patch(
             "app.routes.api.public_integrations.aggregate_global_trend",

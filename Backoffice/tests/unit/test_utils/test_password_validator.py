@@ -2,7 +2,7 @@
 Unit tests for password validation utilities.
 """
 import pytest
-from app.utils.password_validator import (
+from app.utils.auth.password_validator import (
     PasswordValidator,
     validate_password_strength,
     get_password_strength

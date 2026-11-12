@@ -6,11 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from app.utils.activity_endpoint_catalog import (
+from app.utils.activity.activity_endpoint_catalog import (
     ENDPOINT_ACTIVITY_SPECS,
     resolve_activity_catalog_spec,
 )
-from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec
+from app.utils.activity.activity_endpoint_catalog.spec import ActivityEndpointSpec
 
 
 # ---------------------------------------------------------------------------
@@ -23,8 +23,8 @@ def test_merge_registry_wildcard_removes_method_specific_rows():
     _merge_registry applies wildcard '*' overrides by removing all existing
     (method, endpoint) pairs for that endpoint and inserting ('*', endpoint).
     """
-    from app.utils.activity_endpoint_catalog import _merge_registry
-    from app.utils.activity_endpoint_catalog.manual_overrides import MANUAL_ACTIVITY_OVERRIDES
+    from app.utils.activity.activity_endpoint_catalog import _merge_registry
+    from app.utils.activity.activity_endpoint_catalog.manual_overrides import MANUAL_ACTIVITY_OVERRIDES
 
     # Build a fake generated catalog that has an entry for an endpoint that
     # also has a wildcard in MANUAL_ACTIVITY_OVERRIDES (if any), or inject one.
@@ -43,10 +43,10 @@ def test_merge_registry_wildcard_removes_method_specific_rows():
             ("*", "fake_bp.some_action"): ActivityEndpointSpec(description="Wildcard override"),
         }
         with patch(
-            "app.utils.activity_endpoint_catalog.GENERATED_ACTIVITY_SPECS",
+            "app.utils.activity.activity_endpoint_catalog.GENERATED_ACTIVITY_SPECS",
             fake_spec_gen,
         ), patch(
-            "app.utils.activity_endpoint_catalog.MANUAL_ACTIVITY_OVERRIDES",
+            "app.utils.activity.activity_endpoint_catalog.MANUAL_ACTIVITY_OVERRIDES",
             fake_override,
         ):
             result = _merge_registry()
@@ -92,7 +92,7 @@ def test_wildcard_method_resolution():
     wildcard_registry = {
         ("*", "some.action"): ActivityEndpointSpec(description="wildcard hit"),
     }
-    from app.utils.activity_endpoint_catalog.spec import lookup_activity_endpoint_spec
+    from app.utils.activity.activity_endpoint_catalog.spec import lookup_activity_endpoint_spec
 
     result = lookup_activity_endpoint_spec("DELETE", "some.action", wildcard_registry)
     assert result is not None

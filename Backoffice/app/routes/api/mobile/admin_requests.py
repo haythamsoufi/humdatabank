@@ -6,8 +6,8 @@ from flask_login import current_user
 
 from app import db
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import (
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_not_found, mobile_server_error,
 )
 from app.routes.api.mobile import mobile_bp
@@ -114,7 +114,7 @@ def approve_access_request(request_id):
         return mobile_ok(message='Access request approved')
     except Exception as e:
         current_app.logger.error("approve_access_request: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -162,7 +162,7 @@ def reject_access_request(request_id):
         return mobile_ok(message='Access request rejected')
     except Exception as e:
         current_app.logger.error("reject_access_request: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -227,6 +227,6 @@ def approve_all_access_requests():
         return mobile_ok(message=f'{approved_count} request(s) approved', data={'approved_count': approved_count})
     except Exception as e:
         current_app.logger.error("approve_all_access_requests: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()

@@ -6,12 +6,12 @@ from app.models.rbac import RbacUserRole, RbacRole
 from sqlalchemy import or_, func
 from contextlib import suppress
 
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_ok, json_server_error
+from app.utils.common.error_handling import handle_json_view_exception
 from app.extensions import limiter
-from app.utils.rate_limiting import per_user_rate_limit_key
-from app.utils.profile_summary_payload import (
+from app.utils.security.rate_limiting import per_user_rate_limit_key
+from app.utils.profiles.profile_summary_payload import (
     role_badge_key_from_rbac_codes,
     collect_arg_strings,
     parse_uuid_list,

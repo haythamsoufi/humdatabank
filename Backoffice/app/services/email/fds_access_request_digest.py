@@ -10,7 +10,7 @@ from flask import current_app
 from markupsafe import escape
 
 from app.extensions import db
-from app.utils.sql_utils import escape_like_wildcards
+from app.utils.database.sql_utils import escape_like_wildcards
 from app.models import EmailDeliveryLog, User
 from app.services.platform.app_settings_service import (
     get_auto_approve_access_requests,
@@ -33,12 +33,12 @@ from app.services.email.delivery import (
 )
 from app.services.email.rendering import render_admin_email_template
 from app.services.email.service import get_fds_access_request_digest_default_template
-from app.utils.datetime_helpers import (
+from app.utils.common.datetime_helpers import (
     format_in_org_timezone,
     now_in_org_timezone,
     org_day_start_utc,
 )
-from app.utils.organization_helpers import get_org_copyright_year, get_org_name, get_org_team_email
+from app.utils.organization.organization_helpers import get_org_copyright_year, get_org_name, get_org_team_email
 
 # Stable path for user_management.access_requests (scheduler has no HTTP request context).
 ACCESS_REQUESTS_ADMIN_PATH = '/admin/access-requests'
@@ -358,8 +358,8 @@ def run_fds_access_request_digest_job(*, manual: bool = False) -> FdsDigestRunRe
     # FDS digest batch concurrently when REDIS_URL is unset.  Manual admin runs bypass
     # the lock so a forced re-send always executes regardless of whether the scheduled
     # run is in progress.
-    from app.utils.constants import DEFAULT_FDS_DIGEST_LOCK_ID
-    from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+    from app.utils.common.constants import DEFAULT_FDS_DIGEST_LOCK_ID
+    from app.utils.database.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
     use_pg_lock = not manual and db.engine.dialect.name == "postgresql"
     lock_acquired = False

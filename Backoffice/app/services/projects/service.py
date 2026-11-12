@@ -9,7 +9,7 @@ from app import db
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.enums import AssignmentEntityStatusValue, AssignmentScope, EntityType
 from app.models.projects import Project
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 # Separator in period_name for project_cycle assignments: "<reference> · Y1Q2"
 CYCLE_PERIOD_SEP = " · "

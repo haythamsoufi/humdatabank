@@ -2335,7 +2335,7 @@ def run_import(
         if fdrs_from_data_api:
             from flask import current_app
             from fdrs_data_fetcher import build_fdrs_table
-            from app.utils.datetime_helpers import utcnow
+            from app.utils.common.datetime_helpers import utcnow
 
             base_data = (
                 (fdrs_data_api_base or "").strip().rstrip("/")
@@ -2610,7 +2610,7 @@ def run_import(
 
         valid_form_item_ids = None
         if template_id is not None:
-            from app.utils.stable_key import published_form_item_id_set
+            from app.utils.templates.stable_key import published_form_item_id_set
 
             valid_form_item_ids = published_form_item_id_set(int(template_id))
 

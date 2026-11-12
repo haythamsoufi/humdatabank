@@ -1,6 +1,6 @@
 """Tests for structured AI chat sources parsing / synthesis."""
 
-from app.utils.ai_sources_parser import (
+from app.utils.ai.ai_sources_parser import (
     merge_structured_sources,
     parse_labeled_sources,
     render_sources_body_html,

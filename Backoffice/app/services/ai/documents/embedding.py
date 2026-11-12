@@ -65,7 +65,7 @@ class AIEmbeddingService:
             raise EmbeddingError("Cannot generate embedding for empty text")
         _span_ctx = None
         try:
-            from app.utils.ai_tracing import span
+            from app.utils.ai.ai_tracing import span
             _span_ctx = span("ai.embedding.generate", {"model": self.model})
             _span_ctx.__enter__()
         except Exception:
@@ -157,7 +157,7 @@ class AIEmbeddingService:
 
     def estimate_cost(self, total_tokens: int) -> float:
         """Estimate cost for embedding a given number of tokens (centralized pricing)."""
-        from app.utils.ai_pricing import get_embedding_pricing
+        from app.utils.ai.ai_pricing import get_embedding_pricing
         return total_tokens * get_embedding_pricing(self.model)
 
     def warmup(self) -> bool:

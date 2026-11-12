@@ -7,7 +7,7 @@ Default behavior (managed requests):
 - Always remove the session (or on-close for streaming responses)
 
 Opt-outs:
-- Views decorated with @no_auto_transaction (see app/utils/transactions.py)
+- Views decorated with @no_auto_transaction (see app/utils/database/transactions.py)
 - Streaming responses (SSE/generator responses) are not auto-committed/rolled back;
   session removal is deferred to response close.
 """
@@ -21,7 +21,7 @@ from typing import Any, Optional
 from flask import current_app, g, request
 
 from app.extensions import db
-from app.utils.transactions import (
+from app.utils.database.transactions import (
     is_streaming_response,
     is_view_forced,
     is_view_opted_out,

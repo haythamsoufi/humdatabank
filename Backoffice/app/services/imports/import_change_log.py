@@ -24,7 +24,7 @@ from flask import current_app, has_app_context, url_for
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.extensions import db
-from app.utils.audit_context import set_audit_details
+from app.utils.audit.audit_context import set_audit_details
 
 logger = logging.getLogger(__name__)
 

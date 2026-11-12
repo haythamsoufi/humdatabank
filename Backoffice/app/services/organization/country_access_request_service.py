@@ -9,7 +9,7 @@ from app.extensions import db
 from app.models import CountryAccessRequest, UserEntityPermission
 from app.models.enums import CountryAccessRequestStatusValue, EntityType
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 AUTO_RESOLVED_ADMIN_NOTE = (
     "Access already granted outside the request workflow."

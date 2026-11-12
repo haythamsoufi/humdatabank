@@ -35,7 +35,7 @@ client -> reverse proxy -> ProxyFix (PROXY_FIX_X_*) -> request hooks -> site loc
        -> auth (cookie session | mobile Bearer JWT | API key | AI token) -> CSRF -> view
 ```
 
-- **One client IP.** `app.utils.client_ip.get_client_ip()` returns `request.remote_addr` *after* ProxyFix has applied the configured number of trusted hops. `X-Forwarded-For`, `Forwarded` and `X-Real-IP` are never read directly. Rate limiting, login lockout, audit logs, session/device records and the dev-only loopback checks all use it. `is_loopback_request()` additionally refuses any request that carries a forwarding header, so a reverse proxy can never make a remote caller look local.
+- **One client IP.** `app.utils.security.client_ip.get_client_ip()` returns `request.remote_addr` *after* ProxyFix has applied the configured number of trusted hops. `X-Forwarded-For`, `Forwarded` and `X-Real-IP` are never read directly. Rate limiting, login lockout, audit logs, session/device records and the dev-only loopback checks all use it. `is_loopback_request()` additionally refuses any request that carries a forwarding header, so a reverse proxy can never make a remote caller look local.
 - **Cookie vs Bearer.** Bearer JWTs authenticate only under `MOBILE_JWT_BEARER_PATH_PREFIXES` (default `/api/mobile/v1/`) and on the exact path `/api/ai/v2/token`, where the mobile app trades its access token for the AI chat token. Elsewhere the header is ignored, so a mobile access token cannot open a web session on admin or other routes. A Bearer request does not create a session cookie; the WebView bridge that trades a token for a cookie is bound to the token's session id and revocation state.
 - **Idle timeout and revocation** (`SESSION_INACTIVITY_TIMEOUT`, default 2 h) apply to every cookie-authenticated request, including `/api/` paths (JSON 401). Bearer-JWT requests are bounded by the access-token lifetime (30 min) and session revocation.
 - **Site lock** (`COMING_SOON`): only `/api/*` and the Indicator Bank compat blueprint are exempt, by path. No request header lifts the lock. The bypass cookie stores an HMAC of the bypass secret, never the secret itself.
@@ -44,7 +44,7 @@ client -> reverse proxy -> ProxyFix (PROXY_FIX_X_*) -> request hooks -> site loc
 
 `FLASK_CONFIG` unset or empty resolves to **production**. Only an interactive `python run.py` bound to loopback defaults to development. `default` is a deprecated alias for `development` (warning), unknown values abort startup. The resolved name is written back to the environment so every module sees the same value.
 
-### Startup validation (`app/utils/security_startup.py`)
+### Startup validation (`app/utils/security/security_startup.py`)
 
 In production/staging (or with `STRICT_ENV_VALIDATION=true`) the app refuses to start when: `DEBUG` is on; `AI_JWT_SECRET` is set but short or equal to another secret; `AUTH_STATE_BACKEND` is invalid or `redis` without a Redis URL; multiple workers run with `RATE_LIMIT_REQUIRE_SHARED_STORAGE=true` and no shared store. `DEBUG_SKIP_LOGIN=true` outside development + DEBUG is fatal in every environment. A missing, short, or `SECRET_KEY`-equal `MOBILE_JWT_SECRET`, and `ENABLE_SSH` left unset, are warnings: they are logged and shown on System Configuration, and they do not block startup. Other warnings (logged, not fatal): `AI_JWT_SECRET` falling back to `SECRET_KEY`, `TRUST_PROXY_HEADERS` off, `PLUGIN_UPLOAD_ENABLED` on, legacy compatibility flags still on, per-process rate limits with several workers. Worker count is read from `GUNICORN_WORKERS` / `WEB_CONCURRENCY` (`auto` = 2 x CPU + 1), else 3 under gunicorn, else 1.
 
@@ -60,7 +60,7 @@ Tokens signed by the old shared secret are still accepted while `MOBILE_JWT_ACCE
 
 ### Shared authentication state
 
-Refresh-token single-use markers, revoked sessions, token families, login-failure counters, mobile OAuth codes and the auth rate-limit counters live in a store that all workers and instances share (`app/utils/auth_state.py`):
+Refresh-token single-use markers, revoked sessions, token families, login-failure counters, mobile OAuth codes and the auth rate-limit counters live in a store that all workers and instances share (`app/utils/auth/auth_state.py`):
 
 1. Redis when `RATELIMIT_STORAGE_URI` or `REDIS_URL` is set (`AUTH_STATE_BACKEND=auto|redis`).
 2. Otherwise the Postgres table `auth_state_entry` (created by migration `add_auth_state_entry`; entries expire by TTL and are purged opportunistically).
@@ -164,7 +164,7 @@ If not set, secure random passwords are generated. **Test credentials are blocke
 
 ## Logging redaction and error correlation
 
-One redaction policy (`app/utils/logging_security.py`) is used by API usage tracking, activity form-data storage, security events and access logs. Errors carry an `X-Request-ID` and production error bodies are generic. See [Logging & health](../runbooks/observability/logging-and-health.md).
+One redaction policy (`app/utils/security/logging_security.py`) is used by API usage tracking, activity form-data storage, security events and access logs. Errors carry an `X-Request-ID` and production error bodies are generic. See [Logging & health](../runbooks/observability/logging-and-health.md).
 
 ## Seeding guard
 

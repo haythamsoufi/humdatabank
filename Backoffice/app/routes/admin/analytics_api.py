@@ -1,5 +1,5 @@
 # File: Backoffice/app/routes/admin/analytics.py
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 """
 Analytics Module - Dashboard APIs and Reporting
 """
@@ -14,10 +14,10 @@ from app.models import (
     UserLoginLog, UserActivityLog, SecurityEvent, UserSessionLog,
 )
 from app.routes.admin.shared import admin_required, permission_required
-from app.utils.api_responses import json_ok, json_server_error, json_not_found, json_bad_request
-from app.utils.transactions import request_transaction_rollback
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_pagination import validate_pagination_params
+from app.utils.api.api_responses import json_ok, json_server_error, json_not_found, json_bad_request
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_pagination import validate_pagination_params
 from sqlalchemy import func, desc, and_, or_, inspect, text
 from datetime import datetime, timedelta
 from app.services.organization.authorization_service import AuthorizationService
@@ -98,7 +98,7 @@ def session_log_page_view_paths_api(session_id):
 @permission_required('admin.system.maintain')
 def end_session_api(session_id):
     """End a user session and blacklist it (JSON for admin clients)."""
-    from app.utils.request_validation import enforce_api_or_csrf_protection
+    from app.utils.http.request_validation import enforce_api_or_csrf_protection
     from app.services.platform.user_analytics_service import log_admin_action
 
     enforce_api_or_csrf_protection()

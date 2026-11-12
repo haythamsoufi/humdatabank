@@ -141,7 +141,7 @@ class TestInjectMobileWebviewEmbed:
     def test_returns_mobile_embed_value_in_request(self, app):
         """In a request context, returns result of mobile_app_webview_embed_active()."""
         with app.test_request_context('/'):
-            with patch('app.utils.request_utils.mobile_app_webview_embed_active',
+            with patch('app.utils.http.request_utils.mobile_app_webview_embed_active',
                        return_value=True):
                 processors = app.template_context_processors.get(None, [])
                 found = False
@@ -156,7 +156,7 @@ class TestInjectMobileWebviewEmbed:
     def test_returns_false_on_exception(self, app):
         """Exception in mobile_app_webview_embed_active should return False."""
         with app.test_request_context('/'):
-            with patch('app.utils.request_utils.mobile_app_webview_embed_active',
+            with patch('app.utils.http.request_utils.mobile_app_webview_embed_active',
                        side_effect=Exception("error")):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
@@ -176,7 +176,7 @@ class TestInjectAzureB2cConfigured:
     def test_returns_configured_false_by_default(self, app):
         """By default (no B2C config), azure_b2c_configured should be False."""
         with app.test_request_context('/'):
-            with patch('app.utils.azure_b2c_config.is_azure_b2c_configured',
+            with patch('app.utils.auth.azure_b2c_config.is_azure_b2c_configured',
                        return_value=False):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
@@ -190,7 +190,7 @@ class TestInjectAzureB2cConfigured:
     def test_returns_false_on_exception(self, app):
         """Exception in is_azure_b2c_configured should return False."""
         with app.test_request_context('/'):
-            with patch('app.utils.azure_b2c_config.is_azure_b2c_configured',
+            with patch('app.utils.auth.azure_b2c_config.is_azure_b2c_configured',
                        side_effect=Exception("import error")):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
@@ -248,10 +248,10 @@ class TestInjectOrgBranding:
     def test_returns_org_name_on_success(self, app):
         """Happy path: org branding returns ORG_NAME."""
         with app.test_request_context('/'):
-            with patch('app.utils.organization_helpers.get_org_name', return_value='TestOrg'), \
-                 patch('app.utils.organization_helpers.get_org_short_name', return_value='TO'), \
-                 patch('app.utils.organization_helpers.get_org_email_domain', return_value='test.org'), \
-                 patch('app.utils.organization_helpers.get_org_domain', return_value='test.org'), \
+            with patch('app.utils.organization.organization_helpers.get_org_name', return_value='TestOrg'), \
+                 patch('app.utils.organization.organization_helpers.get_org_short_name', return_value='TO'), \
+                 patch('app.utils.organization.organization_helpers.get_org_email_domain', return_value='test.org'), \
+                 patch('app.utils.organization.organization_helpers.get_org_domain', return_value='test.org'), \
                  patch('app.services.platform.app_settings_service.get_organization_branding', return_value={}), \
                  patch('app.services.platform.app_settings_service.get_organization_logo_path', return_value='logo.svg'), \
                  patch('app.services.platform.app_settings_service.get_organization_email_domain', return_value='test.org'), \
@@ -273,7 +273,7 @@ class TestInjectOrgBranding:
     def test_returns_default_on_exception(self, app):
         """Exception in org branding should return defaults."""
         with app.test_request_context('/'):
-            with patch('app.utils.organization_helpers.get_org_name',
+            with patch('app.utils.organization.organization_helpers.get_org_name',
                        side_effect=Exception("service error")):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
@@ -423,7 +423,7 @@ class TestDatetimeFilters:
         with app.test_request_context('/'):
             fn = app.jinja_env.filters['datetime_iso']
             dt = datetime(2024, 1, 15, 10, 30)
-            with patch('app.utils.datetime_helpers.ensure_utc', return_value=None):
+            with patch('app.utils.common.datetime_helpers.ensure_utc', return_value=None):
                 result = fn(dt)
                 assert '2024' in result or result == ''
 
@@ -434,7 +434,7 @@ class TestDatetimeFilters:
             class BadDatetime:
                 def __bool__(self): return True
                 def isoformat(self): raise ValueError("bad datetime")
-            with patch('app.utils.datetime_helpers.ensure_utc', return_value=None):
+            with patch('app.utils.common.datetime_helpers.ensure_utc', return_value=None):
                 # When ensure_utc returns None, falls through to dt.isoformat()
                 # which raises → returns ''
                 # But we can't easily patch the closure-bound ensure_utc.
@@ -546,7 +546,7 @@ class TestGetOrgBranding:
         """When get_organization_branding raises, the context processor returns defaults."""
         # Test the inject_org_branding context processor exception path
         with app.test_request_context('/'):
-            with patch('app.utils.organization_helpers.get_org_name',
+            with patch('app.utils.organization.organization_helpers.get_org_name',
                        side_effect=Exception("service unavailable")):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:

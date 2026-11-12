@@ -928,7 +928,7 @@ def build_upr_assignment_review_pack(
 
     country = None
     try:
-        from app.utils.api_serialization import _country_for_aes
+        from app.utils.api.api_serialization import _country_for_aes
         c = _country_for_aes(aes)
         country = getattr(c, "name", None) if c else None
     except Exception:

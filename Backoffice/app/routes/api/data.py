@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
-from app.utils.ttl_cache import TTLCache
+from app.utils.common.ttl_cache import TTLCache
 
 # Import models
 from app.models import (
@@ -29,15 +29,15 @@ from app.models import (
     FormTemplateVersion,
 )
 from app.models.assignments import AssignmentEntityStatus
-from app.utils.auth import api_capability, require_api_key
+from app.utils.auth.auth import api_capability, require_api_key
 from app.services.security.api_key_permissions import DATA_READ
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.security.rate_limiting import api_rate_limit
 from app import db
 
 # Import utility functions
-from app.utils.api_helpers import json_response, json_data_response, api_error, extract_numeric_value
-from app.utils.api_percentage import orm_item_is_percentage, scale_percentage_rows
-from app.utils.api_serialization import (
+from app.utils.api.api_helpers import json_response, json_data_response, api_error, extract_numeric_value
+from app.utils.api.api_percentage import orm_item_is_percentage, scale_percentage_rows
+from app.utils.api.api_serialization import (
     format_country_info,
     format_form_item_info,
     format_national_society_info,
@@ -72,22 +72,22 @@ from app.services.security.public_data_access import (
     slim_public_data_rows,
     validate_public_data_request,
 )
-from app.utils.api_pagination import (
+from app.utils.api.api_pagination import (
     parse_date_range, get_sort_params, validate_data_endpoint_params,
     validate_pagination_params,
     build_pagination_queries, get_paginated_data_ids, fetch_paginated_rows,
     build_paginated_response, query_filter_in_batches,
     MAX_USER_AUTH_ROWS,
 )
-from app.utils.api_formatting import format_answer_value, format_form_data_response, serialize_form_data_item
-from app.utils.api_serialization import _wrap_disagg_dict as _normalize_disagg_payload_util
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_formatting import format_answer_value, format_form_data_response, serialize_form_data_item
+from app.utils.api.api_serialization import _wrap_disagg_dict as _normalize_disagg_payload_util
+from app.utils.database.sql_utils import safe_ilike_pattern
 from app.services import query_form_data
 from app.services import get_form_data_queries
 from app.services import TemplateService
 from app.services import query_dynamic_indicator_data
 from app.services import query_repeat_group_data
-from app.utils.api_data_filters import (
+from app.utils.api.api_data_filters import (
     VERSION_SCOPE_PUBLISHED,
     apply_form_data_version_scoping,
     build_data_api_scope_meta,
@@ -867,7 +867,7 @@ def _fetch_extended_data(
                 dynamic_orm_rows.extend(q.all())
 
             if dynamic_orm_rows:
-                from app.utils.api_serialization import (
+                from app.utils.api.api_serialization import (
                     batch_countries_for_aes_list,
                     build_dynamic_serialization_context,
                     fetch_dynamic_section_contexts,
@@ -926,7 +926,7 @@ def _fetch_extended_data(
                     aes = getattr(instance, 'assignment_entity_status', None) if instance else None
                     if aes:
                         assigned_aes.append(aes)
-                from app.utils.api_serialization import batch_countries_for_aes_list
+                from app.utils.api.api_serialization import batch_countries_for_aes_list
                 aes_countries = batch_countries_for_aes_list(assigned_aes)
                 for row in rows:
                     item = serialize_repeat_data_item(
@@ -1367,7 +1367,7 @@ def get_all_data():
             if not country_iso3.isalpha():
                 country_iso3 = None
         if (country_iso2 or country_iso3) and not country_id:
-            from app.utils.country_utils import resolve_country_from_iso
+            from app.utils.organization.country_utils import resolve_country_from_iso
             resolved_id, error = resolve_country_from_iso(iso2=country_iso2, iso3=country_iso3)
             if error:
                 status_code = 400 if 'Invalid' in error else 404

@@ -11,7 +11,7 @@ from app.services.forms.matrix_column_migration_service import (
     rewrite_matrix_payload,
     validate_renames,
 )
-from app.utils.matrix_calculation import rename_formula_refs
+from app.utils.forms.matrix_calculation import rename_formula_refs
 
 
 class TestValidateRenames:

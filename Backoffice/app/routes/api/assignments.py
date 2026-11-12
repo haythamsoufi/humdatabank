@@ -13,20 +13,20 @@ from sqlalchemy import literal, select
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 # Import models
 from app.models import AssignedForm, Country, FormData, FormItem
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.auth import api_capability, require_api_key
+from app.utils.auth.auth import api_capability, require_api_key
 from app.services.security.api_key_permissions import SUBMISSIONS_READ
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.security.rate_limiting import api_rate_limit
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error, get_json_safe
-from app.utils.api_responses import require_json_keys
+from app.utils.api.api_helpers import json_response, api_error, get_json_safe
+from app.utils.api.api_responses import require_json_keys
 from app.services.security.api_authentication import (
     api_key_max_per_page,
     authenticate_api_request,
@@ -35,8 +35,8 @@ from app.services.security.api_authentication import (
     redact_request_params,
     _get_user_allowed_country_ids,
 )
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.http.request_validation import enforce_csrf_json
 from app import db
 from app.services.assignments.access_service import apply_assignment_access
 

@@ -18,20 +18,20 @@ from app.forms.form_builder import (FormTemplateForm, FormSectionForm, Indicator
 from app.forms.base import int_or_none
 from app.routes.admin.shared import (admin_required, admin_permission_required, permission_required,
     permission_required_any, system_manager_required, check_template_access)
-from app.utils.request_utils import is_json_request, get_request_data, _is_json_body
+from app.utils.http.request_utils import is_json_request, get_request_data, _is_json_body
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.services.platform.user_analytics_service import log_admin_action
 from app.services.forms.matrix_column_migration_service import column_codes
 from app.services.templates.excel_service import TemplateExcelService
 from app.services.imports.kobo_xls_import_service import KoboXlsImportService
-from app.utils.error_handling import handle_view_exception, handle_json_view_exception
-from app.utils.transactions import request_transaction_rollback
-from app.utils.datetime_helpers import utcnow
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.file_parsing import EXCEL_EXTENSIONS, XLSX_EXTENSIONS
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error, require_json_data
-from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
+from app.utils.common.error_handling import handle_view_exception, handle_json_view_exception
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.files.file_parsing import EXCEL_EXTENSIONS, XLSX_EXTENSIONS
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error, require_json_data
+from app.utils.common.json_helpers import deep_copy_json as _deep_copy_json_value
 from config.config import Config
 from .helpers import (_handle_template_sharing, _handle_template_pages, PageInUseError, _populate_template_sharing,
     _build_template_data_for_js, _clone_template_structure_between_templates,
@@ -126,7 +126,7 @@ def _shared_users_for_template_list(template):
 @bp.route("/templates", methods=["GET"])
 @permission_required('admin.templates.view')
 def manage_templates():
-    from app.utils.form_localization import get_localized_template_name, get_localized_indicator_type, get_localized_indicator_unit
+    from app.utils.forms.form_localization import get_localized_template_name, get_localized_indicator_type, get_localized_indicator_unit
     from flask_babel import gettext as _gettext, ngettext as _ngettext
 
     # System managers can see all templates regardless of ownership and sharing
@@ -259,7 +259,7 @@ def manage_templates():
 
 def _build_template_grid_row_dict(template, *, template_data_counts=None, template_version_counts=None):
     """Build one AG Grid row dict (same shape as templates.html ``templatesData``)."""
-    from app.utils.form_localization import get_localized_template_name
+    from app.utils.forms.form_localization import get_localized_template_name
     from app.services.organization.authorization_service import AuthorizationService
     from flask_babel import gettext as _gettext, ngettext as _ngettext
 
@@ -471,7 +471,7 @@ def import_kobo_xls():
 @bp.route("/templates/new", methods=["GET", "POST"])
 @permission_required('admin.templates.create')
 def new_template():
-    from app.utils.form_localization import get_localized_template_name
+    from app.utils.forms.form_localization import get_localized_template_name
 
     form = FormTemplateForm()
 
@@ -1520,7 +1520,7 @@ def edit_template(template_id):
     if current_app.form_integration:
         custom_field_types = current_app.form_integration.get_custom_field_types_for_builder()
 
-    from app.utils.form_localization import get_localized_template_name, get_localized_indicator_type, get_localized_indicator_unit
+    from app.utils.forms.form_localization import get_localized_template_name, get_localized_indicator_type, get_localized_indicator_unit
     from flask_babel import gettext as _gettext, ngettext as _ngettext
     # Important: Pass template_data first so that callable helpers below cannot be overridden
     # by any accidentally conflicting keys inside template_data.

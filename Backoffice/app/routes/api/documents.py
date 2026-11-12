@@ -14,9 +14,9 @@ from app.models.enums import DocumentStatus
 from app.services.documents import public_access
 from app.services.security.api_authentication import api_key_has_capability
 from app.services.security.api_key_permissions import CONTENT_READ, DOCUMENTS_READ
-from app.utils.auth import require_api_key
-from app.utils.rate_limiting import api_rate_limit
-from app.utils.api_helpers import json_response, api_error
+from app.utils.auth.auth import require_api_key
+from app.utils.security.rate_limiting import api_rate_limit
+from app.utils.api.api_helpers import json_response, api_error
 from app.services.platform import storage_service as storage
 
 
@@ -54,7 +54,7 @@ def get_submitted_documents():
         language = request.args.get('language', default='', type=str).strip()
         is_public = request.args.get('is_public')
         status = request.args.get('status', default='', type=str).strip()
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=20)
 
         # Keys holding only content:read may list published documents; pending, rejected and
@@ -226,7 +226,7 @@ def serve_branding_asset(filename):
     Legacy uploads may still be SVG. Those are served inline so an ``<img>`` can paint
     them, with a script-blocking content security policy and no sandbox.
     """
-    from app.utils.branding_visual_assets import SYSTEM_BRANDING_REL_PREFIX, safe_branding_download_filename
+    from app.utils.branding.branding_visual_assets import SYSTEM_BRANDING_REL_PREFIX, safe_branding_download_filename
 
     return _serve_system_upload(
         SYSTEM_BRANDING_REL_PREFIX, filename,

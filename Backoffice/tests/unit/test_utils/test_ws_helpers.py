@@ -1,4 +1,4 @@
-"""Unit tests for app/utils/ws_helpers.py."""
+"""Unit tests for app/utils/realtime/ws_helpers.py."""
 import json
 import threading
 import time
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.utils.ws_helpers import (
+from app.utils.realtime.ws_helpers import (
     WsInboundPump,
     check_websocket_origin,
     is_notifications_websocket_enabled,
@@ -107,7 +107,7 @@ class TestReleaseRequestDbSession:
 
     def test_calls_safe_remove(self, app):
         with app.app_context():
-            with patch("app.utils.transactions.safe_remove") as mock_remove:
+            with patch("app.utils.database.transactions.safe_remove") as mock_remove:
                 release_request_db_session(reason="unit_test")
                 mock_remove.assert_called_once_with(reason="unit_test")
 

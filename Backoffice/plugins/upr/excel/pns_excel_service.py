@@ -49,7 +49,7 @@ def _filename(prefix: str, country_name: str, iso3: str, period: str) -> str:
 
 def _assignment_identity(aes) -> Tuple[str, str, str, Optional[int], str]:
     from app.models.organization import NationalSociety
-    from app.utils.api_serialization import _country_for_aes
+    from app.utils.api.api_serialization import _country_for_aes
     from import_upr_excel_data import _period_year_token
 
     country = _country_for_aes(aes)
@@ -120,7 +120,7 @@ def _country_name_maps(wb, country_id_by_iso3: Mapping[str, int], iso3_to_ns_id:
 
 
 def _load_workbook(file_bytes: bytes):
-    from app.utils.safe_workbook import load_workbook_safe
+    from app.utils.files.safe_workbook import load_workbook_safe
 
     return load_workbook_safe(file_bytes, read_only=False, data_only=False)
 
@@ -162,7 +162,7 @@ class PnsPlanningExcelService:
     @classmethod
     def build_workbook(cls, aes) -> Tuple[io.BytesIO, str]:
         _ensure_scripts_in_path()
-        from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
+        from app.utils.files.safe_workbook import load_workbook_safe, read_workbook_file_bytes
         from import_upr_excel_data import build_import_context
         from pns_form_excel import (
             default_planning_columns,
@@ -350,7 +350,7 @@ class PnsReportingExcelService:
     @classmethod
     def build_workbook(cls, aes) -> Tuple[io.BytesIO, str]:
         _ensure_scripts_in_path()
-        from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
+        from app.utils.files.safe_workbook import load_workbook_safe, read_workbook_file_bytes
         from import_upr_excel_data import T23_PNS_FUNDING_COLUMNS, build_import_context
         from pns_form_excel import prepare_reporting_workbook, reporting_column_map, write_reporting_funding_rows
 

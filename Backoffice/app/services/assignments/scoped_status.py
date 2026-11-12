@@ -65,7 +65,7 @@ def _row_status(row) -> str:
 
 
 def apply_status_to_rows(rows, new_status, user_id: int | None, source_statuses: set[str] | frozenset[str]) -> int:
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     target = status_value(new_status)
     stamp = utcnow()

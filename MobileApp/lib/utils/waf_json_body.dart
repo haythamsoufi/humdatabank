@@ -5,7 +5,7 @@ import 'dart:convert';
 const int wafJsonMaxChunk = 350;
 
 /// Wraps a JSON object in the base64 envelope the Backoffice AI endpoints unwrap
-/// (`unwrap_waf_json_envelope` in `app/utils/request_utils.py`).
+/// (`unwrap_waf_json_envelope` in `app/utils/http/request_utils.py`).
 ///
 /// The gateway's WAF inspects POST bodies and answers 403 (with no JSON error body)
 /// when chat history contains HTML/markdown/SQL-like text, which happens as soon as a

@@ -72,7 +72,7 @@ Only if a stricter plugin cut is requested:
 
 ## 4. Leave in core (do not move)
 
-- `app/utils/data_quality_constants.py`
+- `app/utils/indicators/data_quality_constants.py`
 - `app/services/imports/import_change_log.py`, `async_import_job_store.py`
 - Validation and data-quality **registries** (they import plugin implementations)
 - `chunk_upr_visuals()` dispatcher in `app/services/ai/documents/chunking.py` (domain term; do not rename)

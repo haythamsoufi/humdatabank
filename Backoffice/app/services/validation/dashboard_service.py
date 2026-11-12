@@ -15,7 +15,7 @@ from app.services.data_quality.helpers import numeric_value, parse_period_year
 from app.services.data_quality.service import get_rule_pack_for_template
 from app.services.forms.reporting_period_service import sort_period_names
 from app.services.validation.pack_registry import get_pack
-from app.utils.data_quality_constants import RULE_PACK_CORE
+from app.utils.indicators.data_quality_constants import RULE_PACK_CORE
 from app.services.validation.rule_labels import format_rule_labels
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
 from .check_service import evaluate_validation_checks, validation_checks_disabled_message

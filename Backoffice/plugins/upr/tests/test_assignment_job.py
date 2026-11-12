@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from plugins.upr.dashboards.assignment_job import (
     ASSIGNMENT_EXPORT_JOB_TYPE,
     REUSE_COMPLETED_SECONDS,

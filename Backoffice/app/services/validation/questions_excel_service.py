@@ -14,7 +14,7 @@ from app import db
 from app.models import Country, FormItem, FormTemplate
 from app.models.validation import ValidationQuestion
 from app.services.data_quality.helpers import form_item_label
-from app.utils.file_parsing import parse_csv_or_excel_to_rows
+from app.utils.files.file_parsing import parse_csv_or_excel_to_rows
 from sqlalchemy.orm import joinedload
 from .question_lifecycle import (
     apply_answer_outcome,

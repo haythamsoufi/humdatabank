@@ -19,7 +19,7 @@ from app.models import Country
 
 logger = logging.getLogger(__name__)
 from app.services.data_retrieval.service import get_value_breakdown as svc_get_value_breakdown
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 
 _YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")

@@ -12,8 +12,8 @@ from app.models import Notification, NotificationType, NotificationPreferences
 from sqlalchemy import func, and_, or_, case
 from sqlalchemy.orm import Query
 import logging
-from app.utils.datetime_helpers import utcnow
-from app.utils.api_helpers import service_error, GENERIC_ERROR_MESSAGE
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.api.api_helpers import service_error, GENERIC_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 

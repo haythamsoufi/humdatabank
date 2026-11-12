@@ -5,7 +5,7 @@ from __future__ import annotations
 from app import db
 from app.models.validation import ValidationQuestion
 from .question_lifecycle import clear_review_state, mark_drafted
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 FOLLOW_UP_SOURCE = "follow_up"
 FOLLOW_UP_ELIGIBLE_STATUSES = frozenset({"answered"})

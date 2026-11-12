@@ -16,7 +16,7 @@ from sqlalchemy.orm import joinedload
 from app.models import FormData, FormItem, FormSection, IndicatorBank, PublicSubmission
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.extensions import db
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 from .shared import (
     get_effective_request_user,

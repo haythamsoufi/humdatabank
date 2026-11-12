@@ -7,7 +7,7 @@ Provides consistent processing across all form types (indicators, questions, doc
 from flask import request, session, current_app
 from app import get_locale
 from app.models import FormData, FormItem, Config, FormSection, DynamicIndicatorData
-from app.utils.form_localization import get_localized_indicator_name
+from app.utils.forms.form_localization import get_localized_indicator_name
 import json
 import re
 from typing import Dict, List, Tuple, Any, Optional
@@ -187,7 +187,7 @@ class FormItemProcessor:
             form_item.display_label = form_item.label
         elif form_item.indicator_bank:
             # Fall back to localized indicator bank name when not custom
-            from app.utils.form_localization import get_localized_indicator_name
+            from app.utils.forms.form_localization import get_localized_indicator_name
             form_item.display_label = get_localized_indicator_name(form_item.indicator_bank)
         else:
             form_item.display_label = form_item.label or ''
@@ -215,8 +215,8 @@ class FormItemProcessor:
     @classmethod
     def _setup_image_properties(cls, form_item: FormItem):
         """Set up image display item properties for entry-form rendering."""
-        from app.utils.form_localization import get_translation_key
-        from app.utils.template_image_assets import resolve_display_url, resolve_locale_image_source
+        from app.utils.forms.form_localization import get_translation_key
+        from app.utils.templates.template_image_assets import resolve_display_url, resolve_locale_image_source
 
         form_item.display_label = form_item.label or ''
         form_item.is_required_for_js = False
@@ -268,7 +268,7 @@ class FormItemProcessor:
     @classmethod
     def _add_translation_support(cls, form_item: FormItem):
         """Add translation support for form items"""
-        from app.utils.form_localization import get_translation_key
+        from app.utils.forms.form_localization import get_translation_key
         from app import get_locale
 
         translation_key = get_translation_key()  # ISO (e.g., 'fr')
@@ -357,7 +357,7 @@ class FormItemProcessor:
                 form_item._display_alt = translated_alt
 
         if form_item.is_image:
-            from app.utils.template_image_assets import resolve_display_url, resolve_locale_image_source
+            from app.utils.templates.template_image_assets import resolve_display_url, resolve_locale_image_source
             source = resolve_locale_image_source(form_item.config, translation_key, fallback_locales=['en'])
             form_item._display_image_url = resolve_display_url(
                 source,
@@ -1159,7 +1159,7 @@ def _set_dynamic_indicator_field_type(dynamic_indicator, indicator_bank):
 
 def _set_dynamic_indicator_disaggregation(dynamic_indicator, dynamic_assignment, section_obj):
     """Set disaggregation options for dynamic indicators"""
-    from app.utils.indicator_utils import supports_disaggregation
+    from app.utils.indicators.indicator_utils import supports_disaggregation
 
     bank = dynamic_assignment.indicator_bank
     bank_supports_disagg = supports_disaggregation(bank.unit, bank.type)

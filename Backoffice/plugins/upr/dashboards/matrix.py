@@ -6,7 +6,7 @@ from typing import Any, Iterator
 
 from app.models.form_items import FormItem
 from app.models.forms import FormData
-from app.utils.api_serialization import _resolve_matrix_cell
+from app.utils.api.api_serialization import _resolve_matrix_cell
 from plugins.upr.dashboards.catalog import (
     EF_CODES,
     FUNDING_ENTITY_LABELS,

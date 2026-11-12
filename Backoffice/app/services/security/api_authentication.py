@@ -21,7 +21,7 @@ Contract:
 - Failure always returns a JSON Response using the standardized API error schema.
 """
 
-from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.common.datetime_helpers import utcnow, ensure_utc
 
 import secrets
 import time
@@ -42,7 +42,7 @@ from app.services.security.api_key_permissions import (
     KeyPermissions,
     parse_key_permissions,
 )
-from app.utils.api_helpers import json_response, api_error, MAX_PER_PAGE, DEFAULT_PER_PAGE, DEFAULT_PAGE
+from app.utils.api.api_helpers import json_response, api_error, MAX_PER_PAGE, DEFAULT_PER_PAGE, DEFAULT_PAGE
 from datetime import datetime
 
 # Rate limiting storage for API keys (key_id -> list of timestamps).

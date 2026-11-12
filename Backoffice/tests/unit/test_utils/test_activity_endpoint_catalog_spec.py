@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/utils/activity_endpoint_catalog/spec.py.
+Comprehensive tests for app/utils/activity/activity_endpoint_catalog/spec.py.
 
 Targets every branch to push coverage from ~63 % → 100 %.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.utils.activity_endpoint_catalog.spec import (
+from app.utils.activity.activity_endpoint_catalog.spec import (
     ActivityEndpointSpec,
     fallback_description_for_unmapped,
     lookup_activity_endpoint_spec,

@@ -27,7 +27,7 @@ from app.services.security.api_authentication import (
     validate_plaintext_db_api_key_for_mobile_auth,
 )
 from app.services.security.api_key_permissions import DATA_READ, REFERENCE_READ, build_permissions_document
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from tests.factories import (
     _grant_entity_permission,
     create_test_admin,

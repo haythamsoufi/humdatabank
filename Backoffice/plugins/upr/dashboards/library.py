@@ -18,7 +18,7 @@ from typing import Any
 from werkzeug.exceptions import NotFound
 
 from app.services.platform import storage_service
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from plugins.upr.dashboards.bulk import normalize_export_format
 from plugins.upr.dashboards.catalog import DASHBOARD_BY_ID
 from plugins.upr.errors import UprError

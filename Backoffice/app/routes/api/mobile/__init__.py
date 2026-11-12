@@ -5,7 +5,7 @@ Dedicated mobile API surface — ``/api/mobile/v1/``.
 Most endpoints require JWT Bearer authentication via ``@mobile_auth_required``.
 Public data endpoints (country map, sectors, indicator bank, FDRS overview)
 are unauthenticated but rate-limited.
-Responses use the standardized mobile envelope from ``app.utils.mobile_responses``.
+Responses use the standardized mobile envelope from ``app.utils.mobile.mobile_responses``.
 """
 
 from flask import Blueprint, current_app, request
@@ -41,7 +41,7 @@ def _check_minimum_app_version():
     client_tuple = _parse_version(client_version)
     min_tuple = _parse_version(min_version)
     if client_tuple and min_tuple and client_tuple < min_tuple:
-        from app.utils.mobile_responses import mobile_error
+        from app.utils.mobile.mobile_responses import mobile_error
         return mobile_error(
             'This version of the app is no longer supported. Please update.',
             426,

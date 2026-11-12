@@ -29,9 +29,9 @@ from flask import Response, current_app, jsonify, request, stream_with_context
 
 from app.extensions import csrf
 from app.services.security.api_key_permissions import CONTENT_READ
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, api_error
-from app.utils.auth import require_api_key
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, api_error
+from app.utils.auth.auth import require_api_key
+from app.utils.common.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
 from plugins.fdrs.services import fdrs_public_adapter as adapter
 from plugins.fdrs.services import fdrs_public_export_cache as export_cache

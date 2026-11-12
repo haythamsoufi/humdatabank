@@ -29,7 +29,7 @@ class ImputationService:
 
     @staticmethod
     def _item_is_percentage(item) -> bool:
-        from app.utils.api_percentage import is_percentage_type, orm_item_is_percentage
+        from app.utils.api.api_percentage import is_percentage_type, orm_item_is_percentage
 
         if orm_item_is_percentage(item):
             return True
@@ -207,7 +207,7 @@ class ImputationService:
                 if aes.entity_id not in prev_assignments_by_country:
                     prev_assignments_by_country[aes.entity_id] = af
 
-        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+        from app.utils.api.api_serialization import batch_countries_for_aes_list, _country_for_aes
         all_target_aes = []
         for assignment in target_assignments:
             all_target_aes.extend(assignment.country_statuses.all())
@@ -550,7 +550,7 @@ class ImputationService:
         total_rows_updated = 0
 
         country_by_aes = {}
-        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+        from app.utils.api.api_serialization import batch_countries_for_aes_list, _country_for_aes
         all_target_aes = []
         for assignment in target_assignments:
             all_target_aes.extend(assignment.country_statuses.all())

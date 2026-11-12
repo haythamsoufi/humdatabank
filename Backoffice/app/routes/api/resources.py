@@ -11,17 +11,17 @@ from sqlalchemy.orm import joinedload
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 # Import models
 from app.models import Resource, ResourceTranslation
-from app.utils.auth import require_api_key
+from app.utils.auth.auth import require_api_key
 from app.services.security.api_authentication import redact_request_params
 from app.services.security.api_key_permissions import CONTENT_READ
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.security.rate_limiting import api_rate_limit
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error
+from app.utils.api.api_helpers import json_response, api_error
 
 
 def _public_link(translation):
@@ -33,7 +33,7 @@ def _public_link(translation):
 
 
 def _is_video_link(url):
-    from app.utils.external_url_validation import is_youtube_url
+    from app.utils.http.external_url_validation import is_youtube_url
 
     return is_youtube_url(url)
 
@@ -96,7 +96,7 @@ def get_resources():
     current_app.logger.debug("Entering resources API endpoint")
 
     try:
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=10, max_per_page=500)
         search_query = request.args.get('search', default='', type=str).strip()
         resource_type_filter = request.args.get('resource_type', default='', type=str).strip()

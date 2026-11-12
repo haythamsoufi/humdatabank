@@ -24,18 +24,18 @@ logger = logging.getLogger(__name__)
 from app.extensions import db
 from app.models import User
 from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission, RbacUserRole
-from app.utils.pg_advisory_lock import (
+from app.utils.database.pg_advisory_lock import (
     release_session_advisory_lock,
     try_session_advisory_lock,
     wait_for_session_advisory_lock,
 )
-from app.utils.transactions import atomic, safe_remove
+from app.utils.database.transactions import atomic, safe_remove
 
 
 class RbacSeedLockMode(str, Enum):
     """How `seed_rbac_permissions_and_roles()` coordinates with concurrent seeders.
 
-    Session-level PostgreSQL advisory locks (see `app/utils/pg_advisory_lock.py`)
+    Session-level PostgreSQL advisory locks (see `app/utils/database/pg_advisory_lock.py`)
     prevent two processes from writing the RBAC catalog at the same time and
     hitting spurious unique-constraint races. Which strategy to use depends on
     who's calling:

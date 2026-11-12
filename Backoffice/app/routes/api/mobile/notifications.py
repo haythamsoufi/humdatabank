@@ -4,13 +4,13 @@
 from flask import request, current_app
 from flask_login import current_user
 
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import (
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_server_error, mobile_paginated,
 )
-from app.utils.rate_limiting import mobile_rate_limit
+from app.utils.security.rate_limiting import mobile_rate_limit
 from app.routes.api.mobile import mobile_bp
 
 
@@ -104,7 +104,7 @@ def mark_notifications_unread():
 def get_notification_preferences():
     """Return current user's notification preferences."""
     from app.services.notification.service import NotificationService
-    from app.utils.notification_push import preferences_for_client
+    from app.utils.notifications.notification_push import preferences_for_client
 
     prefs = NotificationService.get_notification_preferences(current_user.id)
     return mobile_ok(data={'preferences': preferences_for_client(prefs)})

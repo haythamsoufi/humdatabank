@@ -3,9 +3,9 @@ from flask_wtf import csrf
 from app.extensions import limiter
 from app.routes.admin.shared import admin_required, permission_required_any
 from app.services.translation.auto_translator import get_auto_translator
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_forbidden, json_ok
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import json_forbidden, json_ok
+from app.utils.common.error_handling import handle_json_view_exception
 
 from app.routes.admin.utilities import bp
 

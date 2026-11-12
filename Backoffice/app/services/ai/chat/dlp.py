@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tup
 
 from flask import current_app, request
 
-from app.utils.ai_utils import is_user_history_entry
+from app.utils.ai.ai_utils import is_user_history_entry
 
 logger = logging.getLogger(__name__)
 
@@ -526,7 +526,7 @@ def log_dlp_audit_event(
 
     try:
         from app.models import SecurityEvent
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from app.services.platform.user_analytics_service import get_client_ip
 
         # Ensure fields are short/stable

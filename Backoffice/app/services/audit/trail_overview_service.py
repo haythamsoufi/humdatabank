@@ -20,8 +20,8 @@ from app.services.audit.trail_session_query import (
     AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES,
     apply_audit_trail_user_activity_noise_filters,
 )
-from app.utils.audit_trail_labels import activity_type_display_label
-from app.utils.datetime_helpers import ensure_utc, utcnow
+from app.utils.audit.audit_trail_labels import activity_type_display_label
+from app.utils.common.datetime_helpers import ensure_utc, utcnow
 
 OVERVIEW_WINDOW_DAYS = 30
 TREND_DAYS = 14

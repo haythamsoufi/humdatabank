@@ -374,7 +374,7 @@ class TestCreateConsistentDescription:
 
     def test_view_written_description_survives_catalog_override(self):
         """A curated row keeps its own text instead of the generic catalog line."""
-        from app.utils.audit_context import CURATED_DESCRIPTION_KEY
+        from app.utils.audit.audit_context import CURATED_DESCRIPTION_KEY
 
         stored = (
             "Updated assignment status to Approved for 3 countries "

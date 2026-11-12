@@ -2,7 +2,7 @@ import ipaddress
 
 import pytest
 
-from app.utils.outbound_url import is_blocked_ip, parse_network_allowlist, validate_outbound_url
+from app.utils.http.outbound_url import is_blocked_ip, parse_network_allowlist, validate_outbound_url
 
 
 def _public(host, port=None):

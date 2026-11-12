@@ -38,7 +38,7 @@ from .helpers import (  # noqa: E402, F401
 )
 
 from app.services.forms.processing_service import slugify_age_group  # noqa: E402, F401
-from app.utils.route_helpers import get_unified_form_url, get_unified_form_item_id  # noqa: E402, F401
+from app.utils.http.route_helpers import get_unified_form_url, get_unified_form_item_id  # noqa: E402, F401
 
 # Register routes from submodules
 from .entry import register_entry_routes, handle_assignment_form, _preview_template_impl  # noqa: E402, F401

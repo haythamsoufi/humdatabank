@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.utils.country_utils import is_sandbox_country
+from app.utils.organization.country_utils import is_sandbox_country
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from plugins.upr.dashboards.catalog import UPR_VISUAL_TEMPLATE_IDS, kind_for_template
 from plugins.upr.errors import UprError

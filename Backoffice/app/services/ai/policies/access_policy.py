@@ -111,7 +111,7 @@ class AIAccessPolicy:
         """Remove client-asserted privileged context (form builder) the server cannot vouch for."""
         if not isinstance(page_context, dict) or "formBuilder" not in page_context:
             return page_context
-        from app.utils.ai_utils import authorize_form_builder_context
+        from app.utils.ai.ai_utils import authorize_form_builder_context
 
         bound = dict(page_context)
         fb = authorize_form_builder_context(

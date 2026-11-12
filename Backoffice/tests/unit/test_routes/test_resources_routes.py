@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock, PropertyMock
 
 pytestmark = [pytest.mark.unit]
 
-_API_KEY_PATCH = "app.utils.auth.authenticate_db_api_key_only"
+_API_KEY_PATCH = "app.utils.auth.auth.authenticate_db_api_key_only"
 _API_HEADERS = {"Authorization": "Bearer test-key-123"}
 
 

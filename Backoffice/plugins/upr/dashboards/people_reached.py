@@ -30,7 +30,7 @@ from plugins.upr.dashboards.matrix import (
     _scalar_number,
     _split_cell_key,
 )
-from app.utils.api_serialization import _resolve_matrix_cell
+from app.utils.api.api_serialization import _resolve_matrix_cell
 
 def _plan_people_reached(items, by_item, period_name: str) -> list[dict[str, Any]]:
     years = planning_years(period_name)

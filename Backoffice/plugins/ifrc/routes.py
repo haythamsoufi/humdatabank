@@ -6,11 +6,11 @@ from html import escape
 
 from flask import Response, redirect, render_template, request, send_from_directory, url_for
 
-from app.utils.api_responses import GENERIC_ERROR_MESSAGE, json_ok
-from app.utils.client_ip import get_client_ip
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.rate_limiting import rate_limit
-from app.utils.session_persistence import suppress_session_cookie_for_request
+from app.utils.api.api_responses import GENERIC_ERROR_MESSAGE, json_ok
+from app.utils.security.client_ip import get_client_ip
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.security.rate_limiting import rate_limit
+from app.utils.auth.session_persistence import suppress_session_cookie_for_request
 from plugins.ifrc import _PLUGIN_DIR, bp
 
 

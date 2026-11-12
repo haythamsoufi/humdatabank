@@ -427,7 +427,7 @@ class TestCalculateNotificationExpiration:
         assert result is None
 
     def test_positive_ttl_returns_future_datetime(self, app, db_session):
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         with app.app_context():
             app.config['NOTIFICATION_TTL_DAYS'] = {'admin_message': 30}
             result = calculate_notification_expiration(NotificationType.admin_message)
@@ -435,7 +435,7 @@ class TestCalculateNotificationExpiration:
         assert result > utcnow()
 
     def test_uses_notification_expiration_days_when_type_not_in_ttl_map(self, app, db_session):
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         with app.app_context():
             app.config['NOTIFICATION_EXPIRATION_DAYS'] = 45
             app.config['NOTIFICATION_TTL_DAYS'] = {}
@@ -692,8 +692,8 @@ class TestCreateNotification:
 
             with patch('app.services.notification.emails.send_instant_notification_email'):
                 with patch('app.services.notification.push.PushNotificationService'):
-                    with patch('app.utils.ws_manager.broadcast_notification'):
-                        with patch('app.utils.ws_manager.broadcast_unread_count'):
+                    with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                        with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=user.id,
                                 notification_type=NotificationType.admin_message,
@@ -748,8 +748,8 @@ class TestCreateNotification:
 
             with patch('app.services.notification.emails.send_instant_notification_email'):
                 with patch('app.services.notification.push.PushNotificationService'):
-                    with patch('app.utils.ws_manager.broadcast_notification'):
-                        with patch('app.utils.ws_manager.broadcast_unread_count'):
+                    with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                        with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=[u.id for u in users],
                                 notification_type=NotificationType.admin_message,
@@ -823,8 +823,8 @@ class TestCreateNotification:
 
             with patch('app.services.notification.emails.send_instant_notification_email'):
                 with patch('app.services.notification.push.PushNotificationService'):
-                    with patch('app.utils.ws_manager.broadcast_notification'):
-                        with patch('app.utils.ws_manager.broadcast_unread_count'):
+                    with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                        with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=user.id,
                                 notification_type=NotificationType.admin_message,
@@ -848,8 +848,8 @@ class TestCreateNotification:
 
             with patch('app.services.notification.emails.send_instant_notification_email'):
                 with patch('app.services.notification.push.PushNotificationService'):
-                    with patch('app.utils.ws_manager.broadcast_notification'):
-                        with patch('app.utils.ws_manager.broadcast_unread_count'):
+                    with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                        with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=user.id,
                                 notification_type=NotificationType.admin_message,
@@ -881,8 +881,8 @@ class TestNotifyUserAddedToCountries:
 
             with patch('app.services.notification.emails.send_instant_notification_email'), \
                  patch('app.services.notification.push.PushNotificationService'), \
-                 patch('app.utils.ws_manager.broadcast_notification'), \
-                 patch('app.utils.ws_manager.broadcast_unread_count'):
+                 patch('app.utils.realtime.ws_manager.broadcast_notification'), \
+                 patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                 result = notify_user_added_to_countries(
                     user.id, [country_a.id, country_b.id, country_c.id]
                 )
@@ -908,8 +908,8 @@ class TestNotifyUserAddedToCountries:
 
             with patch('app.services.notification.emails.send_instant_notification_email'), \
                  patch('app.services.notification.push.PushNotificationService'), \
-                 patch('app.utils.ws_manager.broadcast_notification'), \
-                 patch('app.utils.ws_manager.broadcast_unread_count'):
+                 patch('app.utils.realtime.ws_manager.broadcast_notification'), \
+                 patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                 result = notify_user_added_to_countries(user.id, [country.id])
 
             assert len(result) == 1
@@ -928,8 +928,8 @@ class TestNotifyUserAddedToCountries:
 
             with patch('app.services.notification.emails.send_instant_notification_email'), \
                  patch('app.services.notification.push.PushNotificationService'), \
-                 patch('app.utils.ws_manager.broadcast_notification'), \
-                 patch('app.utils.ws_manager.broadcast_unread_count'):
+                 patch('app.utils.realtime.ws_manager.broadcast_notification'), \
+                 patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                 result = notify_user_added_to_countries(user.id, [country.id, country.id])
 
             assert len(result) == 1

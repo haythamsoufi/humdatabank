@@ -6,9 +6,9 @@ import uuid
 import pytest
 
 from app.models.ai_chat import AIConversation, AIMessage
-from app.utils.ai_tokens import issue_ai_token
+from app.utils.ai.ai_tokens import issue_ai_token
 from app.services.ai.chat.retention import archive_conversation
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from tests.factories import create_test_user
 
 
@@ -383,7 +383,7 @@ def _csrf_rejected(resp) -> bool:
 @pytest.mark.db
 def test_ai_identity_prefers_bearer_over_cookie(app, client, db_session):
     """Mobile sends its stored session cookie *and* the AI token; the token must win."""
-    from app.utils.ai_request_user import resolve_ai_identity
+    from app.utils.ai.ai_request_user import resolve_ai_identity
 
     cookie_user = create_test_user(db_session, email="cookie-id@test.local", name="Cookie", role="user")
     bearer_user = create_test_user(db_session, email="bearer-id@test.local", name="Bearer", role="user")

@@ -1,10 +1,10 @@
 """
-Unit tests for app/utils/entity_groups.py – 100% coverage target.
+Unit tests for app/utils/organization/entity_groups.py – 100% coverage target.
 """
 import pytest
 from unittest.mock import patch
 
-from app.utils.entity_groups import (
+from app.utils.organization.entity_groups import (
     ENTITY_GROUP_TYPE_MAP,
     _get_default_groups,
     get_enabled_entity_groups,
@@ -100,7 +100,7 @@ class TestGetEnabledEntityGroups:
 
     def test_outside_app_context_falls_back_to_defaults(self):
         # Simulate outside app context by patching current_app to raise
-        import app.utils.entity_groups as eg
+        import app.utils.organization.entity_groups as eg
         original = eg.current_app
         eg.current_app = None
         try:

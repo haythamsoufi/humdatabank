@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-from app.utils.api_formatting import (
+from app.utils.api.api_formatting import (
     choices_from_query,
     serialize_select_options,
     format_answer_value,
@@ -310,8 +310,8 @@ class TestSerializeFormDataItem:
 
     def test_assigned_submission_type_set(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_assigned_item()
                 result = serialize_form_data_item(item, 'assigned')
         assert result['submission_type'] == 'assigned'
@@ -319,24 +319,24 @@ class TestSerializeFormDataItem:
 
     def test_assigned_period_name(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_assigned_item()
                 result = serialize_form_data_item(item, 'assigned')
         assert result['period_name'] == '2024-Annual'
 
     def test_assigned_submitted_at_isoformat(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_assigned_item()
                 result = serialize_form_data_item(item, 'assigned')
         assert result['submitted_at'] == '2024-01-15T10:00:00'
 
     def test_assigned_status_info_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_assigned_item()
                 item.assignment_entity_status = None
                 result = serialize_form_data_item(item, 'assigned')
@@ -345,8 +345,8 @@ class TestSerializeFormDataItem:
 
     def test_assigned_with_form_item(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value={'info': True}):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value={'info': True}):
                 item = self._make_assigned_item()
                 form_item = MagicMock()
                 form_item.form_section = MagicMock()
@@ -357,8 +357,8 @@ class TestSerializeFormDataItem:
 
     def test_public_submission_type_set(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_public_item()
                 result = serialize_form_data_item(item, 'public')
         assert result['submission_type'] == 'public'
@@ -366,8 +366,8 @@ class TestSerializeFormDataItem:
 
     def test_public_template_info(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_public_item()
                 result = serialize_form_data_item(item, 'public')
         assert result['template_id'] == 5
@@ -375,8 +375,8 @@ class TestSerializeFormDataItem:
 
     def test_public_submission_none_fields_are_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_public_item()
                 item.public_submission = None
                 result = serialize_form_data_item(item, 'public')
@@ -385,16 +385,16 @@ class TestSerializeFormDataItem:
 
     def test_public_submitted_at_isoformat(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_public_item()
                 result = serialize_form_data_item(item, 'public')
         assert result['submitted_at'] == '2024-06-01T08:00:00'
 
     def test_assigned_no_submitted_at(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value=None):
                 item = self._make_assigned_item()
                 item.submitted_at = None
                 result = serialize_form_data_item(item, 'assigned')

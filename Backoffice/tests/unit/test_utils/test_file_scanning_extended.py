@@ -1,4 +1,4 @@
-"""Extended tests for app/utils/file_scanning.py – targets 100 % coverage.
+"""Extended tests for app/utils/files/file_scanning.py – targets 100 % coverage.
 
 Complements the basic tests in test_file_scanning.py by exercising every branch
 of FileScanner: ClamAV, VirusTotal, cloud scanner, helper methods, and the
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 from flask import Flask
 from werkzeug.datastructures import FileStorage
 
-from app.utils.file_scanning import (
+from app.utils.files.file_scanning import (
     FileScanError,
     FileScanner,
     scan_file_for_viruses,
@@ -393,12 +393,12 @@ class TestScanWithVirusTotal:
 
 class TestFailOpenOutsideDebugWarning:
     def test_explicit_fail_open_without_debug_logs_critical_once(self, app_ctx, caplog):
-        import app.utils.file_scanning as fs
+        import app.utils.files.file_scanning as fs
 
         fs._fail_open_warned = False
         app_ctx.config["DEBUG"] = False
         app_ctx.config["FILE_SCANNER_FAIL_OPEN"] = True
-        with caplog.at_level("CRITICAL", logger="app.utils.file_scanning"):
+        with caplog.at_level("CRITICAL", logger="app.utils.files.file_scanning"):
             assert FileScanner._should_fail_open() is True
             assert FileScanner._should_fail_open() is True
         criticals = [r for r in caplog.records if r.levelname == "CRITICAL"]
@@ -406,12 +406,12 @@ class TestFailOpenOutsideDebugWarning:
         assert "UNSCANNED" in criticals[0].getMessage()
 
     def test_debug_or_fail_closed_does_not_warn(self, app_ctx, caplog):
-        import app.utils.file_scanning as fs
+        import app.utils.files.file_scanning as fs
 
         fs._fail_open_warned = False
         app_ctx.config["DEBUG"] = True
         app_ctx.config["FILE_SCANNER_FAIL_OPEN"] = True
-        with caplog.at_level("CRITICAL", logger="app.utils.file_scanning"):
+        with caplog.at_level("CRITICAL", logger="app.utils.files.file_scanning"):
             FileScanner._should_fail_open()
             app_ctx.config["DEBUG"] = False
             app_ctx.config["FILE_SCANNER_FAIL_OPEN"] = False
@@ -429,7 +429,7 @@ class TestScanWithCloudService:
         app_ctx.config["CLOUD_SCANNER_URL"] = "https://scanner.example.com/scan"
         app_ctx.config["CLOUD_SCANNER_API_KEY"] = "cloud-key"
         with patch(
-            "app.utils.outbound_url.resolve_host_ips",
+            "app.utils.http.outbound_url.resolve_host_ips",
             return_value=(ipaddress.ip_address("93.184.216.34"),),
         ):
             yield app_ctx
@@ -446,7 +446,7 @@ class TestScanWithCloudService:
     def test_ssrf_urls_are_rejected_before_any_request(self, cloud_ctx, url):
         cloud_ctx.config["CLOUD_SCANNER_URL"] = url
         cloud_ctx.config["FILE_SCANNER_FAIL_OPEN"] = False
-        with patch("app.utils.file_scanning.requests.post") as post:
+        with patch("app.utils.files.file_scanning.requests.post") as post:
             with pytest.raises(FileScanError, match="not permitted"):
                 FileScanner._scan_with_cloud_service(_build_file(), fail_open=False)
         post.assert_not_called()
@@ -456,15 +456,15 @@ class TestScanWithCloudService:
 
         cloud_ctx.config["CLOUD_SCANNER_URL"] = "https://scanner.internal.example/scan"
         private = (ipaddress.ip_address("10.1.2.3"),)
-        with patch("app.utils.outbound_url.resolve_host_ips", return_value=private), patch(
-            "app.utils.file_scanning.requests.post"
+        with patch("app.utils.http.outbound_url.resolve_host_ips", return_value=private), patch(
+            "app.utils.files.file_scanning.requests.post"
         ) as post:
             result = FileScanner._scan_with_cloud_service(_build_file(), fail_open=True)
             assert result["fail_open"] is True
             post.assert_not_called()
         cloud_ctx.config["CLOUD_SCANNER_ALLOWED_NETWORKS"] = "10.0.0.0/8"
-        with patch("app.utils.outbound_url.resolve_host_ips", return_value=private), patch(
-            "app.utils.file_scanning.requests.post",
+        with patch("app.utils.http.outbound_url.resolve_host_ips", return_value=private), patch(
+            "app.utils.files.file_scanning.requests.post",
             return_value=self._make_response({"clean": True, "infected": False}),
         ) as post:
             result = FileScanner._scan_with_cloud_service(_build_file(), fail_open=True)
@@ -475,7 +475,7 @@ class TestScanWithCloudService:
         import requests as _req
 
         with patch(
-            "app.utils.file_scanning.requests.post",
+            "app.utils.files.file_scanning.requests.post",
             side_effect=_req.exceptions.ConnectionError("secret-internal-host:8443 refused"),
         ):
             result = FileScanner._scan_with_cloud_service(_build_file(), fail_open=True)

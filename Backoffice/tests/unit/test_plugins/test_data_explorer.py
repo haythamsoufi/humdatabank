@@ -10,7 +10,7 @@ from app.plugins.data_explorer import (
     user_can_access_data_explorer_nav,
     user_can_read_disaggregation_template,
 )
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
 
 def _plugin_manager_with_pb_progress():

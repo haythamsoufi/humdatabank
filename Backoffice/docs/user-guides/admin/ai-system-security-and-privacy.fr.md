@@ -90,7 +90,7 @@ La interface peut envoyer le contexte de la page pour aider à répondre aux que
 
 Mise en œuvre :
 
-- `app/utils/ai_utils.py` : aides partagées telles que la salubrisation du contexte
+- `app/utils/ai/ai_utils.py` : aides partagées telles que la salubrisation du contexte
 - `app/services/ai/providers/formatting.py` : nettoyage récursif du contexte
 
 ### 4) Audit de la journalisation des événements DLP (sans stocker le contenu du message)

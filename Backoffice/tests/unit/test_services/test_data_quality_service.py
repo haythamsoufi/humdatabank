@@ -19,7 +19,7 @@ from app.services.data_quality.service import (
     list_data_quality_templates_for_entity,
 )
 from app.services.data_quality.types import DataQualityResult
-from app.utils.data_quality_constants import (
+from app.utils.indicators.data_quality_constants import (
     METHODOLOGY_FDRS_V1,
     METHODOLOGY_TO_DEFAULT_RULE_PACK,
     RULE_PACK_FDRS_MATRIX_V1,

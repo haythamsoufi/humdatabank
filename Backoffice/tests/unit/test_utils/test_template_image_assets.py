@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.utils.template_image_assets import (
+from app.utils.templates.template_image_assets import (
     normalize_image_config,
     resolve_display_url,
     resolve_locale_image_source,

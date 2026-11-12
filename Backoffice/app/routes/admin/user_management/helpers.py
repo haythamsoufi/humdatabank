@@ -17,8 +17,8 @@ from app.models import (
     PasswordResetToken, AIConversation, AIMessage,
 )
 from app.models.system import UserDevice
-from app.utils.entity_groups import get_enabled_entity_groups, get_allowed_entity_type_codes
-from app.utils.azure_b2c_config import is_azure_b2c_configured
+from app.utils.organization.entity_groups import get_enabled_entity_groups, get_allowed_entity_type_codes
+from app.utils.auth.azure_b2c_config import is_azure_b2c_configured
 
 # Single source of truth for the RBAC role codes that only a System Manager may
 # assign/revoke. Every privilege-escalation guard (HTML new_user/edit_user in

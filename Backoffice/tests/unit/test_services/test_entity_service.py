@@ -291,7 +291,7 @@ class TestGetLocalizedEntityDisplayName:
     def test_country_type_calls_localization(self, db_session, app):
         with app.app_context():
             country = create_test_country(db_session)
-            with patch("app.utils.form_localization.get_localized_country_name", return_value="Localized Name"):
+            with patch("app.utils.forms.form_localization.get_localized_country_name", return_value="Localized Name"):
                 result = EntityService.get_localized_entity_display_name(
                     EntityType.country.value, country.id
                 )
@@ -321,7 +321,7 @@ class TestGetLocalizedEntityName:
     def test_without_hierarchy(self, db_session, app):
         with app.app_context():
             country = create_test_country(db_session)
-            with patch("app.utils.form_localization.get_localized_country_name", return_value=country.name):
+            with patch("app.utils.forms.form_localization.get_localized_country_name", return_value=country.name):
                 result = EntityService.get_localized_entity_name(
                     EntityType.country.value, country.id, include_hierarchy=False
                 )
@@ -330,7 +330,7 @@ class TestGetLocalizedEntityName:
     def test_with_hierarchy(self, db_session, app):
         with app.app_context():
             country = create_test_country(db_session)
-            with patch("app.utils.form_localization.get_localized_country_name", return_value=country.name):
+            with patch("app.utils.forms.form_localization.get_localized_country_name", return_value=country.name):
                 result = EntityService.get_localized_entity_name(
                     EntityType.country.value, country.id, include_hierarchy=True
                 )
@@ -467,7 +467,7 @@ class TestGetLocalizedEntityHierarchy:
     def test_country_hierarchy_localized(self, db_session, app):
         with app.app_context():
             country = create_test_country(db_session)
-            with patch("app.utils.form_localization.get_localized_country_name", return_value="LocalizedName"):
+            with patch("app.utils.forms.form_localization.get_localized_country_name", return_value="LocalizedName"):
                 result = EntityService.get_localized_entity_hierarchy(
                     EntityType.country.value, country.id
                 )
@@ -484,7 +484,7 @@ class TestGetLocalizedEntityHierarchy:
         with app.app_context():
             with patch.object(EntityService, "get_entity", return_value=branch):
                 with patch(
-                    "app.utils.form_localization.get_localized_country_name",
+                    "app.utils.forms.form_localization.get_localized_country_name",
                     return_value="Localized Kenya",
                 ):
                     result = EntityService.get_localized_entity_hierarchy(EntityType.ns_branch.value, 1)
@@ -497,7 +497,7 @@ class TestGetLocalizedEntityHierarchy:
         with app.app_context():
             with patch.object(EntityService, "get_entity", return_value=subbranch):
                 with patch(
-                    "app.utils.form_localization.get_localized_country_name",
+                    "app.utils.forms.form_localization.get_localized_country_name",
                     return_value="L-Kenya",
                 ):
                     result = EntityService.get_localized_entity_hierarchy(EntityType.ns_subbranch.value, 1)
@@ -511,7 +511,7 @@ class TestGetLocalizedEntityHierarchy:
         with app.app_context():
             with patch.object(EntityService, "get_entity", return_value=lu):
                 with patch(
-                    "app.utils.form_localization.get_localized_country_name",
+                    "app.utils.forms.form_localization.get_localized_country_name",
                     return_value="L-Kenya",
                 ):
                     result = EntityService.get_localized_entity_hierarchy(EntityType.ns_localunit.value, 1)
@@ -554,7 +554,7 @@ class TestGetLocalizedEntityHierarchy:
         lu = _ns_localunit("Office 1", branch=branch, subbranch=subbranch)
         with app.app_context():
             with patch.object(EntityService, "get_entity", return_value=lu):
-                with patch("app.utils.form_localization.get_localized_country_name", return_value="L-Kenya"):
+                with patch("app.utils.forms.form_localization.get_localized_country_name", return_value="L-Kenya"):
                     result = EntityService.get_localized_entity_hierarchy(EntityType.ns_localunit.value, 1)
         assert "CBD" in result
 

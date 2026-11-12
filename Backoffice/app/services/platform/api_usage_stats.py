@@ -11,7 +11,7 @@ from sqlalchemy import case, func, or_
 
 from app import db
 from app.models.api_usage import APIUsage
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 _VAR_RE = re.compile(r"<([^>]+)>|\{([^}]+)\}")
 

@@ -23,14 +23,14 @@ from app.services.validation.questions_excel_service import (
 )
 from app.services.validation.question_follow_up import create_follow_up, parent_ids_with_open_follow_up
 from app.services.validation.question_lifecycle import clear_answer_received, clear_review_state, mark_answer_received
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok
-from app.utils.api_helpers import get_json_safe
-from app.utils.file_parsing import EXCEL_EXTENSIONS
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_ok
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.files.file_parsing import EXCEL_EXTENSIONS
 from flask_wtf import FlaskForm
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.http.request_validation import enforce_csrf_json
 
 
 @bp.route("/validation-questions", methods=["GET"])

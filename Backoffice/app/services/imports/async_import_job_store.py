@@ -20,7 +20,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.extensions import db
 from app.models import AIJob
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 

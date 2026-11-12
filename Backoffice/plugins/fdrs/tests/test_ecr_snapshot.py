@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import text
 
 from app.extensions import db
-from app.utils.datetime_helpers import naive_utc, utcnow
+from app.utils.common.datetime_helpers import naive_utc, utcnow
 from plugins.fdrs.models import EveryoneCountsSnapshot
 from plugins.fdrs.services import ecr_snapshot
 

@@ -7,7 +7,7 @@ import re
 from flask import current_app, request
 
 from app.extensions import db
-from app.utils.mobile_responses import (
+from app.utils.mobile.mobile_responses import (
     mobile_bad_request,
     mobile_not_found,
     mobile_ok,
@@ -136,7 +136,7 @@ def fdrs_overview():
 
     One of indicator_bank_id or kpi_code is required.
     """
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     indicator_bank_id = request.args.get('indicator_bank_id', type=int)
     kpi_code = (request.args.get('kpi_code', type=str) or '').strip() or None
@@ -427,7 +427,7 @@ def _assemble_country_profile(
     [other_totals] is keyed by (indicator bank id, period, country id).
     [document_entries] uses the shape from ``country_documents``.
     """
-    from app.utils.sector_logo_urls import country_ns_logo_url
+    from app.utils.branding.sector_logo_urls import country_ns_logo_url
 
     national_society = country.primary_national_society
     iso3 = (country.iso3 or '').strip().upper()
@@ -553,7 +553,7 @@ def country_profile(iso3):
       - template_id (optional, default 21 — FDRS)
       - locale (optional, default 'en'): localized country, indicator and sector names
     """
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     locale = (request.args.get('locale', 'en') or 'en').strip().lower()
@@ -755,7 +755,7 @@ def region_profile(slug):
       - template_id (optional, default 21 — FDRS)
       - locale (optional, default 'en'): localized country and indicator names
     """
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     locale = (request.args.get('locale', 'en') or 'en').strip().lower()
@@ -924,7 +924,7 @@ def reach_indicators():
       - template_id (optional, default 21 — FDRS)
       - locale (optional, default 'en'): localized sector and indicator names
     """
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     locale = (request.args.get('locale', 'en') or 'en').strip().lower()
@@ -1041,7 +1041,7 @@ def offline_home():
       - locale (optional, default 'en')
       - indicator_bank_ids: comma-separated bank ids the home chips request
     """
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     locale = (request.args.get('locale', 'en') or 'en').strip().lower()
@@ -1132,7 +1132,7 @@ def offline_countries():
     The app stores each piece under the cache key of ``/data/countrymap``,
     ``/data/country-profile/<iso3>`` and ``.../operations``.
     """
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     locale = (request.args.get('locale', 'en') or 'en').strip().lower()
@@ -1140,7 +1140,7 @@ def offline_countries():
     try:
         from app.models import IndicatorBank
         from app.services import CountryService
-        from app.utils.sector_logo_urls import country_ns_logo_url
+        from app.utils.branding.sector_logo_urls import country_ns_logo_url
         from plugins.fdrs.services.fdrs_public_documents import public_documents_by_country
         from plugins.fdrs.services.go_operations import fetch_operations_by_iso3
 

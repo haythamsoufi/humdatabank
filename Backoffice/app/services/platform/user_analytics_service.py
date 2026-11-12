@@ -15,9 +15,9 @@ from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy import DateTime, and_, case, or_, cast, func, inspect, literal, text, Integer
 from app import db
-from app.utils.client_ip import _strip_ip_port, get_client_ip  # noqa: F401 — canonical implementation, re-exported
-from app.utils.datetime_helpers import utcnow, ensure_utc, naive_utc
-from app.utils.transactions import atomic, request_transaction_rollback
+from app.utils.security.client_ip import _strip_ip_port, get_client_ip  # noqa: F401 — canonical implementation, re-exported
+from app.utils.common.datetime_helpers import utcnow, ensure_utc, naive_utc
+from app.utils.database.transactions import atomic, request_transaction_rollback
 from app.models import (
     UserLoginLog, UserActivityLog, UserSessionLog,
     AdminActionLog, SecurityEvent, User
@@ -26,10 +26,10 @@ import json
 import re
 from urllib.parse import urlparse
 from user_agents import parse
-from app.utils.constants import DEFAULT_SESSION_CLEANUP_LOCK_ID
-from app.utils.activity_types import normalize_activity_type
-from app.utils.activity_logging_skip import audit_endpoint_for_activity
-from app.utils.page_view_paths import (
+from app.utils.common.constants import DEFAULT_SESSION_CLEANUP_LOCK_ID
+from app.utils.activity.activity_types import normalize_activity_type
+from app.utils.activity.activity_logging_skip import audit_endpoint_for_activity
+from app.utils.activity.page_view_paths import (
     merge_page_view_path_count,
     page_view_path_key_from_request,
 )
@@ -528,7 +528,7 @@ def increment_session_page_views_without_activity_log_deferred(
     if not session_id:
         return
     try:
-        from app.utils.transactions import atomic
+        from app.utils.database.transactions import atomic
 
         with atomic(remove_session=True):
             _update_session_activity_explicit(
@@ -648,7 +648,7 @@ def log_user_activity_explicit(
     if _should_skip_activity_user_log_endpoint((endpoint or "").strip() or None):
         return
 
-    from app.utils.transactions import atomic
+    from app.utils.database.transactions import atomic
 
     normalized_activity_type = normalize_activity_type(activity_type)
 
@@ -1063,7 +1063,7 @@ def user_session_log_active_duration_seconds_sql():
 
 
 # Per-process cache of revoked session IDs (positives only). The authoritative,
-# cross-worker record is shared storage (app.utils.auth_state: Redis or the
+# cross-worker record is shared storage (app.utils.auth.auth_state: Redis or the
 # auth_state_entry table) plus the ended UserSessionLog row, so a force-logout or a
 # refresh-token-reuse revocation takes effect on every worker and survives restarts.
 _blacklisted_sessions = set()
@@ -1081,7 +1081,7 @@ def add_session_to_blacklist(session_id):
         return
     _blacklisted_sessions.add(session_id)
     try:
-        from app.utils.mobile_jwt import revoke_session_id
+        from app.utils.mobile.mobile_jwt import revoke_session_id
         revoke_session_id(session_id)
     except Exception as e:
         current_app.logger.error(
@@ -1091,8 +1091,8 @@ def add_session_to_blacklist(session_id):
 
 
 def _session_revoked_in_shared_store(session_id, *, fail_closed: bool) -> bool:
-    from app.utils.auth_state import AuthStateUnavailable
-    from app.utils.mobile_jwt import is_session_id_revoked
+    from app.utils.auth.auth_state import AuthStateUnavailable
+    from app.utils.mobile.mobile_jwt import is_session_id_revoked
     try:
         return is_session_id_revoked(session_id)
     except AuthStateUnavailable:
@@ -1685,7 +1685,7 @@ def _empty_page_path_histogram(days: int) -> Dict[str, Any]:
 def format_page_path_histogram_csv(paths: List[Dict[str, Any]]) -> str:
     """CSV text for path, total_views, session_hits (UTF-8 with header)."""
     buf = StringIO()
-    from app.utils.export_safety import safe_csv_writer
+    from app.utils.files.export_safety import safe_csv_writer
 
     w = safe_csv_writer(buf)
     w.writerow(["path", "total_views", "sessions_with_path"])
@@ -1756,7 +1756,7 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
     try:
         from config import Config
         from flask import current_app
-        from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+        from app.utils.database.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
         inspector = inspect(db.engine)
         table_name = UserSessionLog.__tablename__

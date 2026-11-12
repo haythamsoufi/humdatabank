@@ -1,12 +1,12 @@
 # File: Backoffice/app/routes/admin/__init__.py
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 """
 Admin Module - Centralized registration of all admin blueprints
 """
 
 from flask import Blueprint, render_template, current_app, request, url_for, redirect
 from werkzeug.routing.exceptions import BuildError
-from app.utils.api_responses import json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.api.api_responses import json_forbidden, json_not_found, json_ok, json_server_error
 from flask_login import current_user
 from app import db
 from app.models import (
@@ -14,7 +14,7 @@ from app.models import (
     UserLoginLog, SecurityEvent, UserActivityLog, UserSessionLog, AssignmentEntityStatus, PublicSubmissionStatus
 )
 from app.routes.admin.shared import admin_required, admin_permission_required, permission_required, permission_required_any, system_manager_required
-from app.utils.request_utils import is_json_request
+from app.utils.http.request_utils import is_json_request
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_, inspect, select
 from app.services import get_platform_stats

@@ -22,11 +22,11 @@ from app.services.validation.dashboard_service import (
     template_tab_options,
 )
 from app.services.validation.tracker_service import build_tracker_data
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok
-from app.utils.api_helpers import get_json_safe
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_ok
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.http.request_validation import enforce_csrf_json
 
 
 @bp.route("/validation-dashboard/api/rounds", methods=["GET"])

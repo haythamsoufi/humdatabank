@@ -810,7 +810,7 @@ def apply_reported_pns_approvals(
     from app.models.assignments import AssignmentEntityStatus
     from app.models.enums import AssignmentEntityStatusValue
     from app.services.assignments.workflow_service import apply_entity_status_change
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     stats = {"approved": 0, "skipped": 0, "errors": 0}
     aes_ids = sorted(reported_pns_aes_in_scope(ctx, template_ids, rounds=rounds))
@@ -820,7 +820,7 @@ def apply_reported_pns_approvals(
     if dry_run:
         rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
     else:
-        from app.utils.form_authorization import lock_aes_rows_for_update
+        from app.utils.forms.form_authorization import lock_aes_rows_for_update
 
         rows = lock_aes_rows_for_update(aes_ids)
     found = {int(row.id): row for row in rows}
@@ -1063,7 +1063,7 @@ def apply_pns_pending_status_resets(
     """Apply pending resets using parent assignment ``assigned_at`` as status date."""
     from app.extensions import db
     from app.models.assignments import AssignedForm, AssignmentEntityStatus
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     stats = {"updated": 0, "skipped": 0, "errors": 0}
     if not plan:
@@ -1073,7 +1073,7 @@ def apply_pns_pending_status_resets(
     if dry_run:
         aes_rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
     else:
-        from app.utils.form_authorization import lock_aes_rows_for_update
+        from app.utils.forms.form_authorization import lock_aes_rows_for_update
 
         aes_rows = lock_aes_rows_for_update(aes_ids)
     aes_by_id = {int(row.id): row for row in aes_rows}
@@ -1654,7 +1654,7 @@ def load_upr_data_sheet(path: str) -> Tuple[List[str], List[Dict[str, Any]]]:
     except ImportError as exc:
         raise RuntimeError("Excel support requires openpyxl: pip install openpyxl") from exc
 
-    from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
+    from app.utils.files.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
     wb = load_workbook_safe(read_workbook_file_bytes(path), read_only=True, data_only=True)
     if UPR_DATA_SHEET not in wb.sheetnames:
@@ -2937,7 +2937,7 @@ def t22_matrix_is_staff(item) -> bool:
 
 
 def _resolve_published_stable_item(template_id: int, stable_key: str) -> Optional[int]:
-    from app.utils.stable_key import resolve_published_form_item_id
+    from app.utils.templates.stable_key import resolve_published_form_item_id
 
     item_id = resolve_published_form_item_id(int(template_id), stable_key)
     return int(item_id) if item_id else None
@@ -2950,7 +2950,7 @@ def _resolve_t22_staff_item_id(ctx: "UprImportContext") -> Optional[int]:
     staff column, then the label, when this database already keyed the field
     with a different UUID.
     """
-    from app.utils.stable_key import T22_STAFF_MATRIX_STABLE_KEY
+    from app.utils.templates.stable_key import T22_STAFF_MATRIX_STABLE_KEY
 
     staff_id = _resolve_published_stable_item(22, T22_STAFF_MATRIX_STABLE_KEY)
     if staff_id:
@@ -2969,7 +2969,7 @@ def _resolve_t22_staff_item_id(ctx: "UprImportContext") -> Optional[int]:
 
 def _resolve_t22_funding_item_id(ctx: "UprImportContext") -> Optional[int]:
     """Published T22 funding matrix — stable_key, else label, else SP/EF columns."""
-    from app.utils.stable_key import T22_FUNDING_MATRIX_STABLE_KEY
+    from app.utils.templates.stable_key import T22_FUNDING_MATRIX_STABLE_KEY
 
     fund_id = _resolve_published_stable_item(22, T22_FUNDING_MATRIX_STABLE_KEY)
     if fund_id:
@@ -3070,7 +3070,7 @@ def _published_funding_matrix_item(template_id: int):
     pub_vid = getattr(template, "published_version_id", None) if template else None
     if not pub_vid:
         return None
-    from app.utils.sql_utils import ilike_contains
+    from app.utils.database.sql_utils import ilike_contains
 
     labels = REPORTING_SPECIAL_ITEM_LABELS.get("funding") or ()
     query = FormItem.query.filter(
@@ -5097,8 +5097,8 @@ def upsert_upr_discussion_comments(
     """Replace UPR-import discussion comments for affected assignments."""
     from app.extensions import db
     from app.models import SubmissionDiscussionComment
-    from app.utils.datetime_helpers import utcnow
-    from app.utils.discussion_comments import DISCUSSION_SOURCE_UPR_EXCEL
+    from app.utils.common.datetime_helpers import utcnow
+    from app.utils.discussion.discussion_comments import DISCUSSION_SOURCE_UPR_EXCEL
 
     stats = {
         "discussion_inserted": 0,
@@ -5229,7 +5229,7 @@ def run_upr_import(
 
         valid_item_ids: Optional[Set[int]] = None
         if tids:
-            from app.utils.stable_key import published_form_item_id_set_for_templates
+            from app.utils.templates.stable_key import published_form_item_id_set_for_templates
 
             valid_item_ids = published_form_item_id_set_for_templates(tids)
 

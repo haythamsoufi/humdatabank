@@ -30,7 +30,7 @@ from typing import Any, Deque, Dict, List, Optional, Tuple
 from flask import g, request
 
 from app.services.monitoring.system import _is_long_lived_connection_request
-from app.utils.request_utils import is_static_asset_request
+from app.utils.http.request_utils import is_static_asset_request
 
 _lock = threading.Lock()
 _next_request_id = 0
@@ -227,7 +227,7 @@ def _fs_build_payload(pid: int) -> Dict[str, Any]:
 
     ws_pool: Dict[str, Any] = {}
     with suppress(Exception):
-        from app.utils.ws_manager import ws_manager
+        from app.utils.realtime.ws_manager import ws_manager
         ws_pool = ws_manager.snapshot()
 
     db_pool: Dict[str, Any] = get_db_pool_stats()
@@ -697,7 +697,7 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
 
     ws_pool_snapshot: Dict[str, Any] = {}
     try:
-        from app.utils.ws_manager import ws_manager
+        from app.utils.realtime.ws_manager import ws_manager
         ws_pool_snapshot = ws_manager.snapshot()
     except Exception:
         ws_pool_snapshot = {'error': 'unavailable'}

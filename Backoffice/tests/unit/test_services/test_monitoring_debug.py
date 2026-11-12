@@ -200,7 +200,7 @@ class TestConfigureLogging:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
+            patch("app.utils.monitoring.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure_logging(app)
@@ -240,7 +240,7 @@ class TestConfigureLogging:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_fh),
+            patch("app.utils.monitoring.logging_handlers.create_rotating_file_handler", return_value=mock_fh),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure_logging(app)
@@ -257,7 +257,7 @@ class TestConfigureLogging:
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
             patch(
-                "app.utils.logging_handlers.create_rotating_file_handler",
+                "app.utils.monitoring.logging_handlers.create_rotating_file_handler",
                 side_effect=OSError("handler fails"),
             ),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),

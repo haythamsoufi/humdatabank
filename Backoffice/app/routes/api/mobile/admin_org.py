@@ -3,8 +3,8 @@
 
 from flask import request, current_app
 
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import mobile_ok, mobile_not_found, mobile_server_error
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import mobile_ok, mobile_not_found, mobile_server_error
 from app.routes.api.mobile import mobile_bp
 
 

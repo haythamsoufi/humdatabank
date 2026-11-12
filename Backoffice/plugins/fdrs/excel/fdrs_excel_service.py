@@ -65,7 +65,7 @@ class FdrsExcelService:
 
     @classmethod
     def build_workbook(cls, aes) -> Tuple[io.BytesIO, str]:
-        from app.utils.safe_workbook import load_workbook_safe
+        from app.utils.files.safe_workbook import load_workbook_safe
 
         template_path = cls.get_template_path()
         wb = load_workbook_safe(template_path, read_only=False, data_only=False)
@@ -81,7 +81,7 @@ class FdrsExcelService:
 
     @classmethod
     def validate_import_file(cls, aes, file_bytes: bytes) -> Dict[str, Any]:
-        from app.utils.safe_workbook import load_workbook_safe
+        from app.utils.files.safe_workbook import load_workbook_safe
 
         try:
             wb = load_workbook_safe(file_bytes, read_only=False, data_only=False)
@@ -107,7 +107,7 @@ class FdrsExcelService:
     @classmethod
     def import_data_for_form(cls, aes, file_bytes: bytes) -> Dict[str, Any]:
         from app.services.imports.scoped_import_guard import filter_staged_import_payload
-        from app.utils.safe_workbook import load_workbook_safe
+        from app.utils.files.safe_workbook import load_workbook_safe
 
         try:
             wb = load_workbook_safe(file_bytes, read_only=False, data_only=False)
@@ -139,7 +139,7 @@ class FdrsExcelService:
 
 def _assignment_identity(aes) -> Tuple[str, str, str, Optional[int], str]:
     from app.models.organization import NationalSociety
-    from app.utils.api_serialization import _country_for_aes
+    from app.utils.api.api_serialization import _country_for_aes
 
     country = _country_for_aes(aes)
     country_name = (country.name if country else "") or ""

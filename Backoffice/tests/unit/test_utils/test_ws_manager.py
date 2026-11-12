@@ -1,5 +1,5 @@
 """
-Unit tests for app/utils/ws_manager.py – 100% coverage target.
+Unit tests for app/utils/realtime/ws_manager.py – 100% coverage target.
 
 WebSocket connections are fully mocked; no real socket is created.
 """
@@ -8,7 +8,7 @@ import time
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.utils.ws_manager import (
+from app.utils.realtime.ws_manager import (
     WebSocketManager,
     broadcast_notification,
     broadcast_unread_count,
@@ -199,7 +199,7 @@ class TestWebSocketManagerSendToUser:
         ws = _make_ws()
         mgr.add_connection(1, ws)
         # Patch utcnow (used inside send_to_user before the per-ws try block)
-        with patch('app.utils.ws_manager.utcnow', side_effect=Exception('utcnow failed')):
+        with patch('app.utils.realtime.ws_manager.utcnow', side_effect=Exception('utcnow failed')):
             result = mgr.send_to_user(1, 'event', {})
         assert result == 0
 

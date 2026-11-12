@@ -39,7 +39,7 @@ class TestLoginRouteExtended:
         assert resp.status_code in (301, 302, 303, 307, 308)
 
     def test_login_account_locked(self, client, db_session, app):
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
         with app.app_context():
             create_test_user(db_session, email='locked-login@example.com', password='TestPass123!')
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
@@ -218,7 +218,7 @@ class TestAccountSettingsAndDevices:
         from app.extensions import db
         from app.models import User
         from app.routes.auth import kickout_own_device
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user_id = int(admin_user.id)

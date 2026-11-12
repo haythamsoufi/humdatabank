@@ -8,11 +8,11 @@ from app.models import (
 )
 from app.routes.admin.shared import check_template_access
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from sqlalchemy import func
 from config.config import Config
 from .cloning import _clone_template_structure
-from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
+from app.utils.common.json_helpers import deep_copy_json as _deep_copy_json_value
 import json
 
 

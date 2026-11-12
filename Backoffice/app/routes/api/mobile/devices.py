@@ -4,10 +4,10 @@
 from flask import request, current_app
 from flask_login import current_user
 
-from app.utils.api_helpers import get_json_safe
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import mobile_ok, mobile_bad_request
-from app.utils.notification_push import is_notifications_push_enabled, PUSH_NOT_ENABLED_CODE
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import mobile_ok, mobile_bad_request
+from app.utils.notifications.notification_push import is_notifications_push_enabled, PUSH_NOT_ENABLED_CODE
 from app.routes.api.mobile import mobile_bp
 
 
@@ -31,7 +31,7 @@ def register_device():
     if not platform or platform not in ('ios', 'android'):
         return mobile_bad_request('platform must be "ios" or "android"')
 
-    from app.utils.client_ip import get_client_ip
+    from app.utils.security.client_ip import get_client_ip
     ip_address = get_client_ip()
 
     result = PushNotificationService.register_device(

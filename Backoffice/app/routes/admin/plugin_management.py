@@ -7,12 +7,12 @@ from app.plugins import PluginManager
 from app.plugins.form_integration import EntryRenderRequestError, FormIntegration, parse_entry_render_args
 from app.plugins.manager import PluginLifecycleError
 # Do not import csrf_exempt; these API routes are protected by auth/permissions
-from app.utils.rate_limiting import plugin_management_rate_limit, plugin_install_rate_limit
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.request_utils import get_request_data
-from app.utils.constants import CACHE_MAX_AGE_ONE_HOUR
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error, require_json_data
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.security.rate_limiting import plugin_management_rate_limit, plugin_install_rate_limit
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.http.request_utils import get_request_data
+from app.utils.common.constants import CACHE_MAX_AGE_ONE_HOUR
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error, require_json_data
+from app.utils.common.error_handling import handle_json_view_exception
 from typing import Optional, Tuple
 import json
 import io

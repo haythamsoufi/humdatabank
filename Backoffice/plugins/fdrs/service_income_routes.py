@@ -7,8 +7,8 @@ import logging
 from flask import request
 
 from app.routes.admin.shared import permission_required
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_ok, json_server_error
 from plugins.fdrs import bp
 from plugins.fdrs.services.service_income_analysis import load_service_income_analysis
 

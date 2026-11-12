@@ -1,10 +1,10 @@
-"""Tests for app/utils/filters.py – targets 100 % coverage."""
+"""Tests for app/utils/common/filters.py – targets 100 % coverage."""
 import pytest
 from unittest.mock import patch, MagicMock
 from flask import Flask
 from markupsafe import Markup
 
-from app.utils.filters import (
+from app.utils.common.filters import (
     normalize_type,
     escapejs,
     safe_json_attr,
@@ -316,7 +316,7 @@ class TestNl2br:
 class TestProfileInitialsFilter:
     def test_delegates_to_display_initials(self):
         mock_user = MagicMock()
-        with patch("app.utils.profile_utils.display_initials_for_user", return_value="AB") as mock_fn:
+        with patch("app.utils.profiles.profile_utils.display_initials_for_user", return_value="AB") as mock_fn:
             result = profile_initials_filter(mock_user)
         assert result == "AB"
         mock_fn.assert_called_once_with(mock_user)
@@ -325,7 +325,7 @@ class TestProfileInitialsFilter:
         user = MagicMock()
         user.first_name = "Jane"
         user.last_name = "Doe"
-        with patch("app.utils.profile_utils.display_initials_for_user", return_value="JD"):
+        with patch("app.utils.profiles.profile_utils.display_initials_for_user", return_value="JD"):
             result = profile_initials_filter(user)
         assert result == "JD"
 
@@ -363,7 +363,7 @@ class TestRichTextAndEscapingFilters:
     def test_rich_text_strips_active_content_and_keeps_formatting(self):
         from markupsafe import Markup
 
-        from app.utils.filters import rich_text
+        from app.utils.common.filters import rich_text
 
         out = rich_text('<b>ok</b><script>alert(1)</script><img src=x onerror=alert(1)>'
                         '<a href="javascript:alert(1)">x</a><a href="https://e.org">y</a>')
@@ -374,20 +374,20 @@ class TestRichTextAndEscapingFilters:
         assert 'rel="noopener noreferrer"' in out
 
     def test_rich_text_handles_none_and_plain_text(self):
-        from app.utils.filters import rich_text
+        from app.utils.common.filters import rich_text
 
         assert rich_text(None) == ""
         assert rich_text("a\nb") == "a<br>b"
 
     def test_escapejs_neutralises_script_breakout(self):
-        from app.utils.filters import escapejs
+        from app.utils.common.filters import escapejs
 
         out = str(escapejs("</script><b>'x'&\u2028"))
         assert "<" not in out and ">" not in out and "'" not in out and "&" not in out
         assert "\\u003c/script\\u003e" in out
 
     def test_safe_json_attr_escapes_all_html_metacharacters(self):
-        from app.utils.filters import safe_json_attr
+        from app.utils.common.filters import safe_json_attr
 
         out = str(safe_json_attr({"a": "<x>&\"'"}))
         assert '"' not in out and "<" not in out and ">" not in out

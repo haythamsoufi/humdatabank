@@ -1,7 +1,7 @@
 """Template Excel import paths."""
 
 # ========== Template Excel Import/Export Service ==========
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 """
 Service for exporting and importing form templates to/from Excel.
 """
@@ -18,7 +18,7 @@ from app.models.indicator_bank import IndicatorBank
 from contextlib import suppress
 from app.services.monitoring.memory import memory_tracker
 import openpyxl
-from app.utils.safe_workbook import load_workbook_safe
+from app.utils.files.safe_workbook import load_workbook_safe
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
@@ -32,7 +32,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
-from app.utils.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
+from app.utils.templates.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
 
 from app.services.templates.matrix_import import TemplateExcelMatrixMixin
 

@@ -1,7 +1,7 @@
 """Translation services package.
 
 Provides automatic and IFRC translation capabilities for the platform.
-Migrated from app.utils.auto_translator. The IFRC Translation API client lives
+Migrated from app.services.translation.auto_translator. The IFRC Translation API client lives
 directly in auto_translator.py (there is no separate standalone IFRC service
 module — a legacy duplicate under this name was removed as dead code).
 """

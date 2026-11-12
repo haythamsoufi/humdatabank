@@ -424,7 +424,7 @@ def selected_matrix_header_labels(cells, header_columns) -> list[str]:
 
 
 def _cell_text(raw) -> str:
-    from app.utils.matrix_activity import matrix_cell_display_value
+    from app.utils.forms.matrix_activity import matrix_cell_display_value
 
     value = matrix_cell_display_value(raw)
     if value is None or isinstance(value, bool):
@@ -746,7 +746,7 @@ class _CoverageBatch:
         self._operations_cache: dict[tuple, list] = {}
         if not self.catalogue_ok or not self.aes_list:
             return
-        from app.utils.api_serialization import batch_countries_for_aes_list
+        from app.utils.api.api_serialization import batch_countries_for_aes_list
 
         self.countries = batch_countries_for_aes_list(self.aes_list)
         self.forms = _assigned_forms(self.aes_list)

@@ -21,18 +21,18 @@ from flask import session
 
 from app.extensions import db
 from app.models.ai_chat import AIConversation, AIMessage
-from app.utils.ai_request_user import bearer_identity_needs_login, resolve_ai_identity
-from app.utils.ai_utils import is_form_builder_assistant_context, openai_model_supports_sampling_params
-from app.utils.constants import (
+from app.utils.ai.ai_request_user import bearer_identity_needs_login, resolve_ai_identity
+from app.utils.ai.ai_utils import is_form_builder_assistant_context, openai_model_supports_sampling_params
+from app.utils.common.constants import (
     DAILY_RATE_LIMIT_WINDOW_SECONDS,
     WS_HEARTBEAT_INTERVAL_SECONDS,
     WS_INACTIVITY_STALE_SECONDS,
 )
-from app.utils.datetime_helpers import utcnow
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.request_utils import unwrap_waf_json_envelope
-from app.utils.ws_manager import ws_manager
-from app.utils.ws_helpers import (
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.http.request_utils import unwrap_waf_json_envelope
+from app.utils.realtime.ws_manager import ws_manager
+from app.utils.realtime.ws_helpers import (
     WsInboundPump,
     apply_sock_server_options,
     check_websocket_origin,

@@ -1,10 +1,10 @@
-"""Tests for app/utils/json_helpers.py – targets 100 % coverage."""
+"""Tests for app/utils/common/json_helpers.py – targets 100 % coverage."""
 import json
 import copy
 import pytest
 from unittest.mock import patch
 
-from app.utils.json_helpers import deep_copy_json
+from app.utils.common.json_helpers import deep_copy_json
 
 
 class TestDeepCopyJsonNone:
@@ -80,13 +80,13 @@ class TestDeepCopyJsonFallbackDeepCopy:
 
     def test_deepcopy_used_on_json_failure(self):
         original = {"key": "value"}
-        with patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("not serializable")):
+        with patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("not serializable")):
             result = deep_copy_json(original)
         assert result == original
 
     def test_deepcopy_returns_independent_copy(self):
         original = {"a": [1, 2]}
-        with patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("not serializable")):
+        with patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("not serializable")):
             result = deep_copy_json(original)
         assert result == original
 
@@ -96,50 +96,50 @@ class TestDeepCopyJsonShallowFallback:
 
     def _both_fail(self):
         return (
-            patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail")),
-            patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail")),
+            patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail")),
+            patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail")),
         )
 
     def test_dict_shallow_fallback(self):
         original = {"a": 1}
-        p1 = patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail"))
-        p2 = patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
+        p1 = patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail"))
+        p2 = patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
         with p1, p2:
             result = deep_copy_json(original)
         assert result == original
 
     def test_list_shallow_fallback(self):
         original = [1, 2, 3]
-        p1 = patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail"))
-        p2 = patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
+        p1 = patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail"))
+        p2 = patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
         with p1, p2:
             result = deep_copy_json(original)
         assert result == original
 
     def test_string_primitive_fallback(self):
-        p1 = patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail"))
-        p2 = patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
+        p1 = patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail"))
+        p2 = patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
         with p1, p2:
             result = deep_copy_json("hello")
         assert result == "hello"
 
     def test_int_primitive_fallback(self):
-        p1 = patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail"))
-        p2 = patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
+        p1 = patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail"))
+        p2 = patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
         with p1, p2:
             result = deep_copy_json(100)
         assert result == 100
 
     def test_float_primitive_fallback(self):
-        p1 = patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail"))
-        p2 = patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
+        p1 = patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail"))
+        p2 = patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
         with p1, p2:
             result = deep_copy_json(1.5)
         assert result == 1.5
 
     def test_bool_primitive_fallback(self):
-        p1 = patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail"))
-        p2 = patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
+        p1 = patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail"))
+        p2 = patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
         with p1, p2:
             result = deep_copy_json(True)
         assert result is True
@@ -149,8 +149,8 @@ class TestDeepCopyJsonShallowFallback:
         class Opaque:
             pass
         obj = Opaque()
-        p1 = patch("app.utils.json_helpers.json.dumps", side_effect=TypeError("json fail"))
-        p2 = patch("app.utils.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
+        p1 = patch("app.utils.common.json_helpers.json.dumps", side_effect=TypeError("json fail"))
+        p2 = patch("app.utils.common.json_helpers.copy.deepcopy", side_effect=Exception("deepcopy fail"))
         with p1, p2:
             result = deep_copy_json(obj)
         assert result is obj

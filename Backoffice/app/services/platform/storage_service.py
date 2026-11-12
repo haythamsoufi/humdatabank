@@ -608,7 +608,7 @@ def category_rel_for_submitted_storage_path(
     :func:`stream_response`. Returns ``None`` when *storage_path* is a non-empty
     absolute local path that exists on disk (callers may ``send_file`` it directly).
     """
-    from app.utils.file_paths import get_upload_base_path, normalize_stored_relative_path
+    from app.utils.files.file_paths import get_upload_base_path, normalize_stored_relative_path
 
     sp = (storage_path or "").strip()
     if not sp:

@@ -5,9 +5,9 @@ Provides bidirectional communication and prevents blocking the main application 
 """
 
 from flask_login import login_required, current_user
-from app.utils.constants import SESSION_INACTIVITY_SECONDS, WS_INACTIVITY_STALE_SECONDS
-from app.utils.ws_manager import ws_manager
-from app.utils.ws_helpers import (
+from app.utils.common.constants import SESSION_INACTIVITY_SECONDS, WS_INACTIVITY_STALE_SECONDS
+from app.utils.realtime.ws_manager import ws_manager
+from app.utils.realtime.ws_helpers import (
     apply_sock_server_options,
     check_websocket_origin,
     is_notifications_websocket_enabled,

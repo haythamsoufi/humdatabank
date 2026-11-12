@@ -26,7 +26,7 @@ from app.services.data_quality.helpers import (
     validation_question_counts,
 )
 from app.services.data_quality.types import DataQualityResult
-from app.utils.data_quality_constants import METHODOLOGY_FDRS_V1
+from app.utils.indicators.data_quality_constants import METHODOLOGY_FDRS_V1
 
 
 class FdrsV1Methodology:
@@ -136,14 +136,14 @@ class FdrsV1Methodology:
         def _repository_field_ids(assignment_id: int) -> set[int]:
             nonlocal covered_ids
             if covered_ids is None:
-                from app.utils.assignment_document_carryover import repository_satisfied_field_ids
+                from app.utils.documents.assignment_document_carryover import repository_satisfied_field_ids
 
                 aes = db.session.get(AssignmentEntityStatus, assignment_id)
                 covered_ids = repository_satisfied_field_ids(aes) if aes is not None else set()
             return covered_ids
 
         def _reuse_config_enabled(cfg: dict) -> bool:
-            from app.utils.assignment_document_carryover import _config_bool_true
+            from app.utils.documents.assignment_document_carryover import _config_bool_true
 
             return _config_bool_true(cfg.get("cross_assignment_period_reuse"))
 

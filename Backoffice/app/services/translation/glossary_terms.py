@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func, or_
 
 from app.extensions import db
-from app.utils.sql_utils import ilike_contains
+from app.utils.database.sql_utils import ilike_contains
 
 logger = logging.getLogger(__name__)
 

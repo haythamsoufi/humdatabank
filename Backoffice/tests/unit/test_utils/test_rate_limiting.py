@@ -1,5 +1,5 @@
 """
-Unit tests for app/utils/rate_limiting.py
+Unit tests for app/utils/security/rate_limiting.py
 
 Covers: shared-store limiting, rate_limit decorator (all branches),
         mobile_rate_limit, and factory helpers.
@@ -14,7 +14,7 @@ from unittest.mock import patch, MagicMock
 # ---------------------------------------------------------------------------
 
 def _clear_storage():
-    from app.utils.rate_limiting import _rate_limit_storage
+    from app.utils.security.rate_limiting import _rate_limit_storage
     _rate_limit_storage.clear()
 
 
@@ -38,7 +38,7 @@ class TestSharedRateLimitStorage:
         app.config["RATE_LIMIT_SHARED_FALLBACK"] = original
 
     def test_shared_limit_counts_in_store_not_process_memory(self, app, db_session, db_fallback):
-        from app.utils import rate_limiting as rl
+        from app.utils.security import rate_limiting as rl
         with app.app_context():
             results = [rl.hit_rate_limit("shared-key-1", 3, shared=True) for _ in range(5)]
             assert results == [False, False, False, True, True]
@@ -46,7 +46,7 @@ class TestSharedRateLimitStorage:
 
     def test_shared_limit_visible_to_a_second_worker(self, app, db_session, db_fallback):
         """Wiping the in-process buckets (a fresh worker) does not reset a shared counter."""
-        from app.utils import rate_limiting as rl
+        from app.utils.security import rate_limiting as rl
         with app.app_context():
             for _ in range(3):
                 rl.hit_rate_limit("shared-key-2", 3, shared=True)
@@ -54,29 +54,29 @@ class TestSharedRateLimitStorage:
             assert rl.hit_rate_limit("shared-key-2", 3, shared=True) is True
 
     def test_non_shared_limit_stays_in_memory(self, app, db_session, db_fallback):
-        from app.utils import rate_limiting as rl
+        from app.utils.security import rate_limiting as rl
         with app.app_context():
             assert rl.hit_rate_limit("mem-key", 1, shared=False) is False
             assert rl.hit_rate_limit("mem-key", 1, shared=False) is True
             assert "mem-key" in rl._rate_limit_storage
 
     def test_memory_fallback_config_keeps_shared_limiter_in_process(self, app):
-        from app.utils import rate_limiting as rl
+        from app.utils.security import rate_limiting as rl
         app.config["RATE_LIMIT_SHARED_FALLBACK"] = "memory"
         with app.app_context():
             rl.hit_rate_limit("mem-only", 5, shared=True)
             assert "mem-only" in rl._rate_limit_storage
 
     def test_store_outage_degrades_to_process_limiter_not_open(self, app, db_session, db_fallback):
-        from app.utils import rate_limiting as rl
-        from app.utils.auth_state import AuthStateUnavailable
+        from app.utils.security import rate_limiting as rl
+        from app.utils.auth.auth_state import AuthStateUnavailable
         with app.app_context():
-            with patch("app.utils.auth_state.DbAuthStateBackend.incr", side_effect=AuthStateUnavailable("down")):
+            with patch("app.utils.auth.auth_state.DbAuthStateBackend.incr", side_effect=AuthStateUnavailable("down")):
                 results = [rl.hit_rate_limit("outage-key", 2, shared=True) for _ in range(3)]
             assert results == [False, False, True]
 
     def test_auth_rate_limit_uses_shared_store(self, app, db_session, db_fallback):
-        from app.utils import rate_limiting as rl
+        from app.utils.security import rate_limiting as rl
         app.config["DEBUG"] = False
         decorated = rl.auth_rate_limit()(lambda: ("ok", 200))
         with app.test_request_context("/login", method="POST", environ_base={"REMOTE_ADDR": "203.0.113.9"}):
@@ -87,7 +87,7 @@ class TestSharedRateLimitStorage:
         assert getattr(response, "status_code", None) == 302
 
     def test_limit_key_ignores_spoofed_forwarded_for(self, app):
-        from app.utils.client_ip import get_client_ip
+        from app.utils.security.client_ip import get_client_ip
         with app.test_request_context(
             "/login", environ_base={"REMOTE_ADDR": "198.51.100.7"},
             headers={"X-Forwarded-For": "6.6.6.6", "X-Real-IP": "7.7.7.7"},
@@ -110,7 +110,7 @@ class TestRateLimitDecorator:
     # -- Debug skip ------------------------------------------------------------
 
     def test_debug_skip_bypasses_limiting(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         original_skip = app.config.get("RATE_LIMIT_SKIP_DEBUG")
         app.config["DEBUG"] = True
         app.config["RATE_LIMIT_SKIP_DEBUG"] = True
@@ -120,7 +120,7 @@ class TestRateLimitDecorator:
                 return ("ok", 200)
 
             with app.test_request_context("/test"):
-                with patch("app.utils.rate_limiting.get_client_ip", return_value="1.2.3.4"):
+                with patch("app.utils.security.rate_limiting.get_client_ip", return_value="1.2.3.4"):
                     for _ in range(5):
                         result = view()
                     assert result == ("ok", 200)
@@ -131,7 +131,7 @@ class TestRateLimitDecorator:
     # -- Exempt IP -------------------------------------------------------------
 
     def test_exempt_ip_list_bypasses_limiting(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         original_exempt = app.config.get("RATE_LIMIT_EXEMPT_IPS")
         app.config["DEBUG"] = False
         app.config["RATE_LIMIT_EXEMPT_IPS"] = ["192.168.0.1"]
@@ -141,7 +141,7 @@ class TestRateLimitDecorator:
                 return ("ok", 200)
 
             with app.test_request_context("/test"):
-                with patch("app.utils.rate_limiting.get_client_ip", return_value="192.168.0.1"):
+                with patch("app.utils.security.rate_limiting.get_client_ip", return_value="192.168.0.1"):
                     for _ in range(5):
                         result = view()
                     assert result == ("ok", 200)
@@ -149,7 +149,7 @@ class TestRateLimitDecorator:
             app.config["RATE_LIMIT_EXEMPT_IPS"] = original_exempt
 
     def test_exempt_ip_string_config(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         original_exempt = app.config.get("RATE_LIMIT_EXEMPT_IPS")
         app.config["DEBUG"] = False
         app.config["RATE_LIMIT_EXEMPT_IPS"] = "10.0.0.1, 10.0.0.2"
@@ -159,7 +159,7 @@ class TestRateLimitDecorator:
                 return ("ok", 200)
 
             with app.test_request_context("/test"):
-                with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.0.2"):
+                with patch("app.utils.security.rate_limiting.get_client_ip", return_value="10.0.0.2"):
                     result = view()
                     assert result == ("ok", 200)
         finally:
@@ -168,14 +168,14 @@ class TestRateLimitDecorator:
     # -- Method filtering -------------------------------------------------------
 
     def test_get_request_not_counted_when_methods_is_post_only(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=1, methods=["POST"])
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/test", method="GET"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="3.3.3.3"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="3.3.3.3"):
                 for _ in range(5):
                     result = view()
                 assert result == ("ok", 200)
@@ -183,14 +183,14 @@ class TestRateLimitDecorator:
     # -- Rate limit exceeded: JSON response ------------------------------------
 
     def test_json_request_gets_429(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=2)
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/test", headers={"Accept": "application/json"}):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="5.5.5.5"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="5.5.5.5"):
                 view()
                 view()
                 result = view()  # third call exceeds limit of 2
@@ -199,16 +199,16 @@ class TestRateLimitDecorator:
     # -- Rate limit exceeded: web redirect with endpoint -----------------------
 
     def test_web_request_with_endpoint_redirects_to_path(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=1)
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/the/path"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="6.6.6.6"):
-                with patch("app.utils.rate_limiting.is_json_request", return_value=False):
-                    with patch("app.utils.rate_limiting.request") as mock_req:
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="6.6.6.6"):
+                with patch("app.utils.security.rate_limiting.is_json_request", return_value=False):
+                    with patch("app.utils.security.rate_limiting.request") as mock_req:
                         mock_req.method = "POST"
                         mock_req.endpoint = "some.view"
                         mock_req.path = "/the/path"
@@ -219,16 +219,16 @@ class TestRateLimitDecorator:
     # -- Rate limit exceeded: web redirect with redirect_to --------------------
 
     def test_web_request_with_redirect_to_uses_url_for(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=1, redirect_to="auth.login")
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/test"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="7.7.7.7"):
-                with patch("app.utils.rate_limiting.is_json_request", return_value=False):
-                    with patch("app.utils.rate_limiting.url_for", return_value="/login") as mock_url_for:
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="7.7.7.7"):
+                with patch("app.utils.security.rate_limiting.is_json_request", return_value=False):
+                    with patch("app.utils.security.rate_limiting.url_for", return_value="/login") as mock_url_for:
                         view()
                         result = view()
                         mock_url_for.assert_called_with("auth.login")
@@ -237,20 +237,20 @@ class TestRateLimitDecorator:
     # -- Rate limit exceeded: web redirect no endpoint fallback ----------------
 
     def test_web_request_no_endpoint_falls_back_to_root(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=1)
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/test"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="8.8.8.8"):
-                with patch("app.utils.rate_limiting.is_json_request", return_value=False):
-                    with patch("app.utils.rate_limiting.request") as mock_req:
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="8.8.8.8"):
+                with patch("app.utils.security.rate_limiting.is_json_request", return_value=False):
+                    with patch("app.utils.security.rate_limiting.request") as mock_req:
                         mock_req.method = "POST"
                         mock_req.endpoint = None
                         mock_req.path = "/test"
-                        with patch("app.utils.rate_limiting.url_for", side_effect=Exception("no route")):
+                        with patch("app.utils.security.rate_limiting.url_for", side_effect=Exception("no route")):
                             view()
                             result = view()
                             assert result.status_code == 302
@@ -259,14 +259,14 @@ class TestRateLimitDecorator:
     # -- Custom key function ---------------------------------------------------
 
     def test_custom_key_func(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=2, key_func=lambda: "fixed_key_abc")
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/test", headers={"Accept": "application/json"}):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="9.9.9.9"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="9.9.9.9"):
                 view()
                 view()
                 result = view()
@@ -275,7 +275,7 @@ class TestRateLimitDecorator:
     # -- on_limit callback returns response ------------------------------------
 
     def test_on_limit_returns_fallback_response(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         fallback = ("stale", 200)
         @rate_limit(requests_per_minute=1, on_limit=lambda: fallback)
@@ -283,7 +283,7 @@ class TestRateLimitDecorator:
             return ("ok", 200)
 
         with app.test_request_context("/test"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.1.1"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="10.0.1.1"):
                 view()
                 result = view()
                 assert result == fallback
@@ -291,14 +291,14 @@ class TestRateLimitDecorator:
     # -- on_limit callback returns None falls through to 429 ------------------
 
     def test_on_limit_returns_none_falls_through(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=1, on_limit=lambda: None)
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/test", headers={"Accept": "application/json"}):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.2.2"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="10.0.2.2"):
                 view()
                 result = view()
                 assert result.status_code == 429
@@ -306,17 +306,17 @@ class TestRateLimitDecorator:
     # -- Custom flash message --------------------------------------------------
 
     def test_custom_flash_message_used(self, app):
-        from app.utils.rate_limiting import rate_limit
+        from app.utils.security.rate_limiting import rate_limit
         app.config["DEBUG"] = False
         @rate_limit(requests_per_minute=1, flash_message="Custom limit message")
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/test"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="11.0.0.1"):
-                with patch("app.utils.rate_limiting.is_json_request", return_value=False):
-                    with patch("app.utils.rate_limiting.flash") as mock_flash:
-                        with patch("app.utils.rate_limiting.request") as mock_req:
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="11.0.0.1"):
+                with patch("app.utils.security.rate_limiting.is_json_request", return_value=False):
+                    with patch("app.utils.security.rate_limiting.flash") as mock_flash:
+                        with patch("app.utils.security.rate_limiting.request") as mock_req:
                             mock_req.method = "POST"
                             mock_req.endpoint = "view"
                             mock_req.path = "/test"
@@ -332,31 +332,31 @@ class TestRateLimitDecorator:
 @pytest.mark.unit
 class TestFactoryHelpers:
     def test_plugin_management_rate_limit(self):
-        from app.utils.rate_limiting import plugin_management_rate_limit
+        from app.utils.security.rate_limiting import plugin_management_rate_limit
         assert callable(plugin_management_rate_limit())
 
     def test_plugin_install_rate_limit(self):
-        from app.utils.rate_limiting import plugin_install_rate_limit
+        from app.utils.security.rate_limiting import plugin_install_rate_limit
         assert callable(plugin_install_rate_limit())
 
     def test_auth_rate_limit(self):
-        from app.utils.rate_limiting import auth_rate_limit
+        from app.utils.security.rate_limiting import auth_rate_limit
         assert callable(auth_rate_limit())
 
     def test_password_reset_rate_limit(self):
-        from app.utils.rate_limiting import password_reset_rate_limit
+        from app.utils.security.rate_limiting import password_reset_rate_limit
         assert callable(password_reset_rate_limit())
 
     def test_api_rate_limit(self):
-        from app.utils.rate_limiting import api_rate_limit
+        from app.utils.security.rate_limiting import api_rate_limit
         assert callable(api_rate_limit())
 
     def test_mobile_destructive_rate_limit(self):
-        from app.utils.rate_limiting import mobile_destructive_rate_limit
+        from app.utils.security.rate_limiting import mobile_destructive_rate_limit
         assert callable(mobile_destructive_rate_limit())
 
     def test_api_rate_limit_accepts_custom_requests_per_minute(self):
-        from app.utils.rate_limiting import api_rate_limit
+        from app.utils.security.rate_limiting import api_rate_limit
         assert callable(api_rate_limit(requests_per_minute=120))
 
 
@@ -367,25 +367,25 @@ class TestFactoryHelpers:
 @pytest.mark.unit
 class TestApiRateLimitIdentityKey:
     def test_falls_back_to_ip_without_authorization_header(self, app):
-        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        from app.utils.security.rate_limiting import _api_rate_limit_identity_key
         with app.test_request_context("/test"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="1.2.3.4"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="1.2.3.4"):
                 assert _api_rate_limit_identity_key() == "api_1.2.3.4"
 
     def test_falls_back_to_ip_for_non_bearer_authorization(self, app):
-        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        from app.utils.security.rate_limiting import _api_rate_limit_identity_key
         with app.test_request_context("/test", headers={"Authorization": "Basic abc123"}):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="1.2.3.4"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="1.2.3.4"):
                 assert _api_rate_limit_identity_key() == "api_1.2.3.4"
 
     def test_falls_back_to_ip_for_empty_bearer_token(self, app):
-        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        from app.utils.security.rate_limiting import _api_rate_limit_identity_key
         with app.test_request_context("/test", headers={"Authorization": "Bearer "}):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="1.2.3.4"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="1.2.3.4"):
                 assert _api_rate_limit_identity_key() == "api_1.2.3.4"
 
     def test_bearer_token_produces_stable_hashed_key(self, app):
-        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        from app.utils.security.rate_limiting import _api_rate_limit_identity_key
         with app.test_request_context("/test", headers={"Authorization": "Bearer my-secret-key"}):
             key1 = _api_rate_limit_identity_key()
         with app.test_request_context("/test", headers={"Authorization": "Bearer my-secret-key"}):
@@ -395,7 +395,7 @@ class TestApiRateLimitIdentityKey:
         assert "my-secret-key" not in key1
 
     def test_different_bearer_tokens_produce_different_keys(self, app):
-        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        from app.utils.security.rate_limiting import _api_rate_limit_identity_key
         with app.test_request_context("/test", headers={"Authorization": "Bearer key-one"}):
             key1 = _api_rate_limit_identity_key()
         with app.test_request_context("/test", headers={"Authorization": "Bearer key-two"}):
@@ -404,12 +404,12 @@ class TestApiRateLimitIdentityKey:
 
     def test_bearer_token_key_independent_of_client_ip(self, app):
         """Two integrators behind the same NAT/proxy IP get separate buckets."""
-        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        from app.utils.security.rate_limiting import _api_rate_limit_identity_key
         with app.test_request_context("/test", headers={"Authorization": "Bearer key-one"}):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.0.1"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="10.0.0.1"):
                 key1 = _api_rate_limit_identity_key()
         with app.test_request_context("/test", headers={"Authorization": "Bearer key-two"}):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.0.1"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="10.0.0.1"):
                 key2 = _api_rate_limit_identity_key()
         assert key1 != key2
 
@@ -427,7 +427,7 @@ class TestMobileRateLimit:
         _clear_storage()
 
     def test_debug_skip(self, app):
-        from app.utils.rate_limiting import mobile_rate_limit
+        from app.utils.security.rate_limiting import mobile_rate_limit
         original_skip = app.config.get("RATE_LIMIT_SKIP_DEBUG")
         app.config["DEBUG"] = True
         app.config["RATE_LIMIT_SKIP_DEBUG"] = True
@@ -437,7 +437,7 @@ class TestMobileRateLimit:
                 return ("ok", 200)
 
             with app.test_request_context("/api/test"):
-                with patch("app.utils.rate_limiting.get_client_ip", return_value="20.0.0.1"):
+                with patch("app.utils.security.rate_limiting.get_client_ip", return_value="20.0.0.1"):
                     for _ in range(5):
                         result = view()
                     assert result == ("ok", 200)
@@ -446,7 +446,7 @@ class TestMobileRateLimit:
             app.config["RATE_LIMIT_SKIP_DEBUG"] = original_skip
 
     def test_exempt_ip_list(self, app):
-        from app.utils.rate_limiting import mobile_rate_limit, _rate_limit_storage
+        from app.utils.security.rate_limiting import mobile_rate_limit, _rate_limit_storage
         _rate_limit_storage.clear()
         original_exempt = app.config.get("RATE_LIMIT_EXEMPT_IPS")
         app.config["DEBUG"] = False
@@ -457,7 +457,7 @@ class TestMobileRateLimit:
                 return ("ok", 200)
 
             with app.test_request_context("/api/test"):
-                with patch("app.utils.rate_limiting.get_client_ip", return_value="30.0.0.1"):
+                with patch("app.utils.security.rate_limiting.get_client_ip", return_value="30.0.0.1"):
                     for _ in range(5):
                         result = view()
                     assert result == ("ok", 200)
@@ -466,7 +466,7 @@ class TestMobileRateLimit:
             _rate_limit_storage.clear()
 
     def test_exempt_ip_string_config(self, app):
-        from app.utils.rate_limiting import mobile_rate_limit, _rate_limit_storage
+        from app.utils.security.rate_limiting import mobile_rate_limit, _rate_limit_storage
         _rate_limit_storage.clear()
         original_exempt = app.config.get("RATE_LIMIT_EXEMPT_IPS")
         app.config["DEBUG"] = False
@@ -477,7 +477,7 @@ class TestMobileRateLimit:
                 return ("ok", 200)
 
             with app.test_request_context("/api/test"):
-                with patch("app.utils.rate_limiting.get_client_ip", return_value="40.0.0.2"):
+                with patch("app.utils.security.rate_limiting.get_client_ip", return_value="40.0.0.2"):
                     result = view()
                     assert result == ("ok", 200)
         finally:
@@ -485,7 +485,7 @@ class TestMobileRateLimit:
             _rate_limit_storage.clear()
 
     def test_rate_limit_exceeded_returns_mobile_error(self, app):
-        from app.utils.rate_limiting import mobile_rate_limit, _rate_limit_storage
+        from app.utils.security.rate_limiting import mobile_rate_limit, _rate_limit_storage
         _rate_limit_storage.clear()
         app.config["DEBUG"] = False
         @mobile_rate_limit(requests_per_minute=1)
@@ -493,7 +493,7 @@ class TestMobileRateLimit:
             return ("ok", 200)
 
         with app.test_request_context("/api/test"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="50.0.0.1"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="50.0.0.1"):
                 view()
                 result = view()  # second call exceeds limit of 1
                 # mobile_error returns a (jsonify_response, status_code) tuple
@@ -501,13 +501,13 @@ class TestMobileRateLimit:
         _rate_limit_storage.clear()
 
     def test_normal_request_passes_through(self, app):
-        from app.utils.rate_limiting import mobile_rate_limit
+        from app.utils.security.rate_limiting import mobile_rate_limit
         app.config["DEBUG"] = False
         @mobile_rate_limit(requests_per_minute=10)
         def view():
             return ("ok", 200)
 
         with app.test_request_context("/api/test"):
-            with patch("app.utils.rate_limiting.get_client_ip", return_value="60.0.0.1"):
+            with patch("app.utils.security.rate_limiting.get_client_ip", return_value="60.0.0.1"):
                 result = view()
                 assert result == ("ok", 200)

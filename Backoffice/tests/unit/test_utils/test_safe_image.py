@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from app.utils.safe_image import (
+from app.utils.files.safe_image import (
     MAX_RENDER_DPI,
     UnsafeImageError,
     clamp_dpi,

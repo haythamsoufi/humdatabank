@@ -20,10 +20,10 @@ from app.routes.admin.shared import (
     check_template_access,
     system_manager_required,
 )
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_ok
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_ok
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.common.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
 from plugins.fdrs.services.fdrs_publication_job import (
     _run_fdrs_publication_job,

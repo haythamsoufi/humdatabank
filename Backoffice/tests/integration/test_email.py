@@ -30,7 +30,7 @@ class TestEmail:
         assert isinstance(api_key, (str, type(None)))
         assert isinstance(api_url, (str, type(None)))
 
-    @patch('app.utils.email_client.send_email')
+    @patch('app.services.email.client.send_email')
     def test_email_sending_mock(self, mock_send_email, app):
         """Test email sending with mocked function."""
         mock_send_email.return_value = True

@@ -75,8 +75,8 @@ class TestRefreshTokenDirect:
         """Inactive row from cleanup must not block a valid refresh JWT."""
         from app.models.core import UserSessionLog
         from app.routes.api.mobile.auth import refresh_token
-        from app.utils.mobile_jwt import issue_token_pair, decode_mobile_token
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.mobile.mobile_jwt import issue_token_pair, decode_mobile_token
+        from app.utils.common.datetime_helpers import utcnow
 
         sid = 'cleanup-resume-direct-sid'
         with app.app_context():
@@ -122,8 +122,8 @@ class TestRefreshTokenDirect:
     def test_refresh_blocked_after_user_logout(self, app, db_session):
         from app.models.core import UserSessionLog
         from app.routes.api.mobile.auth import refresh_token
-        from app.utils.mobile_jwt import issue_token_pair
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.mobile.mobile_jwt import issue_token_pair
+        from app.utils.common.datetime_helpers import utcnow
 
         sid = 'refresh-logout-block-sid'
         with app.app_context():
@@ -168,7 +168,7 @@ class TestExchangeSessionDirect:
             method='POST',
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_user_activity'), \
                  patch('app.services.platform.user_analytics_service.start_user_session'):
                 resp = exchange_session_for_tokens()
@@ -205,7 +205,7 @@ class TestMobileLogoutDirect:
 
     def test_mobile_logout_jwt_loads_user_without_session(self, app, db_session):
         from app.routes.api.mobile.auth import mobile_logout
-        from app.utils.mobile_jwt import issue_token_pair
+        from app.utils.mobile.mobile_jwt import issue_token_pair
 
         with app.app_context():
             user = create_test_user(db_session, email='jwt-logout@example.com', password='Pass123!')
@@ -229,7 +229,7 @@ class TestMobileLogoutDirect:
 
     def test_mobile_logout_end_session_failure_still_succeeds(self, app, db_session):
         from app.routes.api.mobile.auth import mobile_logout
-        from app.utils.mobile_jwt import issue_token_pair
+        from app.utils.mobile.mobile_jwt import issue_token_pair
 
         with app.app_context():
             user = create_test_user(db_session, email='end-sess-fail@example.com', password='Pass123!')
@@ -253,7 +253,7 @@ class TestMobileLogoutDirect:
     def test_mobile_logout_records_session_duration(self, app, db_session):
         from app.models.core import UserLoginLog, UserSessionLog
         from app.routes.api.mobile.auth import mobile_logout
-        from app.utils.mobile_jwt import issue_token_pair
+        from app.utils.mobile.mobile_jwt import issue_token_pair
 
         sid = 'duration-logout-sid'
         with app.app_context():
@@ -298,7 +298,7 @@ class TestMobileProfileDirect:
             user = create_test_user(db_session, email='profile-direct@example.com', password='Pass123!')
         with app.test_request_context('/api/mobile/v1/auth/profile', method='GET'):
             login_user(user)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = mobile_profile()
         if isinstance(resp, tuple):
             body, status = resp
@@ -318,7 +318,7 @@ class TestMobileProfileDirect:
             user = create_test_user(db_session, email='beta-locked@example.com', password='Pass123!')
         with app.test_request_context('/api/mobile/v1/auth/profile', method='GET'):
             login_user(user)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.app_settings_service.is_ai_beta_restricted', return_value=True), \
                  patch('app.services.platform.app_settings_service.user_is_explicit_beta_tester', return_value=False):
                 resp = mobile_profile()
@@ -339,7 +339,7 @@ class TestMobileProfileDirect:
             content_type='application/json',
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_user_activity'):
                 resp = mobile_update_profile()
         if isinstance(resp, tuple):
@@ -363,7 +363,7 @@ class TestMobileChangePasswordDirect:
             content_type='application/json',
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = mobile_change_password()
         if isinstance(resp, tuple):
             _, status = resp

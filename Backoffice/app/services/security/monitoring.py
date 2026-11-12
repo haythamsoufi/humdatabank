@@ -7,7 +7,7 @@ from flask import request, current_app, g, has_request_context
 from flask_login import current_user
 from app.models import SecurityEvent, AdminActionLog
 from app import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 # Client-reported diagnostics (browser JS errors, mobile app failures): recorded for
 # debugging, never emailed to admins and never above 'low' severity.

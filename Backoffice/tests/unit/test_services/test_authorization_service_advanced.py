@@ -635,7 +635,7 @@ class TestCheckSelfReportAccess:
         assert result is False
 
     def test_system_manager_can_access_self_report(self, db_session, app):
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
         with app.app_context():
             sm = create_test_user(db_session, role="system_manager")
             aes = create_test_assignment_entity_status(
@@ -645,7 +645,7 @@ class TestCheckSelfReportAccess:
         assert result is True
 
     def test_non_country_entity_returns_false(self, db_session, app):
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
         with app.app_context():
             user, country, _ = create_focal_point_with_country(db_session)
             aes = create_test_assignment_entity_status(
@@ -658,7 +658,7 @@ class TestCheckSelfReportAccess:
         assert result is False
 
     def test_no_country_access_returns_false(self, db_session, app):
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
         with app.app_context():
             focal = create_test_user(db_session, role="focal_point")
             aes = create_test_assignment_entity_status(

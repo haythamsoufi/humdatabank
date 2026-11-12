@@ -2,12 +2,12 @@
 
 from types import SimpleNamespace
 
-from app.utils.stable_key import (
+from app.utils.templates.stable_key import (
     T22_FUNDING_MATRIX_STABLE_KEY,
     T22_STAFF_MATRIX_STABLE_KEY,
     is_valid_stable_key,
 )
-from app.utils.stable_key_backfill import (
+from app.utils.templates.stable_key_backfill import (
     align_stable_key,
     fill_null_stable_keys,
     index_by_position,

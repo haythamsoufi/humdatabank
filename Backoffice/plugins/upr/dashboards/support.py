@@ -37,7 +37,7 @@ from plugins.upr.dashboards.pns_funding import (
     pns_area_funding_from_plan_cells,
     pns_funding_from_plan_cells,
 )
-from app.utils.api_serialization import _resolve_matrix_cell
+from app.utils.api.api_serialization import _resolve_matrix_cell
 
 logger = logging.getLogger(__name__)
 

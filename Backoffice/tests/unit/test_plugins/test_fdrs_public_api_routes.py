@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models import FormData, IndicatorBank
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from tests.factories import (
     create_test_api_key,
     create_test_assignment_entity_status,

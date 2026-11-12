@@ -11,7 +11,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def _jwt_headers(app, user_id, sid=None):
-    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_jwt import issue_token_pair
     with app.app_context():
         tokens = issue_token_pair(user_id, session_id=sid or f'dash-sid-{user_id}')
     return {'Authorization': f'Bearer {tokens["access_token"]}'}
@@ -55,7 +55,7 @@ class TestMobileUserDashboard:
         ):
             login_user(user)
             inner_resp = _make_json_response(app, dashboard_payload, 200)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.api.mobile.user_dashboard.get_dashboard', return_value=(inner_resp, 200)):
                 resp = mobile_user_dashboard()
 
@@ -81,7 +81,7 @@ class TestMobileUserDashboard:
         ):
             login_user(user)
             inner_resp = _make_json_response(app, dashboard_payload, 200)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.api.mobile.user_dashboard.get_dashboard', return_value=inner_resp):
                 resp = mobile_user_dashboard()
 
@@ -103,7 +103,7 @@ class TestMobileUserDashboard:
         ):
             login_user(user)
             error_resp = _make_json_response(app, {'error': 'Forbidden'}, 403)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.api.mobile.user_dashboard.get_dashboard', return_value=(error_resp, 403)):
                 resp = mobile_user_dashboard()
 
@@ -124,7 +124,7 @@ class TestMobileUserDashboard:
         ):
             login_user(user)
             empty_resp = _make_json_response(app, {}, 500)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.api.mobile.user_dashboard.get_dashboard', return_value=(empty_resp, 500)):
                 resp = mobile_user_dashboard()
 
@@ -144,7 +144,7 @@ class TestMobileUserDashboard:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.api.mobile.user_dashboard.get_dashboard', side_effect=RuntimeError('bang')):
                 resp = mobile_user_dashboard()
 
@@ -170,7 +170,7 @@ class TestMobileUserDashboard:
         ):
             login_user(user)
             # Return a plain dict tuple: (dict, 200) — resp_obj is not a Response instance
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch(
                      'app.routes.api.mobile.user_dashboard.get_dashboard',
                      return_value=({'assignments': []}, 200),

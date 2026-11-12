@@ -5,7 +5,7 @@ import pytest
 from flask import Flask
 
 from app.services.email.client import send_email
-from app.utils.email_headers import (
+from app.utils.email.email_headers import (
     filter_valid_addresses,
     sanitize_filename,
     sanitize_header_value,

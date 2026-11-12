@@ -13,7 +13,7 @@ from ..base import BaseForm, MultilingualForm, FileUploadForm, _get_language_dis
 
 
 def _validate_resource_external_url(form, field):
-    from app.utils.external_url_validation import resource_external_url_error
+    from app.utils.http.external_url_validation import resource_external_url_error
 
     reason = resource_external_url_error(field.data or "")
     if reason:

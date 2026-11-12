@@ -237,7 +237,7 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     def unregister_validation_packs(self) -> None:
         from app.services.validation.pack_registry import unregister_pack
-        from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
+        from app.utils.indicators.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
 
         unregister_pack(RULE_PACK_FDRS_MATRIX_V1)
 

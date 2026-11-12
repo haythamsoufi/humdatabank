@@ -7,7 +7,7 @@ Covers the functions not exercised by test_api_responses.py:
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.utils.api_responses import (
+from app.utils.api.api_responses import (
     json_form_errors,
     json_ok_result,
     json_select_options,
@@ -170,7 +170,7 @@ class TestJsonErrorHandlerDecorator:
             def failing_view():
                 raise RuntimeError('boom')
 
-            with patch('app.utils.api_responses.request_transaction_rollback') as mock_rb:
+            with patch('app.utils.api.api_responses.request_transaction_rollback') as mock_rb:
                 resp = failing_view()
                 mock_rb.assert_called_once_with(reason='json_error_handler')
             assert resp.status_code == 500
@@ -190,7 +190,7 @@ class TestJsonErrorHandlerDecorator:
             def bad_view():
                 raise ValueError('oops')
 
-            with patch('app.utils.api_responses.request_transaction_rollback'):
+            with patch('app.utils.api.api_responses.request_transaction_rollback'):
                 resp = bad_view()
             assert resp.status_code == 500
 

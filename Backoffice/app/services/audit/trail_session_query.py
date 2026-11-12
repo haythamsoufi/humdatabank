@@ -17,14 +17,14 @@ from typing import Any
 from sqlalchemy import and_, or_
 
 from app.models import AdminActionLog, User, UserActivityLog, UserSessionLog
-from app.utils.activity_logging_skip import (
+from app.utils.activity.activity_logging_skip import (
     ENTRY_FORM_ACTIVITY_ENDPOINTS,
     SKIP_ACTIVITY_ENDPOINTS,
     SKIP_ACTIVITY_ENDPOINT_SUFFIXES,
     SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS,
 )
-from app.utils.datetime_helpers import ensure_utc, utcnow
-from app.utils.sql_utils import escape_like_wildcards
+from app.utils.common.datetime_helpers import ensure_utc, utcnow
+from app.utils.database.sql_utils import escape_like_wildcards
 
 SESSION_END_GRACE_SECONDS = 5
 

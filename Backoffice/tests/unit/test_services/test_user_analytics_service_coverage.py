@@ -457,10 +457,10 @@ class TestSessionBlacklist:
             assert _svc.should_block_mobile_jwt_session("sess-003") is True
 
     def test_mobile_block_fails_closed_when_store_down(self, app):
-        from app.utils.auth_state import AuthStateUnavailable
+        from app.utils.auth.auth_state import AuthStateUnavailable
         with app.app_context():
             with patch(
-                "app.utils.auth_state.DbAuthStateBackend.exists",
+                "app.utils.auth.auth_state.DbAuthStateBackend.exists",
                 side_effect=AuthStateUnavailable("down"),
             ):
                 assert _svc.should_block_mobile_jwt_session("sess-004") is True

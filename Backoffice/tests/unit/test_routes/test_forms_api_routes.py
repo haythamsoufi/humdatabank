@@ -45,7 +45,7 @@ def _lookup_list_get(lookup_list):
 
 
 def _deny_aes(*_args, **_kwargs):
-    from app.utils.api_responses import json_forbidden
+    from app.utils.api.api_responses import json_forbidden
 
     return None, json_forbidden("Assignment not found or access denied")
 
@@ -55,13 +55,13 @@ def _allow_aes(aes):
 
 
 def _deny_child(*_args, **_kwargs):
-    from app.utils.api_responses import json_not_found
+    from app.utils.api.api_responses import json_not_found
 
     return None, json_not_found("Item not found")
 
 
 def _allow_child(obj, aes=None):
-    from app.utils.form_authorization import ChildAccess
+    from app.utils.forms.form_authorization import ChildAccess
 
     return lambda *_args, **_kwargs: (ChildAccess(obj, aes=aes), None)
 
@@ -864,7 +864,7 @@ class TestGetPluginLookupListOptions:
         from app.routes.forms_api import get_plugin_lookup_list_options
 
         def my_handler(country_iso=None, config=None, **kwargs):
-            from app.utils.api_responses import json_ok
+            from app.utils.api.api_responses import json_ok
             return json_ok(rows=[{"code": "EUR"}])
 
         with app.test_request_context("/"):
@@ -955,7 +955,7 @@ class TestDetectCountryContextFromRequest:
             "/", headers={"Referer": "http://localhost/forms/entry/42"}
         ):
             with patch("app.routes.forms_api.load_aes_for_user", return_value=mock_aes), \
-                 patch("app.utils.api_serialization._country_for_aes", return_value=mock_aes.country):
+                 patch("app.utils.api.api_serialization._country_for_aes", return_value=mock_aes.country):
                 country, iso2, iso3 = _detect_country_context_from_request()
         assert iso2 == "US"
 
@@ -1027,7 +1027,7 @@ class TestApiPresenceSync:
         assert resp.status_code == 403
 
     def test_sync_success_returns_users(self, app, admin_user, db_session, client):
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         client = _make_logged_in_client(client, admin_user.id)
         mock_user = MagicMock()

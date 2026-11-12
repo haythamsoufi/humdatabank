@@ -32,7 +32,7 @@ from plugins.upr.dashboards.matrix import (
     _resolve_item,
     _split_cell_key,
 )
-from app.utils.api_serialization import _resolve_matrix_cell
+from app.utils.api.api_serialization import _resolve_matrix_cell
 
 # --------------------------------------------------------------------------- #
 # Published T23 (PNS Reporting) funding-matrix columns.

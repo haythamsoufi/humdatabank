@@ -183,7 +183,7 @@ If Azure Application Gateway WAF is configured:
 
 Matrix field cells are stored in `disagg_data` as `{row}_{column_name}`. Renaming a column's internal `name` in the form builder (not just its display label) leaves old cell keys behind in every row saved before the rename — they no longer match any row/column pairing, so they're silently excluded from the UI and totals, but stay in the JSON forever (e.g. `form_data.id=286867` had a lingering `"...NS 2025 Total Funding": 0` key after item 1403's column was renamed to `ns_fun`).
 
-New saves are protected automatically (`app.utils.api_serialization.prune_stale_matrix_cell_keys`, wired into both the top-level and repeat-group matrix save paths, plus the client-side collector in `matrix-handler.js`). After a rename, clean up the **existing** rows:
+New saves are protected automatically (`app.utils.api.api_serialization.prune_stale_matrix_cell_keys`, wired into both the top-level and repeat-group matrix save paths, plus the client-side collector in `matrix-handler.js`). After a rename, clean up the **existing** rows:
 
 ```bash
 cd Backoffice

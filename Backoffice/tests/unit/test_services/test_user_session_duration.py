@@ -7,13 +7,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.services.platform import user_analytics_service as svc
-from app.utils.datetime_helpers import iso_utc, utcnow
-from app.utils.page_view_paths import (
+from app.utils.common.datetime_helpers import iso_utc, utcnow
+from app.utils.activity.page_view_paths import (
     PAGE_VIEW_PATH_MAX_KEYS,
     merge_page_view_path_count,
     template_path_key,
 )
-from app.utils.request_utils import parse_bool_arg
+from app.utils.http.request_utils import parse_bool_arg
 
 pytestmark = pytest.mark.unit
 

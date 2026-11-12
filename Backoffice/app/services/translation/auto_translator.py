@@ -631,7 +631,7 @@ class LibreTranslateService(TranslationService):
             host = urllib.parse.urlparse(self.base_url).hostname or ""
             if host in ("localhost", "127.0.0.1", "::1"):
                 return True
-            from app.utils.outbound_url import (
+            from app.utils.http.outbound_url import (
                 is_local_dev_environment,
                 parse_network_allowlist,
                 validate_outbound_url,

@@ -16,8 +16,8 @@ from app.models.organization import (
     SecretariatDivision,
     SecretariatRegionalOffice,
 )
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.transactions import request_transaction_rollback
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.database.transactions import request_transaction_rollback
 from config.config import Config
 
 

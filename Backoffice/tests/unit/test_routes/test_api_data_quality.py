@@ -120,7 +120,7 @@ class TestGetDataQualityScore:
         assert data["score"] == 85
 
     def test_client_input_error_message_is_returned_with_400(self, logged_in_client, db_session):
-        from app.utils.api_errors import ClientInputError
+        from app.utils.api.api_errors import ClientInputError
 
         with patch("app.routes.api.data_quality.is_data_quality_dashboard_enabled", return_value=True), \
              patch("app.routes.api.data_quality._user_can_access_entity", return_value=True), \

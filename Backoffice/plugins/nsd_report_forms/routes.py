@@ -10,10 +10,10 @@ from flask_login import current_user
 
 from app import db
 from app.routes.admin.shared import admin_permission_required
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_responses import json_bad_request, json_ok
-from app.utils.file_parsing import EXCEL_EXTENSIONS
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_responses import json_bad_request, json_ok
+from app.utils.files.file_parsing import EXCEL_EXTENSIONS
 
 from plugins.nsd_report_forms import bp
 from plugins.nsd_report_forms.plugin import NSD_ADMIN_PERMISSION

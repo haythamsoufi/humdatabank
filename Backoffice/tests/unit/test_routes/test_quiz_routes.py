@@ -23,7 +23,7 @@ class _FakeKey:
     is_revoked = False
 
 
-_API_KEY_PATCH = "app.utils.auth.authenticate_db_api_key_only"
+_API_KEY_PATCH = "app.utils.auth.auth.authenticate_db_api_key_only"
 _API_HEADERS = {"Authorization": "Bearer test-key-123"}
 
 

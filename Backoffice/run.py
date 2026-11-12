@@ -99,7 +99,7 @@ if __name__ == '__main__':
     default_port = 5000
     port = int(port_env) if port_env else int(default_port)
 
-    from app.utils.dev_server_port import (
+    from app.utils.common.dev_server_port import (
         find_available_port,
         occupied_server_message,
         port_has_listener,

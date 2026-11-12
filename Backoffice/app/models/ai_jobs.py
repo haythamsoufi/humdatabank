@@ -18,7 +18,7 @@ from sqlalchemy.orm import relationship
 from app.extensions import db
 from app.models.enums import AIJobStatusValue, AIJobItemStatusValue
 from app.models.enum_columns import pg_str_enum_column
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class AIJob(db.Model):

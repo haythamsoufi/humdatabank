@@ -9,7 +9,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Date, JSON, Fore
 from sqlalchemy.orm import relationship
 
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class GovernanceIssue(db.Model):

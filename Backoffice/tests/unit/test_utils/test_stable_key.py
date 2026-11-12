@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.utils.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
+from app.utils.templates.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
 from tests.factories import create_test_item, create_test_section, create_test_template
 
 
@@ -23,7 +23,7 @@ def test_normalize_stable_key_rejects_invalid():
 
 def test_resolve_published_form_item_id(db_session, admin_user):
     from app.models import FormItem
-    from app.utils.stable_key import generate_stable_key, resolve_published_form_item_id
+    from app.utils.templates.stable_key import generate_stable_key, resolve_published_form_item_id
 
     template = create_test_template(db_session, owner_id=admin_user.id)
     version = template.published_version
@@ -38,7 +38,7 @@ def test_resolve_published_form_item_id(db_session, admin_user):
 
 
 def test_resolve_form_item_refs(db_session, admin_user):
-    from app.utils.stable_key import generate_stable_key, resolve_form_item_refs
+    from app.utils.templates.stable_key import generate_stable_key, resolve_form_item_refs
 
     template = create_test_template(db_session, owner_id=admin_user.id)
     version = template.published_version

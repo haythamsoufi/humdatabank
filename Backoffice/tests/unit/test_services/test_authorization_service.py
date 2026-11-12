@@ -203,7 +203,7 @@ class TestAuthorizationServiceExtended:
 
     def test_check_self_report_access_self_report_period(self, db_session, app):
         from tests.factories import create_focal_point_with_country, create_test_assignment_entity_status, _grant_role_permission
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
         with app.app_context():
             user, country, _ = create_focal_point_with_country(db_session)
             _grant_role_permission(db_session, 'assignment_editor_submitter', 'assignment.enter')

@@ -174,7 +174,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
     def test_indicator_bank_change_updates_fields(self, app):
@@ -197,7 +197,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = new_bank
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=False):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=False):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.label == "New Indicator"
@@ -215,7 +215,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.label == 'Custom Label'
@@ -235,7 +235,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
     def test_definition_override(self, app):
@@ -251,7 +251,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.definition == 'My definition'
@@ -270,7 +270,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.definition is None
@@ -291,7 +291,7 @@ class TestUpdateIndicatorFields:
         app.config['SUPPORTED_LANGUAGES'] = ['en']
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.label_translations == {"en": "English Label"}
@@ -310,7 +310,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.label_translations is None
@@ -331,7 +331,7 @@ class TestUpdateIndicatorFields:
         app.config['SUPPORTED_LANGUAGES'] = ['en']
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.definition_translations == {"en": "English Def"}
@@ -348,7 +348,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = MagicMock()
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=False):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=False):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.config['allowed_disaggregation_options'] == ['total']
@@ -365,7 +365,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.config.get('default_value') == '42'
@@ -383,7 +383,7 @@ class TestUpdateIndicatorFields:
 
         with patch(f'{_BASE}.IndicatorBank') as MockIB:
             MockIB.query.get.return_value = None
-            with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+            with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                 _update_indicator_fields(indicator, form, request_form)
 
         assert indicator.config is not None

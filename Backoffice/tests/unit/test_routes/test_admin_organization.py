@@ -413,7 +413,7 @@ class TestImportCountries:
         buf.seek(0)
 
         with patch(
-            "app.utils.advanced_validation.AdvancedValidator.validate_mime_type",
+            "app.utils.forms.advanced_validation.AdvancedValidator.validate_mime_type",
             return_value=(True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         ):
             resp = logged_in_client.post(
@@ -449,7 +449,7 @@ class TestImportCountries:
         buf.seek(0)
 
         with patch(
-            "app.utils.advanced_validation.AdvancedValidator.validate_mime_type",
+            "app.utils.forms.advanced_validation.AdvancedValidator.validate_mime_type",
             return_value=(True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         ):
             resp = logged_in_client.post(
@@ -481,7 +481,7 @@ class TestImportCountries:
         buf.seek(0)
 
         with patch(
-            "app.utils.advanced_validation.AdvancedValidator.validate_mime_type",
+            "app.utils.forms.advanced_validation.AdvancedValidator.validate_mime_type",
             return_value=(True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         ):
             resp = logged_in_client.post(
@@ -1815,7 +1815,7 @@ class TestNSSExportImport:
     def test_ns_excel_text_category_is_its_own_column(self, logged_in_client, db_session, app):
         import openpyxl
         from app.models.organization import NationalSociety
-        from app.utils.country_utils import forget_part_of_category, remember_part_of_category
+        from app.utils.organization.country_utils import forget_part_of_category, remember_part_of_category
 
         category_name = "Roster note"
         remember_part_of_category(category_name, "text")

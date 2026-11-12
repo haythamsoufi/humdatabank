@@ -276,7 +276,7 @@ def _update_indicator_fields(indicator, form, request_form):
     age_config = form.age_groups_config.data if form.age_groups_config.data and form.age_groups_config.data.strip() else None
 
     # Check if the unit and type support disaggregation
-    from app.utils.indicator_utils import supports_disaggregation
+    from app.utils.indicators.indicator_utils import supports_disaggregation
     current_bank_indicator = IndicatorBank.query.get(indicator.indicator_bank_id)
     allows_disaggregation_by_unit = current_bank_indicator and supports_disaggregation(current_bank_indicator.unit, current_bank_indicator.type)
 
@@ -677,7 +677,7 @@ def _update_image_fields(image_item, form, request_form):
 
     if hasattr(form, 'image_config') and form.image_config.data:
         try:
-            from app.utils.template_image_assets import normalize_image_config, collect_orphan_paths_after_update
+            from app.utils.templates.template_image_assets import normalize_image_config, collect_orphan_paths_after_update
             parsed = json.loads(form.image_config.data)
             normalized = normalize_image_config(parsed, previous_config=previous_config)
             if image_item.config is None:

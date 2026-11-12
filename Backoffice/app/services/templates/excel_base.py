@@ -1,7 +1,7 @@
 """Shared constants and helpers for template Excel import/export."""
 
 # ========== Template Excel Import/Export Service ==========
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 """
 Service for exporting and importing form templates to/from Excel.
 """
@@ -31,7 +31,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
-from app.utils.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
+from app.utils.templates.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
 
 
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from app.extensions import db
 from app.models.plugin_data import PluginData
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 PLUGIN_ID = "upr"
 SECONDARY_KEY = "secondary"

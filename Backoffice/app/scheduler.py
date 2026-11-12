@@ -206,7 +206,7 @@ def _run_scheduled_job(app, label: str, fn, plugin_id: str | None = None) -> Non
 
 def init_scheduler(app, is_reloader):
     """Initialize the APScheduler background scheduler for periodic tasks."""
-    from app.utils.constants import SESSION_INACTIVITY_SECONDS
+    from app.utils.common.constants import SESSION_INACTIVITY_SECONDS
 
     if app.config.get('TESTING', False) or os.environ.get('RUNNING_MIGRATION'):
         return
@@ -266,7 +266,7 @@ def init_scheduler(app, is_reloader):
                     # _run_scheduled_job provides the context, error handling, and timing.
 
                     def _cleanup_notifications():
-                        from app.utils.notifications import cleanup_old_notifications
+                        from app.services.notification.core import cleanup_old_notifications
                         cleanup_old_notifications()
 
                     def _cleanup_sessions():
@@ -299,7 +299,7 @@ def init_scheduler(app, is_reloader):
                         # Purely in-memory — no DB connection needed.
                         # Own try/except so APScheduler never loses the job on error.
                         try:
-                            from app.utils.ws_manager import ws_manager
+                            from app.utils.realtime.ws_manager import ws_manager
                             cleaned = ws_manager.cleanup_stale_connections(
                                 max_idle_seconds=float(SESSION_INACTIVITY_SECONDS)
                             )

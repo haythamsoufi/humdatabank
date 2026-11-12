@@ -1,5 +1,5 @@
 """
-Tests for app/utils/audit_context.py.
+Tests for app/utils/audit/audit_context.py.
 
 These helpers let a view enrich the single ``UserActivityLog`` row that the
 activity middleware writes, instead of adding a second ``AdminActionLog`` row.
@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from flask import Flask, g
 
-from app.utils.audit_context import (
+from app.utils.audit.audit_context import (
     AUDIT_DETAILS_ATTR,
     AUDIT_SKIP_ATTR,
     CURATED_DESCRIPTION_KEY,

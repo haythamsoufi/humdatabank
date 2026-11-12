@@ -20,11 +20,11 @@ from contextlib import suppress
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from app.utils.transactions import request_transaction_rollback
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.request_utils import get_json_or_form, is_json_request
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.http.request_utils import get_json_or_form, is_json_request
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.services.imports.async_import_job_store import (
     cleanup_expired_import_jobs,
     get_import_job,
@@ -49,7 +49,7 @@ bp = Blueprint("data_sync_imputation", __name__, url_prefix="/admin/templates/da
 
 def _country_by_aes_id_for_assignments(assignments):
     """Batch-resolve Country for country-type AES rows (avoids ``aes.country`` N+1)."""
-    from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+    from app.utils.api.api_serialization import batch_countries_for_aes_list, _country_for_aes
 
     all_aes = []
     for af in assignments or []:
@@ -258,7 +258,7 @@ _SYNC_FAMILIES = frozenset({"fdrs", "upr", "generic"})
 
 def _fdrs_family_template_ids() -> frozenset:
     """Single source of truth: FDRS_TEMPLATE_ID (data_quality_constants)."""
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     return frozenset({FDRS_TEMPLATE_ID})
 
@@ -1379,7 +1379,7 @@ def export_preview_excel(template_id: int):
 
         # Save and return
         output = io.BytesIO()
-        from app.utils.export_safety import sanitize_workbook
+        from app.utils.files.export_safety import sanitize_workbook
         sanitize_workbook(workbook)
         workbook.save(output)
         output.seek(0)

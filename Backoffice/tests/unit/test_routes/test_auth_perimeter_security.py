@@ -112,11 +112,11 @@ class TestMobileOAuthRedirectHandoff:
 
     def test_store_outage_fails_closed_to_error_link(self, app, db_session):
         from app.routes.auth import _mobile_oauth_redirect
-        from app.utils.auth_state import AuthStateUnavailable
+        from app.utils.auth.auth_state import AuthStateUnavailable
 
         user = create_test_user(db_session, email="oauth-outage@example.com")
         with app.test_request_context("/auth/azure/callback"), \
-             patch("app.utils.mobile_oauth_code.create_oauth_code", side_effect=AuthStateUnavailable("down")):
+             patch("app.utils.mobile.mobile_oauth_code.create_oauth_code", side_effect=AuthStateUnavailable("down")):
             resp = _mobile_oauth_redirect(user, "sid-1", _challenge())
         assert "temporarily_unavailable" in resp.headers["Location"]
 
@@ -126,12 +126,12 @@ class TestRegisterAbuseControls:
     def test_post_register_is_rate_limited_per_client_ip(self, client, app, db_session, monkeypatch):
         monkeypatch.setattr("app.routes.auth.is_azure_b2c_configured", lambda: False)
         monkeypatch.setattr("app.routes.auth.RegisterForm.validate_on_submit", lambda self: False)
-        monkeypatch.setattr("app.utils.security_startup.redis_configured", lambda _app: False)
+        monkeypatch.setattr("app.utils.security.security_startup.redis_configured", lambda _app: False)
         app.config["DEBUG"] = False
         app.config["RATE_LIMIT_SKIP_DEBUG"] = False
         app.config["RATE_LIMIT_SHARED_FALLBACK"] = "memory"
 
-        from app.utils import rate_limiting as rl
+        from app.utils.security import rate_limiting as rl
 
         rl._rate_limit_storage.clear()
 
@@ -145,7 +145,7 @@ class TestRegisterAbuseControls:
         assert post("198.51.100.8").status_code == 200
 
     def test_forwarded_for_header_does_not_change_the_rate_limit_key(self, app):
-        from app.utils.client_ip import get_client_ip
+        from app.utils.security.client_ip import get_client_ip
 
         with app.test_request_context(
             "/register", method="POST", headers={"X-Forwarded-For": "203.0.113.99"},

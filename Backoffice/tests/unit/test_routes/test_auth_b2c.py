@@ -301,7 +301,7 @@ class TestAzureCallbackRoute:
              patch('app.routes.auth.log_user_activity'), \
              patch('app.routes.auth.start_user_session'), \
              patch('app.routes.auth.log_login_attempt'), \
-             patch('app.utils.mobile_jwt.issue_token_pair', return_value={
+             patch('app.utils.mobile.mobile_jwt.issue_token_pair', return_value={
                  'access_token': 'at',
                  'refresh_token': 'rt',
                  'expires_in': 3600,

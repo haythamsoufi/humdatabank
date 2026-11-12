@@ -12,11 +12,11 @@ from flask_babel import _
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError, generate_csrf
 
-from app.utils.csp_nonce import get_style_nonce
-from app.utils.logging_security import redact_url
-from app.utils.redirect_utils import get_current_relative_url, safe_redirect
-from app.utils.request_utils import is_json_request
-from app.utils.session_persistence import suppress_session_cookie_for_request
+from app.utils.security.csp_nonce import get_style_nonce
+from app.utils.security.logging_security import redact_url
+from app.utils.http.redirect_utils import get_current_relative_url, safe_redirect
+from app.utils.http.request_utils import is_json_request
+from app.utils.auth.session_persistence import suppress_session_cookie_for_request
 
 REQUEST_ID_HEADER = "X-Request-ID"
 _VALID_INBOUND_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")

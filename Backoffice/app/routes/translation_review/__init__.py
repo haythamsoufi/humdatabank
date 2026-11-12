@@ -29,8 +29,8 @@ from app.services.translation_review.assignment_service import (
 )
 from app.services.translation_review.audit import log_inline_translation_edit
 from app.services.translation_review.compile_helper import compile_and_refresh_locale
-from app.utils.api_responses import json_auth_required, json_bad_request, json_forbidden, json_ok
-from app.utils.request_utils import get_request_data, is_json_request
+from app.utils.api.api_responses import json_auth_required, json_bad_request, json_forbidden, json_ok
+from app.utils.http.request_utils import get_request_data, is_json_request
 
 bp = Blueprint('translation_review', __name__, url_prefix='/translation-review')
 

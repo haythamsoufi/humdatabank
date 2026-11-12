@@ -39,7 +39,7 @@ from app.routes.admin.form_builder.helpers.cloning import (
     _clone_template_structure,
     _clone_template_structure_between_templates,
 )
-from app.utils.stable_key import generate_stable_key
+from app.utils.templates.stable_key import generate_stable_key
 from tests.factories import (
     _grant_role_permission,
     create_test_assignment_entity_status,

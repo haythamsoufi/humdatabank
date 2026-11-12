@@ -297,11 +297,11 @@ class TestUpdatePublicSubmissionStatus:
     def _locked_submission(self, mock_sub):
         """The status route locks the row, then checks manage access."""
         from contextlib import ExitStack
-        from app.utils.form_authorization import AUTH_OK
+        from app.utils.forms.form_authorization import AUTH_OK
 
         stack = ExitStack()
         stack.enter_context(patch(
-            "app.utils.form_authorization.lock_public_submission",
+            "app.utils.forms.form_authorization.lock_public_submission",
             return_value=mock_sub,
         ))
         stack.enter_context(patch(
@@ -837,7 +837,7 @@ class TestDeleteSelfReportAssignment:
         _login(client, admin_user.id)
 
         with app.app_context():
-            from app.utils.constants import SELF_REPORT_PERIOD_NAME
+            from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
             aes = create_test_assignment_entity_status(
                 db_session, period_name=SELF_REPORT_PERIOD_NAME
             )
@@ -858,7 +858,7 @@ class TestDeleteSelfReportAssignment:
                 mock_aes.country.name = "Test Country"
                 mock_q.get_or_404.return_value = mock_aes
 
-                with patch("app.utils.constants.SELF_REPORT_PERIOD_NAME", "self_report"):
+                with patch("app.utils.common.constants.SELF_REPORT_PERIOD_NAME", "self_report"):
                     resp = client.post(f"/forms/delete_self_report_assignment/{aes_id}")
 
         assert resp.status_code == 302
@@ -899,7 +899,7 @@ class TestDeleteSelfReportAssignment:
     def test_delete_self_report_db_exception(self, client, admin_user):
         _login(client, admin_user.id)
 
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
 
         with patch(
             "app.routes.forms.submission.AuthorizationService.check_self_report_access",
@@ -925,7 +925,7 @@ class TestDeleteSelfReportAssignment:
     def test_delete_self_report_no_country(self, client, admin_user):
         _login(client, admin_user.id)
 
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
 
         with patch(
             "app.routes.forms.submission.AuthorizationService.check_self_report_access",
@@ -946,7 +946,7 @@ class TestDeleteSelfReportAssignment:
     def test_delete_self_report_csrf_fail(self, client, admin_user, app):
         _login(client, admin_user.id)
 
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
 
         with app.app_context():
             app.config["WTF_CSRF_ENABLED"] = True
@@ -1111,7 +1111,7 @@ class TestViewAndEditPublicSubmission:
 
     def test_edit_submission_can_edit_false(self, client, admin_user):
         """When user has no edit permission, can_edit=False and POST is skipped."""
-        from app.utils.form_authorization import (
+        from app.utils.forms.form_authorization import (
             AUTH_FORBIDDEN,
             AUTH_OK,
             PUBLIC_SUBMISSION_ACTION_EDIT,
@@ -1147,7 +1147,7 @@ class TestViewAndEditPublicSubmission:
 
     def test_edit_forced_via_query_param(self, client, admin_user):
         """?edit=true no longer elevates privilege when EDIT is denied."""
-        from app.utils.form_authorization import (
+        from app.utils.forms.form_authorization import (
             AUTH_FORBIDDEN,
             AUTH_OK,
             PUBLIC_SUBMISSION_ACTION_EDIT,

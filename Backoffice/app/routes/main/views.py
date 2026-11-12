@@ -22,7 +22,7 @@ def language_flag_svg(language):
     CSP img-src 'self' continues to work without allowing external image hosts.
     """
     from flask import make_response, send_from_directory
-    from app.utils.language_flags import (
+    from app.utils.i18n.language_flags import (
         normalize_language_code,
         language_to_country_flag_code,
     )
@@ -68,7 +68,7 @@ def language_flag_svg(language):
 @bp.route('/language/<language>')
 def set_language(language):
     """Set the language for the current session"""
-    from app.utils.redirect_utils import get_safe_redirect_url, is_safe_redirect_url
+    from app.utils.http.redirect_utils import get_safe_redirect_url, is_safe_redirect_url
     from app.i18n import (
         persist_user_preferred_language,
         queue_language_cookie,
@@ -102,7 +102,7 @@ def set_language(language):
 @bp.route('/reload-translations')
 def reload_translations():
     """Manually reload translations (development only)"""
-    from app.utils.redirect_utils import get_safe_redirect_url, is_safe_redirect_url
+    from app.utils.http.redirect_utils import get_safe_redirect_url, is_safe_redirect_url
     if current_app.config.get('DEBUG', False):
         from flask_babel import refresh
         try:
@@ -170,7 +170,7 @@ def download_submission_pdf(submission_id):
     """Generate and serve a PDF of the public submission using the exact HTML template."""
     submission = PublicSubmission.query.get_or_404(submission_id)
 
-    from app.utils.form_authorization import AUTH_OK, PUBLIC_SUBMISSION_ACTION_VIEW, public_submission_access
+    from app.utils.forms.form_authorization import AUTH_OK, PUBLIC_SUBMISSION_ACTION_VIEW, public_submission_access
 
     if public_submission_access(submission, current_user, PUBLIC_SUBMISSION_ACTION_VIEW) != AUTH_OK:
         from flask import abort

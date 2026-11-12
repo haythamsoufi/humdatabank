@@ -149,7 +149,7 @@ def add_security_headers(response):
 
     _apply_baseline_headers(response)
 
-    from app.utils.csp_nonce import get_csp_nonce
+    from app.utils.security.csp_nonce import get_csp_nonce
     try:
         csp_nonce = get_csp_nonce()
         nonce_directive = f"'nonce-{csp_nonce}'"

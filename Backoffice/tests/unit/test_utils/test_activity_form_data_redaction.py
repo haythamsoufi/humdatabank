@@ -1,4 +1,4 @@
-from app.utils.activity_form_data_redaction import redact_activity_form_data
+from app.utils.activity.activity_form_data_redaction import redact_activity_form_data
 
 
 def test_drops_password_and_csrf():

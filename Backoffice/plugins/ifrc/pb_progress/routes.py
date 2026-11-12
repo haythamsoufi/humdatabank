@@ -24,9 +24,9 @@ from plugins.ifrc.pb_progress.service import PBProgressService
 from plugins.ifrc.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER, validate_version
 from app.routes.admin.shared import permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_ok
 
 logger = logging.getLogger(__name__)
 

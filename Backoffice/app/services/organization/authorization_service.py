@@ -4,7 +4,7 @@ Centralized authorization service for the application.
 Consolidates all authorization logic into a single source of truth.
 
 This service replaces scattered authorization decorators and checks across:
-- app/utils/form_authorization.py
+- app/utils/forms/form_authorization.py
 - app/routes/admin/shared.py
 - Inline authorization checks throughout routes
 
@@ -1506,7 +1506,7 @@ class AuthorizationService:
             bool: True if user has access
         """
         # Import here to avoid circular imports from routes
-        from app.utils.constants import SELF_REPORT_PERIOD_NAME
+        from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
 
         if not user or not user.is_authenticated:
             return False

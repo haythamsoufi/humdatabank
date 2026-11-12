@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.utils.datetime_helpers import ensure_utc
+from app.utils.common.datetime_helpers import ensure_utc
 
 
 def _iso_datetime(dt: Any) -> str:
@@ -19,7 +19,7 @@ def _iso_datetime(dt: Any) -> str:
 
 
 def _humanize_activity_label(value: str) -> str:
-    from app.utils.audit_trail_labels import activity_type_display_label
+    from app.utils.audit.audit_trail_labels import activity_type_display_label
 
     return activity_type_display_label(value)
 

@@ -14,8 +14,8 @@ from sqlalchemy import cast, func, or_, text, Text
 
 from app.models import User, Country, FormItem, IndicatorBank
 from app.extensions import db
-from app.utils.sql_utils import escape_like_wildcards, safe_ilike_pattern
-from app.utils.constants import DEFAULT_INDICATOR_CANDIDATES_LIMIT
+from app.utils.database.sql_utils import escape_like_wildcards, safe_ilike_pattern
+from app.utils.common.constants import DEFAULT_INDICATOR_CANDIDATES_LIMIT
 
 logger = logging.getLogger(__name__)
 

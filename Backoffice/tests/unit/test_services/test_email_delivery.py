@@ -30,7 +30,7 @@ from app.services.email.delivery import (
     count_email_delivery_logs_needing_attention,
     get_skipped_email_delivery_logs,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 def _make_user(suffix=None):

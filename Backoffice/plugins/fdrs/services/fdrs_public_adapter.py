@@ -48,7 +48,7 @@ from app.models.assignments import AssignmentEntityStatus
 from app.models.organization import FDRS_ZONES
 from app.services.data_quality.helpers import parse_period_year
 from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.fdrs.published_facts import published_numeric, published_snapshot_clause
 
 # Same ids as ``plugins/fdrs/scripts/fdrs_sync_constants.py`` (kept here so the web

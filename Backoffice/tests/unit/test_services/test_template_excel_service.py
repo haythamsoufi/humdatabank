@@ -2399,5 +2399,5 @@ class TestStableKeyExcelRoundTrip:
         section = create_test_section(db_session, template, version=version)
         item = create_test_item(db_session, section, template, version=version, item_type='question')
         assert item.stable_key is not None
-        from app.utils.stable_key import is_valid_stable_key
+        from app.utils.templates.stable_key import is_valid_stable_key
         assert is_valid_stable_key(item.stable_key)

@@ -158,7 +158,7 @@ def set_selected_entity_session(
     country_id: Optional[int] = None,
 ) -> None:
     """Set dashboard entity selection keys on the test client session."""
-    from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
+    from app.utils.common.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 
     with client.session_transaction() as sess:
         sess["selected_entity_type"] = entity_type

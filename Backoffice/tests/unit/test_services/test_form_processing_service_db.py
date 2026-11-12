@@ -22,7 +22,7 @@ from tests.factories import (
 class TestGetFormItemsForSection:
 
     def test_empty_section_returns_empty_list(self, db_session):
-        with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+        with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
              patch("app.get_locale", return_value="en"):
             template = create_test_template(db_session)
             section = create_test_section(db_session, template, section_type="standard")
@@ -30,7 +30,7 @@ class TestGetFormItemsForSection:
         assert result == []
 
     def test_standard_section_with_items(self, db_session):
-        with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+        with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
              patch("app.get_locale", return_value="en"):
             template = create_test_template(db_session)
             section = create_test_section(db_session, template, section_type="standard")
@@ -46,7 +46,7 @@ class TestGetFormItemsForSection:
         assert len(result) == 2
 
     def test_archived_items_excluded(self, db_session):
-        with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+        with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
              patch("app.get_locale", return_value="en"):
             template = create_test_template(db_session)
             section = create_test_section(db_session, template, section_type="standard")

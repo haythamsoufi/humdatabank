@@ -1,7 +1,7 @@
 from contextlib import suppress
 from app.routes.forms.helpers import parse_csv_id_set
-from app.utils.datetime_helpers import utcnow
-from app.utils.sql_utils import like_contains, safe_ilike_pattern
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.database.sql_utils import like_contains, safe_ilike_pattern
 """
 API endpoints for form-related operations.
 Extracted from forms.py for better organization and separation of concerns.
@@ -23,7 +23,7 @@ from app.models import (
     FormSection, RepeatGroupInstance, LookupList, LookupListRow,
     User, Country, NationalSociety, Config, SubmissionDiscussionComment,
 )
-from app.utils.form_localization import (
+from app.utils.forms.form_localization import (
     get_localized_indicator_name, get_localized_sector_name, get_localized_subsector_name,
     get_localized_indicator_definition, get_localized_indicator_type, get_localized_indicator_unit,
     get_translation_key
@@ -46,7 +46,7 @@ from app.models import (
     FormItem, FormData,
 )
 from app.services import check_aes_access_light
-from app.utils.form_authorization import (
+from app.utils.forms.form_authorization import (
     AES_ACTION_EDIT,
     AES_ACTION_VIEW,
     authorize_aes_json,
@@ -55,17 +55,17 @@ from app.utils.form_authorization import (
     require_aes_write_lock,
     user_can_read_lookup_list,
 )
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.request_utils import get_json_or_form, is_json_request
-from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.http.request_utils import get_json_or_form, is_json_request
+from app.utils.api.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys
+from app.utils.common.error_handling import handle_json_view_exception
 from app.services.forms.processing_service import _create_dynamic_indicator_object
 from app.routes.forms.helpers import existing_data_for_dynamic_assignment, render_dynamic_indicator_item_html
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.profile_utils import display_initials_for_user, get_user_profile_color
+from app.utils.profiles.profile_utils import display_initials_for_user, get_user_profile_color
 from app.services.notification.core import log_entity_activity
 from markupsafe import escape
-from app.utils.discussion_comments import (
+from app.utils.discussion.discussion_comments import (
     DISCUSSION_SOURCE_UPR_EXCEL,
     discussion_comment_author_label,
     discussion_comment_can_be_managed_by,
@@ -150,7 +150,7 @@ def api_search_indicator_bank():
         # Get search parameters
         query = request.args.get('q', '').strip()
         sector_filter = request.args.get('sector', '')
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=20)
 
         # Base query - only active indicators
@@ -683,7 +683,7 @@ def _detect_country_context_from_request():
         if aes_id:
             aes = load_aes_for_user(aes_id, current_user, AES_ACTION_VIEW)
             if aes:
-                from app.utils.api_serialization import _country_for_aes
+                from app.utils.api.api_serialization import _country_for_aes
                 country = _country_for_aes(aes)
                 if country:
                     return country, country.iso2, country.iso3
@@ -701,7 +701,7 @@ def _detect_country_context_from_request():
             with suppress(Exception):
                 aes = load_aes_for_user(int(m.group(1)), current_user, AES_ACTION_VIEW)
                 if aes:
-                    from app.utils.api_serialization import _country_for_aes
+                    from app.utils.api.api_serialization import _country_for_aes
                     country = _country_for_aes(aes)
                     if country:
                         return country, country.iso2, country.iso3
@@ -833,14 +833,14 @@ def get_lookup_list_options(list_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-from app.utils.sqlalchemy_grid import build_columns_config as _get_model_columns_config, model_to_dict as _model_to_dict
+from app.utils.database.sqlalchemy_grid import build_columns_config as _get_model_columns_config, model_to_dict as _model_to_dict
 
 def get_country_map_options():
     """Get options from Country table for country_map system list"""
     try:
         from flask import session
         from flask_babel import get_locale
-        from app.utils.form_localization import get_localized_country_name
+        from app.utils.forms.form_localization import get_localized_country_name
 
         countries = Country.query.order_by(Country.name).all()
         columns_config = _get_model_columns_config(Country)
@@ -1657,7 +1657,7 @@ def api_presence_sync(aes_id):
 @csrf.exempt  # sendBeacon cannot set X-CSRFToken; only removes caller's own presence
 def api_presence_leave(aes_id):
     """Remove the current user's presence immediately (tab close / navigation)."""
-    from app.utils.request_validation import reject_cross_site_request
+    from app.utils.http.request_validation import reject_cross_site_request
 
     if reject_cross_site_request():
         return json_ok()

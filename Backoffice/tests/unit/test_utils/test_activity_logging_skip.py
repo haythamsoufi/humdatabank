@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/utils/activity_logging_skip.py.
+Comprehensive tests for app/utils/activity/activity_logging_skip.py.
 
 Exercises all branches of should_skip_activity_endpoint,
 should_exclude_from_activity_catalog, and should_skip_activity_path
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.utils.activity_logging_skip import (
+from app.utils.activity.activity_logging_skip import (
     SKIP_ACTIVITY_ENDPOINT_PREFIXES,
     SKIP_ACTIVITY_ENDPOINT_SUFFIXES,
     SKIP_ACTIVITY_ENDPOINTS,
@@ -103,7 +103,7 @@ class TestShouldSkipActivityEndpoint:
         assert should_skip_activity_endpoint(suffix_ep) is True
 
     def test_wizard_and_plumbing_endpoints_skipped(self):
-        from app.utils.activity_logging_skip import SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
+        from app.utils.activity.activity_logging_skip import SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
 
         assert should_skip_activity_endpoint("upr_excel_import.analyze") is True
         assert should_skip_activity_endpoint("excel.validate_upr_country_reporting_import") is True

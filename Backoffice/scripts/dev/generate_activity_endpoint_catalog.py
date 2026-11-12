@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Regenerate per-blueprint partials under app/utils/activity_endpoint_catalog/generated/partials/
-and merged app/utils/activity_endpoint_catalog/generated/__init__.py from Flask url_map.
+Regenerate per-blueprint partials under app/utils/activity/activity_endpoint_catalog/generated/partials/
+and merged app/utils/activity/activity_endpoint_catalog/generated/__init__.py from Flask url_map.
 
 Run from Backoffice directory:
   python scripts/dev/generate_activity_endpoint_catalog.py
@@ -34,7 +34,7 @@ if not os.environ.get("FLASK_CONFIG"):
     os.environ["FLASK_CONFIG"] = "testing"
 
 _GENERATED_PKG = os.path.join(
-    _BACKOFFICE_ROOT, "app", "utils", "activity_endpoint_catalog", "generated"
+    _BACKOFFICE_ROOT, "app", "utils", "activity", "activity_endpoint_catalog", "generated"
 )
 _PARTIALS_DIR = os.path.join(_GENERATED_PKG, "partials")
 
@@ -54,16 +54,16 @@ def _safe_partial_module(blueprint: str) -> str:
 
 def main() -> None:
     from app import create_app
-    from app.utils.activity_logging_skip import (
+    from app.utils.activity.activity_logging_skip import (
         ENTRY_FORM_ACTIVITY_ENDPOINTS,
         should_exclude_from_activity_catalog,
         should_skip_activity_path,
     )
-    from app.utils.activity_endpoint_overrides import (
+    from app.utils.activity.activity_endpoint_overrides import (
         resolve_delete_activity_type,
         resolve_post_activity_type,
     )
-    from app.utils.activity_endpoint_catalog.defaults import (
+    from app.utils.activity.activity_endpoint_catalog.defaults import (
         activity_category_for_endpoint,
         default_generated_description,
     )
@@ -121,7 +121,7 @@ def main() -> None:
             "",
             "from __future__ import annotations",
             "",
-            "from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec",
+            "from app.utils.activity.activity_endpoint_catalog.spec import ActivityEndpointSpec",
             "",
             "",
             "SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {",
@@ -147,12 +147,12 @@ def main() -> None:
         "",
         "from __future__ import annotations",
         "",
-        "from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec, merge_activity_specs",
+        "from app.utils.activity.activity_endpoint_catalog.spec import ActivityEndpointSpec, merge_activity_specs",
         "",
     ]
     for safe_mod, _bp in sorted(partial_modules, key=lambda x: x[0]):
         init_lines.append(
-            f"from app.utils.activity_endpoint_catalog.generated.partials.{safe_mod} import SPECS as _S_{safe_mod}"
+            f"from app.utils.activity.activity_endpoint_catalog.generated.partials.{safe_mod} import SPECS as _S_{safe_mod}"
         )
     init_lines.append("")
     init_lines.append(

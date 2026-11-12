@@ -9,7 +9,7 @@ from app.services.validation.rule_registry import (
     list_rule_definitions,
     list_registered_rule_packs,
 )
-from app.utils.data_quality_constants import RULE_PACK_CORE, RULE_PACK_FDRS_MATRIX_V1
+from app.utils.indicators.data_quality_constants import RULE_PACK_CORE, RULE_PACK_FDRS_MATRIX_V1
 
 pytestmark = [pytest.mark.unit]
 

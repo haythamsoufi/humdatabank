@@ -4,7 +4,7 @@ from contextlib import suppress
 from flask import flash, current_app
 from app import db
 from app.models import FormItem, FormSection, QuestionType, LookupList, IndicatorBank
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from config.config import Config
 from .item_updaters import is_conditions_meaningful, sanitize_blank_body_html
 from .item_config_fields import build_create_config_base
@@ -588,7 +588,7 @@ def _create_image_form_item(template, section, form_data, default_order):
     if config_raw:
         try:
             parsed = json.loads(config_raw) if isinstance(config_raw, str) else config_raw
-            from app.utils.template_image_assets import normalize_image_config
+            from app.utils.templates.template_image_assets import normalize_image_config
             image_config = normalize_image_config(parsed)
         except (json.JSONDecodeError, TypeError):
             image_config = {'image': {'alignment': 'center', 'max_width': '100%', 'sources': {}}}

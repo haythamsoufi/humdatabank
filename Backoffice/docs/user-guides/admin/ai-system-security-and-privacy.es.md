@@ -90,7 +90,7 @@ El frontend puede enviar contexto de página para ayudar a responder preguntas r
 
 Implementación:
 
-- `app/utils/ai_utils.py`: ayudantes compartidos como la sanitización del contexto
+- `app/utils/ai/ai_utils.py`: ayudantes compartidos como la sanitización del contexto
 - `app/services/ai/providers/formatting.py`: limpieza recursiva de contexto
 
 ### 4) Auditoría del registro para eventos DLP (sin almacenar contenido de mensajes)

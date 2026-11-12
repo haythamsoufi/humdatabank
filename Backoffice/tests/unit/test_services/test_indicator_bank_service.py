@@ -21,7 +21,7 @@ from tests.factories import (
     create_test_template,
     create_test_user,
 )
-from app.utils.api_serialization import (
+from app.utils.api.api_serialization import (
     format_bridge_disagg_rows,
     format_fact_form_value_row,
 )

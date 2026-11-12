@@ -26,7 +26,7 @@ from app.services.imports.async_import_job_store import (
     update_import_job,
     _isolated_job_session,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 

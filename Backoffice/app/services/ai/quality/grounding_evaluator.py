@@ -454,7 +454,7 @@ def llm_judge_evaluate(
 
     try:
         from openai import OpenAI
-        from app.utils.ai_utils import openai_model_supports_sampling_params
+        from app.utils.ai.ai_utils import openai_model_supports_sampling_params
 
         api_key = current_app.config.get("OPENAI_API_KEY")
         if not api_key:
@@ -531,7 +531,7 @@ def llm_judge_evaluate(
                 in_tok = getattr(usage, "prompt_tokens", 0) or 0
                 out_tok = getattr(usage, "completion_tokens", 0) or 0
                 try:
-                    from app.utils.ai_pricing import estimate_chat_cost
+                    from app.utils.ai.ai_pricing import estimate_chat_cost
                     cost = estimate_chat_cost(model, in_tok, out_tok)
                     result["eval_cost_usd"] = cost
                     result["eval_input_tokens"] = in_tok

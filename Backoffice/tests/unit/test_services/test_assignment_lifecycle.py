@@ -5,7 +5,7 @@ import pytest
 
 from app import db
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class TestAssignmentEntryAllowed:

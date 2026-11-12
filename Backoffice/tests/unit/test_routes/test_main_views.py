@@ -105,7 +105,7 @@ class TestLanguageFlagSvg:
 class TestSetLanguage:
     def test_valid_language_sets_session(self, client, app):
         app.config["SUPPORTED_LANGUAGES"] = ["en", "fr", "es"]
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False):
             resp = client.get("/language/fr")
         assert resp.status_code == 302
         assert "ui_language=fr" in resp.headers.get("Set-Cookie", "")
@@ -118,7 +118,7 @@ class TestSetLanguage:
         mock_user = MagicMock()
         mock_user.is_authenticated = True
 
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False), \
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False), \
              patch("flask_login.current_user", mock_user), \
              patch("app.i18n.persist_user_preferred_language") as persist:
             resp = client.get("/language/es")
@@ -127,26 +127,26 @@ class TestSetLanguage:
 
     def test_unsupported_language_still_redirects(self, client, app):
         app.config["SUPPORTED_LANGUAGES"] = ["en", "fr"]
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False):
             resp = client.get("/language/zz")
         assert resp.status_code == 302
 
     def test_language_with_region_code_resolved(self, client, app):
         app.config["SUPPORTED_LANGUAGES"] = ["en", "fr", "pt_BR"]
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False):
             resp = client.get("/language/pt-BR")
         assert resp.status_code == 302
 
     def test_safe_referrer_redirects_to_referrer_path(self, client, app):
         app.config["SUPPORTED_LANGUAGES"] = ["en", "fr"]
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=True), \
-             patch("app.utils.redirect_utils.get_safe_redirect_url", return_value="/some/page"):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=True), \
+             patch("app.utils.http.redirect_utils.get_safe_redirect_url", return_value="/some/page"):
             resp = client.get("/language/en", headers={"Referer": "http://localhost/some/page"})
         assert resp.status_code == 302
 
     def test_unsafe_referrer_redirects_to_dashboard(self, client, app):
         app.config["SUPPORTED_LANGUAGES"] = ["en"]
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False):
             resp = client.get("/language/en", headers={"Referer": "http://evil.com/"})
         assert resp.status_code == 302
 
@@ -157,7 +157,7 @@ class TestSetLanguage:
 
     def test_babel_refresh_exception_ignored(self, client, app):
         app.config["SUPPORTED_LANGUAGES"] = ["en"]
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False):
             # refresh is imported inside the function; patch there
             with patch("flask_babel.refresh", side_effect=Exception("refresh fail")):
                 resp = client.get("/language/en")
@@ -166,7 +166,7 @@ class TestSetLanguage:
     def test_language_base_code_match(self, client, app):
         """e.g. 'fr_FR' maps to 'fr' when 'fr' is in supported."""
         app.config["SUPPORTED_LANGUAGES"] = ["en", "fr"]
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False):
             resp = client.get("/language/fr_FR")
         assert resp.status_code == 302
 
@@ -179,7 +179,7 @@ class TestReloadTranslations:
     def test_debug_mode_reloads(self, client, app):
         app.config["DEBUG"] = True
         try:
-            with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False), \
+            with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False), \
                  patch("flask_babel.refresh"), \
                  patch("app.extensions.ensure_translation_mo_files"):
                 resp = client.get("/reload-translations")
@@ -189,15 +189,15 @@ class TestReloadTranslations:
 
     def test_non_debug_mode_shows_warning(self, client, app):
         app.config["DEBUG"] = False
-        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
+        with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False):
             resp = client.get("/reload-translations")
         assert resp.status_code == 302
 
     def test_debug_with_safe_referrer(self, client, app):
         app.config["DEBUG"] = True
         try:
-            with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=True), \
-                 patch("app.utils.redirect_utils.get_safe_redirect_url", return_value="/prev"), \
+            with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=True), \
+                 patch("app.utils.http.redirect_utils.get_safe_redirect_url", return_value="/prev"), \
                  patch("flask_babel.refresh"), \
                  patch("app.extensions.ensure_translation_mo_files"):
                 resp = client.get(
@@ -211,7 +211,7 @@ class TestReloadTranslations:
     def test_debug_ensure_mo_exception_handled(self, client, app):
         app.config["DEBUG"] = True
         try:
-            with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False), \
+            with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False), \
                  patch("flask_babel.refresh"), \
                  patch("app.extensions.ensure_translation_mo_files", side_effect=Exception("fail")):
                 resp = client.get("/reload-translations")
@@ -223,7 +223,7 @@ class TestReloadTranslations:
         app.config["DEBUG"] = True
         app.config.pop("BACKOFFICE_TRANSLATIONS_DIR", None)
         try:
-            with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False), \
+            with patch("app.utils.http.redirect_utils.is_safe_redirect_url", return_value=False), \
                  patch("flask_babel.refresh"):
                 resp = client.get("/reload-translations")
             assert resp.status_code == 302
@@ -348,7 +348,7 @@ class TestDownloadSubmissionPdf:
 
         with patch("app.models.PublicSubmission.query") as mock_q, \
              patch(
-                 "app.utils.form_authorization.public_submission_access",
+                 "app.utils.forms.form_authorization.public_submission_access",
                  return_value="denied",
              ):
             mock_q.get_or_404.return_value = mock_submission

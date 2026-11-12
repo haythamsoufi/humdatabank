@@ -14,8 +14,8 @@ from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models import AIDocument, GuidanceDocument
 from app.services.platform import storage_service as storage
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.datetime_helpers import utcnow
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 

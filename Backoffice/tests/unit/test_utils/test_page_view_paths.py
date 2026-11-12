@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from app.utils.page_view_paths import (
+from app.utils.activity.page_view_paths import (
     merge_page_view_path_count,
     mobile_page_view_path_key,
     normalize_path_key,

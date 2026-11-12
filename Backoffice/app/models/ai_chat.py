@@ -9,7 +9,7 @@ Notes:
 from __future__ import annotations
 
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import UniqueConstraint, JSON
 

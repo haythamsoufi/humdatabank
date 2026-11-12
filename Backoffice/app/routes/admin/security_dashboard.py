@@ -1,15 +1,15 @@
 # Security Dashboard Routes
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import current_user
-from app.utils.request_utils import parse_bool_arg
+from app.utils.http.request_utils import parse_bool_arg
 from app.routes.admin.shared import admin_required, permission_required
 from app.services.security.monitoring import get_security_metrics, log_security_event
 from app.models import SecurityEvent, AdminActionLog
 from app import db
 from datetime import datetime, timedelta
 from sqlalchemy import desc
-from app.utils.datetime_helpers import utcnow
-from app.utils.api_responses import json_ok
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.api.api_responses import json_ok
 
 bp = Blueprint('security', __name__, url_prefix='/admin')
 

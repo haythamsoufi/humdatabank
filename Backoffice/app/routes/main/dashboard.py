@@ -12,9 +12,9 @@ from app.services.assignments.completion_service import AssignmentCompletionServ
 from sqlalchemy import and_, or_, func, case
 from sqlalchemy.orm import aliased, joinedload
 from app.services import get_user_countries
-from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY, SELF_REPORT_PERIOD_NAME
-from app.utils.datetime_helpers import utc_sort_key, utcnow
-from app.utils.form_localization import get_localized_country_name, get_localized_national_society_name as _get_localized_national_society_name
+from app.utils.common.constants import SELECTED_COUNTRY_ID_SESSION_KEY, SELF_REPORT_PERIOD_NAME
+from app.utils.common.datetime_helpers import utc_sort_key, utcnow
+from app.utils.forms.form_localization import get_localized_country_name, get_localized_national_society_name as _get_localized_national_society_name
 from app.services.notification.core import get_country_recent_activities, notify_self_report_created
 from app.services.forms.reporting_period_service import (
     dashboard_assignment_period_sort_key,
@@ -22,23 +22,23 @@ from app.services.forms.reporting_period_service import (
     sync_assigned_form_reporting_period,
 )
 from app.services.notification.service import NotificationService
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from app.forms.shared import DeleteForm
 from app.forms.assignments import ReopenAssignmentForm, ApproveAssignmentForm
 from app.forms.auth_forms import RequestCountryAccessForm
 from flask_babel import _
-from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
+from app.utils.organization.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from contextlib import suppress
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, PAST_ASSIGNMENT_DAYS
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
-from app.utils.request_utils import is_top_level_navigation
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, PAST_ASSIGNMENT_DAYS
+from app.utils.api.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.http.request_utils import is_top_level_navigation
+from app.utils.common.error_handling import handle_json_view_exception
 from app.services.platform.app_settings_service import is_organization_email
 from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.data_explorer import get_data_explorer_nav_permissions
 
 from app.routes.main import bp
-from app.utils.data_quality_constants import is_data_quality_dashboard_enabled
+from app.utils.indicators.data_quality_constants import is_data_quality_dashboard_enabled
 from app.services.data_quality.service import list_data_quality_templates_for_entity
 from app.routes.main.helpers import (
     SELECTED_ENTITY_TYPE_SESSION_KEY,
@@ -464,7 +464,7 @@ def dashboard():
                                  flash(_("Template '%(template)s' has been added to your assignments for %(country)s.", template=template_to_assign.name, country=selected_country.name), "success")
                                  current_app.logger.debug(f"Successfully created self-report AssignmentEntityStatus ID {new_acs.id}.")
                              except Exception as e:
-                                 from app.utils.transactions import request_transaction_rollback
+                                 from app.utils.database.transactions import request_transaction_rollback
                                  request_transaction_rollback()
                                  flash(_("An error occurred. Please try again."), "danger")
                                  current_app.logger.error(f"Error during DB commit for self-report assignment: {e}", exc_info=True)
@@ -911,7 +911,7 @@ def dashboard():
                     .all()
                 )
 
-                from app.utils.organization_helpers import is_org_email
+                from app.utils.organization.organization_helpers import is_org_email
                 admin_role_user_ids = set(
                     uid for (uid,) in db.session.query(RbacUserRole.user_id)
                     .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
@@ -1055,7 +1055,7 @@ def load_more_activities():
 
         from app.services.organization.authorization_service import AuthorizationService
         if not AuthorizationService.has_country_access(current_user, country_id):
-            from app.utils.api_responses import json_forbidden
+            from app.utils.api.api_responses import json_forbidden
             return json_forbidden('Access denied')
 
         # Get more activities - no date cutoff, same ordering as the initial load
@@ -1102,8 +1102,8 @@ def load_more_activities():
 def mark_notifications_read():
     """Mark selected notifications as read via AJAX."""
     from app.services.notification.service import NotificationService
-    from app.utils.api_responses import json_bad_request, json_server_error, json_ok
-    from app.utils.api_helpers import get_json_safe
+    from app.utils.api.api_responses import json_bad_request, json_server_error, json_ok
+    from app.utils.api.api_helpers import get_json_safe
 
     try:
         notification_ids = get_json_safe().get('notification_ids', [])

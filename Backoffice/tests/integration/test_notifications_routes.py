@@ -60,7 +60,7 @@ class TestNotificationsRoutes:
 
     def test_mark_read_validation_400_when_missing_ids(self, logged_in_client):
         with patch(
-            "app.utils.api_authentication.validate_plaintext_db_api_key_for_mobile_auth",
+            "app.services.security.api_authentication.validate_plaintext_db_api_key_for_mobile_auth",
             return_value=True,
         ):
             resp = logged_in_client.post(
@@ -75,7 +75,7 @@ class TestNotificationsRoutes:
 
     def test_mark_read_happy_path_updates_counts(self, logged_in_client):
         with patch(
-            "app.utils.api_authentication.validate_plaintext_db_api_key_for_mobile_auth",
+            "app.services.security.api_authentication.validate_plaintext_db_api_key_for_mobile_auth",
             return_value=True,
         ), patch("app.routes.notifications.NotificationService.mark_as_read", return_value=True), patch(
             "app.routes.notifications.NotificationService.get_unread_count", return_value=0
@@ -118,7 +118,7 @@ class TestNotificationsRoutes:
         with patch("app.routes.notifications.NotificationService.get_notification_preferences", return_value=prefs), patch(
             "app.routes.notifications.NotificationService.update_notification_preferences", return_value=updated
         ), patch(
-            "app.utils.api_authentication.validate_plaintext_db_api_key_for_mobile_auth",
+            "app.services.security.api_authentication.validate_plaintext_db_api_key_for_mobile_auth",
             return_value=True,
         ):
             resp = logged_in_client.get("/notifications/api/preferences")

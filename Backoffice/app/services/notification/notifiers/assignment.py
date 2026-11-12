@@ -149,7 +149,7 @@ def _notification_by_user_id_map(
     from datetime import timedelta
 
     from app.models import Notification
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     result = {}
     missing_user_ids: list[int] = []
@@ -720,7 +720,7 @@ def notify_assignment_submitted(assignment_entity_status):
 def _focal_point_ids_by_org_domain(entity_type, entity_id, *, org_only: bool, exclude_user_ids=None):
     """Assignment editor/submitter IDs filtered by organization email domain."""
     from app.models import User
-    from app.utils.organization_helpers import is_org_email
+    from app.utils.organization.organization_helpers import is_org_email
 
     exclude_set = set(exclude_user_ids or [])
     focal_point_ids = get_assignment_editor_submitter_user_ids_for_entity(

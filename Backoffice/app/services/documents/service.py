@@ -4,9 +4,9 @@ from flask import current_app
 from app.models import db, SubmittedDocument
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.documents import public_access
-from app.utils.external_url_validation import safe_external_redirect_target
-from app.utils.file_paths import resolve_submitted_document_file
-from app.utils.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
+from app.utils.http.external_url_validation import safe_external_redirect_target
+from app.utils.files.file_paths import resolve_submitted_document_file
+from app.utils.documents.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
 from app.services.platform import storage_service as _storage
 import os
 
@@ -31,7 +31,7 @@ class DocumentService:
         if cat in (_storage.SUBMISSIONS, _storage.ENTITY_REPO_ROOT):
             return resolve_submitted_document_file(storage_path)
 
-        from app.utils.file_paths import resolve_admin_document
+        from app.utils.files.file_paths import resolve_admin_document
         return resolve_admin_document(storage_path)
 
     @classmethod
@@ -49,7 +49,7 @@ class DocumentService:
 
         user_country_ids = [country.id for country in current_user.countries.all()]
         from app.services.organization.authorization_service import AuthorizationService
-        from app.utils.api_serialization import _country_for_aes
+        from app.utils.api.api_serialization import _country_for_aes
         if aes.entity_type == 'country':
             aes_country_id = aes.entity_id
         else:
@@ -83,7 +83,7 @@ class DocumentService:
 
         user_country_ids = [country.id for country in current_user.countries.all()]
         from app.services.organization.authorization_service import AuthorizationService
-        from app.utils.api_serialization import _country_for_aes
+        from app.utils.api.api_serialization import _country_for_aes
         if aes.entity_type == 'country':
             aes_country_id = aes.entity_id
         else:
@@ -167,7 +167,7 @@ class DocumentService:
             raise FileNotFoundError("Document not associated with an assignment")
 
         user_country_ids = [country.id for country in current_user.countries.all()]
-        from app.utils.api_serialization import _country_for_aes
+        from app.utils.api.api_serialization import _country_for_aes
         if aes.entity_type == 'country':
             aes_country_id = aes.entity_id
         else:

@@ -9,7 +9,7 @@ from wtforms import StringField, SubmitField, SelectField, SelectMultipleField, 
 from wtforms.validators import DataRequired, Optional
 from wtforms.widgets import ListWidget, CheckboxInput
 from app.models import FormTemplate, Country, User
-from app.utils.form_localization import build_template_select_choices
+from app.utils.forms.form_localization import build_template_select_choices
 from app.models.rbac import RbacUserRole, RbacRole, RbacRolePermission, RbacPermission
 from app.models.enums import AssignmentEntityStatusValue
 from ..base import BaseForm

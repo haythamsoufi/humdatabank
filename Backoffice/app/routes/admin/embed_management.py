@@ -4,8 +4,8 @@ served to the public website.
 """
 from flask import Blueprint, render_template, request, current_app
 from app.routes.admin.shared import permission_required
-from app.utils.request_utils import is_json_request
-from app.utils.api_responses import json_ok, json_bad_request, json_not_found, json_server_error
+from app.utils.http.request_utils import is_json_request
+from app.utils.api.api_responses import json_ok, json_bad_request, json_not_found, json_server_error
 from app import db
 from app.models import EmbedContent
 from app.models.embed_content import validate_embed_url, validate_embed_category, validate_aspect_ratio, PAGE_SLOTS

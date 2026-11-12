@@ -10,10 +10,10 @@ from app import db
 from app.models import FormTemplate, FormSection, FormItem, FormPage, FormTemplateVersion
 from app.routes.admin.shared import permission_required, check_template_access
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.transactions import request_transaction_rollback
-from app.utils.datetime_helpers import utcnow
-from app.utils.request_utils import get_request_data, is_json_request
-from app.utils.api_responses import json_bad_request, json_server_error, json_ok, json_error
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.http.request_utils import get_request_data, is_json_request
+from app.utils.api.api_responses import json_bad_request, json_server_error, json_ok, json_error
 from .helpers import _clone_template_structure
 from .helpers.field_mapping import (
     FieldMappingConflictError,

@@ -31,7 +31,7 @@ The Humanitarian Databank is a comprehensive humanitarian data management and an
 - **Agent architecture (keep consistent)**:
   - **Dependency injection**: `setupServiceLocator()` in `MobileApp/lib/main.dart` registers services (GetIt). Prefer **`sl<ApiService>()`** from `MobileApp/lib/di/service_locator.dart` over calling `ApiService()` directly so tests can override registrations.
   - **HTTP**: Legacy `ApiService` vs `DioClient` — new endpoints should prefer **`DioClient`** (`MobileApp/lib/services/dio_client.dart`); see comments there.
-  - **Mobile JSON envelopes**: Use **`MobileApp/lib/utils/mobile_api_json.dart`** for `success` / `data` parsing aligned with Backoffice `app/utils/mobile_responses.py` — avoid ad-hoc `jsonDecode` + `['data']` copy-paste in new code.
+  - **Mobile JSON envelopes**: Use **`MobileApp/lib/utils/mobile_api_json.dart`** for `success` / `data` parsing aligned with Backoffice `app/utils/mobile/mobile_responses.py` — avoid ad-hoc `jsonDecode` + `['data']` copy-paste in new code.
   - **Loading / error UI**: Reuse **`AppLoadingIndicator`**, **`AppErrorState`**, **`AsyncBody`** (`MobileApp/lib/widgets/`), and optional **`MobileScreenScaffold`** for pushed routes — do not hand-roll full-screen spinners/error columns for each screen.
   - **Navigation**: The app uses **Navigator 1.0** + `AppRoutes` / `AppRouter` (`MobileApp/lib/config/`). **`go_router`** config exists for a future migration — **do not register the same path in both** until the app switches to `MaterialApp.router` (see **`MobileApp/README.md`** → Architecture notes).
   - **Tab shell**: **`MainNavigationScreen`** owns the bottom nav + page view; **child tabs supply their own `AppBar`** (outer scaffold uses `primary: false`). Do not add a second outer `Scaffold` around tab roots.
@@ -206,15 +206,17 @@ Public form templates live under `app/templates/forms/public/` (success and unav
 Domain packages (`forms`, `organization`, `documents`, `security`, `imports`, `public`, `ai`). A few large modules are cohesive and should stay together: assignment-entity variable resolution, `FormDataService`, and `AIAgentExecutor`. Chat page copy and workflow replies are `ai/chat/page_explanations.py` and `ai/chat/workflow_responses.py`, re-exported from `ai/chat/helpers.py`.
 
 #### Utilities (`Backoffice/app/utils/`)
-Prefer `app/services/` for new domain logic. `utils/` holds request helpers, formatting, and authorization checks used by routes (`form_authorization.py`, `formatting.py`, `language_labels.py`, `request_validation.py`).
+Prefer `app/services/` for new domain logic. Helpers are grouped by domain, and the package root is only those packages (no loose modules). Import the module (`from app.utils.forms.form_authorization import ...`). Package `__init__` files do not re-export names.
+
+Shared primitives (constants, dates, JSON, formatting) live in `common/`. The other packages are `activity`, `ai`, `api`, `audit`, `auth`, `branding`, `database`, `discussion`, `documents`, `email`, `files`, `forms`, `http`, `i18n`, `indicators`, `mobile`, `monitoring`, `notifications`, `organization`, `profiles`, `realtime`, `security`, and `templates`. Examples: `forms/form_authorization.py`, `common/formatting.py`, `i18n/language_labels.py`, `http/request_validation.py`.
 
 Three JSON envelopes are intentional and should not be merged:
 
 | Module | Callers |
 |---|---|
-| `api_helpers.py` | External `/api/v1` (`json_response`, `api_error`, `error_id`) |
-| `api_responses.py` | Admin and in-app AJAX (`json_ok`, `json_forbidden`, `json_not_found`) |
-| `mobile_responses.py` | `/api/mobile/v1` only (`success` / `data` / `meta`) |
+| `api/api_helpers.py` | External `/api/v1` (`json_response`, `api_error`, `error_id`) |
+| `api/api_responses.py` | Admin and in-app AJAX (`json_ok`, `json_forbidden`, `json_not_found`) |
+| `mobile/mobile_responses.py` | `/api/mobile/v1` only (`success` / `data` / `meta`) |
 
 `/api/mobile/v1/data/countrymap` and the mobile sectors list are public reference data (rate-limited). The matching `/api/v1` routes stay API-key authenticated.
 
@@ -314,7 +316,7 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 - Routes: `app/routes/translation_review/` (`/translation-review/toggle`, `/translation-review/api/string`, `/api/queue`, `/api/glossary-candidates`)
 - Hooks: `app/services/translation_review/hooks.py` (wraps Jinja + `Domain.gettext`; strips markers from non-HTML responses)
 - Frontend: `app/static/js/translation_review/core.js`, `app/static/css/translation-review.css`, included from `core/layout.html`
-- Production propagation: `app/utils/translation_watcher.py` polls `translation_catalog_version` in all environments; a worker whose artifacts are behind rebuilds them from the database and refreshes Babel. Falls back to the `translations/.sentinel` mtime when the database cannot be read.
+- Production propagation: `app/utils/i18n/translation_watcher.py` polls `translation_catalog_version` in all environments; a worker whose artifacts are behind rebuilds them from the database and refreshes Babel. Falls back to the `translations/.sentinel` mtime when the database cannot be read.
 
 **Deploy notes**
 - Run migrations: `add_rbac_language_scope`, `add_translation_review_tool_toggle`, `add_translation_quality`, `add_translation_catalog_version`
@@ -325,8 +327,8 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 - **Chat API**: `/api/ai/v2` (chat, stream, conversations, export/import). WebSocket: `/api/ai/v2/ws`. Health: `GET /api/ai/v2/health` (anonymous callers get only `{"ok": bool}`; system managers / `admin.ai.manage` also get per-check detail incl. `agent_available` and the `?probe=embedding` probe).
 - **Auth**: Session (Backoffice) or Bearer token (e.g. mobile). Issue tokens via `GET /api/ai/v2/token` (cookie session, or a mobile access token as Bearer: this exact path is allowed in `bearer_jwt_allowed_for_path`, so the mobile app works without a session cookie).
 - **Environment**: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-5-mini`), `GEMINI_API_KEY`, `AZURE_OPENAI_*` for providers. `AI_EMBEDDING_PROVIDER`, `AI_EMBEDDING_MODEL`, `AI_EMBEDDING_DIMENSIONS` (must match pgvector column; changing requires migration and possibly re-embedding). `AI_AGENT_ENABLED`, `AI_AGENT_MAX_ITERATIONS`, `AI_AGENT_TIMEOUT_SECONDS`, `AI_AGENT_COST_LIMIT_USD`, `AI_AGENT_MAX_COMPLETION_TOKENS` (default 32768; cap 128000 for large tables; use 4096 for GPT-4o). `AI_TOOL_OBSERVATION_MAX_ROWS_TABLE_RESULT` (default 250; cap 2000; rows sent from indicator/UPR “all countries” tools; increase for full country datasets). `REDIS_URL` optional for cross-worker rate limiting.
-- **Supported models**: Depend on OpenAI account. Some models (e.g. GPT-5) reject sampling params; see `app.utils.ai_utils.openai_model_supports_sampling_params`.
-- **Shared helpers**: `app.utils.ai_utils` (e.g. `openai_model_supports_sampling_params`, `sanitize_page_context`). RAG: `app.services.ai_vector_store`, `app.services.ai_embedding_service`. Agent: `app.services.ai_agent_executor`, `app.services.ai_tools_registry`. Shared chat request handling: `app.services.ai_chat_request` (parse, resolve conversation, idempotency).
+- **Supported models**: Depend on OpenAI account. Some models (e.g. GPT-5) reject sampling params; see `app.utils.ai.ai_utils.openai_model_supports_sampling_params`.
+- **Shared helpers**: `app.utils.ai.ai_utils` (e.g. `openai_model_supports_sampling_params`, `sanitize_page_context`). RAG: `app.services.ai_vector_store`, `app.services.ai_embedding_service`. Agent: `app.services.ai_agent_executor`, `app.services.ai_tools_registry`. Shared chat request handling: `app.services.ai_chat_request` (parse, resolve conversation, idempotency).
 - **Optional dependencies**: `flask-sock` required for WebSocket endpoints (`/api/ai/v2/ws`, document QA WS). Without it, AI HTTP and SSE still work. `redis` (and `REDIS_URL`) optional for cross-worker WebSocket rate limiting; in-memory limiter used otherwise. `pgvector` required for RAG document search; run migrations so `ai_documents`, `ai_embeddings`, `ai_document_chunks` exist. For full chat (non-fallback): at least one of `OPENAI_API_KEY`, `GEMINI_API_KEY`, or Azure/Copilot keys. For RAG embeddings: `OPENAI_API_KEY` when `AI_EMBEDDING_PROVIDER=openai`, or local model when `AI_EMBEDDING_PROVIDER=local` (dimensions must match DB).
 
 ### AI access policy (who may read what)
@@ -368,9 +370,9 @@ The September 2026 review locked this route because the proxy had no guard (`mcp
 
 Do not default the proxy back to `required`, and do not treat a missing `mcp:use` check as an open finding, while that client still only calls those paths. Set `MCP_PROXY_AUTH_MODE=required` in the same change that adds a non-public call. `admin.mcp.use` and the `mcp:use` capability apply only in that mode. Any other value of `MCP_PROXY_AUTH_MODE` fails closed to `required`.
 
-Controls that stay on in public mode: caller cookies and `Authorization` are stripped before the upstream hop, the upstream host goes through `app/utils/outbound_url.py`, the body is capped, and the route is rate-limited per IP (default 120/minute). A browser that already has a Backoffice session cookie still has to pass CSRF on POST.
+Controls that stay on in public mode: caller cookies and `Authorization` are stripped before the upstream hop, the upstream host goes through `app/utils/http/outbound_url.py`, the body is capped, and the route is rate-limited per IP (default 120/minute). A browser that already has a Backoffice session cookie still has to pass CSRF on POST.
 
-**Outbound requests and exports**: server-side fetches to admin/user-influenced URLs (MCP upstream, LibreTranslate, IFRC document fetch) go through `app/utils/outbound_url.py` (https only, no credentials, host allow-list where applicable, private/link-local/metadata ranges blocked after DNS resolution, redirects re-validated). Every CSV/XLSX writer must use `app/utils/export_safety.py` (`safe_csv_writer`, `safe_csv_dict_writer`, `sanitize_workbook`, `sanitize_dataframe`) so cells starting with `= + - @ TAB CR` are neutralised.
+**Outbound requests and exports**: server-side fetches to admin/user-influenced URLs (MCP upstream, LibreTranslate, IFRC document fetch) go through `app/utils/http/outbound_url.py` (https only, no credentials, host allow-list where applicable, private/link-local/metadata ranges blocked after DNS resolution, redirects re-validated). Every CSV/XLSX writer must use `app/utils/files/export_safety.py` (`safe_csv_writer`, `safe_csv_dict_writer`, `sanitize_workbook`, `sanitize_dataframe`) so cells starting with `= + - @ TAB CR` are neutralised.
 
 ### AI document batch jobs & processing (`AI_DOCS_*`)
 
@@ -462,8 +464,8 @@ npm run dev:safe
 - Session blacklisting for security
 - User activity tracking and analytics
 - Idle timeout and revocation apply to every cookie-authenticated request (including `/api/` paths); Bearer JWTs authenticate only under `MOBILE_JWT_BEARER_PATH_PREFIXES` (default `/api/mobile/v1/`).
-- **Client IP has one source:** `app.utils.client_ip.get_client_ip()` (= `request.remote_addr` after ProxyFix with `PROXY_FIX_X_*` hops). Never read `X-Forwarded-For` / `request.remote_addr` directly in routes; use `is_loopback_request()` for dev-only loopback gates.
-- **Revocation/rotation state is shared** (`app/utils/auth_state.py`: Redis, else Postgres `auth_state_entry`), never per-process. Mobile refresh tokens are single-use with family revocation on reuse. `FLASK_CONFIG` unset means production. A missing `MOBILE_JWT_SECRET` or `ENABLE_SSH` is flagged on System Configuration and does not block startup. Details, env vars and upgrade notes: [`Backoffice/docs/setup/security.md`](../Backoffice/docs/setup/security.md#authentication-sessions-and-perimeter).
+- **Client IP has one source:** `app.utils.security.client_ip.get_client_ip()` (= `request.remote_addr` after ProxyFix with `PROXY_FIX_X_*` hops). Never read `X-Forwarded-For` / `request.remote_addr` directly in routes; use `is_loopback_request()` for dev-only loopback gates.
+- **Revocation/rotation state is shared** (`app/utils/auth/auth_state.py`: Redis, else Postgres `auth_state_entry`), never per-process. Mobile refresh tokens are single-use with family revocation on reuse. `FLASK_CONFIG` unset means production. A missing `MOBILE_JWT_SECRET` or `ENABLE_SSH` is flagged on System Configuration and does not block startup. Details, env vars and upgrade notes: [`Backoffice/docs/setup/security.md`](../Backoffice/docs/setup/security.md#authentication-sessions-and-perimeter).
 
 ### API Structure
 - RESTful endpoints under `/api/v1/`
@@ -474,13 +476,13 @@ npm run dev:safe
 
 ### API Response Helpers
 
-**`app.utils.api_responses`** – use for admin/AJAX routes and internal endpoints with fixed response shapes:
+**`app.utils.api.api_responses`** – use for admin/AJAX routes and internal endpoints with fixed response shapes:
 - **Success**: `json_ok(**extra)` (200), `json_accepted(**extra)` (202), `json_created(**extra)` (201)
 - **Errors**: `json_bad_request(msg)`, `json_forbidden(msg)`, `json_not_found(msg)`, `json_server_error(msg)`, `json_error(msg, status=400, **extra)`
 - **Auth**: `json_auth_required(msg)` (401)
 - Prefer these over inline `jsonify()` for consistency. `GENERIC_ERROR_MESSAGE` is re-exported here.
 
-**`app.utils.api_helpers`** – use for external API routes and error tracking:
+**`app.utils.api.api_helpers`** – use for external API routes and error tracking:
 - `api_error(...)` – returns JSON with `error_id` for external clients
 - `json_response(data, status_code)` – low-level JSON response
 - Use when you need error IDs or custom response semantics for external API consumers.
@@ -488,7 +490,7 @@ npm run dev:safe
 **When to keep `jsonify`**: Pass-through responses (`jsonify(result)` where `result` comes from a service), raw arrays, or responses with custom status/headers (e.g. manifest with `Content-Type`).
 
 ### AJAX / JSON Request Detection
-- Use `is_json_request()` from `app.utils.request_utils` instead of ad-hoc checks (`request.is_json`, `Accept` headers, etc.).
+- Use `is_json_request()` from `app.utils.http.request_utils` instead of ad-hoc checks (`request.is_json`, `Accept` headers, etc.).
 
 ### Client-Side Fetch (Backoffice JS)
 - Use `getFetch()` or `getApiFetch()` from `app/static/js/core/csrf.js` / `app/static/js/lib/api-fetch.js`: `(window.getFetch && window.getFetch()) || fetch` for raw CSRF-aware fetch, or `window.apiFetch` for JSON + optional error display.
@@ -512,14 +514,14 @@ Use the shared primitive; do not hand-roll. A guard test fails the build if the 
 
 | Threat | Primitive | Guard test |
 |---|---|---|
-| `LIKE`/`ILIKE` wildcard injection (`%`, `_`, `\` in user input) | [`app/utils/sql_utils.py`](../Backoffice/app/utils/sql_utils.py): `ilike_contains`, `ilike_prefix`, `ilike_equals`, `like_contains`, `safe_ilike_pattern`, `escape_like_wildcards`; for SQLAlchemy string ops `col.contains(x, autoescape=True)` / `startswith(x, autoescape=True)` | `tests/unit/test_utils/test_sql_like_safety.py` (AST scan of `app/`, `plugins/`, `scripts/`) |
+| `LIKE`/`ILIKE` wildcard injection (`%`, `_`, `\` in user input) | [`app/utils/database/sql_utils.py`](../Backoffice/app/utils/database/sql_utils.py): `ilike_contains`, `ilike_prefix`, `ilike_equals`, `like_contains`, `safe_ilike_pattern`, `escape_like_wildcards`; for SQLAlchemy string ops `col.contains(x, autoescape=True)` / `startswith(x, autoescape=True)` | `tests/unit/test_utils/test_sql_like_safety.py` (AST scan of `app/`, `plugins/`, `scripts/`) |
 | DOM XSS in Backoffice JS | [`app/static/js/lib/safe-dom.js`](../Backoffice/app/static/js/lib/safe-dom.js) (`window.SafeDom`): `escapeHtml` (escapes quotes), `safeUrl` / `safeHrefAttr` / `setHref` / `setSrc` / `openWindow` / `navigate` (http/https + same-origin allow-list, control-char and entity-obfuscation aware), `html` tagged template + `raw`, `setHtml`, `sanitizeHtml` (allow-list; `allowControls` for plugin config forms). There is **no identity fallback**: if `SafeDom` is missing, render text via `textContent`. Prefer DOM APIs / `textContent`; never concatenate data into `innerHTML` without `SafeDom.escapeHtml`. | `tests/js/lib/safe-dom.test.js` (`npx vitest run tests/js/lib`) |
-| Email header / envelope injection | [`app/utils/email_headers.py`](../Backoffice/app/utils/email_headers.py): `sanitize_header_value`, `sanitize_subject`, `sanitize_filename`, `validate_email_address`, `sanitize_sender`. `services/email/client.send_email` applies them to subject, sender and every To/Cc/Bcc address (invalid recipients are dropped and logged; nothing valid left = `no_recipients`; bad sender = `invalid_sender`). | `tests/unit/test_utils/test_email_headers.py` |
-| Open redirects | [`app/utils/redirect_utils.py`](../Backoffice/app/utils/redirect_utils.py): `is_safe_redirect_url` (root-relative or same-origin http(s) only; rejects `//`, backslashes, control characters, userinfo, encoded/NFKC-normalised variants), `safe_redirect`, `get_safe_redirect_url`. Never call `redirect(<user value>)`. For stored external URLs use `external_url_validation.safe_external_redirect_target`. | `tests/unit/test_utils/test_redirect_utils.py` |
-| Zip/XML bombs and huge sheets in spreadsheets | [`app/utils/safe_workbook.py`](../Backoffice/app/utils/safe_workbook.py): `load_workbook_safe`, `read_excel_safe`, `inspect_xlsx`, `safe_iter_rows` (raw size, member count, uncompressed size, per-member ratio, declared rows/cols, sheet count, all checked **before** openpyxl parses; `read_only=True` by default). Limits: `WORKBOOK_MAX_*` config. Never call `openpyxl.load_workbook` / `pd.read_excel` on uploaded data. CSV/JSON uploads: `app/utils/file_parsing.py` (`read_stream_capped`, `load_json_upload`, `MAX_CSV_ROWS`). | `tests/unit/test_utils/test_safe_workbook.py` (includes a tree scan for raw loaders) |
-| Decompression bombs / runaway OCR | [`app/utils/safe_image.py`](../Backoffice/app/utils/safe_image.py): `open_image_safe` (pixel budget from the header, `DecompressionBombWarning` is fatal), `clamp_dpi` / `clamp_render_scale` for PDF page rasterisation, `ocr_image_to_string` (tesseract timeout + downscale). | `tests/unit/test_utils/test_safe_image.py` |
-| Exception text leaking to clients | `raise ClientInputError(...)` for deliberate, user-presentable validation messages and `client_error_message(exc)` in `except ValueError` blocks ([`app/utils/api_errors.py`](../Backoffice/app/utils/api_errors.py)); `handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)` for everything else. Never `json_*(str(e))` from `except Exception`. | `tests/unit/test_utils/test_error_exposure.py` |
-| Scanner outages / SSRF | `FILE_SCANNER_FAIL_OPEN=true` outside DEBUG logs a CRITICAL warning (uploads pass unscanned); default is fail-closed. `CLOUD_SCANNER_URL` is validated with `app.utils.outbound_url.validate_outbound_url` (https, no private/link-local/metadata; private scanners must be listed in `CLOUD_SCANNER_ALLOWED_NETWORKS`), redirects are not followed. | `tests/unit/test_utils/test_file_scanning_extended.py` |
+| Email header / envelope injection | [`app/utils/email/email_headers.py`](../Backoffice/app/utils/email/email_headers.py): `sanitize_header_value`, `sanitize_subject`, `sanitize_filename`, `validate_email_address`, `sanitize_sender`. `services/email/client.send_email` applies them to subject, sender and every To/Cc/Bcc address (invalid recipients are dropped and logged; nothing valid left = `no_recipients`; bad sender = `invalid_sender`). | `tests/unit/test_utils/test_email_headers.py` |
+| Open redirects | [`app/utils/http/redirect_utils.py`](../Backoffice/app/utils/http/redirect_utils.py): `is_safe_redirect_url` (root-relative or same-origin http(s) only; rejects `//`, backslashes, control characters, userinfo, encoded/NFKC-normalised variants), `safe_redirect`, `get_safe_redirect_url`. Never call `redirect(<user value>)`. For stored external URLs use `external_url_validation.safe_external_redirect_target`. | `tests/unit/test_utils/test_redirect_utils.py` |
+| Zip/XML bombs and huge sheets in spreadsheets | [`app/utils/files/safe_workbook.py`](../Backoffice/app/utils/files/safe_workbook.py): `load_workbook_safe`, `read_excel_safe`, `inspect_xlsx`, `safe_iter_rows` (raw size, member count, uncompressed size, per-member ratio, declared rows/cols, sheet count, all checked **before** openpyxl parses; `read_only=True` by default). Limits: `WORKBOOK_MAX_*` config. Never call `openpyxl.load_workbook` / `pd.read_excel` on uploaded data. CSV/JSON uploads: `app/utils/files/file_parsing.py` (`read_stream_capped`, `load_json_upload`, `MAX_CSV_ROWS`). | `tests/unit/test_utils/test_safe_workbook.py` (includes a tree scan for raw loaders) |
+| Decompression bombs / runaway OCR | [`app/utils/files/safe_image.py`](../Backoffice/app/utils/files/safe_image.py): `open_image_safe` (pixel budget from the header, `DecompressionBombWarning` is fatal), `clamp_dpi` / `clamp_render_scale` for PDF page rasterisation, `ocr_image_to_string` (tesseract timeout + downscale). | `tests/unit/test_utils/test_safe_image.py` |
+| Exception text leaking to clients | `raise ClientInputError(...)` for deliberate, user-presentable validation messages and `client_error_message(exc)` in `except ValueError` blocks ([`app/utils/api/api_errors.py`](../Backoffice/app/utils/api/api_errors.py)); `handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)` for everything else. Never `json_*(str(e))` from `except Exception`. | `tests/unit/test_utils/test_error_exposure.py` |
+| Scanner outages / SSRF | `FILE_SCANNER_FAIL_OPEN=true` outside DEBUG logs a CRITICAL warning (uploads pass unscanned); default is fail-closed. `CLOUD_SCANNER_URL` is validated with `app.utils.http.outbound_url.validate_outbound_url` (https, no private/link-local/metadata; private scanners must be listed in `CLOUD_SCANNER_ALLOWED_NETWORKS`), redirects are not followed. | `tests/unit/test_utils/test_file_scanning_extended.py` |
 
 ### File Uploads
 - Document management system
@@ -536,7 +538,7 @@ Rules for any route that returns a stored file to an unauthenticated or low-priv
    - **AI Knowledge Base (MCP / Custom GPT):** `AIDocument.public_id` and `AIDocumentChunk.public_id`. Public JSON fields `document_id` / `chunk_id` and paths `/api/v1/public/documents/<uuid>` (and `…/download`, `…/chunks/<uuid>/context`) are UUID-only — integer path segments do not match (404), so sequential probing cannot enumerate public documents.
 3. **Rate-limit unauthenticated downloads** with `@limiter.limit(public_access.public_download_rate_limit)` (default `60 per minute` per client IP; override with `PUBLIC_DOWNLOAD_RATE_LIMIT`).
 4. **Always stream through `storage_service.stream_response`.** It adds `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`, and forces `attachment` for active content (HTML, SVG, XML, JS, CSS) even when `as_attachment=False`. Inline PDFs get `nosniff` only (Chrome's viewer cannot render under `sandbox`). `add_security_headers` keeps a CSP that is already on the response. Do not use raw `send_file` / `send_from_directory` for user-supplied files.
-5. **Never redirect to a stored URL** (`source_url`, FDRS-synced values) without `app.utils.external_url_validation.safe_external_redirect_target` (https + `IFRC_DOCUMENT_ALLOWED_HOSTS`, default port, no credentials, fail closed).
+5. **Never redirect to a stored URL** (`source_url`, FDRS-synced values) without `app.utils.http.external_url_validation.safe_external_redirect_target` (https + `IFRC_DOCUMENT_ALLOWED_HOSTS`, default port, no credentials, fail closed).
 6. **Branding uploads accept raster images only** (PNG, JPEG, GIF, WebP; ICO for favicons), verified by decoding with Pillow so content must match the extension. SVG is not accepted; a bundled static `logo.svg` can still be set through the path field. Legacy uploaded SVGs are served as sandboxed attachments.
 7. **Template images** (`/forms/template-image/<item>/<path>`): logged-in users, or anonymous visitors presenting `?public_token=<AssignedForm.unique_token>` of an active public form whose published version contains the item (the URL builder adds the token on the public form page). The old `?preview=` bypass no longer exists.
 
@@ -559,7 +561,7 @@ Migration `add_submitted_document_public_id` adds and backfills `submitted_docum
 ### Object-Level Authorization (child ids, assignments, lookup lists)
 Any route that takes an id of an object owned by an assignment (`RepeatGroupInstance`, `DynamicIndicatorData`, `SubmissionDiscussionComment`, `FormData`, ...) must resolve the **owner** and authorize the acting verb on it. `@login_required` plus "the id exists" is not authorization, and neither is `EntityService.check_user_entity_access` alone (it lets any `admin.*` holder through).
 
-All helpers live in [`app/utils/form_authorization.py`](../Backoffice/app/utils/form_authorization.py) and delegate to `AuthorizationService.can_access_assignment` / `can_edit_assignment` / `can_submit_assignment` (RBAC-, entity-scope-, status- and round-aware - the same rules the entry page uses):
+All helpers live in [`app/utils/forms/form_authorization.py`](../Backoffice/app/utils/forms/form_authorization.py) and delegate to `AuthorizationService.can_access_assignment` / `can_edit_assignment` / `can_submit_assignment` (RBAC-, entity-scope-, status- and round-aware - the same rules the entry page uses):
 
 | Need | Helper |
 |---|---|
@@ -577,7 +579,7 @@ All helpers live in [`app/utils/form_authorization.py`](../Backoffice/app/utils/
 
 Lookup lists are global reference data with no owner. Numeric (admin-managed) lists are readable when a template the user can reach references them, or by System Managers / template and assignment admins; system lists (`country_map`, `national_society`, `indicator_bank`) and plugin lists stay open to authenticated users. Row responses are capped at 5000 with a `truncated` flag.
 
-Mobile (`@mobile_auth_required`) routes follow the same rules as their web counterparts: the write routes require the exact web permission (`permission=`, not the any-of `permissions=`), record `log_admin_action`, and send the same notifications. The anonymous `POST /api/mobile/v1/data/indicator-suggestions` is protected by a shared-store rate limit, strict payload validation (`app/utils/suggestion_intake.py`), DB-backed per-email and global caps (`SUGGESTION_PER_EMAIL_DAILY_LIMIT`, `SUGGESTION_GLOBAL_HOURLY_LIMIT`) and an optional reCAPTCHA token (`MOBILE_SUGGESTION_REQUIRE_CAPTCHA=true`).
+Mobile (`@mobile_auth_required`) routes follow the same rules as their web counterparts: the write routes require the exact web permission (`permission=`, not the any-of `permissions=`), record `log_admin_action`, and send the same notifications. The anonymous `POST /api/mobile/v1/data/indicator-suggestions` is protected by a shared-store rate limit, strict payload validation (`app/utils/indicators/suggestion_intake.py`), DB-backed per-email and global caps (`SUGGESTION_PER_EMAIL_DAILY_LIMIT`, `SUGGESTION_GLOBAL_HOURLY_LIMIT`) and an optional reCAPTCHA token (`MOBILE_SUGGESTION_REQUIRE_CAPTCHA=true`).
 
 #### Locking status transitions (TOCTOU)
 Every write to `AssignmentEntityStatus.status` (via `apply_entity_status_change` or directly) must hold the row lock and validate against the **locked** row, otherwise two concurrent requests both pass the "allowed from this status" check and transition twice (double notifications, approve over a just-reopened form).
@@ -601,7 +603,7 @@ Rules that make this safe:
 ### Adding Details to an Audit Trail Row
 Most admin mutations are recorded automatically by `activity_middleware`, which only knows the endpoint, method and status code — so the Audit Trail "Details" panel is empty unless the view says what changed.
 
-- Call `set_audit_details(**fields)` and `set_audit_description(text)` from `app.utils.audit_context`. Both enrich the single `UserActivityLog` row the middleware already writes; view-supplied keys override anything the middleware inferred.
+- Call `set_audit_details(**fields)` and `set_audit_description(text)` from `app.utils.audit.audit_context`. Both enrich the single `UserActivityLog` row the middleware already writes; view-supplied keys override anything the middleware inferred.
 - Prefer humanized keys and values (resolved names, `Yes`/`No`, `before → after` strings). `details_service.humanize_audit_details_dict` renders them and hides request metadata, secrets and bare numeric IDs. See `app/services/audit/assignment_audit.py` for the pattern.
 - Only reach for `log_admin_action(old_values=..., new_values=...)` when the blueprint is listed in `ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING` (`activity_logging_skip.py`); otherwise you get a duplicate row, because the middleware still logs the same POST.
 - Cap collections — a bulk action can span every country on the platform.
@@ -751,7 +753,7 @@ The catalog is **code, not data** — going forward, don't pre-populate `rbac_pe
 | Surface | Decorator / helper |
 |---------|---------------------|
 | `/admin` HTML + JSON routes | `admin_required`, `permission_required(code)`, `permission_required_any(*codes)`, `system_manager_required`, `admin_permission_required[_any]` (combo) — [`app/routes/admin/shared.py`](../Backoffice/app/routes/admin/shared.py) |
-| Mobile API (`/api/mobile/v1/admin/...`) | `mobile_auth_required(permission=code)` / `(permissions=(...))` — [`app/utils/mobile_auth.py`](../Backoffice/app/utils/mobile_auth.py) |
+| Mobile API (`/api/mobile/v1/admin/...`) | `mobile_auth_required(permission=code)` / `(permissions=(...))` — [`app/utils/mobile/mobile_auth.py`](../Backoffice/app/utils/mobile/mobile_auth.py) |
 | Inline checks (service code, either surface) | `AuthorizationService.has_rbac_permission(user, code, scope=...)`; route-local convenience wrapper `user_has_permission(code)` |
 | Templates (UI gating only — **routes remain authoritative**) | Jinja global `has_permission(code)` ([`app/template_context.py`](../Backoffice/app/template_context.py)) |
 | Intentionally-unguarded `/admin` route | `@rbac_guard_audit_exempt("reason")` — otherwise flagged by the startup audit below |
@@ -892,7 +894,7 @@ Detailed runbook: [Incidents → Scenario F (502/504)](Backoffice/docs/runbooks/
 - **AI endpoints + request handling**: `Backoffice/app/routes/ai.py`, `Backoffice/app/services/ai/chat/`
 - **RAG / embeddings / vector store**: `Backoffice/app/services/ai/documents/`, `Backoffice/app/services/ai/providers/`
 - **Business services (by domain)**: `Backoffice/app/services/` — subpackages include `forms/`, `data_retrieval/`, `organization/`, `validation/`, `platform/`, etc. FDRS- and UPR-specific services live in `Backoffice/plugins/fdrs/` and `Backoffice/plugins/upr/`.
-- **Translations / localization**: `Backoffice/app/utils/form_localization.py`, `Backoffice/translations/`, `Backoffice/app/services/translation_review/`
+- **Translations / localization**: `Backoffice/app/utils/forms/form_localization.py`, `Backoffice/translations/`, `Backoffice/app/services/translation_review/`
 - **Button styles / design system**: `Backoffice/app/static/css/theme.css` (CSS variables), `Backoffice/app/static/css/components.css` (`.btn` system), `Backoffice/app/static/css/executive-header.css` (`.professional-action-btn` page-header variants)
 - **Mobile app (Flutter)**: `MobileApp/` — routes: `lib/config/routes.dart`, `lib/config/app_router.dart`; DI: `lib/di/service_locator.dart`; API constants: `lib/config/app_config.dart` (no inline `/api/mobile/v1/...` strings in providers). Shared UI: `lib/widgets/loading_indicator.dart`, `lib/widgets/error_state.dart`, `lib/widgets/async/async_body.dart`, `lib/widgets/mobile_screen_scaffold.dart`. JSON helpers: `lib/utils/mobile_api_json.dart`. iOS CocoaPods / `Podfile.lock` without a Mac: **Regenerate iOS Podfile.lock** workflow (see **Mobile App (Flutter)** in Local Development Quickstart).
 
@@ -1032,8 +1034,8 @@ Also search `app/static/js` for string-built `class="…bg-*-600…"` on buttons
 ### Architecture
 - **Location**: `Backoffice/app/routes/api/mobile/` (sub-package with 10 modules)
 - **Blueprint**: `mobile_bp`, registered in `app/__init__.py`, CSRF-exempt
-- **Auth**: JWT Bearer via `@mobile_auth_required` (from `app.utils.mobile_auth`)
-- **Response envelope**: `app.utils.mobile_responses` — `mobile_ok`, `mobile_paginated`, `mobile_error`
+- **Auth**: JWT Bearer via `@mobile_auth_required` (from `app.utils.mobile.mobile_auth`)
+- **Response envelope**: `app.utils.mobile.mobile_responses` — `mobile_ok`, `mobile_paginated`, `mobile_error`
 - **Rate limiting**: `mobile_rate_limit()`, `auth_rate_limit()` on sensitive endpoints
 - **Version enforcement**: `X-App-Version` header checked against `MOBILE_MIN_APP_VERSION` config
 
@@ -1073,9 +1075,9 @@ All mobile endpoints are defined as `static const String` in `MobileApp/lib/conf
 | `app/routes/api/mobile/admin_content.py` | Templates, assignments, documents, resources, indicators, translations |
 | `app/routes/api/mobile/admin_org.py` | Organization structure |
 | `app/routes/api/mobile/public_data.py` | Country map, sectors, indicators, quiz |
-| `app/utils/mobile_responses.py` | Standardized response envelope |
-| `app/utils/mobile_auth.py` | JWT + session auth decorator |
-| `app/utils/mobile_jwt.py` | JWT token issuance/decoding |
+| `app/utils/mobile/mobile_responses.py` | Standardized response envelope |
+| `app/utils/mobile/mobile_auth.py` | JWT + session auth decorator |
+| `app/utils/mobile/mobile_jwt.py` | JWT token issuance/decoding |
 
 ## HTML Sanitization Policy (Client-Side)
 

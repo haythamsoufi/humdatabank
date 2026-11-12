@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/utils/activity_types.py.
+Comprehensive tests for app/utils/activity/activity_types.py.
 
 Pushes coverage from ~83 % → 100 % by exercising all branches of
 normalize_activity_type and validating the data dictionaries.
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.utils.activity_types import (
+from app.utils.activity.activity_types import (
     CANONICAL_ACTIVITY_TYPES,
     LEGACY_ACTIVITY_TYPE_MAP,
     normalize_activity_type,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.models.validation import ValidationQuestionTemplate
 from app.services.validation.core_checks import CORE_QUESTION_DEFAULTS
 from app.services.validation.types import CheckResult, ValidationQuestionDraft
-from app.utils.data_quality_constants import RULE_PACK_CORE, RULE_PACK_FDRS_MATRIX_V1
+from app.utils.indicators.data_quality_constants import RULE_PACK_CORE, RULE_PACK_FDRS_MATRIX_V1
 
 SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 

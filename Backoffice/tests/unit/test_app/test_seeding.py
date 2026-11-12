@@ -12,7 +12,7 @@ We must patch them at their source module paths:
   - app.models.system.SystemSettings
   - app.models.rbac.RbacRole / RbacUserRole
   - app.services.platform.app_settings_service.*
-  - app.utils.organization_helpers.get_org_email_domain
+  - app.utils.organization.organization_helpers.get_org_email_domain
 """
 
 import os
@@ -173,7 +173,7 @@ class TestSystemSettingsInit:
                                             with patch("app.services.platform.app_settings_service.set_age_groups") as ag:
                                                 with patch("app.services.platform.app_settings_service.set_sex_categories") as sc:
                                                     with patch("app.services.platform.app_settings_service.set_enabled_entity_types") as et:
-                                                        with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                                        with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                                             with patch("app.models.rbac.RbacRole"):
                                                                 with patch("app.models.rbac.RbacUserRole"):
                                                                     create_default_data(app)
@@ -197,7 +197,7 @@ class TestSystemSettingsInit:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -221,7 +221,7 @@ class TestSystemSettingsInit:
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
                                 with patch("app.models.system.SystemSettings", mock_sys_settings):
-                                    with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                    with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                         with patch("app.models.rbac.RbacRole"):
                                             with patch("app.models.rbac.RbacUserRole"):
                                                 with patch("app.services.platform.app_settings_service.set_supported_languages") as sl:
@@ -263,7 +263,7 @@ class TestCountryCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -297,7 +297,7 @@ class TestCountryCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -356,7 +356,7 @@ class TestAdminUserCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole") as mock_rbac_role:
                                         mock_rbac_role.query.filter_by.return_value.first.return_value = MagicMock(id=1)
                                         with patch("app.models.rbac.RbacUserRole"):
@@ -379,7 +379,7 @@ class TestAdminUserCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -404,7 +404,7 @@ class TestAdminUserCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole", mock_rbac_role):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -423,7 +423,7 @@ class TestAdminUserCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -485,7 +485,7 @@ class TestFocalPointUserCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -564,7 +564,7 @@ class TestSystemManagerUserCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)
@@ -726,7 +726,7 @@ class TestNationalSocietyCreation:
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
-                                with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
+                                with patch("app.utils.organization.organization_helpers.get_org_email_domain", return_value="example.com"):
                                     with patch("app.models.rbac.RbacRole"):
                                         with patch("app.models.rbac.RbacUserRole"):
                                             create_default_data(app)

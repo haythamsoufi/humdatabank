@@ -708,7 +708,7 @@ class TestSendNotificationEmails:
         """If user was sent a digest within the window, skip them."""
         from app.models import User, NotificationPreferences
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='within_window@test.com', name='WW', active=True)

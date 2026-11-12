@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from app.utils.reporting_period_label_parser import (
+from app.utils.indicators.reporting_period_label_parser import (
     parse_period_label,
     parse_structured_period_label,
 )

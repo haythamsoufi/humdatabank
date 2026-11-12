@@ -3121,7 +3121,7 @@ def _export_dynamic_indicators(
 
 def _load_assignment_meta(aes_id: int) -> Tuple[Any, str, str, str]:
     from app.models.assignments import AssignmentEntityStatus
-    from app.utils.api_serialization import _country_for_aes
+    from app.utils.api.api_serialization import _country_for_aes
 
     aes = AssignmentEntityStatus.query.get(aes_id)
     if not aes:
@@ -3646,7 +3646,7 @@ def run_upr_country_reporting_import(
 
     with _ctx:
         _, country_name, iso3, period = _load_assignment_meta(aes_id)
-        from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
+        from app.utils.files.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
         with _quiet_openpyxl_io():
             wb = load_workbook_safe(read_workbook_file_bytes(input_path), read_only=False, data_only=True)

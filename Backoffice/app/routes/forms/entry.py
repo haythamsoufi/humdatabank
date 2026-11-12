@@ -36,10 +36,10 @@ from app.services.notification.core import (
     notify_assignment_submitted,
 )
 from app.services.templates.preparation_service import TemplatePreparationService
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
-from app.utils.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
-from app.utils.form_localization import (
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_error, json_ok, json_server_error
+from app.utils.documents.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
+from app.utils.forms.form_localization import (
     get_localized_country_name,
     get_localized_indicator_definition,
     get_localized_indicator_type,
@@ -49,9 +49,9 @@ from app.utils.form_localization import (
     get_localized_template_name,
     get_translation_key,
 )
-from app.utils.request_utils import is_json_request
-from app.utils.route_helpers import get_unified_form_url, get_unified_form_item_id
-from app.utils.transactions import request_transaction_rollback
+from app.utils.http.request_utils import is_json_request
+from app.utils.http.route_helpers import get_unified_form_url, get_unified_form_item_id
+from app.utils.database.transactions import request_transaction_rollback
 from config import Config
 
 from .helpers import (
@@ -132,7 +132,7 @@ def handle_assignment_form(aes_id):
 
     assignment = assignment_entity_status.assigned_form
 
-    from app.utils.form_authorization import redirect_if_assignment_entry_blocked
+    from app.utils.forms.form_authorization import redirect_if_assignment_entry_blocked
 
     blocked = redirect_if_assignment_entry_blocked(
         assignment,
@@ -761,7 +761,7 @@ def handle_assignment_form(aes_id):
              return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
 
         if csrf_form.validate_on_submit():
-            from app.utils.form_authorization import lock_aes_for_update
+            from app.utils.forms.form_authorization import lock_aes_for_update
 
             # Template lock first, then the assignment row: deploy uses the same order.
             if entry_form_is_stale(form_template, request.form.get('form_version_id')):

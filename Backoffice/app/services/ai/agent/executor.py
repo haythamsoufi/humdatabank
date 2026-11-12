@@ -31,7 +31,7 @@ from app.services.ai.quality.reasoning_trace import AIReasoningTraceService
 from app.services.ai.planning.query_planner import AIQueryPlanner, SimplePlan
 from app.services.ai.planning.evidence_plan import AIEvidencePlanner, EvidencePlan
 from app.services.ai.policies.prompt_policy import build_agent_system_prompt
-from app.utils.organization_helpers import get_org_name
+from app.utils.organization.organization_helpers import get_org_name
 from app.services.ai.policies.tool_routing_policy import (
     extract_document_search_batch_summary as _extract_document_search_batch_summary,
     is_redundant_document_search as _is_redundant_document_search,
@@ -52,7 +52,7 @@ from app.services.ai.runtime.step_ux import (
     plan_step_message as _plan_step_message,
     step_display_message as _step_display_message,
 )
-from app.utils.api_helpers import service_error
+from app.utils.api.api_helpers import service_error
 from app.services.ai.runtime.tool_observation import compact_tool_observation_for_llm as _compact_tool_observation_for_llm
 from app.services.ai.runtime.tool_observation import (
     strip_form_builder_snapshots_for_trace as _strip_form_builder_snapshots_for_trace,
@@ -79,8 +79,8 @@ from app.services.ai.agent._tool_circuit_helpers import make_tool_breaker_factor
 from app.services.ai.providers.openai_chat import OpenAIChatCompletionProvider
 from plugins.upr.ai.tool_specs import UPR_BULK_TOOL_NAMES
 from app.services.ai.data.form_retrieval import resolve_indicator_to_primary_id
-from app.utils.ai_utils import openai_model_supports_sampling_params
-from app.utils.datetime_helpers import utcnow
+from app.utils.ai.ai_utils import openai_model_supports_sampling_params
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -1586,7 +1586,7 @@ class AIAgentExecutor:
             # Form-builder assistant: tool actions are not databank/document evidence.
             try:
                 if final_answer_for_trace and not _fb_assistant:
-                    from app.utils.ai_sources_parser import merge_structured_sources
+                    from app.utils.ai.ai_sources_parser import merge_structured_sources
                     result['sources'] = merge_structured_sources(
                         answer=str(final_answer_for_trace),
                         steps=result.get('steps') or [],

@@ -21,8 +21,8 @@ from app.models import (
     RepeatGroupInstance,
     SubmittedDocument,
 )
-from app.utils.matrix_activity import matrix_cell_display_value
-from app.utils.api_serialization import _is_matrix_metadata_key
+from app.utils.forms.matrix_activity import matrix_cell_display_value
+from app.utils.api.api_serialization import _is_matrix_metadata_key
 
 
 def _matrix_cell_has_value(raw: Any) -> bool:
@@ -751,7 +751,7 @@ class AssignmentCompletionService:
         aes = db.session.get(AssignmentEntityStatus, assignment_entity_status_id)
         if aes is None:
             return local_ids
-        from app.utils.assignment_document_carryover import repository_satisfied_field_ids
+        from app.utils.documents.assignment_document_carryover import repository_satisfied_field_ids
 
         extra = repository_satisfied_field_ids(aes)
         if not extra:

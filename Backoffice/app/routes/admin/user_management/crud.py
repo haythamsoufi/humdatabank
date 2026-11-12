@@ -1,7 +1,7 @@
 """HTML / form-based user CRUD routes and access-request management."""
 
-from app.utils.transactions import request_transaction_rollback, safe_rollback
-from app.utils.datetime_helpers import utcnow
+from app.utils.database.transactions import request_transaction_rollback, safe_rollback
+from app.utils.common.datetime_helpers import utcnow
 from collections import defaultdict
 import re
 
@@ -20,18 +20,18 @@ from app.services.organization.country_access_request_service import (
 from app.models.enums import EntityType
 from app.forms.system import UserForm
 from app.routes.admin.shared import permission_required, permission_required_any
-from app.utils.form_localization import get_localized_country_name
+from app.utils.forms.form_localization import get_localized_country_name
 from app.services.platform.user_analytics_service import log_admin_action
 from app.services.platform.user_analytics_query_service import get_user_management_overview_stats
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_forbidden, json_ok
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.entity_groups import get_enabled_entity_groups
-from app.utils.profile_utils import PROFILE_COLORS
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_ok
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.organization.entity_groups import get_enabled_entity_groups
+from app.utils.profiles.profile_utils import PROFILE_COLORS
 from app.models.system import UserDevice
-from app.utils.azure_b2c_config import is_azure_b2c_configured
-from app.utils.country_utils import get_countries_by_region_with_part_of
+from app.utils.auth.azure_b2c_config import is_azure_b2c_configured
+from app.utils.organization.country_utils import get_countries_by_region_with_part_of
 
 from . import bp
 from .helpers import (
@@ -277,7 +277,7 @@ def access_requests():
     from app.services.email.fds_access_request_digest import (
         get_fds_access_request_digest_last_sent_summary,
     )
-    from app.utils.datetime_helpers import ORG_TIMEZONE_LABEL
+    from app.utils.common.datetime_helpers import ORG_TIMEZONE_LABEL
 
     can_manage_fds_digest = AuthorizationService.is_system_manager(current_user)
     fds_digest_settings = get_fds_access_request_digest_settings() if can_manage_fds_digest else None
@@ -810,7 +810,7 @@ def new_user():
                 else:
                     # Validate password strength before creating the user (local auth only).
                     if (not azure_sso_enabled) and password:
-                        from app.utils.password_validator import validate_password_strength
+                        from app.utils.auth.password_validator import validate_password_strength
                         pw_valid, pw_errors = validate_password_strength(password)
                         if not pw_valid:
                             for err in pw_errors:
@@ -1187,7 +1187,7 @@ def edit_user(user_id):
 
             # Update password if provided (local auth only)
             if (not azure_sso_enabled) and form.password.data:
-                from app.utils.password_validator import validate_password_strength
+                from app.utils.auth.password_validator import validate_password_strength
                 pw_valid, pw_errors = validate_password_strength(form.password.data)
                 if not pw_valid:
                     request_transaction_rollback()
@@ -1225,7 +1225,7 @@ def edit_user(user_id):
             # Handle notification preferences
             from app.services.notification.service import NotificationService
             from app.routes.notifications import get_preference_eligible_notification_types
-            from app.utils.notification_push import is_notifications_push_enabled
+            from app.utils.notifications.notification_push import is_notifications_push_enabled
 
             # Get or create notification preferences for the user
             preferences = NotificationService.get_notification_preferences(user.id)
@@ -1406,7 +1406,7 @@ def edit_user(user_id):
         preferences.digest_time = None
 
     # Load registered devices ordered by last activity then creation (most recent first)
-    from app.utils.notification_push import is_notifications_push_enabled
+    from app.utils.notifications.notification_push import is_notifications_push_enabled
 
     registered_devices = []
     if is_notifications_push_enabled():
@@ -1447,7 +1447,7 @@ def edit_user(user_id):
 def kickout_device(user_id, device_id):
     """Kick out (end session) for a specific device. Keeps device registered."""
     try:
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             PUSH_NOT_ENABLED_MESSAGE,
         )
@@ -1503,7 +1503,7 @@ def kickout_device(user_id, device_id):
 def remove_device(user_id, device_id):
     """Remove a device from the registry. Permanently deletes the device record."""
     try:
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             PUSH_NOT_ENABLED_MESSAGE,
         )

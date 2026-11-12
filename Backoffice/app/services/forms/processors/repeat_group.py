@@ -739,7 +739,7 @@ class RepeatGroupProcessorMixin:
         elif is_matrix_field and isinstance(processed_value, dict):
             # Matrix data - store in disagg_data, leave value as None
             # IMPORTANT: Do NOT call set_simple_value for matrix data as it clears disagg_data
-            from app.utils.api_serialization import prune_stale_matrix_cell_keys
+            from app.utils.api.api_serialization import prune_stale_matrix_cell_keys
             matrix_config = (field.config or {}).get('matrix_config') or {} if field else {}
             entry.value = None
             entry.numeric_value = None

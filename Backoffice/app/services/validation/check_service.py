@@ -24,7 +24,7 @@ from app.services.data_quality.helpers import (
 from app.services.data_quality.service import get_rule_pack_for_template
 from app.services.validation.core_checks import run_core_checks
 from app.services.validation.pack_registry import get_pack, list_packs, packs_for_template
-from app.utils.data_quality_constants import RULE_PACK_CORE
+from app.utils.indicators.data_quality_constants import RULE_PACK_CORE
 from app.services.validation.question_assembler import assemble_question_for_kpi
 from app.services.validation.types import (
     CheckResult,
@@ -33,7 +33,7 @@ from app.services.validation.types import (
     ValidationRunResult,
 )
 from .question_lifecycle import mark_drafted
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 @dataclass

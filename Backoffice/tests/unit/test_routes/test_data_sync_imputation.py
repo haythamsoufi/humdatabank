@@ -167,7 +167,7 @@ class TestDataSyncLanding:
 class TestFdrsToolsRoute:
     def test_get_renders_for_system_manager(self, logged_in_client, db_session, app):
         template = create_test_template(db_session, name="FDRS")
-        with patch("app.utils.data_quality_constants.FDRS_TEMPLATE_ID", template.id), \
+        with patch("app.utils.indicators.data_quality_constants.FDRS_TEMPLATE_ID", template.id), \
              patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True), \
              patch("app.routes.admin.data_sync_imputation.check_template_access", return_value=True), \

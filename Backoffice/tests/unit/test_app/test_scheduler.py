@@ -571,10 +571,10 @@ class TestScheduledJobInnerFunctions:
         fn = jobs.get("cleanup_notifications")
         assert fn is not None
 
-        with patch("app.utils.transactions.atomic") as mock_atomic:
+        with patch("app.utils.database.transactions.atomic") as mock_atomic:
             mock_atomic.return_value.__enter__ = MagicMock(return_value=None)
             mock_atomic.return_value.__exit__ = MagicMock(return_value=False)
-            with patch("app.utils.notifications.cleanup_old_notifications"):
+            with patch("app.services.notification.core.cleanup_old_notifications"):
                 fn()  # should not raise
 
     def test_cleanup_notifications_exception(self, app):
@@ -582,7 +582,7 @@ class TestScheduledJobInnerFunctions:
         fn = jobs.get("cleanup_notifications")
         assert fn is not None
 
-        with patch("app.utils.notifications.cleanup_old_notifications", side_effect=Exception("db error")):
+        with patch("app.services.notification.core.cleanup_old_notifications", side_effect=Exception("db error")):
             fn()  # exception is caught and logged
 
     def test_cleanup_sessions_success(self, app):
@@ -684,7 +684,7 @@ class TestScheduledJobInnerFunctions:
 
         mock_ws_manager = MagicMock()
         mock_ws_manager.cleanup_stale_connections.return_value = 3
-        with patch("app.utils.ws_manager.ws_manager", mock_ws_manager):
+        with patch("app.utils.realtime.ws_manager.ws_manager", mock_ws_manager):
             fn()
 
     def test_cleanup_stale_websockets_success_zero_cleaned(self, app):
@@ -693,7 +693,7 @@ class TestScheduledJobInnerFunctions:
 
         mock_ws_manager = MagicMock()
         mock_ws_manager.cleanup_stale_connections.return_value = 0
-        with patch("app.utils.ws_manager.ws_manager", mock_ws_manager):
+        with patch("app.utils.realtime.ws_manager.ws_manager", mock_ws_manager):
             fn()
 
     def test_cleanup_stale_websockets_exception(self, app):
@@ -701,7 +701,7 @@ class TestScheduledJobInnerFunctions:
         fn = jobs.get("cleanup_stale_websockets")
 
         with patch(
-            "app.utils.ws_manager.ws_manager",
+            "app.utils.realtime.ws_manager.ws_manager",
             side_effect=Exception("ws module not loaded"),
         ):
             fn()  # should be caught

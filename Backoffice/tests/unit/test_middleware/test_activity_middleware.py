@@ -1248,7 +1248,7 @@ class TestActivityRegisteredHooks:
 
     def test_after_request_merges_view_supplied_audit_details(self, app):
         """set_audit_details() from a view lands in the middleware's context_data."""
-        from app.utils.audit_context import CURATED_DESCRIPTION_KEY, set_audit_details
+        from app.utils.audit.audit_context import CURATED_DESCRIPTION_KEY, set_audit_details
 
         with app.test_request_context(
             "/admin/assignments/1/entities/bulk-update-status", method="POST"
@@ -1281,7 +1281,7 @@ class TestActivityRegisteredHooks:
 
     def test_after_request_view_details_override_extracted_entity(self, app):
         """A bulk action's real target beats the single entity extraction inferred."""
-        from app.utils.audit_context import set_audit_details
+        from app.utils.audit.audit_context import set_audit_details
 
         def _fake_extract(_app, _req, context_data):
             context_data["entity_name"] = "Kenya"
@@ -1308,7 +1308,7 @@ class TestActivityRegisteredHooks:
                 assert mock_log.call_args[1]["context_data"]["entity_name"] == "Kenya, Chad, Peru"
 
     def test_after_request_no_curated_marker_without_view_description(self, app):
-        from app.utils.audit_context import CURATED_DESCRIPTION_KEY, reset_request_audit_context
+        from app.utils.audit.audit_context import CURATED_DESCRIPTION_KEY, reset_request_audit_context
 
         with app.test_request_context("/admin/assignments/edit/1", method="POST"):
             g.activity_user_id = 1
@@ -1330,7 +1330,7 @@ class TestActivityRegisteredHooks:
 
     def test_after_request_skips_log_when_view_omits_noop_save(self, app):
         """A no-op Update Assignment POST must not write a catalog 'updated' row."""
-        from app.utils.audit_context import skip_activity_log
+        from app.utils.audit.audit_context import skip_activity_log
 
         with app.test_request_context("/admin/assignments/edit/1", method="POST"):
             g.activity_user_id = 1
@@ -1350,7 +1350,7 @@ class TestActivityRegisteredHooks:
 
     def test_before_request_clears_pending_audit_details(self, app):
         """g lives on the app context, so stale details must not reach the next row."""
-        from app.utils.audit_context import AUDIT_DETAILS_ATTR, set_audit_details
+        from app.utils.audit.audit_context import AUDIT_DETAILS_ATTR, set_audit_details
 
         with app.test_request_context("/dashboard"):
             set_audit_details(assignment_title="Stale assignment")
@@ -1366,7 +1366,7 @@ class TestActivityRegisteredHooks:
 
     def test_deferred_path_merges_view_supplied_audit_details(self, app):
         """The transaction-managed path enriches context_data the same way."""
-        from app.utils.audit_context import CURATED_DESCRIPTION_KEY, set_audit_details
+        from app.utils.audit.audit_context import CURATED_DESCRIPTION_KEY, set_audit_details
 
         with app.test_request_context("/admin/assignments/edit/1", method="POST"):
             g.activity_user_id = 1

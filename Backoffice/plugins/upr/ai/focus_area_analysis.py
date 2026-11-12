@@ -13,8 +13,8 @@ from typing import Any, Callable, Dict, List, Optional
 from flask import current_app
 from flask_babel import gettext as _
 
-from app.utils.api_helpers import service_error
-from app.utils.datetime_helpers import utcnow
+from app.utils.api.api_helpers import service_error
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 

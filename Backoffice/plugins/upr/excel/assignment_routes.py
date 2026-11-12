@@ -15,8 +15,8 @@ from app.services.imports.import_change_log import record_assignment_import_audi
 from app.services.monitoring.memory import memory_tracker
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.platform.user_analytics_service import log_user_activity
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
-from app.utils.request_utils import is_json_request
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
+from app.utils.http.request_utils import is_json_request
 from plugins.upr.excel.country_reporting_excel_service import (
     UPR_COUNTRY_REPORTING_LABEL,
     UprCountryReportingExcelService,

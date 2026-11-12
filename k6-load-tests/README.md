@@ -61,7 +61,7 @@ file is never accidentally interpreted as a real `.env` file.)
 | `K6_WRITE_PATH` | `/api/v1/indicator-suggestions` | Endpoint used by `write-smoke.js` when enabled. |
 
 > **Auth note:** API keys must be sent in the `Authorization: Bearer <key>` header.
-> Query-string keys are explicitly rejected by `Backoffice/app/utils/auth.py:_extract_api_key()`.
+> Query-string keys are explicitly rejected by `Backoffice/app/utils/auth/auth.py:_extract_api_key()`.
 
 ---
 

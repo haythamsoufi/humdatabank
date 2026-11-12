@@ -1,4 +1,4 @@
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from contextlib import suppress
 # ========== File: app/routes/auth.py ==========
 from flask import Blueprint, render_template, redirect, url_for, request, flash, session, abort, make_response
@@ -18,21 +18,21 @@ import secrets
 import json
 import jwt
 from jwt.algorithms import RSAAlgorithm
-from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.common.datetime_helpers import utcnow, ensure_utc
 from app.services.platform.user_analytics_service import (
     log_login_attempt, log_logout, start_user_session, log_user_activity, log_user_activity_for_user,
     create_security_event, get_client_ip, get_client_info, add_session_to_blacklist,
     end_other_active_sessions_for_device,
 )
-from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
-from app.utils.client_ip import is_loopback_request
-from app.utils.login_security import (
+from app.utils.http.redirect_utils import safe_redirect, is_safe_redirect_url
+from app.utils.security.client_ip import is_loopback_request
+from app.utils.auth.login_security import (
     burn_password_check, clear_login_failures, record_login_failure,
 )
-from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit, rate_limit
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error, json_forbidden
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.password_validator import validate_password_strength
+from app.utils.security.rate_limiting import auth_rate_limit, password_reset_rate_limit, rate_limit
+from app.utils.api.api_responses import json_bad_request, json_ok, json_server_error, json_forbidden
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.auth.password_validator import validate_password_strength
 from app.models import PasswordResetToken
 import uuid
 from datetime import datetime, timedelta
@@ -41,10 +41,10 @@ from flask import current_app
 from app.extensions import mail, csrf
 from app.services.email.client import send_email
 from app.services.platform.app_settings_service import get_organization_name, is_organization_email, user_has_ai_beta_access
-from app.utils.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
-from app.utils.request_utils import clear_mobile_app_embed_cookie
-from app.utils.azure_b2c_config import is_azure_b2c_configured
-from app.utils.csp_nonce import get_style_nonce
+from app.utils.common.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
+from app.utils.http.request_utils import clear_mobile_app_embed_cookie
+from app.utils.auth.azure_b2c_config import is_azure_b2c_configured
+from app.utils.security.csp_nonce import get_style_nonce
 from app.services.organization.authorization_service import AuthorizationService
 
 bp = Blueprint("auth", __name__)
@@ -62,7 +62,7 @@ def _is_account_locked_out(email: str) -> bool:
     Backed by the shared failure counter (all workers, Redis or DB) and fail-closed:
     an unreadable counter denies the login.
     """
-    from app.utils.login_security import is_login_locked_out
+    from app.utils.auth.login_security import is_login_locked_out
     return is_login_locked_out(email)
 
 
@@ -220,7 +220,7 @@ def _get_dev_act_as_users() -> list[dict]:
 
 def _dev_preset_email(preset: str) -> str | None:
     """Return the expected test-account e-mail for a preset key, or None."""
-    from app.utils.organization_helpers import get_org_email_domain
+    from app.utils.organization.organization_helpers import get_org_email_domain
     domain = get_org_email_domain()
     return {
         'sys_manager': f'test_sys@{domain}',
@@ -648,9 +648,9 @@ def _mobile_oauth_redirect(user, session_id, code_challenge):
     """
     from urllib.parse import urlencode as _urlencode
 
-    from app.utils.auth_state import AuthStateUnavailable
-    from app.utils.mobile_jwt import issue_token_pair
-    from app.utils.mobile_oauth_code import create_oauth_code
+    from app.utils.auth.auth_state import AuthStateUnavailable
+    from app.utils.mobile.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_oauth_code import create_oauth_code
 
     session_id = session_id or session.get('session_id') or secrets.token_urlsafe(16)
 
@@ -736,7 +736,7 @@ def azure_login():
     is_mobile_oauth = request.args.get("mobile_return_scheme") == "humdatabank"
     app_code_challenge = None
     if is_mobile_oauth:
-        from app.utils.mobile_oauth_code import is_valid_code_challenge
+        from app.utils.mobile.mobile_oauth_code import is_valid_code_challenge
 
         candidate = (request.args.get("app_code_challenge") or "").strip()
         method = (request.args.get("app_code_challenge_method") or "S256").strip()
@@ -1072,7 +1072,7 @@ def azure_callback():
             request_transaction_rollback()
             # After a DB dump/restore, sequences can be behind so INSERT gets duplicate key.
             # Reset the user sequence so future signups work, then re-fetch by email and proceed.
-            from app.utils.sequence_utils import reset_user_sequence
+            from app.utils.database.sequence_utils import reset_user_sequence
             if reset_user_sequence():
                 current_app.logger.info("Reset user table sequence after duplicate key (e.g. post-dump).")
             dup_user = UserService.get_by_email(submitted_email)
@@ -1128,7 +1128,7 @@ def azure_callback():
     # silently drop cookies over ~4KB (common on mobile), which looks like
     # "Access denied. Please log in." on the next admin click.
     if id_token:
-        from app.utils.session_persistence import store_oauth_logout_hint
+        from app.utils.auth.session_persistence import store_oauth_logout_hint
         store_oauth_logout_hint(session_id, id_token)
 
     login_user(user)
@@ -1214,7 +1214,7 @@ def logout():
     # Grab the B2C id_token before wiping the session (needed for id_token_hint).
     # Prefer the server-side hint; fall back to a leftover cookie value from
     # sessions issued before the token was moved out of the Flask cookie.
-    from app.utils.session_persistence import pop_oauth_logout_hint
+    from app.utils.auth.session_persistence import pop_oauth_logout_hint
     b2c_id_token = pop_oauth_logout_hint(_sid) or session.get('b2c_id_token')
 
     # Blacklist the session server-side so a replayed cookie is rejected immediately
@@ -1719,7 +1719,7 @@ def account_settings():
 
     # Get user's registered devices (mobile push only)
     from app.models.system import UserDevice
-    from app.utils.notification_push import is_notifications_push_enabled
+    from app.utils.notifications.notification_push import is_notifications_push_enabled
 
     registered_devices = []
     if is_notifications_push_enabled():
@@ -1873,7 +1873,7 @@ def kickout_own_device(device_id):
     """Kick out (end session) for user's own device. Keeps device registered."""
     try:
         from app.models.system import UserDevice
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             PUSH_NOT_ENABLED_MESSAGE,
         )
@@ -1906,7 +1906,7 @@ def kickout_own_device(device_id):
         from werkzeug.exceptions import HTTPException
         if isinstance(e, HTTPException):
             raise
-        from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+        from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
         return handle_json_view_exception(
             e,
             GENERIC_ERROR_MESSAGE,
@@ -1920,7 +1920,7 @@ def remove_own_device(device_id):
     """Remove user's own device from the registry. Permanently deletes the device record."""
     try:
         from app.models.system import UserDevice
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             PUSH_NOT_ENABLED_MESSAGE,
         )

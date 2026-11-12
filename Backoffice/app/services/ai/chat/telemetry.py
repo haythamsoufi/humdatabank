@@ -1,5 +1,5 @@
 # ========== Chatbot Telemetry Service ==========
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 """
 Comprehensive telemetry tracking for chatbot LLM usage, costs, and performance.
 
@@ -346,7 +346,7 @@ class ChatbotTelemetryService:
             return 0.0
         try:
             from flask import current_app
-            from app.utils.ai_pricing import estimate_chat_cost
+            from app.utils.ai.ai_pricing import estimate_chat_cost
             model_name = model or current_app.config.get("OPENAI_MODEL", "gpt-5-mini")
             return estimate_chat_cost(model_name, input_tokens, output_tokens)
         except Exception:

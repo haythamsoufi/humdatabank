@@ -2,7 +2,7 @@
 
 from flask import Flask
 
-from app.utils.azure_b2c_config import is_azure_b2c_configured
+from app.utils.auth.azure_b2c_config import is_azure_b2c_configured
 
 
 def test_is_azure_b2c_configured_false_when_keys_missing():

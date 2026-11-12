@@ -16,7 +16,7 @@ from app.services.reports.data_service import ReportDataService
 from app.services.reports.definition_service import ReportDefinitionService
 from app.services.reports.export_service import ReportExportService
 from app.services.reports.schema import migrate_v1_to_v2
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 

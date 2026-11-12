@@ -17,7 +17,7 @@ from app.models.api_key_management import (
 )
 from app import db
 from app.services.security.api_key_permissions import DATA_READ, USERS_READ, build_permissions_document
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from tests.factories import create_test_user, create_test_api_key
 
 

@@ -19,7 +19,7 @@ from app.models import EmbedContent, FormData, FormItem, IndicatorBank, National
 from app.models.organization import NS_STATUS_INACTIVE
 from app.models.assignments import AssignmentEntityStatus
 from app.services.security.api_key_permissions import CONTENT_READ, build_permissions_document
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from plugins.fdrs.services import fdrs_public_adapter as adapter
 from plugins.fdrs.services.fdrs_society_import import entity_fields, upsert_societies
 from tests.factories import (

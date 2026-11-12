@@ -11,7 +11,7 @@ from flask import has_app_context
 
 from app.extensions import db
 from app.models.plugin_data import PluginData
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 

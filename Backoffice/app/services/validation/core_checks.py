@@ -16,7 +16,7 @@ from app.services.validation.history import (
     ytd_pct,
 )
 from app.services.validation.types import CheckResult
-from app.utils.data_quality_constants import RULE_PACK_CORE
+from app.utils.indicators.data_quality_constants import RULE_PACK_CORE
 
 # English text used when an admin has not saved a question template yet.
 CORE_QUESTION_DEFAULTS: dict[str, tuple[str, bool]] = {

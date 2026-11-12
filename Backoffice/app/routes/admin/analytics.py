@@ -1,6 +1,6 @@
-from app.utils.transactions import request_transaction_rollback
-from app.utils.datetime_helpers import utcnow, ensure_utc
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.common.datetime_helpers import utcnow, ensure_utc
+from app.utils.database.sql_utils import safe_ilike_pattern
 """
 Analytics Routes for Admin Dashboard
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 from flask_login import current_user
 from app import db
 from app.routes.admin.shared import admin_permission_required, permission_required
-from app.utils.request_utils import is_json_request, parse_bool_arg
+from app.utils.http.request_utils import is_json_request, parse_bool_arg
 from app.models import (
     UserLoginLog, UserActivityLog, UserSessionLog, AdminActionLog,
     SecurityEvent, User, Country
@@ -33,9 +33,9 @@ from app.services.platform.user_analytics_service import (
 )
 from app.services.platform.product_analytics_service import get_product_analytics
 from app.middleware.activity_middleware import track_admin_action
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.api_responses import json_ok, json_server_error
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.api.api_responses import json_ok, json_server_error
 from app.services.audit.details_service import (
     format_activity_log_details,
     format_admin_action_details,
@@ -1290,8 +1290,8 @@ def activity_endpoint_catalog():
     Description text uses ``catalog_display_description`` so wording tracks
     ``defaults.py`` without requiring a server restart after regenerating partials.
     """
-    from app.utils.activity_endpoint_catalog import ENDPOINT_ACTIVITY_SPECS
-    from app.utils.activity_endpoint_catalog.defaults import catalog_display_description
+    from app.utils.activity.activity_endpoint_catalog import ENDPOINT_ACTIVITY_SPECS
+    from app.utils.activity.activity_endpoint_catalog.defaults import catalog_display_description
 
     q = (request.args.get("q") or "").strip().lower()
 
@@ -1317,7 +1317,7 @@ def activity_endpoint_catalog():
 
     if request.args.get("export") == "csv":
         buf = io.StringIO()
-        from app.utils.export_safety import safe_csv_writer
+        from app.utils.files.export_safety import safe_csv_writer
 
         writer = safe_csv_writer(buf)
         writer.writerow(

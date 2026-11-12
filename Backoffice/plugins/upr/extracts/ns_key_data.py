@@ -19,7 +19,7 @@ from datetime import datetime
 from typing import Any, Iterable, Mapping
 
 from app.services.data_quality.helpers import parse_period_year
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.upr.dashboards.capacity_comparison import _number_from_fields, _prefer_value, _status_name
 from plugins.upr.dashboards.catalog import KPI_BANK_IDS, PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
 from plugins.upr.validation.validation_dashboard import round_for_assignment

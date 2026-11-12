@@ -323,7 +323,7 @@ class TestUserAnalytics:
 
     def test_partial_includes_activity_table(self, logged_in_client, db_session, app, admin_user):
         from app.models import UserActivityLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user_id = admin_user.id
@@ -612,7 +612,7 @@ class TestAuditTrail:
 
     def test_default_json_includes_entry_form_saves(self, logged_in_client, db_session, app, admin_user):
         from app.models import UserActivityLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             db_session.add(

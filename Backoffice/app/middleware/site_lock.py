@@ -19,7 +19,7 @@ from typing import Optional
 
 from flask import current_app, g, make_response, render_template, request
 
-from app.utils.request_utils import is_static_asset_request
+from app.utils.http.request_utils import is_static_asset_request
 
 _HEALTH_PATHS = frozenset({"/health"})
 _LOCK_EXEMPT_BLUEPRINTS = frozenset({"indicator_bank_compat"})

@@ -157,7 +157,7 @@ from app.models import (
 )
 from app.models.enums import AssignmentEntityStatusValue
 from app.services.ai.documents.vector_store import AIVectorStore
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 from app.services.ai.validation.parsers import (
     ValidationResult,

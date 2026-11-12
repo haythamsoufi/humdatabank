@@ -13,7 +13,7 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from app.utils.sql_utils import like_contains
+from app.utils.database.sql_utils import like_contains
 
 logger = logging.getLogger(__name__)
 

@@ -20,7 +20,7 @@ import json
 from typing import Any, Mapping
 
 from app.services.data_quality.helpers import parse_period_year
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.fdrs.data_quality.fdrs_v1_catalog import (
     FINANCE_TOTAL_EXPENDITURE,
     FINANCE_TOTAL_INCOME,
@@ -369,7 +369,7 @@ def load_service_income_analysis(
 ) -> dict[str, Any]:
     """Read FDRS template totals and the income-sources matrix, then summarize."""
     from app.models import AssignedForm, AssignmentEntityStatus, Country, FormData
-    from app.utils.country_utils import exclude_sandbox_countries
+    from app.utils.organization.country_utils import exclude_sandbox_countries
 
     by_code = _item_ids_for_codes(
         template_id,

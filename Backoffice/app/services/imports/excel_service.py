@@ -12,8 +12,8 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from app.services import get_formdata_map
 from app.services.forms.data_service import FormDataService
 from app.services.forms.variable_resolution_service import VariableResolutionService
-from app.utils.route_helpers import get_unified_form_item_id
-from app.utils.safe_workbook import UnsafeWorkbookError, load_workbook_safe
+from app.utils.http.route_helpers import get_unified_form_item_id
+from app.utils.files.safe_workbook import UnsafeWorkbookError, load_workbook_safe
 from app.models.forms import FormData
 from app.models.assignments import PublicSubmission
 from app import db
@@ -130,11 +130,11 @@ class ExcelService:
                 ws.row_dimensions[row].height = 20
 
         output = io.BytesIO()
-        from app.utils.export_safety import sanitize_workbook
+        from app.utils.files.export_safety import sanitize_workbook
         sanitize_workbook(workbook)
         workbook.save(output)
         output.seek(0)
-        from app.utils.api_serialization import _country_for_aes
+        from app.utils.api.api_serialization import _country_for_aes
         country = _country_for_aes(aes)
         iso3 = country.iso3 if country else "unknown"
         filename = f"data_entry_{iso3}_{aes.assigned_form.period_name.replace(' ', '_')}.xlsx"

@@ -16,7 +16,7 @@ from app.models.validation import ValidationDispatchBatch, ValidationQuestion
 from app.services.organization.entity_service import EntityService
 from app.services.notification.audience import get_assignment_editor_submitter_user_ids_for_entity
 from app.services.notification.core import create_notification
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 @dataclass

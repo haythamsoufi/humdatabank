@@ -1,15 +1,15 @@
 """Tests for per-endpoint activity catalog."""
 
-from app.utils.activity_endpoint_catalog import (
+from app.utils.activity.activity_endpoint_catalog import (
     ENDPOINT_ACTIVITY_SPECS,
     resolve_activity_catalog_spec,
 )
-from app.utils.activity_endpoint_catalog.defaults import (
+from app.utils.activity.activity_endpoint_catalog.defaults import (
     catalog_display_description,
     default_generated_description,
     describe_get_request_without_catalog,
 )
-from app.utils.activity_endpoint_catalog.spec import merge_activity_specs
+from app.utils.activity.activity_endpoint_catalog.spec import merge_activity_specs
 
 
 def test_catalog_keys_unique_after_merge():
@@ -77,7 +77,7 @@ def test_describe_get_api_vs_page():
 
 
 def test_merge_activity_specs_later_wins():
-    from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec
+    from app.utils.activity.activity_endpoint_catalog.spec import ActivityEndpointSpec
 
     a = {("POST", "x.y"): ActivityEndpointSpec(description="a")}
     b = {("POST", "x.y"): ActivityEndpointSpec(description="b")}

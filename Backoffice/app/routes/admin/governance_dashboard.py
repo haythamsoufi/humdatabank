@@ -21,9 +21,9 @@ from app.services.platform.governance_program import (
     validate_acceptance,
 )
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.api_responses import json_ok_result
-from app.utils.country_utils import get_countries_by_region_with_part_of
-from app.utils.request_utils import get_request_data
+from app.utils.api.api_responses import json_ok_result
+from app.utils.organization.country_utils import get_countries_by_region_with_part_of
+from app.utils.http.request_utils import get_request_data
 
 bp = Blueprint("governance_dashboard", __name__, url_prefix="/admin")
 

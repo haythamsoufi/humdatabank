@@ -29,7 +29,7 @@ from app.services.platform.version_deploy_migration_service import (
     VersionDeployMigrationError,
     VersionDeployMigrationService,
 )
-from app.utils.stable_key import generate_stable_key
+from app.utils.templates.stable_key import generate_stable_key
 from tests.factories import (
     create_test_assignment_entity_status,
     create_test_draft_version,

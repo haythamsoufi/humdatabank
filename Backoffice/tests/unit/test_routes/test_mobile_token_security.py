@@ -7,7 +7,7 @@ from unittest.mock import patch
 import jwt
 import pytest
 
-from app.utils.auth_state import AuthStateUnavailable
+from app.utils.auth.auth_state import AuthStateUnavailable
 from tests.factories import create_test_user
 
 pytestmark = [pytest.mark.unit, pytest.mark.auth_security]
@@ -43,7 +43,7 @@ def _refresh(client, refresh_token):
 
 def _claims(app, token):
     with app.app_context():
-        from app.utils.mobile_jwt import decode_mobile_token_ignoring_expiry
+        from app.utils.mobile.mobile_jwt import decode_mobile_token_ignoring_expiry
 
         return decode_mobile_token_ignoring_expiry(token)
 
@@ -102,7 +102,7 @@ class TestSigningSecrets:
 
 class TestAiTokenSecrets:
     def test_dedicated_ai_secret_signs_when_configured(self, app, monkeypatch):
-        from app.utils.ai_tokens import decode_ai_token, issue_ai_token
+        from app.utils.ai.ai_tokens import decode_ai_token, issue_ai_token
 
         monkeypatch.setitem(app.config, "AI_JWT_SECRET", "ai-secret-" + "q" * 40)
         with app.app_context():
@@ -114,7 +114,7 @@ class TestAiTokenSecrets:
             assert decode_ai_token(token).user_id == 5
 
     def test_falls_back_to_secret_key_with_deprecation_warning(self, app, monkeypatch, caplog):
-        from app.utils.ai_tokens import decode_ai_token, issue_ai_token
+        from app.utils.ai.ai_tokens import decode_ai_token, issue_ai_token
 
         monkeypatch.setitem(app.config, "AI_JWT_SECRET", None)
         app.extensions.pop("ai_jwt_fallback_warned", None)
@@ -124,7 +124,7 @@ class TestAiTokenSecrets:
         assert "AI_JWT_SECRET is not set" in caplog.text
 
     def test_tokens_signed_with_old_secret_key_still_valid_after_split(self, app, monkeypatch):
-        from app.utils.ai_tokens import decode_ai_token, issue_ai_token
+        from app.utils.ai.ai_tokens import decode_ai_token, issue_ai_token
 
         monkeypatch.setitem(app.config, "AI_JWT_SECRET", None)
         with app.app_context():
@@ -138,8 +138,8 @@ class TestAiTokenSecrets:
             decode_ai_token(old_token)
 
     def test_mobile_token_is_not_an_ai_token(self, app, monkeypatch):
-        from app.utils.ai_tokens import decode_ai_token
-        from app.utils.mobile_jwt import issue_access_token
+        from app.utils.ai.ai_tokens import decode_ai_token
+        from app.utils.mobile.mobile_jwt import issue_access_token
 
         monkeypatch.setitem(app.config, "AI_JWT_SECRET", "ai-secret-" + "q" * 40)
         with app.app_context():
@@ -201,7 +201,7 @@ class TestRefreshRotation:
         assert _refresh(client, second["refresh_token"]).status_code == 401
 
     def test_concurrent_presentation_lets_exactly_one_through(self, app, client, mobile_user):
-        from app.utils.mobile_jwt import consume_refresh_token
+        from app.utils.mobile.mobile_jwt import consume_refresh_token
 
         first = _tokens(client, mobile_user)
         claims = _claims(app, first["refresh_token"])
@@ -211,14 +211,14 @@ class TestRefreshRotation:
 
     def test_store_outage_fails_closed_with_503_not_a_free_refresh(self, client, mobile_user):
         first = _tokens(client, mobile_user)
-        with patch("app.utils.auth_state.DbAuthStateBackend.add_once", side_effect=AuthStateUnavailable("down")):
+        with patch("app.utils.auth.auth_state.DbAuthStateBackend.add_once", side_effect=AuthStateUnavailable("down")):
             resp = _refresh(client, first["refresh_token"])
         assert resp.status_code == 503
         assert resp.get_json()["error_code"] == "SERVICE_UNAVAILABLE"
 
     def test_store_outage_on_revocation_lookup_fails_closed(self, client, mobile_user):
         first = _tokens(client, mobile_user)
-        with patch("app.utils.auth_state.DbAuthStateBackend.exists", side_effect=AuthStateUnavailable("down")):
+        with patch("app.utils.auth.auth_state.DbAuthStateBackend.exists", side_effect=AuthStateUnavailable("down")):
             resp = _refresh(client, first["refresh_token"])
         assert resp.status_code in (401, 503)
 
@@ -308,7 +308,7 @@ class TestOAuthCodeExchange:
         return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
 
     def _code(self, app, mobile_user, sid=None, verifier=None):
-        from app.utils.mobile_oauth_code import create_oauth_code
+        from app.utils.mobile.mobile_oauth_code import create_oauth_code
 
         with app.app_context():
             return create_oauth_code(mobile_user["id"], sid or str(uuid.uuid4()), self._challenge(verifier or self.VERIFIER))
@@ -367,7 +367,7 @@ class TestOAuthCodeExchange:
         assert client.post(EXCHANGE_URL, json={"code": code, "code_verifier": self.VERIFIER}).status_code == 401
 
     def test_code_for_revoked_session_is_rejected(self, app, client, mobile_user):
-        from app.utils.mobile_jwt import revoke_session_id
+        from app.utils.mobile.mobile_jwt import revoke_session_id
 
         sid = str(uuid.uuid4())
         code = self._code(app, mobile_user, sid=sid)
@@ -377,7 +377,7 @@ class TestOAuthCodeExchange:
 
     def test_store_outage_returns_503(self, app, client, mobile_user):
         code = self._code(app, mobile_user)
-        with patch("app.utils.auth_state.DbAuthStateBackend.pop", side_effect=AuthStateUnavailable("down")):
+        with patch("app.utils.auth.auth_state.DbAuthStateBackend.pop", side_effect=AuthStateUnavailable("down")):
             resp = client.post(EXCHANGE_URL, json={"code": code, "code_verifier": self.VERIFIER})
         assert resp.status_code == 503
 
@@ -422,18 +422,18 @@ class TestMobileLoginAbuseControls:
         assert unknown.get_json() == wrong.get_json()
 
     def test_unknown_email_still_pays_for_a_password_hash(self, client):
-        with patch("app.utils.login_security.burn_password_check") as burn:
+        with patch("app.utils.auth.login_security.burn_password_check") as burn:
             _login(client, "nobody-here@example.com", "Whatever123!")
         burn.assert_called_once_with("Whatever123!")
 
     def test_known_email_does_not_use_the_dummy_hash(self, client, mobile_user):
-        with patch("app.utils.login_security.burn_password_check") as burn:
+        with patch("app.utils.auth.login_security.burn_password_check") as burn:
             _login(client, mobile_user["email"], "Whatever123!")
         burn.assert_not_called()
 
     def test_failures_are_counted_in_the_shared_store_even_though_the_response_is_401(self, app, client, mobile_user):
-        from app.utils.auth_state import NS_LOGIN_FAILURES, get_auth_state
-        from app.utils.login_security import _email_key
+        from app.utils.auth.auth_state import NS_LOGIN_FAILURES, get_auth_state
+        from app.utils.auth.login_security import _email_key
 
         for _ in range(3):
             assert _login(client, mobile_user["email"], "Wrong123!").status_code == 401
@@ -441,7 +441,7 @@ class TestMobileLoginAbuseControls:
             assert get_auth_state().get_counter(NS_LOGIN_FAILURES, _email_key(mobile_user["email"])) == 3
 
     def test_lockout_engages_after_threshold_and_survives_rollbacks(self, app, client, mobile_user):
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
 
         with app.app_context():
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
@@ -451,7 +451,7 @@ class TestMobileLoginAbuseControls:
         assert resp.get_json()["error_code"] == "ACCOUNT_LOCKED"
 
     def test_lockout_applies_even_with_the_correct_password(self, app, client, mobile_user):
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
 
         with app.app_context():
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
@@ -459,7 +459,7 @@ class TestMobileLoginAbuseControls:
         assert _login(client, mobile_user["email"], PASSWORD).status_code == 429
 
     def test_lockout_covers_unknown_emails_uniformly(self, app, client):
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
 
         with app.app_context():
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
@@ -467,8 +467,8 @@ class TestMobileLoginAbuseControls:
         assert _login(client, "ghost@example.com", "x").status_code == 429
 
     def test_successful_login_clears_the_counter(self, app, client, mobile_user):
-        from app.utils.auth_state import NS_LOGIN_FAILURES, get_auth_state
-        from app.utils.login_security import _email_key
+        from app.utils.auth.auth_state import NS_LOGIN_FAILURES, get_auth_state
+        from app.utils.auth.login_security import _email_key
 
         _login(client, mobile_user["email"], "Wrong123!")
         assert _login(client, mobile_user["email"]).status_code == 200
@@ -476,7 +476,7 @@ class TestMobileLoginAbuseControls:
             assert get_auth_state().get_counter(NS_LOGIN_FAILURES, _email_key(mobile_user["email"])) == 0
 
     def test_lockout_check_fails_closed_when_store_is_down(self, client, mobile_user):
-        with patch("app.utils.auth_state.DbAuthStateBackend.get_counter", side_effect=AuthStateUnavailable("down")):
+        with patch("app.utils.auth.auth_state.DbAuthStateBackend.get_counter", side_effect=AuthStateUnavailable("down")):
             assert _login(client, mobile_user["email"]).status_code == 429
 
     def test_failed_attempt_audit_row_is_persisted_despite_the_401(self, app, client, mobile_user):
@@ -494,7 +494,7 @@ class TestMobileLoginAbuseControls:
     def test_counter_key_does_not_contain_the_email(self, app, mobile_user):
         from app import db
         from app.models.auth_state import AuthStateEntry
-        from app.utils.login_security import record_login_failure
+        from app.utils.auth.login_security import record_login_failure
 
         with app.app_context():
             record_login_failure(mobile_user["email"])
@@ -530,7 +530,7 @@ class TestBearerScopingAndSessionBinding:
         assert resp.get_json()["data"]["user"]["id"] == mobile_user["id"]
 
     def test_legacy_prefix_escape_hatch_is_opt_in(self, app, client, mobile_user, monkeypatch):
-        from app.utils.mobile_auth import bearer_jwt_allowed_for_path
+        from app.utils.mobile.mobile_auth import bearer_jwt_allowed_for_path
 
         with app.test_request_context("/"):
             assert bearer_jwt_allowed_for_path("/api/mobile/v1/x") is True
@@ -539,7 +539,7 @@ class TestBearerScopingAndSessionBinding:
             assert bearer_jwt_allowed_for_path("/api/v1/data") is True
 
     def test_ai_token_endpoint_accepts_mobile_bearer_without_session_cookie(self, app, client, mobile_user):
-        from app.utils.ai_tokens import decode_ai_token
+        from app.utils.ai.ai_tokens import decode_ai_token
 
         tokens = _tokens(client, mobile_user)
         client.delete_cookie("session")
@@ -554,7 +554,7 @@ class TestBearerScopingAndSessionBinding:
         assert client.get("/api/ai/v2/token").status_code == 401
 
     def test_bearer_exact_path_allowance_does_not_widen_other_ai_routes(self, app):
-        from app.utils.mobile_auth import bearer_jwt_allowed_for_path
+        from app.utils.mobile.mobile_auth import bearer_jwt_allowed_for_path
 
         with app.test_request_context("/"):
             assert bearer_jwt_allowed_for_path("/api/ai/v2/token") is True
@@ -577,7 +577,7 @@ class TestBearerScopingAndSessionBinding:
             assert sess.get("last_activity")
 
     def test_bridge_cookie_stops_working_once_the_session_is_revoked(self, app, client, mobile_user):
-        from app.utils.mobile_jwt import revoke_session_id
+        from app.utils.mobile.mobile_jwt import revoke_session_id
 
         tokens = _tokens(client, mobile_user)
         sid = _claims(app, tokens["access_token"]).sid
@@ -591,7 +591,7 @@ class TestBearerScopingAndSessionBinding:
         tokens = _tokens(client, mobile_user)
         client.get(SESSION_URL, headers={"Authorization": f"Bearer {tokens['access_token']}"})
         stale = (app.config["SESSION_INACTIVITY_TIMEOUT"] + timedelta(minutes=5))
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with client.session_transaction() as sess:
             sess["last_activity"] = (utcnow() - stale).isoformat()

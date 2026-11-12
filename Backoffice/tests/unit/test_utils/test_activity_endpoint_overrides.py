@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/utils/activity_endpoint_overrides.py.
+Comprehensive tests for app/utils/activity/activity_endpoint_overrides.py.
 
 Pushes coverage from ~70 % → 100 % by exercising all branches of every function.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.utils.activity_endpoint_overrides import (
+from app.utils.activity.activity_endpoint_overrides import (
     ACTIVITY_TYPE_DESCRIPTIONS,
     DELETE_ENDPOINT_SEGMENT_TO_ACTIVITY_TYPE,
     LEGACY_PERFORMED_TITLE_TO_ACTIVITY_TYPE,
@@ -149,7 +149,7 @@ class TestResolvePostActivityType:
 
         fake_full = {"settings.manage_settings": "settings_updated"}
         with patch(
-            "app.utils.activity_endpoint_overrides.POST_FULL_ENDPOINT_TO_ACTIVITY_TYPE",
+            "app.utils.activity.activity_endpoint_overrides.POST_FULL_ENDPOINT_TO_ACTIVITY_TYPE",
             fake_full,
         ):
             result = resolve_post_activity_type("settings.manage_settings")

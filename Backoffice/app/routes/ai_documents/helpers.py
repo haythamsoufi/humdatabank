@@ -21,8 +21,8 @@ from app.models import Country
 from app.services.ai.documents.processor import DocumentProcessingError
 from app.services.ai.documents.embedding import EmbeddingError
 from app.services.ai.documents.vector_store import AIVectorStore
-from app.utils.ai_utils import openai_model_supports_sampling_params
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.ai.ai_utils import openai_model_supports_sampling_params
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
 from app.services.platform import storage_service as _storage
 from plugins.upr.ai.query_detection import query_prefers_upr_documents as _query_prefers_upr_documents
 
@@ -78,7 +78,7 @@ def apply_ai_document_library_filters(query, filters: Dict[str, str]):
     Mirrors knowledge_base() / list_documents() filter semantics.
     """
     from app.models import AIDocument
-    from app.utils.sql_utils import safe_ilike_pattern
+    from app.utils.database.sql_utils import safe_ilike_pattern
 
     status = (filters or {}).get("status") or ""
     file_type = (filters or {}).get("file_type") or ""
@@ -206,11 +206,11 @@ def _validate_ifrc_fetch_url(url: str) -> tuple[bool, str]:
     SSRF protection for IFRC document import: allow only https URLs to allowlisted hosts.
     Host allowlist is configured via IFRC_DOCUMENT_ALLOWED_HOSTS.
 
-    Delegates to the shared policy in ``app.utils.outbound_url``; kept under this name for callers.
+    Delegates to the shared policy in ``app.utils.http.outbound_url``; kept under this name for callers.
     """
     from urllib.parse import urlparse
 
-    from app.utils.outbound_url import validate_outbound_url
+    from app.utils.http.outbound_url import validate_outbound_url
 
     host = (urlparse((url or "").strip()).hostname or "").strip()
     if host:

@@ -1,9 +1,9 @@
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from contextlib import suppress
 import uuid
 # Backoffice/app/routes/api/users.py
-from app.utils.datetime_helpers import utcnow, ensure_utc, utc_sort_key
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.common.datetime_helpers import utcnow, ensure_utc, utc_sort_key
+from app.utils.database.sql_utils import safe_ilike_pattern
 """
 User and Dashboard API endpoints.
 Part of the /api/v1 blueprint.
@@ -27,20 +27,20 @@ from app.models.enums import EntityType
 from app.models.documents import SubmittedDocument
 from app.services.assignments.access_service import apply_assignment_access
 from app.services.assignments.completion_service import AssignmentCompletionService
-from app.utils.auth import require_api_key
+from app.utils.auth.auth import require_api_key
 from app.services.security.api_authentication import redact_request_params
 from app.services.security.api_key_permissions import USERS_READ
-from app.utils.rate_limiting import api_rate_limit
-from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
-from app.utils.form_localization import get_localized_template_name
-from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
+from app.utils.security.rate_limiting import api_rate_limit
+from app.utils.organization.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
+from app.utils.forms.form_localization import get_localized_template_name
+from app.utils.common.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.services.organization.entity_service import EntityService
-from app.utils.api_helpers import json_response, api_error, PAST_ASSIGNMENT_DAYS, get_json_safe
-from app.utils.dashboard_focal_points import (
+from app.utils.api.api_helpers import json_response, api_error, PAST_ASSIGNMENT_DAYS, get_json_safe
+from app.utils.organization.dashboard_focal_points import (
     get_fds_members_for_country,
     get_focal_points_for_country,
 )
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.http.request_validation import enforce_csrf_json
 from app.routes.main.helpers import (
     DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES,
     dashboard_assignment_entity_filter,
@@ -73,7 +73,7 @@ def get_users():
         current_app.logger.debug("Entering users API endpoint")
 
         # Get filter parameters
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=20, max_per_page=500)
         search_query = request.args.get('search', default='', type=str).strip()
 
@@ -358,7 +358,7 @@ def update_current_user_profile():
             return api_error('User not found', 404)
 
         # Get request data
-        from app.utils.api_responses import require_json_content_type, require_json_data
+        from app.utils.api.api_responses import require_json_content_type, require_json_data
         err = require_json_content_type()
         if err:
             return err

@@ -1,4 +1,4 @@
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from flask import render_template, request, flash, redirect, url_for, current_app
 from flask_login import current_user
 from app import db
@@ -6,14 +6,14 @@ from sqlalchemy import or_
 from app.models import IndicatorBank, Sector, SubSector
 from app.forms.system import SectorForm, SubSectorForm
 from app.routes.admin.shared import permission_required, rbac_guard_audit_exempt
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import (
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import (
     json_ok,
     json_server_error,
 )
-from app.utils.request_utils import is_json_request
+from app.utils.http.request_utils import is_json_request
 from sqlalchemy.orm.attributes import flag_modified
-from app.utils.sector_logo_urls import sector_logo_url
+from app.utils.branding.sector_logo_urls import sector_logo_url
 from app.services.platform import storage_service as storage
 from app.routes.admin.system_admin import bp
 from app.routes.admin.system_admin.helpers import (

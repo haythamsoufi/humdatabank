@@ -670,7 +670,7 @@ class WorkflowDocsService:
         from app.services.ai.documents.embedding import AIEmbeddingService
         from app.services.ai.documents.vector_store import AIVectorStore
         from app.services.ai.documents.chunking import AIChunkingService
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         self._ensure_loaded()
 

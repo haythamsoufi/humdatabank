@@ -10,7 +10,7 @@ from app.services.validation.dashboard_service import (
     global_periods_for_template,
     list_countries_for_period,
 )
-from app.utils.api_responses import json_bad_request, json_ok
+from app.utils.api.api_responses import json_bad_request, json_ok
 
 
 def periods_api():

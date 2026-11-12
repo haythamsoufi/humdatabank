@@ -324,7 +324,7 @@ def upsert_assignment_status_from_plan(
     if dry_run:
         aes_rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
     else:
-        from app.utils.form_authorization import lock_aes_rows_for_update
+        from app.utils.forms.form_authorization import lock_aes_rows_for_update
 
         aes_rows = lock_aes_rows_for_update(aes_ids)
     aes_by_id = {int(row.id): row for row in aes_rows}

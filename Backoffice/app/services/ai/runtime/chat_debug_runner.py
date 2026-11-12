@@ -220,7 +220,7 @@ class ChatDebugRunner:
         """Create the AIConversation row so reasoning traces can FK to it."""
         from app.models.ai_chat import AIConversation
         from app.extensions import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         existing = AIConversation.query.filter_by(
             id=self.conversation_id, user_id=self.user_id
@@ -241,7 +241,7 @@ class ChatDebugRunner:
         db.session.commit()
 
     def _platform_context(self) -> Dict[str, Any]:
-        from app.utils.ai_request_user import AIRequestIdentity
+        from app.utils.ai.ai_request_user import AIRequestIdentity
         from app.services.organization.authorization_service import AuthorizationService
         from app.routes.ai import _build_access_context, _build_platform_context
 

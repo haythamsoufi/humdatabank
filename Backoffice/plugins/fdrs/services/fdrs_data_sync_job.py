@@ -26,7 +26,7 @@ from app.services.ai.ai_job_runner import (
     signal_job_cancel,
     start_ai_job_thread,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.services.imports.import_change_log import (
     ImportChangeLogWriter,
     attach_import_change_log_to_activity,

@@ -1,5 +1,5 @@
 /**
- * Per-row matrix formulas. Keep this in step with app/utils/matrix_calculation.py.
+ * Per-row matrix formulas. Keep this in step with app/utils/forms/matrix_calculation.py.
  *
  * Presets compile to one formula. Blank number cells stay blank. Tick cells are
  * 0 or 1. SUM, AVERAGE, MIN, MAX, and COUNT skip blanks. Arithmetic treats

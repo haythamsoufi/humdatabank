@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 from app.models import Country, AssignedForm, FormTemplateVersion
 from app.models.assignments import AssignmentEntityStatus
 from app.extensions import db
-from app.utils.datetime_helpers import ensure_utc, utc_sort_key, utcnow
+from app.utils.common.datetime_helpers import ensure_utc, utc_sort_key, utcnow
 
 from .shared import (
     user_allowed_country_ids,

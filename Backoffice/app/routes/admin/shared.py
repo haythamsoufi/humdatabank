@@ -8,11 +8,11 @@ from flask import current_app, flash, redirect, url_for, session, request
 from flask_login import current_user, login_user
 from functools import wraps
 from app.models import User
-from app.utils.client_ip import get_client_ip, is_loopback_request
-from app.utils.datetime_helpers import utcnow
-from app.utils.redirect_utils import get_current_relative_url
-from app.utils.api_responses import json_auth_required, json_error, json_forbidden
-from app.utils.request_utils import is_json_request
+from app.utils.security.client_ip import get_client_ip, is_loopback_request
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.http.redirect_utils import get_current_relative_url
+from app.utils.api.api_responses import json_auth_required, json_error, json_forbidden
+from app.utils.http.request_utils import is_json_request
 from app.services.organization.authorization_service import AuthorizationService
 
 VALIDATION_DASHBOARD_PERMISSION = "admin.validation.dashboard"
@@ -25,7 +25,7 @@ VALIDATION_DISPATCH_PERMISSIONS = (
 
 
 def _is_json_request():
-    """Alias for is_json_request; prefer importing from app.utils.request_utils."""
+    """Alias for is_json_request; prefer importing from app.utils.http.request_utils."""
     return is_json_request()
 
 
@@ -56,7 +56,7 @@ def _apply_rbac_metadata(decorated_fn, source_fn, **overrides):
 def debug_skip_login_enabled():
     """Whether the dev-only auto-login shortcut is active for this app.
 
-    Mirrors the startup rule in ``app.utils.security_startup.validate_security_settings``
+    Mirrors the startup rule in ``app.utils.security.security_startup.validate_security_settings``
     (development config with DEBUG on); anything else falls back to normal login.
     """
     cfg = current_app.config
@@ -329,7 +329,7 @@ def check_template_access(template_id, user_id):
 
 
 # Re-export from form_localization for backward compatibility
-from app.utils.form_localization import (
+from app.utils.forms.form_localization import (
     get_localized_sector_name,
     get_localized_subsector_name,
 )

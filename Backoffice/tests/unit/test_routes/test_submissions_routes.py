@@ -130,7 +130,7 @@ class TestGetSubmissionDetails:
         assert resp.status_code == 401
 
     def test_submission_not_found(self, client, app):
-        with patch("app.utils.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
+        with patch("app.utils.auth.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
              patch("app.routes.api.submissions.AssignmentEntityStatus.query") as mock_aes_q, \
              patch("app.routes.api.submissions.PublicSubmission.query") as mock_pub_q:
             mock_aes_q.get.return_value = None
@@ -163,7 +163,7 @@ class TestGetSubmissionDetails:
         # submitted_documents must be iterable
         mock_aes.submitted_documents = []
 
-        with patch("app.utils.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
+        with patch("app.utils.auth.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
              patch("app.routes.api.submissions.AssignmentEntityStatus.query") as mock_aes_q, \
              patch("app.routes.api.submissions.PublicSubmission.query") as mock_pub_q, \
              patch("app.routes.api.submissions.format_form_data_response", return_value=[]), \
@@ -200,7 +200,7 @@ class TestGetSubmissionDetails:
         mock_aes.data_entries = data_entries_mock
         mock_aes.submitted_documents = []
 
-        with patch("app.utils.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
+        with patch("app.utils.auth.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
              patch("app.routes.api.submissions.AssignmentEntityStatus.query") as mock_aes_q, \
              patch("app.routes.api.submissions.PublicSubmission.query") as mock_pub_q, \
              patch("app.routes.api.submissions.format_form_data_response", return_value=[]), \
@@ -215,7 +215,7 @@ class TestGetSubmissionDetails:
     def test_exception_returns_500(self, client, app):
         """Route has no try/except; exception from query propagates with TESTING=True."""
         import pytest
-        with patch("app.utils.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
+        with patch("app.utils.auth.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
              patch("app.routes.api.submissions.AssignmentEntityStatus.query") as mock_q:
             mock_q.get.side_effect = RuntimeError("boom")
             with pytest.raises(Exception):

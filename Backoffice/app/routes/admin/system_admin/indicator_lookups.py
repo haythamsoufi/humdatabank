@@ -9,10 +9,10 @@ from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
 from app import db
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_responses import json_bad_request, json_ok, require_json_data
-from app.utils.request_utils import is_json_request
-from app.utils.sector_logo_urls import spef_icon_url
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_responses import json_bad_request, json_ok, require_json_data
+from app.utils.http.request_utils import is_json_request
+from app.utils.branding.sector_logo_urls import spef_icon_url
 from app.forms.system.indicator_lookup_forms import IndicatorBankTypeForm, IndicatorBankUnitForm
 from app.forms.system.indicator_spef_forms import IndicatorBankSpefForm
 from app.models import FormItem, IndicatorBank, IndicatorBankSpef, IndicatorBankType, IndicatorBankUnit
@@ -24,7 +24,7 @@ from app.routes.admin.system_admin.helpers import (
     _save_logo_file,
 )
 from app.services.platform import storage_service as storage
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from config import Config
 
 SPEF_ICON_SUBDIR = "spef"

@@ -157,7 +157,7 @@ class VariableResolutionService:
             catalog_end = cls._read_assignment_attr(reporting_period, 'period_end')
             if catalog_end is not None:
                 return catalog_end.year
-        from app.utils.reporting_period_label_parser import _extract_years
+        from app.utils.indicators.reporting_period_label_parser import _extract_years
 
         years = _extract_years(cls._read_assignment_attr(assigned_form, 'period_name'))
         return max(years) if years else None
@@ -216,7 +216,7 @@ class VariableResolutionService:
         """Infer assignment year from a period label when no AssignedForm row is available (preview)."""
         if not period_name or not str(period_name).strip():
             return None
-        from app.utils.reporting_period_label_parser import _extract_years
+        from app.utils.indicators.reporting_period_label_parser import _extract_years
 
         years = _extract_years(str(period_name))
         return str(max(years)) if years else None
@@ -524,7 +524,7 @@ class VariableResolutionService:
         )
         if column is None:
             return False, None
-        from app.utils.matrix_calculation import evaluate_matrix_row, stored_calculation_value
+        from app.utils.forms.matrix_calculation import evaluate_matrix_row, stored_calculation_value
 
         stored = stored_calculation_value(column, disagg_data, row_entity_id)
         if stored is not None:
@@ -574,7 +574,7 @@ class VariableResolutionService:
                 except (ValueError, TypeError):
                     pass
         if columns:
-            from app.utils.matrix_calculation import column_counts_toward_row_total, evaluate_matrix_row
+            from app.utils.forms.matrix_calculation import column_counts_toward_row_total, evaluate_matrix_row
 
             total = 0.0
             inputs = {}
@@ -1429,7 +1429,7 @@ class VariableResolutionService:
             elif metadata_type == 'national_society_name':
                 # Return National Society name for the country associated with the assigned entity
                 from app.services.organization.entity_service import EntityService
-                from app.utils.form_localization import get_localized_national_society_name
+                from app.utils.forms.form_localization import get_localized_national_society_name
                 country = EntityService.get_country_for_entity(
                     assignment_entity_status.entity_type,
                     assignment_entity_status.entity_id

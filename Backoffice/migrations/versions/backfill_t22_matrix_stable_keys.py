@@ -14,12 +14,12 @@ import json
 from alembic import op
 import sqlalchemy as sa
 
-from app.utils.stable_key import (
+from app.utils.templates.stable_key import (
     T22_FUNDING_MATRIX_STABLE_KEY,
     T22_STAFF_MATRIX_COLUMN,
     T22_STAFF_MATRIX_STABLE_KEY,
 )
-from app.utils.stable_key_backfill import fill_null_stable_keys
+from app.utils.templates.stable_key_backfill import fill_null_stable_keys
 
 
 revision = "backfill_t22_matrix_keys"

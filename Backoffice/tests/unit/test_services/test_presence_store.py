@@ -23,7 +23,7 @@ def _reset_globals():
 
 
 def _utc_now():
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
     return utcnow()
 
 

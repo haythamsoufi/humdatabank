@@ -44,7 +44,7 @@ def _datetimeformat_filter(value: Any) -> str:
         return ""
     if isinstance(value, datetime):
         try:
-            from app.utils.datetime_helpers import ensure_utc
+            from app.utils.common.datetime_helpers import ensure_utc
 
             dt = ensure_utc(value)
             return dt.strftime("%Y-%m-%d %H:%M:%S UTC") if dt else ""

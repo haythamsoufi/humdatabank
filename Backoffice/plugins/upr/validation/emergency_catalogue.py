@@ -256,7 +256,7 @@ _PEOPLE_COLUMN = "Total People to be reached"
 
 def people_reached_amounts(cells: dict[str, Any], column: str = _PEOPLE_COLUMN) -> dict[str, float]:
     """People-to-be-reached total saved on each emergency row."""
-    from app.utils.api_serialization import _resolve_matrix_cell
+    from app.utils.api.api_serialization import _resolve_matrix_cell
 
     suffix = f"_{column}"
     totals: dict[str, float] = {}
@@ -585,7 +585,7 @@ def _ea_header_codes(cells: dict[str, Any], columns: list[str]) -> dict[str, str
 
 
 def _sum_column(cells: dict[str, Any], column: str) -> float | None:
-    from app.utils.api_serialization import _resolve_matrix_cell
+    from app.utils.api.api_serialization import _resolve_matrix_cell
 
     suffix = f"_{column}"
     total = 0.0

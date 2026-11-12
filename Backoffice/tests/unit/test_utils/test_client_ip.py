@@ -1,11 +1,11 @@
-"""Canonical client-IP resolution (app/utils/client_ip.py) and its ProxyFix wiring."""
+"""Canonical client-IP resolution (app/utils/security/client_ip.py) and its ProxyFix wiring."""
 from unittest.mock import patch
 
 import pytest
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from app.utils.client_ip import (
+from app.utils.security.client_ip import (
     UNKNOWN_CLIENT_IP,
     get_client_ip,
     is_loopback_ip,
@@ -146,7 +146,7 @@ class TestSingleSourceOfTruth:
         assert user_analytics_service.get_client_ip is get_client_ip
 
     def test_rate_limiting_uses_canonical_function(self):
-        from app.utils import rate_limiting
+        from app.utils.security import rate_limiting
 
         assert rate_limiting.get_client_ip is get_client_ip
 

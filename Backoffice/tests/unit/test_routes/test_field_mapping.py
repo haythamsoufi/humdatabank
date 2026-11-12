@@ -13,7 +13,7 @@ from app.routes.admin.form_builder.helpers.field_mapping import (
     link_draft_item,
     unlink_draft_item,
 )
-from app.utils.stable_key import generate_stable_key
+from app.utils.templates.stable_key import generate_stable_key
 from tests.factories import (
     create_test_draft_version,
     create_test_item,

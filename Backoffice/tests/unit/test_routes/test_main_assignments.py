@@ -480,7 +480,7 @@ class TestRecordCountryAccessRequestAudit:
         from app.models.system import CountryAccessRequestStatus
         from app.routes.main.assignments import _record_country_access_request_audit
         from app.services.audit.details_service import format_activity_log_details
-        from app.utils.audit_context import apply_audit_details_to_context, reset_request_audit_context
+        from app.utils.audit.audit_context import apply_audit_details_to_context, reset_request_audit_context
 
         pending = MagicMock(status=CountryAccessRequestStatus.PENDING)
         with app.test_request_context("/request_country_access", method="POST"):

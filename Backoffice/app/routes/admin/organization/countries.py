@@ -30,7 +30,7 @@ from app.services.organization.country_service import (
 from app.services.organization.secretariat_regional_office_service import (
     assign_country_secretariat_regional_office,
 )
-from app.utils.country_utils import (
+from app.utils.organization.country_utils import (
     collect_part_of_category_definitions,
     collect_part_of_category_names,
 )
@@ -42,12 +42,12 @@ from app.routes.admin.shared import (
     user_has_country_permission,
     country_has_dependents,
 )
-from app.utils.request_utils import is_json_request
-from app.utils.entity_groups import get_enabled_entity_groups
-from app.utils.transactions import no_auto_transaction, request_transaction_rollback
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_formatting import choices_from_query
-from app.utils.api_responses import (
+from app.utils.http.request_utils import is_json_request
+from app.utils.organization.entity_groups import get_enabled_entity_groups
+from app.utils.database.transactions import no_auto_transaction, request_transaction_rollback
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_formatting import choices_from_query
+from app.utils.api.api_responses import (
     json_bad_request,
     json_error,
     json_ok,
@@ -56,7 +56,7 @@ from app.utils.api_responses import (
     require_json_data,
     require_json_keys,
 )
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.common.error_handling import handle_json_view_exception
 from config.config import Config
 from app.forms.organization import (
     CountryForm,

@@ -22,14 +22,14 @@ def register_template_context(app, config_class):
     from config.config import Config
 
     from app.filters import register_jinja_filters
-    from app.utils.filters import register_filters
+    from app.utils.common.filters import register_filters
 
     app.jinja_env.filters['zip'] = zip
     register_jinja_filters(app)
     register_filters(app)
 
     try:
-        from app.utils.form_localization import (
+        from app.utils.forms.form_localization import (
             get_indicator_bank_type_display,
             get_indicator_bank_unit_display,
             get_localized_validation_message,
@@ -58,7 +58,7 @@ def register_template_context(app, config_class):
     except Exception as e:
         app.logger.error(f"Failed to expose user_has_permission to Jinja: {e}")
     try:
-        from app.utils.form_authorization import (
+        from app.utils.forms.form_authorization import (
             assignment_is_round_closed_for_entity,
             assignment_readonly_notice_reason,
         )
@@ -113,7 +113,7 @@ def register_template_context(app, config_class):
 
     app.jinja_env.globals["inject_js_translations"] = inject_js_translations
 
-    from app.utils.matrix_calculation import (
+    from app.utils.forms.matrix_calculation import (
         matrix_counts_toward_row_total,
         matrix_formula_column_sum,
         matrix_formula_display,
@@ -125,7 +125,7 @@ def register_template_context(app, config_class):
     app.jinja_env.globals['matrix_formula_display'] = matrix_formula_display
     app.jinja_env.globals['matrix_formula_number'] = matrix_formula_number
 
-    from app.utils.matrix_row_order import sort_matrix_display_rows
+    from app.utils.forms.matrix_row_order import sort_matrix_display_rows
 
     app.jinja_env.globals['sort_matrix_display_rows'] = sort_matrix_display_rows
 
@@ -160,7 +160,7 @@ def register_template_context(app, config_class):
     def inject_ui_style_preview():
         """Dev-only IFRC/Legacy style switcher (loopback + DEBUG)."""
         try:
-            from app.utils.ui_style_preview import show_ui_style_preview
+            from app.utils.branding.ui_style_preview import show_ui_style_preview
 
             return {"show_ui_style_preview": show_ui_style_preview()}
         except Exception as e:
@@ -173,7 +173,7 @@ def register_template_context(app, config_class):
         if not has_request_context():
             return {"mobile_app_embedded": False}
         try:
-            from app.utils.request_utils import mobile_app_webview_embed_active
+            from app.utils.http.request_utils import mobile_app_webview_embed_active
 
             return {"mobile_app_embedded": bool(mobile_app_webview_embed_active())}
         except Exception as e:
@@ -184,7 +184,7 @@ def register_template_context(app, config_class):
     def inject_azure_b2c_configured():
         """True when Azure AD B2C OIDC is fully configured (identity owned by IdP)."""
         try:
-            from app.utils.azure_b2c_config import is_azure_b2c_configured
+            from app.utils.auth.azure_b2c_config import is_azure_b2c_configured
 
             return {"azure_b2c_configured": bool(is_azure_b2c_configured())}
         except Exception as e:
@@ -217,7 +217,7 @@ def register_template_context(app, config_class):
             return {}
 
     try:
-        from app.utils.language_flags import language_flag_emoji, language_flag_twemoji_svg_url
+        from app.utils.i18n.language_flags import language_flag_emoji, language_flag_twemoji_svg_url
         app.jinja_env.globals['language_flag_emoji'] = language_flag_emoji
         app.jinja_env.globals['language_flag_twemoji_svg_url'] = language_flag_twemoji_svg_url
     except Exception as e:
@@ -226,7 +226,7 @@ def register_template_context(app, config_class):
         app.jinja_env.globals['language_flag_twemoji_svg_url'] = lambda _code=None: None
 
     try:
-        from app.utils.language_names import language_endonym as _real_endonym, language_display_name
+        from app.utils.i18n.language_names import language_endonym as _real_endonym, language_display_name
         app.jinja_env.globals['language_endonym'] = language_display_name
         app.jinja_env.globals['language_native_name'] = _real_endonym
     except Exception as e:
@@ -260,7 +260,7 @@ def register_template_context(app, config_class):
     @app.context_processor
     def inject_org_branding():
         try:
-            from app.utils.organization_helpers import get_org_name, get_org_short_name, get_org_email_domain, get_org_domain, get_org_team_email
+            from app.utils.organization.organization_helpers import get_org_name, get_org_short_name, get_org_email_domain, get_org_domain, get_org_team_email
             from app.services.platform.app_settings_service import (
                 get_organization_branding,
                 get_organization_logo_path,
@@ -464,8 +464,8 @@ def register_template_context(app, config_class):
         when the server did not register the routes.
         """
         try:
-            from app.utils.ws_helpers import is_notifications_websocket_enabled
-            from app.utils.notification_push import is_notifications_push_enabled
+            from app.utils.realtime.ws_helpers import is_notifications_websocket_enabled
+            from app.utils.notifications.notification_push import is_notifications_push_enabled
             return {
                 'notify_websocket_enabled': is_notifications_websocket_enabled(),
                 'chat_websocket_enabled': bool(current_app.config.get('WEBSOCKET_ENABLED', False)),
@@ -506,7 +506,7 @@ def register_template_context(app, config_class):
         return f"{base_url}?v={asset_version}"
     app.jinja_env.globals['static_url'] = static_url
 
-    from app.utils.sector_logo_urls import ns_logo_url, sector_logo_url, spef_icon_url
+    from app.utils.branding.sector_logo_urls import ns_logo_url, sector_logo_url, spef_icon_url
     app.jinja_env.globals['sector_logo_url'] = sector_logo_url
     app.jinja_env.globals['spef_icon_url'] = spef_icon_url
     app.jinja_env.globals['ns_logo_url'] = ns_logo_url
@@ -548,13 +548,13 @@ def register_template_context(app, config_class):
     from app.services.organization.entity_service import EntityService
     app.jinja_env.globals['EntityService'] = EntityService
 
-    from app.utils.csp_nonce import get_csp_nonce, get_style_nonce
+    from app.utils.security.csp_nonce import get_csp_nonce, get_style_nonce
     app.jinja_env.globals['csp_nonce'] = get_csp_nonce
     app.jinja_env.globals['csp_style_nonce'] = get_style_nonce
 
     # Date formatting filters
     from flask_babel import format_date, format_datetime
-    from app.utils.datetime_helpers import ensure_utc
+    from app.utils.common.datetime_helpers import ensure_utc
 
     @app.template_filter('datetime_iso')
     def datetime_iso_filter(dt):

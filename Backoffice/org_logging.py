@@ -6,7 +6,7 @@ formatting without importing ``app/__init__`` (Flask, SQLAlchemy, config) —
 the master never serves requests and should stay light.
 
 Application code continues to import these helpers via
-``app.utils.datetime_helpers`` / ``app.utils.logging_handlers``, which
+``app.utils.common.datetime_helpers`` / ``app.utils.monitoring.logging_handlers``, which
 re-export them from here.
 """
 

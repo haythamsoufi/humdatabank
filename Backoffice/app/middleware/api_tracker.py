@@ -2,9 +2,9 @@ import time
 from functools import wraps
 from flask import request, g, current_app
 from app.models.api_usage import APIUsage
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_usage_logging_skip import should_skip_api_usage_path
-from app.utils.logging_security import redact_payload_for_storage
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_usage_logging_skip import should_skip_api_usage_path
+from app.utils.security.logging_security import redact_payload_for_storage
 from app import db
 
 

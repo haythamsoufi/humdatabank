@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/utils/activity_endpoint_catalog/defaults.py.
+Comprehensive tests for app/utils/activity/activity_endpoint_catalog/defaults.py.
 
 Targets every branch to bring coverage from ~51 % → 100 %.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.utils.activity_endpoint_catalog.defaults import (
+from app.utils.activity.activity_endpoint_catalog.defaults import (
     _describe_post_inner,
     _humanize_snake_tail,
     _strip_outer_wrappers,
@@ -540,7 +540,7 @@ class TestCatalogDisplayDescription:
 
     def test_wildcard_manual_override(self):
         """If ('*', endpoint) exists in MANUAL_ACTIVITY_OVERRIDES, return that description."""
-        from app.utils.activity_endpoint_catalog.manual_overrides import MANUAL_ACTIVITY_OVERRIDES
+        from app.utils.activity.activity_endpoint_catalog.manual_overrides import MANUAL_ACTIVITY_OVERRIDES
 
         # Find any wildcard entry to test against
         wildcard_entries = [(m, ep) for (m, ep) in MANUAL_ACTIVITY_OVERRIDES if m == "*"]
@@ -556,7 +556,7 @@ class TestCatalogDisplayDescription:
             fake_spec = ActivityEndpointSpec(description="Wildcard Description")
             fake_overrides = {("*", "fake.wildcard_endpoint"): fake_spec}
             with patch(
-                "app.utils.activity_endpoint_catalog.defaults.MANUAL_ACTIVITY_OVERRIDES",
+                "app.utils.activity.activity_endpoint_catalog.defaults.MANUAL_ACTIVITY_OVERRIDES",
                 fake_overrides,
             ):
                 result = catalog_display_description("PUT", "fake.wildcard_endpoint")

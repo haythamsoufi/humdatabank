@@ -882,8 +882,8 @@ def load_everyone_counts(
     """
     from app.models import AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, IndicatorBank
     from app.services.data_quality.helpers import parse_period_year
-    from app.utils.country_utils import exclude_sandbox_countries
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.organization.country_utils import exclude_sandbox_countries
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     if template_id is None:
         template_id = FDRS_TEMPLATE_ID
@@ -982,7 +982,7 @@ def load_leader_sex(template_id: int) -> list[dict[str, Any]]:
     """
     from app.models import AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem
     from app.services.data_quality.helpers import parse_period_year
-    from app.utils.country_utils import exclude_sandbox_countries
+    from app.utils.organization.country_utils import exclude_sandbox_countries
 
     role_by_id = dict(_LEADER_SEX_ITEMS)
     items = FormItem.query.filter(

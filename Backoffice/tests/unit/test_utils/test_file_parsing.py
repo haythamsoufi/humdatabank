@@ -1,11 +1,11 @@
-"""Tests for app/utils/file_parsing.py – targets 100 % coverage."""
+"""Tests for app/utils/files/file_parsing.py – targets 100 % coverage."""
 import io
 import codecs
 import pytest
 from unittest.mock import MagicMock, patch
 from werkzeug.datastructures import FileStorage
 
-from app.utils.file_parsing import (
+from app.utils.files.file_parsing import (
     CSV_EXCEL_EXTENSIONS,
     EXCEL_EXTENSIONS,
     _decode_csv_content,

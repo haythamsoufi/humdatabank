@@ -35,19 +35,19 @@ from app.services.organization.entity_service import EntityService
 from app.forms.content import ResourceForm
 from app.forms.shared import DeleteForm
 from app.routes.admin.shared import permission_required, permission_required_any, rbac_guard_audit_exempt
-from app.utils.request_utils import is_json_request
-from app.utils.redirect_utils import safe_redirect
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_server_error
-from app.utils.file_paths import (
+from app.utils.http.request_utils import is_json_request
+from app.utils.http.redirect_utils import safe_redirect
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_not_found, json_ok, json_server_error
+from app.utils.files.file_paths import (
     get_resource_upload_path,
 )
 from app.services.platform import storage_service as storage
-from app.utils.error_handling import handle_json_view_exception, handle_view_exception
-from app.utils.advanced_validation import AdvancedValidator
-from app.utils.datetime_helpers import utcnow
-from app.utils.sql_utils import safe_ilike_pattern
-from app.utils.transactions import request_transaction_rollback
+from app.utils.common.error_handling import handle_json_view_exception, handle_view_exception
+from app.utils.forms.advanced_validation import AdvancedValidator
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.database.sql_utils import safe_ilike_pattern
+from app.utils.database.transactions import request_transaction_rollback
 from app.services.ai.documents.ingest import (
     maybe_enqueue_submitted_document_ai_processing_after_approval,
 )
@@ -230,7 +230,7 @@ def _serialize_document_row(doc_row: tuple) -> dict:
 
 
 def _language_display_name(language_code: str | None) -> str:
-    from app.utils.language_labels import language_display_name
+    from app.utils.i18n.language_labels import language_display_name
 
     return language_display_name(language_code)
 
@@ -951,7 +951,7 @@ def manage_resources():
 
     # JSON stays paginated for the mobile app. The HTML page loads the full list into AG Grid.
     if is_json_request():
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=10, max_per_page=100)
         if search_query:
             query = query.filter(Resource.default_title.ilike(safe_ilike_pattern(search_query)))
@@ -1532,7 +1532,7 @@ def manage_documents():
     show_country_column = True
 
     if is_json_request():
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
 
         page, per_page = validate_pagination_params(
             request.args, default_per_page=50, max_per_page=200
@@ -1689,7 +1689,7 @@ def delete_document(doc_id):
         flash(msg, "warning")
         return redirect(url_for("main.dashboard"))
 
-    from app.utils.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
+    from app.utils.documents.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
 
     if not user_may_delete_or_replace_submitted_document_file(current_user, document):
         flash(
@@ -1945,7 +1945,7 @@ def edit_document(doc_id):
     is_admin_with_perm = AuthorizationService.has_rbac_permission(current_user, 'admin.documents.manage')
     is_system_manager = AuthorizationService.is_system_manager(current_user)
 
-    from app.utils.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
+    from app.utils.documents.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
 
     if request.method == "POST" and not user_may_delete_or_replace_submitted_document_file(
         current_user, document

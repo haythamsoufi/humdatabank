@@ -923,7 +923,7 @@ class TestHumanizeAuditDetailsDict:
 
     def test_drops_curated_description_marker(self):
         """The marker steers description display; it is not a reviewer-facing field."""
-        from app.utils.audit_context import CURATED_DESCRIPTION_KEY
+        from app.utils.audit.audit_context import CURATED_DESCRIPTION_KEY
 
         result = humanize_audit_details_dict(
             {

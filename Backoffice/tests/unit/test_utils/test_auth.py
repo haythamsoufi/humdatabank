@@ -1,5 +1,5 @@
 """
-Unit tests for app.utils.auth (API key and session decorators).
+Unit tests for app.utils.auth.auth (API key and session decorators).
 """
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
@@ -10,8 +10,8 @@ from flask_login import login_user
 
 from app.services.security.api_authentication import _extract_api_credential
 from app.services.security.api_key_permissions import REFERENCE_READ
-from app.utils.api_helpers import api_error
-from app.utils.auth import (
+from app.utils.api.api_helpers import api_error
+from app.utils.auth.auth import (
     require_api_key,
     require_api_key_or_session,
 )
@@ -66,7 +66,7 @@ class TestRequireApiKey:
             return {'ok': True}
 
         with app.test_request_context('/api/test'):
-            with patch('app.utils.auth.authenticate_db_api_key_only', return_value=True):
+            with patch('app.utils.auth.auth.authenticate_db_api_key_only', return_value=True):
                 result = protected()
             assert result == {'ok': True}
 
@@ -76,7 +76,7 @@ class TestRequireApiKey:
             return 'done'
 
         with app.test_request_context('/api/test'):
-            with patch('app.utils.auth.authenticate_db_api_key_only', return_value=True):
+            with patch('app.utils.auth.auth.authenticate_db_api_key_only', return_value=True):
                 protected()
             assert g.skip_auth is True
 
@@ -89,7 +89,7 @@ class TestRequireApiKey:
 
         with app.test_request_context('/api/test'):
             with patch(
-                'app.utils.auth.authenticate_db_api_key_only',
+                'app.utils.auth.auth.authenticate_db_api_key_only',
                 return_value=error_response,
             ):
                 result = protected()
@@ -117,7 +117,7 @@ class TestRequireApiKey:
 
         app.config['LOG_API_KEY_USAGE'] = True
         with app.test_request_context('/api/test', environ_base={'REMOTE_ADDR': '10.0.0.1'}):
-            with patch('app.utils.auth.authenticate_db_api_key_only', return_value=True):
+            with patch('app.utils.auth.auth.authenticate_db_api_key_only', return_value=True):
                 with patch.object(app.logger, 'info') as mock_info:
                     protected()
             mock_info.assert_called_once()
@@ -132,7 +132,7 @@ class TestRequireApiKey:
 
         app.config['LOG_API_KEY_USAGE'] = False
         with app.test_request_context('/api/test'):
-            with patch('app.utils.auth.authenticate_db_api_key_only', return_value=True):
+            with patch('app.utils.auth.auth.authenticate_db_api_key_only', return_value=True):
                 with patch.object(app.logger, 'info') as mock_info:
                     protected()
             mock_info.assert_not_called()
@@ -173,7 +173,7 @@ class TestRequireApiKeyOrSession:
 
         with app.test_request_context('/api/test'):
             login_user(test_user)
-            with patch('app.utils.auth.authenticate_db_api_key_only') as mock_auth:
+            with patch('app.utils.auth.auth.authenticate_db_api_key_only') as mock_auth:
                 result = protected()
             mock_auth.assert_not_called()
         assert result == {'via': 'session'}
@@ -188,9 +188,9 @@ class TestRequireApiKeyOrSession:
             return {'via': 'api_key'}
 
         with app.test_request_context('/api/test'):
-            with patch('app.utils.auth.current_user', mock_user):
+            with patch('app.utils.auth.auth.current_user', mock_user):
                 with patch(
-                    'app.utils.auth.authenticate_db_api_key_only',
+                    'app.utils.auth.auth.authenticate_db_api_key_only',
                     return_value=True,
                 ) as mock_auth:
                     result = protected()
@@ -204,9 +204,9 @@ class TestRequireApiKeyOrSession:
             return {'via': 'api_key'}
 
         with app.test_request_context('/api/test'):
-            with patch('app.utils.auth.current_user', None):
+            with patch('app.utils.auth.auth.current_user', None):
                 with patch(
-                    'app.utils.auth.authenticate_db_api_key_only',
+                    'app.utils.auth.auth.authenticate_db_api_key_only',
                     return_value=True,
                 ) as mock_auth:
                     result = protected()
@@ -223,9 +223,9 @@ class TestRequireApiKeyOrSession:
             pytest.fail('view must not run when auth fails')
 
         with app.test_request_context('/api/test'):
-            with patch('app.utils.auth.current_user', mock_user):
+            with patch('app.utils.auth.auth.current_user', mock_user):
                 with patch(
-                    'app.utils.auth.authenticate_db_api_key_only',
+                    'app.utils.auth.auth.authenticate_db_api_key_only',
                     return_value=error_response,
                 ):
                     result = protected()
@@ -282,9 +282,9 @@ class TestRequireApiKeyOrSession:
             '/api/test?round=MYR26',
             headers={'Accept': 'text/html,application/xhtml+xml'},
         ):
-            with patch('app.utils.auth.current_user', mock_user):
+            with patch('app.utils.auth.auth.current_user', mock_user):
                 with patch(
-                    'app.utils.auth.authenticate_db_api_key_only'
+                    'app.utils.auth.auth.authenticate_db_api_key_only'
                 ) as mock_auth:
                     result = protected()
 
@@ -307,9 +307,9 @@ class TestRequireApiKeyOrSession:
             '/api/test',
             headers={'Accept': 'application/json'},
         ):
-            with patch('app.utils.auth.current_user', mock_user):
+            with patch('app.utils.auth.auth.current_user', mock_user):
                 with patch(
-                    'app.utils.auth.authenticate_db_api_key_only',
+                    'app.utils.auth.auth.authenticate_db_api_key_only',
                     return_value=error_response,
                 ) as mock_auth:
                     result = protected()
@@ -333,9 +333,9 @@ class TestRequireApiKeyOrSession:
                 'Authorization': 'Bearer invalid',
             },
         ):
-            with patch('app.utils.auth.current_user', mock_user):
+            with patch('app.utils.auth.auth.current_user', mock_user):
                 with patch(
-                    'app.utils.auth.authenticate_db_api_key_only',
+                    'app.utils.auth.auth.authenticate_db_api_key_only',
                     return_value=error_response,
                 ) as mock_auth:
                     result = protected()
@@ -356,9 +356,9 @@ class TestRequireApiKeyOrSession:
             '/api/v1/upr/data?api_key=query-key',
             headers={'Accept': 'text/html'},
         ):
-            with patch('app.utils.auth.current_user', mock_user):
+            with patch('app.utils.auth.auth.current_user', mock_user):
                 with patch(
-                    'app.utils.auth.authenticate_db_api_key_only',
+                    'app.utils.auth.auth.authenticate_db_api_key_only',
                     return_value=True,
                 ) as mock_auth:
                     result = protected()

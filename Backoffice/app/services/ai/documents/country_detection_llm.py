@@ -151,7 +151,7 @@ def classify_geography_with_llm(
         from flask import current_app
         from openai import OpenAI
 
-        from app.utils.ai_utils import openai_model_supports_sampling_params
+        from app.utils.ai.ai_utils import openai_model_supports_sampling_params
 
         api_key = current_app.config.get("OPENAI_API_KEY")
         if not api_key:

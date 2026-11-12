@@ -10,22 +10,22 @@ import uuid
 
         # Import the API blueprint from parent
 from app.routes.api import api_bp
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 # Import models
 from app.models import (
     FormPage, FormSection, FormItem, FormTemplateVersion, LookupList, LookupListRow
 )
-from app.utils.auth import api_capability, require_api_key
+from app.utils.auth.auth import api_capability, require_api_key
 from app.services.security.api_key_permissions import REFERENCE_READ, TEMPLATES_READ
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.security.rate_limiting import api_rate_limit
 from app import db
 from sqlalchemy import func as _sa_func
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error
+from app.utils.api.api_helpers import json_response, api_error
 from app.services import TemplateService
-from app.utils.api_serialization import format_form_item_info
+from app.utils.api.api_serialization import format_form_item_info
 from app.services.security.api_authentication import (
     api_key_max_per_page,
     api_key_template_filter,
@@ -34,8 +34,8 @@ from app.services.security.api_authentication import (
     get_user_allowed_template_ids,
     redact_request_params,
 )
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.form_localization import get_localized_indicator_name
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.forms.form_localization import get_localized_indicator_name
 
 
 @api_bp.route('/templates', methods=['GET'])

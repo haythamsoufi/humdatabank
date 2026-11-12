@@ -7,7 +7,7 @@ from sqlalchemy import and_
 
 from app import db
 from app.models import Notification
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 def generate_notification_hash(user_id, notification_type, related_object_id, title, message=None):
     """

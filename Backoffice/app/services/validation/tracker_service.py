@@ -390,7 +390,7 @@ def _compute_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
             doc_lookup.add((doc.assignment_entity_status_id, doc_key))
 
     if reverse_item_key:
-        from app.utils.assignment_document_carryover import repository_satisfied_field_ids_by_assignment
+        from app.utils.documents.assignment_document_carryover import repository_satisfied_field_ids_by_assignment
 
         for aes_id, field_ids in repository_satisfied_field_ids_by_assignment(
             list(aes_by_country.values())

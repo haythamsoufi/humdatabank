@@ -9,8 +9,8 @@ from threading import Lock
 
 from flask import current_app, make_response, request
 
-from app.utils.constants import APPEALS_TYPE_DEFAULT_IDS_STR, APPEALS_TYPE_DISPLAY_NAMES
-from app.utils.mobile_responses import mobile_bad_request, mobile_ok, mobile_server_error
+from app.utils.common.constants import APPEALS_TYPE_DEFAULT_IDS_STR, APPEALS_TYPE_DISPLAY_NAMES
+from app.utils.mobile.mobile_responses import mobile_bad_request, mobile_ok, mobile_server_error
 
 _UNIFIED_PLANNING_THUMB_JPEG: "OrderedDict[str, bytes]" = OrderedDict()
 _UNIFIED_PLANNING_THUMB_LOCK = Lock()
@@ -58,7 +58,7 @@ def _thumbnail_request_url(max_url_len: int, max_b64_len: int) -> tuple[str | No
     """Read the PDF address from GET ``url_b64`` / ``url`` or the POST JSON body."""
     from urllib.parse import unquote
 
-    from app.utils.api_helpers import get_json_safe
+    from app.utils.api.api_helpers import get_json_safe
 
     raw = ""
     if request.method == "POST":

@@ -6,10 +6,10 @@ import time
 from flask import current_app, g, request, session as flask_session
 from flask_login import current_user
 
-from app.utils.api_helpers import get_json_safe
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import mobile_ok, mobile_bad_request
-from app.utils.rate_limiting import mobile_rate_limit
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import mobile_ok, mobile_bad_request
+from app.utils.security.rate_limiting import mobile_rate_limit
 from app.routes.api.mobile import mobile_bp
 
 # Per-process dedup cache: key -> (screen_name, route_path, timestamp).
@@ -94,7 +94,7 @@ def screen_view():
     _recent_screen_views[cache_key] = (screen_name, route_key, now)
 
     try:
-        from app.utils.page_view_paths import mobile_page_view_path_key
+        from app.utils.activity.page_view_paths import mobile_page_view_path_key
 
         path_key = mobile_page_view_path_key(screen_name, route_path=route_path)
         increment_session_page_views_without_activity_log_deferred(

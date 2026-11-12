@@ -323,7 +323,7 @@ def _seed_dev_dashboard_samples(app_instance, test_country, org_email_domain: st
 
     from app.models import AssignedForm, AssignmentEntityStatus, Country, User
     from app.models.enums import AssignmentEntityStatusValue
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     country_id = None
     if test_country is not None:
@@ -596,7 +596,7 @@ def create_default_data(app_instance):
 
             _ensure_rbac_seeded(app_instance)
 
-            from app.utils.organization_helpers import get_org_email_domain
+            from app.utils.organization.organization_helpers import get_org_email_domain
 
             org_email_domain = get_org_email_domain()
             test_admin_email = f"test_admin@{org_email_domain}"

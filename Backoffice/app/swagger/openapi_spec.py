@@ -14,7 +14,7 @@ def get_openapi_spec():
     try:
         from flask import has_app_context
         if has_app_context():
-            from app.utils.organization_helpers import get_org_name as _get_org_name
+            from app.utils.organization.organization_helpers import get_org_name as _get_org_name
             org_name = _get_org_name()
     except Exception:
         pass

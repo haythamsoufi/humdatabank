@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.extensions import db
-from app.utils.sql_utils import ilike_equals
+from app.utils.database.sql_utils import ilike_equals
 
 # Canonical IFRC statutory regions (SecretariatRegionalOffice rows).
 IFRC_REGION_SEED: List[dict] = [

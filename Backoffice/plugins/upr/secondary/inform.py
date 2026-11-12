@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import re
 import time
@@ -11,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urljoin
 from urllib.request import Request, urlopen
 
-from openpyxl import load_workbook
+from app.utils.files.safe_workbook import load_workbook_safe
 
 from plugins.upr.analysis.flow import inform_class
 from plugins.upr.secondary import paths
@@ -199,7 +198,7 @@ def _norm_risk_class(value: Any) -> str | None:
 
 
 def _sheet_rows(raw: bytes, sheet_predicate) -> list[tuple[Any, ...]]:
-    wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+    wb = load_workbook_safe(raw, read_only=True, data_only=True)
     chosen = None
     for name in wb.sheetnames:
         if sheet_predicate(name):

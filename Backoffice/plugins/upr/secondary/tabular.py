@@ -62,11 +62,9 @@ def rows_from_upload(filename: str, data: bytes | BinaryIO) -> list[dict[str, An
     if name.endswith(".csv") or name.endswith(".txt"):
         return rows_from_csv(raw_bytes.decode("utf-8-sig"))
     if name.endswith(".xlsx") or name.endswith(".xls"):
-        try:
-            from openpyxl import load_workbook
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("openpyxl is required for Excel uploads") from exc
-        wb = load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
+        from app.utils.files.safe_workbook import load_workbook_safe
+
+        wb = load_workbook_safe(raw_bytes, read_only=True, data_only=True)
         ws = wb.active
         matrix = list(ws.iter_rows(values_only=True))
         if not matrix:

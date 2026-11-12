@@ -210,6 +210,8 @@ _TRUSTED_WORKBOOK_READERS = {
     "plugins/ifrc/pb_progress/visuals/scripts/pb_figures/data.py",
     "plugins/ifrc/pb_progress/visuals/scripts/pb_figures/translations.py",
     "plugins/ifrc/pb_progress/visuals/scripts/patch_footnote_placeholders.py",
+    # Operator script: downloads published Everyone Counts workbooks, not a request upload.
+    "plugins/fdrs/scripts/build_ecr_snapshots.py",
 }
 
 

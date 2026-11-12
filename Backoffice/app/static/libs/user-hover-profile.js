@@ -5,9 +5,11 @@
  *
  * When UserHoverProfileConfig.canLinkUserDetails is true (users with admin.users.edit),
  * .ag-user-hover-name and .profile-icon inside triggers are auto-linked to user details.
- * Security (PRAUDIT Finding #1, fixed Apr 2026): prefers data-user-external-id and
- * external_ids= on GET /api/users/profile-summary; server rejects arbitrary user_ids
- * for non-privileged callers. See Backoffice/docs/security/pentest-praudit-20260430-response.md §1.
+ * Security (PRAUDIT Finding #1, fixed Apr 2026): non-privileged callers cannot
+ * pass arbitrary user_ids. Dashboard markup sends data-user-id plus a
+ * data-profile-token signed for that viewer. external_ids= remains for grids
+ * that already hold User.external_id in their row payload.
+ * See Backoffice/docs/security/pentest-praudit-20260430-response.md §1.
  */
 (function() {
     'use strict';
@@ -164,13 +166,17 @@
         return null;
     }
 
-    function fetchProfileSummary(userId, email, externalId) {
+    function fetchProfileSummary(userId, email, externalId, profileToken) {
         var queryParts = [];
         externalId = (externalId || '').trim();
-        if (externalId) {
+        profileToken = (profileToken || '').trim();
+        var hasUserId = userId !== null && userId !== undefined && userId !== '';
+        if (profileToken && hasUserId) {
+            queryParts.push('user_ids=' + encodeURIComponent(String(userId)));
+            queryParts.push('profile_token=' + encodeURIComponent(profileToken));
+        } else if (externalId) {
             queryParts.push('external_ids=' + encodeURIComponent(externalId));
-        }
-        if (userId !== null && userId !== undefined && userId !== '' && !externalId) {
+        } else if (hasUserId) {
             queryParts.push('user_ids=' + encodeURIComponent(String(userId)));
         }
         if (email) {
@@ -659,6 +665,7 @@
         var userId = inlineProfile.id !== undefined ? inlineProfile.id : trigger.getAttribute('data-user-id');
         var email = inlineProfile.email || trigger.getAttribute('data-user-email') || '';
         var externalId = (inlineProfile.external_id || trigger.getAttribute('data-user-external-id') || '').trim();
+        var profileToken = (trigger.getAttribute('data-profile-token') || '').trim();
         var cached = readCachedProfile(userId, email, externalId);
         var effectiveProfile = cached || inlineProfile;
 
@@ -676,9 +683,9 @@
             popup.style.display = 'block';
         }
 
-        var needsFetch = !cached && (externalId || (userId !== null && userId !== undefined && userId !== '') || email);
+        var needsFetch = !cached && (profileToken || externalId || (userId !== null && userId !== undefined && userId !== '') || email);
         if (needsFetch) {
-            fetchProfileSummary(userId, email, externalId).then(function(fetched) {
+            fetchProfileSummary(userId, email, externalId, profileToken).then(function(fetched) {
                 if (activeTrigger !== trigger) return;
                 var profileToRender = fetched ? normalizeProfile(fetched, email) : effectiveProfile;
                 renderProfile(profileToRender);

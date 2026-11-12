@@ -102,6 +102,12 @@ _RE_PASSWORD_ASSIGN = re.compile(
     r"(?i)(?<![a-z0-9])(?:password|passwd|passphrase|pwd)(?![a-z0-9])[\"']?[ \t]*[:=][ \t]*"
     r"(?:\"(?P<dq>[^\"\n]+)\"|'(?P<sq>[^'\n]+)'|(?P<bare>[^\s\"',;](?:[^\n\"',;]*[^\s\"',;])?))"
 )
+# "my password is <secret>" — one token after "is". A digit or symbol is required so
+# ordinary sentences ("my password is too weak to share", "password is required") stay.
+_RE_PASSWORD_IS = re.compile(
+    r"(?i)(?<![a-z0-9])(?:password|passwd|passphrase|pwd)(?![a-z0-9])\s+is\s+"
+    r"(?P<value>[A-Za-z0-9_!@#$%^&*+=/-]{4,})"
+)
 _RE_SECRET_ASSIGN = re.compile(
     r"(?i)(?<![a-z0-9])(?:api[_-]?key|secret(?:[_-]?key)?|client[_-]?secret|private[_-]?key"
     r"|access[_-]?key|account[_-]?key|(?:auth|access)[_-]?token|shared[_-]?access[_-]?(?:key|signature))"
@@ -222,6 +228,13 @@ def _mask_password_assignment(m: "re.Match[str]") -> Optional[str]:
     return _mask_group(m, group, "[REDACTED_PASSWORD]")
 
 
+def _mask_password_is(m: "re.Match[str]") -> Optional[str]:
+    value = m.group("value")
+    if not _is_literal_value(value) or not any(c.isdigit() or c in "_+/=-.@!#$%^&*" for c in value):
+        return None
+    return _mask_group(m, "value", "[REDACTED_PASSWORD]")
+
+
 def _mask_secret_assignment(m: "re.Match[str]") -> Optional[str]:
     value = m.group("value")
     # Real key material has a digit or symbol; this leaves prose such as
@@ -266,6 +279,7 @@ _DETECTORS: Tuple[Tuple[str, "re.Pattern[str]", _Masker], ...] = (
     ("password", _RE_BASIC_AUTH, _fixed("Basic [REDACTED_PASSWORD]")),
     ("api_key_or_secret", _RE_PROVIDER_TOKEN, _fixed("[REDACTED_API_KEY]")),
     ("password", _RE_PASSWORD_ASSIGN, _mask_password_assignment),
+    ("password", _RE_PASSWORD_IS, _mask_password_is),
     ("api_key_or_secret", _RE_SECRET_ASSIGN, _mask_secret_assignment),
     ("email", _RE_EMAIL, _fixed("[REDACTED_EMAIL]")),
     ("iban", _RE_IBAN_CANDIDATE, _mask_iban),

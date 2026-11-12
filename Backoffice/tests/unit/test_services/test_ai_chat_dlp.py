@@ -103,6 +103,7 @@ NOT_SENSITIVE = [
     pytest.param("Reference number: 1234 5678 9012 3456", id="luhn-invalid-16-digits"),
     pytest.param("The secret to success is volunteers", id="prose-secret"),
     pytest.param("my password is too weak to share", id="prose-password"),
+    pytest.param("password is required to sign in", id="prose-password-required"),
     pytest.param("secret: volunteers", id="secret-label-prose-value"),
     pytest.param("Set password: <your password>", id="placeholder-angle-brackets"),
     pytest.param("api_key=${OPENAI_API_KEY}", id="placeholder-env-var"),
@@ -232,6 +233,9 @@ class TestCredentialFormats:
         """A paste cut off before its END marker is key material all the way down."""
         text = "here:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\nb3BlbnNzaC1rZXktdjEAAAAA"
         assert mask_sensitive_text(text) == "here:\n[REDACTED_PRIVATE_KEY]"
+
+    def test_password_stated_in_a_sentence_is_masked(self):
+        assert mask_sensitive_text("my password is qweqwe2123") == "my password is [REDACTED_PASSWORD]"
 
     def test_whole_passphrase_is_masked_not_just_its_first_word(self):
         assert mask_sensitive_text("passphrase: correct horse battery staple") == "passphrase: [REDACTED_PASSWORD]"
@@ -704,7 +708,7 @@ class TestScreenAiMessage:
             form_builder_assistant=False,
             user_id=None,
             transport="http",
-            endpoint_path="/api/ai/v2/chat",
+            endpoint_path="/api/ai/v1/chat",
             client="backoffice",
             conversation_id="conv-123",
             client_message_id="client-msg-1",
@@ -763,7 +767,7 @@ class TestLogDlpAuditEvent:
                 user_id=None,
                 action="allowed",
                 transport="http",
-                endpoint_path="/api/ai/v2/chat",
+                endpoint_path="/api/ai/v1/chat",
                 client="backoffice",
                 conversation_id=None,
                 client_message_id=None,
@@ -782,7 +786,7 @@ class TestLogDlpAuditEvent:
                 user_id=None,
                 action="blocked",
                 transport="http",
-                endpoint_path="/api/ai/v2/chat",
+                endpoint_path="/api/ai/v1/chat",
                 client="backoffice",
                 conversation_id="conv-123",
                 client_message_id="client-msg-1",
@@ -805,7 +809,7 @@ class TestLogDlpAuditEvent:
                 user_id=None,
                 action="blocked",
                 transport="http",
-                endpoint_path="/api/ai/v2/chat",
+                endpoint_path="/api/ai/v1/chat",
                 client="backoffice",
                 conversation_id=None,
                 client_message_id=None,

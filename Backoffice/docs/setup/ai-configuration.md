@@ -15,8 +15,8 @@ The Backoffice includes an AI chat and RAG (document QA) stack. This page focuse
 
 ## Health check
 
-- `GET /api/ai/v2/health` — returns config checks and `agent_available`.
-- `GET /api/ai/v2/health?probe=embedding` — also runs a minimal embedding call (slower).
+- `GET /api/ai/v1/health` — returns config checks and `agent_available`.
+- `GET /api/ai/v1/health?probe=embedding` — also runs a minimal embedding call (slower).
 
 ## AI-related migrations
 

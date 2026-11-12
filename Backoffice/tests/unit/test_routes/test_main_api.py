@@ -115,6 +115,31 @@ class TestApiUsersProfileSummary:
         data = resp.get_json()
         assert data["profiles"] == []
 
+    def test_non_privileged_can_see_shared_scope_user_with_profile_token(self, client, db_session, app):
+        """A page-issued token allows lookup by integer id; a missing token does not."""
+        from app.utils.profile_hover_token import profile_hover_token
+
+        country = create_test_country(db_session)
+        user_a = create_test_user(db_session, role="focal_point")
+        user_b = create_test_user(db_session, role="focal_point")
+        _grant_entity_permission(db_session, user_a, "country", country.id)
+        _grant_entity_permission(db_session, user_b, "country", country.id)
+        db_session.commit()
+
+        with app.app_context():
+            token = profile_hover_token(user_a.id, user_b.id)
+
+        login_session(client, user_a.id)
+        with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=False):
+            denied = client.get(self.URL + f"?user_ids={user_b.id}")
+            allowed = client.get(self.URL + f"?user_ids={user_b.id}&profile_token={token}")
+        assert denied.get_json()["profiles"] == []
+        profiles = allowed.get_json()["profiles"]
+        assert len(profiles) == 1
+        assert profiles[0]["email"] == user_b.email
+        assert "id" not in profiles[0]
+
     def test_non_privileged_with_shared_scope_can_see_peer(self, client, db_session, app):
         """Non-privileged user can see another user who shares an entity permission."""
         country = create_test_country(db_session)

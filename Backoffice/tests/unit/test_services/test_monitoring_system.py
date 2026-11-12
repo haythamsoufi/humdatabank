@@ -709,7 +709,7 @@ class TestIsLongLivedConnectionRequest:
 
     def test_websocket_ai_path(self, app):
         from app.services.monitoring.system import _is_long_lived_connection_request
-        with app.test_request_context("/api/ai/v2/ws"):
+        with app.test_request_context("/api/ai/v1/ws"):
             assert _is_long_lived_connection_request() is True
 
     def test_websocket_upgrade_header(self, app):

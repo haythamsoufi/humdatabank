@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = `${BACKOFFICE_URL}/api/ai/v2/token`;
+    const url = `${BACKOFFICE_URL}/api/ai/v1/token`;
     const headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json'

@@ -384,6 +384,21 @@
   .dev-panel .btn-block:last-child{ margin-bottom:0; }
   .dev-panel-divider{ border-top:1px solid #fef08a; margin:10px 0; }
   .dev-panel label-xs{ display:block; font-size:.72rem; font-weight:600; color:#854d0e; margin-bottom:4px; }
+  .dev-act-as-query{
+    display:block; width:100%; box-sizing:border-box;
+    padding:6px 8px; border:1px solid #fcd34d; border-radius:6px; font-size:.8rem; background:#fff; color:#111827;
+  }
+  .dev-act-as-results{
+    list-style:none; margin:6px 0 0 0; padding:0; max-height:160px; overflow:auto;
+    border:1px solid #fde68a; border-radius:6px; background:#fff;
+  }
+  .dev-act-as-results button{
+    display:block; width:100%; text-align:left; background:#fff; border:0;
+    border-bottom:1px solid #fef3c7; padding:6px 8px; font-size:.75rem; color:#1f2937; cursor:pointer;
+  }
+  .dev-act-as-results li:last-child button{ border-bottom:0; }
+  .dev-act-as-results button:hover{ background:#fffbeb; }
+  .dev-act-as-chosen{ font-size:.75rem; color:#854d0e; margin:6px 0 0 0; }
 
   /* panel footer */
   .panel-footer{
@@ -730,7 +745,7 @@
         <i class="fa-solid fa-user-secret"></i>
         {{ _('Act as (dev only)') }}
       </div>
-      <p class="dev-panel-sub">{{ _('Sign in without a password as a role preset or any active user. Accounts that have not signed in yet are marked not registered.') }}</p>
+      <p class="dev-panel-sub">{% if dev_act_as_all_users %}{{ _('Sign in without a password as a role preset, or search for an active user. The account directory is not listed on this page.') }}{% else %}{{ _('Sign in without a password as a role preset.') }}{% endif %}</p>
 
       <form method="POST" action="{{ url_for('auth.dev_act_as_login') }}" id="devActAsForm">
         {% if form is defined and 'csrf_token' in form %}{{ form.csrf_token(id="dev_act_as_csrf_token") }}{% endif %}
@@ -755,19 +770,17 @@
           <i class="fa-solid fa-user"></i> {{ _('Focal Point') }}
         </button>
 
+        {% if dev_act_as_all_users %}
         <div class="dev-panel-divider"></div>
-        <label for="devActAsUserSelect" style="display:block;font-size:.72rem;font-weight:600;color:#854d0e;margin-bottom:4px;">
-          {{ _('Or choose a user') }}
+        <label for="devActAsUserQuery" style="display:block;font-size:.72rem;font-weight:600;color:#854d0e;margin-bottom:4px;">
+          {{ _('Or find a user') }}
         </label>
-        <select id="devActAsUserSelect" name="user_id" required
-                class="dev-act-as-user-select block w-full px-3 py-2 border border-yellow-300 rounded-md text-sm bg-white text-gray-900">
-          <option value="">{{ _('Select a user…') }}</option>
-          {% for dev_user in dev_act_as_users %}
-          <option value="{{ dev_user.id }}">
-            {{ dev_user.name }} ({{ dev_user.email }}) — {{ dev_user.access_label }}{% if not dev_user.registered %} — {{ _('not registered') }}{% endif %}
-          </option>
-          {% endfor %}
-        </select>
+        <input type="search" id="devActAsUserQuery" class="dev-act-as-query" autocomplete="off"
+               placeholder="{{ _('Type at least 2 characters')|forceescape }}"
+               aria-controls="devActAsUserResults">
+        <input type="hidden" name="user_id" id="devActAsUserId" value="">
+        <ul id="devActAsUserResults" class="dev-act-as-results" hidden></ul>
+        <p id="devActAsUserChosen" class="dev-act-as-chosen" hidden></p>
         <p id="devActAsUserError" class="hidden text-xs text-red-600 m-0" style="margin-top:4px;">{{ _('Please select a user first.') }}</p>
         <button type="submit" id="devActAsSelectedUser"
                 data-loading-text="{{ _('Signing in…') }}"
@@ -775,6 +788,7 @@
                 class="btn btn-block btn-warning" style="margin-top:6px;">
           <i class="fa-solid fa-right-to-bracket"></i> {{ _('Act as selected user') }}
         </button>
+        {% endif %}
       </form>
     </div>
     {% endif %}
@@ -1122,51 +1136,75 @@
   });
 })();
 
-{% if dev_act_as_enabled %}
-/* ---- Dev act-as: Select2 + form validation ---- */
-function initDevActAsUserSelect(){
-  var userSelect = document.getElementById('devActAsUserSelect');
-  if(!userSelect) return;
-  if(!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2){ setTimeout(initDevActAsUserSelect, 250); return; }
-  var $select = window.jQuery(userSelect);
-  try{
-    if($select.hasClass('select2-hidden-accessible')) return;
-    $select.select2({ width:'100%', placeholder:{{ _('Select a user…') | tojson | safe }}, allowClear:false, minimumResultsForSearch:0 });
-    $select.on('select2:select select2:clear', function(){
-      var err = document.getElementById('devActAsUserError');
-      if(err) err.classList.add('hidden');
-    });
-  } catch(e){ window.__clientWarn && window.__clientWarn('dev act-as select2:', e); }
-}
-
-function getDevActAsSelectedUserId(){
-  var userSelect = document.getElementById('devActAsUserSelect');
-  if(!userSelect) return '';
-  if(window.jQuery){
-    var $s = window.jQuery(userSelect);
-    if($s.length && $s.hasClass('select2-hidden-accessible')){ var v = $s.val(); return v ? String(v).trim() : ''; }
-  }
-  return (userSelect.value || '').trim();
-}
-
+{% if dev_act_as_enabled and dev_act_as_all_users %}
+/* ---- Dev act-as: search, then sign in as the chosen account ---- */
 function initDevActAsLogin(){
   var form = document.getElementById('devActAsForm');
-  if(!form) return;
-  var userSelect = document.getElementById('devActAsUserSelect');
+  var queryInput = document.getElementById('devActAsUserQuery');
+  var results = document.getElementById('devActAsUserResults');
+  var chosen = document.getElementById('devActAsUserChosen');
+  var userIdInput = document.getElementById('devActAsUserId');
   var userError = document.getElementById('devActAsUserError');
+  if(!form || !queryInput || !results || !userIdInput) return;
+  var searchUrl = {{ url_for('auth.dev_act_as_user_search')|tojson }};
+  var notRegisteredLabel = {{ _('not registered')|tojson }};
+  var timer = null;
+  var requestSeq = 0;
+
+  function clearChoice(){
+    userIdInput.value = '';
+    if(chosen){ chosen.textContent = ''; chosen.hidden = true; }
+  }
+
+  function renderMatches(users){
+    results.innerHTML = '';
+    if(!users || !users.length){ results.hidden = true; return; }
+    users.forEach(function(user){
+      var item = document.createElement('li');
+      var button = document.createElement('button');
+      button.type = 'button';
+      var label = (user.name || user.email) + ' (' + user.email + ') — ' + (user.access_label || '');
+      if(user.registered === false) label += ' — ' + notRegisteredLabel;
+      button.textContent = label;
+      button.addEventListener('click', function(){
+        userIdInput.value = String(user.id);
+        if(chosen){ chosen.textContent = label; chosen.hidden = false; }
+        if(userError) userError.classList.add('hidden');
+        results.hidden = true;
+        results.innerHTML = '';
+      });
+      item.appendChild(button);
+      results.appendChild(item);
+    });
+    results.hidden = false;
+  }
+
+  queryInput.addEventListener('input', function(){
+    clearChoice();
+    var term = (queryInput.value || '').trim();
+    if(term.length < 2){ results.hidden = true; results.innerHTML = ''; return; }
+    var seq = ++requestSeq;
+    clearTimeout(timer);
+    timer = setTimeout(function(){
+      fetch(searchUrl + '?q=' + encodeURIComponent(term), { credentials: 'same-origin' })
+        .then(function(response){ return response.ok ? response.json() : { users: [] }; })
+        .then(function(payload){ if(seq === requestSeq) renderMatches(payload.users || []); })
+        .catch(function(){ if(seq === requestSeq) renderMatches([]); });
+    }, 250);
+  });
+
   form.addEventListener('submit', function(event){
     var submitter = event.submitter;
-    if(submitter && submitter.getAttribute('name') === 'preset'){ if(userError) userError.classList.add('hidden'); return; }
-    var userId = getDevActAsSelectedUserId();
-    if(!userId){
+    if(submitter && submitter.getAttribute('name') === 'preset'){
+      if(userError) userError.classList.add('hidden');
+      return;
+    }
+    if(!(userIdInput.value || '').trim()){
       event.preventDefault();
       if(userError) userError.classList.remove('hidden');
-      if(window.jQuery && userSelect) window.jQuery(userSelect).select2('open');
-      else if(userSelect) userSelect.focus();
+      queryInput.focus();
     }
   });
-  if(userSelect) userSelect.addEventListener('change', function(){ if(userError) userError.classList.add('hidden'); });
-  initDevActAsUserSelect();
 }
 initDevActAsLogin();
 {% endif %}

@@ -140,7 +140,7 @@ export const StateMixin = {
     saveConversationHistory() {
         try {
             if (this._isImmersive()) {
-                // Backend persists via /api/ai/v2/chat; just notify sidebar to refresh list/title
+                // Backend persists via /api/ai/v1/chat; just notify sidebar to refresh list/title
                 this._dispatchImmersiveUpdate();
                 return;
             }

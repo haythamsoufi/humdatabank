@@ -793,8 +793,8 @@ msgid "AI"
 msgstr "AI"
 
 #: app/templates/admin/api_management.html:367
-msgid "AI /v2"
-msgstr "AI /v2"
+msgid "AI /v1"
+msgstr "AI /v1"
 
 #: app/templates/admin/ai/dashboard.html:34
 msgid "AI Agent"
@@ -908,13 +908,13 @@ msgstr "AI found 1 discrepancy across %(total)s reviewed fields."
 msgid ""
 "AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) "
 "short-lived AI JWT in Authorization: Bearer (often from GET "
-"/api/ai/v2/token), or (3) anonymous when the route allows. Coarse access is "
+"/api/ai/v1/token), or (3) anonymous when the route allows. Coarse access is "
 "public / user / admin / system_manager; AI tools can still enforce granular "
 "RBAC permissions."
 msgstr ""
 "AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) "
 "short-lived AI JWT in Authorization: Bearer (often from GET "
-"/api/ai/v2/token), or (3) anonymous when the route allows. Coarse access is "
+"/api/ai/v1/token), or (3) anonymous when the route allows. Coarse access is "
 "public / user / admin / system_manager; AI tools can still enforce granular "
 "RBAC permissions."
 
@@ -21886,8 +21886,8 @@ msgid "One source"
 msgstr "One source"
 
 #: app/templates/admin/api_management.html:372
-msgid "Only /api/ai/v2 assistants, tools, and related routes."
-msgstr "Only /api/ai/v2 assistants, tools, and related routes."
+msgid "Only /api/ai/v1 assistants, tools, and related routes."
+msgstr "Only /api/ai/v1 assistants, tools, and related routes."
 
 #: app/templates/admin/api_management.html:361
 msgid "Only /api/mobile/v1 routes (Flutter app and admin mobile APIs)."

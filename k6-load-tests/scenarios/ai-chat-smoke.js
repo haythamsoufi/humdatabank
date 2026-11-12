@@ -1,12 +1,12 @@
 // Phase 1.5 — AI chat smoke (OPT-IN, COST-GUARDED)
 //
-// Sends a tiny number of POST requests to /api/ai/v2/chat to verify the chat
+// Sends a tiny number of POST requests to /api/ai/v1/chat to verify the chat
 // pipeline responds under minimal load. This costs LLM tokens — keep it tiny.
 //
 // COST GUARD: the script is a NO-OP unless K6_AI_CHAT_ENABLED=true.
 //
 // Auth: a preissued AI Bearer JWT (K6_AI_TOKEN) obtained via:
-//   GET /api/ai/v2/token   (while logged in to the Backoffice)
+//   GET /api/ai/v1/token   (while logged in to the Backoffice)
 // We never log in inside the script — that would hit auth rate limits and skew
 // results.
 //
@@ -68,7 +68,7 @@ export default function aiChatSmoke(data) {
     message: 'health probe — please reply with a single word: ok',
   });
 
-  const res = http.post(url('/api/ai/v2/chat'), payload, {
+  const res = http.post(url('/api/ai/v1/chat'), payload, {
     headers: headers({ auth: 'aiToken', contentType: 'application/json' }),
     tags: { name: 'ai-chat' },
     timeout: '60s',

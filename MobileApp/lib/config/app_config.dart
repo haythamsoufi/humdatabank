@@ -596,20 +596,21 @@ class AppConfig {
     ];
   }
 
-  // ── AI Chat v2 ──────────────────────────────────────────────────────────────
-  static const String aiApiV2Prefix = '/api/ai/v2';
-  static const String aiV2TokenEndpoint = '$aiApiV2Prefix/token';
-  static const String aiV2ChatEndpoint = '$aiApiV2Prefix/chat';
-  static const String aiV2ChatStreamEndpoint = '$aiApiV2Prefix/chat/stream';
-  static const String aiV2ChatCancelEndpoint = '$aiApiV2Prefix/chat/cancel';
-  static const String aiV2WsEndpoint = '$aiApiV2Prefix/ws';
+  // ── AI Chat v1 ──────────────────────────────────────────────────────────────
+  static const String aiApiV1Prefix = '/api/ai/v1';
+  static const String aiV1TokenEndpoint = '$aiApiV1Prefix/token';
+  static const String aiV1ChatEndpoint = '$aiApiV1Prefix/chat';
+  static const String aiV1ChatAwaitEndpoint = '$aiApiV1Prefix/chat/await';
+  static const String aiV1ChatStreamEndpoint = '$aiApiV1Prefix/chat/stream';
+  static const String aiV1ChatCancelEndpoint = '$aiApiV1Prefix/chat/cancel';
+  static const String aiV1WsEndpoint = '$aiApiV1Prefix/ws';
 
   /// Stream AI replies over the WebSocket instead of Server-Sent Events. The backend only
-  /// serves `/api/ai/v2/ws` when it runs with `WEBSOCKET_ENABLED=true` (off in production), so
+  /// serves `/api/ai/v1/ws` when it runs with `WEBSOCKET_ENABLED=true` (off in production), so
   /// SSE is the default transport. Build with `--dart-define=AI_USE_WEBSOCKET=true` (or set it
   /// in `.env`) against a backend that enables WebSockets.
   static final bool aiUseWebSocket =
       _envFlag('AI_USE_WEBSOCKET', defaultValue: false);
-  static const String aiV2ConversationsEndpoint = '$aiApiV2Prefix/conversations';
-  static const String aiV2FeedbackEndpoint = '$aiApiV2Prefix/feedback';
+  static const String aiV1ConversationsEndpoint = '$aiApiV1Prefix/conversations';
+  static const String aiV1FeedbackEndpoint = '$aiApiV1Prefix/feedback';
 }

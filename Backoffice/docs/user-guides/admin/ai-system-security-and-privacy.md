@@ -4,7 +4,7 @@ This document explains how the Backoffice AI assistant works, what data may be p
 
 ## Scope
 
-- **In scope**: AI chat (`/api/ai/v2/*`), AI Knowledge Base / RAG, workflow-doc Q&A, and the security controls around them (DLP, PII scrubbing, audit events).
+- **In scope**: AI chat (`/api/ai/v1/*`), AI Knowledge Base / RAG, workflow-doc Q&A, and the security controls around them (DLP, PII scrubbing, audit events).
 - **Out of scope**: general platform security (auth, RBAC, backups), except where it directly affects the AI system.
 
 ## High-level architecture

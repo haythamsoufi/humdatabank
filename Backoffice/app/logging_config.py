@@ -10,8 +10,8 @@ from app.utils.logging_security import redact_query_params_in_text
 _NOISY_ACCESS_REQUEST_FRAGMENTS = (
     '"GET /health ',
     '"HEAD /health ',
-    '"GET /api/ai/v2/health ',
-    '"HEAD /api/ai/v2/health ',
+    '"GET /api/ai/v1/health ',
+    '"HEAD /api/ai/v1/health ',
     '"GET /api/v1/health ',
     '"HEAD /api/v1/health ',
 )

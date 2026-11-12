@@ -15,7 +15,7 @@ import { ConversationsMixin } from './conversations.js';
 
 export class HumDatabankChatbot {
     constructor() {
-        this.apiEndpoint = '/api/ai/v2/chat';
+        this.apiEndpoint = '/api/ai/v1/chat';
         this.isInitialized = false;
         this.conversationHistory = [];
         this.isTyping = false;
@@ -652,7 +652,7 @@ export class HumDatabankChatbot {
         if (this._isImmersive()) {
             const cid = this.getActiveConversationId && this.getActiveConversationId();
             if (cid) {
-                this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}/messages`, {
+                this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(cid)}/messages`, {
                     method: 'POST',
                     body: JSON.stringify({
                         role: 'assistant',
@@ -916,19 +916,19 @@ export class HumDatabankChatbot {
      */
 
     _buildConfidenceBadge(confidence, groundingScore) {
-        const level = confidence || (
-            groundingScore != null
-                ? (groundingScore >= 0.7 ? 'high' : groundingScore >= 0.4 ? 'medium' : 'low')
-                : null
-        );
-        if (!level) return null;
-
+        // high / medium / low are grounding scores for answers checked against sources.
+        // "unverified" is a refusal or greeting: there is nothing to ground, so no badge.
         const colorMap = {
             high:   { bg: '#dcfce7', color: '#166534', icon: '●', label: 'High confidence' },
             medium: { bg: '#fef9c3', color: '#854d0e', icon: '●', label: 'Medium confidence' },
             low:    { bg: '#fee2e2', color: '#991b1b', icon: '●', label: 'Low confidence' },
         };
-        const cfg = colorMap[level] || colorMap.medium;
+        let level = (confidence && colorMap[confidence]) ? confidence : null;
+        if (!level && (confidence == null || confidence === '') && groundingScore != null) {
+            level = groundingScore >= 0.7 ? 'high' : groundingScore >= 0.4 ? 'medium' : 'low';
+        }
+        if (!level) return null;
+        const cfg = colorMap[level];
 
         const badge = document.createElement('div');
         badge.className = 'chat-confidence-badge';
@@ -1072,9 +1072,9 @@ export class HumDatabankChatbot {
 
     async callAIService(message, context = {}) {
         try {
-            // Backward-compatible wrapper: route through the unified v2 request path so
+            // Backward-compatible wrapper: route through the unified v1 request path so
             // transport behavior, DLP, sources, and conversation management can't drift.
-            // `context` is intentionally ignored here to preserve the /api/ai/v2 contract.
+            // `context` is intentionally ignored here to preserve the /api/ai/v1 contract.
             return await this.callBackendAPI(String(message ?? ''), {}, null);
         } catch (error) {
             console.error('AI service error:', error);

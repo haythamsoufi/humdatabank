@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Chatbot CLI
 
-To send a message through the live chatbot (same agent, tools, and traces as the UI), use `flask ai-chat` from `Backoffice/`. Do not POST `/api/ai/v2/chat`, script a dev-act-as login, or write a one-off HTTP client. The CLI boots its own app context; the dev server on port 5000 does not need to be running.
+To send a message through the live chatbot (same agent, tools, and traces as the UI), use `flask ai-chat` from `Backoffice/`. Do not POST `/api/ai/v1/chat`, script a dev-act-as login, or write a one-off HTTP client. The CLI boots its own app context; the dev server on port 5000 does not need to be running.
 
 ```powershell
 cd Backoffice

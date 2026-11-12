@@ -14,12 +14,31 @@ register_validation_summary_routes(bp)
 # Template global for getting frontend URL
 @bp.app_template_global()
 def get_frontend_url_global():
-    """Template global for getting frontend URL."""
+    """Template global for getting frontend URL.
+
+    A loopback website URL (local public site) is omitted unless this request is
+    itself a direct loopback connection, so a shared host does not advertise
+    ``http://localhost:3000``.
+    """
     try:
+        import ipaddress
+        from urllib.parse import urlparse
+
         from app.services.platform.app_settings_service import get_frontend_url as _get_frontend_url
+        from app.utils.client_ip import is_loopback_request
+
         url = _get_frontend_url()
         if url is None:
             return "#"
+        host = (urlparse(str(url)).hostname or "").strip().lower()
+        loopback_host = host == "localhost"
+        if host and not loopback_host:
+            try:
+                loopback_host = ipaddress.ip_address(host).is_loopback
+            except ValueError:
+                loopback_host = False
+        if loopback_host and not is_loopback_request():
+            return ""
         return url
     except Exception as e:
         current_app.logger.debug("get_frontend_url failed: %s", e)

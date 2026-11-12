@@ -24,7 +24,7 @@ from app.utils.request_validation import enforce_api_or_csrf_protection
 # Exact paths (not prefixes) where a mobile access token is accepted outside the mobile
 # API prefix. The mobile app trades its JWT here for the short-lived AI chat token; it has
 # no Flask session cookie to present (Bearer and PKCE logins never mint one).
-MOBILE_JWT_BEARER_EXACT_PATHS = frozenset({"/api/ai/v2/token"})
+MOBILE_JWT_BEARER_EXACT_PATHS = frozenset({"/api/ai/v1/token"})
 
 
 def bearer_jwt_allowed_for_path(path: str) -> bool:

@@ -5,7 +5,7 @@ Handles uploading, processing, searching, and managing documents for the RAG sys
 Split into submodules by functional area; all routes register on the shared ``ai_docs_bp`` blueprint.
 
 Access is governed by route-level RBAC (e.g. admin.ai.manage, admin.documents.manage), not AI beta
-allow-listing — beta gating applies to the chatbot (/api/ai/v2/*, WebSocket chat) only.
+allow-listing — beta gating applies to the chatbot (/api/ai/v1/*, WebSocket chat) only.
 """
 
 import logging

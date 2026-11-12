@@ -19,6 +19,7 @@ from typing import Optional
 
 from flask import request, current_app
 from flask_login import current_user
+from werkzeug.local import LocalProxy
 
 import logging
 
@@ -47,6 +48,12 @@ def _bearer_token() -> Optional[str]:
 
 def _identity_for_user(user: User, auth_source: str) -> AIRequestIdentity:
     from app.services.organization.authorization_service import AuthorizationService
+
+    # current_user is a proxy. The stream worker runs in a fresh request context
+    # with no session, so a stored proxy resolves to AnonymousUserMixin even
+    # when the caller is logged in. Keep the user instance captured here.
+    if isinstance(user, LocalProxy):
+        user = user._get_current_object()
 
     if AuthorizationService.is_system_manager(user):
         level = "system_manager"

@@ -49,7 +49,7 @@ Option (a) is the standard pattern for all new mobile-facing routes.
 - ``PUT  /api/v1/auth/profile`` — JSON profile update
 - ``GET  /api/v1/csrf-token`` — issue CSRF token for session
 
-**AI chat uses a separate JWT** issued by ``GET /api/ai/v2/token`` (session
+**AI chat uses a separate JWT** issued by ``GET /api/ai/v1/token`` (session
 cookie, or a mobile access token as ``Authorization: Bearer`` on that exact path); it is
 independent of ``X-Mobile-Auth``.
 """

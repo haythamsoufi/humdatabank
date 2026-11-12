@@ -115,8 +115,11 @@ class RequestCountryAccessForm(FlaskForm):
             # Build choices - we'll add the "already have access" text in the template/JS
             self.requested_country_id.choices = [(c.id, c.name) for c in countries]
 
-            # Store which countries have access for template use
+            # Store which countries have access for template use.
+            # When the user already has every country, pages emit a flag instead of the id list.
+            all_country_ids = {c.id for c in countries}
             self._user_has_access = user_country_ids
+            self._user_has_access_all = bool(all_country_ids) and all_country_ids <= user_country_ids
         except Exception as e:
             # Log the error for debugging
             import logging
@@ -124,6 +127,7 @@ class RequestCountryAccessForm(FlaskForm):
             # In case DB not available (e.g., during initialization), provide an empty list
             self.requested_country_id.choices = []
             self._user_has_access = set()
+            self._user_has_access_all = False
 
 
 class ResetPasswordForm(FlaskForm):

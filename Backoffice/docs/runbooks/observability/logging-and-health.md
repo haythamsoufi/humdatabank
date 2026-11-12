@@ -67,7 +67,7 @@ This emits detailed per-field logs. Do not leave on in production (noise, potent
 ### AI system health
 
 ```
-GET /api/ai/v2/health
+GET /api/ai/v1/health
 ```
 
 **Sample healthy response:**
@@ -101,7 +101,7 @@ Detailed env reference: [`../../setup/ai-configuration.md`](../../setup/ai-confi
 For a quick "is the app responding?" check without authentication:
 ```
 GET /                         ← Public landing page
-GET /api/ai/v2/health         ← AI health (no auth required)
+GET /api/ai/v1/health         ← AI health (no auth required)
 ```
 
 If either returns 5xx or times out, check the Azure App Service status page and stream application logs.

@@ -24,7 +24,7 @@ In development with `DEBUG=true`, `/login` shows a yellow **"Act as (dev only)"*
 | Submit button `[data-dev-act-as-preset="sys_manager"]` | System Manager (`test_sys@<org-domain>`) |
 | Submit button `[data-dev-act-as-preset="admin"]` | Admin (`test_admin@<org-domain>`) |
 | Submit button `[data-dev-act-as-preset="focal"]` | Focal Point (`test_focal@<org-domain>`) |
-| `#devActAsUserSelect` + `#devActAsSelectedUser` | Any active user (Select2; prefer presets for automation) |
+| `#devActAsUserQuery` + `#devActAsSelectedUser` | A searched active user, only when `DEV_ACT_AS_ALL_USERS` is on (prefer presets for automation) |
 
 Preset buttons are native **form submits** — click and wait for navigation (admin pages can take >5s; use `browser_wait_for` if a click times out but the URL may already have changed).
 

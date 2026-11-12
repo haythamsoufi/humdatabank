@@ -111,7 +111,7 @@ export const ConversationsMixin = {
 
         listEl.innerHTML = '<li class="chat-floating-chat-list-loading">Loading…</li>';
 
-        this._apiFetch('/api/ai/v2/conversations')
+        this._apiFetch('/api/ai/v1/conversations')
             .then(res => res.ok ? res.json() : { conversations: [] })
             .then(data => {
                 const conversations = data.conversations || [];
@@ -299,7 +299,7 @@ export const ConversationsMixin = {
     },
 
     _maybeRestoreInflightFromConversationResponse(convData, conversationId) {
-        // convData comes from GET /api/ai/v2/conversations/:id
+        // convData comes from GET /api/ai/v1/conversations/:id
         try {
             let inflight = convData && convData.conversation && convData.conversation.meta
                 ? convData.conversation.meta.inflight
@@ -413,7 +413,7 @@ export const ConversationsMixin = {
             return;
         }
         try {
-            const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}`);
+            const res = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(cid)}`);
             if (String(this._getFloatingConversationId() || '') !== cid) return;
             if (res.status === 404) {
                 this._clearFloatingBrowserCache();
@@ -456,7 +456,7 @@ export const ConversationsMixin = {
                 return;
             }
             try {
-                const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(conversationId)}`);
+                const res = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(conversationId)}`);
                 if (!res.ok) {
                     // Retry later; don't kill the poll immediately on transient errors
                     this._inflightPollTimer = setTimeout(pollOnce, 2500);
@@ -534,7 +534,7 @@ export const ConversationsMixin = {
         if (!activeId) return;
         try {
             const res = await this._apiFetch(
-                `/api/ai/v2/conversations/${encodeURIComponent(activeId)}`
+                `/api/ai/v1/conversations/${encodeURIComponent(activeId)}`
             );
             if (!res.ok) return;
             const data = await res.json();
@@ -601,7 +601,7 @@ export const ConversationsMixin = {
             }
             this.activeConversationId = this._getImmersiveActiveId();
 
-            const listRes = await this._apiFetch('/api/ai/v2/conversations');
+            const listRes = await this._apiFetch('/api/ai/v1/conversations');
             if (!listRes.ok) {
                 this.loadConversation([]);
                 this._dispatchImmersiveUpdate();
@@ -640,7 +640,7 @@ export const ConversationsMixin = {
                     return;
                 }
             }
-            const convRes = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(activeId)}`);
+            const convRes = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(activeId)}`);
             if (!convRes.ok) {
                 this.loadConversation([]);
                 this._dispatchImmersiveUpdate();
@@ -772,7 +772,7 @@ export const ConversationsMixin = {
             return;
         }
         try {
-            const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}?limit=1`);
+            const res = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(cid)}?limit=1`);
             if (String(this._getFloatingConversationId() || '') !== String(cid)) return;
             if (res.status === 404) {
                 this._clearFloatingBrowserCache();
@@ -918,7 +918,7 @@ export const ConversationsMixin = {
                 this.isTyping = false;
                 this._setSendButtonStop(false);
                 this.hideTypingIndicator();
-                const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(chatId)}`);
+                const res = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(chatId)}`);
                 if (!res.ok) return;
                 const data = await res.json();
                 const messages = this._mapApiMessages(data.messages || []);
@@ -934,7 +934,7 @@ export const ConversationsMixin = {
             return;
         }
         try {
-            const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(chatId)}`);
+            const res = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(chatId)}`);
             if (!res.ok) return;
             const data = await res.json();
             const messages = this._mapApiMessages(data.messages || []);
@@ -953,11 +953,11 @@ export const ConversationsMixin = {
     async deleteChat(chatId) {
         if (this._isImmersive()) {
             try {
-                const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(chatId)}`, { method: 'DELETE' });
+                const res = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(chatId)}`, { method: 'DELETE' });
                 if (!res.ok) return;
                 const wasActive = this.activeConversationId === chatId;
                 const deletedFloating = String(this._getFloatingConversationId() || '') === String(chatId);
-                const listRes = await this._apiFetch('/api/ai/v2/conversations');
+                const listRes = await this._apiFetch('/api/ai/v1/conversations');
                 if (!listRes.ok) {
                     if (wasActive) {
                         this._setImmersiveActiveId(null);
@@ -979,7 +979,7 @@ export const ConversationsMixin = {
                 } else if (wasActive) {
                     const nextId = conversations[0].id;
                     this._setImmersiveActiveId(nextId);
-                    const convRes = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(nextId)}`);
+                    const convRes = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(nextId)}`);
                     if (convRes.ok) {
                         const convData = await convRes.json();
                         const messages = this._mapApiMessages(convData.messages || []);
@@ -996,7 +996,7 @@ export const ConversationsMixin = {
             return;
         }
         try {
-            const res = await this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(chatId)}`, { method: 'DELETE' });
+            const res = await this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(chatId)}`, { method: 'DELETE' });
             if (!res.ok) return;
             const wasActive = String(this._getFloatingConversationId() || '') === String(chatId);
             if (wasActive) {
@@ -1012,7 +1012,7 @@ export const ConversationsMixin = {
     async deleteAllChats() {
         if (this._isImmersive()) {
             try {
-                const res = await this._apiFetch('/api/ai/v2/conversations?confirm=true', {
+                const res = await this._apiFetch('/api/ai/v1/conversations?confirm=true', {
                     method: 'DELETE'
                 });
                 if (!res.ok) {
@@ -1030,7 +1030,7 @@ export const ConversationsMixin = {
             return;
         }
         try {
-            const res = await this._apiFetch('/api/ai/v2/conversations?confirm=true', {
+            const res = await this._apiFetch('/api/ai/v1/conversations?confirm=true', {
                 method: 'DELETE'
             });
             if (!res.ok) {
@@ -1274,7 +1274,7 @@ export const ConversationsMixin = {
                 if (current === rating) return;
                 likeBtn.disabled = true;
                 dislikeBtn.disabled = true;
-                this._apiFetch('/api/ai/v2/feedback', {
+                this._apiFetch('/api/ai/v1/feedback', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ trace_id: parseInt(traceId, 10), rating }),

@@ -17,10 +17,10 @@ class TestWebSocketRoutesSmoke:
 
         # AI WS follows WEBSOCKET_ENABLED (config default is False).
         if not app.config.get("WEBSOCKET_ENABLED", False):
-            assert not _path_is_registered(app, "/api/ai/v2/ws")
+            assert not _path_is_registered(app, "/api/ai/v1/ws")
             return
 
-        assert _path_is_registered(app, "/api/ai/v2/ws")
+        assert _path_is_registered(app, "/api/ai/v1/ws")
         assert _path_is_registered(app, "/api/ai/documents/ws")
 
     def test_notifications_ws_never_registered_on_app_fixture(self, app):

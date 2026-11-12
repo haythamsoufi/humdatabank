@@ -1,8 +1,11 @@
 """
-Swagger/OpenAPI documentation routes
+Swagger/OpenAPI documentation routes.
+
+These GET routes are public. The document describes `/api/v1`; it does not
+return databank records. Calling a protected operation from Try it out still
+requires that operation's own API key or session.
 """
 from flask import Blueprint, current_app, jsonify, render_template
-from flask_login import login_required
 from app.swagger.openapi_spec import get_openapi_spec
 from app.utils.api_responses import json_error, json_ok, json_server_error
 
@@ -10,7 +13,6 @@ swagger_bp = Blueprint('swagger', __name__, url_prefix='/api-docs')
 
 
 @swagger_bp.route('/')
-@login_required
 def swagger_ui():
     """
     Serve the Swagger UI interface.
@@ -30,7 +32,6 @@ def swagger_ui():
 
 
 @swagger_bp.route('/openapi.json')
-@login_required
 def openapi_json():
     """
     Serve the OpenAPI specification as JSON.
@@ -54,7 +55,6 @@ def openapi_json():
 
 
 @swagger_bp.route('/openapi.yaml')
-@login_required
 def openapi_yaml():
     """
     Serve the OpenAPI specification as YAML.
@@ -76,7 +76,6 @@ def openapi_yaml():
 
 
 @swagger_bp.route('/test')
-@login_required
 def test_spec():
     """
     Test endpoint to verify OpenAPI spec generation.
@@ -102,7 +101,4 @@ def test_spec():
         )
     except Exception as e:
         current_app.logger.error(f"Error in test endpoint: {e}", exc_info=True)
-        return json_server_error(
-            "Failed to run test request.",
-            status="error",
-        )
+        return json_server_error("Failed to run test request.")

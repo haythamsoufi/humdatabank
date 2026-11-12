@@ -11,7 +11,7 @@ from app.utils.activity_endpoint_catalog.generated.partials.admin import SPECS a
 from app.utils.activity_endpoint_catalog.generated.partials.admin_communication import SPECS as _S_admin_communication
 from app.utils.activity_endpoint_catalog.generated.partials.ai_documents import SPECS as _S_ai_documents
 from app.utils.activity_endpoint_catalog.generated.partials.ai_management import SPECS as _S_ai_management
-from app.utils.activity_endpoint_catalog.generated.partials.ai_v2 import SPECS as _S_ai_v2
+from app.utils.activity_endpoint_catalog.generated.partials.ai_v1 import SPECS as _S_ai_v1
 from app.utils.activity_endpoint_catalog.generated.partials.analytics import SPECS as _S_analytics
 from app.utils.activity_endpoint_catalog.generated.partials.api_key_management import SPECS as _S_api_key_management
 from app.utils.activity_endpoint_catalog.generated.partials.assignment_management import SPECS as _S_assignment_management
@@ -48,7 +48,7 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_admin_communication,
     _S_ai_documents,
     _S_ai_management,
-    _S_ai_v2,
+    _S_ai_v1,
     _S_analytics,
     _S_api_key_management,
     _S_assignment_management,

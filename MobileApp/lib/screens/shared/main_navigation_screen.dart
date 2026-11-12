@@ -6,6 +6,7 @@ import '../../utils/debug_logger.dart';
 import '../../utils/constants.dart';
 import '../../utils/navigation_helper.dart';
 import '../../providers/shared/auth_provider.dart';
+import '../../providers/shared/ai_chat_provider.dart';
 import '../../providers/shared/notification_provider.dart';
 import '../../providers/shared/tab_customization_provider.dart';
 import '../../services/screen_view_tracker.dart';
@@ -171,6 +172,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
       DebugLogger.logNav('lifecycle → background, clearing screen cache');
+      Provider.of<AiChatProvider>(context, listen: false).noteAppBackgrounded();
       _clearDistantScreens();
     } else if (state == AppLifecycleState.resumed) {
       DebugLogger.logNav('lifecycle → resumed');
@@ -178,6 +180,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         if (!mounted) return;
         final auth = Provider.of<AuthProvider>(context, listen: false);
         if (!auth.isAuthenticated) return;
+        await Provider.of<AiChatProvider>(context, listen: false)
+            .syncInflightAfterResume(isAuthenticated: true);
+        if (!mounted) return;
         await Provider.of<NotificationProvider>(context, listen: false)
             .refreshUnreadCount(authProvider: auth);
       });

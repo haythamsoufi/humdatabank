@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../models/shared/ai_chat.dart';
+import '../../config/api_timeouts.dart';
 import '../../config/app_config.dart';
 import '../../services/ai_chat_exception.dart';
 import '../../services/ai_chat_service.dart';
@@ -94,6 +95,8 @@ class AiChatProvider with ChangeNotifier {
   String? _streamStatusHint;
   bool _inflightRestoreActive = false;
   int _inflightPollEpoch = 0;
+  /// True while `/chat/await` is following a turn that was already submitted.
+  bool _storedReplyWaitActive = false;
 
   /// Categorize HTTP/WS transport failures for user-facing [AiChatMessage.errorType].
   static String? _inferChatErrorType(Object e, String lower) {
@@ -424,6 +427,33 @@ class AiChatProvider with ChangeNotifier {
     _lastPreparingQueryDetail = null;
   }
 
+  /// Keep the steps already on screen when a later snapshot is shorter.
+  ///
+  /// The server snapshot lags the live stream. Replacing a longer list with
+  /// "Preparing query…" is what made status disappear after the socket dropped.
+  static List<AiChatAgentStep> mergeAgentSteps(
+    List<AiChatAgentStep> current,
+    List<AiChatAgentStep> incoming,
+  ) {
+    if (incoming.isEmpty) return current;
+    if (current.isNotEmpty && incoming.length < current.length) return current;
+    return incoming;
+  }
+
+  void _rememberInflightSteps([String? conversationId]) {
+    final sid = conversationId ?? _conversationId;
+    if (sid == null || sid.isEmpty || _agentSteps.isEmpty) return;
+    _detachedAgentStepsByConversationId[sid] = _agentSteps
+        .map((e) => e.copyWith(detailLines: List<String>.from(e.detailLines)))
+        .toList();
+  }
+
+  /// App went to the background. The socket may die; the steps must still be here on return.
+  void noteAppBackgrounded() {
+    if (!_isStreaming && !_inflightRestoreActive) return;
+    _rememberInflightSteps();
+  }
+
   void _initAgentProgressIfNeeded() {
     if (_agentSteps.isEmpty) {
       _agentSteps = [const AiChatAgentStep(message: _preparingQueryLabel)];
@@ -709,12 +739,9 @@ class AiChatProvider with ChangeNotifier {
     };
   }
 
-  void _applyInflightSnapshot(Map<String, dynamic> inflight) {
+  List<AiChatAgentStep> _stepsFromInflight(Map<String, dynamic> inflight) {
     final steps = inflight['steps'];
-    if (steps is! List || steps.isEmpty) {
-      _agentSteps = [const AiChatAgentStep(message: _preparingQueryLabel)];
-      return;
-    }
+    if (steps is! List || steps.isEmpty) return const [];
     final out = <AiChatAgentStep>[];
     for (final s in steps) {
       if (s is! Map) continue;
@@ -724,39 +751,79 @@ class AiChatProvider with ChangeNotifier {
       final lines = dl is List ? dl.map((e) => e.toString()).toList() : <String>[];
       out.add(AiChatAgentStep(message: msg, detailLines: lines));
     }
-    _agentSteps = out.isNotEmpty ? out : [const AiChatAgentStep(message: _preparingQueryLabel)];
+    return out;
+  }
+
+  void _applyInflightSnapshot(Map<String, dynamic> inflight) {
+    final incoming = _stepsFromInflight(inflight);
+    final merged = mergeAgentSteps(_agentSteps, incoming);
+    _agentSteps = merged.isNotEmpty
+        ? merged
+        : (_agentSteps.isNotEmpty
+            ? _agentSteps
+            : [const AiChatAgentStep(message: _preparingQueryLabel)]);
+  }
+
+  Map<String, dynamic>? _inflightMapFromConversation(Map<String, dynamic>? getConvResponse) {
+    if (getConvResponse == null) return null;
+    final conv = getConvResponse['conversation'];
+    if (conv is! Map) return null;
+    final metaRaw = conv['meta'];
+    if (metaRaw is! Map) return null;
+    final infRaw = metaRaw['inflight'];
+    if (infRaw is! Map || (infRaw['status']?.toString() ?? '') != 'in_progress') return null;
+    return Map<String, dynamic>.from(infRaw);
+  }
+
+  Future<void> _refreshInflightSnapshot(String conversationId) async {
+    try {
+      final data = await _service.getConversation(conversationId);
+      if (_conversationId != conversationId) return;
+      final inflight = _inflightMapFromConversation(data);
+      if (inflight == null) return;
+      _inflightRestoreActive = true;
+      _applyInflightSnapshot(inflight);
+      _ensurePlaceholderAssistantForInflight();
+      notifyListeners();
+    } catch (e) {
+      DebugLogger.logWarn('AI', 'Inflight refresh failed: $e');
+    }
+  }
+
+  /// Pull the in-progress steps back after the app or the chat screen returns.
+  ///
+  /// A live stream or an `/chat/await` loop keeps its own steps. This only fills
+  /// the panel from the server snapshot, and starts a poll when nothing local is
+  /// still following the run.
+  Future<void> syncInflightAfterResume({required bool isAuthenticated}) async {
+    final cid = _conversationId;
+    if (!isAuthenticated || cid == null || cid.isEmpty) return;
+    if (_isStreaming || _inflightRestoreActive || _storedReplyWaitActive) {
+      await _refreshInflightSnapshot(cid);
+      return;
+    }
+    try {
+      final data = await _service.getConversation(cid);
+      if (_conversationId != cid || _isStreaming || _storedReplyWaitActive) return;
+      _maybeRestoreInflight(data, cid, isAuthenticated);
+      if (_inflightRestoreActive) notifyListeners();
+    } catch (e) {
+      DebugLogger.logWarn('AI', 'Resume inflight sync failed: $e');
+    }
   }
 
   void _maybeRestoreInflight(Map<String, dynamic>? getConvResponse, String conversationId, bool isAuthenticated) {
     if (!isAuthenticated || getConvResponse == null) return;
-    final conv = getConvResponse['conversation'];
-    if (conv is! Map) return;
-    final metaRaw = conv['meta'];
-    if (metaRaw is! Map) return;
-    Map<String, dynamic>? inflight;
-    final infRaw = metaRaw['inflight'];
-    if (infRaw is Map && (infRaw['status']?.toString() ?? '') == 'in_progress') {
-      inflight = Map<String, dynamic>.from(infRaw);
-      _detachedAgentStepsByConversationId.remove(conversationId);
-    }
-    if (inflight == null) {
-      final cached = _detachedAgentStepsByConversationId[conversationId];
-      if (cached != null && cached.isNotEmpty) {
-        inflight = {
-          'status': 'in_progress',
-          'steps': cached
-              .map((s) => {
-                    'message': s.message,
-                    'detail_lines': List<String>.from(s.detailLines),
-                  })
-              .toList(),
-        };
-        _detachedAgentStepsByConversationId.remove(conversationId);
-      }
-    }
-    if (inflight == null) return;
+    final inflight = _inflightMapFromConversation(getConvResponse);
+    final cached = _detachedAgentStepsByConversationId.remove(conversationId);
+    if (inflight == null && (cached == null || cached.isEmpty)) return;
     _inflightRestoreActive = true;
-    _applyInflightSnapshot(inflight);
+    if (cached != null && cached.isNotEmpty) {
+      _agentSteps = cached;
+    }
+    if (inflight != null) {
+      _applyInflightSnapshot(inflight);
+    }
     // Match the in-thread layout used while streaming: a trailing empty assistant row
     // holds the progress panel. Without it, [user] is last and the UI only has the
     // column-level inflight bar — which renders *above* the message list.
@@ -794,6 +861,9 @@ class AiChatProvider with ChangeNotifier {
           }
         }
         if (active == null) {
+          // A live stream or /chat/await still owns the panel. One GET without
+          // a snapshot must not wipe the steps the user is looking at.
+          if (_isStreaming || _storedReplyWaitActive) continue;
           _inflightRestoreActive = false;
           _clearAgentProgress();
           _detachedAgentStepsByConversationId.remove(conversationId);
@@ -808,6 +878,7 @@ class AiChatProvider with ChangeNotifier {
         notifyListeners();
       } catch (_) {}
     }
+    if (_isStreaming || _storedReplyWaitActive) return;
     _inflightRestoreActive = false;
     _clearAgentProgress();
     _detachedAgentStepsByConversationId.remove(conversationId);
@@ -817,11 +888,8 @@ class AiChatProvider with ChangeNotifier {
   /// Close the WebSocket and clear streaming UI when the user opens another chat, starts a new
   /// one, or reloads the list. Server generation continues when `keep_running_on_disconnect` is set.
   Future<void> _detachStreamForNavigation() async {
-    final sid = _conversationId;
-    if (_isStreaming && sid != null && sid.isNotEmpty && _agentSteps.isNotEmpty) {
-      _detachedAgentStepsByConversationId[sid] = _agentSteps
-          .map((e) => e.copyWith(detailLines: List<String>.from(e.detailLines)))
-          .toList();
+    if (_isStreaming || _inflightRestoreActive) {
+      _rememberInflightSteps();
     }
     _inflightPollEpoch++;
     _inflightRestoreActive = false;
@@ -1187,21 +1255,36 @@ class AiChatProvider with ChangeNotifier {
       );
     }
 
-    // Once the server sent `meta` it is running the agent with `keep_running_on_disconnect`,
-    // so a dropped connection must not re-submit the turn (that would start a second full run
-    // while the first is still working). Wait for the persisted reply instead; only re-send
-    // when the server finished without producing one.
-    Future<void> recoverOrFallbackToHttp() async {
+    // The request was handed to the network. A timeout or a dropped socket does
+    // not mean the server missed it — posting /chat again starts a second agent.
+    // Only a failure before the server could accept the socket may resubmit.
+    Future<void> recoverOrFallbackToHttp({required bool submitted}) async {
+      if (httpFallbackStarted || recoveryStarted) return;
       final cid = _conversationId;
-      if (!serverAcceptedStream || !isAuthenticated || cid == null || cid.isEmpty) {
-        await fallbackToHttp();
+      final turnSubmitted = submitted || serverAcceptedStream;
+      if (turnSubmitted) {
+        recoveryStarted = true;
+        if (streamGeneration != _wsConnectionSession) return;
+        if (!isAuthenticated || cid == null || cid.isEmpty || clientMessageId == null || clientMessageId.isEmpty) {
+          DebugLogger.logWarn('AI', 'Stream dropped after submit; not starting a second run');
+          _isStreaming = false;
+          _clearAgentProgress();
+          notifyListeners();
+          return;
+        }
+        DebugLogger.logWarn('AI', 'Stream dropped after submit; waiting for the stored reply');
+        await _waitForSubmittedTurn(
+          message: message,
+          isAuthenticated: isAuthenticated,
+          conversationId: cid,
+          clientMessageId: clientMessageId,
+          generation: streamGeneration,
+          branchFromEdit: _wsBranchFromEdit,
+          branchConversationHistory: _wsBranchConversationHistory,
+        );
         return;
       }
-      if (httpFallbackStarted || recoveryStarted) return;
-      recoveryStarted = true;
-      DebugLogger.logWarn('AI', 'SSE stream dropped after the server accepted the turn; waiting for the stored reply');
-      final recovered = await _recoverStreamedTurnFromServer(cid, streamGeneration);
-      if (!recovered) await fallbackToHttp();
+      await fallbackToHttp();
     }
 
     final history = branchFromEdit && branchConversationHistory != null
@@ -1225,14 +1308,6 @@ class AiChatProvider with ChangeNotifier {
           if (streamGeneration != _wsConnectionSession) return;
           if (httpFallbackStarted || recoveryStarted) return;
           if (data['type'] == 'meta') serverAcceptedStream = true;
-          // The stream worker reports any unclassified server exception as error_type "Error".
-          // Retry those once over plain HTTP (the long-standing path) instead of surfacing a
-          // generic failure; classified errors (quota, DLP, auth, timeout...) are shown as-is.
-          if (data['type'] == 'error' && isUnclassifiedStreamError(data['error_type'])) {
-            DebugLogger.logWarn('AI', 'SSE stream reported a server error, falling back to HTTP');
-            await fallbackToHttp();
-            return;
-          }
           await _handleWsJson(data, outboundMessage: message, isAuthenticated: isAuthenticated);
           if (streamGeneration != _wsConnectionSession) return;
           notifyListeners();
@@ -1251,7 +1326,10 @@ class AiChatProvider with ChangeNotifier {
           _noteBetaAccessDenial(e);
           return;
         }
-        await recoverOrFallbackToHttp();
+        final submitted = e is AiChatStreamDisconnected
+            ? e.requestMayBeOnServer
+            : streamRequestMayBeOnServer(e, handedToNetwork: true);
+        await recoverOrFallbackToHttp(submitted: submitted);
       },
       onDone: () async {
         if (streamGeneration != _wsConnectionSession) return;
@@ -1260,10 +1338,10 @@ class AiChatProvider with ChangeNotifier {
           return;
         }
         // 'done' / 'error' envelopes clear [_isStreaming]; still streaming means the
-        // connection ended without a final envelope.
+        // connection ended without a final envelope. The request was already sent.
         if (!_isStreaming) return;
         DebugLogger.logWarn('AI', 'SSE stream ended before completion');
-        await recoverOrFallbackToHttp();
+        await recoverOrFallbackToHttp(submitted: true);
       },
     );
   }
@@ -1374,19 +1452,35 @@ class AiChatProvider with ChangeNotifier {
       );
     }
 
-    // Same rule as SSE: after `meta`, the server keeps running. Poll for the stored reply
-    // instead of starting a second agent run.
-    Future<void> recoverOrFallbackToHttp() async {
+    // After the payload is on the socket, a drop must wait for that run.
+    // Posting /chat again starts a second agent.
+    var payloadSent = false;
+    Future<void> recoverOrFallbackToHttp({required bool submitted}) async {
+      if (httpFallbackStarted || recoveryStarted) return;
       final cid = _conversationId;
-      if (!serverAcceptedStream || !isAuthenticated || cid == null || cid.isEmpty) {
-        await fallbackToHttp();
+      if (submitted || serverAcceptedStream || payloadSent) {
+        recoveryStarted = true;
+        if (wsListenGeneration != _wsConnectionSession) return;
+        if (!isAuthenticated || cid == null || cid.isEmpty || clientMessageId == null || clientMessageId.isEmpty) {
+          DebugLogger.logWarn('AI', 'WebSocket dropped after send; not starting a second run');
+          _isStreaming = false;
+          _clearAgentProgress();
+          notifyListeners();
+          return;
+        }
+        DebugLogger.logWarn('AI', 'WebSocket dropped after send; waiting for the stored reply');
+        await _waitForSubmittedTurn(
+          message: message,
+          isAuthenticated: isAuthenticated,
+          conversationId: cid,
+          clientMessageId: clientMessageId,
+          generation: wsListenGeneration,
+          branchFromEdit: _wsBranchFromEdit,
+          branchConversationHistory: _wsBranchConversationHistory,
+        );
         return;
       }
-      if (httpFallbackStarted || recoveryStarted) return;
-      recoveryStarted = true;
-      DebugLogger.logWarn('AI', 'WebSocket closed after the server accepted the turn; waiting for the stored reply');
-      final recovered = await _recoverStreamedTurnFromServer(cid, wsListenGeneration);
-      if (!recovered) await fallbackToHttp();
+      await fallbackToHttp();
     }
 
     _channel = await _service.connectWebSocket();
@@ -1396,6 +1490,7 @@ class AiChatProvider with ChangeNotifier {
       branchFromEdit: branchFromEdit,
       branchConversationHistory: branchConversationHistory,
     )));
+    payloadSent = true;
 
     _wsSub = _channel!.stream.listen(
       (event) async {
@@ -1452,7 +1547,7 @@ class AiChatProvider with ChangeNotifier {
           _noteBetaAccessDenial(e);
           return;
         }
-        await recoverOrFallbackToHttp();
+        await recoverOrFallbackToHttp(submitted: true);
       },
       onDone: () async {
         if (wsListenGeneration != _wsConnectionSession) return;
@@ -1464,7 +1559,7 @@ class AiChatProvider with ChangeNotifier {
         // Still streaming here means the socket closed without a final envelope.
         if (!_isStreaming) return;
         DebugLogger.logWarn('AI', 'WS closed before completion');
-        await recoverOrFallbackToHttp();
+        await recoverOrFallbackToHttp(submitted: true);
       },
     );
   }
@@ -2011,6 +2106,84 @@ class AiChatProvider with ChangeNotifier {
     }
   }
 
+  /// The socket died after the turn was submitted. Keep the steps on screen and
+  /// wait for that same run. Do not clear the placeholder or start another agent.
+  Future<void> _waitForSubmittedTurn({
+    required String message,
+    required bool isAuthenticated,
+    required String conversationId,
+    required String clientMessageId,
+    required int generation,
+    required bool branchFromEdit,
+    required List<Map<String, dynamic>>? branchConversationHistory,
+  }) async {
+    _rememberInflightSteps(conversationId);
+    _inflightRestoreActive = true;
+    _isStreaming = true;
+    _ensurePlaceholderAssistantForInflight();
+    notifyListeners();
+    await _sendHttpIntoLastAssistant(
+      message,
+      isAuthenticated: isAuthenticated,
+      persistUserMessage: false,
+      clientMessageId: clientMessageId,
+      branchFromEdit: branchFromEdit,
+      branchConversationHistory: branchConversationHistory,
+      preserveProgress: true,
+      loadReply: () => _awaitReadyChatResult(
+        conversationId: conversationId,
+        clientMessageId: clientMessageId,
+        generation: generation,
+      ),
+    );
+  }
+
+  /// Blocks until the server delivers the reply for a turn that was already submitted.
+  ///
+  /// Each call to `/chat/await` returns as soon as the original run finishes, or
+  /// after a short wait with `ready: false` so the UI can show progress. This
+  /// never starts a second agent run.
+  Future<Map<String, dynamic>> _awaitReadyChatResult({
+    required String conversationId,
+    required String clientMessageId,
+    required int generation,
+  }) async {
+    final deadline = DateTime.now().add(ApiTimeouts.aiChat);
+    while (DateTime.now().isBefore(deadline)) {
+      if (generation != _wsConnectionSession || _conversationId != conversationId) {
+        throw const _TurnSuperseded();
+      }
+      Map<String, dynamic> data;
+      try {
+        data = await _service.awaitChatReply(
+          conversationId: conversationId,
+          clientMessageId: clientMessageId,
+        );
+      } catch (e) {
+        if (e is _TurnSuperseded) rethrow;
+        if (generation != _wsConnectionSession || _conversationId != conversationId) {
+          throw const _TurnSuperseded();
+        }
+        DebugLogger.logWarn('AI', 'Waiting for the stored reply failed, retrying: $e');
+        await Future.delayed(const Duration(seconds: 2));
+        continue;
+      }
+      if (generation != _wsConnectionSession || _conversationId != conversationId) {
+        throw const _TurnSuperseded();
+      }
+      if (data['ready'] == true) return data;
+      if (data['failed'] == true) {
+        throw Exception('The assistant could not finish that reply. Please try again.');
+      }
+      final inf = data['inflight'];
+      if (inf is Map) {
+        _applyInflightSnapshot(Map<String, dynamic>.from(inf));
+        notifyListeners();
+      }
+    }
+    throw TimeoutException('Waiting for the answer timed out');
+  }
+
   Future<void> _sendHttpIntoLastAssistant(
     String message, {
     bool isAuthenticated = false,
@@ -2018,8 +2191,12 @@ class AiChatProvider with ChangeNotifier {
     String? clientMessageId,
     bool branchFromEdit = false,
     List<Map<String, dynamic>>? branchConversationHistory,
+    Future<Map<String, dynamic>> Function()? loadReply,
+    bool preserveProgress = false,
   }) async {
-    _clearAgentProgress();
+    if (!preserveProgress) {
+      _clearAgentProgress();
+    }
     // Keep an empty assistant row at the tail so the progress panel / typing indicator
     // shows while the HTTP request runs (the WebSocket fallback removes its placeholder).
     if (_messages.isEmpty ||
@@ -2027,8 +2204,12 @@ class AiChatProvider with ChangeNotifier {
         _messages.last.content.isNotEmpty) {
       _messages.add(AiChatMessage(role: 'assistant', content: ''));
     }
-    _initAgentProgressIfNeeded();
+    if (!preserveProgress || _agentSteps.isEmpty) {
+      _initAgentProgressIfNeeded();
+    }
     _isStreaming = true;
+    if (preserveProgress) _inflightRestoreActive = true;
+    if (loadReply != null) _storedReplyWaitActive = true;
     notifyListeners();
     final navEpoch = _navigationEpoch;
     try {
@@ -2039,17 +2220,40 @@ class AiChatProvider with ChangeNotifier {
               ? branchConversationHistory
               : _conversationHistoryPayload())
           : null;
-      final data = await _service.sendMessageHttp(
-        message: message,
-        conversationId: serverConversationId,
-        isAuthenticated: isAuthenticated,
-        clientMessageId: isAuthenticated ? clientMessageId : null,
-        pageContext: _mobilePageContext(),
-        preferredLanguage: _preferredLanguageCode,
-        conversationHistory: hist,
-        sources: isAuthenticated ? _sourcesForPayload() : null,
-        branchFromEdit: branchFromEdit,
-      );
+      Map<String, dynamic> data;
+      try {
+        if (loadReply != null) {
+          data = await loadReply();
+        } else {
+          data = await _service.sendMessageHttp(
+            message: message,
+            conversationId: serverConversationId,
+            isAuthenticated: isAuthenticated,
+            clientMessageId: isAuthenticated ? clientMessageId : null,
+            pageContext: _mobilePageContext(),
+            preferredLanguage: _preferredLanguageCode,
+            conversationHistory: hist,
+            sources: isAuthenticated ? _sourcesForPayload() : null,
+            branchFromEdit: branchFromEdit,
+          );
+        }
+      } on AiChatHttpException catch (e) {
+        if (loadReply == null &&
+            e.backendErrorType == 'turn_in_progress' &&
+            serverConversationId != null &&
+            serverConversationId.isNotEmpty &&
+            clientMessageId != null &&
+            clientMessageId.isNotEmpty) {
+          DebugLogger.logWarn('AI', 'Chat POST found the turn already running; waiting for that reply');
+          data = await _awaitReadyChatResult(
+            conversationId: serverConversationId,
+            clientMessageId: clientMessageId,
+            generation: _wsConnectionSession,
+          );
+        } else {
+          rethrow;
+        }
+      }
       if (navEpoch != _navigationEpoch) {
         _isStreaming = false;
         notifyListeners();
@@ -2152,15 +2356,20 @@ class AiChatProvider with ChangeNotifier {
         }
       }
       _isStreaming = false;
+      _inflightRestoreActive = false;
       _clearAgentProgress();
+      if (_conversationId != null) {
+        _detachedAgentStepsByConversationId.remove(_conversationId);
+      }
       notifyListeners();
     } catch (e) {
-      if (navEpoch != _navigationEpoch) {
+      if (e is _TurnSuperseded || navEpoch != _navigationEpoch) {
         _isStreaming = false;
         notifyListeners();
         return;
       }
       _isStreaming = false; // Stop streaming immediately on error
+      _inflightRestoreActive = false;
       _clearAgentProgress();
 
       if (AiChatHttpException.errorDeniesBetaAccess(e)) {
@@ -2207,6 +2416,8 @@ class AiChatProvider with ChangeNotifier {
       ));
 
       notifyListeners();
+    } finally {
+      _storedReplyWaitActive = false;
     }
   }
 
@@ -2321,4 +2532,9 @@ class AiChatProvider with ChangeNotifier {
     _disconnectWs();
     super.dispose();
   }
+}
+
+/// The user left the conversation while `/chat/await` was still open.
+class _TurnSuperseded implements Exception {
+  const _TurnSuperseded();
 }

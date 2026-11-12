@@ -21,6 +21,9 @@
             margin: 0;
             background: #fafafa;
         }
+        .swagger-ui .scheme-container .schemes > div:has(.servers) {
+            display: none;
+        }
     </style>
 </head>
 <body{% if show_staging_banner %} class="has-staging-banner"{% endif %}>
@@ -28,7 +31,6 @@
     <div id="swagger-ui"></div>
 
     <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
-    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
     <script nonce="{{ csp_nonce() }}">
         window.onload = function() {
             window.__clientLog && window.__clientLog('Swagger UI: Initializing...');
@@ -41,11 +43,6 @@
                     '<h2>Error: Swagger UI libraries failed to load</h2>' +
                     '<p>Please check your internet connection and refresh the page.</p>' +
                     '</div>';
-                return;
-            }
-
-            if (typeof SwaggerUIStandalonePreset === 'undefined') {
-                console.error('Swagger UI: SwaggerUIStandalonePreset is not defined');
                 return;
             }
 
@@ -68,22 +65,104 @@
                         tags: spec.tags?.length || 0
                     });
 
-                    // Initialize Swagger UI with inline spec
+                    function headerValue(headers, name) {
+                        if (!headers) return '';
+                        if (typeof headers.get === 'function') {
+                            return headers.get(name) || headers.get(name.toLowerCase()) || '';
+                        }
+                        const found = Object.keys(headers).find(function (key) {
+                            return key.toLowerCase() === name.toLowerCase();
+                        });
+                        return found ? headers[found] : '';
+                    }
+
+                    function specPath(url) {
+                        const parsed = new URL(url, window.location.origin);
+                        let path = parsed.pathname;
+                        const prefixes = (spec.servers || []).map(function (server) {
+                            try {
+                                return new URL(server.url, window.location.origin).pathname.replace(/\/$/, '');
+                            } catch (e) {
+                                return '';
+                            }
+                        }).filter(Boolean).sort(function (a, b) { return b.length - a.length; });
+                        for (let i = 0; i < prefixes.length; i++) {
+                            const prefix = prefixes[i];
+                            if (path === prefix || path.indexOf(prefix + '/') === 0) {
+                                path = path.slice(prefix.length) || '/';
+                                break;
+                            }
+                        }
+                        return path;
+                    }
+
+                    function findOperation(url, method) {
+                        const path = specPath(url);
+                        const methodName = String(method || 'get').toLowerCase();
+                        const direct = spec.paths && spec.paths[path];
+                        if (direct && direct[methodName]) return direct[methodName];
+                        const actual = path.split('/').filter(Boolean);
+                        const templates = Object.keys(spec.paths || {});
+                        for (let i = 0; i < templates.length; i++) {
+                            const tmpl = templates[i];
+                            const parts = tmpl.split('/').filter(Boolean);
+                            if (parts.length !== actual.length) continue;
+                            const matches = parts.every(function (part, index) {
+                                return (part.charAt(0) === '{' && part.charAt(part.length - 1) === '}') || part === actual[index];
+                            });
+                            if (matches && spec.paths[tmpl][methodName]) return spec.paths[tmpl][methodName];
+                        }
+                        return null;
+                    }
+
+                    // Initialize Swagger UI with inline spec.
+                    // credentials stay omitted so a logged-in browser cannot
+                    // authorize Try it out. Key routes need Authorize; session-only
+                    // routes are refused here.
                     const ui = SwaggerUIBundle({
                         spec: spec,  // Use inline spec for better error handling
                         dom_id: '#swagger-ui',
                         deepLinking: true,
                         presets: [
-                            SwaggerUIBundle.presets.apis,
-                            SwaggerUIStandalonePreset
+                            SwaggerUIBundle.presets.apis
                         ],
-                        plugins: [
-                            SwaggerUIBundle.plugins.DownloadUrl
-                        ],
-                        layout: "StandaloneLayout",
+                        layout: "BaseLayout",
+                        filter: true,
                         validatorUrl: null,
+                        withCredentials: false,
+                        persistAuthorization: true,
                         tryItOutEnabled: true,
                         supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                        requestInterceptor: function (req) {
+                            req.credentials = 'omit';
+                            var target;
+                            try {
+                                target = new URL(req.url, window.location.origin);
+                            } catch (e) {
+                                throw new Error('Try it out only calls this host.');
+                            }
+                            if (target.origin !== window.location.origin) {
+                                throw new Error('Try it out only calls this host.');
+                            }
+                            const op = findOperation(req.url, req.method);
+                            if (!op) return req;
+                            const schemes = [];
+                            (op.security || []).forEach(function (entry) {
+                                if (entry && typeof entry === 'object') {
+                                    Object.keys(entry).forEach(function (name) { schemes.push(name); });
+                                }
+                            });
+                            if (!schemes.length) return req;
+                            if (schemes.every(function (name) { return name === 'SessionAuth'; })) {
+                                throw new Error('This route requires a logged-in Backoffice session. An API key cannot call it, so Try it out is disabled.');
+                            }
+                            const bearer = String(headerValue(req.headers, 'Authorization') || '').trim();
+                            const apiKey = String(headerValue(req.headers, 'X-API-Key') || '').trim();
+                            if (!/^Bearer\s+\S+/i.test(bearer) && !apiKey) {
+                                throw new Error('This route requires an API key. Click Authorize, paste the key, and try again.');
+                            }
+                            return req;
+                        },
                         onComplete: function() {
                             window.__clientLog && window.__clientLog('Swagger UI: Initialization complete');
                         }

@@ -462,7 +462,7 @@ export const HtmlPipelineMixin = {
 
         let resp;
         try {
-            resp = await this._apiFetch('/api/ai/v2/table/export', {
+            resp = await this._apiFetch('/api/ai/v1/table/export', {
                 method: 'POST',
                 body: JSON.stringify({ rows })
             });

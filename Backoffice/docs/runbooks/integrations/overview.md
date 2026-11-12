@@ -13,4 +13,4 @@ Thin index for optional services the Backoffice plugs into — full env keys sta
 
 - LibreTranslate unreachable → translations fall back/disabled paths depending on toggles — check service health and outbound firewall.
 - Azure mount missing → uploads or translation persistence quietly fail paths depending on caller — correlate with `/admin` document upload logs.
-- AI provider outage → **`/api/ai/v2/health`** degraded; chat may fallback — observability [`../observability/logging-and-health.md`](../observability/logging-and-health.md).
+- AI provider outage → **`/api/ai/v1/health`** degraded; chat may fallback — observability [`../observability/logging-and-health.md`](../observability/logging-and-health.md).

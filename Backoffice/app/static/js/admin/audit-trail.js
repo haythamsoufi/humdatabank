@@ -797,7 +797,7 @@ $(document).ready(function() {
             'country_access_requested': { icon: 'fa-globe', bg: 'bg-blue-50',   text: 'text-blue-800',   label: cfg.t.country_access_ca116168 },
             'country_selected':    { icon: 'fa-flag',       bg: 'bg-blue-50',    text: 'text-blue-800',   label: cfg.t.country_selection_cd8e66c6 },
 
-            // ── AI chat (DELETE on /api/ai/v2/...) ──────────────────────────
+            // ── AI chat (DELETE on /api/ai/v1/...) ──────────────────────────
             'ai_conversation_deleted':      { icon: 'fa-comments', bg: 'bg-red-50',    text: 'text-red-800',    label: cfg.t.ai_chat_deleted_9c30a335 },
             'ai_conversations_deleted_all': { icon: 'fa-comments', bg: 'bg-red-100',   text: 'text-red-900',   label: cfg.t.all_ai_chats_deleted_9546c247 },
         };

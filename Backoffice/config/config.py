@@ -432,11 +432,15 @@ class Config:
     # Reject (instead of only logging) form-builder saves whose plugin field config fails validate_config.
     PLUGIN_FIELD_CONFIG_ENFORCE = _parse_bool(os.environ.get("PLUGIN_FIELD_CONFIG_ENFORCE"), default=False)
 
-    # Kept so an existing DEV_ACT_AS_EXTRA_EMAILS env var still parses. The local Act as
-    # picker lists every active user and does not read this list.
+    # Kept so an existing DEV_ACT_AS_EXTRA_EMAILS env var still parses. The Act as
+    # search does not read this list.
     DEV_ACT_AS_EXTRA_EMAILS: list[str] = [
         e.strip().lower() for e in (os.environ.get("DEV_ACT_AS_EXTRA_EMAILS") or "").split(",") if e.strip()
     ]
+    # Local Act as may search any active account and sign in by user id only when this
+    # is true. Default off so a restored production database is not listed on /login.
+    # Role presets (test_sys / test_admin / test_focal) stay available without it.
+    DEV_ACT_AS_ALL_USERS = _parse_bool(os.environ.get("DEV_ACT_AS_ALL_USERS"), default=False)
 
     # Dev-only auto-login shortcut for admin routes; startup refuses it unless DEBUG and
     # FLASK_CONFIG=development (see create_app / security_startup).

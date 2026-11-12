@@ -56,9 +56,11 @@ from app.services.ai.chat.request import (
     get_idempotent_reply,
     apply_anonymous_rules,
     load_conversation_history_for_llm,
+    load_stored_chat_reply,
     replace_conversation_messages,
     find_existing_reply_for_client_message_id,
 )
+from app.services.ai.chat.inflight_turns import begin_turn, finish_turn, get_running_turn, get_turn
 from sqlalchemy.orm.attributes import flag_modified
 from app.utils.datetime_helpers import utcnow
 from app.extensions import db, limiter
@@ -87,7 +89,7 @@ def _get_ai_chat_integration():
         return None
 
 
-ai_bp = Blueprint("ai_v2", __name__, url_prefix="/api/ai/v2")
+ai_bp = Blueprint("ai_v1", __name__, url_prefix="/api/ai/v1")
 
 
 def _chat_json_body():
@@ -736,6 +738,30 @@ def _build_access_context(identity) -> Dict[str, Any]:
     }
 
 
+def _session_user(identity):
+    """User row attached to this thread's session.
+
+    Streaming captures the caller on the request thread and reads them again on
+    the worker. That instance is detached there, so a dynamic relationship such
+    as ``countries`` cannot be loaded from it.
+    """
+    user = getattr(identity, "user", None)
+    user_id = getattr(user, "id", None)
+    if user_id is None:
+        return None
+    try:
+        from sqlalchemy.orm import object_session
+
+        if object_session(user) is not None:
+            return user
+    except Exception as e:
+        logger.debug("session user attachment check failed: %s", e)
+    from app.extensions import db
+    from app.models import User
+
+    return db.session.get(User, int(user_id))
+
+
 def _build_platform_context(identity, access_context: Dict[str, Any]) -> Dict[str, Any]:
     """Build platform context for the AI engine. Used by chat and chat_stream."""
     platform_context: Dict[str, Any] = {
@@ -779,9 +805,10 @@ def _build_platform_context(identity, access_context: Dict[str, Any]) -> Dict[st
         except Exception as e_assign:
             current_app.logger.warning("Could not compute assignment stats: %s", e_assign)
 
-    if identity.is_authenticated and identity.user:
+    session_user = _session_user(identity) if identity.is_authenticated and identity.user else None
+    if session_user is not None:
         try:
-            user_countries = identity.user.countries.all() if hasattr(identity.user, "countries") else []
+            user_countries = session_user.countries.all() if hasattr(session_user, "countries") else []
             if access_context["role"] not in ("admin", "system_manager"):
                 platform_context["available_countries"] = [
                     {"id": c.id, "name": c.name, "iso3": getattr(c, "iso3", ""), "national_society": getattr(c, "national_society_name", "") or ""}
@@ -1121,7 +1148,7 @@ def chat():
         form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
         user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
         transport="http",
-        endpoint_path=(request.path or "/api/ai/v2/chat"),
+        endpoint_path=(request.path or "/api/ai/v1/chat"),
         client=str((data.get("client") or "unknown")),
         conversation_id=(parsed.conversation_id or data.get("conversation_id")),
         client_message_id=parsed.client_message_id,
@@ -1149,7 +1176,7 @@ def chat():
             dbg = (os.getenv("AI_CHAT_DEBUG_LOGS") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
         if bool(dbg):
             current_app.logger.debug(
-                "AI v2 /chat request: user=%s auth=%s conv_id_in=%s client_msg_id=%s msg_preview=%r",
+                "AI v1 /chat request: user=%s auth=%s conv_id_in=%s client_msg_id=%s msg_preview=%r",
                 (int(identity.user.id) if identity.is_authenticated and identity.user else None),
                 str(identity.auth_source),
                 (parsed.conversation_id or None),
@@ -1177,7 +1204,7 @@ def chat():
                 dbg = (os.getenv("AI_CHAT_DEBUG_LOGS") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
             if bool(dbg):
                 current_app.logger.debug(
-                    "AI v2 /chat deduped reply: user=%s conv_id=%s client_msg_id=%s user_msg_id=%s assistant_msg_id=%s",
+                    "AI v1 /chat deduped reply: user=%s conv_id=%s client_msg_id=%s user_msg_id=%s assistant_msg_id=%s",
                     (int(identity.user.id) if identity.is_authenticated and identity.user else None),
                     conversation_id,
                     parsed.client_message_id,
@@ -1224,8 +1251,55 @@ def chat():
     function_calls_used = []
     error_type: Optional[str] = None
     success = False
+    owned_turn = False
+    turn_status = "failed"
 
     try:
+        # A stream (or an earlier POST) already accepted this client_message_id.
+        # Do not start a second agent; the caller waits on /chat/await.
+        if (
+            identity.is_authenticated
+            and identity.user
+            and conversation_id
+            and client_message_id
+        ):
+            running = get_running_turn(user_id=int(identity.user.id), client_message_id=client_message_id)
+            if running is not None:
+                current_app.logger.info(
+                    "AI v1 /chat duplicate suppressed client_message_id=%s conversation_id=%s owner_request_id=%s",
+                    client_message_id,
+                    conversation_id,
+                    running.request_id,
+                )
+                with suppress(Exception):
+                    db.session.rollback()
+                return json_error(
+                    "This message is already being answered.",
+                    409,
+                    success=False,
+                    error_type="turn_in_progress",
+                    conversation_id=running.conversation_id or conversation_id,
+                    client_message_id=client_message_id,
+                )
+            _claimed, created = begin_turn(
+                user_id=int(identity.user.id),
+                client_message_id=client_message_id,
+                conversation_id=conversation_id,
+                request_id=str(uuid.uuid4()),
+            )
+            if not created:
+                with suppress(Exception):
+                    db.session.rollback()
+                return json_error(
+                    "This message is already being answered.",
+                    409,
+                    success=False,
+                    error_type="turn_in_progress",
+                    conversation_id=_claimed.conversation_id or conversation_id,
+                    client_message_id=client_message_id,
+                )
+            owned_turn = True
+
         # Centralized OpenAI-only chain (agent -> OpenAI)
         from app.services.ai.chat.engine import AIChatEngine
 
@@ -1286,7 +1360,7 @@ def chat():
                     )
                 )
             except Exception as e:
-                current_app.logger.warning("Failed to track telemetry for v2 chat failure: %s", e, exc_info=True)
+                current_app.logger.warning("Failed to track telemetry for v1 chat failure: %s", e, exc_info=True)
 
             return json_error(
                 err_msg,
@@ -1448,14 +1522,15 @@ def chat():
             telemetry_service.track_interaction(metrics)
         except Exception as e:
             # Don't fail the request if telemetry fails
-            current_app.logger.warning("Failed to track telemetry for v2 chat: %s", e, exc_info=True)
+            current_app.logger.warning("Failed to track telemetry for v1 chat: %s", e, exc_info=True)
 
         # Log which provider was used for debugging
         current_app.logger.info(
-            f"AI v2 chat response: provider={llm_provider}, model={model_name}, "
+            f"AI v1 chat response: provider={llm_provider}, model={model_name}, "
             f"response_length={len(response_text or '')}, user_id={identity.user.id if identity.user else 'anonymous'}"
         )
 
+        turn_status = "completed"
         return json_ok(
             success=True,
             conversation_id=conversation_id,
@@ -1485,7 +1560,7 @@ def chat():
         error_message = GENERIC_ERROR_MESSAGE
         # Classify on the real exception text; it is never returned to the client.
         classify_text = f"{error_type} {e}"
-        current_app.logger.exception("AI v2 chat failed: %s", error_type)
+        current_app.logger.exception("AI v1 chat failed: %s", error_type)
 
         # Track error in telemetry
         try:
@@ -1555,11 +1630,219 @@ def chat():
             message=error_response.get("message"),
         )
     finally:
+        if owned_turn and client_message_id and identity.is_authenticated and identity.user:
+            with suppress(Exception):
+                finish_turn(
+                    user_id=int(identity.user.id),
+                    client_message_id=client_message_id,
+                    status=turn_status,
+                )
         if did_login:
             with suppress(Exception):
                 logout_user()
             with suppress(Exception):
                 session.modified = False
+
+
+def _joined_sse_response(turn, *, did_login: bool, message: str, masked_user_message: Optional[str]):
+    """SSE body for a client that resubmitted a turn this process is already running.
+
+    Heartbeats keep the connection open. When the owner finishes, the stored reply
+    is written out. This does not start an agent.
+    """
+
+    def _gen():
+        try:
+            meta_out: Dict[str, Any] = {
+                "type": "meta",
+                "request_id": turn.request_id,
+                "conversation_id": turn.conversation_id,
+                "joined": True,
+            }
+            if message:
+                meta_out["initial_conversation_title"] = _build_initial_conversation_title(message)
+            if masked_user_message:
+                meta_out["masked_user_message"] = masked_user_message
+            yield f"data: {json.dumps(meta_out)}\n\n"
+            try:
+                heartbeat_every = float(current_app.config.get("AI_SSE_HEARTBEAT_SECONDS", 10))
+            except (TypeError, ValueError):
+                heartbeat_every = 10.0
+            try:
+                agent_timeout = int(current_app.config.get("AI_AGENT_TIMEOUT_SECONDS", 300))
+            except (TypeError, ValueError):
+                agent_timeout = 300
+            try:
+                idle = float(current_app.config.get("AI_SSE_IDLE_TIMEOUT_SECONDS", 180))
+            except (TypeError, ValueError):
+                idle = 180.0
+            hard = max(idle, float(agent_timeout) + 30.0)
+            started = time.time()
+            last_hb = 0.0
+            while not turn.done.wait(timeout=1.0):
+                now = time.time()
+                if now - started >= hard:
+                    current_app.logger.info(
+                        "AI SSE joined owner_request_id=%s still running after %.1fs",
+                        turn.request_id,
+                        now - started,
+                    )
+                    return
+                if (now - last_hb) >= heartbeat_every:
+                    last_hb = now
+                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+            with suppress(Exception):
+                db.session.rollback()
+            stored = None
+            if turn.conversation_id and turn.client_message_id:
+                stored = load_stored_chat_reply(
+                    conversation_id=turn.conversation_id,
+                    user_id=turn.user_id,
+                    client_message_id=turn.client_message_id,
+                )
+            reply = (stored or {}).get("reply") or ""
+            if stored and str(reply).strip():
+                done_payload: Dict[str, Any] = {
+                    "type": "done",
+                    "response": reply,
+                    "provider": (stored.get("meta") or {}).get("provider") or "stored",
+                    "model": (stored.get("meta") or {}).get("model"),
+                    "conversation_id": turn.conversation_id,
+                    "joined": True,
+                }
+                if stored.get("trace_id") is not None:
+                    done_payload["trace_id"] = stored.get("trace_id")
+                for key in ("map_payload", "chart_payload", "table_payload", "sources"):
+                    if stored.get(key):
+                        done_payload[key] = stored.get(key)
+                yield f"data: {json.dumps(done_payload)}\n\n"
+            elif turn.status == "cancelled":
+                yield f"data: {json.dumps({'type': 'cancelled', 'message': 'Request cancelled'})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'error', 'message': GENERIC_ERROR_MESSAGE, 'error_type': 'Error'})}\n\n"
+        except GeneratorExit:
+            raise
+        finally:
+            if did_login:
+                with suppress(Exception):
+                    logout_user()
+                with suppress(Exception):
+                    session.modified = False
+            with suppress(Exception):
+                db.session.remove()
+
+    resp = Response(stream_with_context(_gen()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
+
+
+def _read_inflight_snapshot(user_id: int, conversation_id: str) -> Optional[Dict[str, Any]]:
+    convo = AIConversation.query.filter_by(id=conversation_id, user_id=user_id).first()
+    if not convo or not isinstance(convo.meta, dict):
+        return None
+    inflight = convo.meta.get("inflight")
+    if isinstance(inflight, dict) and inflight.get("status") == "in_progress":
+        return inflight
+    return None
+
+
+@ai_bp.route("/chat/await", methods=["POST"])
+@limiter.limit("40 per minute")
+def chat_await():
+    """Wait until an already-submitted turn has a stored reply, then return it.
+
+    Does not start an agent. The mobile client calls this when its SSE connection
+    drops after the request was sent. Each call waits at most 20 seconds (under
+    the gunicorn worker timeout) and returns ``ready: false`` if the answer is
+    still in progress, so the client calls again. When the owner finishes during
+    the wait, this response carries the reply.
+    """
+    identity = resolve_ai_identity()
+    beta_denied = _ai_beta_denied_response(identity)
+    if beta_denied is not None:
+        return beta_denied
+    if not identity.is_authenticated or not identity.user:
+        return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
+
+    data, body_error = _chat_json_body()
+    if body_error is not None:
+        return body_error
+    conversation_id = str(data.get("conversation_id") or "").strip()
+    client_message_id = str(data.get("client_message_id") or "").strip()[:64]
+    if not conversation_id or not client_message_id:
+        return json_error("conversation_id and client_message_id are required", 400, success=False)
+    try:
+        wait_seconds = float(data.get("wait_seconds") or 15)
+    except (TypeError, ValueError):
+        wait_seconds = 15.0
+    wait_seconds = min(max(wait_seconds, 1.0), 20.0)
+
+    user_id = int(identity.user.id)
+    # Don't hold a pooled connection while this request waits.
+    with suppress(Exception):
+        db.session.rollback()
+    with suppress(Exception):
+        db.session.remove()
+
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        stored = load_stored_chat_reply(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            client_message_id=client_message_id,
+        )
+        with suppress(Exception):
+            db.session.rollback()
+        with suppress(Exception):
+            db.session.remove()
+        if stored:
+            return json_ok(success=True, ready=True, **stored)
+
+        turn = get_turn(user_id=user_id, client_message_id=client_message_id)
+        if turn is not None and turn.done.is_set() and not stored:
+            if turn.status in {"failed", "cancelled"}:
+                return json_ok(
+                    success=True,
+                    ready=False,
+                    failed=True,
+                    status=turn.status,
+                    conversation_id=conversation_id,
+                    client_message_id=client_message_id,
+                )
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        if turn is not None and not turn.done.is_set():
+            turn.done.wait(timeout=min(1.0, remaining))
+        else:
+            time.sleep(min(0.4, remaining))
+
+    inflight = None
+    try:
+        inflight = _read_inflight_snapshot(user_id, conversation_id)
+    except Exception as e:
+        logger.debug("chat_await inflight read failed: %s", e)
+        with suppress(Exception):
+            db.session.rollback()
+    finally:
+        with suppress(Exception):
+            db.session.remove()
+
+    accepted = get_running_turn(user_id=user_id, client_message_id=client_message_id) is not None or inflight is not None
+    return json_ok(
+        success=True,
+        ready=False,
+        failed=False,
+        accepted=accepted,
+        conversation_id=conversation_id,
+        client_message_id=client_message_id,
+        inflight=inflight,
+    )
 
 
 @ai_bp.route("/chat/stream", methods=["POST"])
@@ -1634,7 +1917,7 @@ def chat_stream():
         form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
         user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
         transport="sse",
-        endpoint_path=(request.path or "/api/ai/v2/chat/stream"),
+        endpoint_path=(request.path or "/api/ai/v1/chat/stream"),
         client=str((data.get("client") or "unknown")),
         conversation_id=(parsed.conversation_id or data.get("conversation_id")),
         client_message_id=parsed.client_message_id,
@@ -1661,24 +1944,27 @@ def chat_stream():
     masked_user_message_for_client = dlp_message if dlp_message != parsed.message else None
     parsed.message = dlp_message
 
+    # History, the user row, and platform context used to run here, before any
+    # byte was sent. Mobile gives the stream 30s to deliver response headers, so
+    # that work has to happen after the first SSE event, on the worker thread.
     if not identity.is_authenticated:
         parsed = apply_anonymous_rules(parsed)
         conversation_id = None
-        conversation_history = parsed.conversation_history or []
     else:
-        conversation_id, conversation_history = resolve_conversation_and_history(identity, parsed)
-
-    access_context = _build_access_context(identity)
+        conversation_id = (str(parsed.conversation_id).strip() if parsed.conversation_id else "") or str(uuid.uuid4())
+        parsed.conversation_id = conversation_id
 
     message = parsed.message
     page_context = parsed.page_context
     preferred_language = parsed.preferred_language
     client_message_id = parsed.client_message_id
     branch_from_edit = parsed.branch_from_edit
+    conversation_history = list(parsed.conversation_history or [])
+    platform_context: Dict[str, Any] = {}
 
     # Generation is server-side work: a refresh / navigation / dropped connection must NOT cancel it.
     # The worker keeps running, persists the reply, and clears conversation.meta.inflight; the client
-    # recovers by polling GET /conversations/<id>. Only an explicit POST /chat/cancel (Stop) cancels.
+    # recovers by polling GET /conversations/<id> or POST /chat/await. Only an explicit POST /chat/cancel stops it.
     # Anonymous requests have no persisted conversation to recover, so those still cancel on disconnect.
     # Clients may opt out explicitly with keep_running_on_disconnect=false.
     keep_running_on_disconnect = bool(
@@ -1687,102 +1973,6 @@ def chat_stream():
         and conversation_id
         and data.get("keep_running_on_disconnect", True)
     )
-
-    # Ensure the conversation row exists immediately for new chats so the immersive UI can
-    # refresh the sidebar list right away (stream persistence happens async later).
-    if identity.is_authenticated and identity.user and conversation_id:
-        try:
-            convo = AIConversation.query.filter_by(id=conversation_id, user_id=int(identity.user.id)).first()
-            if not convo:
-                title = _build_initial_conversation_title(message)
-                client = (data.get("client") or "unknown")
-                if not isinstance(client, str):
-                    client = "unknown"
-                client = client.strip().lower()
-                if client not in {"website", "mobile", "backoffice", "unknown"}:
-                    client = "unknown"
-                convo = AIConversation(
-                    id=conversation_id,
-                    user_id=int(identity.user.id),
-                    title=title,
-                    created_at=utcnow(),
-                    updated_at=utcnow(),
-                    last_message_at=utcnow(),
-                    meta={"client": client, "source": "stream_init", "title_source": "auto_initial"},
-                )
-                db.session.add(convo)
-                db.session.commit()
-                _run_conversation_title_refine_background(
-                    current_app._get_current_object(),
-                    user_id=int(identity.user.id),
-                    conversation_id=conversation_id,
-                    user_message=message,
-                )
-            else:
-                # Touch updated_at so it sorts correctly in the sidebar even before messages persist.
-                convo.updated_at = utcnow()
-                db.session.commit()
-        except Exception as e:
-            current_app.logger.exception("Failed to pre-create AI conversation (stream init)")
-            with suppress(Exception):
-                db.session.rollback()
-
-    existing = get_idempotent_reply(identity, conversation_id, client_message_id)
-    if existing:
-        reply_text, _, _ = existing
-        request_id = str(uuid.uuid4())
-
-        def _deduped_gen():
-            yield f"data: {json.dumps({'type': 'meta', 'request_id': request_id, 'deduped': True, 'conversation_id': conversation_id})}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'response': reply_text, 'provider': 'deduped', 'model': None})}\n\n"
-
-        _deduped_resp = Response(stream_with_context(_deduped_gen()), mimetype="text/event-stream")
-        _deduped_resp.headers["Cache-Control"] = "no-cache"
-        _deduped_resp.headers["X-Accel-Buffering"] = "no"
-        return _deduped_resp
-
-    # Persist the USER message immediately for logged-in users (before long-running tool calls).
-    # This is important for immersive UI so a refresh shows at least the submitted message.
-    if identity.is_authenticated and identity.user and conversation_id and message and not branch_from_edit:
-        try:
-            convo = AIConversation.query.filter_by(id=conversation_id, user_id=int(identity.user.id)).first()
-            if convo:
-                convo.updated_at = utcnow()
-                convo.last_message_at = utcnow()
-
-            should_insert_user = True
-            if client_message_id:
-                existing_user = AIMessage.query.filter_by(
-                    conversation_id=conversation_id,
-                    user_id=int(identity.user.id),
-                    role="user",
-                    client_message_id=client_message_id,
-                ).first()
-                if existing_user:
-                    should_insert_user = False
-
-            if should_insert_user:
-                db.session.add(
-                    AIMessage(
-                        conversation_id=conversation_id,
-                        user_id=int(identity.user.id),
-                        role="user",
-                        content=message,
-                        client_message_id=client_message_id,
-                        meta={"page_context": page_context} if page_context else None,
-                    )
-                )
-            # Commit even if we skipped insert so convo timestamp touches don't leak as pending work.
-            db.session.commit()
-        except Exception as e:
-            current_app.logger.exception("Failed to persist user message at stream start")
-            with suppress(Exception):
-                db.session.rollback()
-
-    platform_context = _get_platform_context_cached(identity, access_context)
-    # Stream uses minimal country list; ensure keys exist for engine
-    if "available_countries" not in platform_context:
-        platform_context["available_countries"] = []
 
     request_id = str(uuid.uuid4())
     start_time = utcnow()
@@ -1814,31 +2004,32 @@ def chat_stream():
         logger.debug("Failed to get user_id_for_persist: %s", e)
         user_id_for_persist = None
 
-    # Persist an "in-flight" progress snapshot on the conversation so immersive UI can
-    # restore steps/progress after a refresh while generation continues server-side.
-    if user_id_for_persist and conversation_id:
-        try:
-            convo = AIConversation.query.filter_by(id=conversation_id, user_id=user_id_for_persist).first()
-            if convo:
-                meta = convo.meta if isinstance(convo.meta, dict) else {}
-                meta = dict(meta)
-                meta["inflight"] = {
-                    "request_id": request_id,
-                    "status": "in_progress",
-                    "started_at": utcnow().isoformat(),
-                    "updated_at": utcnow().isoformat(),
-                    "steps": [{"message": "Preparing query…", "detail_lines": []}],
-                }
-                convo.meta = meta
-                convo.updated_at = utcnow()
-                db.session.commit()
-        except Exception as e:
-            current_app.logger.exception("AI SSE[%s] failed to persist inflight snapshot", request_id)
-            with suppress(Exception):
-                db.session.rollback()
+    owns_turn = False
+    if user_id_for_persist and conversation_id and client_message_id:
+        claimed, created = begin_turn(
+            user_id=user_id_for_persist,
+            client_message_id=client_message_id,
+            conversation_id=conversation_id,
+            request_id=request_id,
+        )
+        if not created:
+            current_app.logger.info(
+                "AI SSE[%s] joining in-flight turn owner_request_id=%s conversation_id=%s client_message_id=%s",
+                request_id,
+                claimed.request_id,
+                conversation_id,
+                client_message_id,
+            )
+            return _joined_sse_response(
+                claimed,
+                did_login=did_login,
+                message=message,
+                masked_user_message=masked_user_message_for_client,
+            )
+        owns_turn = True
 
     current_app.logger.info(
-        "AI SSE[%s] start user_id=%s conversation_id=%s client_message_id=%s",
+        "AI SSE[%s] accepted user_id=%s conversation_id=%s client_message_id=%s",
         request_id,
         user_id_for_persist,
         conversation_id,
@@ -2057,10 +2248,143 @@ def chat_stream():
                 logger.debug("delta_stats update failed: %s", e)
         _emit({"type": "delta", "text": delta_html})
 
+    def _prepare_stream_turn() -> Optional[str]:
+        """DB setup that used to block the first SSE byte. Returns a deduped reply, or None."""
+        nonlocal conversation_history, platform_context
+        started = time.perf_counter()
+        history_ms = 0
+        persist_ms = 0
+        if identity.is_authenticated and identity.user and conversation_id:
+            phase = time.perf_counter()
+            _cid, history = resolve_conversation_and_history(identity, parsed)
+            conversation_history = list(history or [])
+            history_ms = int((time.perf_counter() - phase) * 1000)
+
+            phase = time.perf_counter()
+            try:
+                convo = AIConversation.query.filter_by(id=conversation_id, user_id=int(identity.user.id)).first()
+                if not convo:
+                    title = _build_initial_conversation_title(message)
+                    client = (data.get("client") or "unknown")
+                    if not isinstance(client, str):
+                        client = "unknown"
+                    client = client.strip().lower()
+                    if client not in {"website", "mobile", "backoffice", "unknown"}:
+                        client = "unknown"
+                    convo = AIConversation(
+                        id=conversation_id,
+                        user_id=int(identity.user.id),
+                        title=title,
+                        created_at=utcnow(),
+                        updated_at=utcnow(),
+                        last_message_at=utcnow(),
+                        meta={"client": client, "source": "stream_init", "title_source": "auto_initial"},
+                    )
+                    db.session.add(convo)
+                    db.session.commit()
+                    _run_conversation_title_refine_background(
+                        app_obj,
+                        user_id=int(identity.user.id),
+                        conversation_id=conversation_id,
+                        user_message=message,
+                    )
+                else:
+                    convo.updated_at = utcnow()
+                    db.session.commit()
+            except Exception as e:
+                current_app.logger.exception("Failed to pre-create AI conversation (stream init)")
+                with suppress(Exception):
+                    db.session.rollback()
+                logger.debug("stream init conversation error: %s", e)
+
+            existing = get_idempotent_reply(identity, conversation_id, client_message_id)
+            if existing:
+                current_app.logger.info(
+                    "AI SSE[%s] setup deduped history_ms=%d",
+                    request_id,
+                    history_ms,
+                )
+                return existing[0]
+
+            if message and not branch_from_edit:
+                try:
+                    convo = AIConversation.query.filter_by(id=conversation_id, user_id=int(identity.user.id)).first()
+                    if convo:
+                        convo.updated_at = utcnow()
+                        convo.last_message_at = utcnow()
+                    should_insert_user = True
+                    if client_message_id:
+                        existing_user = AIMessage.query.filter_by(
+                            conversation_id=conversation_id,
+                            user_id=int(identity.user.id),
+                            role="user",
+                            client_message_id=client_message_id,
+                        ).first()
+                        if existing_user:
+                            should_insert_user = False
+                    if should_insert_user:
+                        db.session.add(
+                            AIMessage(
+                                conversation_id=conversation_id,
+                                user_id=int(identity.user.id),
+                                role="user",
+                                content=message,
+                                client_message_id=client_message_id,
+                                meta={"page_context": page_context} if page_context else None,
+                            )
+                        )
+                    db.session.commit()
+                except Exception as e:
+                    current_app.logger.exception("Failed to persist user message at stream start")
+                    with suppress(Exception):
+                        db.session.rollback()
+                    logger.debug("stream user persist error: %s", e)
+            persist_ms = int((time.perf_counter() - phase) * 1000)
+
+        phase = time.perf_counter()
+        access_context = _build_access_context(identity)
+        platform_context = _get_platform_context_cached(identity, access_context)
+        if "available_countries" not in platform_context:
+            platform_context["available_countries"] = []
+        platform_ms = int((time.perf_counter() - phase) * 1000)
+
+        if user_id_for_persist and conversation_id:
+            try:
+                convo = AIConversation.query.filter_by(id=conversation_id, user_id=user_id_for_persist).first()
+                if convo:
+                    meta = convo.meta if isinstance(convo.meta, dict) else {}
+                    meta = dict(meta)
+                    meta["inflight"] = {
+                        "request_id": request_id,
+                        "status": "in_progress",
+                        "started_at": utcnow().isoformat(),
+                        "updated_at": utcnow().isoformat(),
+                        "steps": [{"message": "Preparing query…", "detail_lines": []}],
+                    }
+                    convo.meta = meta
+                    convo.updated_at = utcnow()
+                    db.session.commit()
+            except Exception as e:
+                current_app.logger.exception("AI SSE[%s] failed to persist inflight snapshot", request_id)
+                with suppress(Exception):
+                    db.session.rollback()
+                logger.debug("inflight snapshot error: %s", e)
+
+        current_app.logger.info(
+            "AI SSE[%s] setup done history_ms=%d persist_ms=%d platform_ms=%d total_ms=%d",
+            request_id,
+            history_ms,
+            persist_ms,
+            platform_ms,
+            int((time.perf_counter() - started) * 1000),
+        )
+        return None
+
     # Run engine in a background thread and feed events into the queue.
     _worker_spawn_t = time.time()
 
     def _worker() -> None:
+        turn_status = "failed"
         try:
             _worker_start_t = time.time()
             current_app_logger = None  # will be set once app context is available
@@ -2094,6 +2418,20 @@ def chat_stream():
                         g.ai_form_builder_ctx = trusted_form_builder_context()
                     except Exception as e:
                         logger.debug("g.ai_form_builder_ctx failed in worker: %s", e)
+                    deduped_reply = _prepare_stream_turn()
+                    if deduped_reply is not None:
+                        _emit(
+                            {
+                                "type": "_final",
+                                "provider": "deduped",
+                                "model": None,
+                                "function_calls_used": [],
+                                "response": deduped_reply,
+                                "success": True,
+                            }
+                        )
+                        turn_status = "completed"
+                        return
                     # Pass conversation_id so agent traces can log it (do not mutate cached platform_context)
                     run_platform_context = {**platform_context, "conversation_id": conversation_id} if conversation_id else platform_context
                     current_app.logger.info(
@@ -2122,6 +2460,7 @@ def chat_stream():
                         )
                         _emit({"type": "cancelled", "message": "Request cancelled"})
                         _clear_inflight_snapshot()
+                        turn_status = "cancelled"
                         return
                     response_text = result.response_html or ("".join(delta_accum) if delta_accum else "")
                     map_payload_result = getattr(result, "map_payload", None)
@@ -2237,12 +2576,21 @@ def chat_stream():
                         # Always clear the inflight snapshot when the worker finishes (success or failure)
                         # so refreshes don't show stale "in progress" steps.
                         _clear_inflight_snapshot()
+                    turn_status = "completed" if result.success else "failed"
         except Exception as e:
             logger.exception("AI chat stream worker failed: %s", e)
+            turn_status = "failed"
             _emit({"type": "error", "message": GENERIC_ERROR_MESSAGE, "error_type": "Error"})
             with suppress(Exception):
                 _clear_inflight_snapshot()
         finally:
+            if owns_turn and user_id_for_persist and client_message_id:
+                with suppress(Exception):
+                    finish_turn(
+                        user_id=user_id_for_persist,
+                        client_message_id=client_message_id,
+                        status=turn_status,
+                    )
             with suppress(Exception):
                 with _ACTIVE_SSE_CANCEL_LOCK:
                     _ACTIVE_SSE_CANCEL_EVENTS.pop(request_id, None)
@@ -2292,6 +2640,12 @@ def chat_stream():
                 # Tell the client what actually got sent/persisted so it can correct its
                 # optimistic local echo of the raw text the user typed before DLP masking.
                 _meta_out["masked_user_message"] = masked_user_message_for_client
+            current_app.logger.info(
+                "AI SSE[%s] flushing headers conversation_id=%s client_message_id=%s",
+                request_id,
+                conversation_id,
+                client_message_id,
+            )
             yield f"data: {json.dumps(_meta_out)}\n\n"
             while True:
                 try:
@@ -2385,7 +2739,7 @@ def chat_stream():
                         )
                         telemetry_service.track_interaction(metrics)
                     except Exception as e:
-                        current_app.logger.warning("Failed to track telemetry for v2 chat stream: %s", e, exc_info=True)
+                        current_app.logger.warning("Failed to track telemetry for v1 chat stream: %s", e, exc_info=True)
 
                     current_app.logger.info(
                         "AI SSE[%s] emitting done conversation_id=%s response_len=%s provider=%s model=%s",
@@ -2791,7 +3145,7 @@ def export_table_as_excel():
     if csrf_error:
         return csrf_error
 
-    # Ensure current_user reflects Bearer auth for consistency with the rest of ai_v2.
+    # Ensure current_user reflects Bearer auth for consistency with the rest of ai_v1.
     try:
         if bearer_identity_needs_login(identity):
             login_user(identity.user, remember=False)

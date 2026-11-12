@@ -55,7 +55,7 @@ Put that blueprint on a host whose path layout matches the client:
 | **A. Take over `data-api.ifrc.org`** | None. DNS or the app gateway sends `/api/*` and `/csv/*` to Backoffice. | Preferred cutover. The base URL, the CSV links, and the compiled `apiKey` keep working. |
 | **B. New host, same paths** | One config change: `fdrsHttpService.initialize("https://<new-host>/api/", key)`, plus the three CSV `href`s. | Use if `data-api.ifrc.org` must stay up in parallel (staging, shadow read). |
 
-Do not invent a new prefix such as `/api/v1/fdrs-compat`. The client concatenates paths onto `…/api/`, so the routes have to be `/api/data`, `/api/entities/ns`, and so on. Those paths do not collide with Backoffice `/api/v1`, `/api/mobile/v1`, or `/api/ai/v2`.
+Do not invent a new prefix such as `/api/v1/fdrs-compat`. The client concatenates paths onto `…/api/`, so the routes have to be `/api/data`, `/api/entities/ns`, and so on. Those paths do not collide with Backoffice `/api/v1`, `/api/mobile/v1`, or `/api/ai/v1`.
 
 ```text
 data.ifrc.org  (unchanged Angular app)

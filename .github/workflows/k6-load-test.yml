@@ -29,7 +29,7 @@ on:
         type: choice
         default: smoke
         options:
-          - smoke                  # Phase 1: /health + /api/ai/v2/health
+          - smoke                  # Phase 1: /health + /api/ai/v1/health
           - api-v1-reads           # Phase 1: 1-2 /api/v1 GETs
           - api-v1-reads-extended  # Phase 1.5: round-robin across non-rate-limited GETs
           - documents              # Phase 1.5: public document/thumbnail downloads

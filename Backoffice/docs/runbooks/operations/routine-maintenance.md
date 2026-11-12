@@ -34,7 +34,7 @@ Confirm the app is running and AI subsystems are healthy:
 
 ```bash
 # From a browser or curl:
-GET https://<your-app-url>/api/ai/v2/health
+GET https://<your-app-url>/api/ai/v1/health
 ```
 
 Expected JSON: `{ "status": "ok", "agent_available": true, "providers": { ... } }`.  
@@ -125,7 +125,7 @@ Confirm that database backups are completing and restorable:
 4. Run smoke test on restored environment:
    ```bash
    python -m flask db current          # confirm migration revision
-   GET /api/ai/v2/health               # confirm AI subsystem
+   GET /api/ai/v1/health               # confirm AI subsystem
    ```
 5. Document the restore test result and date.
 

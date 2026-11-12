@@ -1,0 +1,268 @@
+{
+  "edition": "OCHA Global Humanitarian Overview 2026, plan table as of 11 June 2026",
+  "reference_year": 2026,
+  "as_of": "2026-06-11",
+  "source_url": "https://data.humdata.org/dataset/5beb619b-7934-419d-8a7b-3e6458590e8e/resource/0e00f31f-f7cf-4664-a91e-c4d368b5a9fa/download/plan_table_humanitarian_action_2026_cdd056d1-698b-4ce6-817a-c651b21cb155_as_on_2026-06-11.xlsx",
+  "updated_at": "2026-06-11T11:25:21Z",
+  "note": "People in need from the OCHA Humanitarian Action plan table for 2026. Where a country has more than one plan, the plan with the larger people-in-need figure is kept. Plans that are not a single country are listed under omitted and are not used.",
+  "by_iso3": {
+    "AFG": {
+      "people_in_need": 21889283,
+      "people_targeted": 17479657,
+      "plan_name": "Afghanistan",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1502"
+    },
+    "BFA": {
+      "people_in_need": 4474321,
+      "people_targeted": 2651923,
+      "plan_name": "Burkina Faso",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1499"
+    },
+    "CAF": {
+      "people_in_need": 2286959,
+      "people_targeted": 1265483,
+      "plan_name": "Central African Republic",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1507"
+    },
+    "CMR": {
+      "people_in_need": 2875515,
+      "people_targeted": 1880879,
+      "plan_name": "Cameroon",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1498"
+    },
+    "COD": {
+      "people_in_need": 14940727,
+      "people_targeted": 7313763,
+      "plan_name": "Democratic Republic of the Congo",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1509"
+    },
+    "COL": {
+      "people_in_need": 6927007,
+      "people_targeted": 2656763,
+      "plan_name": "Colombia",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1500"
+    },
+    "CUB": {
+      "people_in_need": 4200000,
+      "people_targeted": 2000000,
+      "plan_name": "Cuba",
+      "plan_type": "Other",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1601"
+    },
+    "HTI": {
+      "people_in_need": 6414193,
+      "people_targeted": 4162202,
+      "plan_name": "Haiti",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1503"
+    },
+    "LBN": {
+      "people_in_need": 1390000,
+      "people_targeted": 1390000,
+      "plan_name": "Lebanon",
+      "plan_type": "FA",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1568"
+    },
+    "LKA": {
+      "people_in_need": 1200000,
+      "people_targeted": 658370,
+      "plan_name": "Sri Lanka",
+      "plan_type": "Other",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1565"
+    },
+    "MDG": {
+      "people_in_need": 632461,
+      "people_targeted": 454975,
+      "plan_name": "Madagascar",
+      "plan_type": "FA",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1567"
+    },
+    "MLI": {
+      "people_in_need": 5083155,
+      "people_targeted": 3808385,
+      "plan_name": "Mali",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1511"
+    },
+    "MMR": {
+      "people_in_need": 16229050,
+      "people_targeted": 4868096,
+      "plan_name": "Myanmar",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1505"
+    },
+    "MOZ": {
+      "people_in_need": 2356162,
+      "people_targeted": 1745582,
+      "plan_name": "Mozambique",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1506"
+    },
+    "NER": {
+      "people_in_need": 3081200,
+      "people_targeted": 1983640,
+      "plan_name": "Niger",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1513"
+    },
+    "NGA": {
+      "people_in_need": 5929291,
+      "people_targeted": 2527178,
+      "plan_name": "Nigeria",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1508"
+    },
+    "PAK": {
+      "people_in_need": 2800000,
+      "people_targeted": 1900000,
+      "plan_name": "Pakistan",
+      "plan_type": "Other",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1532"
+    },
+    "PSE": {
+      "people_in_need": 3618110,
+      "people_targeted": 2970096,
+      "plan_name": "Occupied Palestinian Territory",
+      "plan_type": "FA",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1510"
+    },
+    "SDN": {
+      "people_in_need": 33699770,
+      "people_targeted": 20419163,
+      "plan_name": "Sudan",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1514"
+    },
+    "SOM": {
+      "people_in_need": 4796040,
+      "people_targeted": 2430751,
+      "plan_name": "Somalia",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1516"
+    },
+    "SSD": {
+      "people_in_need": 9913863,
+      "people_targeted": 4343435,
+      "plan_name": "South Sudan",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1512"
+    },
+    "SYR": {
+      "people_in_need": 15598267,
+      "people_targeted": 8561766,
+      "plan_name": "Syrian Arab Republic",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1518"
+    },
+    "TCD": {
+      "people_in_need": 4509014,
+      "people_targeted": 3352810,
+      "plan_name": "Chad",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1501"
+    },
+    "UKR": {
+      "people_in_need": 10849697,
+      "people_targeted": 4118954,
+      "plan_name": "Ukraine",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1515"
+    },
+    "VEN": {
+      "people_in_need": 7943720,
+      "people_targeted": 5453591,
+      "plan_name": "Venezuela",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1517"
+    },
+    "VNM": {
+      "people_in_need": 1443903,
+      "people_targeted": 658761,
+      "plan_name": "Viet Nam (Multiple Typhoons 2025-2026)",
+      "plan_type": "Other",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1522"
+    },
+    "YEM": {
+      "people_in_need": 22325198,
+      "people_targeted": 12004155,
+      "plan_name": "Yemen",
+      "plan_type": "HNRP",
+      "status": "Confirmed data",
+      "plan_url": "https://humanitarianaction.info/plan/1520"
+    }
+  },
+  "omitted": [
+    {
+      "plan": "Horn of Africa to Yemen and Southern Africa (MRP)",
+      "plan_type": "REG",
+      "people_in_need": 1352987
+    },
+    {
+      "plan": "Islamic Republic of Iran (RRP)",
+      "plan_type": "REG",
+      "people_in_need": 2800000
+    },
+    {
+      "plan": "Rohingya (JRP)",
+      "plan_type": "REG",
+      "people_in_need": 1890109
+    },
+    {
+      "plan": "Sudan (RRP)",
+      "plan_type": "REG",
+      "people_in_need": 2557885
+    },
+    {
+      "plan": "Syria (3RP)",
+      "plan_type": "REG",
+      "people_in_need": 15312704
+    },
+    {
+      "plan": "Uganda (RRP)",
+      "plan_type": "REG",
+      "people_in_need": 2225443
+    },
+    {
+      "plan": "Venezuela (RMRP)",
+      "plan_type": "REG",
+      "people_in_need": 6853248
+    },
+    {
+      "plan": "GHO 2026 (Plan not yet defined)",
+      "plan_type": "Other",
+      "people_in_need": null
+    }
+  ]
+}

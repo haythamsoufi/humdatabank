@@ -160,8 +160,8 @@ class TestActivityCategoryForEndpoint:
     def test_ai_documents(self):
         assert activity_category_for_endpoint("ai_documents.bar") == "admin_ai"
 
-    def test_ai_v2(self):
-        assert activity_category_for_endpoint("ai_v2.chat") == "admin_ai"
+    def test_ai_v1(self):
+        assert activity_category_for_endpoint("ai_v1.chat") == "admin_ai"
 
     def test_ai(self):
         assert activity_category_for_endpoint("ai.thing") == "admin_ai"

@@ -35,7 +35,7 @@ class TestShouldSkipApiUsageTracking:
             assert _should_skip_api_usage_tracking() is True
 
     def test_ai_ws_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/ws"):
+        with app.test_request_context("/api/ai/v1/ws"):
             assert _should_skip_api_usage_tracking() is True
 
     def test_ai_documents_ws_skipped(self, app):
@@ -43,11 +43,11 @@ class TestShouldSkipApiUsageTracking:
             assert _should_skip_api_usage_tracking() is True
 
     def test_ai_chat_stream_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             assert _should_skip_api_usage_tracking() is True
 
     def test_ai_chat_cancel_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/chat/cancel"):
+        with app.test_request_context("/api/ai/v1/chat/cancel"):
             assert _should_skip_api_usage_tracking() is True
 
     def test_ai_documents_workflow_tour_skipped(self, app):
@@ -70,33 +70,33 @@ class TestShouldSkipApiUsageTracking:
         with app.test_request_context("/api/forms/dynamic-indicators/render-pending"):
             assert _should_skip_api_usage_tracking() is True
 
-    def test_ai_v2_token_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/token"):
+    def test_ai_v1_token_skipped(self, app):
+        with app.test_request_context("/api/ai/v1/token"):
             assert _should_skip_api_usage_tracking() is True
 
     def test_variables_resolve_skipped(self, app):
         with app.test_request_context("/api/v1/variables/resolve"):
             assert _should_skip_api_usage_tracking() is True
 
-    def test_ai_v2_conversations_get_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/conversations", method="GET"):
+    def test_ai_v1_conversations_get_skipped(self, app):
+        with app.test_request_context("/api/ai/v1/conversations", method="GET"):
             assert _should_skip_api_usage_tracking() is True
 
-    def test_ai_v2_conversations_post_not_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/conversations", method="POST"):
+    def test_ai_v1_conversations_post_not_skipped(self, app):
+        with app.test_request_context("/api/ai/v1/conversations", method="POST"):
             assert _should_skip_api_usage_tracking() is False
 
-    def test_ai_v2_single_conversation_get_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/conversations/abc123", method="GET"):
+    def test_ai_v1_single_conversation_get_skipped(self, app):
+        with app.test_request_context("/api/ai/v1/conversations/abc123", method="GET"):
             assert _should_skip_api_usage_tracking() is True
 
-    def test_ai_v2_single_conversation_get_with_sub_path_not_skipped(self, app):
+    def test_ai_v1_single_conversation_get_with_sub_path_not_skipped(self, app):
         # Has a slash after the ID — not a single conversation
-        with app.test_request_context("/api/ai/v2/conversations/abc123/messages", method="GET"):
+        with app.test_request_context("/api/ai/v1/conversations/abc123/messages", method="GET"):
             assert _should_skip_api_usage_tracking() is False
 
-    def test_ai_v2_conversations_delete_not_skipped(self, app):
-        with app.test_request_context("/api/ai/v2/conversations/abc", method="DELETE"):
+    def test_ai_v1_conversations_delete_not_skipped(self, app):
+        with app.test_request_context("/api/ai/v1/conversations/abc", method="DELETE"):
             assert _should_skip_api_usage_tracking() is False
 
     def test_normal_api_path_not_skipped(self, app):

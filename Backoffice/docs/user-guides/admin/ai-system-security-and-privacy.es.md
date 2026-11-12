@@ -4,7 +4,7 @@ Este documento explica cómo funciona el asistente de IA de backoffice, qué dat
 
 ## Alcance
 
-- **En alcance**: chat de IA (`/api/ai/v2/*`), Base de conocimiento de IA / RAG, preguntas y respuestas de documentación de flujo de trabajo y los controles de seguridad que los rodean (DLP, limpieza de PII, eventos de auditoría).
+- **En alcance**: chat de IA (`/api/ai/v1/*`), Base de conocimiento de IA / RAG, preguntas y respuestas de documentación de flujo de trabajo y los controles de seguridad que los rodean (DLP, limpieza de PII, eventos de auditoría).
 - **Fuera de alcance**: seguridad general de la plataforma (autenticación, RBAC, copias de seguridad), excepto cuando afecta directamente al sistema de IA.
 
 ## Arquitectura de alto nivel

@@ -101,6 +101,8 @@ class TestProbeBind:
         sock = MagicMock()
         with patch("app.utils.common.dev_server_port.socket.socket", return_value=sock), patch(
             "app.utils.common.dev_server_port.os.name", "nt"
+        ), patch(
+            "app.utils.common.dev_server_port.socket.SO_EXCLUSIVEADDRUSE", 1, create=True
         ):
             assert probe_bind("127.0.0.1", 5000) is True
         sock.setsockopt.assert_called()

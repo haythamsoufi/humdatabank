@@ -130,20 +130,6 @@ class TestApiRbacRolesCatalog:
         assert resp.status_code in (302, 403)
 
     def test_handles_exception(self, logged_in_sm_client, db_session):
-        with patch(
-            "app.routes.admin.user_management.api.RbacRole",
-            side_effect=Exception("rbac error"),
-        ):
-            pass
-        from app.models.rbac import RbacRole
-        with patch.object(
-            RbacRole,
-            "query",
-            new_callable=lambda: type(
-                "Q", (), {"order_by": staticmethod(lambda *a: type("Q2", (), {"all": staticmethod(lambda: (_ for _ in ()).throw(Exception("fail")))})())}
-            ),
-        ):
-            pass
         # Just verify the endpoint is accessible for sys_mgr
         resp = logged_in_sm_client.get("/admin/api/rbac/roles")
         assert resp.status_code == 200

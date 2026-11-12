@@ -108,10 +108,14 @@ def to_backoffice_rel(raw: str) -> str | None:
 
 
 def is_pytest_file(rel: str) -> bool:
+    """True for pytest modules, not scripts that merely start with ``test_``."""
     name = Path(rel).name
     if not name.endswith(".py"):
         return False
-    return name.startswith("test_") or name.endswith("_test.py")
+    if not (name.startswith("test_") or name.endswith("_test.py")):
+        return False
+    parts = Path(rel).parts
+    return "tests" in parts
 
 
 def is_ignorable(rel: str) -> bool:

@@ -120,9 +120,9 @@ class AdvancedValidator:
         if not filename:
             return "untitled"
 
-        # SECURITY: Remove path components to prevent path traversal attacks
-        # Normalize path separators and get only the basename
-        filename = os.path.basename(filename)
+        # SECURITY: Remove path components to prevent path traversal attacks.
+        # Normalize separators first so a Windows path is stripped on Linux too.
+        filename = os.path.basename(filename.replace("\\", "/"))
         # Additional check for path traversal attempts
         if '..' in filename or filename.startswith('/') or filename.startswith('\\'):
             # If path traversal detected, use only the final component

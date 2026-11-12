@@ -66,10 +66,13 @@ def normalize_stored_relative_path(value: str, root_folder: str | None = None) -
     - Trims leading slashes
     - If root_folder is provided, strips any leading '<root_folder>/' prefix
     """
-    rel = (value or '').strip()
+    # Convert separators before stripping a drive letter. os.path.basename
+    # does not treat backslash as a separator on Linux, so "D:\data\file.txt"
+    # would otherwise survive as "D:/data/file.txt".
+    rel = (value or '').strip().replace('\\', '/')
     if _WINDOWS_DRIVE_PREFIX.match(rel):
-        rel = os.path.basename(rel)
-    rel = rel.replace('\\', '/').strip('/')
+        rel = rel.split(':', 1)[1]
+    rel = rel.strip('/')
     if root_folder:
         prefix = f"{root_folder.strip('/')}/"
         if rel.startswith(prefix):

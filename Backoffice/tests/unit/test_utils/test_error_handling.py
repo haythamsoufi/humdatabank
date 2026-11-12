@@ -201,10 +201,10 @@ class TestHandleJsonViewException:
     def test_returns_json_error_tuple(self, app):
         with app.test_request_context():
             with patch('app.utils.common.error_handling.request_transaction_rollback'):
-                resp, status = handle_json_view_exception(
+                resp = handle_json_view_exception(
                     ValueError('test'), 'Operation failed'
                 )
-        assert status == 500
+        assert resp.status_code == 500
         data = resp.get_json()
         assert data['error'] == 'Operation failed'
         assert data['success'] is False
@@ -212,10 +212,10 @@ class TestHandleJsonViewException:
     def test_custom_status_code(self, app):
         with app.test_request_context():
             with patch('app.utils.common.error_handling.request_transaction_rollback'):
-                resp, status = handle_json_view_exception(
+                resp = handle_json_view_exception(
                     ValueError('test'), 'Bad input', status_code=400
                 )
-        assert status == 400
+        assert resp.status_code == 400
 
     def test_rollback_called(self, app):
         with app.test_request_context():

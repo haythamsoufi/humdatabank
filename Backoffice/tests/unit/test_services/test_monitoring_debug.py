@@ -902,10 +902,7 @@ class TestLogUserAction:
         mock_user.id = 99
         mock_user.is_authenticated = True
         with app.app_context():
-            with patch(
-                "app.services.monitoring.debug.current_user",
-                new_callable=lambda: type("P", (), {"id": 99})
-            ):
+            with patch("flask_login.current_user", mock_user):
                 log_user_action("view", logger=mock_logger)
         mock_logger.info.assert_called_once()
 

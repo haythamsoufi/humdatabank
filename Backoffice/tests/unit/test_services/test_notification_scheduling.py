@@ -392,8 +392,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService'):
                             with patch('app.services.notification.scheduling.send_instant_notification_email'):
@@ -460,9 +460,9 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification',
+            with patch('app.utils.realtime.ws_manager.broadcast_notification',
                        side_effect=Exception('ws fail')):
-                with patch('app.services.notification.scheduling.broadcast_unread_count',
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count',
                            side_effect=Exception('ws fail')):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService'):
@@ -494,8 +494,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService') as MockPush:
                             MockPush.send_push_notification.side_effect = Exception('push fail')
@@ -527,8 +527,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService'):
                             with patch('app.services.notification.scheduling.send_instant_notification_email',
@@ -569,8 +569,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService') as MockPush:
                             MockPush.send_push_notification.return_value = {'success': True}
@@ -608,8 +608,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService') as MockPush:
                             with patch('app.services.notification.scheduling.send_instant_notification_email') as mock_email:

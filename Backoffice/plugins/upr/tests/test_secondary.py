@@ -52,6 +52,7 @@ def test_import_multilateral_pledges_excel(tmp_path, monkeypatch):
 
     from plugins.upr.secondary import paths
     from plugins.upr.secondary import imports as imp
+    from plugins.upr.secondary import registry
     from plugins.upr.secondary.loaders import load_multilateral
     from plugins.upr.secondary.preview import preview_source
 
@@ -59,6 +60,8 @@ def test_import_multilateral_pledges_excel(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "MULTILATERAL_DIR", tmp_path / "multilateral")
     monkeypatch.setattr(paths, "EAS_SPRM_OPS_DIR", tmp_path / "eas")
     monkeypatch.setattr(imp, "touch_source", lambda *a, **k: k)
+    # Preview reads source status from PluginData. This test only has the files it just wrote.
+    monkeypatch.setattr(registry, "load_secondary_meta", lambda: {"sources": {}})
     monkeypatch.setattr(
         imp,
         "country_name_to_iso3",

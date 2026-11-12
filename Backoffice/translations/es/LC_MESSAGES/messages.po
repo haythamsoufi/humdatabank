@@ -5168,6 +5168,12 @@ msgstr ""
 "Calculado para cada fila a partir de las otras columnas de esa fila. El pie "
 "de página de la columna suma esos resultados."
 
+#: plugins/ifrc/templates/decisions/_i18n.html:113
+msgid ""
+"Calculated from Unified Plan, Unified Report and FDRS submissions in the "
+"Databank."
+msgstr ""
+
 #: app/templates/forms/entry_form/partials/matrix_table.html:524
 msgid "Calculated from other columns in this row"
 msgstr "Calculado a partir de otras columnas de esta fila"
@@ -5929,6 +5935,10 @@ msgid ""
 msgstr ""
 "Elige quién debe recibir este mensaje de prueba. Utiliza el contenido actual"
 " de la plantilla y los valores de marcador de ejemplo."
+
+#: app/routes/auth.py:404
+msgid "Choosing a specific account is turned off. Use a role preset."
+msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:673
 msgid "Chunks"
@@ -8895,6 +8905,14 @@ msgid ""
 "prepare Federation-wide decisions. It shows the evidence and raises prompts "
 "for people to review. It does not make decisions, and it never scores or "
 "ranks National Societies."
+msgstr ""
+
+#: plugins/ifrc/templates/decisions/_guidance.html:4
+msgid ""
+"Decision Maker brings together Unified Plan, Unified Report and FDRS data to"
+" help prepare Federation-wide decisions. It shows the evidence and raises "
+"prompts for people to review. It does not make decisions, and it never "
+"scores or ranks National Societies."
 msgstr ""
 
 #: plugins/ifrc/templates/decisions/catalogue.html:26
@@ -22320,6 +22338,10 @@ msgstr "Fuente de opciones"
 msgid "Or choose a user"
 msgstr "O elige un usuario"
 
+#: app/templates/auth/login.html:776
+msgid "Or find a user"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:96
 msgid "Orange"
 msgstr "Naranja"
@@ -29527,6 +29549,16 @@ msgstr ""
 "activo. Las cuentas que aún no han iniciado sesión están marcadas como no "
 "registradas."
 
+#: app/templates/auth/login.html:748
+msgid ""
+"Sign in without a password as a role preset, or search for an active user. "
+"The account directory is not listed on this page."
+msgstr ""
+
+#: app/templates/auth/login.html:748
+msgid "Sign in without a password as a role preset."
+msgstr ""
+
 #: plugins/ifrc/templates/decisions/_i18n.html:119
 msgid "Signals"
 msgstr ""
@@ -33490,6 +33522,10 @@ msgid ""
 msgstr ""
 "Escribe [ para insertar una variable, por ejemplo, [assignment_period]. Los "
 "datos guardados utilizan el valor resuelto."
+
+#: app/templates/auth/login.html:779
+msgid "Type at least 2 characters"
+msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1583
 msgid "Type at least 2 characters to search."

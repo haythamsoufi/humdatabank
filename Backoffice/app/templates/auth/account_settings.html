@@ -499,7 +499,18 @@ document.addEventListener('DOMContentLoaded', function() {
         activateAccountTab(hash);
     }
 
+    {% if request_access_form._user_has_access_all %}
+    const userHasAccessToAllCountries = true;
+    const userHasAccessCountries = [];
+    {% else %}
+    const userHasAccessToAllCountries = false;
     const userHasAccessCountries = {{ request_access_form._user_has_access|list|tojson|safe }};
+    {% endif %}
+    function userAlreadyHasCountryAccess(countryId) {
+        if (userHasAccessToAllCountries) return true;
+        const parsed = parseInt(countryId, 10);
+        return userHasAccessCountries.includes(parsed);
+    }
     const canRequestMultipleCountries = {{ can_request_multiple_countries|tojson|safe }};
 
     function enforceSingleCountrySelection($select) {
@@ -532,7 +543,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!data.id) return data.text;
                 const $result = window.jQuery('<span></span>');
                 let displayText = data.text;
-                if (userHasAccessCountries.includes(parseInt(data.id))) {
+                if (userAlreadyHasCountryAccess(data.id)) {
                     displayText = `${data.text} (You already have access)`;
                     $result.css({ color: '#9ca3af', fontStyle: 'italic' });
                 }
@@ -540,14 +551,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return $result;
             },
             templateSelection: function(data) {
-                if (userHasAccessCountries.includes(parseInt(data.id))) return null;
+                if (userAlreadyHasCountryAccess(data.id)) return null;
                 return data.text;
             }
         });
 
         $select.find('option').each(function() {
             const optionId = parseInt(window.jQuery(this).val());
-            if (userHasAccessCountries.includes(optionId)) {
+            if (userAlreadyHasCountryAccess(optionId)) {
                 window.jQuery(this).prop('disabled', true);
             }
         });

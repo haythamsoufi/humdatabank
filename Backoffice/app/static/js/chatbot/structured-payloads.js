@@ -95,7 +95,7 @@ export function registerStructuredPayloadListener() {
         var exportFetch = (window.getFetch && window.getFetch()) || fetch;
         var filename = (fileBase || 'data-table') + '.xlsx';
         try {
-            var res = await exportFetch('/api/ai/v2/table/export', {
+            var res = await exportFetch('/api/ai/v1/table/export', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {

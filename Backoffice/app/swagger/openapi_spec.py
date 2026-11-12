@@ -1,15 +1,21 @@
 """
-OpenAPI 3.0 specification for the Databank REST API.
+OpenAPI 3.0 specification for the Backoffice ``/api/v1`` API.
+
+The path list is generated from the live Flask url map (see ``route_spec``).
+Overlays add query parameters and response schemas that the route scan cannot
+see. Mobile (``/api/mobile/v1``) and the legacy Indicator Bank compatibility
+routes (``/Indicator``, ``/Sector``, ...) are separate surfaces and are not
+part of this document.
 """
+from __future__ import annotations
+
 import os
 
-def get_openapi_spec():
-    """
-    Returns the OpenAPI 3.0 specification as a dictionary.
-    """
-    base_url = os.environ.get('API_BASE_URL', 'http://localhost:5000')
-    api_version = 'v1'
+from app.swagger.overlays import operation_overlays
+from app.swagger.route_spec import build_paths, tag_definitions
 
+
+def _org_name() -> str:
     org_name = "Humanitarian Databank"
     try:
         from flask import has_app_context
@@ -18,1025 +24,246 @@ def get_openapi_spec():
             org_name = _get_org_name()
     except Exception:
         pass
+    return org_name
 
-    spec = {
+
+def _contact(org_name: str) -> dict:
+    contact = {"name": f"{org_name} API Support"}
+    try:
+        from flask import has_app_context
+        if has_app_context():
+            from app.utils.organization.organization_helpers import get_org_team_email
+            email = get_org_team_email()
+            if email:
+                contact["email"] = email
+    except Exception:
+        pass
+    return contact
+
+
+def _servers() -> list:
+    """One server, so Swagger UI does not offer a host dropdown.
+
+    A request always documents the host that served it. Try it out then
+    cannot send a pasted API key to a different environment. Localhost is
+    only the fallback when there is no request (tests and offline generation).
+    """
+    try:
+        from flask import has_request_context, request
+        if has_request_context():
+            origin = (request.host_url or "").rstrip("/")
+            if origin:
+                return [{
+                    "url": f"{origin}/api/v1",
+                    "description": "The server that served this page.",
+                }]
+    except Exception:
+        pass
+
+    configured = (os.environ.get("API_BASE_URL") or "").strip().rstrip("/")
+    if configured:
+        return [{"url": f"{configured}/api/v1", "description": "API_BASE_URL"}]
+    return [{"url": "http://localhost:5000/api/v1", "description": "Local development"}]
+
+
+def _components() -> dict:
+    return {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "API Key",
+                "description": "Database-managed API key in the Authorization header: `Bearer <key>`.",
+            },
+            "ApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+                "description": "Same API key in the X-API-Key header. Query-string keys are deprecated and only work for keys that opted in.",
+            },
+            "SessionAuth": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "session",
+                "description": "A logged-in Backoffice session is accepted on some routes. Try it out on this page sends an API key only, so a route that accepts a session and nothing else cannot be called from this page.",
+            },
+        },
+        "schemas": {
+            "Error": {
+                "type": "object",
+                "description": "Error body from api_error(). `success` is not part of this payload.",
+                "properties": {
+                    "error": {"type": "string", "example": "Could not fetch indicator bank data"},
+                    "error_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "123e4567-e89b-12d3-a456-426614174000",
+                    },
+                    "debug": {
+                        "type": "string",
+                        "description": "Present only when the server is in debug mode.",
+                    },
+                },
+                "required": ["error", "error_id"],
+            },
+            "Country": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "example": 1},
+                    "name": {"type": "string", "example": "Afghanistan"},
+                    "localized_name": {"type": "string"},
+                    "iso2": {"type": "string", "example": "AF"},
+                    "iso3": {"type": "string", "example": "AFG"},
+                    "region": {"type": "string", "example": "Asia Pacific"},
+                    "multilingual_names": {
+                        "type": "object",
+                        "additionalProperties": {"type": "string"},
+                        "description": "Country names in languages other than English.",
+                    },
+                    "national_society_name": {"type": "string"},
+                },
+            },
+            "Indicator": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "definition": {"type": "string"},
+                    "type": {"type": "string"},
+                    "type_translations": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "unit": {"type": "string"},
+                    "unit_translations": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "sector": {"type": "object"},
+                    "archived": {"type": "boolean"},
+                },
+            },
+            "Template": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "sections_count": {"type": "integer"},
+                    "pages_count": {"type": "integer"},
+                    "items_count": {"type": "integer"},
+                },
+            },
+            "Submission": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "type": {"type": "string", "description": "assigned or public"},
+                    "template_id": {"type": "integer"},
+                    "period_name": {"type": "string"},
+                    "status": {"type": "string"},
+                    "submitted_at": {"type": "string", "format": "date-time"},
+                    "country_info": {"type": "object"},
+                },
+            },
+            "Pagination": {
+                "type": "object",
+                "description": (
+                    "List endpoints on this API use total_items, total_pages, and current_page. "
+                    "page, per_page, total, and pages are kept for clients that still look for those names."
+                ),
+                "properties": {
+                    "page": {"type": "integer", "example": 1},
+                    "per_page": {"type": "integer", "example": 20},
+                    "total": {"type": "integer", "example": 100},
+                    "pages": {"type": "integer", "example": 5},
+                    "total_items": {"type": "integer"},
+                    "total_pages": {"type": "integer"},
+                    "current_page": {"type": "integer"},
+                },
+            },
+        },
+        "parameters": {
+            "PageParam": {
+                "name": "page",
+                "in": "query",
+                "description": "Page number (1-indexed).",
+                "required": False,
+                "schema": {"type": "integer", "minimum": 1, "default": 1},
+            },
+            "PerPageParam": {
+                "name": "per_page",
+                "in": "query",
+                "description": "Page size. The default and the maximum depend on the endpoint and on API_KEY_MAX_PER_PAGE.",
+                "required": False,
+                "schema": {"type": "integer", "minimum": 1},
+            },
+            "LocaleParam": {
+                "name": "locale",
+                "in": "query",
+                "description": "Locale code for localized labels (en, fr, es, ar, zh, ru, hi).",
+                "required": False,
+                "schema": {"type": "string", "default": "en"},
+            },
+        },
+        "responses": {
+            "Unauthorized": {
+                "description": "Missing or invalid API key, or no session on a session-only route.",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+            },
+            "Forbidden": {
+                "description": "Authenticated, but the key lacks the required capability or is out of scope.",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+            },
+            "NotFound": {
+                "description": "Resource not found, or hidden because the key is out of scope.",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+            },
+            "BadRequest": {
+                "description": "Invalid parameters or JSON body.",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+            },
+            "ServerError": {
+                "description": "Internal server error. `error_id` correlates with the server log.",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+            },
+        },
+    }
+
+
+def get_api_paths() -> dict:
+    """OpenAPI paths relative to ``/api/v1``. Empty when there is no app context."""
+    from flask import current_app, has_app_context
+    if not has_app_context():
+        return {}
+    return build_paths(current_app._get_current_object(), operation_overlays())
+
+
+def get_openapi_spec() -> dict:
+    """OpenAPI 3.0 document for the routes registered on ``/api/v1``."""
+    org_name = _org_name()
+    paths = get_api_paths()
+    used_tags = []
+    for item in paths.values():
+        for operation in item.values():
+            if isinstance(operation, dict):
+                used_tags.extend(operation.get("tags") or [])
+
+    return {
         "openapi": "3.0.3",
         "info": {
             "title": f"{org_name} API",
-            "description": f"Comprehensive REST API for the {org_name} system. Provides access to countries, indicators, templates, submissions, and more.",
+            "description": (
+                f"Integration API for the {org_name}. It covers the data an API key or a public client can read: "
+                "countries, the indicator bank, templates, submissions, form data, resources, documents, and the "
+                "public assistant endpoints. "
+                "Click Authorize and paste a key. Swagger sends `Authorization: Bearer` or `X-API-Key`. "
+                "Public routes can be tried with no key. "
+                "A route that accepts only a logged-in session cannot be called with an API key. "
+                "Session helpers, the form editor, browser error reports, the mobile API (`/api/mobile/v1`), "
+                "and the legacy Indicator Bank routes (`/Indicator`, `/Sector`, `/Subsector`) are separate and are not listed here."
+            ),
             "version": "1.0.0",
-            "contact": {
-                "name": f"{org_name} API Support",
-                "email": "support@example.com"
-            },
-            "license": {
-                "name": "Proprietary",
-                "url": "https://example.com"
-            }
+            "contact": _contact(org_name),
+            "license": {"name": "Proprietary"},
         },
-        "servers": [
-            {
-                "url": f"{base_url}/api/{api_version}",
-                "description": "Production server"
-            },
-            {
-                "url": "http://localhost:5000/api/v1",
-                "description": "Development server"
-            }
-        ],
-        "tags": [
-            {
-                "name": "Authentication",
-                "description": "API authentication endpoints"
-            },
-            {
-                "name": "Countries",
-                "description": "Country and period management"
-            },
-            {
-                "name": "Indicators",
-                "description": "Indicator bank, sectors, and subsectors"
-            },
-            {
-                "name": "Templates",
-                "description": "Form templates and form items"
-            },
-            {
-                "name": "Data",
-                "description": "Form data and submissions"
-            },
-            {
-                "name": "Submissions",
-                "description": "Public and assigned form submissions"
-            },
-            {
-                "name": "Users",
-                "description": "User management and profiles"
-            },
-            {
-                "name": "Assignments",
-                "description": "Form assignments and entity management"
-            },
-            {
-                "name": "Resources",
-                "description": "Resources and publications"
-            },
-            {
-                "name": "Documents",
-                "description": "Submitted documents and file uploads"
-            },
-            {
-                "name": "Common",
-                "description": "Common words and shared resources"
-            },
-            {
-                "name": "Quiz",
-                "description": "Quiz functionality"
-            },
-            {
-                "name": "Variables",
-                "description": "Variable resolution"
-            }
-        ],
-        "components": {
-            "securitySchemes": {
-                "BearerAuth": {
-                    "type": "http",
-                    "scheme": "bearer",
-                    "bearerFormat": "API Key",
-                    "description": "Database-managed API key provided as Bearer token in Authorization header"
-                }
-            },
-            "schemas": {
-                "Error": {
-                    "type": "object",
-                    "properties": {
-                        "success": {
-                            "type": "boolean",
-                            "example": False
-                        },
-                        "error": {
-                            "type": "string",
-                            "example": "Error message"
-                        },
-                        "error_id": {
-                            "type": "string",
-                            "format": "uuid",
-                            "example": "123e4567-e89b-12d3-a456-426614174000"
-                        },
-                        "message": {
-                            "type": "string",
-                            "example": "Detailed error message"
-                        }
-                    },
-                    "required": ["success", "error"]
-                },
-                "Country": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer", "example": 1},
-                        "name": {"type": "string", "example": "Afghanistan"},
-                        "iso3": {"type": "string", "example": "AFG"},
-                        "region": {"type": "string", "example": "Asia Pacific"},
-                        "multilingual_names": {
-                            "type": "object",
-                            "description": "Country names in different languages"
-                        },
-                        "national_society": {
-                            "type": "object",
-                            "description": "Primary national society information"
-                        }
-                    }
-                },
-                "Indicator": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer"},
-                        "name": {"type": "string"},
-                        "definition": {"type": "string"},
-                        "type": {"type": "string"},
-                        "type_translations": {
-                            "type": "object",
-                            "additionalProperties": {"type": "string"},
-                        },
-                        "unit": {"type": "string"},
-                        "unit_translations": {
-                            "type": "object",
-                            "additionalProperties": {"type": "string"},
-                        },
-                        "sector": {"type": "object"},
-                        "archived": {"type": "boolean"}
-                    }
-                },
-                "Template": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer"},
-                        "name": {"type": "string"},
-                        "description": {"type": "string"},
-                        "version": {"type": "integer"},
-                        "is_active": {"type": "boolean"}
-                    }
-                },
-                "Submission": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer"},
-                        "template_id": {"type": "integer"},
-                        "country_id": {"type": "integer"},
-                        "submitted_at": {"type": "string", "format": "date-time"},
-                        "status": {"type": "string"}
-                    }
-                },
-                "Pagination": {
-                    "type": "object",
-                    "properties": {
-                        "page": {"type": "integer", "example": 1},
-                        "per_page": {"type": "integer", "example": 20},
-                        "total": {"type": "integer", "example": 100},
-                        "pages": {"type": "integer", "example": 5}
-                    }
-                }
-            },
-            "parameters": {
-                "PageParam": {
-                    "name": "page",
-                    "in": "query",
-                    "description": "Page number (1-indexed)",
-                    "required": False,
-                    "schema": {"type": "integer", "minimum": 1, "default": 1}
-                },
-                "PerPageParam": {
-                    "name": "per_page",
-                    "in": "query",
-                    "description": "Number of items per page",
-                    "required": False,
-                    "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}
-                },
-                "LocaleParam": {
-                    "name": "locale",
-                    "in": "query",
-                    "description": "Locale code for localized responses (en, fr, es, ar, zh, ru, hi)",
-                    "required": False,
-                    "schema": {"type": "string", "default": "en"}
-                }
-            },
-            "responses": {
-                "Unauthorized": {
-                    "description": "Unauthorized - Invalid or missing API key",
-                    "content": {
-                        "application/json": {
-                            "schema": {"$ref": "#/components/schemas/Error"}
-                        }
-                    }
-                },
-                "Forbidden": {
-                    "description": "Forbidden - Insufficient permissions",
-                    "content": {
-                        "application/json": {
-                            "schema": {"$ref": "#/components/schemas/Error"}
-                        }
-                    }
-                },
-                "NotFound": {
-                    "description": "Resource not found",
-                    "content": {
-                        "application/json": {
-                            "schema": {"$ref": "#/components/schemas/Error"}
-                        }
-                    }
-                },
-                "BadRequest": {
-                    "description": "Bad request - Invalid parameters",
-                    "content": {
-                        "application/json": {
-                            "schema": {"$ref": "#/components/schemas/Error"}
-                        }
-                    }
-                },
-                "ServerError": {
-                    "description": "Internal server error",
-                    "content": {
-                        "application/json": {
-                            "schema": {"$ref": "#/components/schemas/Error"}
-                        }
-                    }
-                }
-            }
-        },
-        "paths": {}
+        "servers": _servers(),
+        "tags": tag_definitions(used_tags),
+        "components": _components(),
+        "paths": paths,
     }
-
-    # Add paths from separate function
-    spec["paths"] = get_api_paths()
-
-    return spec
-
-
-def get_api_paths():
-    """
-    Returns all API paths with their operations.
-    """
-    paths = {
-        "/countrymap": {
-            "get": {
-                "tags": ["Countries"],
-                "summary": "Get all countries",
-                "description": "Retrieve a list of all countries with optional localization and pagination.",
-                "operationId": "getCountries",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {"$ref": "#/components/parameters/LocaleParam"},
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of countries",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "countries": {
-                                            "type": "array",
-                                            "items": {"$ref": "#/components/schemas/Country"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"},
-                    "500": {"$ref": "#/components/responses/ServerError"}
-                }
-            }
-        },
-        "/periods": {
-            "get": {
-                "tags": ["Countries"],
-                "summary": "Get periods",
-                "description": "Retrieve available periods for data reporting.",
-                "operationId": "getPeriods",
-                "security": [{"BearerAuth": []}],
-                "responses": {
-                    "200": {
-                        "description": "List of periods",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "periods": {"type": "array", "items": {"type": "string"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/indicator-bank": {
-            "get": {
-                "tags": ["Indicators"],
-                "summary": "Get indicator bank",
-                "description": "Retrieve all indicators from the indicator bank with optional filtering. Public — no API key required.",
-                "operationId": "getIndicatorBank",
-                "parameters": [
-                    {
-                        "name": "search",
-                        "in": "query",
-                        "description": "Search query for indicator name or definition",
-                        "required": False,
-                        "schema": {"type": "string"}
-                    },
-                    {
-                        "name": "type",
-                        "in": "query",
-                        "description": "Filter by indicator type",
-                        "required": False,
-                        "schema": {"type": "string"}
-                    },
-                    {
-                        "name": "sector",
-                        "in": "query",
-                        "description": "Filter by sector name",
-                        "required": False,
-                        "schema": {"type": "string"}
-                    },
-                    {
-                        "name": "sub_sector",
-                        "in": "query",
-                        "description": "Filter by sub-sector name",
-                        "required": False,
-                        "schema": {"type": "string"}
-                    },
-                    {
-                        "name": "emergency",
-                        "in": "query",
-                        "description": "Filter by emergency type",
-                        "required": False,
-                        "schema": {"type": "string"}
-                    },
-                    {
-                        "name": "archived",
-                        "in": "query",
-                        "description": "Filter by archived status (true/false)",
-                        "required": False,
-                        "schema": {"type": "string", "enum": ["true", "false"]}
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of indicators",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "indicators": {
-                                            "type": "array",
-                                            "items": {"$ref": "#/components/schemas/Indicator"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/indicator-bank/{indicator_id}": {
-            "get": {
-                "tags": ["Indicators"],
-                "summary": "Get indicator by ID",
-                "description": "Retrieve a specific indicator by its ID. Public — no API key required.",
-                "operationId": "getIndicatorById",
-                "parameters": [
-                    {
-                        "name": "indicator_id",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "integer"}
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Indicator details",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "indicator": {"$ref": "#/components/schemas/Indicator"}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "404": {"$ref": "#/components/responses/NotFound"}
-                }
-            }
-        },
-        "/sectors": {
-            "get": {
-                "tags": ["Indicators"],
-                "summary": "Get sectors",
-                "description": "Retrieve all active sectors.",
-                "operationId": "getSectors",
-                "security": [{"BearerAuth": []}],
-                "responses": {
-                    "200": {
-                        "description": "List of sectors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "sectors": {"type": "array", "items": {"type": "object"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/subsectors": {
-            "get": {
-                "tags": ["Indicators"],
-                "summary": "Get subsectors",
-                "description": "Retrieve all active subsectors, optionally filtered by sector.",
-                "operationId": "getSubsectors",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "sector_id",
-                        "in": "query",
-                        "description": "Filter by sector ID",
-                        "required": False,
-                        "schema": {"type": "integer"}
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of subsectors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "subsectors": {"type": "array", "items": {"type": "object"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/sectors-subsectors": {
-            "get": {
-                "tags": ["Indicators"],
-                "summary": "Get sectors with subsectors",
-                "description": "Retrieve all sectors with their associated subsectors.",
-                "operationId": "getSectorsSubsectors",
-                "security": [{"BearerAuth": []}],
-                "responses": {
-                    "200": {
-                        "description": "Sectors with subsectors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "sectors": {"type": "array", "items": {"type": "object"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/templates": {
-            "get": {
-                "tags": ["Templates"],
-                "summary": "Get templates",
-                "description": "Retrieve all form templates with optional filtering.",
-                "operationId": "getTemplates",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "active",
-                        "in": "query",
-                        "description": "Filter by active status",
-                        "required": False,
-                        "schema": {"type": "boolean"}
-                    },
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of templates",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "templates": {
-                                            "type": "array",
-                                            "items": {"$ref": "#/components/schemas/Template"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/templates/{template_id}": {
-            "get": {
-                "tags": ["Templates"],
-                "summary": "Get template by ID",
-                "description": "Retrieve a specific template with all its sections and items.",
-                "operationId": "getTemplateById",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "template_id",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "integer"}
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Template details",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "template": {"$ref": "#/components/schemas/Template"}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "404": {"$ref": "#/components/responses/NotFound"},
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/templates/{template_id}/data": {
-            "get": {
-                "tags": ["Data"],
-                "summary": "Get data by template",
-                "description": "Retrieve form data submitted for a specific template.",
-                "operationId": "getDataByTemplate",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "template_id",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "integer"}
-                    },
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Form data for template",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "data": {"type": "array", "items": {"type": "object"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "404": {"$ref": "#/components/responses/NotFound"},
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/data": {
-            "get": {
-                "tags": ["Data"],
-                "summary": "Get form data with dimension tables",
-                "description": (
-                    "Retrieve submission data with related dimension tables. "
-                    "Returns fact arrays (data, dynamic_data, repeat_data, dynamic_context) "
-                    "plus full dimension tables (form_items, countries, indicator_bank). "
-                    "Use layout=flat (default) for the legacy bundle or layout=star for a "
-                    "dimensional export (fact_form_values, dim_*, bridge_disagg_values). "
-                    "fact_form_values includes static, dynamic, and repeat rows; matrix values are a long array on disaggregation_data (schema 1.1)."
-                    "countries[] and indicator_bank[] are always the full catalog (~192 / ~466 rows)."
-                ),
-                "operationId": "getFormData",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "layout",
-                        "in": "query",
-                        "description": "Response shape: flat (default) or star",
-                        "required": False,
-                        "schema": {"type": "string", "enum": ["flat", "star"], "default": "flat"}
-                    },
-                    {
-                        "name": "template_id",
-                        "in": "query",
-                        "description": "Filter by template ID",
-                        "required": False,
-                        "schema": {"type": "integer"}
-                    },
-                    {
-                        "name": "country_id",
-                        "in": "query",
-                        "description": "Filter by country ID",
-                        "required": False,
-                        "schema": {"type": "integer"}
-                    },
-                    {
-                        "name": "country_iso2",
-                        "in": "query",
-                        "description": "Filter by country ISO2 (resolved to country_id)",
-                        "required": False,
-                        "schema": {"type": "string"}
-                    },
-                    {
-                        "name": "country_iso3",
-                        "in": "query",
-                        "description": "Filter by country ISO3 (resolved to country_id)",
-                        "required": False,
-                        "schema": {"type": "string"}
-                    },
-                    {
-                        "name": "disagg",
-                        "in": "query",
-                        "description": "Include disaggregation data (true/false)",
-                        "required": False,
-                        "schema": {"type": "boolean"}
-                    },
-                    {
-                        "name": "related",
-                        "in": "query",
-                        "description": "Related form_items scope: page (current page) or all (full filtered dataset). countries[] and indicator_bank[] always return full catalogs.",
-                        "required": False,
-                        "schema": {"type": "string", "enum": ["page", "all"], "default": "page"}
-                    },
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Form data with dimension tables (flat or star layout)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "oneOf": [
-                                        {
-                                            "type": "object",
-                                            "description": "Flat layout (default)",
-                                            "properties": {
-                                                "data": {"type": "array", "items": {"type": "object"}},
-                                                "dynamic_data": {"type": "array", "items": {"type": "object"}},
-                                                "repeat_data": {"type": "array", "items": {"type": "object"}},
-                                                "dynamic_context": {"type": "array", "items": {"type": "object"}},
-                                                "form_items": {"type": "array", "items": {"type": "object"}},
-                                                "countries": {"type": "array", "items": {"type": "object"}},
-                                                "national_societies": {"type": "array", "items": {"type": "object"}},
-                                                "indicator_bank": {"type": "array", "items": {"type": "object"}},
-                                                "matrix_cells": {"type": "array", "items": {"type": "object"}},
-                                                "total_items": {"type": "integer"},
-                                                "total_pages": {"type": "integer"},
-                                                "current_page": {"type": "integer"},
-                                                "per_page": {"type": "integer"}
-                                            }
-                                        },
-                                        {
-                                            "type": "object",
-                                            "description": "Star layout (layout=star)",
-                                            "properties": {
-                                                "data": {
-                                                    "type": "object",
-                                                    "properties": {
-                                                        "schema_version": {"type": "string"},
-                                                        "grain": {"type": "string"},
-                                                        "tables": {
-                                                            "type": "object",
-                                                            "properties": {
-                                                                "fact_form_values": {"type": "array"},
-                                                                "dim_country": {"type": "array"},
-                                                                "dim_national_society": {"type": "array"},
-                                                                "dim_indicator_bank": {"type": "array"},
-                                                                "dim_form_item": {"type": "array"},
-                                                                "dim_dynamic_context": {"type": "array"},
-                                                                "dim_template": {"type": "array"},
-                                                                "dim_period": {"type": "array"},
-                                                                "dim_submission": {"type": "array"},
-                                                                "bridge_disagg_values": {"type": "array"}
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                "meta": {"type": "object"}
-                                            }
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/data/tables": {
-            "get": {
-                "tags": ["Data"],
-                "summary": "Legacy redirect to /data",
-                "description": (
-                    "Deprecated. Returns HTTP 308 Permanent Redirect to /api/v1/data "
-                    "with the same query string. Use GET /data instead."
-                ),
-                "operationId": "getFormDataTablesLegacyRedirect",
-                "deprecated": True,
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "308": {
-                        "description": "Permanent redirect to /api/v1/data (same query string)",
-                        "headers": {
-                            "Location": {"schema": {"type": "string"}},
-                            "Deprecation": {"schema": {"type": "string"}},
-                            "Link": {"schema": {"type": "string"}}
-                        }
-                    }
-                }
-            }
-        },
-        "/submissions": {
-            "get": {
-                "tags": ["Submissions"],
-                "summary": "Get submissions",
-                "description": "Retrieve form submissions with optional filtering.",
-                "operationId": "getSubmissions",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "template_id",
-                        "in": "query",
-                        "description": "Filter by template ID",
-                        "required": False,
-                        "schema": {"type": "integer"}
-                    },
-                    {
-                        "name": "country_id",
-                        "in": "query",
-                        "description": "Filter by country ID",
-                        "required": False,
-                        "schema": {"type": "integer"}
-                    },
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of submissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "submissions": {
-                                            "type": "array",
-                                            "items": {"$ref": "#/components/schemas/Submission"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/submissions/{submission_id}": {
-            "get": {
-                "tags": ["Submissions"],
-                "summary": "Get submission by ID",
-                "description": "Retrieve a specific submission with all its data.",
-                "operationId": "getSubmissionById",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "submission_id",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "integer"}
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Submission details",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "submission": {"$ref": "#/components/schemas/Submission"}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "404": {"$ref": "#/components/responses/NotFound"},
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/users": {
-            "get": {
-                "tags": ["Users"],
-                "summary": "Get users",
-                "description": "Retrieve a list of users (admin only).",
-                "operationId": "getUsers",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of users",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "users": {"type": "array", "items": {"type": "object"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"},
-                    "403": {"$ref": "#/components/responses/Forbidden"}
-                }
-            }
-        },
-        "/user/profile": {
-            "get": {
-                "tags": ["Users"],
-                "summary": "Get current user profile",
-                "description": "Retrieve the authenticated user's profile information.",
-                "operationId": "getUserProfile",
-                "security": [{"BearerAuth": []}],
-                "responses": {
-                    "200": {
-                        "description": "User profile",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "user": {"type": "object"}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            },
-            "put": {
-                "tags": ["Users"],
-                "summary": "Update user profile",
-                "description": "Update the authenticated user's profile information.",
-                "operationId": "updateUserProfile",
-                "security": [{"BearerAuth": []}],
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "email": {"type": "string", "format": "email"},
-                                    "language": {"type": "string"}
-                                }
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Updated user profile",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "user": {"type": "object"}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "400": {"$ref": "#/components/responses/BadRequest"},
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/resources": {
-            "get": {
-                "tags": ["Resources"],
-                "summary": "Get resources",
-                "description": "Retrieve all published resources.",
-                "operationId": "getResources",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {"$ref": "#/components/parameters/LocaleParam"},
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of resources",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "resources": {"type": "array", "items": {"type": "object"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/common-words": {
-            "get": {
-                "tags": ["Common"],
-                "summary": "Get common words",
-                "description": "Retrieve common words used in the system.",
-                "operationId": "getCommonWords",
-                "security": [{"BearerAuth": []}],
-                "responses": {
-                    "200": {
-                        "description": "List of common words",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "common_words": {"type": "array", "items": {"type": "string"}}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        }
-    }
-
-    return paths

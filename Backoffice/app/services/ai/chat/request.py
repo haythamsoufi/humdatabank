@@ -262,6 +262,37 @@ def replace_conversation_messages(
         raise
 
 
+def _user_and_following_assistant(
+    *,
+    conversation_id: str,
+    user_id: int,
+    client_message_id: str,
+) -> Tuple[Optional[AIMessage], Optional[AIMessage]]:
+    user_msg = (
+        AIMessage.query.filter_by(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            client_message_id=client_message_id,
+            role="user",
+        )
+        .order_by(AIMessage.id.asc())
+        .first()
+    )
+    if not user_msg:
+        return None, None
+    assistant_msg = (
+        AIMessage.query.filter(
+            AIMessage.conversation_id == conversation_id,
+            AIMessage.user_id == user_id,
+            AIMessage.role == "assistant",
+            AIMessage.id > user_msg.id,
+        )
+        .order_by(AIMessage.id.asc())
+        .first()
+    )
+    return user_msg, assistant_msg
+
+
 def find_existing_reply_for_client_message_id(
     *,
     conversation_id: str,
@@ -273,34 +304,57 @@ def find_existing_reply_for_client_message_id(
     return (reply_text, user_msg_id, assistant_msg_id). Otherwise None.
     """
     try:
-        user_msg = (
-            AIMessage.query.filter_by(
-                conversation_id=conversation_id,
-                user_id=user_id,
-                client_message_id=client_message_id,
-                role="user",
-            )
-            .order_by(AIMessage.id.asc())
-            .first()
+        user_msg, assistant_msg = _user_and_following_assistant(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            client_message_id=client_message_id,
         )
-        if not user_msg:
+        if not user_msg or not assistant_msg or not (assistant_msg.content or "").strip():
             return None
-
-        assistant_msg = (
-            AIMessage.query.filter(
-                AIMessage.conversation_id == conversation_id,
-                AIMessage.user_id == user_id,
-                AIMessage.role == "assistant",
-                AIMessage.id > user_msg.id,
-            )
-            .order_by(AIMessage.id.asc())
-            .first()
-        )
-        if assistant_msg and (assistant_msg.content or "").strip():
-            return (assistant_msg.content, int(user_msg.id), int(assistant_msg.id))
-        return None
+        return (assistant_msg.content, int(user_msg.id), int(assistant_msg.id))
     except Exception as e:
         logger.debug("_last_assistant_message failed: %s", e, exc_info=True)
+        return None
+
+
+def load_stored_chat_reply(
+    *,
+    conversation_id: str,
+    user_id: int,
+    client_message_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Full stored reply for a client message, including structured payloads.
+
+    Used when a dropped stream (or a duplicate POST) should receive the answer
+    the original run already persisted, instead of starting another agent.
+    """
+    try:
+        user_msg, assistant_msg = _user_and_following_assistant(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            client_message_id=client_message_id,
+        )
+        if not user_msg or not assistant_msg or not (assistant_msg.content or "").strip():
+            return None
+        meta = assistant_msg.meta if isinstance(assistant_msg.meta, dict) else {}
+        return {
+            "conversation_id": conversation_id,
+            "reply": assistant_msg.content or "",
+            "map_payload": meta.get("map_payload"),
+            "chart_payload": meta.get("chart_payload"),
+            "table_payload": meta.get("table_payload"),
+            "sources": meta.get("sources"),
+            "trace_id": meta.get("trace_id"),
+            "meta": {
+                "provider": meta.get("provider") or "stored",
+                "model": meta.get("model"),
+                "joined": True,
+                "confidence": meta.get("confidence"),
+                "grounding_score": meta.get("grounding_score"),
+            },
+        }
+    except Exception as e:
+        logger.debug("load_stored_chat_reply failed: %s", e, exc_info=True)
         return None
 
 

@@ -11,7 +11,7 @@ get_endpoint_registry() in api_management merges those rows with ENDPOINT_REGIST
 # surface values:
 #   'v1'              – External data API  (/api/v1/*)
 #   'mobile'          – Flutter mobile API (/api/mobile/v1/*)
-#   'ai'              – AI chat + documents (/api/ai/v2/* and /api/ai/documents/*)
+#   'ai'              – AI chat + documents (/api/ai/v1/* and /api/ai/documents/*)
 #   'indicator_bank'  – Indicator Bank app routes (/Indicator, /Sector, /list-home, …)
 #   'fdrs_public'     – data.ifrc.org legacy contract (/api/data, /api/entities/ns, /csv/export, …)
 #   'decisions'       – Decision Maker JSON API (/api/decisions, /api/decision-flags, …)
@@ -376,63 +376,63 @@ EXTERNAL_API_REGISTRY = [
      ]},
 ]
 
-# ── AI Chat API  /api/ai/v2/* ─────────────────────────────────────────────────
+# ── AI Chat API  /api/ai/v1/* ─────────────────────────────────────────────────
 AI_API_REGISTRY = [
     # ── Chat ──────────────────────────────────────────────────────────────────
-    {'group': 'Chat', 'path': '/api/ai/v2/chat', 'methods': ['POST'],
+    {'group': 'Chat', 'path': '/api/ai/v1/chat', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Non-streaming chat request; anonymous allowed if Website proxy secret matches',
      'consumers': 'Backoffice, Website, Mobile'},
-    {'group': 'Chat', 'path': '/api/ai/v2/chat/stream', 'methods': ['POST'],
+    {'group': 'Chat', 'path': '/api/ai/v1/chat/stream', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'SSE streaming chat; same identity and proxy rules as /chat',
      'consumers': 'Backoffice, Website, Mobile'},
-    {'group': 'Chat', 'path': '/api/ai/v2/chat/cancel', 'methods': ['POST'],
+    {'group': 'Chat', 'path': '/api/ai/v1/chat/cancel', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Signal SSE stream cancellation by request_id'},
-    {'group': 'Chat', 'path': '/api/ai/v2/ws', 'methods': ['WS'],
+    {'group': 'Chat', 'path': '/api/ai/v1/ws', 'methods': ['WS'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'WebSocket streaming chat (flask-sock). Mounted only when WEBSOCKET_ENABLED is on.',
      'consumers': 'Backoffice, Mobile'},
-    {'group': 'Chat', 'path': '/api/ai/v2/feedback', 'methods': ['POST'],
+    {'group': 'Chat', 'path': '/api/ai/v1/feedback', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Submit like/dislike feedback on a reasoning trace'},
 
     # ── Conversations ──────────────────────────────────────────────────────────
-    {'group': 'Conversations', 'path': '/api/ai/v2/conversations', 'methods': ['GET', 'DELETE'],
+    {'group': 'Conversations', 'path': '/api/ai/v1/conversations', 'methods': ['GET', 'DELETE'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'List current user conversations (GET) or delete all (DELETE, requires confirm param)'},
-    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>', 'methods': ['GET', 'DELETE'],
+    {'group': 'Conversations', 'path': '/api/ai/v1/conversations/<conversation_id>', 'methods': ['GET', 'DELETE'],
      'auth': 'ai_session', 'rate_limited': False,
      'description': 'Get messages for a conversation (GET) or delete it entirely (DELETE)'},
-    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/clear-inflight', 'methods': ['POST'],
+    {'group': 'Conversations', 'path': '/api/ai/v1/conversations/<conversation_id>/clear-inflight', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Clear stale inflight metadata on a conversation'},
-    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/export', 'methods': ['GET'],
+    {'group': 'Conversations', 'path': '/api/ai/v1/conversations/<conversation_id>/export', 'methods': ['GET'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Download conversation history as JSON export'},
-    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/messages', 'methods': ['POST'],
+    {'group': 'Conversations', 'path': '/api/ai/v1/conversations/<conversation_id>/messages', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Append a persisted message to a conversation (e.g. client-side errors)'},
-    {'group': 'Conversations', 'path': '/api/ai/v2/conversations/<conversation_id>/import', 'methods': ['POST'],
+    {'group': 'Conversations', 'path': '/api/ai/v1/conversations/<conversation_id>/import', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Bulk-import client-side message history (e.g. mobile offline sync)'},
 
     # ── Tools & Tokens ────────────────────────────────────────────────────────
-    {'group': 'Tools & Tokens', 'path': '/api/ai/v2/table/export', 'methods': ['POST'],
+    {'group': 'Tools & Tokens', 'path': '/api/ai/v1/table/export', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
      'description': 'Build and return Excel file from AI chat table rows'},
-    {'group': 'Tools & Tokens', 'path': '/api/ai/v2/token', 'methods': ['GET'],
+    {'group': 'Tools & Tokens', 'path': '/api/ai/v1/token', 'methods': ['GET'],
      'auth': 'session', 'rate_limited': False,
      'description': 'Issue short-lived AI JWT for Website / Mobile clients (@login_required)',
      'consumers': 'Website, Mobile (AiChatService)'},
-    {'group': 'Tools & Tokens', 'path': '/api/ai/v2/health', 'methods': ['GET'],
+    {'group': 'Tools & Tokens', 'path': '/api/ai/v1/health', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': False,
      'description': 'AI stack health check (optional ?probe=embedding for RAG status)'},
 ]
 
 # ── AI Documents / RAG API  /api/ai/documents/* ───────────────────────────────
-# Flask-Login session (not the /api/ai/v2 chat JWT). Variable names MUST match
+# Flask-Login session (not the /api/ai/v1 chat JWT). Variable names MUST match
 # url_map so the live scanner treats these as documented.
 AI_DOCUMENTS_API_REGISTRY = [
     {'group': 'Documents (RAG)', 'path': '/api/ai/documents/upload', 'methods': ['POST'],

@@ -1,0 +1,2459 @@
+{
+  "edition": "IFRC GO active DREF and Emergency Appeals started in 2025 or 2026",
+  "reference_year": 2026,
+  "as_of": "2026-11-11",
+  "source_url": "https://goadmin.ifrc.org/api/v2/appeal/?status=0",
+  "updated_at": "2026-11-11T15:13:52Z",
+  "note": "Active operations on the IFRC GO platform whose start date is in 2025 or 2026. Operations GO still marks active but that started earlier are omitted. Appeals with no country code, and appeals whose name marks them as regional, are omitted so they are not assigned to one country. People targeted are not added to the Unified Plan.",
+  "by_iso3": {
+    "AFG": {
+      "active_operations": 5,
+      "active_drefs": 3,
+      "active_appeals": 2,
+      "people_targeted": 615200,
+      "operations": [
+        {
+          "name": "Afghanistan: Population Movement, 2025",
+          "code": "MDRAF018",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 350000,
+          "start_date": "2025-04-12"
+        },
+        {
+          "name": "Afghanistan - Earthquake",
+          "code": "MDRAF019",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 170000,
+          "start_date": "2025-09-03"
+        },
+        {
+          "name": "Afghanistan - Complex Emergency",
+          "code": "MDRAF020",
+          "appeal_type": "DREF",
+          "people_targeted": 70000,
+          "start_date": "2026-03-11"
+        },
+        {
+          "name": "Afghanistan - Flood",
+          "code": "MDRAF022",
+          "appeal_type": "DREF",
+          "people_targeted": 13200,
+          "start_date": "2026-08-01"
+        },
+        {
+          "name": "Afghanistan - Floods 2026",
+          "code": "MDRAF021",
+          "appeal_type": "DREF",
+          "people_targeted": 12000,
+          "start_date": "2026-04-05"
+        }
+      ]
+    },
+    "AGO": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 737500,
+      "operations": [
+        {
+          "name": "Angola - Cholera Response",
+          "code": "MDRAO011",
+          "appeal_type": "DREF",
+          "people_targeted": 720000,
+          "start_date": "2025-01-21"
+        },
+        {
+          "name": "Angola - Floods 2026",
+          "code": "MDRAO014",
+          "appeal_type": "DREF",
+          "people_targeted": 17500,
+          "start_date": "2026-03-06"
+        }
+      ]
+    },
+    "ALB": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 17000,
+      "operations": [
+        {
+          "name": "Albania - Heatwave sEAP",
+          "code": "MDRAL009",
+          "appeal_type": "DREF",
+          "people_targeted": 17000,
+          "start_date": "2025-06-20"
+        }
+      ]
+    },
+    "ARG": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 6550,
+      "operations": [
+        {
+          "name": "Argentina - Flash Flood",
+          "code": "MDRAR024",
+          "appeal_type": "DREF",
+          "people_targeted": 4000,
+          "start_date": "2025-05-26"
+        },
+        {
+          "name": "Argentina -Landslide",
+          "code": "MDRAR025",
+          "appeal_type": "DREF",
+          "people_targeted": 2550,
+          "start_date": "2026-01-26"
+        }
+      ]
+    },
+    "ARM": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 1550,
+      "operations": [
+        {
+          "name": "Armenia Hail storm",
+          "code": "MDRAM018",
+          "appeal_type": "DREF",
+          "people_targeted": 1550,
+          "start_date": "2026-06-13"
+        }
+      ]
+    },
+    "BDI": {
+      "active_operations": 5,
+      "active_drefs": 5,
+      "active_appeals": 0,
+      "people_targeted": 153722,
+      "operations": [
+        {
+          "name": "Burundi - Epidemic",
+          "code": "MDRBI024",
+          "appeal_type": "DREF",
+          "people_targeted": 108122,
+          "start_date": "2025-12-12"
+        },
+        {
+          "name": "Burundi - Population Movement",
+          "code": "MDRBI023",
+          "appeal_type": "DREF",
+          "people_targeted": 20000,
+          "start_date": "2025-02-27"
+        },
+        {
+          "name": "Burundi - Population Movement",
+          "code": "MDRBI025",
+          "appeal_type": "DREF",
+          "people_targeted": 15600,
+          "start_date": "2025-12-15"
+        },
+        {
+          "name": "Burundi Flood EAP",
+          "code": "MDRBI027",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-07-27"
+        },
+        {
+          "name": "Burundi - Floods - imminent DREF",
+          "code": "MDRBI028",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-10-31"
+        }
+      ]
+    },
+    "BEN": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 160000,
+      "operations": [
+        {
+          "name": "Benin - Election Readiness",
+          "code": "MDRBJ023",
+          "appeal_type": "DREF",
+          "people_targeted": 160000,
+          "start_date": "2026-03-11"
+        }
+      ]
+    },
+    "BFA": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 26075,
+      "operations": [
+        {
+          "name": "Burkina Faso - Floods EAP",
+          "code": "MDRBF024",
+          "appeal_type": "DREF",
+          "people_targeted": 26075,
+          "start_date": "2026-03-16"
+        }
+      ]
+    },
+    "BGD": {
+      "active_operations": 4,
+      "active_drefs": 4,
+      "active_appeals": 0,
+      "people_targeted": 1530000,
+      "operations": [
+        {
+          "name": "Bangladesh Measles",
+          "code": "MDRBD039",
+          "appeal_type": "DREF",
+          "people_targeted": 1000000,
+          "start_date": "2026-04-14"
+        },
+        {
+          "name": "Bangladesh - Dengue Outbreak",
+          "code": "MDRBD041",
+          "appeal_type": "DREF",
+          "people_targeted": 300000,
+          "start_date": "2026-09-19"
+        },
+        {
+          "name": "Bangladesh - Cold Wave EAP",
+          "code": "MDRBD038",
+          "appeal_type": "DREF",
+          "people_targeted": 150000,
+          "start_date": "2025-07-16"
+        },
+        {
+          "name": "Bangladesh Cox's Bazar Monsoon",
+          "code": "MDRBD040",
+          "appeal_type": "DREF",
+          "people_targeted": 80000,
+          "start_date": "2026-07-14"
+        }
+      ]
+    },
+    "BOL": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 6800,
+      "operations": [
+        {
+          "name": "Bolivia - Flash Floods",
+          "code": "MDRBO020",
+          "appeal_type": "DREF",
+          "people_targeted": 3000,
+          "start_date": "2025-12-24"
+        },
+        {
+          "name": "Bolivia Civil Unrest",
+          "code": "MDRBO022",
+          "appeal_type": "DREF",
+          "people_targeted": 2800,
+          "start_date": "2026-06-13"
+        },
+        {
+          "name": "Bolivia - Flash Floods",
+          "code": "MDRBO021",
+          "appeal_type": "DREF",
+          "people_targeted": 1000,
+          "start_date": "2026-03-25"
+        }
+      ]
+    },
+    "BRA": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 5510,
+      "operations": [
+        {
+          "name": "Brazil - Floods 2026",
+          "code": "MDRBR012",
+          "appeal_type": "DREF",
+          "people_targeted": 5510,
+          "start_date": "2026-03-06"
+        }
+      ]
+    },
+    "BWA": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 14000,
+      "operations": [
+        {
+          "name": "Botswana - Flood",
+          "code": "MDRBW008",
+          "appeal_type": "DREF",
+          "people_targeted": 9000,
+          "start_date": "2025-03-11"
+        },
+        {
+          "name": "Botswana - Floods",
+          "code": "MDRBW009",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2026-03-27"
+        }
+      ]
+    },
+    "CAF": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 2166357,
+      "operations": [
+        {
+          "name": "Central African Republic - Ebola Virus Disease Readiness",
+          "code": "MDRCF034",
+          "appeal_type": "DREF",
+          "people_targeted": 2166357,
+          "start_date": "2026-06-17"
+        }
+      ]
+    },
+    "CHL": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 5000,
+      "operations": [
+        {
+          "name": "Chile - Wildfire",
+          "code": "MDRCL019",
+          "appeal_type": "DREF",
+          "people_targeted": 3000,
+          "start_date": "2026-01-26"
+        },
+        {
+          "name": "Chile - Wildfire sEAP",
+          "code": "MDRCL018",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2025-02-13"
+        }
+      ]
+    },
+    "CIV": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 4500,
+      "operations": [
+        {
+          "name": "Cote d'Ivoire",
+          "code": "MDRCI020",
+          "appeal_type": "DREF",
+          "people_targeted": 2500,
+          "start_date": "2026-07-11"
+        },
+        {
+          "name": "Côte d'Ivore - Floods sEAP",
+          "code": "MDRCI017",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2025-04-09"
+        }
+      ]
+    },
+    "CMR": {
+      "active_operations": 5,
+      "active_drefs": 4,
+      "active_appeals": 1,
+      "people_targeted": 372493,
+      "operations": [
+        {
+          "name": "Cameroon - Food Insecurity",
+          "code": "MDRCM042",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 330000,
+          "start_date": "2025-12-08"
+        },
+        {
+          "name": "Cameroon - Cholera EAP",
+          "code": "MDRCM040",
+          "appeal_type": "DREF",
+          "people_targeted": 13500,
+          "start_date": "2025-03-04"
+        },
+        {
+          "name": "Cameroon - Flood",
+          "code": "MDRCM045",
+          "appeal_type": "DREF",
+          "people_targeted": 12000,
+          "start_date": "2026-08-13"
+        },
+        {
+          "name": "Cameroon - Floods EAP",
+          "code": "MDRCM044",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-03-25"
+        },
+        {
+          "name": "Cameroon - Fire",
+          "code": "MDRCM043",
+          "appeal_type": "DREF",
+          "people_targeted": 6993,
+          "start_date": "2026-02-11"
+        }
+      ]
+    },
+    "COD": {
+      "active_operations": 6,
+      "active_drefs": 5,
+      "active_appeals": 1,
+      "people_targeted": 1036100,
+      "operations": [
+        {
+          "name": "DRC - Ebola outbreak",
+          "code": "MDRCD047",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 965000,
+          "start_date": "2025-09-11"
+        },
+        {
+          "name": "DRC - Floods",
+          "code": "MDRCD046",
+          "appeal_type": "DREF",
+          "people_targeted": 22500,
+          "start_date": "2025-04-28"
+        },
+        {
+          "name": "Democratic Republic of Congo - Flood",
+          "code": "MDRCD048",
+          "appeal_type": "DREF",
+          "people_targeted": 18000,
+          "start_date": "2025-11-19"
+        },
+        {
+          "name": "DRC Maniema Floods",
+          "code": "MDRCD050",
+          "appeal_type": "DREF",
+          "people_targeted": 15600,
+          "start_date": "2026-04-20"
+        },
+        {
+          "name": "DRC - Cholera",
+          "code": "MDRCD049",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-03-06"
+        },
+        {
+          "name": "Democratic Republic of Congo Floods sEAP",
+          "code": "MDRCD052",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2026-06-11"
+        }
+      ]
+    },
+    "COG": {
+      "active_operations": 6,
+      "active_drefs": 6,
+      "active_appeals": 0,
+      "people_targeted": 276077,
+      "operations": [
+        {
+          "name": "Republic of Congo - Cholera",
+          "code": "MDRCG025",
+          "appeal_type": "DREF",
+          "people_targeted": 214577,
+          "start_date": "2025-08-04"
+        },
+        {
+          "name": "Republic of Congo - Cholera Outbreak",
+          "code": "MDRCG028",
+          "appeal_type": "DREF",
+          "people_targeted": 15000,
+          "start_date": "2026-04-06"
+        },
+        {
+          "name": "Congo Likouala Flood",
+          "code": "MDRCG030",
+          "appeal_type": "DREF",
+          "people_targeted": 13500,
+          "start_date": "2026-10-18"
+        },
+        {
+          "name": "Congo - Floods",
+          "code": "MDRCG026",
+          "appeal_type": "DREF",
+          "people_targeted": 12500,
+          "start_date": "2025-11-25"
+        },
+        {
+          "name": "Congo Population Movement",
+          "code": "MDRCG029",
+          "appeal_type": "DREF",
+          "people_targeted": 12500,
+          "start_date": "2026-06-25"
+        },
+        {
+          "name": "Congo BVD Readiness",
+          "code": "MDRCG031",
+          "appeal_type": "DREF",
+          "people_targeted": 8000,
+          "start_date": "2026-10-19"
+        }
+      ]
+    },
+    "COK": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 10000,
+      "operations": [
+        {
+          "name": "Cook Islands - Dengue Outbreak",
+          "code": "MDRCK003",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-02-17"
+        }
+      ]
+    },
+    "COL": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 35900,
+      "operations": [
+        {
+          "name": "Colombia - Earthquake",
+          "code": "MDRCO036",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 24000,
+          "start_date": "2026-08-11"
+        },
+        {
+          "name": "Colombia - Floods",
+          "code": "MDRCO035",
+          "appeal_type": "DREF",
+          "people_targeted": 9900,
+          "start_date": "2026-02-16"
+        },
+        {
+          "name": "Colombia - Forced Displacement sEAP",
+          "code": "MDRCO031",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2025-03-28"
+        }
+      ]
+    },
+    "COM": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 35000,
+      "operations": [
+        {
+          "name": "Comoros - Mpox Epidemic",
+          "code": "MDRKM014",
+          "appeal_type": "DREF",
+          "people_targeted": 30000,
+          "start_date": "2026-01-29"
+        },
+        {
+          "name": "Comoros Cholera sEAP",
+          "code": "MDRKM015",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2026-08-28"
+        }
+      ]
+    },
+    "CPV": {
+      "active_operations": 2,
+      "active_drefs": 1,
+      "active_appeals": 1,
+      "people_targeted": 77850,
+      "operations": [
+        {
+          "name": "Cape Verde - Flood",
+          "code": "MDRCV005",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 75850,
+          "start_date": "2025-08-20"
+        },
+        {
+          "name": "Cape Verde-Drought-sEAP",
+          "code": "MDRCV006",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2026-07-31"
+        }
+      ]
+    },
+    "CUB": {
+      "active_operations": 2,
+      "active_drefs": 1,
+      "active_appeals": 1,
+      "people_targeted": 110000,
+      "operations": [
+        {
+          "name": "Cuba - Hurricane",
+          "code": "MDRCU013",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 100000,
+          "start_date": "2025-10-30"
+        },
+        {
+          "name": "Cuba- Arboviral Outbreak",
+          "code": "MDRCU012",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2025-10-17"
+        }
+      ]
+    },
+    "DJI": {
+      "active_operations": 4,
+      "active_drefs": 4,
+      "active_appeals": 0,
+      "people_targeted": 17904,
+      "operations": [
+        {
+          "name": "Djibouti - Population Movement - sEAP",
+          "code": "MDRDJ008",
+          "appeal_type": "DREF",
+          "people_targeted": 6244,
+          "start_date": "2025-09-05"
+        },
+        {
+          "name": "Djibuti - Population Movement",
+          "code": "MDRDJ011",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2026-09-21"
+        },
+        {
+          "name": "Djibouti - Storm Surge",
+          "code": "MDRDJ010",
+          "appeal_type": "DREF",
+          "people_targeted": 4160,
+          "start_date": "2026-07-31"
+        },
+        {
+          "name": "Djibouti - Floods sEAP",
+          "code": "MDRDJ009",
+          "appeal_type": "DREF",
+          "people_targeted": 2500,
+          "start_date": "2026-03-13"
+        }
+      ]
+    },
+    "DOM": {
+      "active_operations": 4,
+      "active_drefs": 4,
+      "active_appeals": 0,
+      "people_targeted": 20750,
+      "operations": [
+        {
+          "name": "Dominican Republic Floods",
+          "code": "MDRDO021",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-04-21"
+        },
+        {
+          "name": "Dominican Republic - Hurricane Melissa",
+          "code": "MDRDO019",
+          "appeal_type": "DREF",
+          "people_targeted": 6750,
+          "start_date": "2025-10-30"
+        },
+        {
+          "name": "Dominican Republic - Cyclone sEAP",
+          "code": "MDRDO020",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2026-02-05"
+        },
+        {
+          "name": "Dominican Republic - Population Movement",
+          "code": "MDRDO022",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2026-11-01"
+        }
+      ]
+    },
+    "DZA": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 14000,
+      "operations": [
+        {
+          "name": "Algeria - Wildfires",
+          "code": "MDRDZ015",
+          "appeal_type": "DREF",
+          "people_targeted": 8000,
+          "start_date": "2026-07-29"
+        },
+        {
+          "name": "Algeria Flood",
+          "code": "MDRDZ014",
+          "appeal_type": "DREF",
+          "people_targeted": 6000,
+          "start_date": "2026-01-29"
+        }
+      ]
+    },
+    "ECU": {
+      "active_operations": 4,
+      "active_drefs": 3,
+      "active_appeals": 1,
+      "people_targeted": 193800,
+      "operations": [
+        {
+          "name": "Ecuador - Floods",
+          "code": "MDREC027",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 176200,
+          "start_date": "2025-03-10"
+        },
+        {
+          "name": "Ecuador - Floods",
+          "code": "MDREC030",
+          "appeal_type": "DREF",
+          "people_targeted": 16600,
+          "start_date": "2026-03-24"
+        },
+        {
+          "name": "Ecuador - Disease outbreak",
+          "code": "MDREC031",
+          "appeal_type": "DREF",
+          "people_targeted": 1000,
+          "start_date": "2026-05-07"
+        },
+        {
+          "name": "Ecuador - Floods - Imminent",
+          "code": "MDREC032",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-10-12"
+        }
+      ]
+    },
+    "EGY": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 4000,
+      "operations": [
+        {
+          "name": "Egypt - Flood",
+          "code": "MDREG022",
+          "appeal_type": "DREF",
+          "people_targeted": 4000,
+          "start_date": "2025-10-10"
+        }
+      ]
+    },
+    "ETH": {
+      "active_operations": 5,
+      "active_drefs": 5,
+      "active_appeals": 0,
+      "people_targeted": 648189,
+      "operations": [
+        {
+          "name": "Ethiopia - Outbreak",
+          "code": "MDRET039",
+          "appeal_type": "DREF",
+          "people_targeted": 573000,
+          "start_date": "2025-11-19"
+        },
+        {
+          "name": "Ethiopia Drought Response",
+          "code": "MDRET042",
+          "appeal_type": "DREF",
+          "people_targeted": 50000,
+          "start_date": "2026-09-29"
+        },
+        {
+          "name": "Ethiopia - Cholera sEAP",
+          "code": "MDRET038",
+          "appeal_type": "DREF",
+          "people_targeted": 12500,
+          "start_date": "2025-08-12"
+        },
+        {
+          "name": "Ethiopia - Population Movement",
+          "code": "MDRET040",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-03-18"
+        },
+        {
+          "name": "Ethiopia - Landslide",
+          "code": "MDRET041",
+          "appeal_type": "DREF",
+          "people_targeted": 2689,
+          "start_date": "2026-03-25"
+        }
+      ]
+    },
+    "FJI": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 12000,
+      "operations": [
+        {
+          "name": "Fiji Tropical Cyclone Vaianu",
+          "code": "MDRFJ009",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-04-15"
+        },
+        {
+          "name": "Fiji - Tropical Cyclone  sEAP",
+          "code": "MDRFJ008",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2025-05-22"
+        }
+      ]
+    },
+    "GAB": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 13650,
+      "operations": [
+        {
+          "name": "Gabon - Election Preparedness",
+          "code": "MDRGA014",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2025-03-20"
+        },
+        {
+          "name": "Gabon - Windstorms",
+          "code": "MDRGA015",
+          "appeal_type": "DREF",
+          "people_targeted": 3650,
+          "start_date": "2025-12-22"
+        }
+      ]
+    },
+    "GEO": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 3535,
+      "operations": [
+        {
+          "name": "Georgia - Floods",
+          "code": "MDRGE021",
+          "appeal_type": "DREF",
+          "people_targeted": 3535,
+          "start_date": "2026-07-04"
+        }
+      ]
+    },
+    "GHA": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 222867,
+      "operations": [
+        {
+          "name": "Ghana - Cholera Outbreak",
+          "code": "MDRGH020",
+          "appeal_type": "DREF",
+          "people_targeted": 150000,
+          "start_date": "2025-01-16"
+        },
+        {
+          "name": "Ghana - Floods",
+          "code": "MDRGH023",
+          "appeal_type": "DREF",
+          "people_targeted": 69867,
+          "start_date": "2026-07-10"
+        },
+        {
+          "name": "Ghana - Flood sEAP",
+          "code": "MDRGH022",
+          "appeal_type": "DREF",
+          "people_targeted": 3000,
+          "start_date": "2025-09-10"
+        }
+      ]
+    },
+    "GIN": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 17523,
+      "operations": [
+        {
+          "name": "Guinea - Floods",
+          "code": "MDRGN018",
+          "appeal_type": "DREF",
+          "people_targeted": 17523,
+          "start_date": "2025-07-31"
+        }
+      ]
+    },
+    "GMB": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 3617,
+      "operations": [
+        {
+          "name": "Gambia Floods sEAP",
+          "code": "MDRGM018",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2026-05-27"
+        },
+        {
+          "name": "Gambia - Population Movement",
+          "code": "MDRGM017",
+          "appeal_type": "DREF",
+          "people_targeted": 1617,
+          "start_date": "2026-01-08"
+        }
+      ]
+    },
+    "GNB": {
+      "active_operations": 4,
+      "active_drefs": 4,
+      "active_appeals": 0,
+      "people_targeted": 7924,
+      "operations": [
+        {
+          "name": "Guinea-Bissau - Windstorm",
+          "code": "MDRGW009",
+          "appeal_type": "DREF",
+          "people_targeted": 3024,
+          "start_date": "2026-08-19"
+        },
+        {
+          "name": "Guinea Bissau - Fire",
+          "code": "MDRGW008",
+          "appeal_type": "DREF",
+          "people_targeted": 2051,
+          "start_date": "2026-03-31"
+        },
+        {
+          "name": "Guinea Bissau - Windstorm",
+          "code": "MDRGW006",
+          "appeal_type": "DREF",
+          "people_targeted": 1883,
+          "start_date": "2025-06-20"
+        },
+        {
+          "name": "Guinea-Bissau - Fire",
+          "code": "MDRGW005",
+          "appeal_type": "DREF",
+          "people_targeted": 966,
+          "start_date": "2025-02-06"
+        }
+      ]
+    },
+    "GNQ": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 1500,
+      "operations": [
+        {
+          "name": "Equatorial Guinea - flood",
+          "code": "MDRGQ006",
+          "appeal_type": "DREF",
+          "people_targeted": 1500,
+          "start_date": "2025-08-07"
+        }
+      ]
+    },
+    "GTM": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 3000,
+      "operations": [
+        {
+          "name": "Guatemala – Measles Outbreak",
+          "code": "MDRGT027",
+          "appeal_type": "DREF",
+          "people_targeted": 3000,
+          "start_date": "2026-01-23"
+        }
+      ]
+    },
+    "HND": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 20000,
+      "operations": [
+        {
+          "name": "Honduras - Floods EAP",
+          "code": "MDRHN027",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2025-10-30"
+        },
+        {
+          "name": "Honduras - Drought - EAP",
+          "code": "MDRHN029",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-09-08"
+        },
+        {
+          "name": "Honduras - Drought",
+          "code": "MDRHN028",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-08-21"
+        }
+      ]
+    },
+    "IDN": {
+      "active_operations": 4,
+      "active_drefs": 4,
+      "active_appeals": 0,
+      "people_targeted": 289600,
+      "operations": [
+        {
+          "name": "Indonesia - Drought",
+          "code": "MDRID030",
+          "appeal_type": "DREF",
+          "people_targeted": 200000,
+          "start_date": "2026-09-25"
+        },
+        {
+          "name": "Indonesia - Floods",
+          "code": "MDRID028",
+          "appeal_type": "DREF",
+          "people_targeted": 59600,
+          "start_date": "2025-12-06"
+        },
+        {
+          "name": "Indonesia: East Nusa Tenggara Earthquake",
+          "code": "MDRID029",
+          "appeal_type": "DREF",
+          "people_targeted": 20000,
+          "start_date": "2026-08-18"
+        },
+        {
+          "name": "Indonesia - Flood EAP",
+          "code": "MDRID027",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2025-02-17"
+        }
+      ]
+    },
+    "IND": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 75000,
+      "operations": [
+        {
+          "name": "India - Floods",
+          "code": "MDRIN029",
+          "appeal_type": "DREF",
+          "people_targeted": 75000,
+          "start_date": "2026-08-02"
+        }
+      ]
+    },
+    "IRN": {
+      "active_operations": 4,
+      "active_drefs": 3,
+      "active_appeals": 1,
+      "people_targeted": 10218510,
+      "operations": [
+        {
+          "name": "Iran - Complex Emergency 2026",
+          "code": "MDRIR018",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 10000000,
+          "start_date": "2026-02-28"
+        },
+        {
+          "name": "Iran - Complex Emergency",
+          "code": "MDRIR015",
+          "appeal_type": "DREF",
+          "people_targeted": 200000,
+          "start_date": "2025-06-20"
+        },
+        {
+          "name": "Iran - Floods",
+          "code": "MDRIR017",
+          "appeal_type": "DREF",
+          "people_targeted": 12000,
+          "start_date": "2025-12-23"
+        },
+        {
+          "name": "Iran - Wildfires",
+          "code": "MDRIR016",
+          "appeal_type": "DREF",
+          "people_targeted": 6510,
+          "start_date": "2025-12-07"
+        }
+      ]
+    },
+    "IRQ": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 516230,
+      "operations": [
+        {
+          "name": "Iraq - Crimean-Congo Hemorrhagic Fever",
+          "code": "MDRIQ021",
+          "appeal_type": "DREF",
+          "people_targeted": 500000,
+          "start_date": "2026-06-20"
+        },
+        {
+          "name": "Iraq - Floods",
+          "code": "MDRIQ019",
+          "appeal_type": "DREF",
+          "people_targeted": 16230,
+          "start_date": "2025-12-18"
+        },
+        {
+          "name": "Iraq - Population Movement 2026",
+          "code": "MDRIQ020",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-03-05"
+        }
+      ]
+    },
+    "JAM": {
+      "active_operations": 1,
+      "active_drefs": 0,
+      "active_appeals": 1,
+      "people_targeted": 180000,
+      "operations": [
+        {
+          "name": "Jamaica - Hurricane Melissa",
+          "code": "MDRJM005",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 180000,
+          "start_date": "2025-10-23"
+        }
+      ]
+    },
+    "KEN": {
+      "active_operations": 9,
+      "active_drefs": 8,
+      "active_appeals": 1,
+      "people_targeted": 2485159,
+      "operations": [
+        {
+          "name": "Kenya Bundibugyo Ebola Virus Disease (BVD) Readiness",
+          "code": "MDRKE072",
+          "appeal_type": "DREF",
+          "people_targeted": 1702310,
+          "start_date": "2026-06-13"
+        },
+        {
+          "name": "Kenya - Flood and Cholera",
+          "code": "MDRKE066",
+          "appeal_type": "DREF",
+          "people_targeted": 375109,
+          "start_date": "2025-05-26"
+        },
+        {
+          "name": "Kenya - Complex Emergency",
+          "code": "MDRKE068",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 300000,
+          "start_date": "2025-10-22"
+        },
+        {
+          "name": "Kenya - Drought",
+          "code": "MDRKE065",
+          "appeal_type": "DREF",
+          "people_targeted": 60000,
+          "start_date": "2025-04-07"
+        },
+        {
+          "name": "Kenya - Cholera sEAP",
+          "code": "MDRKE071",
+          "appeal_type": "DREF",
+          "people_targeted": 20000,
+          "start_date": "2026-03-17"
+        },
+        {
+          "name": "Kenya - Population Movement",
+          "code": "MDRKE075",
+          "appeal_type": "DREF",
+          "people_targeted": 15240,
+          "start_date": "2026-10-29"
+        },
+        {
+          "name": "Kenya - Floods 2026",
+          "code": "MDRKE070",
+          "appeal_type": "DREF",
+          "people_targeted": 12500,
+          "start_date": "2026-03-13"
+        },
+        {
+          "name": "Kenya - Polio outbreak",
+          "code": "MDRKE073",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-09-14"
+        },
+        {
+          "name": "Kenya-Floods-imminent DREF",
+          "code": "MDRKE074",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-10-27"
+        }
+      ]
+    },
+    "KGZ": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 1611,
+      "operations": [
+        {
+          "name": "Kyrgyzstan - Flash floods",
+          "code": "MDRKG022",
+          "appeal_type": "DREF",
+          "people_targeted": 1611,
+          "start_date": "2026-07-22"
+        }
+      ]
+    },
+    "LAO": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 12000,
+      "operations": [
+        {
+          "name": "Laos - Flood",
+          "code": "MDRLA012",
+          "appeal_type": "DREF",
+          "people_targeted": 12000,
+          "start_date": "2026-08-20"
+        }
+      ]
+    },
+    "LBN": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 27130,
+      "operations": [
+        {
+          "name": "Lebanon - Cold Wave sEAP",
+          "code": "MDRLB019",
+          "appeal_type": "DREF",
+          "people_targeted": 18930,
+          "start_date": "2025-06-05"
+        },
+        {
+          "name": "Lebanon -  Population Movement",
+          "code": "MDRLB020",
+          "appeal_type": "DREF",
+          "people_targeted": 8200,
+          "start_date": "2026-02-16"
+        }
+      ]
+    },
+    "LBR": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 10372,
+      "operations": [
+        {
+          "name": "Liberia - Floods",
+          "code": "MDRLR012",
+          "appeal_type": "DREF",
+          "people_targeted": 6125,
+          "start_date": "2026-09-02"
+        },
+        {
+          "name": "Liberia Windstorm",
+          "code": "MDRLR010",
+          "appeal_type": "DREF",
+          "people_targeted": 2604,
+          "start_date": "2026-03-31"
+        },
+        {
+          "name": "Liberia Fires",
+          "code": "MDRLR011",
+          "appeal_type": "DREF",
+          "people_targeted": 1643,
+          "start_date": "2026-04-01"
+        }
+      ]
+    },
+    "LKA": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 553000,
+      "operations": [
+        {
+          "name": "Sri Lanka - Tropical Cyclone",
+          "code": "MDRLK023",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 500000,
+          "start_date": "2025-12-02"
+        },
+        {
+          "name": "Sri Lanka - Dengue outbreak",
+          "code": "MDRLK024",
+          "appeal_type": "DREF",
+          "people_targeted": 37000,
+          "start_date": "2026-06-18"
+        },
+        {
+          "name": "Sri Lanka - Dengue sEAP",
+          "code": "MDRLK022",
+          "appeal_type": "DREF",
+          "people_targeted": 16000,
+          "start_date": "2025-06-03"
+        }
+      ]
+    },
+    "MAR": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 17800,
+      "operations": [
+        {
+          "name": "Morocco - Flood",
+          "code": "MDRMA011",
+          "appeal_type": "DREF",
+          "people_targeted": 17800,
+          "start_date": "2025-12-24"
+        }
+      ]
+    },
+    "MDA": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 1093,
+      "operations": [
+        {
+          "name": "Moldova Floods",
+          "code": "MDRMD008",
+          "appeal_type": "DREF",
+          "people_targeted": 1093,
+          "start_date": "2026-06-23"
+        }
+      ]
+    },
+    "MDG": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 120000,
+      "operations": [
+        {
+          "name": "Madagascar - Mpox Epidemic",
+          "code": "MDRMG026",
+          "appeal_type": "DREF",
+          "people_targeted": 50000,
+          "start_date": "2026-01-20"
+        },
+        {
+          "name": "Madagascar –  Tropical Cyclone",
+          "code": "MDRMG027",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 45000,
+          "start_date": "2026-02-07"
+        },
+        {
+          "name": "Madagascar - Cyclone EAP",
+          "code": "MDRMG025",
+          "appeal_type": "DREF",
+          "people_targeted": 25000,
+          "start_date": "2025-09-19"
+        }
+      ]
+    },
+    "MKD": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 1900,
+      "operations": [
+        {
+          "name": "North Macedonia– Floods",
+          "code": "MDRMK011",
+          "appeal_type": "DREF",
+          "people_targeted": 1900,
+          "start_date": "2026-01-23"
+        }
+      ]
+    },
+    "MLI": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 33200,
+      "operations": [
+        {
+          "name": "Mali - Flood EAP",
+          "code": "MDRML021",
+          "appeal_type": "DREF",
+          "people_targeted": 24000,
+          "start_date": "2025-03-19"
+        },
+        {
+          "name": "Mali - Complex Emergency",
+          "code": "MDRML022",
+          "appeal_type": "DREF",
+          "people_targeted": 7200,
+          "start_date": "2026-06-12"
+        },
+        {
+          "name": "Mali Food Insecurity sEAP",
+          "code": "MDRML023",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2026-08-07"
+        }
+      ]
+    },
+    "MMR": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 93720,
+      "operations": [
+        {
+          "name": "Myanmar - Earthquake",
+          "code": "MDRMM023",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 75000,
+          "start_date": "2025-03-29"
+        },
+        {
+          "name": "Myanmar Flood-Landslides",
+          "code": "MDRMM025",
+          "appeal_type": "DREF",
+          "people_targeted": 9600,
+          "start_date": "2026-10-08"
+        },
+        {
+          "name": "Myanmar - Floods",
+          "code": "MDRMM024",
+          "appeal_type": "DREF",
+          "people_targeted": 9120,
+          "start_date": "2026-08-12"
+        }
+      ]
+    },
+    "MNG": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 3700,
+      "operations": [
+        {
+          "name": "Mongolia - Snowstorm 2026",
+          "code": "MDRMN021",
+          "appeal_type": "DREF",
+          "people_targeted": 3700,
+          "start_date": "2026-02-27"
+        }
+      ]
+    },
+    "MOZ": {
+      "active_operations": 1,
+      "active_drefs": 0,
+      "active_appeals": 1,
+      "people_targeted": 75000,
+      "operations": [
+        {
+          "name": "Mozambique - Floods",
+          "code": "MDRMZ027",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 75000,
+          "start_date": "2026-01-26"
+        }
+      ]
+    },
+    "MRT": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 47700,
+      "operations": [
+        {
+          "name": "Mauritania Drought",
+          "code": "MDRMR021",
+          "appeal_type": "DREF",
+          "people_targeted": 37200,
+          "start_date": "2026-06-02"
+        },
+        {
+          "name": "Mauritania - Population Movement",
+          "code": "MDRMR019",
+          "appeal_type": "DREF",
+          "people_targeted": 8100,
+          "start_date": "2025-08-08"
+        },
+        {
+          "name": "Mauritania - Flood sEAP",
+          "code": "MDRMR020",
+          "appeal_type": "DREF",
+          "people_targeted": 2400,
+          "start_date": "2025-09-26"
+        }
+      ]
+    },
+    "MUS": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 2000,
+      "operations": [
+        {
+          "name": "Madagascar - Floods sEAP",
+          "code": "MDRMG024",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2025-08-14"
+        }
+      ]
+    },
+    "MWI": {
+      "active_operations": 6,
+      "active_drefs": 6,
+      "active_appeals": 0,
+      "people_targeted": 295597,
+      "operations": [
+        {
+          "name": "Malawi Measles",
+          "code": "MDRMW027",
+          "appeal_type": "DREF",
+          "people_targeted": 165116,
+          "start_date": "2026-07-30"
+        },
+        {
+          "name": "Malawi - Floods",
+          "code": "MDRMW025",
+          "appeal_type": "DREF",
+          "people_targeted": 49104,
+          "start_date": "2026-02-06"
+        },
+        {
+          "name": "Malawi – Food Insecurity",
+          "code": "MDRMW024",
+          "appeal_type": "DREF",
+          "people_targeted": 45000,
+          "start_date": "2025-10-24"
+        },
+        {
+          "name": "Malawi - Population Movement",
+          "code": "MDRMW022",
+          "appeal_type": "DREF",
+          "people_targeted": 14877,
+          "start_date": "2025-02-11"
+        },
+        {
+          "name": "Malawi - Pluvial Floods sEAP",
+          "code": "MDRMW023",
+          "appeal_type": "DREF",
+          "people_targeted": 12500,
+          "start_date": "2025-10-17"
+        },
+        {
+          "name": "Malawi Population Movement",
+          "code": "MDRMW026",
+          "appeal_type": "DREF",
+          "people_targeted": 9000,
+          "start_date": "2026-06-28"
+        }
+      ]
+    },
+    "MYS": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 7000,
+      "operations": [
+        {
+          "name": "Malaysia Sandakan Fire",
+          "code": "MDRMY013",
+          "appeal_type": "DREF",
+          "people_targeted": 7000,
+          "start_date": "2026-05-02"
+        }
+      ]
+    },
+    "NER": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 10000,
+      "operations": [
+        {
+          "name": "Niger - Drought EAP",
+          "code": "MDRNE031",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2025-12-04"
+        }
+      ]
+    },
+    "NGA": {
+      "active_operations": 6,
+      "active_drefs": 5,
+      "active_appeals": 1,
+      "people_targeted": 2034924,
+      "operations": [
+        {
+          "name": "Nigeria - Malnutrition",
+          "code": "MDRNG042",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 1000000,
+          "start_date": "2025-05-22"
+        },
+        {
+          "name": "Nigeria - Cholera Outbreak",
+          "code": "MDRNG046",
+          "appeal_type": "DREF",
+          "people_targeted": 1000000,
+          "start_date": "2026-07-31"
+        },
+        {
+          "name": "Nigeria - Population Movement",
+          "code": "MDRNG043",
+          "appeal_type": "DREF",
+          "people_targeted": 24000,
+          "start_date": "2025-07-14"
+        },
+        {
+          "name": "Nigeria - Population Movement",
+          "code": "MDRNG047",
+          "appeal_type": "DREF",
+          "people_targeted": 7700,
+          "start_date": "2026-09-11"
+        },
+        {
+          "name": "Nigeria - Drought sEAP",
+          "code": "MDRNG044",
+          "appeal_type": "DREF",
+          "people_targeted": 3224,
+          "start_date": "2026-10-09"
+        },
+        {
+          "name": "Nigeria - Floods imminent",
+          "code": "MDRNG045",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-07-24"
+        }
+      ]
+    },
+    "NPL": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 67500,
+      "operations": [
+        {
+          "name": "Rasuwa Flash Flood",
+          "code": "MDRNP022",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 50000,
+          "start_date": "2026-08-26"
+        },
+        {
+          "name": "Nepal Floods sEAP",
+          "code": "MDRNP021",
+          "appeal_type": "DREF",
+          "people_targeted": 9500,
+          "start_date": "2026-07-20"
+        },
+        {
+          "name": "Nepal - Heatwave sEAP",
+          "code": "MDRNP020",
+          "appeal_type": "DREF",
+          "people_targeted": 8000,
+          "start_date": "2025-12-03"
+        }
+      ]
+    },
+    "PAK": {
+      "active_operations": 2,
+      "active_drefs": 1,
+      "active_appeals": 1,
+      "people_targeted": 330000,
+      "operations": [
+        {
+          "name": "Pakistan - Flood",
+          "code": "MDRPK028",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 225000,
+          "start_date": "2025-08-21"
+        },
+        {
+          "name": "Pakistan - Riverine Floods EAP",
+          "code": "MDRPK029",
+          "appeal_type": "DREF",
+          "people_targeted": 105000,
+          "start_date": "2025-09-15"
+        }
+      ]
+    },
+    "PAN": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 7740,
+      "operations": [
+        {
+          "name": "Panamá - Earthquake",
+          "code": "MDRPA023",
+          "appeal_type": "DREF",
+          "people_targeted": 4075,
+          "start_date": "2026-10-10"
+        },
+        {
+          "name": "Panama - Floods",
+          "code": "MDRPA022",
+          "appeal_type": "DREF",
+          "people_targeted": 3665,
+          "start_date": "2026-08-26"
+        }
+      ]
+    },
+    "PHL": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 357429,
+      "operations": [
+        {
+          "name": "Philippines - Cebu Earthquake",
+          "code": "MDRPH057",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 284904,
+          "start_date": "2025-10-02"
+        },
+        {
+          "name": "Philippines - Earthquake",
+          "code": "MDRPH059",
+          "appeal_type": "DREF",
+          "people_targeted": 40000,
+          "start_date": "2026-06-11"
+        },
+        {
+          "name": "Philippines - Floods",
+          "code": "MDRPH060",
+          "appeal_type": "DREF",
+          "people_targeted": 32525,
+          "start_date": "2026-08-31"
+        }
+      ]
+    },
+    "PNG": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 5000,
+      "operations": [
+        {
+          "name": "Papua New Guinea Cyclone Maila",
+          "code": "MDRPG013",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2026-04-17"
+        }
+      ]
+    },
+    "PRY": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 2450,
+      "operations": [
+        {
+          "name": "Paraguay - Drought sEAP",
+          "code": "MDRPY024",
+          "appeal_type": "DREF",
+          "people_targeted": 2450,
+          "start_date": "2025-08-13"
+        }
+      ]
+    },
+    "RWA": {
+      "active_operations": 4,
+      "active_drefs": 4,
+      "active_appeals": 0,
+      "people_targeted": 509360,
+      "operations": [
+        {
+          "name": "Rwanda BVD preparedness",
+          "code": "MDRRW027",
+          "appeal_type": "DREF",
+          "people_targeted": 500000,
+          "start_date": "2026-06-04"
+        },
+        {
+          "name": "Rwanda - Floods sEAP",
+          "code": "MDRRW026",
+          "appeal_type": "DREF",
+          "people_targeted": 4000,
+          "start_date": "2026-02-20"
+        },
+        {
+          "name": "Rwanda - Flash Flood",
+          "code": "MDRRW025",
+          "appeal_type": "DREF",
+          "people_targeted": 3360,
+          "start_date": "2026-02-12"
+        },
+        {
+          "name": "Rwanda - Population Movement",
+          "code": "MDRRW024",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2025-12-13"
+        }
+      ]
+    },
+    "SLB": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 7480,
+      "operations": [
+        {
+          "name": "Solomon Islands Tropical Storm Maila",
+          "code": "MDRSB007",
+          "appeal_type": "DREF",
+          "people_targeted": 7480,
+          "start_date": "2026-04-21"
+        }
+      ]
+    },
+    "SLE": {
+      "active_operations": 5,
+      "active_drefs": 5,
+      "active_appeals": 0,
+      "people_targeted": 262155,
+      "operations": [
+        {
+          "name": "Sierra Leone: Measles outbreak",
+          "code": "MDRSL021",
+          "appeal_type": "DREF",
+          "people_targeted": 240703,
+          "start_date": "2026-05-25"
+        },
+        {
+          "name": "Sierra Leone: Windstorm and Fire",
+          "code": "MDRSL020",
+          "appeal_type": "DREF",
+          "people_targeted": 8372,
+          "start_date": "2026-05-22"
+        },
+        {
+          "name": "Sierra Leone - Floods",
+          "code": "MDRSL022",
+          "appeal_type": "DREF",
+          "people_targeted": 5100,
+          "start_date": "2026-08-13"
+        },
+        {
+          "name": "Sierra Leone - Floods",
+          "code": "MDRSL019",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2025-09-13"
+        },
+        {
+          "name": "Sierra Leone - Fire Incidents",
+          "code": "MDRSL018",
+          "appeal_type": "DREF",
+          "people_targeted": 2980,
+          "start_date": "2025-03-28"
+        }
+      ]
+    },
+    "SLV": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 2000,
+      "operations": [
+        {
+          "name": "El Salvador -Extreme Rainfall sEAP",
+          "code": "MDRSV018",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2025-02-17"
+        }
+      ]
+    },
+    "SOM": {
+      "active_operations": 5,
+      "active_drefs": 4,
+      "active_appeals": 1,
+      "people_targeted": 565740,
+      "operations": [
+        {
+          "name": "Somalia - Complex Emergency",
+          "code": "MDRSO025",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 450000,
+          "start_date": "2025-09-26"
+        },
+        {
+          "name": "Somalia - Cholera Outbreak",
+          "code": "MDRSO028",
+          "appeal_type": "DREF",
+          "people_targeted": 36240,
+          "start_date": "2026-10-22"
+        },
+        {
+          "name": "Somalia Insect Infestation sEAP",
+          "code": "MDRSO027",
+          "appeal_type": "DREF",
+          "people_targeted": 34800,
+          "start_date": "2026-07-27"
+        },
+        {
+          "name": "Somalia - Cholera sEAP",
+          "code": "MDRSO023",
+          "appeal_type": "DREF",
+          "people_targeted": 24700,
+          "start_date": "2025-06-25"
+        },
+        {
+          "name": "Somalia - Dengue",
+          "code": "MDRSO026",
+          "appeal_type": "DREF",
+          "people_targeted": 20000,
+          "start_date": "2026-03-05"
+        }
+      ]
+    },
+    "SRB": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 3219,
+      "operations": [
+        {
+          "name": "Serbia - Extreme Winter Condition",
+          "code": "MDRRS016",
+          "appeal_type": "DREF",
+          "people_targeted": 3219,
+          "start_date": "2026-01-20"
+        }
+      ]
+    },
+    "SSD": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 159948,
+      "operations": [
+        {
+          "name": "South Sudan MVD Readiness",
+          "code": "MDRSS018",
+          "appeal_type": "DREF",
+          "people_targeted": 131000,
+          "start_date": "2025-12-30"
+        },
+        {
+          "name": "South Sudan - Floods sEAP",
+          "code": "MDRSS017",
+          "appeal_type": "DREF",
+          "people_targeted": 20000,
+          "start_date": "2025-10-23"
+        },
+        {
+          "name": "South Sudan - Civil Unrest",
+          "code": "MDRSS016",
+          "appeal_type": "DREF",
+          "people_targeted": 8948,
+          "start_date": "2025-01-28"
+        }
+      ]
+    },
+    "STP": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 0,
+      "operations": [
+        {
+          "name": "Sao Tome and Principe - Election Readiness",
+          "code": "MDRST003",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-06-30"
+        }
+      ]
+    },
+    "SUR": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 2000,
+      "operations": [
+        {
+          "name": "Suriname - Chikungunya Outbreak",
+          "code": "MDRSR004",
+          "appeal_type": "DREF",
+          "people_targeted": 2000,
+          "start_date": "2026-03-12"
+        }
+      ]
+    },
+    "SYR": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 130000,
+      "operations": [
+        {
+          "name": "Syria - Drought",
+          "code": "MDRSY017",
+          "appeal_type": "DREF",
+          "people_targeted": 100000,
+          "start_date": "2025-08-22"
+        },
+        {
+          "name": "Syria - Floods",
+          "code": "MDRSY019",
+          "appeal_type": "DREF",
+          "people_targeted": 20000,
+          "start_date": "2026-06-04"
+        },
+        {
+          "name": "Syria - Floods",
+          "code": "MDRSY018",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-02-13"
+        }
+      ]
+    },
+    "TCD": {
+      "active_operations": 3,
+      "active_drefs": 3,
+      "active_appeals": 0,
+      "people_targeted": 538698,
+      "operations": [
+        {
+          "name": "Chad - Cholera Outbreak",
+          "code": "MDRTD025",
+          "appeal_type": "DREF",
+          "people_targeted": 214398,
+          "start_date": "2025-09-23"
+        },
+        {
+          "name": "Chad - Dengue Outbreak",
+          "code": "MDRTD027",
+          "appeal_type": "DREF",
+          "people_targeted": 200000,
+          "start_date": "2026-11-04"
+        },
+        {
+          "name": "Chad - Cholera Outbreak",
+          "code": "MDRTD026",
+          "appeal_type": "DREF",
+          "people_targeted": 124300,
+          "start_date": "2026-07-23"
+        }
+      ]
+    },
+    "TJK": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 2140,
+      "operations": [
+        {
+          "name": "Tajikistan - Flood and Mudflow",
+          "code": "MDRTJ038",
+          "appeal_type": "DREF",
+          "people_targeted": 2140,
+          "start_date": "2026-07-18"
+        }
+      ]
+    },
+    "TKM": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 0,
+      "operations": [
+        {
+          "name": "Turkmenistan - Population Movement Imminent",
+          "code": "MDRTM001",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-03-16"
+        }
+      ]
+    },
+    "TLS": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 6073,
+      "operations": [
+        {
+          "name": "Timor Leste - Flood sEAP",
+          "code": "MDRTL001",
+          "appeal_type": "DREF",
+          "people_targeted": 6073,
+          "start_date": "2025-02-18"
+        }
+      ]
+    },
+    "TUN": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 20000,
+      "operations": [
+        {
+          "name": "Tunisia - Wildfires",
+          "code": "MDRTN013",
+          "appeal_type": "DREF",
+          "people_targeted": 15000,
+          "start_date": "2026-08-06"
+        },
+        {
+          "name": "Tunisia - Flood",
+          "code": "MDRTN012",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2026-01-28"
+        }
+      ]
+    },
+    "TZA": {
+      "active_operations": 5,
+      "active_drefs": 5,
+      "active_appeals": 0,
+      "people_targeted": 275150,
+      "operations": [
+        {
+          "name": "Tanzania - Marburg Outbreak",
+          "code": "MDRTZ039",
+          "appeal_type": "DREF",
+          "people_targeted": 147785,
+          "start_date": "2025-01-27"
+        },
+        {
+          "name": "Tanzania - Flood EAP",
+          "code": "MDRTZ041",
+          "appeal_type": "DREF",
+          "people_targeted": 120000,
+          "start_date": "2025-05-15"
+        },
+        {
+          "name": "Tanzania - Flood",
+          "code": "MDRTZ043",
+          "appeal_type": "DREF",
+          "people_targeted": 3250,
+          "start_date": "2026-01-15"
+        },
+        {
+          "name": "Tanzania - Floods",
+          "code": "MDRTZ044",
+          "appeal_type": "DREF",
+          "people_targeted": 2615,
+          "start_date": "2026-04-03"
+        },
+        {
+          "name": "Tanzania - Floods",
+          "code": "MDRTZ045",
+          "appeal_type": "DREF",
+          "people_targeted": 1500,
+          "start_date": "2026-11-07"
+        }
+      ]
+    },
+    "UGA": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 619300,
+      "operations": [
+        {
+          "name": "Uganda - Ebola Outbreak",
+          "code": "MDRUG055",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 520000,
+          "start_date": "2025-02-07"
+        },
+        {
+          "name": "Uganda - Drought",
+          "code": "MDRUG059",
+          "appeal_type": "DREF",
+          "people_targeted": 76800,
+          "start_date": "2026-10-20"
+        },
+        {
+          "name": "Uganda - Population movement",
+          "code": "MDRUG056",
+          "appeal_type": "DREF",
+          "people_targeted": 22500,
+          "start_date": "2025-04-08"
+        }
+      ]
+    },
+    "URY": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 1000,
+      "operations": [
+        {
+          "name": "Uruguay - Drought",
+          "code": "MDRUY006",
+          "appeal_type": "DREF",
+          "people_targeted": 1000,
+          "start_date": "2026-03-26"
+        }
+      ]
+    },
+    "VEN": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 321000,
+      "operations": [
+        {
+          "name": "Venezuela-Earthquake",
+          "code": "MDRVE015",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 300000,
+          "start_date": "2026-06-25"
+        },
+        {
+          "name": "Venezuela Water Emergency",
+          "code": "MDRVE014",
+          "appeal_type": "DREF",
+          "people_targeted": 16000,
+          "start_date": "2026-03-13"
+        },
+        {
+          "name": "Venezuela - Flood",
+          "code": "MDRVE012",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2025-07-01"
+        }
+      ]
+    },
+    "VNM": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 49810,
+      "operations": [
+        {
+          "name": "Viet Nam - Monsoon Flood",
+          "code": "MDRVN025",
+          "appeal_type": "DREF",
+          "people_targeted": 36530,
+          "start_date": "2025-08-14"
+        },
+        {
+          "name": "Viet Nam - Flood",
+          "code": "MDRVN026",
+          "appeal_type": "DREF",
+          "people_targeted": 13280,
+          "start_date": "2025-11-29"
+        }
+      ]
+    },
+    "VUT": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 0,
+      "operations": [
+        {
+          "name": "Vanuatu - Volcanic Eruption Imminent",
+          "code": "MDRVU013",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2026-03-20"
+        }
+      ]
+    },
+    "WSM": {
+      "active_operations": 1,
+      "active_drefs": 1,
+      "active_appeals": 0,
+      "people_targeted": 15000,
+      "operations": [
+        {
+          "name": "Samoa - Dengue Outbreak",
+          "code": "MDRWS003",
+          "appeal_type": "DREF",
+          "people_targeted": 15000,
+          "start_date": "2025-08-14"
+        }
+      ]
+    },
+    "YEM": {
+      "active_operations": 3,
+      "active_drefs": 2,
+      "active_appeals": 1,
+      "people_targeted": 538500,
+      "operations": [
+        {
+          "name": "Yemen - Population Movement",
+          "code": "MDRYE018",
+          "appeal_type": "Emergency Appeal",
+          "people_targeted": 500000,
+          "start_date": "2026-09-11"
+        },
+        {
+          "name": "Yemen Floods",
+          "code": "MDRYE017",
+          "appeal_type": "DREF",
+          "people_targeted": 38500,
+          "start_date": "2026-04-03"
+        },
+        {
+          "name": "Yemen - Floods",
+          "code": "MDRYE016",
+          "appeal_type": "DREF",
+          "people_targeted": 0,
+          "start_date": "2025-08-28"
+        }
+      ]
+    },
+    "ZAF": {
+      "active_operations": 2,
+      "active_drefs": 2,
+      "active_appeals": 0,
+      "people_targeted": 15000,
+      "operations": [
+        {
+          "name": "South Africa - Flood",
+          "code": "MDRZA022",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-01-25"
+        },
+        {
+          "name": "South Africa - Flood",
+          "code": "MDRZA021",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2025-05-16"
+        }
+      ]
+    },
+    "ZMB": {
+      "active_operations": 4,
+      "active_drefs": 4,
+      "active_appeals": 0,
+      "people_targeted": 1383602,
+      "operations": [
+        {
+          "name": "Zambia Cholera",
+          "code": "MDRZM027",
+          "appeal_type": "DREF",
+          "people_targeted": 1200000,
+          "start_date": "2026-03-01"
+        },
+        {
+          "name": "Zambia - Measles",
+          "code": "MDRZM028",
+          "appeal_type": "DREF",
+          "people_targeted": 154316,
+          "start_date": "2026-07-18"
+        },
+        {
+          "name": "Zambia - Drought EAP2024ZM02",
+          "code": "MDRZM025",
+          "appeal_type": "DREF",
+          "people_targeted": 22530,
+          "start_date": "2025-03-27"
+        },
+        {
+          "name": "Zambia - Floods",
+          "code": "MDRZM026",
+          "appeal_type": "DREF",
+          "people_targeted": 6756,
+          "start_date": "2026-01-30"
+        }
+      ]
+    },
+    "ZWE": {
+      "active_operations": 6,
+      "active_drefs": 6,
+      "active_appeals": 0,
+      "people_targeted": 477499,
+      "operations": [
+        {
+          "name": "Zimbabwe - Cholera",
+          "code": "MDRZW024",
+          "appeal_type": "DREF",
+          "people_targeted": 309019,
+          "start_date": "2025-03-20"
+        },
+        {
+          "name": "Zimbabwe - Cholera",
+          "code": "MDRZW029",
+          "appeal_type": "DREF",
+          "people_targeted": 88200,
+          "start_date": "2026-07-20"
+        },
+        {
+          "name": "Zimbabwe - Cholera sEAP",
+          "code": "MDRZW026",
+          "appeal_type": "DREF",
+          "people_targeted": 61780,
+          "start_date": "2025-10-16"
+        },
+        {
+          "name": "Zimbabwe- Floods",
+          "code": "MDRZW027",
+          "appeal_type": "DREF",
+          "people_targeted": 10000,
+          "start_date": "2026-02-05"
+        },
+        {
+          "name": "Zimbabwe - Population Movement",
+          "code": "MDRZW028",
+          "appeal_type": "DREF",
+          "people_targeted": 5000,
+          "start_date": "2026-07-03"
+        },
+        {
+          "name": "Zimbabwe Hailstorms",
+          "code": "MDRZW030",
+          "appeal_type": "DREF",
+          "people_targeted": 3500,
+          "start_date": "2026-10-15"
+        }
+      ]
+    }
+  },
+  "omitted_count": 129
+}

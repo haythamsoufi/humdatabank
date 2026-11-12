@@ -106,7 +106,7 @@ Actions are grouped by where they apply. Prioritize **P0** before the next repor
 | Priority | Action | Rationale |
 |----------|--------|-----------|
 | P2 | Confirm AGW **backend timeout** (currently ~**30 s** per `gunicorn.conf.py` comment) vs product needs | AI/SSE needs ≥300 s on dedicated routes; general API should stay ≤30 s |
-| P2 | **Separate backend pools** or routing rules: long-running paths (`/api/ai/v2/chat/stream`, exports) vs default | Prevents one slow stream from starving form/presence traffic |
+| P2 | **Separate backend pools** or routing rules: long-running paths (`/api/ai/v1/chat/stream`, exports) vs default | Prevents one slow stream from starving form/presence traffic |
 | P3 | Enable / retain **AGW access logs** with `backendResponseStatus`, `timeTaken`, `backendPoolName` | 504s often never hit App Service Http5xx metrics |
 
 *Do not* raise AGW timeout globally to “fix” 504s — that masks stuck workers and holds DB connections longer.

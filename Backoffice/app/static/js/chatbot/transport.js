@@ -73,7 +73,7 @@ export const TransportMixin = {
 
     _buildUnifiedChatPayload(userMessage, sendOptions = {}) {
         /**
-         * Single source of truth for the /api/ai/v2 chat request contract.
+         * Single source of truth for the /api/ai/v1 chat request contract.
          * All transports (HTTP JSON, SSE, WS) MUST use this to avoid drift.
          */
         const pageContext = this.getPageContext();
@@ -720,7 +720,7 @@ export const TransportMixin = {
                     this.addErrorMessage(plainText || 'AI service unavailable. Please try again in a moment.', message);
                     const cid = this.getActiveConversationId && this.getActiveConversationId();
                     if (cid) {
-                        this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}/clear-inflight`, { method: 'POST' }).catch(() => {});
+                        this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(cid)}/clear-inflight`, { method: 'POST' }).catch(() => {});
                         if (this._dispatchImmersiveUpdate) this._dispatchImmersiveUpdate();
                     }
                 } else {
@@ -757,6 +757,17 @@ export const TransportMixin = {
                 // Do not show generic connection error or fall back.
                 return;
             }
+            if (error && error.name === 'TurnInProgress') {
+                const cid = error.conversationId || (this.getActiveConversationId && this.getActiveConversationId());
+                console.warn('[Chatbot] Transport: HTTP join refused because the turn is already running');
+                if (cid && this._keepsRunningOnDisconnect()) {
+                    if (inflightState) inflightState.detached = true;
+                    this._startInflightPoll(cid, (inflightState && inflightState.request_id) || null);
+                    this.isTyping = true;
+                    this.showTypingIndicator();
+                    return;
+                }
+            }
             const isAbort = error && (error.name === 'AbortError' || /aborted|cancelled|canceled/i.test(String(error.message || '')));
             if (isAbort) {
                 this._log('Request was stopped by user (abort/cancel)');
@@ -772,7 +783,7 @@ export const TransportMixin = {
                 this.addErrorMessage(errorMessage, message);
                 const cid = this.getActiveConversationId && this.getActiveConversationId();
                 if (cid) {
-                    this._apiFetch(`/api/ai/v2/conversations/${encodeURIComponent(cid)}/clear-inflight`, { method: 'POST' }).catch(() => {});
+                    this._apiFetch(`/api/ai/v1/conversations/${encodeURIComponent(cid)}/clear-inflight`, { method: 'POST' }).catch(() => {});
                     if (this._dispatchImmersiveUpdate) this._dispatchImmersiveUpdate();
                 }
             }
@@ -1239,7 +1250,7 @@ export const TransportMixin = {
     async streamResponseWithWebSocket(userMessage, sendOptions = {}, abortRef, detachRef, inflightKey) {
         return new Promise((resolve, reject) => {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/api/ai/v2/ws`;
+            const wsUrl = `${protocol}//${window.location.host}/api/ai/v1/ws`;
 
             let ws;
             try {
@@ -1514,7 +1525,7 @@ export const TransportMixin = {
                 try {
                     const reqId = ctx && ctx.request_id;
                     if (reqId) {
-                        this._apiFetch('/api/ai/v2/chat/cancel', {
+                        this._apiFetch('/api/ai/v1/chat/cancel', {
                             method: 'POST',
                             body: JSON.stringify({
                                 request_id: String(reqId),
@@ -1573,7 +1584,7 @@ export const TransportMixin = {
             ctx.finish = finish;
 
             try {
-                const resp = await fetch('/api/ai/v2/chat/stream', {
+                const resp = await fetch('/api/ai/v1/chat/stream', {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
@@ -1838,7 +1849,7 @@ export const TransportMixin = {
             // handleSendMessage is the sole caller and already has dedicated handling for both
             // in its outer catch, so re-throw and let it get there.
             const isAbort = error && (error.name === 'AbortError' || /aborted|cancelled|canceled/i.test(String(error.message || '')));
-            if (error && (error.name === 'DlpConfirmationRequired' || isAbort)) {
+            if (error && (error.name === 'DlpConfirmationRequired' || error.name === 'TurnInProgress' || isAbort)) {
                 throw error;
             }
             this.apiAvailable = false;
@@ -1923,6 +1934,12 @@ export const TransportMixin = {
                 if (errBody && errBody.error_type && String(errBody.error_type).startsWith('dlp_')) {
                     throw this._makeDlpError(errBody);
                 }
+                if (response.status === 409 && errBody && errBody.error_type === 'turn_in_progress') {
+                    const inFlight = new Error('This message is already being answered.');
+                    inFlight.name = 'TurnInProgress';
+                    inFlight.conversationId = errBody.conversation_id || null;
+                    throw inFlight;
+                }
                 throw (window.httpErrorSync && window.httpErrorSync(response)) || new Error(`HTTP error! status: ${response.status}`);
             }
 
@@ -1978,13 +1995,13 @@ export const TransportMixin = {
                 });
             }
 
-            // Update preferred language if it was detected/changed (v2 may not send this)
+            // Update preferred language if it was detected/changed (the chat API may not send this)
             if (data.detected_language && data.detected_language !== this.preferredLanguage) {
                 this._setPreferredLanguage(data.detected_language);
                 if (this.debug) this.debug.chatbot(`Language preference updated to: ${this.preferredLanguage}`);
             }
 
-            // Unified API returns reply (v2); legacy chatbot returned response
+            // Chat API returns reply; legacy chatbot returned response
             return data.reply != null ? data.reply : data.response;
         } catch (error) {
             const endTime = performance.now();

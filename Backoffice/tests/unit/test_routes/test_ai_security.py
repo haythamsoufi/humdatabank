@@ -21,7 +21,7 @@ class TestPublicProxyGate:
         from app.routes.ai import _is_allowed_public_proxy_request
 
         monkeypatch.delenv("AI_PUBLIC_PROXY_SECRET", raising=False)
-        with app.test_request_context("/api/ai/v2/chat", environ_base={"REMOTE_ADDR": "127.0.0.1"}):
+        with app.test_request_context("/api/ai/v1/chat", environ_base={"REMOTE_ADDR": "127.0.0.1"}):
             assert _is_allowed_public_proxy_request() is False
 
     def test_empty_flask_config_is_not_local_dev(self, app, monkeypatch):
@@ -29,7 +29,7 @@ class TestPublicProxyGate:
 
         monkeypatch.delenv("AI_PUBLIC_PROXY_SECRET", raising=False)
         monkeypatch.setenv("FLASK_CONFIG", "")
-        with app.test_request_context("/api/ai/v2/chat", environ_base={"REMOTE_ADDR": "127.0.0.1"}):
+        with app.test_request_context("/api/ai/v1/chat", environ_base={"REMOTE_ADDR": "127.0.0.1"}):
             assert _is_allowed_public_proxy_request() is False
 
     def test_explicit_local_dev_loopback_allowed_without_secret(self, app, monkeypatch):
@@ -37,9 +37,9 @@ class TestPublicProxyGate:
 
         monkeypatch.delenv("AI_PUBLIC_PROXY_SECRET", raising=False)
         with patch("app.routes.ai.is_local_dev_environment", return_value=True):
-            with app.test_request_context("/api/ai/v2/chat", environ_base={"REMOTE_ADDR": "127.0.0.1"}):
+            with app.test_request_context("/api/ai/v1/chat", environ_base={"REMOTE_ADDR": "127.0.0.1"}):
                 assert _is_allowed_public_proxy_request() is True
-            with app.test_request_context("/api/ai/v2/chat", environ_base={"REMOTE_ADDR": "203.0.113.9"}):
+            with app.test_request_context("/api/ai/v1/chat", environ_base={"REMOTE_ADDR": "203.0.113.9"}):
                 assert _is_allowed_public_proxy_request() is False
 
     def test_secret_is_compared_in_constant_time(self, app, monkeypatch):
@@ -47,7 +47,7 @@ class TestPublicProxyGate:
 
         monkeypatch.setenv("AI_PUBLIC_PROXY_SECRET", SECRET)
         headers = {ai_module.PUBLIC_AI_PROXY_HEADER: SECRET}
-        with app.test_request_context("/api/ai/v2/chat", headers=headers):
+        with app.test_request_context("/api/ai/v1/chat", headers=headers):
             with patch.object(ai_module.hmac, "compare_digest", wraps=ai_module.hmac.compare_digest) as spy:
                 assert ai_module._is_allowed_public_proxy_request() is True
             spy.assert_called_once()
@@ -58,12 +58,12 @@ class TestPublicProxyGate:
 
         monkeypatch.setenv("AI_PUBLIC_PROXY_SECRET", SECRET)
         headers = {ai_module.PUBLIC_AI_PROXY_HEADER: presented} if presented is not None else {}
-        with app.test_request_context("/api/ai/v2/chat", headers=headers):
+        with app.test_request_context("/api/ai/v1/chat", headers=headers):
             assert ai_module._is_allowed_public_proxy_request() is False
 
     def test_anonymous_chat_endpoint_rejected_without_secret(self, client, monkeypatch):
         monkeypatch.delenv("AI_PUBLIC_PROXY_SECRET", raising=False)
-        resp = client.post("/api/ai/v2/chat", json={"message": "hi"})
+        resp = client.post("/api/ai/v1/chat", json={"message": "hi"})
         assert resp.status_code == 401
 
 
@@ -325,7 +325,7 @@ class TestUsageBudget:
             "app.routes.ai.check_daily_cost_budget", return_value=BudgetVerdict(False, "system", 300.0, 250.0)
         ):
             resp = client.post(
-                "/api/ai/v2/chat",
+                "/api/ai/v1/chat",
                 json={"message": "hi"},
                 headers={"X-hum-databank-AI-Proxy": SECRET},
             )

@@ -82,7 +82,7 @@ class AiConversationSummary {
   final String? title;
   final DateTime? updatedAt;
   final DateTime? lastMessageAt;
-  /// From GET `/api/ai/v2/conversations` when [meta.inflight.status] is `in_progress` server-side.
+  /// From GET `/api/ai/v1/conversations` when [meta.inflight.status] is `in_progress` server-side.
   final bool inflightInProgress;
 
   AiConversationSummary({

@@ -288,7 +288,7 @@ class TestApiManagementHelpers:
     def test_surface_for_path(self):
         from app.routes.admin.api_management import _surface_for_path
         assert _surface_for_path("/api/mobile/v1/auth/token") == "mobile"
-        assert _surface_for_path("/api/ai/v2/chat") == "ai"
+        assert _surface_for_path("/api/ai/v1/chat") == "ai"
         assert _surface_for_path("/api/v1/data") == "v1"
         assert _surface_for_path("/api/other") == "other"
         assert _surface_for_path("/api/decisions") == "decisions"
@@ -451,7 +451,7 @@ class TestApiManagementHelpers:
         ):
             assert path not in undoc
         if not app.config.get("WEBSOCKET_ENABLED", False):
-            assert "/api/ai/v2/ws" not in stale
+            assert "/api/ai/v1/ws" not in stale
             assert "/api/ai/documents/ws" not in stale
 
     def test_scan_does_not_flag_fdrs_published_data_undocumented(self, app):

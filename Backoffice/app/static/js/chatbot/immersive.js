@@ -1112,7 +1112,7 @@
 
         var exportFetch = (window.getFetch && window.getFetch()) || fetch;
         try {
-            var res = await exportFetch('/api/ai/v2/table/export', {
+            var res = await exportFetch('/api/ai/v1/table/export', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -1662,7 +1662,7 @@
 
         var exportFetch = (window.getFetch && window.getFetch()) || fetch;
         try {
-            var res = await exportFetch('/api/ai/v2/table/export', {
+            var res = await exportFetch('/api/ai/v1/table/export', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -1711,7 +1711,7 @@
         var filename = (fileBase || 'data-table') + '.xlsx';
         var exportFetch = (window.getFetch && window.getFetch()) || fetch;
         try {
-            var res = await exportFetch('/api/ai/v2/table/export', {
+            var res = await exportFetch('/api/ai/v1/table/export', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -2802,7 +2802,7 @@
         var newChatFallback = t('newChat', 'New chat');
         if (isRefreshingConversations) return;
         isRefreshingConversations = true;
-        apiFetch('/api/ai/v2/conversations')
+        apiFetch('/api/ai/v1/conversations')
             .then(function (res) { return res.ok ? res.json() : { conversations: [] }; })
             .then(function (data) {
                 lastConversations = data.conversations || [];

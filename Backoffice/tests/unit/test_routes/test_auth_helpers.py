@@ -245,6 +245,7 @@ class TestDevActAsHelpers:
 
         monkeypatch.setenv('FLASK_CONFIG', 'development')
         app.config['DEBUG'] = True
+        app.config['DEV_ACT_AS_ALL_USERS'] = True
         user = create_test_user(db_session, email='test_admin@humdatabank.org', name='Route User')
 
         with app.test_request_context(
@@ -265,6 +266,7 @@ class TestDevActAsHelpers:
 
         monkeypatch.setenv('FLASK_CONFIG', 'development')
         app.config['DEBUG'] = True
+        app.config['DEV_ACT_AS_ALL_USERS'] = True
         signed_in = create_test_user(db_session, email='real.admin@example.org', name='Real Admin')
         db_session.add(UserLoginLog(
             user_id=signed_in.id,
@@ -292,6 +294,7 @@ class TestDevActAsHelpers:
 
         monkeypatch.setenv('FLASK_CONFIG', 'development')
         app.config['DEBUG'] = True
+        app.config['DEV_ACT_AS_ALL_USERS'] = True
         preadded = create_test_user(db_session, email='preadded.route@example.com', name='Pre Added Route')
 
         with app.test_request_context(
@@ -366,6 +369,62 @@ class TestDevActAsHelpers:
         with app.test_request_context('/login/dev-act-as', method='POST', environ_base={'REMOTE_ADDR': '10.0.0.5'}):
             with pytest.raises(NotFound):
                 dev_act_as_login()
+
+    def test_dev_act_as_route_rejects_user_id_without_all_users_flag(self, app, db_session, monkeypatch):
+        from app.routes.auth import dev_act_as_login
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        app.config['DEV_ACT_AS_ALL_USERS'] = False
+        user = create_test_user(db_session, email='hidden.person@example.org', name='Hidden Person')
+
+        with app.test_request_context(
+            '/login/dev-act-as',
+            method='POST',
+            data={'user_id': str(user.id)},
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            with patch('app.routes.auth._complete_dev_act_as_login') as mock_complete:
+                resp = dev_act_as_login()
+        mock_complete.assert_not_called()
+        assert resp.status_code == 302
+
+    def test_dev_act_as_search_404_without_flag(self, app, monkeypatch):
+        from app.routes.auth import dev_act_as_user_search
+        from werkzeug.exceptions import NotFound
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        app.config['DEV_ACT_AS_ALL_USERS'] = False
+        with app.test_request_context(
+            '/login/dev-act-as/users?q=hidden',
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            with pytest.raises(NotFound):
+                dev_act_as_user_search()
+
+    def test_dev_act_as_search_returns_short_matches(self, app, db_session, monkeypatch):
+        from app.routes.auth import dev_act_as_user_search
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        app.config['DEV_ACT_AS_ALL_USERS'] = True
+        create_test_user(db_session, email='secret.person@example.org', name='Secret Person')
+
+        with app.test_request_context(
+            '/login/dev-act-as/users?q=s',
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            short = dev_act_as_user_search()
+        assert short.get_json()['users'] == []
+
+        with app.test_request_context(
+            '/login/dev-act-as/users?q=secret.person',
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            matched = dev_act_as_user_search()
+        emails = [row['email'] for row in matched.get_json()['users']]
+        assert 'secret.person@example.org' in emails
 
 
 @pytest.mark.unit

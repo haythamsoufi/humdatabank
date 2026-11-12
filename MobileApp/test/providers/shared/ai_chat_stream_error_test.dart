@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hum_databank_app/models/shared/ai_chat.dart';
 import 'package:hum_databank_app/providers/shared/ai_chat_provider.dart';
+import 'package:hum_databank_app/services/ai_chat_service.dart';
 
 void main() {
   group('AiChatProvider.isUnclassifiedStreamError', () {
@@ -82,6 +86,54 @@ void main() {
       ]) {
         expect(AiChatProvider.isUnclassifiedStreamError(t), isFalse, reason: t);
       }
+    });
+  });
+
+  group('mergeAgentSteps', () {
+    test('a later snapshot does not replace steps already on screen', () {
+      const preparing = AiChatAgentStep(message: 'Preparing query…');
+      const searching = AiChatAgentStep(message: 'Searching documents');
+      expect(
+        AiChatProvider.mergeAgentSteps(const [preparing, searching], const [preparing]),
+        [preparing, searching],
+      );
+      expect(
+        AiChatProvider.mergeAgentSteps(const [preparing], const [preparing, searching]),
+        [preparing, searching],
+      );
+      expect(AiChatProvider.mergeAgentSteps(const [preparing], const []), [preparing]);
+    });
+  });
+
+  group('streamRequestMayBeOnServer', () {
+    test('a header timeout means the request may already be running', () {
+      expect(
+        streamRequestMayBeOnServer(
+          TimeoutException('Future not completed'),
+          handedToNetwork: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('connection refused never reached the server', () {
+      expect(
+        streamRequestMayBeOnServer(
+          Exception('SocketException: Connection refused'),
+          handedToNetwork: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a request that never left the device was not submitted', () {
+      expect(
+        streamRequestMayBeOnServer(
+          TimeoutException('Future not completed'),
+          handedToNetwork: false,
+        ),
+        isFalse,
+      );
     });
   });
 }

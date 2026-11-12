@@ -179,7 +179,7 @@ az webapp log tail --name <webapp-name> --resource-group <rg-name>
 
 ### Check AI system health
 ```
-GET /api/ai/v2/health
+GET /api/ai/v1/health
 ```
 
 ### Rebuild CSS after template changes

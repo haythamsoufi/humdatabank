@@ -179,7 +179,7 @@ Confirms requests pass when no minimum version is configured, that missing the h
 
 ## API Tests — Backoffice (`tests/api/`)
 
-These tests exercise the `/api/v1/*` and `/api/ai/v2/*` endpoints consumed by external API clients and internal services.
+These tests exercise the `/api/v1/*` and `/api/ai/v1/*` endpoints consumed by external API clients and internal services.
 
 ---
 
@@ -266,7 +266,7 @@ Confirms that requests without a valid CSRF token are rejected — critical for 
 ### `test_ai_chat_endpoints` · 15 tests
 
 **Critical functions:** AI chat auth, SSE streaming contract, conversation lifecycle, AI JWT issuance, Excel table export  
-**Covers:** `/api/ai/v2/*` — health checks, conversations, chat, streaming chat, token issuance, and table export.  
+**Covers:** `/api/ai/v1/*` — health checks, conversations, chat, streaming chat, token issuance, and table export.  
 Verifies auth for both session and Bearer tokens, input validation (message required, too long), SSE stream format, conversation list/export/delete/archive flows, AI JWT issuance for logged-in users, and Excel table export headers.
 
 ---

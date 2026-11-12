@@ -201,6 +201,20 @@ class TestRequestCountryAccessForm:
             db_session.commit()
             form = RequestCountryAccessForm(user_id=user.id)
             assert country.id in form._user_has_access
+            assert form._user_has_access_all is (set(cid for cid, _name in form.requested_country_id.choices) <= form._user_has_access)
+
+    def test_access_all_flag_when_user_has_every_country(self, app, db_session):
+        from tests.factories import create_test_country, create_test_user
+        with app.app_context():
+            create_test_country(db_session)
+            user = create_test_user(db_session, role='focal_point')
+            preview = RequestCountryAccessForm()
+            for country_id, _name in preview.requested_country_id.choices:
+                user.add_entity_permission('country', country_id)
+            db_session.commit()
+            form = RequestCountryAccessForm(user_id=user.id)
+            assert form.requested_country_id.choices
+            assert form._user_has_access_all is True
 
     def test_requires_at_least_one_country(self, app, db_session):
         with app.app_context():
@@ -233,6 +247,7 @@ class TestRequestCountryAccessForm:
                 form = RequestCountryAccessForm()
             assert form.requested_country_id.choices == []
             assert form._user_has_access == set()
+            assert form._user_has_access_all is False
 
     def test_without_user_id_has_empty_access_set(self, app, db_session):
         from tests.factories import create_test_country

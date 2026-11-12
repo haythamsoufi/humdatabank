@@ -52,7 +52,7 @@ Filter the output for `ERROR`, `CRITICAL`, and the time window of the incident.
 
 ### 3b. Check AI health endpoint
 ```
-GET https://<app-url>/api/ai/v2/health
+GET https://<app-url>/api/ai/v1/health
 ```
 If `status` is not `ok`, the AI subsystem is degraded. Check provider keys.
 
@@ -161,7 +161,7 @@ Also set **`WEBSITES_CONTAINER_START_TIME_LIMIT=230`** (Configuration → Applic
 
 ### Scenario D: AI chat not working
 
-1. `GET /api/ai/v2/health` → check which provider is unavailable.
+1. `GET /api/ai/v1/health` → check which provider is unavailable.
 2. If provider unavailable: verify API key in App Service env vars; test the key directly with provider's API.
 3. If `agent_available: false`: check `AI_AGENT_ENABLED=true` in config.
 4. If chat works but responses are poor: see [RAG quality](../ai/rag-quality-and-embeddings.md).

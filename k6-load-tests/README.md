@@ -26,7 +26,7 @@ k6 version
 
 | Phase | Scope | Status |
 |------|-------|--------|
-| **1** | Smoke (`/health`, `/api/ai/v2/health`) + 1–2 `/api/v1` reads with API key. | Implemented |
+| **1** | Smoke (`/health`, `/api/ai/v1/health`) + 1–2 `/api/v1` reads with API key. | Implemented |
 | **1.5** | Broader Backoffice coverage: extended `/api/v1` reads, document downloads, opt-in AI chat smoke, opt-in write smoke, mixed realistic profile. | Implemented (opt-in gates) |
 | **2** | Website (Next.js) + Mobile API (`/api/mobile/v1`) scenarios. | Roadmap (not implemented) |
 
@@ -55,7 +55,7 @@ file is never accidentally interpreted as a real `.env` file.)
 |----------|---------|---------|
 | `K6_DOC_IDS` | _(unset)_ | Comma-separated submitted-document IDs for `document-download.js` (e.g. `12,34,56`). Optional. |
 | `K6_RESOURCE_IDS` | _(unset)_ | Comma-separated `id:lang` pairs for resource downloads (e.g. `7:en,9:fr`). Optional. |
-| `K6_AI_TOKEN` | _(unset)_ | Preissued AI Bearer JWT (`GET /api/ai/v2/token` while logged in). Required by `ai-chat-smoke.js` when enabled. |
+| `K6_AI_TOKEN` | _(unset)_ | Preissued AI Bearer JWT (`GET /api/ai/v1/token` while logged in). Required by `ai-chat-smoke.js` when enabled. |
 | `K6_AI_CHAT_ENABLED` | `false` | Set to `true` to actually run the AI chat scenario. Otherwise the script is a no-op (cost guard). |
 | `K6_WRITE_ENABLED` | `false` | Set to `true` to actually run the write-smoke scenario. **Throwaway staging DB only.** |
 | `K6_WRITE_PATH` | `/api/v1/indicator-suggestions` | Endpoint used by `write-smoke.js` when enabled. |
@@ -72,7 +72,7 @@ All commands assume your shell is at the **repository root**.
 ### Phase 1
 
 ```bash
-# Smoke: GET /health and GET /api/ai/v2/health
+# Smoke: GET /health and GET /api/ai/v1/health
 k6 run k6-load-tests/scenarios/smoke-backoffice.js -e BASE_URL=https://your-staging-host
 
 # /api/v1 reads (1–2 endpoints) — requires Bearer API key
@@ -122,7 +122,7 @@ k6 run k6-load-tests/scenarios/write-smoke.js \
 - **Rate limits:** scripts target endpoints flagged `rate_limited: False` in
   `Backoffice/app/routes/admin/api_management.py`. If you change scripts to hit
   rate-limited endpoints, expect HTTP `429` and tune VUs/RPS down accordingly.
-- **AI health (`/api/ai/v2/health`)** can return `503` if `OPENAI_API_KEY` (or related
+- **AI health (`/api/ai/v1/health`)** can return `503` if `OPENAI_API_KEY` (or related
   config) is not present in the target environment. Treat that as an environment
   signal, **not** a k6 bug.
 - **Do not** point unbounded load at production without ops sign-off.

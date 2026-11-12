@@ -491,7 +491,7 @@ def register_ai_ws(app) -> None:
     apply_sock_server_options(app)
     sock = Sock(app)
 
-    @sock.route("/api/ai/v2/ws")
+    @sock.route("/api/ai/v1/ws")
     def ai_ws(ws):
         """
         Mobile-first WebSocket API with improved streaming, heartbeat, and cancel support.
@@ -856,7 +856,7 @@ def register_ai_ws(app) -> None:
                     form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
                     user_id=(int(identity.user.id) if getattr(identity, "is_authenticated", False) and getattr(identity, "user", None) else None),
                     transport="ws",
-                    endpoint_path=(request.path or "/api/ai/v2/ws"),
+                    endpoint_path=(request.path or "/api/ai/v1/ws"),
                     client=str((payload.get("client") or "unknown")),
                     conversation_id=(getattr(parsed, "conversation_id", None) or payload.get("conversation_id")),
                     client_message_id=getattr(parsed, "client_message_id", None),
@@ -1541,7 +1541,7 @@ def register_ai_ws(app) -> None:
             return
 
         # Admission control: shares the same per-process thread budget as the
-        # notifications and AI chat WebSockets (see /api/ai/v2/ws above).
+        # notifications and AI chat WebSockets (see /api/ai/v1/ws above).
         if not ws_manager.add_connection(current_user.id, ws, channel='ai_docs'):
             try:
                 ws.send(json.dumps({

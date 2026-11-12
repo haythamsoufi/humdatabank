@@ -14,6 +14,39 @@ import 'api_service.dart';
 import 'storage_service.dart';
 import '../di/service_locator.dart';
 
+/// True when the chat request was handed to the network and the server may
+/// already be running it. A dropped stream in that state must wait for the
+/// stored reply instead of posting the question again.
+///
+/// Connection failures that happen before a socket is accepted (refused, DNS)
+/// mean the server never saw the request.
+bool streamRequestMayBeOnServer(Object error, {required bool handedToNetwork}) {
+  if (!handedToNetwork) return false;
+  final text = error.toString().toLowerCase();
+  const neverAccepted = <String>[
+    'connection refused',
+    'failed host lookup',
+    'network is unreachable',
+    'no address associated',
+    'nodename nor servname',
+    'no internet',
+  ];
+  for (final marker in neverAccepted) {
+    if (text.contains(marker)) return false;
+  }
+  return true;
+}
+
+class AiChatStreamDisconnected implements Exception {
+  AiChatStreamDisconnected(this.cause, {required this.requestMayBeOnServer});
+
+  final Object cause;
+  final bool requestMayBeOnServer;
+
+  @override
+  String toString() => cause.toString();
+}
+
 class AiChatService {
   static final AiChatService _instance = AiChatService._internal();
   factory AiChatService() => _instance;
@@ -36,7 +69,7 @@ class AiChatService {
   /// Returns null if not authenticated.
   Future<String?> fetchAndCacheToken() async {
     try {
-      final resp = await _api.get(AppConfig.aiV2TokenEndpoint, includeAuth: true, useCache: false);
+      final resp = await _api.get(AppConfig.aiV1TokenEndpoint, includeAuth: true, useCache: false);
       if (resp.statusCode != 200) {
         final denied = AiChatHttpException.fromResponse(resp.statusCode, resp.body);
         DebugLogger.logWarn('AI', 'AI token request failed: HTTP ${resp.statusCode}');
@@ -114,7 +147,7 @@ class AiChatService {
       ));
 
       final resp = await _api.post(
-        AppConfig.aiV2ChatEndpoint,
+        AppConfig.aiV1ChatEndpoint,
         includeAuth: isAuthenticated, // Only require auth if user is authenticated
         body: body,
         additionalHeaders: headers.isEmpty ? null : headers,
@@ -136,7 +169,7 @@ class AiChatService {
           final refreshed = await fetchAndCacheToken();
           if (refreshed != null && refreshed.isNotEmpty) {
             final retryResp = await _api.post(
-              AppConfig.aiV2ChatEndpoint,
+              AppConfig.aiV1ChatEndpoint,
               includeAuth: isAuthenticated,
               body: body,
               additionalHeaders: {'Authorization': 'Bearer $refreshed'},
@@ -188,7 +221,53 @@ class AiChatService {
     throw lastError ?? Exception('Chat failed after retries');
   }
 
-  /// Streams a chat turn over Server-Sent Events (`POST /api/ai/v2/chat/stream`).
+  /// Wait for a turn that was already submitted over SSE.
+  ///
+  /// The server holds the call until the original run stores its reply, or for
+  /// [wait] and then returns `ready: false`. This does not start a new agent run.
+  Future<Map<String, dynamic>> awaitChatReply({
+    required String conversationId,
+    required String clientMessageId,
+    Duration wait = const Duration(seconds: 15),
+    bool isAuthenticated = true,
+  }) async {
+    Future<Map<String, dynamic>> once(String? token) async {
+      final headers = <String, String>{};
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      final resp = await _api.post(
+        AppConfig.aiV1ChatAwaitEndpoint,
+        includeAuth: isAuthenticated,
+        body: wrapWafJsonBody({
+          'conversation_id': conversationId,
+          'client_message_id': clientMessageId,
+          'wait_seconds': wait.inSeconds,
+        }),
+        additionalHeaders: headers.isEmpty ? null : headers,
+        retryable: false,
+        timeout: wait + const Duration(seconds: 10),
+      );
+      if (resp.statusCode != 200) {
+        throw AiChatHttpException.fromResponse(resp.statusCode, resp.body);
+      }
+      return _decodeChatSuccess(resp.body);
+    }
+
+    final token = await getCachedToken();
+    try {
+      return await once(token);
+    } on AiChatHttpException catch (e) {
+      final rejected = e.statusCode == 401 || e.statusCode == 403 || _isCsrfRejection(e.statusCode, e.message);
+      if (!isAuthenticated || !rejected) rethrow;
+      await clearToken();
+      final refreshed = await fetchAndCacheToken();
+      if (refreshed == null || refreshed.isEmpty) rethrow;
+      return once(refreshed);
+    }
+  }
+
+  /// Streams a chat turn over Server-Sent Events (`POST /api/ai/v1/chat/stream`).
   ///
   /// Each event is the decoded JSON object the server emitted (`meta`, `step`, `step_detail`,
   /// `delta`, `structured`, `done`, `error`, `heartbeat`), i.e. the same envelopes the
@@ -212,6 +291,7 @@ class AiChatService {
     ApiStreamedPost? open;
     StreamSubscription<String>? lineSub;
     var cancelled = false;
+    var handedToNetwork = false;
 
     Future<void> release() async {
       cancelled = true;
@@ -241,7 +321,7 @@ class AiChatService {
 
     Future<ApiStreamedPost> openWith(String? token) {
       return _api.openStreamingPost(
-        AppConfig.aiV2ChatStreamEndpoint,
+        AppConfig.aiV1ChatStreamEndpoint,
         body: body,
         includeAuth: isAuthenticated,
         additionalHeaders:
@@ -251,6 +331,7 @@ class AiChatService {
 
     Future<void> run() async {
       try {
+        handedToNetwork = true;
         var handle = await openWith(await getCachedToken());
         if (cancelled) {
           handle.close();
@@ -314,7 +395,15 @@ class AiChatService {
 
         await done.future;
       } catch (e, st) {
-        if (!cancelled && !controller.isClosed) controller.addError(e, st);
+        if (!cancelled && !controller.isClosed) {
+          controller.addError(
+            AiChatStreamDisconnected(
+              e,
+              requestMayBeOnServer: streamRequestMayBeOnServer(e, handedToNetwork: handedToNetwork),
+            ),
+            st,
+          );
+        }
       } finally {
         open?.close();
         open = null;
@@ -332,7 +421,7 @@ class AiChatService {
     try {
       final token = await getCachedToken();
       await _api.post(
-        AppConfig.aiV2ChatCancelEndpoint,
+        AppConfig.aiV1ChatCancelEndpoint,
         includeAuth: true,
         body: {'request_id': requestId},
         additionalHeaders:
@@ -377,7 +466,7 @@ class AiChatService {
       scheme: wsScheme,
       host: baseUri.host,
       port: wsPort,
-      path: AppConfig.aiV2WsEndpoint,
+      path: AppConfig.aiV1WsEndpoint,
     );
 
     // Debug log the WebSocket URL (remove in production)
@@ -455,7 +544,7 @@ class AiChatService {
   Future<List<dynamic>> listConversations() async {
     final resp = await _withFreshAiToken(
       send: (headers) => _api.get(
-        AppConfig.aiV2ConversationsEndpoint,
+        AppConfig.aiV1ConversationsEndpoint,
         includeAuth: true,
         useCache: false,
         queryParams: {'limit': '50'},
@@ -471,7 +560,7 @@ class AiChatService {
   Future<Map<String, dynamic>> getConversation(String conversationId) async {
     final resp = await _withFreshAiToken(
       send: (headers) => _api.get(
-        '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
+        '${AppConfig.aiV1ConversationsEndpoint}/$conversationId',
         includeAuth: true,
         useCache: false,
         queryParams: {'limit': '200'},
@@ -487,7 +576,7 @@ class AiChatService {
   Future<void> deleteConversation(String conversationId) async {
     final resp = await _withFreshAiToken(
       send: (headers) => _api.delete(
-        '${AppConfig.aiV2ConversationsEndpoint}/$conversationId',
+        '${AppConfig.aiV1ConversationsEndpoint}/$conversationId',
         includeAuth: true,
         additionalHeaders: headers,
       ),
@@ -510,7 +599,7 @@ class AiChatService {
     };
     final resp = await _withFreshAiToken(
       send: (headers) => _api.post(
-        '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/import',
+        '${AppConfig.aiV1ConversationsEndpoint}/$conversationId/import',
         includeAuth: true,
         body: payload,
         additionalHeaders: headers,
@@ -529,7 +618,7 @@ class AiChatService {
     try {
       final resp = await _withFreshAiToken(
         send: (headers) => _api.post(
-          AppConfig.aiV2FeedbackEndpoint,
+          AppConfig.aiV1FeedbackEndpoint,
           includeAuth: true,
           body: {'trace_id': traceId, 'rating': r},
           additionalHeaders: headers,
@@ -550,7 +639,7 @@ class AiChatService {
     try {
       await _withFreshAiToken(
         send: (headers) => _api.post(
-          '${AppConfig.aiV2ConversationsEndpoint}/$conversationId/clear-inflight',
+          '${AppConfig.aiV1ConversationsEndpoint}/$conversationId/clear-inflight',
           includeAuth: true,
           body: const <String, dynamic>{},
           additionalHeaders: headers,

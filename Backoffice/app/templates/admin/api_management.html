@@ -364,12 +364,12 @@
                     </span>
                     <span class="ep-filter-wrap">
                         <button type="button" data-surface="ai" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-none border"{% if ep_surface_filter_disabled['ai'] %} disabled{% endif %}>
-                            {{ svg_icon('bubbles', 'w-4 h-4 mr-1 align-text-bottom') }}{{ _('AI /v2') }}
+                            {{ svg_icon('bubbles', 'w-4 h-4 mr-1 align-text-bottom') }}{{ _('AI /v1') }}
                             <span class="ml-1 opacity-60">{{ surface_summary.ai.total }}</span>
                         </button>
                         <span class="ep-filter-tip" role="tooltip">
                             <span class="ep-filter-tip-inner">
-                                <span class="ep-filter-tip-line">{{ _('Only /api/ai/v2 assistants, tools, and related routes.') }}</span>
+                                <span class="ep-filter-tip-line">{{ _('Only /api/ai/v1 assistants, tools, and related routes.') }}</span>
                             </span>
                         </span>
                     </span>
@@ -576,7 +576,7 @@
                 <i class="fas fa-key text-indigo-500 mr-1" aria-hidden="true"></i>{{ _('Key / Session — either works') }}</span>
             <span class="cursor-help" title="{{ _('Flask-Login session only (@login_required). The user is already signed into the Backoffice in the browser.')|forceescape }}">
                 <i class="fas fa-user text-blue-500 mr-1" aria-hidden="true"></i>{{ _('Session — @login_required') }}</span>
-            {% set ep_ai_identity_tip = _('AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) short-lived AI JWT in Authorization: Bearer (often from GET /api/ai/v2/token), or (3) anonymous when the route allows. Coarse access is public / user / admin / system_manager; AI tools can still enforce granular RBAC permissions.') %}
+            {% set ep_ai_identity_tip = _('AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) short-lived AI JWT in Authorization: Bearer (often from GET /api/ai/v1/token), or (3) anonymous when the route allows. Coarse access is public / user / admin / system_manager; AI tools can still enforce granular RBAC permissions.') %}
             <span class="ep-ai-identity-tip-trigger cursor-help outline-none rounded-sm" tabindex="0"
                   aria-label="{{ ep_ai_identity_tip }}">
                 <span class="inline-flex items-center">
@@ -1909,7 +1909,7 @@ window.apiMgmtRegistryConfig.t = {
   bearer_token_using_a_database_managed_ap_e33b4b55: {{ _('Bearer token using a database-managed API key (Authorization: Bearer …). Typical for external integrations.')|tojson }},
   valid_api_key_bearer_or_an_authenticated_b2773975: {{ _('Valid API key (Bearer) or an authenticated Backoffice session, depending on the client. Pagination and response shape may differ by mode.')|tojson }},
   flask_login_session_only_login_required__ed5712e9: {{ _('Flask-Login session only (@login_required). The user is already signed into the Backoffice in the browser.')|tojson }},
-  ai_identity_from_resolve_ai_identity_1_b_b4baf968: {{ _('AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) short-lived AI JWT in Authorization: Bearer (often from GET /api/ai/v2/token), or (3) anonymous when the route allows. Coarse access is public / user / admin / system_manager; AI tools can still enforce granular RBAC permissions.')|tojson }},
+  ai_identity_from_resolve_ai_identity_1_b_b4baf968: {{ _('AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) short-lived AI JWT in Authorization: Bearer (often from GET /api/ai/v1/token), or (3) anonymous when the route allows. Coarse access is public / user / admin / system_manager; AI tools can still enforce granular RBAC permissions.')|tojson }},
   mobile_user_jwt_or_compatible_session_vi_952d94ed: {{ _('Mobile user JWT or compatible session via @mobile_auth_required, without requiring a specific RBAC permission on the route.')|tojson }},
   mobile_admin_mobile_auth_required_plus_o_d68c5a24: {{ _('Mobile admin: @mobile_auth_required plus one RBAC permission. The exact permission code is appended below when known.')|tojson }},
   column_filters_are_hiding_some_rows_that_20419783: {{ _('Column filters are hiding some rows that match this chip.')|tojson }},

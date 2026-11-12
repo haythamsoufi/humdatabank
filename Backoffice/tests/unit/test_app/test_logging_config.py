@@ -93,7 +93,7 @@ class TestIsNoisyAccessLogMessage:
     def test_ai_health_endpoint_filtered(self):
         msg = (
             '127.0.0.1 - - [28/Jun/2026:21:00:00 +0000] '
-            '"GET /api/ai/v2/health HTTP/1.1" 200 42 "-" "curl/8.0" 12'
+            '"GET /api/ai/v1/health HTTP/1.1" 200 42 "-" "curl/8.0" 12'
         )
         assert is_noisy_access_log_message(msg) is True
 

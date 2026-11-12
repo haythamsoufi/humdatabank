@@ -26,11 +26,11 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
         return True
 
     # WebSocket upgrade endpoints
-    if path in ("/api/ai/v2/ws", "/api/ai/documents/ws"):
+    if path in ("/api/ai/v1/ws", "/api/ai/documents/ws"):
         return True
 
     # Streaming / cancel — tracked elsewhere; not comparable to normal REST latency
-    if path in ("/api/ai/v2/chat/stream", "/api/ai/v2/chat/cancel"):
+    if path in ("/api/ai/v1/chat/stream", "/api/ai/v1/chat/cancel"):
         return True
 
     # Product tour content under document workflows
@@ -60,17 +60,17 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
     if path.startswith("/api/forms/assignment/") and path.endswith("/entry-bootstrap"):
         return True
 
-    if path == "/api/ai/v2/token":
+    if path == "/api/ai/v1/token":
         return True
 
     if path == "/api/v1/variables/resolve":
         return True
 
     # Polled conversation list / single conversation (GET only)
-    if method == "GET" and path == "/api/ai/v2/conversations":
+    if method == "GET" and path == "/api/ai/v1/conversations":
         return True
-    if method == "GET" and path.startswith("/api/ai/v2/conversations/"):
-        rest = path[len("/api/ai/v2/conversations/") :]
+    if method == "GET" and path.startswith("/api/ai/v1/conversations/"):
+        rest = path[len("/api/ai/v1/conversations/") :]
         if rest and "/" not in rest:
             return True
 

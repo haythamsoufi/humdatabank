@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     }
 
     const API_BASE_URL = resolveBackofficeBaseUrl();
-    const url = `${API_BASE_URL}/api/ai/v2/chat`;
+    const url = `${API_BASE_URL}/api/ai/v1/chat`;
 
     // Forward Authorization header if present (for logged-in Website users later)
     const authHeader = req.headers.authorization;

@@ -26,11 +26,11 @@ export default async function handler(req, res) {
     let url;
     if (conversation_id) {
       // Get specific conversation
-      url = `${API_BASE_URL}/api/ai/v2/conversations/${conversation_id}`;
+      url = `${API_BASE_URL}/api/ai/v1/conversations/${conversation_id}`;
     } else {
       // List all conversations
       const limit = req.query.limit || '50';
-      url = `${API_BASE_URL}/api/ai/v2/conversations?limit=${limit}`;
+      url = `${API_BASE_URL}/api/ai/v1/conversations?limit=${limit}`;
     }
 
     const resp = await fetch(url, {

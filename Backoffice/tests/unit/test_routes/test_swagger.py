@@ -65,8 +65,8 @@ class TestGetOpenApiSpec:
             from app.swagger.openapi_spec import get_openapi_spec
             spec = get_openapi_spec()
         servers = spec.get("servers", [])
-        assert len(servers) >= 1
-        assert "url" in servers[0]
+        assert len(servers) == 1
+        assert servers[0]["url"].endswith("/api/v1")
 
     def test_tags_section(self, app):
         with app.app_context():
@@ -75,8 +75,11 @@ class TestGetOpenApiSpec:
         tags = spec.get("tags", [])
         tag_names = [t["name"] for t in tags]
         assert "Countries" in tag_names
-        assert "Indicators" in tag_names
+        assert "Indicator bank" in tag_names
         assert "Templates" in tag_names
+        assert "Indicators" not in tag_names
+        assert "Users" not in tag_names
+        assert "Quiz" not in tag_names
 
     def test_components_section(self, app):
         with app.app_context():
@@ -157,11 +160,12 @@ class TestGetOpenApiSpec:
             spec = get_openapi_spec()
         assert "/submissions" in spec["paths"]
 
-    def test_paths_has_user_profile(self, app):
+    def test_paths_omit_user_profile(self, app):
         with app.app_context():
             from app.swagger.openapi_spec import get_openapi_spec
             spec = get_openapi_spec()
-        assert "/user/profile" in spec["paths"]
+        assert "/user/profile" not in spec["paths"]
+        assert "/users" not in spec["paths"]
 
     def test_paths_has_resources(self, app):
         with app.app_context():
@@ -169,17 +173,18 @@ class TestGetOpenApiSpec:
             spec = get_openapi_spec()
         assert "/resources" in spec["paths"]
 
-    def test_paths_has_common_words(self, app):
+    def test_paths_has_common_words_under_indicator_bank(self, app):
         with app.app_context():
             from app.swagger.openapi_spec import get_openapi_spec
             spec = get_openapi_spec()
-        assert "/common-words" in spec["paths"]
+        assert spec["paths"]["/common-words"]["get"]["tags"] == ["Indicator bank"]
 
-    def test_paths_has_data_tables(self, app):
+    def test_paths_omit_legacy_data_tables(self, app):
         with app.app_context():
             from app.swagger.openapi_spec import get_openapi_spec
             spec = get_openapi_spec()
-        assert "/data/tables" in spec["paths"]
+        assert "/data/tables" not in spec["paths"]
+        assert "/quiz/leaderboard" not in spec["paths"]
 
     def test_paths_has_periods(self, app):
         with app.app_context():
@@ -217,7 +222,14 @@ class TestGetOpenApiSpec:
             from app.swagger.openapi_spec import get_openapi_spec
             spec = get_openapi_spec()
         urls = [s["url"] for s in spec.get("servers", [])]
-        assert any("localhost" in url or "http" in url for url in urls)
+        assert len(urls) == 1
+        assert urls[0].endswith("/api/v1")
+
+    def test_request_spec_uses_only_the_current_host(self, app):
+        with app.test_request_context(base_url="https://databank.example.org/"):
+            from app.swagger.openapi_spec import get_openapi_spec
+            spec = get_openapi_spec()
+        assert [s["url"] for s in spec["servers"]] == ["https://databank.example.org/api/v1"]
 
     def test_get_api_paths_returns_dict(self, app):
         with app.app_context():
@@ -250,13 +262,12 @@ class TestGetOpenApiSpec:
             paths = get_api_paths()
         assert "/templates/{template_id}" in paths
 
-    def test_user_profile_has_get_and_put(self, app):
+    def test_user_routes_are_omitted(self, app):
         with app.app_context():
             from app.swagger.openapi_spec import get_api_paths
             paths = get_api_paths()
-        profile = paths.get("/user/profile", {})
-        assert "get" in profile
-        assert "put" in profile
+        assert "/user/profile" not in paths
+        assert "/users" not in paths
 
     def test_submission_by_id_path(self, app):
         with app.app_context():
@@ -282,11 +293,11 @@ class TestGetOpenApiSpec:
             paths = get_api_paths()
         assert "/sectors-subsectors" in paths
 
-    def test_users_path(self, app):
+    def test_users_path_is_omitted(self, app):
         with app.app_context():
             from app.swagger.openapi_spec import get_api_paths
             paths = get_api_paths()
-        assert "/users" in paths
+        assert "/users" not in paths
 
     def test_template_data_path(self, app):
         with app.app_context():
@@ -300,7 +311,8 @@ class TestGetOpenApiSpec:
             spec = get_openapi_spec()
         error_schema = spec["components"]["schemas"]["Error"]
         assert "required" in error_schema
-        assert "success" in error_schema["required"]
+        assert "error" in error_schema["required"]
+        assert "error_id" in error_schema["required"]
 
     def test_pagination_schema_properties(self, app):
         with app.app_context():
@@ -327,9 +339,17 @@ class TestGetOpenApiSpec:
 # ===========================================================================
 
 class TestSwaggerUI:
-    def test_unauthenticated_redirects(self, client, db_session):
+    def test_unauthenticated_returns_html(self, client, db_session):
         resp = client.get("/api-docs/")
-        _assert_status(resp, 302, 401)
+        _assert_status(resp, 200)
+        assert resp.content_type.startswith("text/html")
+        assert b"apiDocsBaseUrl" not in resp.data
+        assert b"api-docs-bar" not in resp.data
+        assert b'layout: "BaseLayout"' in resp.data
+        assert b"filter: true" in resp.data
+        assert b"StandaloneLayout" not in resp.data
+        assert b"swagger-ui-standalone-preset" not in resp.data
+        assert b"Try it out only calls this host." in resp.data
 
     def test_authenticated_returns_html(self, logged_in_client, db_session):
         resp = logged_in_client.get("/api-docs/")
@@ -343,15 +363,18 @@ class TestSwaggerUI:
 
     def test_spec_error_still_renders(self, logged_in_client, db_session):
         """Even if spec generation fails, UI should still render."""
-        with patch("app.swagger.openapi_spec.get_openapi_spec", side_effect=RuntimeError("boom")):
+        with patch("app.swagger.routes.get_openapi_spec", side_effect=RuntimeError("boom")):
             resp = logged_in_client.get("/api-docs/")
         _assert_status(resp, 200)
 
 
 class TestOpenApiJson:
-    def test_unauthenticated_redirects(self, client, db_session):
+    def test_unauthenticated_returns_json(self, client, db_session):
         resp = client.get("/api-docs/openapi.json")
-        _assert_status(resp, 302, 401)
+        _assert_status(resp, 200)
+        data = _get_json(resp)
+        assert data.get("openapi") == "3.0.3"
+        assert "/indicator-bank" in data.get("paths", {})
 
     def test_authenticated_returns_json(self, logged_in_client, db_session):
         resp = logged_in_client.get("/api-docs/openapi.json")
@@ -375,18 +398,18 @@ class TestOpenApiJson:
 
     def test_missing_openapi_field_returns_500(self, logged_in_client, db_session):
         """When spec is missing 'openapi' field should return server error."""
-        with patch("app.swagger.openapi_spec.get_openapi_spec", return_value={"paths": {}}):
+        with patch("app.swagger.routes.get_openapi_spec", return_value={"paths": {}}):
             resp = logged_in_client.get("/api-docs/openapi.json")
         _assert_status(resp, 500)
 
     def test_missing_paths_field_returns_500(self, logged_in_client, db_session):
         """When spec is missing 'paths' field should return server error."""
-        with patch("app.swagger.openapi_spec.get_openapi_spec", return_value={"openapi": "3.0.3"}):
+        with patch("app.swagger.routes.get_openapi_spec", return_value={"openapi": "3.0.3"}):
             resp = logged_in_client.get("/api-docs/openapi.json")
         _assert_status(resp, 500)
 
     def test_spec_exception_returns_500(self, logged_in_client, db_session):
-        with patch("app.swagger.openapi_spec.get_openapi_spec", side_effect=Exception("broken")):
+        with patch("app.swagger.routes.get_openapi_spec", side_effect=Exception("broken")):
             resp = logged_in_client.get("/api-docs/openapi.json")
         _assert_status(resp, 500)
 
@@ -398,9 +421,9 @@ class TestOpenApiJson:
 
 
 class TestOpenApiYaml:
-    def test_unauthenticated_redirects(self, client, db_session):
+    def test_unauthenticated_returns_yaml_or_503(self, client, db_session):
         resp = client.get("/api-docs/openapi.yaml")
-        _assert_status(resp, 302, 401)
+        _assert_status(resp, 200, 503)
 
     def test_authenticated_returns_yaml_or_503(self, logged_in_client, db_session):
         """Endpoint returns YAML if PyYAML is installed, 503 if not."""
@@ -440,15 +463,17 @@ class TestOpenApiYaml:
         except ImportError:
             pytest.skip("PyYAML not installed")
 
-        with patch("app.swagger.openapi_spec.get_openapi_spec", side_effect=RuntimeError("fail")):
+        with patch("app.swagger.routes.get_openapi_spec", side_effect=RuntimeError("fail")):
             resp = logged_in_client.get("/api-docs/openapi.yaml")
         _assert_status(resp, 500)
 
 
 class TestSwaggerTestSpec:
-    def test_unauthenticated_redirects(self, client, db_session):
+    def test_unauthenticated_returns_success(self, client, db_session):
         resp = client.get("/api-docs/test")
-        _assert_status(resp, 302, 401)
+        _assert_status(resp, 200)
+        data = _get_json(resp)
+        assert data.get("status") == "success"
 
     def test_authenticated_returns_success(self, logged_in_client, db_session):
         resp = logged_in_client.get("/api-docs/test")
@@ -506,7 +531,7 @@ class TestSwaggerTestSpec:
         assert data.get("title")
 
     def test_spec_exception_returns_500(self, logged_in_client, db_session):
-        with patch("app.swagger.openapi_spec.get_openapi_spec", side_effect=Exception("boom")):
+        with patch("app.swagger.routes.get_openapi_spec", side_effect=Exception("boom")):
             resp = logged_in_client.get("/api-docs/test")
         _assert_status(resp, 500)
 
@@ -604,7 +629,9 @@ class TestOpenApiSpecIntegrity:
         with app.app_context():
             from app.swagger.openapi_spec import get_openapi_spec
             spec = get_openapi_spec()
-        assert spec["info"].get("description")
+        description = spec["info"].get("description") or ""
+        assert description
+        assert "cannot be called with an API key" in description
 
     def test_indicator_bank_no_auth_required(self, app):
         """Indicator bank (public endpoint) should have no security requirement."""
@@ -623,3 +650,103 @@ class TestOpenApiSpecIntegrity:
         op = paths["/countrymap"]["get"]
         security = op.get("security", [])
         assert any("BearerAuth" in (s or {}) for s in security)
+
+    def test_omitted_groups_stay_out_of_the_spec(self, app):
+        from app.swagger.route_spec import is_omitted_from_spec
+
+        with app.app_context():
+            from app.swagger.openapi_spec import get_api_paths
+            paths = get_api_paths()
+        assert not any(is_omitted_from_spec(path) for path in paths)
+        for kept in ("/countrymap", "/indicator-bank", "/templates", "/data", "/submissions", "/resources", "/submitted-documents", "/public/global-trend", "/common-words", "/assigned-forms"):
+            assert kept in paths
+
+    def test_indicator_bank_documents_paging(self, app):
+        with app.app_context():
+            from app.swagger.openapi_spec import get_api_paths
+            paths = get_api_paths()
+        names = []
+        for param in paths["/indicator-bank"]["get"]["parameters"]:
+            if "$ref" in param:
+                names.append(param["$ref"].rsplit("/", 1)[-1])
+            else:
+                names.append(param["name"])
+        assert "search" in names
+        assert "PageParam" in names
+        assert "PerPageParam" in names
+        props = paths["/indicator-bank"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["properties"]
+        assert "total" in props
+        assert "success" not in props
+
+    def test_public_integrations_are_documented(self, app):
+        with app.app_context():
+            from app.swagger.openapi_spec import get_api_paths
+            paths = get_api_paths()
+        assert "/public/global-trend" in paths
+        assert "/public/documents/search" in paths
+        assert "/public/reports/country" in paths
+        assert paths["/public/global-trend"]["get"].get("security") == []
+
+    def test_every_v1_route_is_in_the_spec(self, app):
+        """A new /api/v1 route must appear unless it is on the omit list."""
+        from app.swagger.route_spec import flask_rule_to_openapi, is_omitted_from_spec
+
+        with app.app_context():
+            from app.swagger.openapi_spec import get_api_paths
+            paths = get_api_paths()
+            missing = []
+            for rule in app.url_map.iter_rules():
+                if not rule.rule.startswith("/api/v1/") and rule.rule != "/api/v1":
+                    continue
+                methods = {m.lower() for m in rule.methods} - {"head", "options"}
+                path = flask_rule_to_openapi(rule.rule)
+                if is_omitted_from_spec(path):
+                    continue
+                item = paths.get(path) or {}
+                for method in methods:
+                    if method not in item:
+                        missing.append(f"{method.upper()} {rule.rule}")
+        assert not missing, "OpenAPI spec is missing routes:\n" + "\n".join(sorted(missing))
+
+
+class TestDocsWording:
+    def test_session_only_blurb_rejects_an_api_key(self):
+        from app.swagger.route_spec import _auth_blurb
+
+        text = _auth_blurb(None, "session", "get")
+        assert "API key is not accepted" in text
+        assert "cannot call this route" in text
+        assert "HTTP Basic" not in text
+
+    def test_key_or_session_blurb_omits_basic_auth(self):
+        from app.swagger.route_spec import _auth_blurb
+
+        text = _auth_blurb(None, "api_key_or_session", "get")
+        assert "HTTP Basic" not in text
+        assert "X-API-Key" in text
+        assert "logged-in session" in text
+
+    def test_plugin_segments_use_product_tag_names(self):
+        from app.swagger.route_spec import _tag_for
+
+        assert _tag_for("/fdrs/published-data") == "FDRS"
+        assert _tag_for("/nsd-funds/deadlines") == "NSD funds"
+        assert _tag_for("/nskeydata") == "NS key data"
+        assert _tag_for("/upr/data") == "UPR"
+        assert _tag_for("/upr/documents") == "UPR"
+
+    def test_plugin_overlays_document_the_live_query_parameters(self):
+        from app.swagger.overlays import operation_overlays
+
+        overlays = operation_overlays()
+
+        def names(key):
+            return [param["name"] for param in overlays[key]["parameters"]]
+
+        assert names("GET /nskeydata") == ["iso2", "iso3", "year"]
+        assert "text/html" in overlays["GET /upr/documents"]["responses"]["200"]["content"]
+        assert "period_name" in names("GET /fdrs/published-data")
+        assert "due_from" in names("GET /nsd-funds/deadlines")
+        assert overlays["GET /nsd-funds/kpis"]["summary"]
+        assert "layout" in names("GET /upr/master")
+        assert "round" in names("GET /upr/data")

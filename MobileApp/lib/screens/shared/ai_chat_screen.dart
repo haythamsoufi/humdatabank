@@ -173,6 +173,10 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       if (auth.user?.aiBetaAccessLocked == true) return;
       await _loadConversations();
       if (!mounted) return;
+      await context.read<AiChatProvider>().syncInflightAfterResume(
+            isAuthenticated: auth.isAuthenticated,
+          );
+      if (!mounted) return;
       await _applyRouteLaunchArgsOnce();
     });
   }

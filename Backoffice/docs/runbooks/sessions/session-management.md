@@ -90,7 +90,7 @@ When `REDIS_URL` is configured:
 Without `REDIS_URL`:
 - Each worker has its own in-memory rate limiter and presence store.
 - ARR Affinity must be enabled for those in-memory features.
-- AI WebSocket connections (`/api/ai/v2/ws`) require ARR affinity or single-worker deployment.
+- AI WebSocket connections (`/api/ai/v1/ws`) require ARR affinity or single-worker deployment.
 
 ### Azure B2C logout
 

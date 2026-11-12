@@ -153,7 +153,7 @@ npm run lint
 
 ### Chatbot CLI (`flask ai-chat`)
 
-Send a prompt through the same agent path as the UI. Run it from `Backoffice/` with `FLASK_APP=run.py`. It does not need the dev server, and it is the way to try a chatbot message — do not script `POST /api/ai/v2/chat`.
+Send a prompt through the same agent path as the UI. Run it from `Backoffice/` with `FLASK_APP=run.py`. It does not need the dev server, and it is the way to try a chatbot message — do not script `POST /api/ai/v1/chat`.
 
 ```powershell
 $env:FLASK_APP = "run.py"
@@ -324,12 +324,12 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 - No translations volume is needed. `entrypoint.sh` rebuilds `.po`/`.mo` from `messages.pot` + `translation_string` after migrations. Deployments still mounting Azure Files at `/data/translations` must run `flask translations import-catalog` **before** upgrading — see `Backoffice/docs/setup/persistent-translations.md`.
 
 ### AI System Configuration (Backoffice)
-- **Chat API**: `/api/ai/v2` (chat, stream, conversations, export/import). WebSocket: `/api/ai/v2/ws`. Health: `GET /api/ai/v2/health` (anonymous callers get only `{"ok": bool}`; system managers / `admin.ai.manage` also get per-check detail incl. `agent_available` and the `?probe=embedding` probe).
-- **Auth**: Session (Backoffice) or Bearer token (e.g. mobile). Issue tokens via `GET /api/ai/v2/token` (cookie session, or a mobile access token as Bearer: this exact path is allowed in `bearer_jwt_allowed_for_path`, so the mobile app works without a session cookie).
+- **Chat API**: `/api/ai/v1` (chat, stream, conversations, export/import). WebSocket: `/api/ai/v1/ws`. Health: `GET /api/ai/v1/health` (anonymous callers get only `{"ok": bool}`; system managers / `admin.ai.manage` also get per-check detail incl. `agent_available` and the `?probe=embedding` probe).
+- **Auth**: Session (Backoffice) or Bearer token (e.g. mobile). Issue tokens via `GET /api/ai/v1/token` (cookie session, or a mobile access token as Bearer: this exact path is allowed in `bearer_jwt_allowed_for_path`, so the mobile app works without a session cookie).
 - **Environment**: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-5-mini`), `GEMINI_API_KEY`, `AZURE_OPENAI_*` for providers. `AI_EMBEDDING_PROVIDER`, `AI_EMBEDDING_MODEL`, `AI_EMBEDDING_DIMENSIONS` (must match pgvector column; changing requires migration and possibly re-embedding). `AI_AGENT_ENABLED`, `AI_AGENT_MAX_ITERATIONS`, `AI_AGENT_TIMEOUT_SECONDS`, `AI_AGENT_COST_LIMIT_USD`, `AI_AGENT_MAX_COMPLETION_TOKENS` (default 32768; cap 128000 for large tables; use 4096 for GPT-4o). `AI_TOOL_OBSERVATION_MAX_ROWS_TABLE_RESULT` (default 250; cap 2000; rows sent from indicator/UPR “all countries” tools; increase for full country datasets). `REDIS_URL` optional for cross-worker rate limiting.
 - **Supported models**: Depend on OpenAI account. Some models (e.g. GPT-5) reject sampling params; see `app.utils.ai.ai_utils.openai_model_supports_sampling_params`.
 - **Shared helpers**: `app.utils.ai.ai_utils` (e.g. `openai_model_supports_sampling_params`, `sanitize_page_context`). RAG: `app.services.ai_vector_store`, `app.services.ai_embedding_service`. Agent: `app.services.ai_agent_executor`, `app.services.ai_tools_registry`. Shared chat request handling: `app.services.ai_chat_request` (parse, resolve conversation, idempotency).
-- **Optional dependencies**: `flask-sock` required for WebSocket endpoints (`/api/ai/v2/ws`, document QA WS). Without it, AI HTTP and SSE still work. `redis` (and `REDIS_URL`) optional for cross-worker WebSocket rate limiting; in-memory limiter used otherwise. `pgvector` required for RAG document search; run migrations so `ai_documents`, `ai_embeddings`, `ai_document_chunks` exist. For full chat (non-fallback): at least one of `OPENAI_API_KEY`, `GEMINI_API_KEY`, or Azure/Copilot keys. For RAG embeddings: `OPENAI_API_KEY` when `AI_EMBEDDING_PROVIDER=openai`, or local model when `AI_EMBEDDING_PROVIDER=local` (dimensions must match DB).
+- **Optional dependencies**: `flask-sock` required for WebSocket endpoints (`/api/ai/v1/ws`, document QA WS). Without it, AI HTTP and SSE still work. `redis` (and `REDIS_URL`) optional for cross-worker WebSocket rate limiting; in-memory limiter used otherwise. `pgvector` required for RAG document search; run migrations so `ai_documents`, `ai_embeddings`, `ai_document_chunks` exist. For full chat (non-fallback): at least one of `OPENAI_API_KEY`, `GEMINI_API_KEY`, or Azure/Copilot keys. For RAG embeddings: `OPENAI_API_KEY` when `AI_EMBEDDING_PROVIDER=openai`, or local model when `AI_EMBEDDING_PROVIDER=local` (dimensions must match DB).
 
 ### AI access policy (who may read what)
 
@@ -1202,7 +1202,7 @@ Publication is **scoped to one `AssignedForm` (template + reporting period) at a
 ## Troubleshooting (Common)
 
 - **iOS `pod` / CocoaPods on Windows**: `pod` is not available on Windows; you cannot refresh `MobileApp/ios/Podfile.lock` locally. Use the **Regenerate iOS Podfile.lock** GitHub Action (see **Mobile App (Flutter)** above).
-- **`/api/ai/v2/ws` not working**: ensure `flask-sock` is installed/enabled; HTTP/SSE endpoints can still work without websockets.
+- **`/api/ai/v1/ws` not working**: ensure `flask-sock` is installed/enabled; HTTP/SSE endpoints can still work without websockets.
 - **RAG returns nothing / errors after changing embedding model**: `AI_EMBEDDING_DIMENSIONS` must match the pgvector column; changing it requires a migration and re-embedding.
 - **AI falls back / “no provider configured”**: set at least one provider key (`OPENAI_API_KEY`, `GEMINI_API_KEY`, or Azure equivalents) and confirm model name via `OPENAI_MODEL`.
 - **Backoffice is fast on Azure and slow only in local `python run.py` (Windows):** the request reaches Flask and then sits inside the process while real-time endpoint protection scans imports and templates. The local database is not the cause. See [Slow local navigation (Windows)](../Backoffice/docs/runbooks/development/local-windows-slow-navigation.md).

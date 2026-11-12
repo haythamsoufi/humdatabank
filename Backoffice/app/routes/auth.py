@@ -108,6 +108,11 @@ def _get_test_passwords():
     return test_passwords
 
 
+def _dev_act_as_all_users_enabled() -> bool:
+    """True when local Act as may search and sign in as any active user."""
+    return bool(current_app.config.get("DEV_ACT_AS_ALL_USERS", False))
+
+
 def _is_dev_act_as_enabled(*, require_loopback: bool = False) -> bool:
     """True when dev act-as is allowed (development/default config and DEBUG)."""
     flask_config = os.environ.get('FLASK_CONFIG', '').lower()
@@ -191,9 +196,10 @@ def _dev_act_as_access_by_user(user_ids: list[int]) -> dict[int, str]:
 
 
 def _get_dev_act_as_users() -> list[dict]:
-    """Every active account, for the local dev act-as picker.
+    """Every active account, for the gated local dev act-as search.
 
-    Still only rendered when development, DEBUG, and a loopback request all hold.
+    The login page does not render this list. Search results are returned only when
+    development, DEBUG, a loopback request, and DEV_ACT_AS_ALL_USERS all hold.
     Accounts with no real sign-in are marked so pre-added users stay visible.
     """
     users = (
@@ -214,6 +220,43 @@ def _get_dev_act_as_users() -> list[dict]:
             'access_level': access,
             'access_label': _DEV_ACT_AS_ACCESS_LABELS.get(access, access),
             'registered': user.id in registered_ids,
+        })
+    return result
+
+
+def _search_dev_act_as_users(query: str, limit: int = 8) -> list[dict]:
+    """Active accounts whose name or email contains ``query``. Empty when ``query`` is short."""
+    term = (query or "").strip()
+    if len(term) < 2:
+        return []
+    from sqlalchemy import or_
+
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    users = (
+        User.query.filter(User.active.is_(True))
+        .filter(or_(
+            User.name.ilike(pattern, escape="\\"),
+            User.email.ilike(pattern, escape="\\"),
+        ))
+        .order_by(User.name, User.email)
+        .limit(limit)
+        .all()
+    )
+    if not users:
+        return []
+    user_ids = [user.id for user in users]
+    registered_ids = _registered_user_ids(user_ids)
+    access_by_user = _dev_act_as_access_by_user(user_ids)
+    result = []
+    for user in users:
+        access = access_by_user.get(user.id, "user")
+        result.append({
+            "id": user.id,
+            "email": user.email,
+            "name": user.name or user.email,
+            "access_label": _DEV_ACT_AS_ACCESS_LABELS.get(access, access),
+            "registered": user.id in registered_ids,
         })
     return result
 
@@ -321,7 +364,7 @@ def _login_page_context(
         'flask_config': flask_config,
         'test_passwords': _get_test_passwords(),
         'dev_act_as_enabled': dev_enabled,
-        'dev_act_as_users': _get_dev_act_as_users() if dev_enabled else [],
+        'dev_act_as_all_users': dev_enabled and _dev_act_as_all_users_enabled(),
     }
     if title is not None:
         ctx['title'] = title
@@ -351,9 +394,18 @@ def dev_act_as_login():
     if preset:
         user = _resolve_dev_act_as_preset(preset)
     if not user and user_id:
-        candidate = User.query.filter_by(id=user_id, active=True).first()
-        if candidate:
-            user = candidate
+        # Presets stay available without this flag. Accepting any active id while the
+        # directory is hidden would only conceal the ids.
+        if _dev_act_as_all_users_enabled():
+            candidate = User.query.filter_by(id=user_id, active=True).first()
+            if candidate:
+                user = candidate
+        else:
+            flash(_("Choosing a specific account is turned off. Use a role preset."), "warning")
+            next_page = request.form.get('next')
+            if next_page and is_safe_redirect_url(next_page):
+                return redirect(url_for("auth.login", next=next_page))
+            return redirect(url_for("auth.login"))
 
     if not user:
         if preset:
@@ -377,6 +429,15 @@ def dev_act_as_login():
     _complete_dev_act_as_login(user)
     next_page = request.form.get('next') or request.args.get('next')
     return safe_redirect(next_page, default_route='main.dashboard')
+
+
+@bp.route("/login/dev-act-as/users", methods=["GET"])
+@auth_rate_limit()
+def dev_act_as_user_search():
+    """Short name/email matches for the local Act as search. Not a full directory."""
+    if not _is_dev_act_as_enabled(require_loopback=True) or not _dev_act_as_all_users_enabled():
+        abort(404)
+    return json_ok(users=_search_dev_act_as_users(request.args.get("q") or ""))
 
 
 @bp.route("/login", methods=["GET", "POST"])

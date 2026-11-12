@@ -2,10 +2,10 @@
 //
 // Hits two unauthenticated health endpoints exposed by the Flask Backoffice:
 //   GET /health             (Backoffice/app/routes/public.py)
-//   GET /api/ai/v2/health   (Backoffice/app/routes/ai.py)
+//   GET /api/ai/v1/health   (Backoffice/app/routes/ai.py)
 //
 // Notes:
-//   - /api/ai/v2/health may return 503 on environments where OPENAI_API_KEY (or
+//   - /api/ai/v1/health may return 503 on environments where OPENAI_API_KEY (or
 //     related AI config) is missing. That is treated as an environment signal,
 //     NOT a k6 failure. The check accepts 200 OR 503.
 //   - We deliberately do NOT pass ?probe=embedding to avoid LLM/embed cost.
@@ -44,7 +44,7 @@ export function setup() {
   // Warmup: one request to each endpoint to discount cold-start latency
   // (lazy imports, AI integration init, DB pool open).
   http.get(url('/health'), { headers: headers(), tags: { warmup: 'true' } });
-  http.get(url('/api/ai/v2/health'), {
+  http.get(url('/api/ai/v1/health'), {
     headers: headers(),
     tags: { warmup: 'true' },
   });
@@ -60,7 +60,7 @@ export default function smokeBackoffice() {
   });
   checkPublicHealth(healthRes);
 
-  const aiHealthRes = http.get(url('/api/ai/v2/health'), {
+  const aiHealthRes = http.get(url('/api/ai/v1/health'), {
     headers: reqHeaders,
     tags: { name: 'ai-health' },
   });

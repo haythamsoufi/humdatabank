@@ -1420,7 +1420,20 @@
 {# Initialize Select2 for country access request form #}
 <script nonce="{{ csp_nonce() }}">
 // Countries user already has access to
+{% if request_access_form._user_has_access_all %}
+const userHasAccessToAllCountries = true;
+const userHasAccessCountries = [];
+{% else %}
+const userHasAccessToAllCountries = false;
 const userHasAccessCountries = {{ request_access_form._user_has_access|list|tojson|safe }};
+{% endif %}
+function userAlreadyHasCountryAccess(countryId) {
+    if (userHasAccessToAllCountries) {
+        return true;
+    }
+    const parsed = parseInt(countryId, 10);
+    return userHasAccessCountries.includes(parsed);
+}
 const canRequestMultipleCountries = {{ can_request_multiple_countries|tojson|safe }};
 
 function enforceSingleCountrySelection($select) {
@@ -1533,7 +1546,7 @@ function initRequestAccessCountrySelect() {
                 }
                 const $result = window.jQuery('<span></span>');
                 let displayText = data.text;
-                if (userHasAccessCountries.includes(parseInt(data.id))) {
+                if (userAlreadyHasCountryAccess(data.id)) {
                     displayText = data.text + ' (' + {{ _("You already have access")|tojson|safe }} + ')';
                     $result.css({
                         'color': '#9ca3af',
@@ -1545,7 +1558,7 @@ function initRequestAccessCountrySelect() {
             },
             templateSelection: function(data) {
                 // Don't allow selection of countries user already has access to
-                if (userHasAccessCountries.includes(parseInt(data.id))) {
+                if (userAlreadyHasCountryAccess(data.id)) {
                     return null;
                 }
                 return data.text;
@@ -1562,7 +1575,7 @@ function initRequestAccessCountrySelect() {
         // Disable options for countries user already has access to
         $select.find('option').each(function() {
             const optionId = parseInt(window.jQuery(this).val());
-            if (userHasAccessCountries.includes(optionId)) {
+            if (userAlreadyHasCountryAccess(optionId)) {
                 window.jQuery(this).prop('disabled', true);
             }
         });
@@ -1609,7 +1622,7 @@ function initModalRequestAccessCountrySelect() {
                 }
                 const $result = window.jQuery('<span></span>');
                 let displayText = data.text;
-                if (userHasAccessCountries.includes(parseInt(data.id))) {
+                if (userAlreadyHasCountryAccess(data.id)) {
                     displayText = data.text + ' (' + {{ _("You already have access")|tojson|safe }} + ')';
                     $result.css({
                         'color': '#9ca3af',
@@ -1621,7 +1634,7 @@ function initModalRequestAccessCountrySelect() {
             },
             templateSelection: function(data) {
                 // Don't allow selection of countries user already has access to
-                if (userHasAccessCountries.includes(parseInt(data.id))) {
+                if (userAlreadyHasCountryAccess(data.id)) {
                     return null;
                 }
                 return data.text;
@@ -1638,7 +1651,7 @@ function initModalRequestAccessCountrySelect() {
         // Disable options for countries user already has access to
         $select.find('option').each(function() {
             const optionId = parseInt(window.jQuery(this).val());
-            if (userHasAccessCountries.includes(optionId)) {
+            if (userAlreadyHasCountryAccess(optionId)) {
                 window.jQuery(this).prop('disabled', true);
             }
         });

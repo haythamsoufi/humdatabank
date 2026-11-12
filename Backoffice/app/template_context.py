@@ -385,6 +385,16 @@ def register_template_context(app, config_class):
                 current_app.logger.debug("user_access_level check failed: %s", e)
                 return "public"
 
+        def profile_hover_token(user_id):
+            try:
+                if not current_user.is_authenticated or user_id in (None, ""):
+                    return ""
+                from app.utils.profile_hover_token import profile_hover_token as _sign
+                return _sign(int(current_user.id), int(user_id))
+            except Exception as e:
+                current_app.logger.debug("profile_hover_token failed: %s", e)
+                return ""
+
         return {
             "has_permission": has_permission,
             "current_user_has_role": current_user_has_role,
@@ -393,6 +403,7 @@ def register_template_context(app, config_class):
             "get_admin_gate_permissions": get_admin_gate_permissions,
             "is_admin_user": is_admin_user,
             "can_access_data_explorer_nav": can_access_data_explorer_nav,
+            "profile_hover_token": profile_hover_token,
         }
 
     @app.context_processor

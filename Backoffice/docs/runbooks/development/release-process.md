@@ -53,7 +53,7 @@ npm run build:css
 2. Login as System Manager.
 3. Load at least one form and one admin page touched by your change.
 4. Check browser console for CSP errors or JS exceptions.
-5. If AI features changed: hit `GET /api/ai/v2/health` and send a test message.
+5. If AI features changed: hit `GET /api/ai/v1/health` and send a test message.
 
 ---
 
@@ -71,7 +71,7 @@ npm run build:css
    - Anonymous: `GET /` (or your configured health landing route) → HTTP 200.
    - Authenticated: login as a focal point + load a form.
    - Admin: load the assignment management page.
-   - AI: `GET /api/ai/v2/health` → `status: ok`.
+   - AI: `GET /api/ai/v1/health` → `status: ok`.
 
 ---
 

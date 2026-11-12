@@ -256,7 +256,7 @@ def _is_long_lived_connection_request() -> bool:
         path = (request.path or "").lower()
         if path in {
             "/api/notifications/ws",
-            "/api/ai/v2/ws",
+            "/api/ai/v1/ws",
         }:
             return True
 

@@ -760,8 +760,8 @@ msgid "AI"
 msgstr "الذكاء الاصطناعي"
 
 #: app/templates/admin/api_management.html:367
-msgid "AI /v2"
-msgstr "الذكاء الاصطناعي /v2"
+msgid "AI /v1"
+msgstr "الذكاء الاصطناعي /v1"
 
 #: app/templates/admin/ai/dashboard.html:34
 msgid "AI Agent"
@@ -877,13 +877,13 @@ msgstr "وجد الذكاء الاصطناعي اختلافا واحدا بين 
 msgid ""
 "AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) "
 "short-lived AI JWT in Authorization: Bearer (often from GET "
-"/api/ai/v2/token), or (3) anonymous when the route allows. Coarse access is "
+"/api/ai/v1/token), or (3) anonymous when the route allows. Coarse access is "
 "public / user / admin / system_manager; AI tools can still enforce granular "
 "RBAC permissions."
 msgstr ""
 "هوية الذكاء الاصطناعي من resolve_ai_identity(): (1) كوكي جلسة الخلفية، (2) "
 "JWT الذكاء الاصطناعي قصير العمر في التفويض: حامل (غالبا من GET "
-"/api/ai/v2/token)، أو (3) مجهول عندما يسمح المسار. الوصول الخشن عام / مستخدم"
+"/api/ai/v1/token)، أو (3) مجهول عندما يسمح المسار. الوصول الخشن عام / مستخدم"
 " / مسؤول / system_manager؛ لا تزال أدوات الذكاء الاصطناعي قادرة على تطبيق "
 "صلاحيات RBAC الدقيقة."
 
@@ -21485,8 +21485,8 @@ msgid "One source"
 msgstr ""
 
 #: app/templates/admin/api_management.html:372
-msgid "Only /api/ai/v2 assistants, tools, and related routes."
-msgstr "فقط مساعدي /api/ai/v2، الأدوات، والمسارات ذات الصلة."
+msgid "Only /api/ai/v1 assistants, tools, and related routes."
+msgstr "فقط مساعدي /api/ai/v1، الأدوات، والمسارات ذات الصلة."
 
 #: app/templates/admin/api_management.html:361
 msgid "Only /api/mobile/v1 routes (Flutter app and admin mobile APIs)."

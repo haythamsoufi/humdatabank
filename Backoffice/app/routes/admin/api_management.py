@@ -169,7 +169,7 @@ _FDRS_PUBLIC_COMPAT_ENDPOINT_PREFIX = 'fdrs.fdrs_public_compat_'
 # Mounted by flask-sock only when WEBSOCKET_ENABLED is on. Absent from url_map
 # while sockets are off, which is expected rather than a removed route.
 _WEBSOCKET_ROUTES = frozenset({
-    '/api/ai/v2/ws',
+    '/api/ai/v1/ws',
     '/api/ai/documents/ws',
 })
 
@@ -393,7 +393,7 @@ def _endpoint_registry_grid_rows(all_endpoints: list[dict]) -> list[dict]:
             if path.startswith('/api/ai/documents'):
                 group_label = f'AI Documents — {grp}'
             else:
-                group_label = f'AI /v2 — {grp}'
+                group_label = f'AI /v1 — {grp}'
         elif surf == 'indicator_bank':
             group_label = grp or 'Indicator Bank app'
         elif surf == 'fdrs_public':

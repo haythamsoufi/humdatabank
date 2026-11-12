@@ -178,7 +178,7 @@ def activity_category_for_endpoint(endpoint: str) -> str:
     if bp in (
         "ai_management",
         "ai_documents",
-        "ai_v2",
+        "ai_v1",
         "ai",
         "ai_ws",
     ):

@@ -4,7 +4,7 @@ Ce document explique comment fonctionne l’assistant IA Backoffice, quelles don
 
 ## Portée
 
-- **Dans le champ d’application** : chat IA (`/api/ai/v2/*`), base de connaissances IA / RAG, questions-réponses workflow-doc, et les contrôles de sécurité qui les entourent (DLP, nettoyage des PII, événements d’audit).
+- **Dans le champ d’application** : chat IA (`/api/ai/v1/*`), base de connaissances IA / RAG, questions-réponses workflow-doc, et les contrôles de sécurité qui les entourent (DLP, nettoyage des PII, événements d’audit).
 - **Hors champ de contrôle** : sécurité générale de la plateforme (authentisation, RBAC, sauvegardes), sauf lorsque cela affecte directement le système d’IA.
 
 ## Architecture de haut niveau

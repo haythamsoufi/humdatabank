@@ -15,7 +15,7 @@ from tests.factories import create_test_user
 @pytest.mark.api
 def test_ai_health_anonymous_gets_generic_status_only(client, app):
     """Unauthenticated health callers see only the overall status, never per-check detail."""
-    resp = client.get("/api/ai/v2/health?probe=embedding")
+    resp = client.get("/api/ai/v1/health?probe=embedding")
     assert resp.status_code in (200, 503)
     data = resp.get_json()
     assert set(data) == {"ok"}
@@ -25,7 +25,7 @@ def test_ai_health_anonymous_gets_generic_status_only(client, app):
 @pytest.mark.api
 def test_ai_health_manager_gets_checks_and_agent_available(logged_in_sm_client):
     """AI managers get config checks and agent_available."""
-    resp = logged_in_sm_client.get("/api/ai/v2/health")
+    resp = logged_in_sm_client.get("/api/ai/v1/health")
     assert resp.status_code in (200, 503)
     data = resp.get_json()
     assert "checks" in data
@@ -37,7 +37,7 @@ def test_ai_health_manager_gets_checks_and_agent_available(logged_in_sm_client):
 @pytest.mark.api
 def test_ai_conversations_require_auth(client, app):
     """Conversations list requires authentication; no auth returns 401."""
-    resp = client.get("/api/ai/v2/conversations")
+    resp = client.get("/api/ai/v1/conversations")
     assert resp.status_code == 401
     data = resp.get_json()
     assert data.get("success") is False
@@ -47,20 +47,20 @@ def test_ai_conversations_require_auth(client, app):
 @pytest.mark.api
 def test_ai_conversations_invalid_bearer_rejected(client, app):
     """Conversations with invalid Bearer token returns 401."""
-    resp = client.get("/api/ai/v2/conversations", headers={"Authorization": "Bearer invalid-token"})
+    resp = client.get("/api/ai/v1/conversations", headers={"Authorization": "Bearer invalid-token"})
     assert resp.status_code == 401
 
 
 @pytest.mark.api
 def test_ai_chat_validation_message_required(client, app, db_session):
-    """POST /api/ai/v2/chat returns 400 when message is missing or empty."""
+    """POST /api/ai/v1/chat returns 400 when message is missing or empty."""
     user = create_test_user(db_session, email="ai_val@test.local", name="AI Val", role="user")
     with app.app_context():
         token = issue_ai_token(user_id=int(user.id), role="user")
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = client.post(
-        "/api/ai/v2/chat",
+        "/api/ai/v1/chat",
         json={},
         content_type="application/json",
         headers=headers,
@@ -71,7 +71,7 @@ def test_ai_chat_validation_message_required(client, app, db_session):
     assert "message" in (data.get("error") or "").lower() or "required" in (data.get("error") or "").lower()
 
     resp = client.post(
-        "/api/ai/v2/chat",
+        "/api/ai/v1/chat",
         json={"message": "   "},
         content_type="application/json",
         headers=headers,
@@ -81,7 +81,7 @@ def test_ai_chat_validation_message_required(client, app, db_session):
 
 @pytest.mark.api
 def test_ai_chat_validation_message_too_long(client, app, db_session):
-    """POST /api/ai/v2/chat returns 413 when message exceeds AI_MAX_MESSAGE_CHARS."""
+    """POST /api/ai/v1/chat returns 413 when message exceeds AI_MAX_MESSAGE_CHARS."""
     user = create_test_user(db_session, email="ai_long@test.local", name="AI Long", role="user")
     with app.app_context():
         token = issue_ai_token(user_id=int(user.id), role="user")
@@ -90,7 +90,7 @@ def test_ai_chat_validation_message_too_long(client, app, db_session):
     app.config["AI_MAX_MESSAGE_CHARS"] = 50
     long_message = "x" * 51
     resp = client.post(
-        "/api/ai/v2/chat",
+        "/api/ai/v1/chat",
         json={"message": long_message},
         content_type="application/json",
         headers=headers,
@@ -102,7 +102,7 @@ def test_ai_chat_validation_message_too_long(client, app, db_session):
 
 @pytest.mark.api
 def test_ai_chat_returns_success_with_fallback(client, app, db_session):
-    """POST /api/ai/v2/chat without OPENAI_API_KEY returns 503 (no offline fallback)."""
+    """POST /api/ai/v1/chat without OPENAI_API_KEY returns 503 (no offline fallback)."""
     user = create_test_user(db_session, email="ai_chat@test.local", name="AI Chat", role="user")
     with app.app_context():
         token = issue_ai_token(user_id=int(user.id), role="user")
@@ -111,7 +111,7 @@ def test_ai_chat_returns_success_with_fallback(client, app, db_session):
     # Ensure keys are unset for this assertion
     app.config["OPENAI_API_KEY"] = ""
     resp = client.post(
-        "/api/ai/v2/chat",
+        "/api/ai/v1/chat",
         json={"message": "Hello, what can you do?"},
         content_type="application/json",
         headers=headers,
@@ -123,14 +123,14 @@ def test_ai_chat_returns_success_with_fallback(client, app, db_session):
 
 @pytest.mark.api
 def test_ai_chat_stream_validation(client, app, db_session):
-    """POST /api/ai/v2/chat/stream returns 400 when message is empty."""
+    """POST /api/ai/v1/chat/stream returns 400 when message is empty."""
     user = create_test_user(db_session, email="ai_stream_val@test.local", name="AI Stream Val", role="user")
     with app.app_context():
         token = issue_ai_token(user_id=int(user.id), role="user")
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = client.post(
-        "/api/ai/v2/chat/stream",
+        "/api/ai/v1/chat/stream",
         json={"message": ""},
         content_type="application/json",
         headers=headers,
@@ -151,7 +151,7 @@ def test_ai_chat_stream_accepts_chunked_waf_payload_envelope(client, app, db_ses
     envelope = {"payload": encoded[:20], "payload__c1": encoded[20:]}
 
     resp = client.post(
-        "/api/ai/v2/chat/stream",
+        "/api/ai/v1/chat/stream",
         json=envelope,
         content_type="application/json",
         headers=headers,
@@ -171,7 +171,7 @@ def test_ai_chat_stream_rejects_malformed_waf_envelope(client, app, db_session):
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = client.post(
-        "/api/ai/v2/chat/stream",
+        "/api/ai/v1/chat/stream",
         json={"payload": "!!!not-valid-base64!!!"},
         content_type="application/json",
         headers=headers,
@@ -182,14 +182,14 @@ def test_ai_chat_stream_rejects_malformed_waf_envelope(client, app, db_session):
 
 @pytest.mark.api
 def test_ai_chat_stream_returns_sse_meta_and_done(client, app, db_session):
-    """POST /api/ai/v2/chat/stream returns SSE with meta and done events."""
+    """POST /api/ai/v1/chat/stream returns SSE with meta and done events."""
     user = create_test_user(db_session, email="ai_stream@test.local", name="AI Stream", role="user")
     with app.app_context():
         token = issue_ai_token(user_id=int(user.id), role="user")
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = client.post(
-        "/api/ai/v2/chat/stream",
+        "/api/ai/v1/chat/stream",
         json={"message": "Say hello in one word."},
         content_type="application/json",
         headers=headers,
@@ -210,6 +210,92 @@ def test_ai_chat_stream_returns_sse_meta_and_done(client, app, db_session):
             break
     else:
         pytest.fail("Expected at least one 'done' or 'error' event in stream")
+
+
+@pytest.mark.api
+@pytest.mark.db
+def test_ai_chat_await_returns_stored_reply_without_running_agent(client, app, db_session):
+    """POST /chat/await delivers a reply that was already stored for this client message."""
+    user = create_test_user(db_session, email="ai_await@test.local", name="AI Await", role="user")
+    with app.app_context():
+        token = issue_ai_token(user_id=int(user.id), role="user")
+    headers = {"Authorization": f"Bearer {token}"}
+    convo_id = str(uuid.uuid4())
+    client_message_id = "msg-await-1"
+    convo = AIConversation(id=convo_id, user_id=user.id, title="Await", created_at=utcnow(), updated_at=utcnow())
+    db_session.add(convo)
+    db_session.add(
+        AIMessage(
+            conversation_id=convo_id,
+            user_id=user.id,
+            role="user",
+            content="test3",
+            client_message_id=client_message_id,
+            created_at=utcnow(),
+        )
+    )
+    db_session.add(
+        AIMessage(
+            conversation_id=convo_id,
+            user_id=user.id,
+            role="assistant",
+            content="Ready when you are.",
+            created_at=utcnow(),
+        )
+    )
+    db_session.commit()
+
+    resp = client.post(
+        "/api/ai/v1/chat/await",
+        json={
+            "conversation_id": convo_id,
+            "client_message_id": client_message_id,
+            "wait_seconds": 1,
+        },
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data.get("ready") is True
+    assert data.get("reply") == "Ready when you are."
+    assert data.get("conversation_id") == convo_id
+
+
+@pytest.mark.api
+def test_ai_chat_duplicate_post_does_not_start_a_second_run(client, app, db_session):
+    """POST /chat while that client_message_id is already running returns 409."""
+    from app.services.ai.chat.inflight_turns import begin_turn, finish_turn
+
+    user = create_test_user(db_session, email="ai_dup@test.local", name="AI Dup", role="user")
+    with app.app_context():
+        token = issue_ai_token(user_id=int(user.id), role="user")
+    headers = {"Authorization": f"Bearer {token}"}
+    convo_id = str(uuid.uuid4())
+    client_message_id = "msg-dup-1"
+    _turn, created = begin_turn(
+        user_id=int(user.id),
+        client_message_id=client_message_id,
+        conversation_id=convo_id,
+        request_id="owner-request",
+    )
+    assert created is True
+    try:
+        resp = client.post(
+            "/api/ai/v1/chat",
+            json={
+                "message": "test3",
+                "conversation_id": convo_id,
+                "client_message_id": client_message_id,
+            },
+            content_type="application/json",
+            headers=headers,
+        )
+        assert resp.status_code == 409
+        data = resp.get_json()
+        assert data.get("error_type") == "turn_in_progress"
+    finally:
+        finish_turn(user_id=int(user.id), client_message_id=client_message_id, status="cancelled")
 
 
 @pytest.mark.api
@@ -265,14 +351,14 @@ def test_ai_chat_list_export_and_delete_all(client, app, db_session, tmp_path):
     db_session.commit()
 
     # List conversations
-    resp = client.get("/api/ai/v2/conversations?limit=50", headers=headers)
+    resp = client.get("/api/ai/v1/conversations?limit=50", headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["success"] is True
     assert any(c["id"] == convo_id for c in data["conversations"])
 
     # Export conversation
-    resp = client.get(f"/api/ai/v2/conversations/{convo_id}/export", headers=headers)
+    resp = client.get(f"/api/ai/v1/conversations/{convo_id}/export", headers=headers)
     assert resp.status_code == 200
     assert resp.headers.get("Content-Type", "").startswith("application/json")
     payload = json.loads(resp.data.decode("utf-8"))
@@ -280,10 +366,10 @@ def test_ai_chat_list_export_and_delete_all(client, app, db_session, tmp_path):
     assert len(payload["messages"]) == 2
 
     # Delete all requires confirmation
-    resp = client.delete("/api/ai/v2/conversations", headers=headers)
+    resp = client.delete("/api/ai/v1/conversations", headers=headers)
     assert resp.status_code == 400
 
-    resp = client.delete("/api/ai/v2/conversations?confirm=true", headers=headers)
+    resp = client.delete("/api/ai/v1/conversations?confirm=true", headers=headers)
     assert resp.status_code == 200
     out = resp.get_json()
     assert out["success"] is True
@@ -325,7 +411,7 @@ def test_ai_chat_archived_conversation_loads_from_archive(client, app, db_sessio
     assert os.path.exists(full_path)
 
     # GET conversation should read from archive
-    resp = client.get(f"/api/ai/v2/conversations/{convo_id}?limit=200", headers=headers)
+    resp = client.get(f"/api/ai/v1/conversations/{convo_id}?limit=200", headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["success"] is True
@@ -335,14 +421,14 @@ def test_ai_chat_archived_conversation_loads_from_archive(client, app, db_sessio
 
 @pytest.mark.api
 def test_ai_token_requires_login(client):
-    resp = client.get("/api/ai/v2/token", follow_redirects=False)
+    resp = client.get("/api/ai/v1/token", follow_redirects=False)
     # Flask-Login typically redirects to login for browser unauthenticated requests
     assert resp.status_code in (302, 401, 403)
 
 
 @pytest.mark.api
 def test_ai_token_issues_jwt_for_logged_in_user(logged_in_client):
-    resp = logged_in_client.get("/api/ai/v2/token")
+    resp = logged_in_client.get("/api/ai/v1/token")
     assert resp.status_code == 200
     data = resp.get_json()
     assert isinstance(data, dict)
@@ -352,7 +438,7 @@ def test_ai_token_issues_jwt_for_logged_in_user(logged_in_client):
 @pytest.mark.api
 @pytest.mark.db
 def test_ai_table_export_requires_auth(client):
-    resp = client.post("/api/ai/v2/table/export", json={"rows": [["A"]]})
+    resp = client.post("/api/ai/v1/table/export", json={"rows": [["A"]]})
     assert resp.status_code == 401
 
 
@@ -364,10 +450,10 @@ def test_ai_table_export_validation_and_headers(client, app, db_session):
         token = issue_ai_token(user_id=int(user.id), role="user")
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = client.post("/api/ai/v2/table/export", headers=headers, json={})
+    resp = client.post("/api/ai/v1/table/export", headers=headers, json={})
     assert resp.status_code == 400
 
-    resp = client.post("/api/ai/v2/table/export", headers=headers, json={"rows": [["H1", "H2"], ["a", "b"]]})
+    resp = client.post("/api/ai/v1/table/export", headers=headers, json={"rows": [["H1", "H2"], ["a", "b"]]})
     resp.close()
     assert resp.status_code == 200
     assert resp.headers.get("X-hum-databank-Export-Completed") == "1"
@@ -395,7 +481,7 @@ def test_ai_identity_prefers_bearer_over_cookie(app, client, db_session):
         sess["_fresh"] = True
 
     with client.application.test_request_context(
-        "/api/ai/v2/chat", method="POST", headers={"Authorization": f"Bearer {token}"}
+        "/api/ai/v1/chat", method="POST", headers={"Authorization": f"Bearer {token}"}
     ):
         from flask import session as flask_session
 
@@ -404,12 +490,17 @@ def test_ai_identity_prefers_bearer_over_cookie(app, client, db_session):
         assert identity.auth_source == "bearer"
         assert int(identity.user.id) == bearer_id
 
-    with client.application.test_request_context("/api/ai/v2/chat", method="POST"):
+    with client.application.test_request_context("/api/ai/v1/chat", method="POST"):
         from flask import session as flask_session
 
         flask_session["_user_id"] = str(cookie_id)
         identity = resolve_ai_identity()
         assert identity.auth_source == "cookie"
+        assert int(identity.user.id) == cookie_id
+
+    # The SSE worker opens a context with no session. The stored user must stay
+    # the caller, not follow current_user back to AnonymousUserMixin.
+    with client.application.test_request_context("/api/ai/v1/chat/stream", method="POST"):
         assert int(identity.user.id) == cookie_id
 
 
@@ -425,11 +516,11 @@ def test_ai_post_with_cookie_and_bearer_skips_csrf_but_cookie_only_does_not(app,
         sess["_user_id"] = str(uid)
         sess["_fresh"] = True
 
-    cookie_only = client.post("/api/ai/v2/feedback", json={"trace_id": 1, "rating": "like"})
+    cookie_only = client.post("/api/ai/v1/feedback", json={"trace_id": 1, "rating": "like"})
     assert _csrf_rejected(cookie_only)
 
     both = client.post(
-        "/api/ai/v2/feedback",
+        "/api/ai/v1/feedback",
         json={"trace_id": 1, "rating": "like"},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -454,7 +545,7 @@ def test_ai_chat_dlp_asks_before_sending_a_credential(client, app, db_session, m
         token = issue_ai_token(user_id=int(user.id), role="user")
 
     resp = client.post(
-        "/api/ai/v2/chat",
+        "/api/ai/v1/chat",
         json={"message": "password: SuperSecret123"},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -478,7 +569,7 @@ def test_ai_chat_edit_branch_persists_masked_history(client, app, db_session, mo
     convo_id = str(uuid.uuid4())
 
     resp = client.post(
-        "/api/ai/v2/chat",
+        "/api/ai/v1/chat",
         json={
             "message": "and my api_key=Zq8vR2xL9mN4pT7w",
             "conversation_id": convo_id,

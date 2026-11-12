@@ -29,7 +29,9 @@ export const WidgetUiMixin = {
         const header = widget.querySelector('.chat-header');
         if (!header) return;
 
-        const STORAGE_KEY = 'chatbot_float_pos';
+        // Position is session-only. A reload returns the window to its CSS corner.
+        try { localStorage.removeItem('chatbot_float_pos'); } catch (_) {}
+
         let dragging = false;
         let startX = 0, startY = 0, startLeft = 0, startTop = 0;
 
@@ -53,12 +55,6 @@ export const WidgetUiMixin = {
             widget.classList.remove('chat-dragging');
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    left: parseInt(widget.style.left, 10),
-                    top:  parseInt(widget.style.top,  10),
-                }));
-            } catch (_) {}
         };
 
         header.addEventListener('mousedown', (e) => {
@@ -88,17 +84,6 @@ export const WidgetUiMixin = {
             if (!widget.classList.contains('chat-dragged')) return;
             applyPos(parseInt(widget.style.left, 10), parseInt(widget.style.top, 10));
         });
-
-        this._restoreFloatPos = () => {
-            if (this._isImmersive() || this._isMobileFloatingLayout()) return;
-            try {
-                const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-                if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
-                    widget.classList.add('chat-dragged');
-                    applyPos(saved.left, saved.top);
-                }
-            } catch (_) {}
-        };
     },
 
     _initFabDrag() {
@@ -750,7 +735,6 @@ export const WidgetUiMixin = {
         }
 
         if (isOpen) {
-            if (typeof this._restoreFloatPos === 'function') this._restoreFloatPos();
             // Only show greeting if chat is opened AND there's no conversation history
             if (this.conversationHistory.length === 0) {
                 this.showWelcomeMessage();

@@ -543,25 +543,25 @@ class TestBearerScopingAndSessionBinding:
 
         tokens = _tokens(client, mobile_user)
         client.delete_cookie("session")
-        resp = client.get("/api/ai/v2/token", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+        resp = client.get("/api/ai/v1/token", headers={"Authorization": f"Bearer {tokens['access_token']}"})
         assert resp.status_code == 200, resp.get_data(as_text=True)
         with app.app_context():
             assert decode_ai_token(resp.get_json()["token"]).user_id == mobile_user["id"]
 
     def test_ai_token_endpoint_rejects_invalid_bearer_and_anonymous(self, client, mobile_user):
         client.delete_cookie("session")
-        assert client.get("/api/ai/v2/token", headers={"Authorization": "Bearer not.a.jwt"}).status_code == 401
-        assert client.get("/api/ai/v2/token").status_code == 401
+        assert client.get("/api/ai/v1/token", headers={"Authorization": "Bearer not.a.jwt"}).status_code == 401
+        assert client.get("/api/ai/v1/token").status_code == 401
 
     def test_bearer_exact_path_allowance_does_not_widen_other_ai_routes(self, app):
         from app.utils.mobile.mobile_auth import bearer_jwt_allowed_for_path
 
         with app.test_request_context("/"):
-            assert bearer_jwt_allowed_for_path("/api/ai/v2/token") is True
-            assert bearer_jwt_allowed_for_path("/api/ai/v2/token/") is True
-            assert bearer_jwt_allowed_for_path("/api/ai/v2/token-extra") is False
-            assert bearer_jwt_allowed_for_path("/api/ai/v2/conversations") is False
-            assert bearer_jwt_allowed_for_path("/api/ai/v2/chat") is False
+            assert bearer_jwt_allowed_for_path("/api/ai/v1/token") is True
+            assert bearer_jwt_allowed_for_path("/api/ai/v1/token/") is True
+            assert bearer_jwt_allowed_for_path("/api/ai/v1/token-extra") is False
+            assert bearer_jwt_allowed_for_path("/api/ai/v1/conversations") is False
+            assert bearer_jwt_allowed_for_path("/api/ai/v1/chat") is False
 
     def test_api_key_header_style_bearer_is_not_treated_as_jwt(self, client, mobile_user):
         resp = client.get(SESSION_URL, headers={"Authorization": "Bearer not.a.jwt"})

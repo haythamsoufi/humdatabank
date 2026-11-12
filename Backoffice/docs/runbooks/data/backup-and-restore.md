@@ -163,7 +163,7 @@ python -m flask db upgrade  # should report "already up to date" or apply pendin
 # Admin → edit an existing record → save → confirm saved
 
 # 7. AI health check
-# GET /api/ai/v2/health → { "status": "ok", "rag_enabled": true }
+# GET /api/ai/v1/health → { "status": "ok", "rag_enabled": true }
 
 # 8. RAG sanity check
 # Send a test chat message that requires document search → confirm a response is returned

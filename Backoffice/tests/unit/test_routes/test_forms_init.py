@@ -17,14 +17,16 @@ pytestmark = [pytest.mark.unit]
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _frontend_url_global():
+    """The function registered as the get_frontend_url_global template global."""
+    from app.routes.forms import get_frontend_url_global
+    return get_frontend_url_global
+
+
 def _call_global(app):
     """Call get_frontend_url_global() inside an app context and return the result."""
     with app.app_context():
-        from app.routes.forms import bp
-        # The function is registered as an app_template_global; retrieve it.
-        fn = bp.app_template_globals.get("get_frontend_url_global")
-        assert fn is not None, "get_frontend_url_global template global not found on blueprint"
-        return fn()
+        return _frontend_url_global()()
 
 
 # ---------------------------------------------------------------------------
@@ -43,10 +45,7 @@ class TestGetFrontendUrlGlobal:
                 return_value="https://example.com",
                 create=True,
             ):
-                from app.routes.forms import bp
-
-                fn = bp.app_template_globals.get("get_frontend_url_global")
-                assert fn is not None
+                fn = _frontend_url_global()
 
                 with patch(
                     "app.routes.forms.__init__" if False else "app.services.platform.app_settings_service",
@@ -63,10 +62,7 @@ class TestGetFrontendUrlGlobal:
     def test_returns_hash_when_service_returns_none(self, app):
         """When get_frontend_url() returns None, the function should return '#'."""
         with app.app_context():
-            from app.routes.forms import bp
-
-            fn = bp.app_template_globals.get("get_frontend_url_global")
-            assert fn is not None
+            fn = _frontend_url_global()
 
             with patch(
                 "app.services.platform.app_settings_service.get_frontend_url",
@@ -78,10 +74,7 @@ class TestGetFrontendUrlGlobal:
     def test_returns_hash_when_service_raises_exception(self, app):
         """When get_frontend_url() raises, the except branch should return '#'."""
         with app.app_context():
-            from app.routes.forms import bp
-
-            fn = bp.app_template_globals.get("get_frontend_url_global")
-            assert fn is not None
+            fn = _frontend_url_global()
 
             with patch(
                 "app.services.platform.app_settings_service.get_frontend_url",
@@ -101,14 +94,29 @@ class TestGetFrontendUrlGlobal:
             return original_import(name, *args, **kwargs)
 
         with app.app_context():
-            from app.routes.forms import bp
-
-            fn = bp.app_template_globals.get("get_frontend_url_global")
-            assert fn is not None
+            fn = _frontend_url_global()
 
             with patch("builtins.__import__", side_effect=_broken_import):
                 result = fn()
         assert result == "#"
+
+    def test_strips_loopback_frontend_url_off_loopback(self, app):
+        with app.test_request_context('/', environ_base={'REMOTE_ADDR': '10.1.2.3'}):
+            fn = _frontend_url_global()
+            with patch(
+                "app.services.platform.app_settings_service.get_frontend_url",
+                return_value="http://localhost:3000",
+            ):
+                assert fn() == ""
+
+    def test_keeps_loopback_frontend_url_on_loopback(self, app):
+        with app.test_request_context('/', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+            fn = _frontend_url_global()
+            with patch(
+                "app.services.platform.app_settings_service.get_frontend_url",
+                return_value="http://localhost:3000",
+            ):
+                assert fn() == "http://localhost:3000"
 
     def test_blueprint_is_registered_with_correct_prefix(self, app):
         """The forms blueprint should be registered under /forms."""

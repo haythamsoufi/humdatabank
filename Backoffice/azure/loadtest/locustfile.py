@@ -21,7 +21,7 @@ Instead we exercise:
 
 1. Unauthenticated health endpoints (always run):
      - GET /health
-     - GET /api/ai/v2/health   (200 or 503 both accepted - 503 just means
+     - GET /api/ai/v1/health   (200 or 503 both accepted - 503 just means
                                  OPENAI/AI is not configured in the env)
 
 2. Bearer-authenticated /api/v1 reads (only when ``LOADTEST_API_KEY``
@@ -1574,8 +1574,8 @@ class BackofficeUser(HttpUser):
     def ai_health(self) -> None:
         """AI subsystem health. 503 is acceptable when AI is not configured."""
         self._get(
-            "/api/ai/v2/health",
-            name="GET /api/ai/v2/health",
+            "/api/ai/v1/health",
+            name="GET /api/ai/v1/health",
             with_auth=False,
             accept=(200, 503),
         )

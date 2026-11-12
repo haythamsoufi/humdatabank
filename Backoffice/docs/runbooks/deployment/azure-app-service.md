@@ -57,7 +57,7 @@ Or inline (override specific settings via env vars listed in §3a):
 gunicorn --bind=0.0.0.0:8000 --workers=4 --worker-class=gthread --threads=4 --timeout=120 run:app
 ```
 
-> WebSocket (`/api/ai/v2/ws`) requires a worker class that supports long-lived connections (`gthread` supports this). If an Application Gateway is in front, set its backend timeout ≥ 300s to accommodate AI SSE streams.
+> WebSocket (`/api/ai/v1/ws`) requires a worker class that supports long-lived connections (`gthread` supports this). If an Application Gateway is in front, set its backend timeout ≥ 300s to accommodate AI SSE streams.
 
 ### 3a. Recommended Application Settings (avoid 502/504)
 
@@ -193,7 +193,7 @@ Run after every deployment to staging and production:
 [ ] Authenticated: login as System Manager → admin dashboard loads
 [ ] Form: load an entry form for a known assignment → no JS errors
 [ ] Admin: load Assignment Management page → list loads
-[ ] AI health: GET /api/ai/v2/health → { "status": "ok" }
+[ ] AI health: GET /api/ai/v1/health → { "status": "ok" }
 [ ] Migration: python -m flask db current → matches expected revision
 [ ] Logs: no ERROR or CRITICAL in first 2 minutes of startup
 ```
@@ -235,7 +235,7 @@ This swaps back to the previous code. **Note:** If migrations ran against the pr
 |---------|--------------|-----------|
 | Session sharing | Requires ARR Affinity (sticky sessions) | Shared across workers — no affinity needed |
 | Rate limiting (authenticated APIs / AI) | Per-process (inconsistent) | Cross-worker (consistent) |
-| AI WebSocket (`/api/ai/v2/ws`) | Requires affinity or single worker | Requires affinity or single worker |
+| AI WebSocket (`/api/ai/v1/ws`) | Requires affinity or single worker | Requires affinity or single worker |
 | Presence heartbeats | In-memory (per-worker, clears on restart) | Redis-backed (shared, survives restart) |
 
 **Recommendation:** Configure `REDIS_URL` for any deployment with 2+ workers. Provision **[Azure Managed Redis Balanced B0 — West Europe](redis-provisioning.md)** (Private Link; ~CHF 22/mo two-node HA).

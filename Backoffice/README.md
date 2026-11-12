@@ -102,7 +102,7 @@ Backoffice/
 
 - **Full index:** [docs/README.md](docs/README.md) – getting started, user guides by role, engineering runbooks
 - **Setup & optional features:** [docs/setup/](docs/setup/README.md) – LibreTranslate, AI, security (detailed)
-- **API (when running):** Swagger UI at `/api-docs/`, OpenAPI at `/api-docs/openapi.json` or `/api-docs/openapi.yaml`
+- **API (when running):** public Swagger UI at `/api-docs/` (no login). OpenAPI at `/api-docs/openapi.json` or `/api-docs/openapi.yaml`. The page lists the integration API only. Authorize with an API key to try protected routes.
 
 ## 🌍 Internationalization
 
@@ -112,7 +112,7 @@ The platform supports multiple languages (multilingual indicators, sector transl
 
 ## 🤖 AI chat and RAG
 
-The backoffice includes an AI chat and RAG (document QA). You need at least one provider key (OpenAI, Gemini, or Azure) and `SECRET_KEY` for token signing. Optional: WebSockets (`flask-sock`), RAG (migrations + embedding env), Redis for rate limiting. Health: `GET /api/ai/v2/health`.
+The backoffice includes an AI chat and RAG (document QA). You need at least one provider key (OpenAI, Gemini, or Azure) and `SECRET_KEY` for token signing. Optional: WebSockets (`flask-sock`), RAG (migrations + embedding env), Redis for rate limiting. Health: `GET /api/ai/v1/health`.
 
 → **Details:** [AI configuration](docs/setup/ai-configuration.md)
 

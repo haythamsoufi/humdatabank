@@ -66,9 +66,9 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
 
     try:
         csrf.exempt(ai_bp)
-        app.logger.debug("AI v2 blueprint registered and CSRF exempted")
+        app.logger.debug("AI v1 blueprint registered and CSRF exempted")
     except Exception as e:
-        app.logger.warning("Could not exempt AI v2 blueprint from CSRF: %s", e)
+        app.logger.warning("Could not exempt AI v1 blueprint from CSRF: %s", e)
 
     if app.config.get("WEBSOCKET_ENABLED", False):
         try:

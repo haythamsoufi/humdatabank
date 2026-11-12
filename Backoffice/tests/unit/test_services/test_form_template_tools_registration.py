@@ -77,12 +77,12 @@ class TestFormTemplateToolSpecs:
 @pytest.mark.unit
 class TestFormTemplateToolGating:
     def test_no_context_means_no_tools(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             # No g.ai_form_builder_ctx set at all.
             assert _form_template_allowed_tools() == set()
 
     def test_context_without_permissions_means_no_tools(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             g.ai_form_builder_ctx = {"enabled": True, "template_id": 1}
             with patch.object(
                 registry_module,
@@ -92,7 +92,7 @@ class TestFormTemplateToolGating:
                 assert _form_template_allowed_tools() == set()
 
     def test_view_only_exposes_read_tool(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             g.ai_form_builder_ctx = {"enabled": True, "template_id": 1}
             with patch.object(
                 registry_module,
@@ -102,7 +102,7 @@ class TestFormTemplateToolGating:
                 assert _form_template_allowed_tools() == {"get_form_template_full_structure"}
 
     def test_full_permissions_expose_all_tools(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             g.ai_form_builder_ctx = {"enabled": True, "template_id": 1}
             with patch.object(
                 registry_module,
@@ -112,7 +112,7 @@ class TestFormTemplateToolGating:
                 assert _form_template_allowed_tools() == set(FORM_TEMPLATE_TOOL_NAMES)
 
     def test_disabled_context_means_no_tools(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             g.ai_form_builder_ctx = {"enabled": False}
             with patch.object(
                 registry_module,
@@ -125,12 +125,12 @@ class TestFormTemplateToolGating:
 @pytest.mark.unit
 class TestToolDefinitionsExposure:
     def test_definitions_exclude_form_tools_without_context(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             names = _tool_names(_registry_instance().get_tool_definitions_openai())
             assert names.isdisjoint(FORM_TEMPLATE_TOOL_NAMES)
 
     def test_definitions_include_form_tools_with_context_and_permissions(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             g.ai_form_builder_ctx = {"enabled": True, "template_id": 1}
             with patch.object(
                 registry_module,
@@ -144,7 +144,7 @@ class TestToolDefinitionsExposure:
             assert "get_workflow_guide" not in names
 
     def test_definitions_respect_partial_permissions(self, app):
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             g.ai_form_builder_ctx = {"enabled": True, "template_id": 1}
             with patch.object(
                 registry_module,
@@ -158,7 +158,7 @@ class TestToolDefinitionsExposure:
     def test_search_indicator_bank_kept_when_form_builder_active_and_sources_disabled(self, app):
         """The agent must resolve indicator ids while building forms, even when the
         databank source is disabled in the panel."""
-        with app.test_request_context("/api/ai/v2/chat/stream"):
+        with app.test_request_context("/api/ai/v1/chat/stream"):
             g.ai_form_builder_ctx = {"enabled": True, "template_id": 1}
             g.ai_sources_cfg = {"historical": False, "system_documents": False, "upr_documents": False}
             with patch.object(

@@ -66,7 +66,7 @@
     var SURFACE_LABELS = {
         v1: 'External /api/v1',
         mobile: 'Mobile /api/mobile/v1',
-        ai: 'AI /api/ai/v2',
+        ai: 'AI /api/ai/v1',
         indicator_bank: 'Indicator Bank app',
         fdrs_public: 'FDRS public frontend',
         decisions: 'Decision Maker',
@@ -870,7 +870,7 @@
         }
         var md = '# API Endpoint Registry — Audit Report\nGenerated: ' + now + '\n\n---\n\n## Summary\n\n| | Count |\n|---|---:|\n';
         md += '| **Total endpoints** | **' + eps.length + '** |\n';
-        md += '| External `/api/v1` | ' + bySurface.v1.length + ' |\n| Mobile `/api/mobile/v1` | ' + bySurface.mobile.length + ' |\n| AI `/api/ai/v2` | ' + bySurface.ai.length + ' |\n| Indicator Bank app | ' + bySurface.indicator_bank.length + ' |\n| FDRS public frontend | ' + bySurface.fdrs_public.length + ' |\n| Decision Maker | ' + bySurface.decisions.length + ' |\n| Other `/api` | ' + bySurface.other.length + ' |\n';
+        md += '| External `/api/v1` | ' + bySurface.v1.length + ' |\n| Mobile `/api/mobile/v1` | ' + bySurface.mobile.length + ' |\n| AI `/api/ai/v1` | ' + bySurface.ai.length + ' |\n| Indicator Bank app | ' + bySurface.indicator_bank.length + ' |\n| FDRS public frontend | ' + bySurface.fdrs_public.length + ' |\n| Decision Maker | ' + bySurface.decisions.length + ' |\n| Other `/api` | ' + bySurface.other.length + ' |\n';
         md += '| ⚠️ Flagged issues | **' + flagged.length + '** |\n| 🔁 Cross-surface overlaps | ' + overlapPairs.length + ' |\n';
         md += '| 📊 Endpoints with usage stats | ' + eps.filter(function (e) { return e.requests > 0; }).length + ' |\n';
         md += '| 👻 Undocumented | ' + rows.filter(function (r) { return r.undocumented; }).length + ' |\n';

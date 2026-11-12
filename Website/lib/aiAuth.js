@@ -42,7 +42,7 @@ export async function fetchAiToken(maxRetries = 2) {
     typeof window.location.href === 'string';
   const url = isBrowser
     ? `${window.location.origin}/api/ai-token`
-    : `${resolveBackofficeBaseUrl()}/api/ai/v2/token`;
+    : `${resolveBackofficeBaseUrl()}/api/ai/v1/token`;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

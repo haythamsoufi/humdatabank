@@ -2,7 +2,7 @@
 Systemic guard for CSRF-exempt blueprints.
 
 CSRF review finding ("No blueprint-wide test enforces CSRF checks on every
-mutating route in exempt blueprints"): api_v2/api/mobile_api/ai_v2/swagger are
+mutating route in exempt blueprints"): api_v2/api/mobile_api/ai_v1/swagger are
 wholesale ``csrf.exempt()``'d, and individual mutating views are expected to
 enforce protection manually (enforce_csrf_json(), mobile_auth_required,
 require_api_key, etc.). The only prior automated check was two hand-picked
@@ -36,7 +36,7 @@ CSRF_EXEMPT_BLUEPRINT_NAMES = {
     "swagger",  # swagger_bp — app/__init__.py
     "indicator_bank_compat",  # app/routes/__init__.py
     "mobile_api",  # mobile_bp (Blueprint name "mobile_api") — app/routes/__init__.py
-    "ai_v2",  # ai_bp (Blueprint name "ai_v2") — app/routes/__init__.py
+    "ai_v1",  # ai_bp (Blueprint name "ai_v1") — app/routes/__init__.py
     "mcp",  # mcp_bp — app/routes/__init__.py
 }
 

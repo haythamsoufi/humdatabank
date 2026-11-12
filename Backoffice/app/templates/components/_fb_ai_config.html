@@ -8,7 +8,7 @@
 {
     "templateId": {{ fb_ai_template_id | default(none, true) | tojson }},
     "versionId": {{ fb_ai_version_id | default(none, true) | tojson }},
-    "chatStreamUrl": "/api/ai/v2/chat/stream",
+    "chatStreamUrl": "/api/ai/v1/chat/stream",
     "extractUrl": {{ url_for('form_builder.ai_extract_document') | tojson }},
     "extractImageUrl": {{ url_for('form_builder.ai_extract_image') | tojson }},
     "restoreStructureUrl": {{ url_for('form_builder.ai_restore_structure', template_id=0) | tojson }},

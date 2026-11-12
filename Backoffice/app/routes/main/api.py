@@ -42,11 +42,21 @@ def api_users_profile_summary():
         )
 
         # Non-privileged callers must not use arbitrary sequential ids (enumeration).
-        # Allow integer id only for the current user (self).
+        # Integer ids are accepted for self, and for another user only when the page
+        # embedded a profile_token signed for this viewer and that target.
         if is_privileged:
             effective_user_ids = parsed_user_ids
         else:
-            effective_user_ids = [i for i in parsed_user_ids if i == int(current_user.id)]
+            self_id = int(current_user.id)
+            effective_user_ids = [i for i in parsed_user_ids if i == self_id]
+            presented_token = (request.args.get("profile_token") or "").strip()
+            if presented_token:
+                from app.utils.profile_hover_token import profile_hover_token_matches
+                for uid in parsed_user_ids:
+                    if uid in effective_user_ids:
+                        continue
+                    if profile_hover_token_matches(self_id, uid, presented_token):
+                        effective_user_ids.append(uid)
 
         if not effective_user_ids and not external_uuids and not emails:
             return json_ok(status='success', profiles=[])

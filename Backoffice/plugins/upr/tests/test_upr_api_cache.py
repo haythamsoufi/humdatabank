@@ -104,6 +104,9 @@ def test_master_endpoint_returns_complete_extract_without_pagination(monkeypatch
         "build_upr_master",
         lambda **kwargs: {"data": rows},
     )
+    # The summary reads PluginData. This test uses a bare Flask app, so the
+    # lookup would raise and the handler would return an error with no data.
+    monkeypatch.setattr(upr_data_routes, "_secondary_summary_table", lambda: [])
 
     with app.test_request_context("/api/v1/upr/master?page=9&per_page=1"):
         response = upr_data_routes.get_upr_master.__wrapped__()

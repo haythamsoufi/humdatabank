@@ -1,4 +1,4 @@
-"""Tests for the shared redaction policy in app/utils/logging_security.py."""
+"""Tests for the shared redaction policy in app/utils/security/logging_security.py."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from app.utils.logging_security import (
+from app.utils.security.logging_security import (
     REDACTED,
     is_sensitive_key,
     redact_payload_for_storage,

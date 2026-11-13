@@ -10,7 +10,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def _jwt_headers(app, user_id, sid=None):
-    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_jwt import issue_token_pair
     with app.app_context():
         tokens = issue_token_pair(user_id, session_id=sid or f'notif-sid-{user_id}')
     return {'Authorization': f'Bearer {tokens["access_token"]}'}
@@ -59,8 +59,8 @@ class TestListNotifications:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = list_notifications()
 
@@ -79,8 +79,8 @@ class TestListNotifications:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = list_notifications()
 
@@ -99,8 +99,8 @@ class TestListNotifications:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = list_notifications()
 
@@ -119,8 +119,8 @@ class TestListNotifications:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = list_notifications()
 
@@ -146,8 +146,8 @@ class TestNotificationCount:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = notification_count()
 
@@ -176,8 +176,8 @@ class TestMarkNotificationsRead:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = mark_notifications_read()
 
@@ -198,8 +198,8 @@ class TestMarkNotificationsRead:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = mark_notifications_read()
 
@@ -220,8 +220,8 @@ class TestMarkNotificationsRead:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = mark_notifications_read()
 
@@ -245,8 +245,8 @@ class TestMarkNotificationsRead:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', svc):
                 resp = mark_notifications_read()
 
@@ -274,8 +274,8 @@ class TestMarkNotificationsUnread:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = mark_notifications_unread()
 
@@ -296,8 +296,8 @@ class TestMarkNotificationsUnread:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = mark_notifications_unread()
 
@@ -321,8 +321,8 @@ class TestMarkNotificationsUnread:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', svc):
                 resp = mark_notifications_unread()
 
@@ -343,7 +343,7 @@ class TestNotificationPreferences:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = get_notification_preferences()
 
@@ -372,8 +372,8 @@ class TestNotificationPreferences:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', _mock_notification_service()):
                 resp = update_notification_preferences()
 
@@ -397,8 +397,8 @@ class TestNotificationPreferences:
             headers=headers,
         ):
             login_user(user)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
-                 patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
+                 patch('app.utils.security.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch('app.services.notification.service.NotificationService', svc):
                 resp = update_notification_preferences()
 

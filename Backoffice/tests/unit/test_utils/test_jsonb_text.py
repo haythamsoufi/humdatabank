@@ -1,4 +1,4 @@
-from app.utils.jsonb_text import text_from_jsonb_item, text_list_from_jsonb
+from app.utils.database.jsonb_text import text_from_jsonb_item, text_list_from_jsonb
 
 
 def test_text_from_jsonb_item_string():

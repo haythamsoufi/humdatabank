@@ -7,7 +7,7 @@ import logging
 import pytest
 from unittest.mock import MagicMock, patch, call
 
-from app.utils.error_handling import (
+from app.utils.common.error_handling import (
     suppress_with_log,
     handle_view_exception,
     handle_json_view_exception,
@@ -37,7 +37,7 @@ class TestSuppressWithLog:
                 raise RuntimeError('should propagate')
 
     def test_logs_message_on_exception(self):
-        with patch('app.utils.error_handling.logger') as mock_logger:
+        with patch('app.utils.common.error_handling.logger') as mock_logger:
             with suppress_with_log(TypeError, message='Optional op failed', log_level=logging.DEBUG):
                 raise TypeError('bad type')
             mock_logger.log.assert_called_once()
@@ -45,7 +45,7 @@ class TestSuppressWithLog:
             assert 'Optional op failed' in call_args[0][1]
 
     def test_custom_log_level_used(self):
-        with patch('app.utils.error_handling.logger') as mock_logger:
+        with patch('app.utils.common.error_handling.logger') as mock_logger:
             with suppress_with_log(AttributeError, message='attr error', log_level=logging.WARNING):
                 raise AttributeError('no attr')
             call_args = mock_logger.log.call_args
@@ -58,7 +58,7 @@ class TestSuppressWithLog:
             # All suppressed
 
     def test_exception_included_in_log_message(self):
-        with patch('app.utils.error_handling.logger') as mock_logger:
+        with patch('app.utils.common.error_handling.logger') as mock_logger:
             with suppress_with_log(KeyError, message='Missing key'):
                 raise KeyError('some_key')
             logged_msg = mock_logger.log.call_args[0][1]
@@ -73,7 +73,7 @@ class TestSuppressWithLog:
 class TestHandleViewException:
     def test_returns_none_when_no_redirect(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'):
                 result = handle_view_exception(
                     ValueError('test'), 'An error occurred'
                 )
@@ -81,15 +81,15 @@ class TestHandleViewException:
 
     def test_flashes_user_message(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash') as mock_flash:
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash') as mock_flash:
                 handle_view_exception(ValueError('test'), 'User-visible error')
                 mock_flash.assert_called_once_with('User-visible error', 'danger')
 
     def test_custom_flash_category(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash') as mock_flash:
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash') as mock_flash:
                 handle_view_exception(
                     ValueError('test'), 'Warning msg', flash_category='warning'
                 )
@@ -97,8 +97,8 @@ class TestHandleViewException:
 
     def test_redirects_to_url_when_provided(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash'):
                 result = handle_view_exception(
                     ValueError('test'), 'Error', redirect_url='/dashboard'
                 )
@@ -107,12 +107,12 @@ class TestHandleViewException:
 
     def test_redirects_to_endpoint_when_provided(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash'):
                 # 'main.dashboard' might not exist in test app, so use a registered endpoint
                 # Just test that redirect() is called with url_for result
-                with patch('app.utils.error_handling.redirect') as mock_redirect, \
-                     patch('app.utils.error_handling.url_for', return_value='/some/path') as mock_url_for:
+                with patch('app.utils.common.error_handling.redirect') as mock_redirect, \
+                     patch('app.utils.common.error_handling.url_for', return_value='/some/path') as mock_url_for:
                     handle_view_exception(
                         ValueError('test'), 'Error',
                         redirect_endpoint='some.endpoint',
@@ -123,8 +123,8 @@ class TestHandleViewException:
 
     def test_abort_called_when_abort_on_unhandled(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash'), \
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash'), \
                  patch('flask.abort') as mock_abort:
                 handle_view_exception(
                     ValueError('test'), 'Error',
@@ -134,15 +134,15 @@ class TestHandleViewException:
 
     def test_rollback_called(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback') as mock_rb, \
-                 patch('app.utils.error_handling.flash'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback') as mock_rb, \
+                 patch('app.utils.common.error_handling.flash'):
                 handle_view_exception(ValueError('test'), 'Error')
                 mock_rb.assert_called_once()
 
     def test_custom_rollback_reason(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback') as mock_rb, \
-                 patch('app.utils.error_handling.flash'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback') as mock_rb, \
+                 patch('app.utils.common.error_handling.flash'):
                 handle_view_exception(
                     ValueError('test'), 'Error', rollback_reason='custom_rollback'
                 )
@@ -150,8 +150,8 @@ class TestHandleViewException:
 
     def test_logs_error_with_exc_info(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash'):
                 # current_app.logger.error should be called with exc_info=True
                 with patch.object(app.logger, 'error') as mock_log:
                     handle_view_exception(ValueError('test'), 'User message')
@@ -161,8 +161,8 @@ class TestHandleViewException:
 
     def test_custom_log_message(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash'):
                 with patch.object(app.logger, 'error') as mock_log:
                     handle_view_exception(
                         ValueError('test'), 'User msg',
@@ -172,17 +172,17 @@ class TestHandleViewException:
 
     def test_no_flash_when_message_empty(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash') as mock_flash:
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash') as mock_flash:
                 handle_view_exception(ValueError('test'), user_message='')
                 mock_flash.assert_not_called()
 
     def test_redirect_url_takes_priority_over_endpoint(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'), \
-                 patch('app.utils.error_handling.flash'), \
-                 patch('app.utils.error_handling.redirect') as mock_redirect, \
-                 patch('app.utils.error_handling.url_for') as mock_url_for:
+            with patch('app.utils.common.error_handling.request_transaction_rollback'), \
+                 patch('app.utils.common.error_handling.flash'), \
+                 patch('app.utils.common.error_handling.redirect') as mock_redirect, \
+                 patch('app.utils.common.error_handling.url_for') as mock_url_for:
                 handle_view_exception(
                     ValueError('test'), 'Error',
                     redirect_url='/direct',
@@ -200,32 +200,32 @@ class TestHandleViewException:
 class TestHandleJsonViewException:
     def test_returns_json_error_tuple(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'):
-                resp, status = handle_json_view_exception(
+            with patch('app.utils.common.error_handling.request_transaction_rollback'):
+                resp = handle_json_view_exception(
                     ValueError('test'), 'Operation failed'
                 )
-        assert status == 500
+        assert resp.status_code == 500
         data = resp.get_json()
         assert data['error'] == 'Operation failed'
         assert data['success'] is False
 
     def test_custom_status_code(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'):
-                resp, status = handle_json_view_exception(
+            with patch('app.utils.common.error_handling.request_transaction_rollback'):
+                resp = handle_json_view_exception(
                     ValueError('test'), 'Bad input', status_code=400
                 )
-        assert status == 400
+        assert resp.status_code == 400
 
     def test_rollback_called(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback') as mock_rb:
+            with patch('app.utils.common.error_handling.request_transaction_rollback') as mock_rb:
                 handle_json_view_exception(ValueError('test'), 'Error')
                 mock_rb.assert_called_once()
 
     def test_custom_rollback_reason(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback') as mock_rb:
+            with patch('app.utils.common.error_handling.request_transaction_rollback') as mock_rb:
                 handle_json_view_exception(
                     ValueError('test'), 'Error', rollback_reason='json_view'
                 )
@@ -233,7 +233,7 @@ class TestHandleJsonViewException:
 
     def test_logs_error(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'):
                 with patch.object(app.logger, 'error') as mock_log:
                     handle_json_view_exception(ValueError('boom'), 'Oops')
                     mock_log.assert_called_once()
@@ -242,7 +242,7 @@ class TestHandleJsonViewException:
 
     def test_custom_log_message(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'):
                 with patch.object(app.logger, 'error') as mock_log:
                     handle_json_view_exception(
                         ValueError('test'), 'User msg',
@@ -254,7 +254,7 @@ class TestHandleJsonViewException:
 
     def test_default_log_message_when_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.error_handling.request_transaction_rollback'):
+            with patch('app.utils.common.error_handling.request_transaction_rollback'):
                 with patch.object(app.logger, 'error') as mock_log:
                     handle_json_view_exception(ValueError('test'), '')
                     logged_msg = mock_log.call_args[0][0]

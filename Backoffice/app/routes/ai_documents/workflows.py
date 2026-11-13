@@ -7,8 +7,8 @@ import logging
 from flask import request
 from flask_login import login_required, current_user
 
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
 from app.routes.admin.shared import admin_required
 
 from . import ai_docs_bp

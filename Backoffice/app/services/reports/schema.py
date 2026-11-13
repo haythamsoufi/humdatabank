@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.services.reports.translation_helpers import normalize_language, wrap_legacy_text
-from app.utils.schema_validation import SchemaValidationError, validate_plugin_config
+from app.utils.forms.schema_validation import SchemaValidationError, validate_plugin_config
 
 _SCHEMA_V2_PATH = Path(__file__).resolve().parents[2] / "schemas" / "report_definition_v2.json"
 

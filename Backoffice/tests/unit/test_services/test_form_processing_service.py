@@ -546,7 +546,7 @@ class TestSetupIndicatorProperties:
         bank.name_translations = None
         fi = _make_form_item(item_type="indicator", label="", indicator_bank=bank)
         with app.app_context():
-            with patch("app.utils.form_localization.get_localized_indicator_name", return_value="Localized Name"):
+            with patch("app.utils.forms.form_localization.get_localized_indicator_name", return_value="Localized Name"):
                 FormItemProcessor._setup_indicator_properties(fi)
         assert fi.display_label == "Localized Name"
         assert fi.has_custom_label is False
@@ -559,7 +559,7 @@ class TestSetupIndicatorProperties:
         fi = _make_form_item(item_type="indicator", label="Bank Indicator", indicator_bank=bank)
         fi.label_translations = None
         with app.app_context():
-            with patch("app.utils.form_localization.get_localized_indicator_name", return_value="Bank Indicator"):
+            with patch("app.utils.forms.form_localization.get_localized_indicator_name", return_value="Bank Indicator"):
                 FormItemProcessor._setup_indicator_properties(fi)
         assert fi.has_custom_label is False
 
@@ -582,7 +582,7 @@ class TestSetupIndicatorProperties:
         fi = _make_form_item(item_type="indicator", label="Bank Indicator", indicator_bank=bank)
         fi.label_translations = None
         with app.app_context():
-            with patch("app.utils.form_localization.get_localized_indicator_name", return_value="Bank Indicator"):
+            with patch("app.utils.forms.form_localization.get_localized_indicator_name", return_value="Bank Indicator"):
                 FormItemProcessor._setup_indicator_properties(fi)
         assert fi.has_custom_label is False
 
@@ -689,7 +689,7 @@ class TestAddTranslationSupport:
         fi.definition_translations = None
         fi.display_label = "English Label"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
                  patch("app.get_locale", return_value="en"):
                 FormItemProcessor._add_translation_support(fi)
         assert fi.display_label == "English Label"
@@ -701,7 +701,7 @@ class TestAddTranslationSupport:
         fi.definition_translations = None
         fi.display_label = "English Label"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr"):
                 FormItemProcessor._add_translation_support(fi)
         assert fi.display_label == "Étiquette Française"
@@ -714,7 +714,7 @@ class TestAddTranslationSupport:
         fi.definition = "English Definition"
         fi.display_label = "English Label"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr"):
                 FormItemProcessor._add_translation_support(fi)
         # Definition translation is display-only and must never mutate the ORM column
@@ -730,7 +730,7 @@ class TestAddTranslationSupport:
         fi.options_translations = None
         fi.display_label = "English Q"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr"):
                 FormItemProcessor._add_translation_support(fi)
         assert fi.display_label == "Question Française"
@@ -745,7 +745,7 @@ class TestAddTranslationSupport:
         fi.display_label = "Upload"
         fi.description = "English Description"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr"):
                 FormItemProcessor._add_translation_support(fi)
         assert fi.description == "Description en Français"
@@ -759,7 +759,7 @@ class TestAddTranslationSupport:
         fi.options = [{"label": "Yes", "value": "yes"}]
         fi.get_display_options = MagicMock(return_value=[{"label": "Oui", "value": "yes"}])
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr"):
                 FormItemProcessor._add_translation_support(fi)
         assert fi.display_options == [{"label": "Oui", "value": "yes"}]
@@ -771,7 +771,7 @@ class TestAddTranslationSupport:
         fi.definition_translations = None
         fi.display_label = "English Label"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr_FR"):
                 FormItemProcessor._add_translation_support(fi)
         assert fi.display_label == "Étiquette Française"
@@ -783,7 +783,7 @@ class TestAddTranslationSupport:
         fi.definition_translations = None
         fi.display_label = "English Label"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr"):
                 FormItemProcessor._add_translation_support(fi)
         assert fi.display_label == "Étiquette"
@@ -1686,7 +1686,7 @@ class TestSetupFormItemForTemplate:
         fi.label_translations = None
         fi.definition_translations = None
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
                  patch("app.get_locale", return_value="en"):
                 result = FormItemProcessor.setup_form_item_for_template(fi, None)
         assert result.display_label == "My Indicator"
@@ -1703,7 +1703,7 @@ class TestSetupFormItemForTemplate:
         )
 
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
                  patch("app.get_locale", return_value="en"):
                 FormItemProcessor.setup_form_item_for_template(item, None)
 
@@ -1721,7 +1721,7 @@ class TestSetupFormItemForTemplate:
         fi.definition_translations = None
         fi.options_translations = None
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
                  patch("app.get_locale", return_value="en"):
                 result = FormItemProcessor.setup_form_item_for_template(fi, None)
         assert result.display_label == "My Question"
@@ -1736,7 +1736,7 @@ class TestSetupFormItemForTemplate:
         fi.options_translations = None
         fi.description_translations = None
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
                  patch("app.get_locale", return_value="en"):
                 result = FormItemProcessor.setup_form_item_for_template(fi, None)
         assert result.display_label == "Upload"
@@ -1751,7 +1751,7 @@ class TestSetupFormItemForTemplate:
         fi.options_translations = None
         fi.description_translations = None
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
                  patch("app.get_locale", return_value="en"):
                 result = FormItemProcessor.setup_form_item_for_template(fi, None)
         assert result.display_label == "My Matrix"
@@ -1768,7 +1768,7 @@ class TestSetupFormItemForTemplate:
         fi.config = None
         fi.item_type = "plugin_map"
         with app.app_context():
-            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+            with patch("app.utils.forms.form_localization.get_translation_key", return_value="en"), \
                  patch("app.get_locale", return_value="en"):
                 result = FormItemProcessor.setup_form_item_for_template(fi, None)
         assert result.display_label == "Map"

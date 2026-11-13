@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from flask import current_app
 
-from app.utils.organization_helpers import get_org_name
+from app.utils.organization.organization_helpers import get_org_name
 
 
 _ROLE_LABELS = {
@@ -31,7 +31,7 @@ def _build_focal_point_context_block(
     Personalized focal-point context appended to the agent system prompt.
     This section is NOT cached so it always reflects the current user's live data.
     """
-    from app.utils.datetime_helpers import parse_iso_utc, utcnow
+    from app.utils.common.datetime_helpers import parse_iso_utc, utcnow
 
     ns_label = ", ".join(str(c) for c in countries[:10]) if countries else None
 

@@ -1,0 +1,84 @@
+"""
+AUTO-GENERATED — merged activity catalog from per-blueprint partials.
+Regenerate: python scripts/dev/generate_activity_endpoint_catalog.py
+"""
+
+from __future__ import annotations
+
+from app.utils.activity.activity_endpoint_catalog.spec import ActivityEndpointSpec, merge_activity_specs
+
+from app.utils.activity.activity_endpoint_catalog.generated.partials.admin import SPECS as _S_admin
+from app.utils.activity.activity_endpoint_catalog.generated.partials.admin_communication import SPECS as _S_admin_communication
+from app.utils.activity.activity_endpoint_catalog.generated.partials.ai_documents import SPECS as _S_ai_documents
+from app.utils.activity.activity_endpoint_catalog.generated.partials.ai_management import SPECS as _S_ai_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.ai_v1 import SPECS as _S_ai_v1
+from app.utils.activity.activity_endpoint_catalog.generated.partials.analytics import SPECS as _S_analytics
+from app.utils.activity.activity_endpoint_catalog.generated.partials.api_key_management import SPECS as _S_api_key_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.assignment_management import SPECS as _S_assignment_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.auth import SPECS as _S_auth
+from app.utils.activity.activity_endpoint_catalog.generated.partials.content_management import SPECS as _S_content_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.data_exploration import SPECS as _S_data_exploration
+from app.utils.activity.activity_endpoint_catalog.generated.partials.data_sync_imputation import SPECS as _S_data_sync_imputation
+from app.utils.activity.activity_endpoint_catalog.generated.partials.embed_management import SPECS as _S_embed_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.emergency_operations_plugin import SPECS as _S_emergency_operations_plugin
+from app.utils.activity.activity_endpoint_catalog.generated.partials.excel import SPECS as _S_excel
+from app.utils.activity.activity_endpoint_catalog.generated.partials.form_builder import SPECS as _S_form_builder
+from app.utils.activity.activity_endpoint_catalog.generated.partials.forms import SPECS as _S_forms
+from app.utils.activity.activity_endpoint_catalog.generated.partials.forms_api import SPECS as _S_forms_api
+from app.utils.activity.activity_endpoint_catalog.generated.partials.fdrs import SPECS as _S_fdrs
+from app.utils.activity.activity_endpoint_catalog.generated.partials.indicator_bank_compat import SPECS as _S_indicator_bank_compat
+from app.utils.activity.activity_endpoint_catalog.generated.partials.interactive_map_plugin import SPECS as _S_interactive_map_plugin
+from app.utils.activity.activity_endpoint_catalog.generated.partials.main import SPECS as _S_main
+from app.utils.activity.activity_endpoint_catalog.generated.partials.monitoring import SPECS as _S_monitoring
+from app.utils.activity.activity_endpoint_catalog.generated.partials.notifications import SPECS as _S_notifications
+from app.utils.activity.activity_endpoint_catalog.generated.partials.organization import SPECS as _S_organization
+from app.utils.activity.activity_endpoint_catalog.generated.partials.pb_progress import SPECS as _S_pb_progress
+from app.utils.activity.activity_endpoint_catalog.generated.partials.plugin_management import SPECS as _S_plugin_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.rbac_management import SPECS as _S_rbac_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.security import SPECS as _S_security
+from app.utils.activity.activity_endpoint_catalog.generated.partials.settings import SPECS as _S_settings
+from app.utils.activity.activity_endpoint_catalog.generated.partials.system_admin import SPECS as _S_system_admin
+from app.utils.activity.activity_endpoint_catalog.generated.partials.translation_review import SPECS as _S_translation_review
+from app.utils.activity.activity_endpoint_catalog.generated.partials.upr_excel_import import SPECS as _S_upr_excel_import
+from app.utils.activity.activity_endpoint_catalog.generated.partials.user_management import SPECS as _S_user_management
+from app.utils.activity.activity_endpoint_catalog.generated.partials.utilities import SPECS as _S_utilities
+
+GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_activity_specs(
+    _S_admin,
+    _S_admin_communication,
+    _S_ai_documents,
+    _S_ai_management,
+    _S_ai_v1,
+    _S_analytics,
+    _S_api_key_management,
+    _S_assignment_management,
+    _S_auth,
+    _S_content_management,
+    _S_data_exploration,
+    _S_data_sync_imputation,
+    _S_embed_management,
+    _S_emergency_operations_plugin,
+    _S_excel,
+    _S_form_builder,
+    _S_forms,
+    _S_forms_api,
+    _S_fdrs,
+    _S_indicator_bank_compat,
+    _S_interactive_map_plugin,
+    _S_main,
+    _S_monitoring,
+    _S_notifications,
+    _S_organization,
+    _S_pb_progress,
+    _S_plugin_management,
+    _S_rbac_management,
+    _S_security,
+    _S_settings,
+    _S_system_admin,
+    _S_translation_review,
+    _S_upr_excel_import,
+    _S_user_management,
+    _S_utilities,
+    allow_override=False,
+)
+

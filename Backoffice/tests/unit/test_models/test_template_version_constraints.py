@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models import FormItem, FormSection, FormTemplateVersion
-from app.utils.stable_key import generate_stable_key
+from app.utils.templates.stable_key import generate_stable_key
 from tests.factories import (
     create_test_draft_version,
     create_test_item,

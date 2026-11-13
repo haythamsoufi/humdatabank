@@ -9,7 +9,7 @@ from flask import g
 from app.extensions import db
 from app.models import AIReasoningTrace, AIToolUsage, User
 from app.models.embeddings import AIDocument
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 pytestmark = [pytest.mark.unit]
 
@@ -113,7 +113,7 @@ class TestAnonymousToolSurface:
 
 class TestFormBuilderBinding:
     def test_client_asserted_context_is_dropped_for_anonymous_and_bearer(self, app, system_manager_user):
-        from app.utils.ai_utils import authorize_form_builder_context
+        from app.utils.ai.ai_utils import authorize_form_builder_context
 
         fb = {"enabled": True, "template_id": 1}
         with app.test_request_context():
@@ -122,13 +122,13 @@ class TestFormBuilderBinding:
             assert authorize_form_builder_context(fb, user_id=system_manager_user.id, auth_source="anonymous") is None
 
     def test_user_without_template_permission_is_denied(self, app, test_user):
-        from app.utils.ai_utils import authorize_form_builder_context
+        from app.utils.ai.ai_utils import authorize_form_builder_context
 
         with app.test_request_context():
             assert authorize_form_builder_context({"enabled": True}, user_id=test_user.id) is None
 
     def test_manager_with_cookie_session_is_authorized_and_ids_validated(self, app, system_manager_user):
-        from app.utils.ai_utils import authorize_form_builder_context
+        from app.utils.ai.ai_utils import authorize_form_builder_context
 
         with app.test_request_context():
             assert authorize_form_builder_context({"enabled": True}, user_id=system_manager_user.id) == {"enabled": True}
@@ -140,7 +140,7 @@ class TestFormBuilderBinding:
             ) is None
 
     def test_explicitly_disabled_context_is_ignored(self, app, system_manager_user):
-        from app.utils.ai_utils import authorize_form_builder_context
+        from app.utils.ai.ai_utils import authorize_form_builder_context
 
         with app.test_request_context():
             assert authorize_form_builder_context({"enabled": False}, user_id=system_manager_user.id) is None

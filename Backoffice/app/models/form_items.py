@@ -12,7 +12,7 @@ from config import Config
 import json
 from contextlib import suppress
 from sqlalchemy import event
-from app.utils.stable_key import generate_stable_key
+from app.utils.templates.stable_key import generate_stable_key
 
 
 class FormItem(db.Model):
@@ -302,7 +302,7 @@ class FormItem(db.Model):
         """Return a localized, human-friendly type label for indicators; fallback to raw type."""
         with suppress(Exception):
             if self.is_indicator and self.type:
-                from app.utils.form_localization import get_localized_indicator_type  # local import to avoid circulars
+                from app.utils.forms.form_localization import get_localized_indicator_type  # local import to avoid circulars
                 # If helper returns falsy, fallback to raw value
                 localized = get_localized_indicator_type(self.type)
                 return localized if localized is not None else (self.type or '')
@@ -313,7 +313,7 @@ class FormItem(db.Model):
         """Return a localized, human-friendly unit label for indicators; fallback to raw unit."""
         with suppress(Exception):
             if self.is_indicator and self.unit:
-                from app.utils.form_localization import get_localized_indicator_unit  # local import to avoid circulars
+                from app.utils.forms.form_localization import get_localized_indicator_unit  # local import to avoid circulars
                 localized = get_localized_indicator_unit(self.unit)
                 return localized if localized is not None else (self.unit or '')
         return self.unit or ''
@@ -576,7 +576,7 @@ class FormItem(db.Model):
                 from app.models.core import Country
                 from flask import session
                 from flask_babel import get_locale
-                from app.utils.form_localization import get_localized_country_name
+                from app.utils.forms.form_localization import get_localized_country_name
                 countries = Country.query.order_by(Country.name).all()
                 options = []
 
@@ -659,7 +659,7 @@ class FormItem(db.Model):
                 options = []
 
                 # Get current locale for localization
-                from app.utils.form_localization import get_translation_key
+                from app.utils.forms.form_localization import get_translation_key
                 current_locale = get_translation_key()
 
                 # Dynamically get the value from the display column

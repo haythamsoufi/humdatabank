@@ -34,7 +34,7 @@ from plugins.ifrc.pb_progress.versions import (
     version_storage_prefix,
 )
 from app.services.platform import storage_service
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -995,7 +995,7 @@ class PBProgressService:
                 tmp.write(file_bytes)
                 temp_path = tmp.name
 
-            from app.utils.safe_workbook import inspect_xlsx
+            from app.utils.files.safe_workbook import inspect_xlsx
             from plugins.ifrc.pb_progress.db_source import WorkbookValidationError, validate_uploaded_workbook
 
             inspect_xlsx(file_bytes)

@@ -9,7 +9,7 @@ from requests import Response
 from typing import Iterable, Optional, List, Tuple
 from flask import current_app
 from app.services.email.protection import _is_production_flask_config
-from app.utils.email_headers import (
+from app.utils.email.email_headers import (
     filter_valid_addresses,
     sanitize_filename,
     sanitize_sender,

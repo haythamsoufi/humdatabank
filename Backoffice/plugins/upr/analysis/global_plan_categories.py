@@ -12,7 +12,7 @@ from typing import Any, Iterable
 from app.extensions import db
 from app.models.core import Country
 from app.models.organization import NationalSociety
-from app.utils.country_utils import load_part_of_category_catalog
+from app.utils.organization.country_utils import load_part_of_category_catalog
 
 
 def _norm_label(value: Any) -> str:

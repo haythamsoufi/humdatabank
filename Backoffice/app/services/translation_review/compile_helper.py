@@ -7,7 +7,7 @@ import os
 
 from flask import current_app
 
-from app.utils.po_lock import po_file_lock
+from app.utils.i18n.po_lock import po_file_lock
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def compile_locale_catalog(locale: str) -> bool:
 
 def compile_and_refresh_locale(locale: str) -> bool:
     """Compile a locale catalog and refresh Flask-Babel in the current process."""
-    from app.utils.po_persistence import finalize_translation_writes
+    from app.utils.i18n.po_persistence import finalize_translation_writes
 
     if not compile_locale_catalog(locale):
         return False

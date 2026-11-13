@@ -23,7 +23,7 @@ from app.models import (
 )
 from app.models.enums import AssignmentEntityStatusValue
 from app.services.ai.documents.vector_store import AIVectorStore
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 from app.services.ai.validation.parsers import (
     ValidationResult,
@@ -912,7 +912,7 @@ class AIFormDataValidationService:
                 if not hasattr(self, "_aes_country_cache"):
                     self._aes_country_cache = {}
                 if aes.id not in self._aes_country_cache:
-                    from app.utils.api_serialization import _country_for_aes
+                    from app.utils.api.api_serialization import _country_for_aes
                     self._aes_country_cache[aes.id] = _country_for_aes(aes)
                 country = self._aes_country_cache[aes.id]
             elif ps and getattr(ps, "country", None):
@@ -937,7 +937,7 @@ class AIFormDataValidationService:
             tmpl = getattr(assigned_form, "template", None) if assigned_form else None
             if tmpl is not None:
                 with suppress(Exception):
-                    from app.utils.form_localization import get_localized_template_name
+                    from app.utils.forms.form_localization import get_localized_template_name
                     template_name = (get_localized_template_name(tmpl) or "").strip() or None
                 if not template_name:
                     pub = getattr(tmpl, "published_version", None)

@@ -1,5 +1,5 @@
-# app/utils/system_monitor.py
-from app.utils.datetime_helpers import utcnow
+# app/services/monitoring/system.py
+from app.utils.common.datetime_helpers import utcnow
 """
 System monitoring utilities for tracking CPU, disk, database, and request metrics.
 Complements memory monitoring to provide comprehensive system health tracking.
@@ -52,7 +52,7 @@ class SystemMonitor:
                 # Create system log file path
                 self.log_file_path = os.path.join(logs_dir, 'system.log')
 
-                from app.utils.logging_handlers import create_app_log_formatter, create_rotating_file_handler
+                from app.utils.monitoring.logging_handlers import create_app_log_formatter, create_rotating_file_handler
                 max_bytes = app.config.get('SYSTEM_LOG_MAX_BYTES', 10 * 1024 * 1024)  # 10MB default
                 backup_count = app.config.get('SYSTEM_LOG_BACKUP_COUNT', 5)  # Keep 5 backups
                 self.file_handler = create_rotating_file_handler(

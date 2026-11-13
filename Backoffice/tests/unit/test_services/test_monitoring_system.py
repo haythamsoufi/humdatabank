@@ -140,7 +140,7 @@ class TestSystemConfigure:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
+            patch("app.utils.monitoring.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure(app, enabled=True)
@@ -154,7 +154,7 @@ class TestSystemConfigure:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
+            patch("app.utils.monitoring.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure(app, enabled=True)
@@ -174,7 +174,7 @@ class TestSystemConfigure:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
+            patch("app.utils.monitoring.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure(app, enabled=True)
@@ -364,7 +364,10 @@ class TestGetDatabasePoolStats:
         mock_db = MagicMock()
         mock_db.engine.pool = mock_pool
 
-        with patch("app.services.monitoring.system.db", mock_db):
+        with patch(
+            "app.services.monitoring.request_pressure.get_db_pool_stats",
+            return_value={"size": 5, "checked_in": 3, "checked_out": 2, "overflow": 1},
+        ):
             result = mgr.get_database_pool_stats()
 
         assert result["size"] == 5
@@ -377,7 +380,10 @@ class TestGetDatabasePoolStats:
         mock_logger = MagicMock()
         mgr.logger = mock_logger
 
-        with patch("app.services.monitoring.system.db", side_effect=RuntimeError("db error")):
+        with patch(
+            "app.services.monitoring.request_pressure.get_db_pool_stats",
+            side_effect=RuntimeError("db error"),
+        ):
             result = mgr.get_database_pool_stats()
 
         assert "error" in result
@@ -386,7 +392,10 @@ class TestGetDatabasePoolStats:
         mgr = _fresh_system_monitor()
         mgr.logger = None
 
-        with patch("app.services.monitoring.system.db", side_effect=RuntimeError("db error")):
+        with patch(
+            "app.services.monitoring.request_pressure.get_db_pool_stats",
+            side_effect=RuntimeError("db error"),
+        ):
             result = mgr.get_database_pool_stats()
 
         assert "error" in result
@@ -396,10 +405,10 @@ class TestGetDatabasePoolStats:
         mock_logger = MagicMock()
         mgr.logger = mock_logger
 
-        mock_db = MagicMock()
-        mock_db.engine.pool.size.side_effect = RuntimeError("pool error")
-
-        with patch("app.services.monitoring.system.db", mock_db):
+        with patch(
+            "app.services.monitoring.request_pressure.get_db_pool_stats",
+            side_effect=RuntimeError("pool error"),
+        ):
             result = mgr.get_database_pool_stats()
 
         assert "error" in result

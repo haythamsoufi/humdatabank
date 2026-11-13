@@ -18,9 +18,9 @@ from typing import Dict, Any, Optional, List, Callable
 from functools import wraps
 from flask import current_app, request
 from markupsafe import escape
-from app.utils.api_responses import json_ok, json_server_error
-from app.utils.api_helpers import get_json_safe
-from app.utils.request_utils import is_json_request
+from app.utils.api.api_responses import json_ok, json_server_error
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.http.request_utils import is_json_request
 from flask_login import current_user, login_required
 from app.routes.admin.shared import permission_required
 import json
@@ -99,7 +99,7 @@ def safe_request_error(exc: BaseException) -> str:
 
 def _plugin_config_payload():
     """Read a plugin config POST, including a base64 WAF envelope."""
-    from app.utils.request_utils import unwrap_waf_json_envelope
+    from app.utils.http.request_utils import unwrap_waf_json_envelope
 
     return unwrap_waf_json_envelope(get_json_safe())
 

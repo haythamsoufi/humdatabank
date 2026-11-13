@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import create_app
-from app.utils.email_client import send_email
+from app.services.email.client import send_email
 import requests
 import json
 import base64

@@ -1,16 +1,16 @@
 import json
 
-from app.utils.transactions import request_transaction_rollback, register_post_commit
+from app.utils.database.transactions import request_transaction_rollback, register_post_commit
 from contextlib import suppress
 from config.config import Config
 # File: Backoffice/app/routes/admin/assignment_management.py
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 """
 Assignment Management Module - Form assignments and public assignments
 """
 
 from flask import Blueprint, abort, render_template, request, flash, redirect, url_for, current_app
-from app.utils.redirect_utils import get_safe_redirect_url
+from app.utils.http.redirect_utils import get_safe_redirect_url
 from flask_babel import _
 from flask_login import current_user
 from app import db
@@ -26,11 +26,11 @@ from app.forms.assignments import (
     AssignedFormForm, AssignmentEntityStatusForm
 )
 from app.forms.shared import DeleteForm
-from app.utils.api_responses import json_error, json_bad_request, json_not_found, json_ok, json_server_error, json_forbidden
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_responses import json_error, json_bad_request, json_not_found, json_ok, json_server_error, json_forbidden
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
-from app.utils.request_utils import is_json_request
+from app.utils.http.request_utils import is_json_request
 from app.services.imports.assignment_excel_access import (
     assignment_uses_unified_country_plan_excel,
     assignment_uses_upr_country_reporting_excel,
@@ -41,11 +41,11 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
-from app.utils.form_localization import get_localized_country_name, build_template_select_choices
-from app.utils.country_utils import get_countries_by_region_with_part_of
+from app.utils.forms.form_localization import get_localized_country_name, build_template_select_choices
+from app.utils.organization.country_utils import get_countries_by_region_with_part_of
 from app.services.assignments.service import AssignmentService
 from app.services.assignments.workflow_service import apply_entity_status_change
-from app.utils.form_authorization import begin_aes_transition, lock_aes_rows_for_update
+from app.utils.forms.form_authorization import begin_aes_transition, lock_aes_rows_for_update
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
 from app.services.forms.reporting_period_service import (
@@ -60,11 +60,11 @@ from app.services.audit.assignment_audit import (
     build_entity_status_update_audit,
     country_due_dates_snapshot,
 )
-from app.utils.audit_context import set_audit_description, set_audit_details, skip_activity_log
+from app.utils.audit.audit_context import set_audit_description, set_audit_details, skip_activity_log
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField, HiddenField
 from wtforms.validators import Optional, DataRequired
-from app.utils.entity_groups import get_enabled_entity_groups
+from app.utils.organization.entity_groups import get_enabled_entity_groups
 from app.models.assignments import (
     SUBMISSION_REVIEW_RECIPIENT_FDS,
     SUBMISSION_REVIEW_RECIPIENT_SPECIFIC,
@@ -77,7 +77,7 @@ from app.services.assignments.access_service import (
     set_assignment_allowed_roles,
     user_can_access_assigned_form,
 )
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
 
@@ -2419,7 +2419,7 @@ def bulk_update_due_date_selected(assignment_id):
 @permission_required('admin.assignments.public_submissions.manage')
 def update_public_submission_status(submission_id):
     """Update the status of a public submission."""
-    from app.utils.form_authorization import (
+    from app.utils.forms.form_authorization import (
         AUTH_OK,
         PUBLIC_SUBMISSION_ACTION_MANAGE,
         lock_public_submission,

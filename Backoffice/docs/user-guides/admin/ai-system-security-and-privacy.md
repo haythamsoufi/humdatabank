@@ -90,7 +90,7 @@ The frontend can send page context to help answer UI-related questions. The back
 
 Implementation:
 
-- `app/utils/ai_utils.py`: shared helpers such as context sanitization
+- `app/utils/ai/ai_utils.py`: shared helpers such as context sanitization
 - `app/services/ai/providers/formatting.py`: recursive context scrubbing
 
 ### 4) Audit logging for DLP events (without storing message content)

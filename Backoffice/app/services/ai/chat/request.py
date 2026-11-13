@@ -18,8 +18,8 @@ from flask import current_app
 from app.extensions import db
 from app.models.ai_chat import AIConversation, AIMessage
 from app.services.ai.chat.dlp import mask_conversation_history
-from app.utils.datetime_helpers import utcnow
-from app.utils.ai_utils import (
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.ai.ai_utils import (
     detect_query_language,
     is_form_builder_assistant_context,
     is_user_history_entry,

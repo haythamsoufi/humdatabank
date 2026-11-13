@@ -100,7 +100,7 @@ def redact_payload(value: Any, *, max_bytes: int = 60_000) -> Any:
         return value
     if mode == MODE_MINIMAL:
         return _shape(value)
-    from app.utils.logging_security import redact_payload_for_storage
+    from app.utils.security.logging_security import redact_payload_for_storage
 
     return _redact_strings(redact_payload_for_storage(value, max_bytes=max_bytes))
 
@@ -170,7 +170,7 @@ def purge_expired_trace_content(*, dry_run: bool = False, batch_size: int = 500)
     """Scrub old trace/tool-usage content while keeping the analytics columns (cost, status, timings)."""
     from app.extensions import db
     from app.models import AIReasoningTrace, AIToolUsage
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     stats = {"traces_scrubbed": 0, "tool_usage_scrubbed": 0}
     now = utcnow()

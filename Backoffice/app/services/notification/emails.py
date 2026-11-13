@@ -22,8 +22,8 @@ from app.services.email.delivery import (
 )
 from app.models import Notification, NotificationPreferences, User, EmailDeliveryLog
 from sqlalchemy import and_
-from app.utils.datetime_helpers import utcnow
-from app.utils.organization_helpers import get_org_name
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.organization.organization_helpers import get_org_name
 
 # Try to import pytz for timezone support
 try:
@@ -541,8 +541,8 @@ def send_notification_emails():
     lock_acquired = False
     lock_id = None
     try:
-        from app.utils.constants import DEFAULT_DIGEST_EMAIL_LOCK_ID
-        from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+        from app.utils.common.constants import DEFAULT_DIGEST_EMAIL_LOCK_ID
+        from app.utils.database.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
         use_pg_lock = db.engine.dialect.name == "postgresql"
         if use_pg_lock:

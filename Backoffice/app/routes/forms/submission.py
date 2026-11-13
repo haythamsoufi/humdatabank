@@ -21,10 +21,10 @@ from app.services.organization.authorization_service import AuthorizationService
 from app.services.organization.entity_service import EntityService
 from app.services.forms.data_service import FormDataService
 from app.services.forms.processing_service import get_form_items_for_section, slugify_age_group
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
-from app.utils.constants import SELF_REPORT_PERIOD_NAME
-from app.utils.form_authorization import (
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
+from app.utils.forms.form_authorization import (
     AUTH_FORBIDDEN,
     AUTH_OK,
     PUBLIC_SUBMISSION_ACTION_EDIT,
@@ -32,7 +32,7 @@ from app.utils.form_authorization import (
     PUBLIC_SUBMISSION_ACTION_VIEW,
     public_submission_access,
 )
-from app.utils.form_localization import (
+from app.utils.forms.form_localization import (
     get_localized_country_name,
     get_localized_indicator_definition,
     get_localized_indicator_type,
@@ -41,7 +41,7 @@ from app.utils.form_localization import (
     get_localized_template_name,
     get_translation_key,
 )
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from config import Config
 
 from .helpers import (
@@ -191,7 +191,7 @@ def register_submission_routes(bp):
     @admin_required
     def update_public_submission_status(submission_id):
         """Update public submission status via AJAX."""
-        from app.utils.form_authorization import lock_public_submission
+        from app.utils.forms.form_authorization import lock_public_submission
 
         submission = lock_public_submission(submission_id)
         if submission is None:
@@ -291,7 +291,7 @@ def register_submission_routes(bp):
                     if assignment_entity_status.assigned_form and assignment_entity_status.assigned_form.template
                     else "Template"
                 )
-                from app.utils.api_serialization import _country_for_aes
+                from app.utils.api.api_serialization import _country_for_aes
                 _sub_country = _country_for_aes(assignment_entity_status)
                 country_name = _sub_country.name if _sub_country else "Unknown"
 

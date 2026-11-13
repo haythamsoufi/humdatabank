@@ -67,7 +67,7 @@ class TestGetAccessToken:
         assert result is None
 
     def test_returns_cached_token_when_valid(self, app, db_session):
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         import app.services.notification.push as push_module
         original_token = PushNotificationService._access_token
         original_expiry = PushNotificationService._token_expiry
@@ -456,7 +456,7 @@ class TestRegisterDevice:
     def test_reactivates_logged_out_device(self, app, db_session):
         from app.models import User, UserDevice
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='reactivate@test.com', name='Reactivate', active=True)
@@ -619,7 +619,7 @@ class TestUpdateDeviceActivity:
     def test_updates_specific_device_by_token(self, app, db_session):
         from app.models import User, UserDevice
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='activity@test.com', name='Activity', active=True)
@@ -648,7 +648,7 @@ class TestUpdateDeviceActivity:
     def test_throttled_device_not_updated(self, app, db_session):
         from app.models import User, UserDevice
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='throttled@test.com', name='Throttled', active=True)
@@ -677,7 +677,7 @@ class TestUpdateDeviceActivity:
     def test_updates_all_devices_when_no_token(self, app, db_session):
         from app.models import User, UserDevice
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='alldevices@test.com', name='AllDevices', active=True)

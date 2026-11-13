@@ -227,7 +227,7 @@ class CommonValidators:
         age_disaggregation_selected = 'age' in selected_disaggregation_options or 'sex_age' in selected_disaggregation_options
 
         # Check if the unit supports age disaggregation
-        from app.utils.indicator_utils import supports_disaggregation
+        from app.utils.indicators.indicator_utils import supports_disaggregation
         allows_age_disaggregation_unit = indicator_unit and supports_disaggregation(indicator_unit, indicator_type)
 
         # If age disaggregation is selected but the unit doesn't support it

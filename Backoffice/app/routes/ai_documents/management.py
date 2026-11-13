@@ -11,9 +11,9 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk, Country
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
 from app.services.platform import storage_service as _storage
 
 from . import ai_docs_bp

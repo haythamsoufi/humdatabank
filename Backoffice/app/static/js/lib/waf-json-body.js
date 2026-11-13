@@ -8,7 +8,7 @@
  * Plain saves are base64. Form-builder saves whose base64 would be longer
  * than gzip+hex use a "gz:" prefix plus lowercase hex of the gzip bytes.
  *
- * Server: unwrap_waf_json_envelope() in app/utils/request_utils.py.
+ * Server: unwrap_waf_json_envelope() in app/utils/http/request_utils.py.
  *
  * @module lib/waf-json-body
  */

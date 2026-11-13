@@ -11,7 +11,7 @@ from typing import Any, Optional
 from app.extensions import db
 from app.models import FormData, FormItem
 from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
-from app.utils.api_helpers import extract_numeric_value
+from app.utils.api.api_helpers import extract_numeric_value
 
 
 def public_form_item_ids(

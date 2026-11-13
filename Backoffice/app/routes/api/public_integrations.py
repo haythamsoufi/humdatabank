@@ -23,9 +23,9 @@ from app.services.public.document_service import (
     stream_public_ai_document_download,
 )
 from app.services.public.report_service import build_country_report, get_report_template
-from app.utils.api_errors import GENERIC_NOT_FOUND_MESSAGE, client_error_message
-from app.utils.api_helpers import api_error, json_response
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.api.api_errors import GENERIC_NOT_FOUND_MESSAGE, client_error_message
+from app.utils.api.api_helpers import api_error, json_response
+from app.utils.security.rate_limiting import api_rate_limit
 
 
 @api_bp.route("/public/global-trend", methods=["GET"])

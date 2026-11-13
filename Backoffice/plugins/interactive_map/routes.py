@@ -19,11 +19,11 @@ from app.plugins.plugin_utils import (
     REDACTED_SECRET,
     safe_request_error,
 )
-from app.utils.rate_limiting import hit_rate_limit
-from app.utils.api_helpers import get_json_safe
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_error, json_not_found, json_ok, json_server_error
+from app.utils.security.rate_limiting import hit_rate_limit
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_error, json_not_found, json_ok, json_server_error
 
 from pathlib import Path
 

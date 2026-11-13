@@ -28,7 +28,7 @@ from app.services.forms.processing_service import (
     _create_dynamic_indicator_object,
     slugify_age_group,
 )
-from app.utils.form_localization import (
+from app.utils.forms.form_localization import (
     get_localized_indicator_definition,
     get_localized_indicator_type,
     get_localized_indicator_unit,
@@ -650,7 +650,7 @@ def compute_entry_form_progress_metrics(
     existing_submitted_documents_dict = build_submitted_documents_dict(
         assignment_entity_status.id
     )
-    from app.utils.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
+    from app.utils.documents.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
 
     merge_carryover_into_submitted_documents_dict(
         existing_submitted_documents_dict,

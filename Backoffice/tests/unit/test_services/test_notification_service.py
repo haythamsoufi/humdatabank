@@ -743,7 +743,7 @@ class TestGetUserNotifications:
 
     def test_date_from_filter(self, app, db_session):
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user, notif = _create_user_and_notification(db, 'date_from')
@@ -756,7 +756,7 @@ class TestGetUserNotifications:
 
     def test_date_to_filter(self, app, db_session):
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user, notif = _create_user_and_notification(db, 'date_to')
@@ -939,7 +939,7 @@ class TestApplyLocalizedCountryParam:
             message_params = {'country': 'Lebanon'}
 
             with patch('app.models.Country.query') as mock_query, \
-                 patch('app.utils.form_localization.get_localized_country_name', return_value='لبنان') as mock_localize:
+                 patch('app.utils.forms.form_localization.get_localized_country_name', return_value='لبنان') as mock_localize:
                 mock_query.get.return_value = country
                 result = NotificationService._apply_localized_country_param(
                     notification,
@@ -1095,7 +1095,7 @@ class TestBuildEmailDeliveryFieldsMap:
     def test_latest_log_wins_on_retries(self, app, db_session):
         from app.models import User, Notification, NotificationType, EmailDeliveryLog
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from datetime import timedelta
 
         with app.app_context():

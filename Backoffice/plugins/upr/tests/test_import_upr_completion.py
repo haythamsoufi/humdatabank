@@ -16,7 +16,7 @@ import import_upr_excel_data as imp  # noqa: E402
 def _patch_writers(monkeypatch, ctx, refreshed):
     monkeypatch.setattr(imp, "prepare_upr_transform", lambda *_a, **_k: ([], ctx, False))
     monkeypatch.setattr(
-        "app.utils.stable_key.published_form_item_id_set_for_templates",
+        "app.utils.templates.stable_key.published_form_item_id_set_for_templates",
         lambda _tids: set(),
     )
     monkeypatch.setattr(imp, "sync_non_reported_pns_assignments", lambda *_a, **_k: {})

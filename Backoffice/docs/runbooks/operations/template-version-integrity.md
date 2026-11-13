@@ -36,7 +36,7 @@ Exit code `1` means a blocking finding.
 |---|---|---|
 | `multiple_drafts` | Yes | More than one draft for a template. Keep one; discard the others in the Form Builder |
 | `published_inconsistencies` | Yes | More than one published version, or `published_version_id` does not point at the published one. Fix with a reviewed SQL update, never by guessing |
-| `duplicate_item_keys` / `duplicate_section_keys` | Yes | Two rows of one version share a `stable_key`. Give one row a new key (`app.utils.stable_key.generate_stable_key`) or unlink it in the field mapping page |
+| `duplicate_item_keys` / `duplicate_section_keys` | Yes | Two rows of one version share a `stable_key`. Give one row a new key (`app.utils.templates.stable_key.generate_stable_key`) or unlink it in the field mapping page |
 | `items_without_key` / `sections_without_key` | No | Older rows without keys. Deploy backfills by position, but running `python scripts/ops/backfill_stable_keys.py --dry-run` first makes the result reviewable |
 
 ## Deploy refused: quick triage

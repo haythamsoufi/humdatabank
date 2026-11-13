@@ -17,7 +17,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.models.ai_chat import AIConversation, AIMessage
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 @dataclass

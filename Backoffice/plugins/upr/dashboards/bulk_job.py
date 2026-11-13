@@ -35,7 +35,7 @@ from app.services.ai.ai_job_runner import (
     start_ai_job_thread,
 )
 from app.services.platform import storage_service
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from plugins.upr.dashboards.audience import apply_narrative_audience, resolve_narrative_audience
 from plugins.upr.dashboards.bulk import match_narrative_path, normalize_export_format
 from plugins.upr.dashboards.catalog import dashboards_for_kind, kind_for_template
@@ -43,7 +43,7 @@ from plugins.upr.dashboards.data import build_payload, filename_from_visual_titl
 from plugins.upr.errors import UprError
 from plugins.upr.dashboards.i18n import export_locale, parse_export_language
 from plugins.upr.dashboards.render import render_dashboard_html
-from app.utils.pg_advisory_lock import acquire_transaction_advisory_lock
+from app.utils.database.pg_advisory_lock import acquire_transaction_advisory_lock
 from plugins.upr.dashboards.library import store_rendered_country
 from plugins.upr.dashboards.service import STORAGE_CATEGORY, UprVisualsService
 

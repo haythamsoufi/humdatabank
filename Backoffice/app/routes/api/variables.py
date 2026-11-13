@@ -16,15 +16,15 @@ import uuid
 from app.routes.api import api_bp
 
 # Import utility functions from utility modules
-from app.utils.api_helpers import json_response, api_error, get_json_safe
-from app.utils.api_responses import require_json_keys
+from app.utils.api.api_helpers import json_response, api_error, get_json_safe
+from app.utils.api.api_responses import require_json_keys
 
 # Import models and services
 from app.models import FormTemplate
 from app.models.assignments import AssignmentEntityStatus
 from app.services.forms.variable_resolution_service import VariableResolutionService
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.http.request_validation import enforce_csrf_json
 
 
 class _PreviewEntityStatus:

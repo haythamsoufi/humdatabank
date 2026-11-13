@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.utils.api_data_filters import (
+from app.utils.api.api_data_filters import (
     VERSION_SCOPE_ALL,
     VERSION_SCOPE_PUBLISHED,
     apply_form_data_version_scoping,
@@ -53,7 +53,7 @@ class TestParseDataItemFilters:
         assert err['status'] == 400
         assert 'template_id' in err['message']
 
-    @patch('app.utils.api_data_filters.resolve_published_form_item_id', return_value=42)
+    @patch('app.utils.api.api_data_filters.resolve_published_form_item_id', return_value=42)
     def test_stable_key_resolves_to_published_item_id(self, _mock_resolve):
         key = str(uuid.uuid4())
         item_id, stable, scope, err = parse_data_item_filters(
@@ -66,7 +66,7 @@ class TestParseDataItemFilters:
         assert stable == key
         assert scope == VERSION_SCOPE_PUBLISHED
 
-    @patch('app.utils.api_data_filters.resolve_published_form_item_id', return_value=None)
+    @patch('app.utils.api.api_data_filters.resolve_published_form_item_id', return_value=None)
     def test_unknown_stable_key_uses_sentinel_item_id(self, _mock_resolve):
         key = str(uuid.uuid4())
         item_id, stable, _, err = parse_data_item_filters(
@@ -158,8 +158,8 @@ class TestResolveAssignmentScope:
         row.template = template
         return row
 
-    @patch('app.utils.api_data_filters.joinedload')
-    @patch('app.utils.api_data_filters.AssignedForm')
+    @patch('app.utils.api.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.AssignedForm')
     def test_derives_template_when_all_match(self, mock_assigned_form, _mock_joinedload):
         mock_assigned_form.query.options.return_value.filter.return_value.all.return_value = [
             self._row(4, 33, 'Unified Country Report'),
@@ -170,8 +170,8 @@ class TestResolveAssignmentScope:
         assert template_id == 33
         assert template_ids == [33]
 
-    @patch('app.utils.api_data_filters.joinedload')
-    @patch('app.utils.api_data_filters.AssignedForm')
+    @patch('app.utils.api.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.AssignedForm')
     def test_allows_mixed_templates(self, mock_assigned_form, _mock_joinedload):
         mock_assigned_form.query.options.return_value.filter.return_value.all.return_value = [
             self._row(4, 33, 'Unified Country Report'),
@@ -182,8 +182,8 @@ class TestResolveAssignmentScope:
         assert template_id is None
         assert template_ids == [23, 33]
 
-    @patch('app.utils.api_data_filters.joinedload')
-    @patch('app.utils.api_data_filters.AssignedForm')
+    @patch('app.utils.api.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.AssignedForm')
     def test_validates_against_explicit_template_id(self, mock_assigned_form, _mock_joinedload):
         mock_assigned_form.query.options.return_value.filter.return_value.all.return_value = [
             self._row(34, 23, 'Reporting - International Bilateral Support'),
@@ -194,8 +194,8 @@ class TestResolveAssignmentScope:
         assert error['status'] == 400
         assert '34 → template 23' in error['message']
 
-    @patch('app.utils.api_data_filters.joinedload')
-    @patch('app.utils.api_data_filters.AssignedForm')
+    @patch('app.utils.api.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.AssignedForm')
     def test_wrapper_returns_single_template_only(self, mock_assigned_form, _mock_joinedload):
         mock_assigned_form.query.options.return_value.filter.return_value.all.return_value = [
             self._row(4, 33, 'Unified Country Report'),
@@ -204,8 +204,8 @@ class TestResolveAssignmentScope:
         assert error is None
         assert template_id == 33
 
-    @patch('app.utils.api_data_filters.joinedload')
-    @patch('app.utils.api_data_filters.AssignedForm')
+    @patch('app.utils.api.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.AssignedForm')
     def test_not_found_error_hints_at_submission_id(self, mock_assigned_form, _mock_joinedload):
         """Regression: assignment_id=1610 (an AssignmentEntityStatus/submission id, not an
         AssignedForm id) used to 404 with a bare 'not found' message."""
@@ -217,8 +217,8 @@ class TestResolveAssignmentScope:
         assert '1610' in error['message']
         assert 'submission_id' in error['message']
 
-    @patch('app.utils.api_data_filters.joinedload')
-    @patch('app.utils.api_data_filters.AssignedForm')
+    @patch('app.utils.api.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.AssignedForm')
     def test_not_found_error_lists_all_missing_ids(self, mock_assigned_form, _mock_joinedload):
         mock_assigned_form.query.options.return_value.filter.return_value.all.return_value = [
             self._row(4, 33, 'Unified Country Report'),
@@ -239,13 +239,13 @@ class TestResolveAssignmentEntityStatusFallback:
         inherently ambiguous, so the fallback only handles the single-id case."""
         assert resolve_assignment_entity_status_fallback([1610, 1611]) is None
 
-    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.joinedload')
     @patch('app.models.assignments.AssignmentEntityStatus')
     def test_none_when_submission_not_found(self, mock_aes_cls, _mock_joinedload):
         mock_aes_cls.query.options.return_value.filter.return_value.first.return_value = None
         assert resolve_assignment_entity_status_fallback([1610]) is None
 
-    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.joinedload')
     @patch('app.models.assignments.AssignmentEntityStatus')
     def test_resolves_submission_id_and_template_id(self, mock_aes_cls, _mock_joinedload):
         aes = MagicMock()
@@ -257,7 +257,7 @@ class TestResolveAssignmentEntityStatusFallback:
         result = resolve_assignment_entity_status_fallback([1610])
         assert result == (1610, 21)
 
-    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.utils.api.api_data_filters.joinedload')
     @patch('app.models.assignments.AssignmentEntityStatus')
     def test_resolves_submission_id_without_assigned_form(self, mock_aes_cls, _mock_joinedload):
         aes = MagicMock()
@@ -278,9 +278,9 @@ class TestBuildDataApiScopeMeta:
             version_scope=VERSION_SCOPE_PUBLISHED,
         ) is None
 
-    @patch('app.utils.api_data_filters._resolve_scope_period_names', return_value=['Jan-Jun 2026'])
-    @patch('app.utils.api_data_filters._resolve_scope_template_names_for_ids', return_value=['A', 'B'])
-    @patch('app.utils.api_data_filters.resolve_template_published_version_id', side_effect=[11, 22])
+    @patch('app.utils.api.api_data_filters._resolve_scope_period_names', return_value=['Jan-Jun 2026'])
+    @patch('app.utils.api.api_data_filters._resolve_scope_template_names_for_ids', return_value=['A', 'B'])
+    @patch('app.utils.api.api_data_filters.resolve_template_published_version_id', side_effect=[11, 22])
     def test_multi_template_assignment_scope(self, _mock_pub, _mock_names, _mock_periods):
         meta = build_data_api_scope_meta(
             template_id=None,
@@ -295,8 +295,8 @@ class TestBuildDataApiScopeMeta:
         assert meta['assignment_ids'] == [4, 34]
         assert 'template_id' not in meta
 
-    @patch('app.utils.api_data_filters._resolve_scope_period_names', return_value=[])
-    @patch('app.utils.api_data_filters._resolve_scope_template_names', return_value=['FDRS'])
+    @patch('app.utils.api.api_data_filters._resolve_scope_period_names', return_value=[])
+    @patch('app.utils.api.api_data_filters._resolve_scope_template_names', return_value=['FDRS'])
     def test_includes_template_and_version_fields(self, _mock_periods, _mock_templates):
         key = str(uuid.uuid4())
         meta = build_data_api_scope_meta(
@@ -313,8 +313,8 @@ class TestBuildDataApiScopeMeta:
             'template_names': ['FDRS'],
         }
 
-    @patch('app.utils.api_data_filters._resolve_scope_period_names', return_value=['2024'])
-    @patch('app.utils.api_data_filters._resolve_scope_template_names', return_value=['Annual Report'])
+    @patch('app.utils.api.api_data_filters._resolve_scope_period_names', return_value=['2024'])
+    @patch('app.utils.api.api_data_filters._resolve_scope_template_names', return_value=['Annual Report'])
     def test_includes_template_and_period_names(self, _mock_templates, _mock_periods):
         meta = build_data_api_scope_meta(
             template_id=5,
@@ -336,14 +336,14 @@ class TestBuildDataApiScopeMeta:
 
 @pytest.mark.unit
 class TestResolveTemplatePublishedVersionId:
-    @patch('app.utils.api_data_filters.db')
+    @patch('app.utils.api.api_data_filters.db')
     def test_returns_published_version_id(self, mock_db):
         tmpl = MagicMock()
         tmpl.published_version_id = 55
         mock_db.session.get.return_value = tmpl
         assert resolve_template_published_version_id(1) == 55
 
-    @patch('app.utils.api_data_filters.db')
+    @patch('app.utils.api.api_data_filters.db')
     def test_missing_template_returns_none(self, mock_db):
         mock_db.session.get.return_value = None
         assert resolve_template_published_version_id(1) is None

@@ -1,6 +1,6 @@
 """Row locking and re-validation of AssignmentEntityStatus transitions (TOCTOU).
 
-Single-session tests cover the helpers in ``app.utils.form_authorization``; the
+Single-session tests cover the helpers in ``app.utils.forms.form_authorization``; the
 ``TestConcurrent*`` classes run real Postgres row-lock contention with one Flask app context
 (and therefore one DB connection / transaction) per thread.
 """
@@ -13,7 +13,7 @@ from sqlalchemy import event, text
 
 from app import db
 from app.models import AssignmentEntityStatus
-from app.utils.form_authorization import (
+from app.utils.forms.form_authorization import (
     TRANSITION_FORBIDDEN,
     TRANSITION_GONE,
     TRANSITION_OK,
@@ -448,7 +448,7 @@ class TestBatchWritersLockRows:
             calls.append(sorted(ids))
             return real(ids, **kwargs)
 
-        monkeypatch.setattr("app.utils.form_authorization.lock_aes_rows_for_update", recording)
+        monkeypatch.setattr("app.utils.forms.form_authorization.lock_aes_rows_for_update", recording)
         return calls
 
     def test_upr_pending_reset_locks_only_when_writing(self, app, make_aes, monkeypatch):

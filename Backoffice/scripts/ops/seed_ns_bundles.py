@@ -90,7 +90,7 @@ def main() -> int:
     from app import create_app
     from app.extensions import db
     from app.models import Country, NationalSociety
-    from app.utils.country_utils import (
+    from app.utils.organization.country_utils import (
         PART_OF_CATEGORY_TEXT,
         load_part_of_category_catalog,
         remember_part_of_category,

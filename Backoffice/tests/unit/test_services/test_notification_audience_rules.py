@@ -25,7 +25,7 @@ def test_assignment_submitted_defaults_all_buckets_true():
 
 
 def test_assignment_submitted_settings_row_marks_grouped_email():
-    from app.utils.notification_registry import build_notification_settings_delivery_rows
+    from app.utils.notifications.notification_registry import build_notification_settings_delivery_rows
 
     rows = build_notification_settings_delivery_rows(
         ttl_resolver=lambda _tk: 30,

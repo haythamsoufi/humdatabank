@@ -11,17 +11,17 @@ from app import db
 from app.models import User, Country, UserEntityPermission, CountryAccessRequest, UserSessionLog
 from app.routes.admin.shared import permission_required, permission_required_any
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.profile_summary_payload import (
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.profiles.profile_summary_payload import (
     role_badge_key_from_rbac_codes,
     collect_arg_strings,
     parse_uuid_list,
     parse_int_user_ids,
     profile_summary_scope_fields,
 )
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 
 from . import bp
 from .helpers import (

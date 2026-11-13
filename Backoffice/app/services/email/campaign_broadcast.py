@@ -16,8 +16,8 @@ from app.services.email.client import send_email
 from app.services.email.delivery import log_email_attempt, mark_email_failed_or_unknown, mark_email_sent
 from app.services.email.rendering import render_admin_email_template
 from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
-from app.utils.datetime_helpers import utcnow
-from app.utils.organization_helpers import get_org_copyright_year, get_org_name
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.organization.organization_helpers import get_org_copyright_year, get_org_name
 
 
 def build_campaign_email_context(

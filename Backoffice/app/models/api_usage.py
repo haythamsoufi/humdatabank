@@ -1,6 +1,6 @@
 from datetime import datetime
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class APIUsage(db.Model):

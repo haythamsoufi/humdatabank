@@ -97,7 +97,7 @@ class AIReasoningTraceService:
             from app.models import AIReasoningTrace
             from app.models.enums import AIReasoningTraceStatusValue
             from app.extensions import db
-            from app.utils.ai_trace_user_attribution import merge_trace_diagnostics_user_attribution
+            from app.utils.ai.ai_trace_user_attribution import merge_trace_diagnostics_user_attribution
 
             input_tokens, output_tokens = self._estimate_token_counts(query, None)
             lang = (query_language or "en").strip()[:10] if query_language else "en"
@@ -173,7 +173,7 @@ class AIReasoningTraceService:
         try:
             from app.models import AIReasoningTrace
             from app.extensions import db
-            from app.utils.ai_trace_user_attribution import merge_trace_diagnostics_user_attribution
+            from app.utils.ai.ai_trace_user_attribution import merge_trace_diagnostics_user_attribution
 
             normalized_steps = steps or []
             tools_used = self._extract_tools_used(normalized_steps)
@@ -283,7 +283,7 @@ class AIReasoningTraceService:
         try:
             from app.models import AIReasoningTrace
             from app.extensions import db
-            from app.utils.ai_trace_user_attribution import merge_trace_diagnostics_user_attribution
+            from app.utils.ai.ai_trace_user_attribution import merge_trace_diagnostics_user_attribution
             tools_used = self._extract_tools_used(steps)
 
             # Count tokens (approximate)

@@ -1,5 +1,5 @@
 """
-Unit tests for app/utils/translation_watcher.py (sentinel-based watcher).
+Unit tests for app/utils/i18n/translation_watcher.py (sentinel-based watcher).
 
 File-system and threading interactions are mocked or use tmp_path throughout.
 Covers the current API: init_app/start_watching/stop_watching lifecycle,
@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.utils.translation_watcher import TranslationWatcher, init_translation_watcher
+from app.utils.i18n.translation_watcher import TranslationWatcher, init_translation_watcher
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ class TestReload:
         watcher = TranslationWatcher()
         watcher.app = app
 
-        with patch('app.utils.translation_watcher.refresh') as mock_refresh:
+        with patch('app.utils.i18n.translation_watcher.refresh') as mock_refresh:
             watcher._reload()
         mock_refresh.assert_called_once()
         app.app_context.assert_called_once()
@@ -210,7 +210,7 @@ class TestReload:
         watcher = TranslationWatcher()
         watcher.app = app
 
-        with patch('app.utils.translation_watcher.refresh', side_effect=Exception('fail')):
+        with patch('app.utils.i18n.translation_watcher.refresh', side_effect=Exception('fail')):
             watcher._reload()
         app.logger.error.assert_called_once()
 
@@ -304,7 +304,7 @@ class TestWatchLoop:
             else:
                 watcher.watching = False
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_reload') as mock_reload:
             watcher._watch_loop()
@@ -334,7 +334,7 @@ class TestWatchLoop:
             else:
                 watcher.watching = False
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_reload') as mock_reload:
             watcher._watch_loop()
@@ -356,7 +356,7 @@ class TestWatchLoop:
             if calls['n'] >= 2:
                 watcher.watching = False
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_reload') as mock_reload:
             watcher._watch_loop()
@@ -379,7 +379,7 @@ class TestWatchLoop:
             calls['n'] += 1
             watcher.watching = False
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_fallback_files', side_effect=RuntimeError('boom')):
             watcher._watch_loop()  # must not raise
@@ -406,7 +406,7 @@ class TestWatchLoop:
         # once the sentinel file exists.
         (tmp_path / '.sentinel').write_text('0')
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_changed', side_effect=RuntimeError('boom')):
             watcher._watch_loop()
@@ -426,7 +426,7 @@ class TestWatchLoop:
             seen_intervals.append(secs)
             watcher.watching = False
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep):
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep):
             watcher._watch_loop()
 
         assert seen_intervals == [42.0]
@@ -439,7 +439,7 @@ class TestWatchLoop:
 class TestInitTranslationWatcher:
     def test_init_translation_watcher_calls_init_app(self):
         app = _make_app(debug=True)
-        with patch('app.utils.translation_watcher.translation_watcher') as mock_tw:
+        with patch('app.utils.i18n.translation_watcher.translation_watcher') as mock_tw:
             init_translation_watcher(app)
             mock_tw.init_app.assert_called_once_with(app)
 
@@ -473,7 +473,7 @@ class TestDatabaseVersionSignal:
         versions = iter([1, 2, 2])
         fake_sleep, _ = self._loop_once(watcher)
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', side_effect=lambda: next(versions)), \
              patch.object(watcher, '_rebuild_if_stale') as mock_rebuild, \
              patch.object(watcher, '_reload') as mock_reload:
@@ -491,7 +491,7 @@ class TestDatabaseVersionSignal:
 
         fake_sleep, _ = self._loop_once(watcher, stop_after=2)
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', return_value=7), \
              patch.object(watcher, '_rebuild_if_stale') as mock_rebuild, \
              patch.object(watcher, '_reload') as mock_reload:
@@ -523,7 +523,7 @@ class TestDatabaseVersionSignal:
             else:
                 watcher.watching = False
 
-        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+        with patch('app.utils.i18n.translation_watcher.time.sleep', side_effect=fake_sleep), \
              patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_reload') as mock_reload:
             watcher._watch_loop()

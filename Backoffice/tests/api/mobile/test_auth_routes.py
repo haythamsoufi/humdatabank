@@ -146,7 +146,7 @@ class TestExchangeSession:
             sess['_user_id'] = str(user_id)
             sess['_fresh'] = True
             sess['session_id'] = 'existing-web-session'
-        with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+        with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
             resp = client.post(
                 f'{PREFIX}/auth/exchange-session',
                 headers={'Content-Type': 'application/json', 'X-App-Version': '99.0.0'},
@@ -164,7 +164,7 @@ class TestExchangeSession:
 @pytest.mark.integration
 class TestIssueTokensLockout:
     def test_account_locked_returns_429(self, client, mobile_user, db_session, app):
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
         with app.app_context():
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
                 record_login_failure('mobile@test.com')
@@ -202,7 +202,7 @@ class TestRefreshTokenExtended:
 
     def test_refresh_missing_user_returns_401(self, client, db_session, app):
         import jwt as pyjwt
-        from app.utils.mobile_jwt import (
+        from app.utils.mobile.mobile_jwt import (
             _jwt_secret, MOBILE_TOKEN_AUDIENCE, MOBILE_TOKEN_ISSUER, MOBILE_TOKEN_ALGORITHM,
         )
         payload = {
@@ -224,7 +224,7 @@ class TestMobileLogoutExtended:
         headers = _make_jwt_headers(app, mobile_user)
         expired_headers = dict(headers)
         import jwt as pyjwt
-        from app.utils.mobile_jwt import (
+        from app.utils.mobile.mobile_jwt import (
             _jwt_secret, MOBILE_TOKEN_AUDIENCE, MOBILE_TOKEN_ISSUER, MOBILE_TOKEN_ALGORITHM,
         )
         payload = {
@@ -285,7 +285,7 @@ class TestMobileAuthRoutesExtended:
             'email': 'mobile@test.com', 'password': 'MobilePass123!',
         })
         refresh_token = login_resp.get_json()['data']['refresh_token']
-        from app.utils.mobile_jwt import decode_mobile_token
+        from app.utils.mobile.mobile_jwt import decode_mobile_token
         with app.app_context():
             claims = decode_mobile_token(refresh_token, expected_type='refresh')
             from app.models.core import UserSessionLog

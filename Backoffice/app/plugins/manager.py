@@ -1,5 +1,5 @@
 # Backoffice/app/plugins/manager.py
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 import re
 import sys
@@ -203,7 +203,7 @@ class PluginManager:
     def _save_discovery_cache(self):
         """Save plugin discovery cache to persistent storage."""
         try:
-            from app.utils.file_lock import atomic_json_write
+            from app.utils.files.file_lock import atomic_json_write
 
             cache_data = {
                 'cache': self._discovery_cache,

@@ -1,5 +1,5 @@
-# app/utils/debug_utils.py
-from app.utils.datetime_helpers import utcnow
+# app/services/monitoring/debug.py
+from app.utils.common.datetime_helpers import utcnow
 """
 Unified debugging utilities for the application.
 Provides consistent logging patterns, performance monitoring, and debug helpers.
@@ -58,7 +58,7 @@ class DebugManager:
 
         self.verbose_debug = bool(log_level <= logging.DEBUG)
 
-        from app.utils.logging_handlers import (
+        from app.utils.monitoring.logging_handlers import (
             configure_process_org_timezone,
             create_app_log_formatter,
             install_org_timezone_werkzeug_access_log,
@@ -133,7 +133,7 @@ class DebugManager:
         application_file_handler = None
         if app.config.get('APPLICATION_LOG_FILE_ENABLED', True):
             try:
-                from app.utils.logging_handlers import create_app_log_formatter, create_rotating_file_handler
+                from app.utils.monitoring.logging_handlers import create_app_log_formatter, create_rotating_file_handler
 
                 # Create logs directory if it doesn't exist
                 logs_dir = os.path.join(app.instance_path, 'logs')
@@ -233,7 +233,7 @@ class DebugManager:
 
         # Transaction rollbacks on every 4xx/exception are expected; keep warnings/errors only.
         for _txn_logger in (
-            'app.utils.transactions',
+            'app.utils.database.transactions',
             'app.middleware.transaction_middleware',
         ):
             logging.getLogger(_txn_logger).setLevel(logging.INFO)

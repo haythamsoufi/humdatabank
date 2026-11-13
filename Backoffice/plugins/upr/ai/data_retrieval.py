@@ -22,8 +22,8 @@ from sqlalchemy import desc, literal, text
 
 from app.extensions import db
 from app.models import AIDocument, AIDocumentChunk, Country
-from app.utils.api_helpers import service_error, GENERIC_ERROR_MESSAGE
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import service_error, GENERIC_ERROR_MESSAGE
+from app.utils.database.sql_utils import safe_ilike_pattern
 from app.services.ai.documents.access import apply_document_read_filter
 from app.services.ai.policies.access_policy import resolve_ai_access_policy
 

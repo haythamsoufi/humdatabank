@@ -28,7 +28,7 @@ from typing import Dict, List, Optional
 from app.extensions import db
 from app.models.forms import DynamicSectionContext
 from app.models.form_items import FormItem
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def slot_for_section(section) -> Optional[int]:
 
 def _country_iso_for_aes(aes) -> Optional[str]:
     try:
-        from app.utils.api_serialization import _country_for_aes
+        from app.utils.api.api_serialization import _country_for_aes
         country = _country_for_aes(aes)
     except Exception:
         country = None

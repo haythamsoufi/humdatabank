@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 _G_ATTR = "ai_cache_trace_events"
 _fallback_events: List[Dict[str, Any]] = []

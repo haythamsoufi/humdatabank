@@ -200,7 +200,7 @@ class TestConfigureLogging:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
+            patch("app.utils.monitoring.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure_logging(app)
@@ -240,7 +240,7 @@ class TestConfigureLogging:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_fh),
+            patch("app.utils.monitoring.logging_handlers.create_rotating_file_handler", return_value=mock_fh),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure_logging(app)
@@ -257,7 +257,7 @@ class TestConfigureLogging:
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
             patch(
-                "app.utils.logging_handlers.create_rotating_file_handler",
+                "app.utils.monitoring.logging_handlers.create_rotating_file_handler",
                 side_effect=OSError("handler fails"),
             ),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
@@ -902,10 +902,7 @@ class TestLogUserAction:
         mock_user.id = 99
         mock_user.is_authenticated = True
         with app.app_context():
-            with patch(
-                "app.services.monitoring.debug.current_user",
-                new_callable=lambda: type("P", (), {"id": 99})
-            ):
+            with patch("flask_login.current_user", mock_user):
                 log_user_action("view", logger=mock_logger)
         mock_logger.info.assert_called_once()
 

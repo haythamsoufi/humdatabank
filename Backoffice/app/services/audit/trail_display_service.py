@@ -9,18 +9,18 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.utils.activity_types import normalize_activity_type
-from app.utils.activity_logging_skip import audit_endpoint_for_activity
-from app.utils.activity_endpoint_overrides import (
+from app.utils.activity.activity_types import normalize_activity_type
+from app.utils.activity.activity_logging_skip import audit_endpoint_for_activity
+from app.utils.activity.activity_endpoint_overrides import (
     description_for_activity_type,
     infer_activity_type_from_legacy_description,
     infer_activity_type_from_submitted_line,
     resolve_delete_activity_type,
     resolve_post_activity_type,
 )
-from app.utils.activity_endpoint_catalog import resolve_activity_catalog_spec
-from app.utils.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
-from app.utils.audit_context import has_curated_description
+from app.utils.activity.activity_endpoint_catalog import resolve_activity_catalog_spec
+from app.utils.activity.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
+from app.utils.audit.audit_context import has_curated_description
 
 @dataclass(frozen=True)
 class FormContextLookups:
@@ -174,7 +174,7 @@ def build_form_context_lookups_from_activity_logs(
             )
             .all()
         )
-        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+        from app.utils.api.api_serialization import batch_countries_for_aes_list, _country_for_aes
 
         aes_countries = batch_countries_for_aes_list(rows)
         for aes in rows:
@@ -246,7 +246,7 @@ def _resolve_form_context(
                     if country:
                         country_name = country.name
                 else:
-                    from app.utils.api_serialization import _country_for_aes
+                    from app.utils.api.api_serialization import _country_for_aes
                     country = _country_for_aes(aes)
                     if country:
                         country_name = country.name

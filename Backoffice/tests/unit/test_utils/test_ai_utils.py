@@ -1,4 +1,4 @@
-"""Unit tests for app.utils.ai_utils.sanitize_page_context.
+"""Unit tests for app.utils.ai.ai_utils.sanitize_page_context.
 
 Focused on the formBuilder.enabled handling: the sanitizer must treat
 page_context as untrusted input, but must not silently override an explicit
@@ -11,7 +11,7 @@ defeat a caller's explicit opt-out.
 
 import pytest
 
-from app.utils.ai_utils import (
+from app.utils.ai.ai_utils import (
     is_form_builder_assistant_context,
     is_user_history_entry,
     sanitize_page_context,

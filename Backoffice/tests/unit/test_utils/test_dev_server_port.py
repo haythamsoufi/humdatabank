@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from app.utils.dev_server_port import (
+from app.utils.common.dev_server_port import (
     connect_host,
     dev_process_serves_http,
     find_available_port,
@@ -60,13 +60,13 @@ class TestConnectHost:
 class TestPortHasListener:
     def test_true_when_connect_succeeds(self):
         mock_cm = MagicMock()
-        with patch("app.utils.dev_server_port.socket.create_connection", return_value=mock_cm):
+        with patch("app.utils.common.dev_server_port.socket.create_connection", return_value=mock_cm):
             assert port_has_listener("127.0.0.1", 5000) is True
         mock_cm.__enter__.assert_called()
 
     def test_false_when_connect_fails(self):
         with patch(
-            "app.utils.dev_server_port.socket.create_connection",
+            "app.utils.common.dev_server_port.socket.create_connection",
             side_effect=OSError("refused"),
         ):
             assert port_has_listener("127.0.0.1", 5000) is False
@@ -78,12 +78,12 @@ class TestPidListeningOn:
             "  TCP    127.0.0.1:5000         0.0.0.0:0              LISTENING       29124\r\n"
             "  TCP    127.0.0.1:50001        0.0.0.0:0              LISTENING       999\r\n"
         )
-        with patch("app.utils.dev_server_port.subprocess.check_output", return_value=netstat):
+        with patch("app.utils.common.dev_server_port.subprocess.check_output", return_value=netstat):
             assert pid_listening_on(5000) == 29124
 
     def test_returns_none_when_netstat_fails(self):
         with patch(
-            "app.utils.dev_server_port.subprocess.check_output",
+            "app.utils.common.dev_server_port.subprocess.check_output",
             side_effect=OSError("no netstat"),
         ):
             assert pid_listening_on(5000) is None
@@ -93,14 +93,16 @@ class TestProbeBind:
     def test_false_on_oserror(self):
         sock = MagicMock()
         sock.bind.side_effect = OSError(10048, "in use")
-        with patch("app.utils.dev_server_port.socket.socket", return_value=sock):
+        with patch("app.utils.common.dev_server_port.socket.socket", return_value=sock):
             assert probe_bind("127.0.0.1", 5000) is False
         sock.close.assert_called()
 
     def test_true_when_bind_works(self):
         sock = MagicMock()
-        with patch("app.utils.dev_server_port.socket.socket", return_value=sock), patch(
-            "app.utils.dev_server_port.os.name", "nt"
+        with patch("app.utils.common.dev_server_port.socket.socket", return_value=sock), patch(
+            "app.utils.common.dev_server_port.os.name", "nt"
+        ), patch(
+            "app.utils.common.dev_server_port.socket.SO_EXCLUSIVEADDRUSE", 1, create=True
         ):
             assert probe_bind("127.0.0.1", 5000) is True
         sock.setsockopt.assert_called()
@@ -110,24 +112,24 @@ class TestProbeBind:
 class TestFindAvailablePort:
     def test_skips_port_with_http_listener(self):
         with patch(
-            "app.utils.dev_server_port.port_has_listener",
+            "app.utils.common.dev_server_port.port_has_listener",
             side_effect=lambda host, port: port == 5000,
         ), patch(
-            "app.utils.dev_server_port.probe_bind",
+            "app.utils.common.dev_server_port.probe_bind",
             side_effect=lambda host, port: port == 5001,
         ):
             assert find_available_port("127.0.0.1", 5000) == 5001
 
     def test_falls_back_to_start_when_none_free(self):
-        with patch("app.utils.dev_server_port.port_has_listener", return_value=True), patch(
-            "app.utils.dev_server_port.probe_bind", return_value=False
+        with patch("app.utils.common.dev_server_port.port_has_listener", return_value=True), patch(
+            "app.utils.common.dev_server_port.probe_bind", return_value=False
         ):
             assert find_available_port("127.0.0.1", 5000, max_tries=3) == 5000
 
 
 class TestOccupiedMessage:
     def test_includes_pid_and_taskkill(self):
-        with patch("app.utils.dev_server_port.pid_listening_on", return_value=29124):
+        with patch("app.utils.common.dev_server_port.pid_listening_on", return_value=29124):
             msg = occupied_server_message("127.0.0.1", 5000)
         assert "29124" in msg
         assert "taskkill /F /PID 29124" in msg

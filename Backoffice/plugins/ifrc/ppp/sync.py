@@ -1303,7 +1303,7 @@ def import_asset(asset: dict, submissions: list[dict], *, owner, apply: bool, re
     )
     from app.models.enums import AssignmentEntityStatusValue
     from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period, upsert_reporting_period
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     uid = asset.get("uid")
     form_name = asset.get("name") or uid

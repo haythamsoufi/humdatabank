@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from app.models.enums import AssignmentEntityStatusValue
 from app.services.platform.app_settings_service import is_organization_email
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 if TYPE_CHECKING:
     from app.models.assignments import AssignmentEntityStatus

@@ -32,8 +32,8 @@ from app.services.imports.import_change_log import (
     attach_import_change_log_to_activity,
     set_import_audit_details,
 )
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import (
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import (
     json_accepted,
     json_bad_request,
     json_forbidden,
@@ -41,7 +41,7 @@ from app.utils.api_responses import (
     json_ok,
 )
 from werkzeug.exceptions import HTTPException
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.common.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
 from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
 from plugins.fdrs.services.fdrs_data_sync_job import (
@@ -125,7 +125,7 @@ def fdrs_sync_script_available() -> bool:
 
 
 def fdrs_settings_status() -> Dict[str, Any]:
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     years_start = years_end = None
     try:
@@ -193,7 +193,7 @@ def parse_reported_import_states(data: Dict[str, Any]) -> Optional[List[int]]:
 def fdrs_tools():
     """FDRS tools hub: preview, imputation, Sync (run/verify), documents, and publication."""
     from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID as fdrs_template_id
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID as fdrs_template_id
     from flask import current_app
     from flask_login import current_user
     from plugins.fdrs.services.fdrs_document_status_job import (

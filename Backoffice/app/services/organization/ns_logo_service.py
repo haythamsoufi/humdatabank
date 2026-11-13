@@ -15,8 +15,8 @@ from werkzeug.datastructures import FileStorage
 from app.extensions import db
 from app.models.core import Country
 from app.models.organization import NationalSociety
-from app.utils.file_paths import save_system_logo
-from app.utils.sector_logo_urls import github_ns_logo_url
+from app.utils.files.file_paths import save_system_logo
+from app.utils.branding.sector_logo_urls import github_ns_logo_url
 
 logger = logging.getLogger(__name__)
 

@@ -388,7 +388,7 @@ class TestCommonValidatorsValidateAgeGroupsConfig:
 
     def test_raises_when_age_selected_unsupported_unit(self):
         from app.forms.base import CommonValidators
-        with patch('app.utils.indicator_utils.supports_disaggregation', return_value=False):
+        with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=False):
             field = MagicMock()
             field.data = ''
             with pytest.raises(ValidationError, match="Age disaggregation is only allowed"):
@@ -396,14 +396,14 @@ class TestCommonValidatorsValidateAgeGroupsConfig:
 
     def test_valid_age_groups_format(self):
         from app.forms.base import CommonValidators
-        with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+        with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
             field = MagicMock()
             field.data = '0-4,5-9,10-14'
             CommonValidators.validate_age_groups_config(field, ['age'], 'people', 'Number')
 
     def test_empty_parts_in_age_groups_raises(self):
         from app.forms.base import CommonValidators
-        with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+        with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
             field = MagicMock()
             field.data = '0-4,,10-14'
             with pytest.raises(ValidationError, match="must not contain empty parts"):
@@ -411,7 +411,7 @@ class TestCommonValidatorsValidateAgeGroupsConfig:
 
     def test_invalid_characters_in_age_group_raises(self):
         from app.forms.base import CommonValidators
-        with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+        with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
             field = MagicMock()
             field.data = '0-4,5@9'
             with pytest.raises(ValidationError, match="invalid characters"):
@@ -419,7 +419,7 @@ class TestCommonValidatorsValidateAgeGroupsConfig:
 
     def test_sex_age_in_options_triggers_age_check(self):
         from app.forms.base import CommonValidators
-        with patch('app.utils.indicator_utils.supports_disaggregation', return_value=False):
+        with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=False):
             field = MagicMock()
             field.data = ''
             with pytest.raises(ValidationError):
@@ -427,7 +427,7 @@ class TestCommonValidatorsValidateAgeGroupsConfig:
 
     def test_no_unit_with_age_raises(self):
         from app.forms.base import CommonValidators
-        with patch('app.utils.indicator_utils.supports_disaggregation', return_value=False):
+        with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=False):
             field = MagicMock()
             field.data = ''
             with pytest.raises(ValidationError):

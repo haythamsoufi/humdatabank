@@ -13,8 +13,8 @@ import datetime as dt
 from flask import Blueprint, request
 
 from app.services.security.api_key_permissions import SUBMISSIONS_READ
-from app.utils.api_helpers import api_error, json_data_response
-from app.utils.auth import require_api_key
+from app.utils.api.api_helpers import api_error, json_data_response
+from app.utils.auth.auth import require_api_key
 
 from plugins.nsd_report_forms.overview import data
 

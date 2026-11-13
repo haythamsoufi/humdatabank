@@ -22,7 +22,7 @@ from app.models import (
 )
 from app.models.assignments import AssignmentPageStatus
 from app.models.documents import SubmittedDocument
-from app.utils.stable_key import generate_stable_key
+from app.utils.templates.stable_key import generate_stable_key
 
 
 class VersionDeployMigrationError(Exception):

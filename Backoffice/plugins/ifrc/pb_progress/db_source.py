@@ -15,15 +15,15 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.utils.sql_utils import ilike_contains
+from app.utils.database.sql_utils import ilike_contains
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.core import Country
 from app.models.form_items import FormItem
 from app.models.forms import FormData
 from app.models.indicator_bank import IndicatorBank, IndicatorBankSpef
 from app.services.platform import storage_service
-from app.utils.country_utils import exclude_sandbox_countries
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.organization.country_utils import exclude_sandbox_countries
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.upr.dashboards.catalog import UPR_REPORTING_TEMPLATE_ID
 from plugins.ifrc.pb_progress.plugin_data_store import (
     EXCEL_NAME,

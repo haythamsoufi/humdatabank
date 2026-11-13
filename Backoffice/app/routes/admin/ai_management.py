@@ -18,13 +18,13 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.extensions import db, limiter
 from app.routes.admin.shared import admin_permission_required
-from app.utils.datetime_helpers import utcnow, ensure_utc
-from app.utils.sql_utils import safe_ilike_pattern
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.request_utils import is_json_request, parse_ids_from_request
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.common.datetime_helpers import utcnow, ensure_utc
+from app.utils.database.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.http.request_utils import is_json_request, parse_ids_from_request
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.api.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.common.error_handling import handle_json_view_exception
 from app.services.platform import storage_service as _storage
 from app.services.ai.ai_job_runner import (
     ensure_ai_job_running,
@@ -1003,7 +1003,7 @@ def reprocess_document_metadata(document_id):
 def mine_document_terminology():
     """Mine glossary candidates from selected Knowledge Base documents."""
     from app.services.translation.glossary_mining import mine_selected_documents
-    from app.utils.request_utils import parse_ids_from_request
+    from app.utils.http.request_utils import parse_ids_from_request
 
     try:
         ids = parse_ids_from_request("ids")
@@ -2088,7 +2088,7 @@ def bulk_download_documents():
     try:
         from app.models import AIDocument
         from app.routes.ai_documents.helpers import _download_ifrc_document
-        from app.utils.file_paths import (
+        from app.utils.files.file_paths import (
             get_upload_base_path,
             get_temp_upload_path,
             ensure_dir,
@@ -2483,7 +2483,7 @@ def check_submitted_document_ai_status(submitted_doc_id):
 
 def _language_display_name_for_import(language_code: str | None) -> str:
     """Display label for a document language code (import grid)."""
-    from app.utils.language_labels import language_display_name
+    from app.utils.i18n.language_labels import language_display_name
 
     return language_display_name(language_code, fallback="")
 
@@ -2496,7 +2496,7 @@ def _serialize_system_document_for_ai_import(
     entity_names=None,
 ) -> dict:
     """Serialize a SubmittedDocument row for the AI import modal grid."""
-    from app.utils.api_serialization import _country_for_aes
+    from app.utils.api.api_serialization import _country_for_aes
 
     source = "standalone"
     assignment_name = ""
@@ -2626,7 +2626,7 @@ def list_system_documents():
         # Limit results
         documents = query.limit(limit).all()
 
-        from app.utils.api_serialization import batch_countries_for_aes_list
+        from app.utils.api.api_serialization import batch_countries_for_aes_list
         from app.services.organization.entity_service import EntityService
 
         aes_list = [
@@ -2813,7 +2813,7 @@ def _trace_for_viewer(trace):
 
 def _admin_trace_query_security(trace) -> dict:
     """Suspicion summary for a trace (agent query + optional original user query)."""
-    from app.utils.ai_query_security import analyze_ai_user_query, merge_ai_query_security_results
+    from app.utils.ai.ai_query_security import analyze_ai_user_query, merge_ai_query_security_results
 
     analyses = [analyze_ai_user_query(getattr(trace, "query", None) or "")]
     if getattr(trace, "original_query", None):
@@ -2824,7 +2824,7 @@ def _admin_trace_query_security(trace) -> dict:
 
 def _admin_trace_query_security_text(text) -> dict:
     """Suspicion summary for a single string (e.g. first message in a conversation)."""
-    from app.utils.ai_query_security import analyze_ai_user_query, merge_ai_query_security_results
+    from app.utils.ai.ai_query_security import analyze_ai_user_query, merge_ai_query_security_results
 
     merged = merge_ai_query_security_results([analyze_ai_user_query(text or "")])
     return _format_merged_trace_query_security(merged)
@@ -3681,7 +3681,7 @@ def ai_review_queue():
 def ai_review_detail(review_id):
     """View and annotate a single trace review."""
     from app.models.embeddings import AITraceReview
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     review = AITraceReview.query.get_or_404(review_id)
 
@@ -3691,7 +3691,7 @@ def ai_review_detail(review_id):
         allowed_verdicts = ("correct", "partially_correct", "incorrect", "needs_improvement", "")
 
         if status not in ("completed", "dismissed", "pending", "in_review"):
-            from app.utils.api_responses import json_bad_request
+            from app.utils.api.api_responses import json_bad_request
             return json_bad_request("Invalid status")
 
         # Dismiss should not implicitly rewrite annotation fields.
@@ -3701,7 +3701,7 @@ def ai_review_detail(review_id):
             ground_truth = data.get("ground_truth_answer") or ""
 
             if verdict not in allowed_verdicts:
-                from app.utils.api_responses import json_bad_request
+                from app.utils.api.api_responses import json_bad_request
                 return json_bad_request("Invalid verdict")
 
             review.verdict = verdict or None
@@ -3713,7 +3713,7 @@ def ai_review_detail(review_id):
         if status == "completed" and not review.completed_at:
             review.completed_at = utcnow()
         db.session.commit()
-        from app.utils.api_responses import json_ok
+        from app.utils.api.api_responses import json_ok
         return json_ok(message="Review saved")
 
     return render_template(
@@ -3730,7 +3730,7 @@ def ai_review_detail(review_id):
 def ai_review_auto_queue():
     """Auto-queue traces with low grounding score or dislike rating that don't have a review yet."""
     from app.models.embeddings import AITraceReview
-    from app.utils.api_responses import json_ok, json_server_error
+    from app.utils.api.api_responses import json_ok, json_server_error
 
     try:
         threshold = float(request.get_json(silent=True, force=True).get("threshold", 0.5) if request.data else 0.5)

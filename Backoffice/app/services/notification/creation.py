@@ -9,8 +9,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models import Notification, NotificationPreferences, User, NotificationType
-from app.utils.constants import MAX_NOTIFICATION_MESSAGE_LENGTH
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.constants import MAX_NOTIFICATION_MESSAGE_LENGTH
+from app.utils.common.datetime_helpers import utcnow
 
 from app.services.notification.validators import (
     validate_notification_url,
@@ -661,7 +661,7 @@ def create_notification(
                 # Phase 2: Broadcast notifications via WebSocket for bulk inserts (non-blocking)
                 # This is separate from the transaction - if it fails, notifications are already saved
                 try:
-                    from app.utils.ws_manager import broadcast_notification, broadcast_unread_count
+                    from app.utils.realtime.ws_manager import broadcast_notification, broadcast_unread_count
                     from app.services.notification.service import NotificationService
 
                     # Query back the created notifications to get IDs for WebSocket broadcasting
@@ -771,7 +771,7 @@ def create_notification(
 
                             # Query back successfully created notifications for WebSocket broadcasting
                             try:
-                                from app.utils.ws_manager import broadcast_notification, broadcast_unread_count
+                                from app.utils.realtime.ws_manager import broadcast_notification, broadcast_unread_count
                                 from app.services.notification.service import NotificationService
 
                                 recent_cutoff = utcnow() - timedelta(seconds=5)
@@ -839,7 +839,7 @@ def create_notification(
             # Send push notifications for bulk inserts (optional)
             if send_push_notifications:
                 try:
-                    from app.utils.notification_push import is_notifications_push_enabled
+                    from app.utils.notifications.notification_push import is_notifications_push_enabled
                     from app.services.notification.push import PushNotificationService
 
                     if is_notifications_push_enabled():
@@ -1069,7 +1069,7 @@ def create_notification(
 
             # Phase 2: Broadcast notifications via WebSocket
             try:
-                from app.utils.ws_manager import broadcast_notification, broadcast_unread_count
+                from app.utils.realtime.ws_manager import broadcast_notification, broadcast_unread_count
                 from app.services.notification.service import NotificationService
 
                 # Track users we've already sent unread count updates to
@@ -1108,7 +1108,7 @@ def create_notification(
             # Send push notifications for regular inserts (optional)
             if send_push_notifications:
                 try:
-                    from app.utils.notification_push import is_notifications_push_enabled
+                    from app.utils.notifications.notification_push import is_notifications_push_enabled
                     from app.services.notification.push import PushNotificationService
 
                     if is_notifications_push_enabled():

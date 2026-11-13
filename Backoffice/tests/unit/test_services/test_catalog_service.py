@@ -319,7 +319,7 @@ class TestUpsertStringIntegration:
         from app.services.translation.catalog_service import upsert_string
 
         with patch("app.services.translation.catalog_service._sync_po_entry") as mock_sync, \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             created = upsert_string(
                 locale="fr", msgid="Hello", msgstr="Bonjour",
                 provenance=PROVENANCE_HUMAN,
@@ -343,7 +343,7 @@ class TestUpsertStringIntegration:
         from app.services.translation.catalog_service import upsert_string
 
         with patch("app.services.translation.catalog_service._sync_po_entry"), \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             upsert_string(locale="fr", msgid="Hello", msgstr="Bonjour", provenance=PROVENANCE_HUMAN)
             overwritten = upsert_string(
                 locale="fr", msgid="Hello", msgstr="Salut (forced)",
@@ -361,7 +361,7 @@ class TestUpsertStringIntegration:
         from app.services.translation.catalog_service import upsert_string
 
         with patch("app.services.translation.catalog_service._sync_po_entry"), \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             wrote = upsert_string(
                 locale="en", msgid="Hello", msgstr="Hello",
                 provenance=PROVENANCE_HUMAN,
@@ -390,7 +390,7 @@ class TestUpsertBatchIntegration:
             ("Goodbye", "es", "Adiós"),
         ]
         with patch("app.services.translation.catalog_service._sync_po_entries_bulk") as mock_bulk_sync, \
-             patch("app.utils.po_persistence.finalize_translation_writes") as mock_finalize:
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes") as mock_finalize:
             result = upsert_batch(items, provenance=PROVENANCE_MACHINE, engine="google")
 
         assert result["updated"] == 5
@@ -404,7 +404,7 @@ class TestUpsertBatchIntegration:
 
         with patch("app.services.translation.catalog_service._sync_po_entry"), \
              patch("app.services.translation.catalog_service._sync_po_entries_bulk"), \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             upsert_string(locale="fr", msgid="Hello", msgstr="Bonjour (human)", provenance=PROVENANCE_HUMAN)
 
             result = upsert_batch(
@@ -427,7 +427,7 @@ class TestUpsertBatchIntegration:
 
         with patch("app.services.translation.catalog_service._sync_po_entry"), \
              patch("app.services.translation.catalog_service._sync_po_entries_bulk"), \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             upsert_string(locale="fr", msgid="Hello", msgstr="Bonjour (human)", provenance=PROVENANCE_HUMAN)
 
             result = upsert_batch(
@@ -444,7 +444,7 @@ class TestUpsertBatchIntegration:
         from app.services.translation.catalog_service import upsert_batch
 
         with patch("app.services.translation.catalog_service._sync_po_entries_bulk") as mock_bulk, \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             result = upsert_batch(
                 [("Hello", "en", "Hello"), ("Hello", "fr", "Bonjour")],
                 provenance=PROVENANCE_HUMAN,
@@ -498,7 +498,7 @@ class TestUpsertStringConcurrency:
 
         with patch.object(TranslationString, "query", _MissFirstThenReal()), \
              patch("app.services.translation.catalog_service._sync_po_entry") as mock_sync, \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             changed = upsert_string(
                 locale=locale, msgid=msgid, msgstr="Traduction gagnante",
                 provenance=PROVENANCE_MACHINE, engine="google",
@@ -530,7 +530,7 @@ class TestUpsertStringConcurrency:
 
         with patch.object(TranslationString, "query", _AlwaysMiss()), \
              patch("app.services.translation.catalog_service._sync_po_entry"), \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             with pytest.raises(IntegrityError):
                 upsert_string(
                     locale=locale, msgid=msgid, msgstr="Nouvelle traduction",
@@ -569,7 +569,7 @@ class TestUpsertBatchConcurrency:
 
         with patch.object(TranslationString, "query", _MissFirstThenReal()), \
              patch("app.services.translation.catalog_service._sync_po_entries_bulk") as mock_bulk, \
-             patch("app.utils.po_persistence.finalize_translation_writes"):
+             patch("app.utils.i18n.po_persistence.finalize_translation_writes"):
             result = upsert_batch(
                 [(msgid, locale, "Traduction gagnante")],
                 provenance=PROVENANCE_MACHINE,
@@ -807,7 +807,7 @@ class TestCatalogVersion:
                 return nullcontext()
 
             with patch.object(catalog_service, 'read_catalog_version', return_value=4), \
-                 patch('app.utils.po_lock.po_file_lock', side_effect=_peer_wins_the_race), \
+                 patch('app.utils.i18n.po_lock.po_file_lock', side_effect=_peer_wins_the_race), \
                  patch.object(catalog_service, 'materialize_catalogs') as mock_mat:
                 assert catalog_service.sync_catalogs_if_stale() is None
             mock_mat.assert_not_called()
@@ -819,7 +819,7 @@ class TestCatalogVersion:
             app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
             catalog_service.write_materialized_version(1)
             with patch.object(catalog_service, 'read_catalog_version', return_value=9), \
-                 patch('app.utils.po_lock.po_file_lock', side_effect=RuntimeError('held')), \
+                 patch('app.utils.i18n.po_lock.po_file_lock', side_effect=RuntimeError('held')), \
                  patch.object(catalog_service, 'materialize_catalogs') as mock_mat:
                 assert catalog_service.sync_catalogs_if_stale() is None
             mock_mat.assert_not_called()

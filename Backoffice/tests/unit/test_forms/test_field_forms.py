@@ -123,7 +123,7 @@ class TestIndicatorFormValidateAgeGroupsConfig:
                 form.allowed_disaggregation_options.data = ['total']
                 field = MagicMock()
                 field.data = ''
-                with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+                with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                     form.validate_age_groups_config(field)
 
     def test_indicator_from_db_fallback(self, app):
@@ -138,7 +138,7 @@ class TestIndicatorFormValidateAgeGroupsConfig:
                 form.allowed_disaggregation_options.data = ['total']
                 field = MagicMock()
                 field.data = ''
-                with patch('app.utils.indicator_utils.supports_disaggregation', return_value=True):
+                with patch('app.utils.indicators.indicator_utils.supports_disaggregation', return_value=True):
                     form.validate_age_groups_config(field)
 
 

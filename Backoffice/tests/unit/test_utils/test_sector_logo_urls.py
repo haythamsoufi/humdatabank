@@ -11,7 +11,7 @@ class _LogoEntity:
 
 
 def test_sector_logo_url_uses_cdn_when_configured(app):
-    from app.utils.sector_logo_urls import sector_logo_url
+    from app.utils.branding.sector_logo_urls import sector_logo_url
 
     sector = _LogoEntity(
         entity_id=3,
@@ -28,7 +28,7 @@ def test_sector_logo_url_uses_cdn_when_configured(app):
 
 
 def test_sector_logo_url_falls_back_to_admin_route(app, client):
-    from app.utils.sector_logo_urls import sector_logo_url
+    from app.utils.branding.sector_logo_urls import sector_logo_url
 
     sector = _LogoEntity(entity_id=7, logo_filename="Health.png")
     app.config["STATIC_CDN_URL"] = ""
@@ -40,7 +40,7 @@ def test_sector_logo_url_falls_back_to_admin_route(app, client):
 
 
 def test_spef_icon_url_falls_back_to_admin_route(app, client):
-    from app.utils.sector_logo_urls import spef_icon_url
+    from app.utils.branding.sector_logo_urls import spef_icon_url
 
     class _Spef:
         id = 4
@@ -56,7 +56,7 @@ def test_spef_icon_url_falls_back_to_admin_route(app, client):
 
 
 def test_spef_icon_url_none_without_icon(app):
-    from app.utils.sector_logo_urls import spef_icon_url
+    from app.utils.branding.sector_logo_urls import spef_icon_url
 
     class _Spef:
         id = 1
@@ -66,7 +66,7 @@ def test_spef_icon_url_none_without_icon(app):
 
 
 def test_ns_logo_url_falls_back_to_admin_route(app, client):
-    from app.utils.sector_logo_urls import ns_logo_url
+    from app.utils.branding.sector_logo_urls import ns_logo_url
 
     ns = _LogoEntity(entity_id=11, logo_filename="BGD.png")
     app.config["STATIC_CDN_URL"] = ""
@@ -78,7 +78,7 @@ def test_ns_logo_url_falls_back_to_admin_route(app, client):
 
 
 def test_ns_logo_url_via_api(app, client):
-    from app.utils.sector_logo_urls import ns_logo_url
+    from app.utils.branding.sector_logo_urls import ns_logo_url
 
     ns = _LogoEntity(entity_id=11, logo_filename="BGD.png")
     app.config["STATIC_CDN_URL"] = ""
@@ -90,13 +90,13 @@ def test_ns_logo_url_via_api(app, client):
 
 
 def test_ns_logo_url_none_without_file(app):
-    from app.utils.sector_logo_urls import ns_logo_url
+    from app.utils.branding.sector_logo_urls import ns_logo_url
 
     assert ns_logo_url(_LogoEntity(entity_id=1)) is None
 
 
 def test_github_ns_logo_url():
-    from app.utils.sector_logo_urls import github_ns_logo_url
+    from app.utils.branding.sector_logo_urls import github_ns_logo_url
 
     assert github_ns_logo_url("bgd") == (
         "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ns_logos/BGD.png"

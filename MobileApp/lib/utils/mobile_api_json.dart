@@ -3,7 +3,7 @@ import 'dart:convert';
 /// Helpers for `/api/mobile/v1` JSON and legacy Flask `json_ok` shapes.
 ///
 /// Mobile success envelope: `{ "success": true, "data": ... }`
-/// See Backoffice `app/utils/mobile_responses.py`.
+/// See Backoffice `app/utils/mobile/mobile_responses.py`.
 
 Map<String, dynamic> decodeJsonObject(String body) {
   final decoded = jsonDecode(body);

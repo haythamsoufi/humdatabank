@@ -10,7 +10,7 @@ from app.models.validation import ValidationKpiCheckType, ValidationQuestionTemp
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 from plugins.fdrs.validation.fdrs_matrix.history import CHECK_TYPE_3YEAR_AVG, CHECK_TYPE_PAST_YEAR
 from app.services.validation.rule_registry import list_registered_rule_packs, list_rule_definitions
-from app.utils.data_quality_constants import REGISTERED_RULE_PACKS
+from app.utils.indicators.data_quality_constants import REGISTERED_RULE_PACKS
 
 
 CHECK_TYPE_OPTIONS = (

@@ -7,7 +7,7 @@ Centralizes template processing logic to eliminate duplication.
 from flask import current_app
 from app.models import FormSection, DynamicIndicatorData, Config, FormItem, FormPage, Sector, SubSector, IndicatorBank, IndicatorBankType, IndicatorBankUnit
 from app import db
-from app.utils.form_localization import (
+from app.utils.forms.form_localization import (
     get_localized_page_name, get_localized_section_name, get_localized_indicator_name,
     get_localized_sector_name, get_localized_subsector_name, get_indicator_bank_type_display,
     get_indicator_bank_unit_display, get_localized_indicator_type, get_localized_indicator_unit,
@@ -122,7 +122,7 @@ _lookup_cache: Dict[str, Dict] = {}  # key: 'types:<lang>' or 'units:<lang>'
 
 def _get_type_label_map(lang: str) -> Dict[str, str]:
     """Return cached code/name → display-label dict for IndicatorBankType."""
-    from app.utils.form_localization import get_localized_indicator_type
+    from app.utils.forms.form_localization import get_localized_indicator_type
 
     key = f"types:{lang}"
     with _lookup_cache_lock:
@@ -146,7 +146,7 @@ def _get_type_label_map(lang: str) -> Dict[str, str]:
 
 def _get_unit_label_map(lang: str) -> Dict[str, str]:
     """Return cached code/name → display-label dict for IndicatorBankUnit."""
-    from app.utils.form_localization import get_localized_indicator_unit
+    from app.utils.forms.form_localization import get_localized_indicator_unit
 
     key = f"units:{lang}"
     with _lookup_cache_lock:

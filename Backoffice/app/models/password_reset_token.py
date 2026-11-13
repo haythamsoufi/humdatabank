@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from app import db
 from sqlalchemy import Index
 from typing import Optional
-from app.utils.datetime_helpers import utcnow
-from app.utils.datetime_helpers import ensure_utc
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import ensure_utc
 
 
 class PasswordResetToken(db.Model):

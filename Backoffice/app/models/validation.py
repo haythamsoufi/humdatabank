@@ -5,7 +5,7 @@ Validation questions and reference data for template-agnostic data quality check
 from __future__ import annotations
 
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class ValidationQuestion(db.Model):

@@ -25,7 +25,7 @@ from app.models import (
     IndicatorSuggestion,
     Sector,
 )
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 logger = logging.getLogger(__name__)
 

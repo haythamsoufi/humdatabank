@@ -25,7 +25,7 @@ from app.models import (
 )
 from app.models.rbac import RbacRole, RbacUserRole
 from app.services.platform.user_analytics_service import user_session_log_wall_seconds_sql
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 SECRETARIAT_ENTITY_TYPES = frozenset({

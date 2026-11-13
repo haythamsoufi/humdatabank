@@ -11,7 +11,7 @@ import copy
 import json
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from app.utils.audit_context import CURATED_DESCRIPTION_KEY
+from app.utils.audit.audit_context import CURATED_DESCRIPTION_KEY
 
 # Avoid flooding the UI / JSON payload
 _MAX_PERMISSION_LINES = 120

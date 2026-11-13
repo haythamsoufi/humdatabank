@@ -13,8 +13,8 @@ This blueprint handles:
 # ========== Notifications Routes ==========
 import logging
 
-from app.utils.datetime_helpers import utcnow
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, flash, session
 from flask_login import login_required, current_user
@@ -24,14 +24,14 @@ from app.services.notification.push import PushNotificationService
 from app.services.notification.analytics import NotificationAnalytics
 from app.services.organization.authorization_service import AuthorizationService
 # WebSocket implementation - see app/routes/notifications_ws.py
-from app.utils.transactions import no_auto_transaction, request_transaction_rollback
+from app.utils.database.transactions import no_auto_transaction, request_transaction_rollback
 from app.services.notification.core import create_notification
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.rate_limiting import per_user_rate_limit_key
-from app.utils.request_utils import get_json_or_form, is_json_request
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.security.rate_limiting import per_user_rate_limit_key
+from app.utils.http.request_utils import get_json_or_form, is_json_request
 from app.routes.admin.shared import permission_required
-from app.utils.api_responses import json_bad_request, json_created, json_forbidden, json_not_found, json_ok, json_ok_result, json_server_error, json_error_handler, require_json_data
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_responses import json_bad_request, json_created, json_forbidden, json_not_found, json_ok, json_ok_result, json_server_error, json_error_handler, require_json_data
+from app.utils.common.error_handling import handle_json_view_exception
 from app.models import Notification, NotificationType, NotificationCampaign
 from config import Config
 from datetime import datetime
@@ -95,7 +95,7 @@ def get_preference_eligible_notification_types(merged_rules=None):
     Uses the notification registry (active emitters with audience buckets).
     ``merged_rules`` is accepted for backwards compatibility but not used.
     """
-    from app.utils.notification_registry import list_preference_configurable_notification_types
+    from app.utils.notifications.notification_registry import list_preference_configurable_notification_types
 
     return list_preference_configurable_notification_types()
 
@@ -113,7 +113,7 @@ def get_notification_types_for_user(user, *, for_admin_configuration=False):
             'for_user': list of notification types relevant to the user's role,
         }
     """
-    from app.utils.notification_registry import (
+    from app.utils.notifications.notification_registry import (
         list_notification_types_for_role_buckets,
         list_preference_configurable_notification_types,
     )
@@ -301,7 +301,7 @@ def api_get_notifications():
                 # Refresh translations to pick up the new locale
                 refresh()
                 # Verify locale is set
-                from app.utils.form_localization import get_translation_key
+                from app.utils.forms.form_localization import get_translation_key
                 current_locale = get_translation_key()
                 current_app.logger.info(
                     f"Set session language to {language} from API request. "
@@ -312,7 +312,7 @@ def api_get_notifications():
                 # Continue anyway - force_locale will still work
 
         # Get pagination parameters
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=20, max_per_page=100)
         offset = (page - 1) * per_page
 
@@ -452,7 +452,7 @@ def api_notification_stream_status():
     # roughly once per 5 minutes per active user.
     logger.info("[WS_STATUS_FETCH] served user_id=%s", current_user.id)
 
-    from app.utils.ws_helpers import is_notifications_websocket_enabled
+    from app.utils.realtime.ws_helpers import is_notifications_websocket_enabled
 
     # Notification stream is always HTTP-only. WEBSOCKET_ENABLED is for AI chat/docs.
     global_ws_enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
@@ -566,7 +566,7 @@ def api_get_notification_preferences():
         logger.info("[NOTIF_PREFS_FETCH] served user_id=%s", current_user.id)
         preferences = NotificationService.get_notification_preferences(current_user.id)
 
-        from app.utils.notification_push import preferences_for_client
+        from app.utils.notifications.notification_push import preferences_for_client
 
         return json_ok(
             success=True,
@@ -639,7 +639,7 @@ def api_update_notification_preferences():
             return handle_json_view_exception(service_error, 'Service error.', status_code=500)
 
         if preferences:
-            from app.utils.notification_push import preferences_for_client
+            from app.utils.notifications.notification_push import preferences_for_client
 
             return json_ok(
                 success=True,
@@ -1055,7 +1055,7 @@ def api_export_notifications():
         if format_type == 'csv':
             from flask import Response
             import io
-            from app.utils.export_safety import safe_csv_writer
+            from app.utils.files.export_safety import safe_csv_writer
 
             output = io.StringIO()
             writer = safe_csv_writer(output)
@@ -1101,7 +1101,7 @@ def api_export_notifications():
 def register_device():
     """Register a device for push notifications"""
     try:
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             PUSH_NOT_ENABLED_MESSAGE,
         )
@@ -1120,7 +1120,7 @@ def register_device():
         timezone = data.get('timezone')
 
         # Get IP address from request
-        from app.utils.client_ip import get_client_ip
+        from app.utils.security.client_ip import get_client_ip
         ip_address = get_client_ip()
 
         if not device_token:
@@ -1222,7 +1222,7 @@ def api_admin_assignments():
         assignments = campaign_only(AssignedForm.query).order_by(
             AssignedForm.period_name.desc(), AssignedForm.assigned_at.desc()
         ).all()
-        from app.utils.form_localization import get_localized_template_name, get_translation_key
+        from app.utils.forms.form_localization import get_localized_template_name, get_translation_key
         translation_key = get_translation_key()
         result = []
         for af in assignments:
@@ -1268,7 +1268,7 @@ def api_admin_send_push():
         send_push = data.get('send_push', False)  # Default to False - must be explicitly enabled
         category = data.get('category')  # Optional category
         tags = data.get('tags')  # Optional tags (list or comma-separated string)
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             PUSH_NOT_ENABLED_MESSAGE,
         )
@@ -2018,7 +2018,7 @@ def api_admin_get_users_bulk():
             user_id_filters.append(entity_user_ids)
 
         # Pagination parameters
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=100, max_per_page=500)
 
         # Intersect all user ID filters (users must match all filters)
@@ -2193,7 +2193,7 @@ def api_admin_get_all_notifications():
     """Get all notifications across all users (admin only)"""
     try:
         # Get pagination parameters
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=20, max_per_page=100)
         offset = (page - 1) * per_page
 
@@ -2369,7 +2369,7 @@ def api_create_campaign():
             return json_bad_request(error_message, success=False)
 
         # Validate delivery methods
-        from app.utils.notification_push import is_notifications_push_enabled
+        from app.utils.notifications.notification_push import is_notifications_push_enabled
 
         send_email = data.get('send_email', True)
         send_push = data.get('send_push', True) and is_notifications_push_enabled()
@@ -2561,7 +2561,7 @@ def api_update_campaign(campaign_id):
         if 'send_email' in data:
             campaign.send_email = data['send_email']
         if 'send_push' in data:
-            from app.utils.notification_push import is_notifications_push_enabled
+            from app.utils.notifications.notification_push import is_notifications_push_enabled
             campaign.send_push = bool(data['send_push']) and is_notifications_push_enabled()
         if 'override_preferences' in data:
             campaign.override_preferences = data['override_preferences']
@@ -2679,7 +2679,7 @@ def api_send_campaign(campaign_id):
         if campaign.user_selection_type == 'entity' and campaign.entity_selection:
             # Entity-based email campaign - send one email per entity
             from app.services.email.campaigns import send_multiple_entity_email_campaigns
-            from app.utils.notification_emails import sanitize_for_email
+            from app.services.notification.emails import sanitize_for_email
 
             if not campaign.send_email:
                 error_message = 'Entity-based campaigns require email to be enabled'
@@ -2689,7 +2689,7 @@ def api_send_campaign(campaign_id):
             # Get distribution rules (default: organization in CC, non-organization in To)
             # New format: {'to': ['non_organization'], 'cc': ['organization']}
             # Legacy format (deprecated): {'ifrc_in': 'cc', 'non_ifrc_in': 'to'} or {'organization_in': 'cc', 'non_organization_in': 'to'}
-            from app.utils.organization_helpers import is_org_email
+            from app.utils.organization.organization_helpers import is_org_email
             distribution_rules = campaign.email_distribution_rules
             if not distribution_rules:
                 distribution_rules = {'to': ['non_organization'], 'cc': ['organization']}

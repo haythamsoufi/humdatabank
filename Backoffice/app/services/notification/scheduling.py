@@ -17,7 +17,7 @@ from app.services.notification.core import (
     is_notification_type_enabled_for_user,
 )
 from app.models.enums import NotificationType
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.services.notification.service import NotificationService
 from app.services.notification.push import PushNotificationService
 from app.services.notification.emails import send_instant_notification_email
@@ -244,8 +244,8 @@ def process_scheduled_notifications() -> int:
     Returns:
         Number of notifications processed
     """
-    from app.utils.constants import DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID
-    from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+    from app.utils.common.constants import DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID
+    from app.utils.database.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
     lock_acquired = False
     lock_id = None
@@ -339,7 +339,7 @@ def process_scheduled_notifications() -> int:
                         'tags': getattr(notification, 'tags', None),
                     }
                     if current_app.config.get("WEBSOCKET_ENABLED", False):
-                        from app.utils.ws_manager import broadcast_notification
+                        from app.utils.realtime.ws_manager import broadcast_notification
                         broadcast_notification(notification.user_id, notification_data)
                     users_to_notify_unread.add(notification.user_id)
                 except Exception as e:
@@ -395,7 +395,7 @@ def process_scheduled_notifications() -> int:
             try:
                 unread_count = NotificationService.get_unread_count(uid)
                 if current_app.config.get("WEBSOCKET_ENABLED", False):
-                    from app.utils.ws_manager import broadcast_unread_count
+                    from app.utils.realtime.ws_manager import broadcast_unread_count
                     broadcast_unread_count(uid, unread_count)
             except Exception as e:
                 current_app.logger.warning(

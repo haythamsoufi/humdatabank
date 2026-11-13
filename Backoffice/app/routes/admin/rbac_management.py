@@ -13,10 +13,10 @@ from app.models.rbac import (
 from app.models import User, FormTemplate, AssignedForm
 from app.routes.admin.shared import admin_required, admin_permission_required, system_manager_required
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.transactions import request_transaction_rollback
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_responses import json_ok, json_server_error
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_responses import json_ok, json_server_error
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, desc
 

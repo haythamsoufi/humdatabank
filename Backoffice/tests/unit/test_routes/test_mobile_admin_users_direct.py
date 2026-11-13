@@ -150,7 +150,7 @@ class TestUpdateUser:
 
         with app.test_request_context(**self._put('/api/mobile/v1/admin/users/99999', {'name': 'X'})):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_user(99999)
 
         _, status = _parse(resp)
@@ -163,7 +163,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'unsupported_field': 'value'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_user(route_user.id)
 
         _, status = _parse(resp)
@@ -176,7 +176,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'name': 'New Name'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_user(route_user.id)
 
@@ -190,7 +190,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'name': 'A' * 101}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_user(route_user.id)
 
         _, status = _parse(resp)
@@ -203,7 +203,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'name': None}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_user(route_user.id)
 
@@ -217,7 +217,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'title': 'Dr.'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_user(route_user.id)
 
@@ -231,7 +231,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'title': 'T' * 101}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_user(route_user.id)
 
         _, status = _parse(resp)
@@ -244,7 +244,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'title': None}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_user(route_user.id)
 
@@ -258,7 +258,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'chatbot_enabled': True}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_user(route_user.id)
 
@@ -272,7 +272,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'profile_color': '#FF5733'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_user(route_user.id)
 
@@ -286,7 +286,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'profile_color': 'not-a-color'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_user(route_user.id)
 
         _, status = _parse(resp)
@@ -299,7 +299,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'profile_color': ''}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_user(route_user.id)
 
         _, status = _parse(resp)
@@ -312,7 +312,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'active': False}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_user(route_user.id)
 
@@ -326,7 +326,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_admin.id}', {'active': False}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = update_user(route_admin.id)
 
         _, status = _parse(resp)
@@ -339,7 +339,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'name': 'Changed'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.organization.authorization_service.AuthorizationService.is_system_manager',
                        return_value=False), \
                  patch('app.services.organization.authorization_service.AuthorizationService.is_admin',
@@ -356,7 +356,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'rbac_role_ids': [1]}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
                        return_value=False):
                 resp = update_user(route_user.id)
@@ -371,7 +371,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'rbac_role_ids': 'not-a-list'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
                        return_value=True):
                 resp = update_user(route_user.id)
@@ -386,7 +386,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'rbac_role_ids': ['not-an-int']}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
                        return_value=True):
                 resp = update_user(route_user.id)
@@ -401,7 +401,7 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_admin.id}', {'rbac_role_ids': [1]}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
                        return_value=True), \
                  patch('app.services.organization.authorization_service.AuthorizationService.is_system_manager',
@@ -418,10 +418,10 @@ class TestUpdateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}', {'name': 'Test'}
         )):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.platform.user_analytics_service.log_admin_action',
                        side_effect=RuntimeError('db error')), \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 resp = update_user(route_user.id)
 
         _, status = _parse(resp)
@@ -440,7 +440,7 @@ class TestActivateUser:
             '/api/mobile/v1/admin/users/99999/activate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = activate_user(99999)
 
         _, status = _parse(resp)
@@ -453,7 +453,7 @@ class TestActivateUser:
             f'/api/mobile/v1/admin/users/{route_admin.id}/activate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = activate_user(route_admin.id)
 
         _, status = _parse(resp)
@@ -466,7 +466,7 @@ class TestActivateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}/activate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.organization.authorization_service.AuthorizationService.is_system_manager',
                        return_value=False), \
                  patch('app.services.organization.authorization_service.AuthorizationService.is_admin',
@@ -483,7 +483,7 @@ class TestActivateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}/activate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = activate_user(route_user.id)
 
         _, status = _parse(resp)
@@ -502,7 +502,7 @@ class TestDeactivateUser:
             '/api/mobile/v1/admin/users/99999/deactivate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = deactivate_user(99999)
 
         _, status = _parse(resp)
@@ -515,7 +515,7 @@ class TestDeactivateUser:
             f'/api/mobile/v1/admin/users/{route_admin.id}/deactivate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = deactivate_user(route_admin.id)
 
         _, status = _parse(resp)
@@ -528,7 +528,7 @@ class TestDeactivateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}/deactivate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.services.organization.authorization_service.AuthorizationService.is_system_manager',
                        return_value=False), \
                  patch('app.services.organization.authorization_service.AuthorizationService.is_admin',
@@ -545,7 +545,7 @@ class TestDeactivateUser:
             f'/api/mobile/v1/admin/users/{route_user.id}/deactivate', method='POST'
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = deactivate_user(route_user.id)
 
         _, status = _parse(resp)

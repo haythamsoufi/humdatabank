@@ -6,7 +6,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
 from flask_limiter import Limiter
 
-from app.utils.client_ip import get_client_ip
+from app.utils.security.client_ip import get_client_ip
 import os
 from contextlib import suppress
 from pathlib import Path
@@ -67,7 +67,7 @@ def ensure_translation_mo_files(app, translations_dir: str) -> None:
     except ImportError:
         return
 
-    from app.utils.po_lock import po_file_lock
+    from app.utils.i18n.po_lock import po_file_lock
 
     root = Path(translations_dir)
     if not root.is_dir():

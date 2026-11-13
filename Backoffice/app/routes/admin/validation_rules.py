@@ -24,11 +24,11 @@ from app.services.validation.registry_service import (
     upsert_check_type,
     upsert_threshold,
 )
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_ok
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.http.request_validation import enforce_csrf_json
 
 
 def _handle_registry_mutation(operation: Callable[[], dict], *, log_label: str):

@@ -17,10 +17,10 @@ from flask_login import current_user
 
 from app.routes.api.mobile import mobile_bp
 from app.services.security.monitoring import SecurityMonitor
-from app.utils.api_helpers import get_json_safe
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import mobile_bad_request, mobile_ok, mobile_server_error
-from app.utils.rate_limiting import mobile_rate_limit
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import mobile_bad_request, mobile_ok, mobile_server_error
+from app.utils.security.rate_limiting import mobile_rate_limit
 
 MOBILE_CLIENT_ERROR_EVENT_TYPE = 'mobile_client_error'
 ALLOWED_CATEGORIES = frozenset({'offline_download', 'offline_open'})

@@ -23,7 +23,7 @@ from collections import OrderedDict
 
 from flask import current_app
 
-from app.utils.safe_workbook import UnsafeWorkbookError, load_workbook_safe, safe_iter_rows
+from app.utils.files.safe_workbook import UnsafeWorkbookError, load_workbook_safe, safe_iter_rows
 
 _logger = logging.getLogger(__name__)
 
@@ -1506,7 +1506,7 @@ class KoboDataImportService:
         from app.models.assignments import AssignedForm, AssignmentEntityStatus
         from app.models.forms import FormData
         from app.models.core import Country
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         if openpyxl is None:
             return {'success': False, 'message': 'openpyxl is required'}

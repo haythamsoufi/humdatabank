@@ -3,7 +3,7 @@ from flask_babel import _
 from app import db
 from app.models import UserSessionLog
 from app.routes.admin.shared import permission_required
-from app.utils.error_handling import handle_view_exception
+from app.utils.common.error_handling import handle_view_exception
 from sqlalchemy import inspect
 
 from app.routes.admin.utilities import bp

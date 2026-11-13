@@ -11,13 +11,13 @@ from app import db
 from app.models import FormTemplate, FormSection, FormItem, FormTemplateVersion
 from app.models.core import Country
 from app.services.imports.kobo_data_import_service import KoboDataImportService
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.file_parsing import EXCEL_EXTENSIONS
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.files.file_parsing import EXCEL_EXTENSIONS
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
-from app.utils.api_helpers import get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.api.api_helpers import get_json_safe
 from app.routes.admin.shared import admin_required, system_manager_required
 
 
@@ -26,7 +26,7 @@ from app.routes.admin.shared import admin_required, system_manager_required
 @system_manager_required
 def kobo_data_import():
     """Render the KoBo data import wizard page."""
-    from app.utils.form_localization import get_localized_template_name
+    from app.utils.forms.form_localization import get_localized_template_name
 
     countries = Country.query.filter_by(status='Active').order_by(Country.name).all()
 
@@ -254,7 +254,7 @@ def kobo_data_import_preview():
 @system_manager_required
 def kobo_data_import_template_structure():
     """Return sections and items for an existing template (AJAX)."""
-    from app.utils.form_localization import get_localized_template_name
+    from app.utils.forms.form_localization import get_localized_template_name
 
     data = get_json_safe()
     if not data or not data.get('template_id'):
@@ -263,7 +263,7 @@ def kobo_data_import_template_structure():
     template_id = int(data['template_id'])
     template = FormTemplate.query.get(template_id)
     if not template:
-        from app.utils.api_responses import json_not_found
+        from app.utils.api.api_responses import json_not_found
         return json_not_found('Template not found')
 
     version = template.published_version

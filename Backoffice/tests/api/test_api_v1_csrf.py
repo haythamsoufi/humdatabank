@@ -8,7 +8,7 @@ import uuid
 @pytest.mark.integration
 class TestApiV1CsrfSessionEndpoints:
     def test_profile_update_requires_csrf(self, client, db_session, app, monkeypatch):
-        import app.utils.request_validation as rv
+        import app.utils.http.request_validation as rv
         from app.models import User
 
         with app.app_context():
@@ -35,7 +35,7 @@ class TestApiV1CsrfSessionEndpoints:
         assert data.get("error") == "CSRF validation failed"
 
     def test_quiz_submit_requires_csrf(self, client, db_session, app, monkeypatch):
-        import app.utils.request_validation as rv
+        import app.utils.http.request_validation as rv
         from app.models import User
 
         with app.app_context():

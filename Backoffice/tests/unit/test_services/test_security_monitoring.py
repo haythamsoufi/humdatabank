@@ -23,7 +23,7 @@ def _make_security_event(
     timestamp=None,
 ):
     """Create a mock SecurityEvent object."""
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
     event = MagicMock()
     event.id = id
     event.event_type = event_type

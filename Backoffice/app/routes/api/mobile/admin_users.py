@@ -7,10 +7,10 @@ from flask import request, current_app
 from flask_login import current_user
 
 from app import db
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import (
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import (
     mobile_ok,
     mobile_bad_request,
     mobile_not_found,
@@ -19,7 +19,7 @@ from app.utils.mobile_responses import (
     mobile_forbidden,
 )
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 from app.routes.api.mobile import mobile_bp
 
 
@@ -264,7 +264,7 @@ def update_user(user_id):
         return mobile_ok(message='User updated')
     except Exception as e:
         current_app.logger.error('update_user: %s', e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -308,7 +308,7 @@ def activate_user(user_id):
         return mobile_ok(message='User activated')
     except Exception as e:
         current_app.logger.error('activate_user: %s', e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 
@@ -347,7 +347,7 @@ def deactivate_user(user_id):
         return mobile_ok(message='User deactivated')
     except Exception as e:
         current_app.logger.error('deactivate_user: %s', e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()
 

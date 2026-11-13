@@ -723,7 +723,7 @@ msgid "A4 report (PDF)"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:99
-#: app/utils/audit_trail_labels.py:21
+#: app/utils/audit/audit_trail_labels.py:21
 msgid "AI"
 msgstr ""
 
@@ -977,7 +977,7 @@ msgstr ""
 msgid "API URL Builder"
 msgstr "एपीआई URL बिल्डर"
 
-#: app/utils/audit_trail_labels.py:69
+#: app/utils/audit/audit_trail_labels.py:69
 msgid "API key created"
 msgstr ""
 
@@ -985,7 +985,7 @@ msgstr ""
 msgid "API key for URL builder"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:70
+#: app/utils/audit/audit_trail_labels.py:70
 msgid "API key revoked"
 msgstr ""
 
@@ -1115,11 +1115,11 @@ msgstr ""
 msgid "Access Rules"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:61
+#: app/utils/audit/audit_trail_labels.py:61
 msgid "Access approved"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:63
+#: app/utils/audit/audit_trail_labels.py:63
 msgid "Access auto-resolved"
 msgstr ""
 
@@ -1152,7 +1152,7 @@ msgstr ""
 msgid "Access management sections"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:62
+#: app/utils/audit/audit_trail_labels.py:62
 msgid "Access rejected"
 msgstr ""
 
@@ -1161,7 +1161,7 @@ msgid "Access request sections"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:563
-#: app/utils/audit_trail_labels.py:64
+#: app/utils/audit/audit_trail_labels.py:64
 msgid "Access requested"
 msgstr ""
 
@@ -1185,7 +1185,7 @@ msgstr ""
 msgid "Accessed"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:36
+#: app/utils/audit/audit_trail_labels.py:36
 msgid "Account"
 msgstr ""
 
@@ -1204,7 +1204,7 @@ msgstr ""
 msgid "Account Status"
 msgstr "खाता सेटिंग्स"
 
-#: app/utils/audit_trail_labels.py:57
+#: app/utils/audit/audit_trail_labels.py:57
 msgid "Account created"
 msgstr ""
 
@@ -2937,7 +2937,7 @@ msgstr ""
 #: app/templates/admin/analytics/user_detail.html:16
 #: app/templates/admin/settings/manage_settings.html:1222
 #: app/templates/admin/user_management/user_form.html:128
-#: app/utils/audit_trail_labels.py:29
+#: app/utils/audit/audit_trail_labels.py:29
 msgid "Analytics"
 msgstr "विश्लेषण देखें"
 
@@ -3955,7 +3955,7 @@ msgstr ""
 #: app/templates/admin/rbac/groups.html:58
 #: app/templates/admin/templates/templates.html:315
 #: app/templates/admin/user_management/users.html:269
-#: app/utils/audit_trail_labels.py:24
+#: app/utils/audit/audit_trail_labels.py:24
 msgid "Assignments"
 msgstr "कार्य"
 
@@ -4461,7 +4461,7 @@ msgid "Back to top"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:484
-#: app/utils/audit_trail_labels.py:19 app/utils/audit_trail_labels.py:20
+#: app/utils/audit/audit_trail_labels.py:19 app/utils/audit/audit_trail_labels.py:20
 msgid "Back-office action"
 msgstr ""
 
@@ -4547,7 +4547,7 @@ msgstr ""
 msgid "Before"
 msgstr ""
 
-#: app/utils/form_localization.py:132
+#: app/utils/forms/form_localization.py:132
 msgid "Beneficiaries"
 msgstr "लाभार्थी"
 
@@ -4606,7 +4606,7 @@ msgstr ""
 msgid "Bold"
 msgstr ""
 
-#: app/utils/form_localization.py:86
+#: app/utils/forms/form_localization.py:86
 msgid "Boolean"
 msgstr "बूलियन"
 
@@ -4919,6 +4919,12 @@ msgstr ""
 msgid ""
 "Calculated for each row from the other columns in that row. The column "
 "footer sums those results."
+msgstr ""
+
+#: plugins/ifrc/templates/decisions/_i18n.html:113
+msgid ""
+"Calculated from Unified Plan, Unified Report and FDRS submissions in the "
+"Databank."
 msgstr ""
 
 #: app/templates/forms/entry_form/partials/matrix_table.html:524
@@ -5268,7 +5274,7 @@ msgstr ""
 msgid "Center"
 msgstr ""
 
-#: app/utils/form_localization.py:137
+#: app/utils/forms/form_localization.py:137
 msgid "Centers"
 msgstr "केंद्र"
 
@@ -5653,6 +5659,10 @@ msgid ""
 "content and sample placeholder values."
 msgstr ""
 
+#: app/routes/auth.py:404
+msgid "Choosing a specific account is turned off. Use a role preset."
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:673
 msgid "Chunks"
 msgstr ""
@@ -5974,7 +5984,7 @@ msgstr "नाम दर्ज करें"
 msgid "Client:"
 msgstr ""
 
-#: app/utils/form_localization.py:138
+#: app/utils/forms/form_localization.py:138
 msgid "Clinics"
 msgstr "क्लीनिक"
 
@@ -6340,7 +6350,7 @@ msgstr ""
 msgid "Communications per day chart"
 msgstr ""
 
-#: app/utils/form_localization.py:134
+#: app/utils/forms/form_localization.py:134
 msgid "Communities"
 msgstr "समुदाय"
 
@@ -6717,7 +6727,7 @@ msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:486
 #: app/templates/admin/communication/center.html:548
-#: app/utils/audit_trail_labels.py:22
+#: app/utils/audit/audit_trail_labels.py:22
 msgid "Content"
 msgstr "टिप्पणियां"
 
@@ -8121,7 +8131,7 @@ msgid "Data Entries"
 msgstr "डेटा प्रविष्टि"
 
 #: app/routes/forms/validation_summary.py:828
-#: app/utils/form_localization.py:357 app/utils/form_localization.py:377
+#: app/utils/forms/form_localization.py:357 app/utils/forms/form_localization.py:377
 msgid "Data Entry"
 msgstr "डेटा प्रविष्टि"
 
@@ -8238,7 +8248,7 @@ msgid "Data collection launch"
 msgstr ""
 
 #: app/templates/admin/analytics/_user_detail_partial.html:254
-#: app/utils/audit_trail_labels.py:51 app/utils/audit_trail_labels.py:53
+#: app/utils/audit/audit_trail_labels.py:51 app/utils/audit/audit_trail_labels.py:53
 msgid "Data deleted"
 msgstr ""
 
@@ -8252,7 +8262,7 @@ msgstr ""
 msgid "Data export"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:54
+#: app/utils/audit/audit_trail_labels.py:54
 msgid "Data exported"
 msgstr ""
 
@@ -8272,7 +8282,7 @@ msgid "Data matrix for"
 msgstr "डेटा निर्यात"
 
 #: app/templates/admin/analytics/_user_detail_partial.html:252
-#: app/utils/audit_trail_labels.py:50 app/utils/audit_trail_labels.py:52
+#: app/utils/audit/audit_trail_labels.py:50 app/utils/audit/audit_trail_labels.py:52
 msgid "Data modified"
 msgstr ""
 
@@ -8398,7 +8408,7 @@ msgstr ""
 #: app/templates/admin/ai/knowledge_base.html:868
 #: app/templates/admin/indicator_bank/change_history.html:182
 #: app/templates/components/ag_grid_i18n_js.html:44
-#: app/utils/form_localization.py:84 app/utils/form_localization.py:85
+#: app/utils/forms/form_localization.py:84 app/utils/forms/form_localization.py:85
 msgid "Date"
 msgstr "तारीख"
 
@@ -8508,6 +8518,14 @@ msgid ""
 "prepare Federation-wide decisions. It shows the evidence and raises prompts "
 "for people to review. It does not make decisions, and it never scores or "
 "ranks National Societies."
+msgstr ""
+
+#: plugins/ifrc/templates/decisions/_guidance.html:4
+msgid ""
+"Decision Maker brings together Unified Plan, Unified Report and FDRS data to"
+" help prepare Federation-wide decisions. It shows the evidence and raises "
+"prompts for people to review. It does not make decisions, and it never "
+"scores or ranks National Societies."
 msgstr ""
 
 #: plugins/ifrc/templates/decisions/catalogue.html:26
@@ -9252,7 +9270,7 @@ msgstr "विवरण देखें"
 msgid "Device distribution chart"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:65
+#: app/utils/audit/audit_trail_labels.py:65
 msgid "Device registered"
 msgstr ""
 
@@ -9261,7 +9279,7 @@ msgid "Device registration"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:560
-#: app/utils/audit_trail_labels.py:66
+#: app/utils/audit/audit_trail_labels.py:66
 msgid "Device unregistered"
 msgstr ""
 
@@ -9534,7 +9552,7 @@ msgstr ""
 msgid "Dismissing..."
 msgstr ""
 
-#: app/utils/form_localization.py:153
+#: app/utils/forms/form_localization.py:153
 msgid "Displaced"
 msgstr "विस्थापित"
 
@@ -10078,7 +10096,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:504
-#: app/utils/audit_trail_labels.py:41 app/utils/audit_trail_labels.py:42
+#: app/utils/audit/audit_trail_labels.py:41 app/utils/audit/audit_trail_labels.py:42
 msgid "Draft save"
 msgstr ""
 
@@ -10365,7 +10383,7 @@ msgstr ""
 msgid "ERP"
 msgstr ""
 
-#: app/utils/form_localization.py:128
+#: app/utils/forms/form_localization.py:128
 msgid "EUR"
 msgstr "यूरो"
 
@@ -10867,7 +10885,7 @@ msgstr ""
 msgid "Email templates"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:68
+#: app/utils/audit/audit_trail_labels.py:68
 msgid "Email templates updated"
 msgstr ""
 
@@ -10883,7 +10901,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:487
-#: app/utils/audit_trail_labels.py:23
+#: app/utils/audit/audit_trail_labels.py:23
 msgid "Embed"
 msgstr ""
 
@@ -11840,7 +11858,7 @@ msgstr ""
 msgid "Excel import requires a 'msgid' column header."
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:75
+#: app/utils/audit/audit_trail_labels.py:75
 msgid "Excel imported"
 msgstr ""
 
@@ -11984,7 +12002,7 @@ msgstr ""
 msgid "Expenditure"
 msgstr ""
 
-#: app/utils/form_localization.py:145
+#: app/utils/forms/form_localization.py:145
 msgid "Experts"
 msgstr "विशेषज्ञ"
 
@@ -12360,7 +12378,7 @@ msgstr ""
 msgid "Facebook"
 msgstr ""
 
-#: app/utils/form_localization.py:136
+#: app/utils/forms/form_localization.py:136
 msgid "Facilities"
 msgstr "सुविधाएं"
 
@@ -12841,7 +12859,7 @@ msgstr ""
 msgid "File upload"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:55 app/utils/audit_trail_labels.py:56
+#: app/utils/audit/audit_trail_labels.py:55 app/utils/audit/audit_trail_labels.py:56
 msgid "File uploaded"
 msgstr ""
 
@@ -13337,7 +13355,7 @@ msgstr "फॉर्म अपडेट किया गया"
 msgid "Form Validated"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:46
+#: app/utils/audit/audit_trail_labels.py:46
 msgid "Form approved"
 msgstr ""
 
@@ -13380,7 +13398,7 @@ msgstr ""
 msgid "Form items cannot be added to a discussion section."
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:47
+#: app/utils/audit/audit_trail_labels.py:47
 msgid "Form reopened"
 msgstr ""
 
@@ -13396,7 +13414,7 @@ msgstr ""
 msgid "Form submit"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:43 app/utils/audit_trail_labels.py:49
+#: app/utils/audit/audit_trail_labels.py:43 app/utils/audit/audit_trail_labels.py:49
 msgid "Form submitted"
 msgstr ""
 
@@ -13412,7 +13430,7 @@ msgstr "फॉर्म टेम्पलेट"
 msgid "Form updated"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:48
+#: app/utils/audit/audit_trail_labels.py:48
 msgid "Form validated"
 msgstr ""
 
@@ -13441,7 +13459,7 @@ msgid "Formatting toolbar"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:492
-#: app/utils/audit_trail_labels.py:28
+#: app/utils/audit/audit_trail_labels.py:28
 msgid "Forms"
 msgstr ""
 
@@ -14454,7 +14472,7 @@ msgstr ""
 msgid "Homepage"
 msgstr ""
 
-#: app/utils/form_localization.py:139
+#: app/utils/forms/form_localization.py:139
 msgid "Hospitals"
 msgstr "अस्पताल"
 
@@ -14477,7 +14495,7 @@ msgid ""
 "Host countries with the largest PNS funding requirements on their plans."
 msgstr ""
 
-#: app/utils/form_localization.py:133
+#: app/utils/forms/form_localization.py:133
 msgid "Households"
 msgstr "परिवार"
 
@@ -15564,7 +15582,7 @@ msgstr ""
 msgid "Indicators"
 msgstr "संकेतक"
 
-#: app/utils/audit_trail_labels.py:26
+#: app/utils/audit/audit_trail_labels.py:26
 msgid "Indicators & lists"
 msgstr ""
 
@@ -15712,11 +15730,11 @@ msgid ""
 " chosen time."
 msgstr ""
 
-#: app/utils/form_localization.py:146
+#: app/utils/forms/form_localization.py:146
 msgid "Instructors"
 msgstr "प्रशिक्षक"
 
-#: app/utils/form_localization.py:87
+#: app/utils/forms/form_localization.py:87
 msgid "Integer"
 msgstr "पूर्णांक"
 
@@ -15945,26 +15963,26 @@ msgstr ""
 msgid "Item Type"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:84
+#: app/utils/audit/audit_trail_labels.py:84
 msgid "Item added"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:86
+#: app/utils/audit/audit_trail_labels.py:86
 msgid "Item deleted"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:85
+#: app/utils/audit/audit_trail_labels.py:85
 msgid "Item modified"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:87
+#: app/utils/audit/audit_trail_labels.py:87
 msgid "Item restored"
 msgstr ""
 
 #: app/templates/admin/templates/new_template.html:1137
 #: app/templates/forms/entry_form/validation_summary_pdf.html:201
 #: app/templates/forms/form_builder/form_builder.html:1173
-#: app/utils/form_localization.py:129
+#: app/utils/forms/form_localization.py:129
 msgid "Items"
 msgstr "वस्तुएं"
 
@@ -17273,11 +17291,11 @@ msgstr ""
 msgid "Logged Out"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:38
+#: app/utils/audit/audit_trail_labels.py:38
 msgid "Logged in"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:39
+#: app/utils/audit/audit_trail_labels.py:39
 msgid "Logged out"
 msgstr ""
 
@@ -18128,7 +18146,7 @@ msgstr ""
 msgid "Mid-year reports: participating"
 msgstr ""
 
-#: app/utils/form_localization.py:152
+#: app/utils/forms/form_localization.py:152
 msgid "Migrants"
 msgstr "प्रवासी"
 
@@ -18272,7 +18290,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:498
-#: app/utils/audit_trail_labels.py:35
+#: app/utils/audit/audit_trail_labels.py:35
 msgid "Monitoring"
 msgstr ""
 
@@ -18649,7 +18667,7 @@ msgstr ""
 #: app/templates/admin/projects/detail.html:47
 #: app/templates/components/entity_dropdown.html:32
 #: app/templates/components/entity_dropdown.html:157
-#: app/utils/form_localization.py:154
+#: app/utils/forms/form_localization.py:154
 #: plugins/upr/analysis/analysis_labels.py:269
 msgid "National Society"
 msgstr ""
@@ -20679,7 +20697,7 @@ msgstr ""
 #: app/templates/core/layout.html:342 app/templates/core/layout.html:351
 #: app/templates/notifications/center.html:7
 #: app/templates/notifications/center.html:41
-#: app/utils/audit_trail_labels.py:34
+#: app/utils/audit/audit_trail_labels.py:34
 msgid "Notifications"
 msgstr "सूचनाएं"
 
@@ -20730,7 +20748,7 @@ msgid "Nov"
 msgstr "नहीं"
 
 #: app/templates/admin/templates/data_sync_imputation.html:182
-#: app/utils/form_localization.py:76 app/utils/form_localization.py:77
+#: app/utils/forms/form_localization.py:76 app/utils/forms/form_localization.py:77
 msgid "Number"
 msgstr "संख्या"
 
@@ -21327,6 +21345,10 @@ msgstr ""
 msgid "Or choose a user"
 msgstr ""
 
+#: app/templates/auth/login.html:776
+msgid "Or find a user"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:96
 msgid "Orange"
 msgstr ""
@@ -21363,7 +21385,7 @@ msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:489
 #: app/templates/admin/organization/edit_entity.html:15
-#: app/utils/audit_trail_labels.py:25
+#: app/utils/audit/audit_trail_labels.py:25
 #: plugins/upr/templates/admin/_upr_global_plan_panel.html:10
 msgid "Organization"
 msgstr "संगठन"
@@ -21420,7 +21442,7 @@ msgid ""
 "assignments members can access — they grant no permissions."
 msgstr ""
 
-#: app/utils/form_localization.py:135
+#: app/utils/forms/form_localization.py:135
 msgid "Organizations"
 msgstr "संगठन"
 
@@ -21454,9 +21476,9 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:1212
 #: app/templates/admin/validation_dashboard.html:474
 #: app/templates/forms/entry_form/export_pdf.html:611
-#: app/utils/audit_trail_labels.py:37 app/utils/form_localization.py:315
-#: app/utils/form_localization.py:327 app/utils/form_localization.py:336
-#: app/utils/form_localization.py:348
+#: app/utils/audit/audit_trail_labels.py:37 app/utils/forms/form_localization.py:315
+#: app/utils/forms/form_localization.py:327 app/utils/forms/form_localization.py:336
+#: app/utils/forms/form_localization.py:348
 #: plugins/upr/analysis/analysis_labels.py:160
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:500
 msgid "Other"
@@ -21847,7 +21869,7 @@ msgid "Page submitted successfully."
 msgstr ""
 
 #: app/templates/admin/analytics/_user_detail_partial.html:242
-#: app/utils/audit_trail_labels.py:18
+#: app/utils/audit/audit_trail_labels.py:18
 msgid "Page view"
 msgstr ""
 
@@ -21936,7 +21958,7 @@ msgstr ""
 msgid "Partially Correct"
 msgstr ""
 
-#: app/utils/form_localization.py:147
+#: app/utils/forms/form_localization.py:147
 msgid "Participants"
 msgstr "प्रतिभागी"
 
@@ -22188,7 +22210,7 @@ msgstr ""
 msgid "Pending validation"
 msgstr ""
 
-#: app/utils/form_localization.py:122
+#: app/utils/forms/form_localization.py:122
 msgid "People"
 msgstr "लोग"
 
@@ -22267,13 +22289,13 @@ msgid ""
 "each entity's assignment status when first saved."
 msgstr ""
 
-#: app/utils/form_localization.py:126
+#: app/utils/forms/form_localization.py:126
 msgid "Percent"
 msgstr "प्रतिशत"
 
 #: app/templates/admin/templates/data_sync_imputation.html:183
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:395
-#: app/utils/form_localization.py:78 app/utils/form_localization.py:79
+#: app/utils/forms/form_localization.py:78 app/utils/forms/form_localization.py:79
 msgid "Percentage"
 msgstr "प्रतिशत"
 
@@ -22776,7 +22798,7 @@ msgstr "Plugin scan completed"
 
 #: app/services/documentation/service.py:322
 #: app/templates/admin/analytics/audit_trail.html:496
-#: app/utils/audit_trail_labels.py:33
+#: app/utils/audit/audit_trail_labels.py:33
 msgid "Plugins"
 msgstr ""
 
@@ -23244,7 +23266,7 @@ msgstr ""
 msgid "Professional Health Services Mapping"
 msgstr ""
 
-#: app/utils/form_localization.py:143
+#: app/utils/forms/form_localization.py:143
 msgid "Professionals"
 msgstr "पेशेवर"
 
@@ -23265,7 +23287,7 @@ msgstr ""
 msgid "Profile colour must be a #RRGGBB value."
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:40
+#: app/utils/audit/audit_trail_labels.py:40
 msgid "Profile updated"
 msgstr ""
 
@@ -24080,7 +24102,7 @@ msgstr ""
 #: app/templates/admin/communication/center.html:159
 #: app/templates/admin/communication/center.html:1421
 #: app/templates/admin/settings/manage_settings.html:1539
-#: app/utils/form_localization.py:148
+#: app/utils/forms/form_localization.py:148
 msgid "Recipients"
 msgstr "प्राप्तकर्ता"
 
@@ -24218,7 +24240,7 @@ msgstr ""
 msgid "Refreshing…"
 msgstr ""
 
-#: app/utils/form_localization.py:151
+#: app/utils/forms/form_localization.py:151
 msgid "Refugees"
 msgstr "शरणार्थी"
 
@@ -25336,7 +25358,7 @@ msgstr ""
 msgid "Return to form builder"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:45
+#: app/utils/audit/audit_trail_labels.py:45
 msgid "Returned for revision"
 msgstr ""
 
@@ -26067,7 +26089,7 @@ msgstr ""
 msgid "Scheduled maintenance in progress — we'll be back shortly"
 msgstr ""
 
-#: app/utils/form_localization.py:140
+#: app/utils/forms/form_localization.py:140
 msgid "Schools"
 msgstr "स्कूल"
 
@@ -26529,11 +26551,11 @@ msgstr "खंड"
 msgid "Section Type"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:81
+#: app/utils/audit/audit_trail_labels.py:81
 msgid "Section added"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:83
+#: app/utils/audit/audit_trail_labels.py:83
 msgid "Section deleted"
 msgstr ""
 
@@ -26545,7 +26567,7 @@ msgstr ""
 msgid "Section heading in the report"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:82
+#: app/utils/audit/audit_trail_labels.py:82
 msgid "Section modified"
 msgstr ""
 
@@ -26664,7 +26686,7 @@ msgstr "सुरक्षा घटनाएं"
 msgid "Security Settings"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:90
+#: app/utils/audit/audit_trail_labels.py:90
 msgid "Security event resolved"
 msgstr ""
 
@@ -27498,7 +27520,7 @@ msgid "Sent for Review"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:462
-#: app/utils/audit_trail_labels.py:44
+#: app/utils/audit/audit_trail_labels.py:44
 msgid "Sent for review"
 msgstr ""
 
@@ -27562,7 +27584,7 @@ msgid "Session Logs"
 msgstr "सत्र लॉग"
 
 #: app/templates/admin/analytics/sessions.html:169
-#: app/utils/audit_trail_labels.py:88
+#: app/utils/audit/audit_trail_labels.py:88
 msgid "Session ended"
 msgstr ""
 
@@ -27603,7 +27625,7 @@ msgstr ""
 #: app/templates/admin/analytics/_user_detail_partial.html:99
 #: app/templates/admin/analytics/dashboard.html:144
 #: app/templates/admin/analytics/sessions.html:104
-#: app/utils/form_localization.py:130
+#: app/utils/forms/form_localization.py:130
 msgid "Sessions"
 msgstr "सत्र"
 
@@ -27611,7 +27633,7 @@ msgstr "सत्र"
 msgid "Sessions Cleaned"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:89
+#: app/utils/audit/audit_trail_labels.py:89
 msgid "Sessions cleaned"
 msgstr ""
 
@@ -27674,7 +27696,7 @@ msgstr ""
 #: app/templates/admin/dashboard.html:139
 #: app/templates/admin/plugin_management.html:211
 #: app/templates/admin/security/settings.html:14
-#: app/utils/audit_trail_labels.py:31 app/utils/audit_trail_labels.py:32
+#: app/utils/audit/audit_trail_labels.py:31 app/utils/audit/audit_trail_labels.py:32
 msgid "Settings"
 msgstr "Settings"
 
@@ -27692,7 +27714,7 @@ msgstr ""
 msgid "Settings sections"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:67
+#: app/utils/audit/audit_trail_labels.py:67
 msgid "Settings updated"
 msgstr ""
 
@@ -27793,7 +27815,7 @@ msgstr ""
 msgid "Sharing Updated"
 msgstr "फॉर्म अपडेट किया गया"
 
-#: app/utils/audit_trail_labels.py:77
+#: app/utils/audit/audit_trail_labels.py:77
 msgid "Sharing updated"
 msgstr ""
 
@@ -28230,6 +28252,16 @@ msgid ""
 "that have not signed in yet are marked not registered."
 msgstr ""
 
+#: app/templates/auth/login.html:748
+msgid ""
+"Sign in without a password as a role preset, or search for an active user. "
+"The account directory is not listed on this page."
+msgstr ""
+
+#: app/templates/auth/login.html:748
+msgid "Sign in without a password as a role preset."
+msgstr ""
+
 #: plugins/ifrc/templates/decisions/_i18n.html:119
 msgid "Signals"
 msgstr ""
@@ -28470,7 +28502,7 @@ msgstr ""
 msgid "Special purpose funds (CHF)"
 msgstr ""
 
-#: app/utils/form_localization.py:144
+#: app/utils/forms/form_localization.py:144
 msgid "Specialists"
 msgstr "विशेषज्ञ"
 
@@ -28496,7 +28528,7 @@ msgid "Split into SPEF sections (CC / SP / EF)"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:489
-#: app/utils/form_localization.py:124
+#: app/utils/forms/form_localization.py:124
 #: plugins/upr/analysis/analysis_labels.py:218
 msgid "Staff"
 msgstr "कर्मचारी"
@@ -28901,7 +28933,7 @@ msgstr ""
 msgid "Structured output (chart/map payload)"
 msgstr ""
 
-#: app/utils/form_localization.py:141
+#: app/utils/forms/form_localization.py:141
 msgid "Students"
 msgstr "छात्र"
 
@@ -29287,7 +29319,7 @@ msgstr ""
 msgid "Surface"
 msgstr ""
 
-#: app/utils/form_localization.py:150
+#: app/utils/forms/form_localization.py:150
 msgid "Survivors"
 msgstr "जीवित"
 
@@ -29596,7 +29628,7 @@ msgstr ""
 msgid "Target term is required"
 msgstr ""
 
-#: app/utils/form_localization.py:142
+#: app/utils/forms/form_localization.py:142
 msgid "Teachers"
 msgstr "शिक्षक"
 
@@ -29787,7 +29819,7 @@ msgstr ""
 msgid "Template administrator"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:71
+#: app/utils/audit/audit_trail_labels.py:71
 msgid "Template created"
 msgstr ""
 
@@ -29807,7 +29839,7 @@ msgstr ""
 msgid "Template creation methods"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:73
+#: app/utils/audit/audit_trail_labels.py:73
 msgid "Template deleted"
 msgstr ""
 
@@ -29817,11 +29849,11 @@ msgstr ""
 msgid "Template details"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:74
+#: app/utils/audit/audit_trail_labels.py:74
 msgid "Template imported"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:72
+#: app/utils/audit/audit_trail_labels.py:72
 msgid "Template modified"
 msgstr ""
 
@@ -29905,7 +29937,7 @@ msgstr ""
 #: app/templates/admin/reports/partials/_widget_palette.html:8
 #: app/templates/admin/templates/data_sync_imputation.html:184
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:518
-#: app/utils/form_localization.py:80 app/utils/form_localization.py:81
+#: app/utils/forms/form_localization.py:80 app/utils/forms/form_localization.py:81
 msgid "Text"
 msgstr "पाठ"
 
@@ -31449,7 +31481,7 @@ msgstr ""
 msgid "Training announcement"
 msgstr ""
 
-#: app/utils/form_localization.py:131
+#: app/utils/forms/form_localization.py:131
 msgid "Trainings"
 msgstr "प्रशिक्षण"
 
@@ -31912,6 +31944,10 @@ msgid ""
 "resolved value."
 msgstr ""
 
+#: app/templates/auth/login.html:779
+msgid "Type at least 2 characters"
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:1583
 msgid "Type at least 2 characters to search."
 msgstr ""
@@ -32031,7 +32067,7 @@ msgstr ""
 msgid "URL unavailable"
 msgstr ""
 
-#: app/utils/form_localization.py:127
+#: app/utils/forms/form_localization.py:127
 msgid "USD"
 msgstr "अमेरिकी डॉलर"
 
@@ -32264,7 +32300,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_indicator_bank_tabs.html:37
 #: app/templates/admin/indicator_bank/indicator_bank.html:1969
 #: app/templates/admin/indicator_bank/measurement_lookups.html:52
-#: app/utils/form_localization.py:125
+#: app/utils/forms/form_localization.py:125
 msgid "Units"
 msgstr "इकाइयां"
 
@@ -32293,15 +32329,15 @@ msgstr "इकाइयां"
 #: app/templates/core/dashboard/_assignment_card_body.html:196
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:55
 #: app/templates/forms/form_builder/form_builder.html:1363
-#: app/utils/form_localization.py:527 app/utils/form_localization.py:533
-#: app/utils/form_localization.py:556
+#: app/utils/forms/form_localization.py:527 app/utils/forms/form_localization.py:533
+#: app/utils/forms/form_localization.py:556
 msgid "Unknown"
 msgstr "अज्ञात"
 
 #: app/services/notification/service.py:963
 #: app/templates/core/dashboard/_access_request_modal.html:41
 #: app/templates/core/dashboard/_access_requests.html:176
-#: app/utils/form_localization.py:505 app/utils/form_localization.py:518
+#: app/utils/forms/form_localization.py:505 app/utils/forms/form_localization.py:518
 msgid "Unknown Country"
 msgstr "अज्ञात उपयोगकर्ता"
 
@@ -32312,16 +32348,16 @@ msgstr "अज्ञात उपयोगकर्ता"
 #: app/templates/forms/entry_form/entry_form.html:4132
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:158
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:166
-#: app/utils/form_localization.py:244 app/utils/form_localization.py:251
+#: app/utils/forms/form_localization.py:244 app/utils/forms/form_localization.py:251
 msgid "Unknown Indicator"
 msgstr "अज्ञात संकेतक"
 
-#: app/utils/form_localization.py:385 app/utils/form_localization.py:405
+#: app/utils/forms/form_localization.py:385 app/utils/forms/form_localization.py:405
 msgid "Unknown Section"
 msgstr "अज्ञात खंड"
 
-#: app/routes/main/helpers.py:1724 app/utils/form_localization.py:425
-#: app/utils/form_localization.py:432
+#: app/routes/main/helpers.py:1724 app/utils/forms/form_localization.py:425
+#: app/utils/forms/form_localization.py:432
 msgid "Unknown Template"
 msgstr "अज्ञात टेम्पलेट"
 
@@ -33023,7 +33059,7 @@ msgstr ""
 msgid "User activity"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:58
+#: app/utils/audit/audit_trail_labels.py:58
 msgid "User added"
 msgstr ""
 
@@ -33037,7 +33073,7 @@ msgstr ""
 msgid "User auth: No pagination. Returns all accessible data."
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:60
+#: app/utils/audit/audit_trail_labels.py:60
 msgid "User deleted"
 msgstr ""
 
@@ -33054,7 +33090,7 @@ msgstr ""
 msgid "User information"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:59
+#: app/utils/audit/audit_trail_labels.py:59
 msgid "User modified"
 msgstr ""
 
@@ -33108,7 +33144,7 @@ msgstr ""
 #: app/templates/admin/analytics/audit_trail.html:491
 #: app/templates/admin/rbac/roles.html:52
 #: app/templates/admin/user_management/users.html:267
-#: app/utils/audit_trail_labels.py:27
+#: app/utils/audit/audit_trail_labels.py:27
 msgid "Users"
 msgstr ""
 
@@ -33151,7 +33187,7 @@ msgid "Uses the period of the current assignment (shown in the form header)."
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:494
-#: app/utils/audit_trail_labels.py:30
+#: app/utils/audit/audit_trail_labels.py:30
 msgid "Utilities"
 msgstr ""
 
@@ -33391,7 +33427,7 @@ msgid ""
 "fields."
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:76
+#: app/utils/audit/audit_trail_labels.py:76
 msgid "Variables updated"
 msgstr ""
 
@@ -33465,15 +33501,15 @@ msgstr ""
 msgid "Version Note Added"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:79
+#: app/utils/audit/audit_trail_labels.py:79
 msgid "Version created"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:80
+#: app/utils/audit/audit_trail_labels.py:80
 msgid "Version deleted"
 msgstr ""
 
-#: app/utils/audit_trail_labels.py:78
+#: app/utils/audit/audit_trail_labels.py:78
 msgid "Version deployed"
 msgstr ""
 
@@ -33498,7 +33534,7 @@ msgstr ""
 msgid "Very high volume: counts are based on the most recent rows only."
 msgstr ""
 
-#: app/utils/form_localization.py:149
+#: app/utils/forms/form_localization.py:149
 msgid "Victims"
 msgstr "पीड़ित"
 
@@ -33775,7 +33811,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:488
-#: app/utils/form_localization.py:123
+#: app/utils/forms/form_localization.py:123
 #: plugins/upr/analysis/analysis_labels.py:217
 msgid "Volunteers"
 msgstr "स्वयंसेवक"
@@ -34396,7 +34432,7 @@ msgid "Yes, rotate key"
 msgstr ""
 
 #: app/templates/admin/templates/data_sync_imputation.html:185
-#: app/utils/form_localization.py:82 app/utils/form_localization.py:83
+#: app/utils/forms/form_localization.py:82 app/utils/forms/form_localization.py:83
 msgid "Yes/No"
 msgstr "हाँ/नहीं"
 

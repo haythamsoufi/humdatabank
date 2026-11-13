@@ -90,7 +90,7 @@
 
 التنفيذ:
 
-- `app/utils/ai_utils.py`: مساعدات مشتركة مثل تنظيف السياق
+- `app/utils/ai/ai_utils.py`: مساعدات مشتركة مثل تنظيف السياق
 - `app/services/ai/providers/formatting.py`: فرك السياق التكراري
 
 ### 4) تسجيل التدقيق لأحداث DLP (دون تخزين محتوى الرسائل)

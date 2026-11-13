@@ -7,9 +7,9 @@ import logging
 from flask_login import current_user
 
 from app.routes.admin.shared import permission_required
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_accepted, json_error, json_ok, json_server_error
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_accepted, json_error, json_ok, json_server_error
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.fdrs import bp
 from plugins.fdrs.services.ecr_snapshot import read_snapshot, request_rebuild
 

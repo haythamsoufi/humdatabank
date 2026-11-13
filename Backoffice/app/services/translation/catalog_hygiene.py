@@ -84,7 +84,7 @@ def filelock_status() -> Dict[str, object]:
     drifted from requirements.txt (e.g. a stale venv/image) and concurrent
     Gunicorn workers can corrupt .po files with lost updates.
     """
-    from app.utils.po_lock import filelock_protection_status
+    from app.utils.i18n.po_lock import filelock_protection_status
 
     return filelock_protection_status()
 

@@ -315,7 +315,7 @@ class TestGetPeriods:
 
     def test_invalid_iso_returns_error(self, client, auth_headers, db_session):
         """Invalid ISO code returns 4xx error."""
-        with patch("app.utils.country_utils.resolve_country_from_iso", return_value=(None, "Country not found")):
+        with patch("app.utils.organization.country_utils.resolve_country_from_iso", return_value=(None, "Country not found")):
             resp = client.get(_api("/periods?country_iso3=ZZZ"), headers=auth_headers)
         assert resp.status_code in (400, 404)
 

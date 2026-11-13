@@ -1,11 +1,11 @@
-"""Unit tests for app/utils/po_lock.py: cross-process PO locking and the sentinel."""
+"""Unit tests for app/utils/i18n/po_lock.py: cross-process PO locking and the sentinel."""
 import time
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from app.utils import po_lock
+from app.utils.i18n import po_lock
 
 
 @pytest.mark.unit

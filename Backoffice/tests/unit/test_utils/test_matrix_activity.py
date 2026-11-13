@@ -1,6 +1,6 @@
 """Tests for matrix recent-activity display helpers."""
 
-from app.utils.matrix_activity import (
+from app.utils.forms.matrix_activity import (
     MATRIX_HEADER_ACTIVITY_ROW,
     collect_matrix_activity_cell_changes,
     is_matrix_activity_payload,

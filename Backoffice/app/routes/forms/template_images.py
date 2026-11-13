@@ -9,7 +9,7 @@ from flask_login import current_user
 
 from app.models import AssignedForm, FormItem
 from app.services.platform import storage_service as storage
-from app.utils.template_image_assets import TEMPLATE_ASSETS
+from app.utils.templates.template_image_assets import TEMPLATE_ASSETS
 
 
 def _normalize_storage_path(storage_path: str | None) -> str | None:

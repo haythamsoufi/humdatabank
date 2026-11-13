@@ -16,7 +16,7 @@ from app.models import FormTemplate, FormTemplateVersion, FormItem, FormSection,
 from app.models.assignments import AssignmentEntityStatus
 from app.extensions import db
 from app.services.forms.reporting_period_service import period_chronology_sort_key
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 from .shared import (
     form_item_privacy_is_public_expr,

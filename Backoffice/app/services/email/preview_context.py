@@ -8,8 +8,8 @@ from flask import current_app, url_for
 
 from app.services.platform.app_settings_service import EMAIL_TEMPLATE_KEYS
 from app.services.email.rendering import _datetimeformat_filter
-from app.utils.datetime_helpers import utcnow
-from app.utils.organization_helpers import get_org_copyright_year, get_org_name, get_org_team_email
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.organization.organization_helpers import get_org_copyright_year, get_org_name, get_org_team_email
 
 _SECURITY_ALERT_PALETTE = {
     "low": ("#d97706", "#fffbeb", "#f59e0b"),

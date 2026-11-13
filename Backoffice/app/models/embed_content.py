@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from ..extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 POWERBI_EMBED_DOMAINS = (
     'app.powerbi.com',

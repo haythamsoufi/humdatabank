@@ -7,10 +7,10 @@ from flask_login import current_user
 from app import db
 from app.models import FormItem, FormPage, FormSection, FormTemplate
 from app.routes.api.mobile import mobile_bp
-from app.utils.form_authorization import user_can_access_template
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import mobile_bad_request, mobile_not_found, mobile_ok, mobile_server_error
-from app.utils.stable_key import normalize_stable_key, resolve_form_item_refs, resolve_published_form_item_id
+from app.utils.forms.form_authorization import user_can_access_template
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import mobile_bad_request, mobile_not_found, mobile_ok, mobile_server_error
+from app.utils.templates.stable_key import normalize_stable_key, resolve_form_item_refs, resolve_published_form_item_id
 
 
 def _serialize_published_structure(template: FormTemplate) -> dict:

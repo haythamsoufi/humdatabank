@@ -15,7 +15,7 @@ from app.routes.ai_documents.upload import (
     get_document_processing_stage_from_db,
     start_single_document_processing,
 )
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
 
 pytestmark = [pytest.mark.unit]
 

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from flask import session
 
-from app.utils.session_persistence import (
+from app.utils.auth.session_persistence import (
     B2C_ID_TOKEN_SESSION_KEY,
     BROWSER_COOKIE_MAX_BYTES,
     SuppressableSessionInterface,

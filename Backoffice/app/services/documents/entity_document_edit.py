@@ -69,7 +69,7 @@ def document_language_options() -> list[dict[str, str]]:
     name so clients can search in English too.
     """
     from config import Config
-    from app.utils.language_names import language_endonym
+    from app.utils.i18n.language_names import language_endonym
 
     names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", None) or {}
     catalog: dict[str, str] = {}
@@ -206,8 +206,8 @@ def replace_submitted_document_file(document, file_storage) -> tuple[bool, list[
     from app.models.assignments import AssignmentEntityStatus
     from app.routes.admin.content_management import _standalone_entity_for_library_paths
     from app.services.platform import storage_service as storage
-    from app.utils.datetime_helpers import utcnow
-    from app.utils.file_paths import save_submission_document
+    from app.utils.common.datetime_helpers import utcnow
+    from app.utils.files.file_paths import save_submission_document
 
     new_filename = secure_filename(file_storage.filename or "")
     file_ext = os.path.splitext(new_filename)[1].lower()

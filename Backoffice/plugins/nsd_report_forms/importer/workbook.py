@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
-from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
+from app.utils.files.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
 from . import layout
 

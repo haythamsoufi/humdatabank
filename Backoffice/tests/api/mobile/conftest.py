@@ -2,7 +2,7 @@
 import uuid
 import pytest
 from tests.factories import create_test_user, create_test_admin
-from app.utils.mobile_jwt import issue_token_pair
+from app.utils.mobile.mobile_jwt import issue_token_pair
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def sm_jwt_headers(app, sm_mobile_user):
 def expired_jwt_headers(app, mobile_user):
     """JWT headers with an expired access token (should 401)."""
     import jwt as pyjwt
-    from app.utils.mobile_jwt import (
+    from app.utils.mobile.mobile_jwt import (
         _jwt_secret, MOBILE_TOKEN_AUDIENCE, MOBILE_TOKEN_ISSUER, MOBILE_TOKEN_ALGORITHM,
     )
     payload = {

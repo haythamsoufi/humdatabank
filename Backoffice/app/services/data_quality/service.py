@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app import db
-from app.utils.api_errors import ClientInputError
+from app.utils.api.api_errors import ClientInputError
 from app.models import FormData, FormTemplate
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.forms import FormTemplateVersion
@@ -11,7 +11,7 @@ from app.services.data_quality.helpers import get_assignment_aes
 from app.services.forms.reporting_period_service import period_chronology_sort_key
 from app.services.data_quality.methodologies import get_methodology
 from app.services.data_quality.types import DataQualityResult
-from app.utils.data_quality_constants import METHODOLOGY_TO_DEFAULT_RULE_PACK
+from app.utils.indicators.data_quality_constants import METHODOLOGY_TO_DEFAULT_RULE_PACK
 
 
 def get_methodology_for_template(template: FormTemplate) -> str | None:

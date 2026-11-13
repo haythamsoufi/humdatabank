@@ -47,10 +47,10 @@ from app.services.platform.user_analytics_service import (
     user_session_log_active_duration_seconds_sql,
     user_session_log_wall_seconds_sql,
 )
-from app.utils.datetime_helpers import iso_utc, utcnow
-from app.utils.page_view_paths import distinct_page_view_path_count
-from app.utils.request_utils import parse_bool_arg
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.common.datetime_helpers import iso_utc, utcnow
+from app.utils.activity.page_view_paths import distinct_page_view_path_count
+from app.utils.http.request_utils import parse_bool_arg
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 
 def has_table(table_name: str) -> bool:

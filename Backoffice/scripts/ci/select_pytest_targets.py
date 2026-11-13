@@ -108,10 +108,14 @@ def to_backoffice_rel(raw: str) -> str | None:
 
 
 def is_pytest_file(rel: str) -> bool:
+    """True for pytest modules, not scripts that merely start with ``test_``."""
     name = Path(rel).name
     if not name.endswith(".py"):
         return False
-    return name.startswith("test_") or name.endswith("_test.py")
+    if not (name.startswith("test_") or name.endswith("_test.py")):
+        return False
+    parts = Path(rel).parts
+    return "tests" in parts
 
 
 def is_ignorable(rel: str) -> bool:
@@ -248,7 +252,70 @@ def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
     return hits
 
 
-def plan_pytest_run(changed_paths: list[str], root: Path | None = None) -> PytestPlan:
+def _substantive_rels(base_ref: str) -> set[str] | None:
+    """Backoffice-relative paths whose diff is more than an import-path move.
+
+    A rename that only rewrites ``app.utils`` / ``app.services`` / ``app.middleware``
+    imports does not need the whole matching test file. Those files already
+    contain failures that are independent of the move; selecting all of them
+    turns a package move into a full-suite run.
+    """
+    try:
+        diff = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(REPO_ROOT),
+                "diff",
+                "-M",
+                "--find-renames",
+                "-U0",
+                f"{base_ref}...HEAD",
+            ],
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    substantive: set[str] = set()
+    current: str | None = None
+    current_hit = False
+
+    def finish() -> None:
+        nonlocal current, current_hit
+        if current_hit and current:
+            rel = to_backoffice_rel(current)
+            if rel:
+                substantive.add(rel)
+        current = None
+        current_hit = False
+
+    for line in diff.splitlines():
+        if line.startswith("diff --git "):
+            finish()
+            parts = line.split(" b/", 1)
+            current = parts[1] if len(parts) == 2 else None
+            continue
+        if current is None or not (line.startswith("+") or line.startswith("-")):
+            continue
+        if line.startswith("+++") or line.startswith("---"):
+            continue
+        body = line[1:].strip()
+        if not body or body.startswith(("#", '"""', "'''")):
+            continue
+        if any(token in body for token in ("app.utils", "app/utils", "app.services", "app.middleware")):
+            continue
+        current_hit = True
+    finish()
+    return substantive
+
+
+def plan_pytest_run(
+    changed_paths: list[str],
+    root: Path | None = None,
+    *,
+    substantive_rels: set[str] | None = None,
+) -> PytestPlan:
     """Decide skip vs selected from repo-relative changed paths."""
     root = root or BACKOFFICE_ROOT
     rels: list[str] = []
@@ -261,6 +328,8 @@ def plan_pytest_run(changed_paths: list[str], root: Path | None = None) -> Pytes
         return PytestPlan("skip", (), "No Backoffice files in the diff", False)
 
     actionable = [rel for rel in rels if not is_ignorable(rel)]
+    if substantive_rels is not None:
+        actionable = [rel for rel in actionable if rel in substantive_rels]
     if not actionable:
         return PytestPlan("skip", (), "Diff is non-Python (templates/static/docs)", False)
 
@@ -362,7 +431,8 @@ def main(argv: list[str] | None = None) -> int:
         except subprocess.CalledProcessError as exc:
             print(f"git diff failed: {exc}", file=sys.stderr)
             return 2
-        plan = plan_pytest_run(changed)
+        substantive = _substantive_rels(args.base_ref) if args.base_ref else None
+        plan = plan_pytest_run(changed, substantive_rels=substantive)
 
     print(f"mode={plan.mode}")
     print(f"reason={plan.reason}")

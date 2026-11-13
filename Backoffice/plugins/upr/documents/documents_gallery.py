@@ -22,11 +22,11 @@ import requests
 from flask import Response, render_template, request, url_for
 from markupsafe import escape
 
-from app.utils.client_ip import get_client_ip
-from app.utils.constants import APPEALS_TYPE_DEFAULT_IDS_STR, APPEALS_TYPE_DISPLAY_NAMES
-from app.utils.external_url_validation import validate_allowlisted_https_url
-from app.utils.rate_limiting import rate_limit
-from app.utils.session_persistence import suppress_session_cookie_for_request
+from app.utils.security.client_ip import get_client_ip
+from app.utils.common.constants import APPEALS_TYPE_DEFAULT_IDS_STR, APPEALS_TYPE_DISPLAY_NAMES
+from app.utils.http.external_url_validation import validate_allowlisted_https_url
+from app.utils.security.rate_limiting import rate_limit
+from app.utils.auth.session_persistence import suppress_session_cookie_for_request
 from plugins.upr import bp
 
 logger = logging.getLogger(__name__)

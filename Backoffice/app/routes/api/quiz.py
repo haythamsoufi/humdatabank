@@ -1,4 +1,4 @@
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 # Backoffice/app/routes/api/quiz.py
 """
 Quiz API endpoints.
@@ -14,15 +14,15 @@ from app.routes.api import api_bp
 
 # Import models
 from app.models import User
-from app.utils.auth import require_api_key
+from app.utils.auth.auth import require_api_key
 from app.services.security.api_key_permissions import USERS_READ
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.security.rate_limiting import api_rate_limit
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error, get_json_safe
-from app.utils.api_responses import require_json_keys
+from app.utils.api.api_helpers import json_response, api_error, get_json_safe
+from app.utils.api.api_responses import require_json_keys
 from app import db
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.http.request_validation import enforce_csrf_json
 
 
 @api_bp.route('/quiz/submit-score', methods=['POST'])

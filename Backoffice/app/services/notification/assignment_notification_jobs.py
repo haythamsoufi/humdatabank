@@ -28,7 +28,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from flask import current_app
 
 from app.extensions import db
-from app.utils.datetime_helpers import ensure_utc, utcnow
+from app.utils.common.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)
 

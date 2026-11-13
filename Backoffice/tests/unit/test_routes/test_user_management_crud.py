@@ -58,7 +58,7 @@ def _make_device(db_session, user_id, logged_out=False):
         device_token="token_" + str(user_id),
     )
     if logged_out:
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         device.logged_out_at = utcnow()
     db_session.add(device)
     db_session.commit()
@@ -125,7 +125,7 @@ class TestManageUsers:
         assert resp.status_code == 200
 
     def test_grid_payload_includes_join_date(self, logged_in_client, db_session):
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         joined_at = utcnow().replace(microsecond=0)
         user = create_test_user(db_session, email="joined_at@example.com")
@@ -151,7 +151,7 @@ class TestManageUsers:
         from datetime import timedelta
 
         from app.models.core import UserLoginLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         last_login = utcnow().replace(microsecond=0)
         older_login = last_login - timedelta(days=3)
@@ -569,8 +569,8 @@ class TestApproveAllAccessRequests:
 
         with patch("app.services.notification.emails.send_instant_notification_email"), \
              patch("app.services.notification.push.PushNotificationService"), \
-             patch("app.utils.ws_manager.broadcast_notification"), \
-             patch("app.utils.ws_manager.broadcast_unread_count"):
+             patch("app.utils.realtime.ws_manager.broadcast_notification"), \
+             patch("app.utils.realtime.ws_manager.broadcast_unread_count"):
             resp = logged_in_client.post(
                 "/admin/access-requests/approve-all", follow_redirects=False
             )
@@ -633,8 +633,8 @@ class TestApproveUserAccessRequests:
 
         with patch("app.services.notification.emails.send_instant_notification_email"), \
              patch("app.services.notification.push.PushNotificationService"), \
-             patch("app.utils.ws_manager.broadcast_notification"), \
-             patch("app.utils.ws_manager.broadcast_unread_count"):
+             patch("app.utils.realtime.ws_manager.broadcast_notification"), \
+             patch("app.utils.realtime.ws_manager.broadcast_unread_count"):
             resp = logged_in_client.post(
                 f"/admin/access-requests/user/{user.id}/approve-all", follow_redirects=False
             )

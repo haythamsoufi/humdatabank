@@ -70,13 +70,13 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
         patch("app.services.AssignmentService", svc))
 
     # redirect_if_assignment_entry_blocked is locally imported:
-    # `from app.utils.form_authorization import redirect_if_assignment_entry_blocked`
+    # `from app.utils.forms.form_authorization import redirect_if_assignment_entry_blocked`
     mocks["redirect_if_blocked"] = stack.enter_context(
-        patch("app.utils.form_authorization.redirect_if_assignment_entry_blocked",
+        patch("app.utils.forms.form_authorization.redirect_if_assignment_entry_blocked",
               return_value=None))
     # lock_aes_for_update refreshes the AES row; MagicMock AES has no SA identity.
     mocks["lock_aes_for_update"] = stack.enter_context(
-        patch("app.utils.form_authorization.lock_aes_for_update",
+        patch("app.utils.forms.form_authorization.lock_aes_for_update",
               return_value=False))
 
     # AuthorizationService is locally imported:
@@ -378,7 +378,7 @@ class TestHandleAssignmentFormGet:
                 mock_svc = stack.enter_context(
                     patch("app.services.AssignmentService"))
                 stack.enter_context(
-                    patch("app.utils.form_authorization.redirect_if_assignment_entry_blocked",
+                    patch("app.utils.forms.form_authorization.redirect_if_assignment_entry_blocked",
                           return_value=blocked_response))
                 mock_svc.get_assignment_entity_status_by_id.return_value = aes
 
@@ -397,7 +397,7 @@ class TestHandleAssignmentFormGet:
                 mock_svc = stack.enter_context(
                     patch("app.services.AssignmentService"))
                 stack.enter_context(
-                    patch("app.utils.form_authorization.redirect_if_assignment_entry_blocked",
+                    patch("app.utils.forms.form_authorization.redirect_if_assignment_entry_blocked",
                           return_value=None))
                 mock_auth = stack.enter_context(
                     patch("app.services.organization.authorization_service.AuthorizationService"))

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.models.validation import ValidationQuestion
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 VALID_ANSWER_OUTCOMES = frozenset({"changes_made_approved", "no_changes_approved"})
 

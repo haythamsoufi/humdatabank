@@ -20,11 +20,11 @@ Auth policy:
 from flask import request, current_app
 from flask_login import current_user
 
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.rate_limiting import mobile_rate_limit
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.security.rate_limiting import mobile_rate_limit
 from app import db
-from app.utils.mobile_responses import (
+from app.utils.mobile.mobile_responses import (
     mobile_ok,
     mobile_bad_request,
     mobile_server_error,
@@ -33,9 +33,9 @@ from app.utils.mobile_responses import (
     mobile_created,
     mobile_error,
 )
-from app.utils.transactions import request_transaction_rollback
-from app.utils.sql_utils import safe_ilike_pattern
-from app.utils.sector_logo_urls import country_ns_logo_url, sector_logo_url
+from app.utils.database.transactions import request_transaction_rollback
+from app.utils.database.sql_utils import safe_ilike_pattern
+from app.utils.branding.sector_logo_urls import country_ns_logo_url, sector_logo_url
 from app.routes.api.mobile import mobile_bp
 # In-process JPEG cache lives in plugins.upr.documents.mobile.
 
@@ -188,8 +188,8 @@ def submit_indicator_suggestion():
     ``MOBILE_SUGGESTION_REQUIRE_CAPTCHA`` is enabled.
     """
     from app.models import IndicatorSuggestion
-    from app.utils.api_helpers import get_json_safe
-    from app.utils.suggestion_intake import (
+    from app.utils.api.api_helpers import get_json_safe
+    from app.utils.indicators.suggestion_intake import (
         SuggestionValidationError,
         suggestion_throttle_error,
         validate_suggestion_payload,
@@ -304,7 +304,7 @@ def mobile_periods():
       - template_id (optional, default 21 — FDRS): scope to a specific form template
       - country_id (optional): scope to one country's assignments/submissions
     """
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     template_id = request.args.get('template_id', FDRS_TEMPLATE_ID, type=int)
     country_id = request.args.get('country_id', type=int)
@@ -448,7 +448,7 @@ def mobile_disaggregation_overview():
     from app.models.assignments import AssignmentEntityStatus
     from app.services.organization.authorization_service import AuthorizationService
     from plugins.fdrs.published_facts import public_form_item_ids, published_snapshot_clause
-    from app.utils.mobile_disaggregation import (
+    from app.utils.mobile.mobile_disaggregation import (
         aggregate_disaggregation_rows,
         can_view_disaggregation_country_details,
         get_disaggregation_country_scope,
@@ -599,7 +599,7 @@ def mobile_disaggregation_overview():
 
 def _serialize_public_resource(r, *, locale: str, base_url: str, storage) -> dict:
     """Build the public JSON object for one Resource row (mobile /data/resources)."""
-    from app.utils.external_url_validation import is_youtube_url, safe_resource_external_url
+    from app.utils.http.external_url_validation import is_youtube_url, safe_resource_external_url
 
     title = r.get_title(locale)
     description = r.get_description(locale)
@@ -814,7 +814,7 @@ def submit_quiz_score():
     the session-based v1 endpoint). The client should send only ``score``;
     identity comes from the JWT.
     """
-    from app.utils.api_helpers import get_json_safe
+    from app.utils.api.api_helpers import get_json_safe
 
     data = get_json_safe()
     score = data.get('score')
@@ -837,6 +837,6 @@ def submit_quiz_score():
         )
     except Exception as e:
         current_app.logger.error("submit_quiz_score: %s", e, exc_info=True)
-        from app.utils.transactions import request_transaction_rollback
+        from app.utils.database.transactions import request_transaction_rollback
         request_transaction_rollback()
         return mobile_server_error()

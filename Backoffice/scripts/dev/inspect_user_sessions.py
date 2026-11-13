@@ -68,8 +68,8 @@ def main() -> None:
     app = create_app("production")
     with app.app_context():
         from app.models import User, UserSessionLog, UserLoginLog
-        from app.utils.datetime_helpers import utcnow, ensure_utc
-        from app.utils.sql_utils import ilike_equals
+        from app.utils.common.datetime_helpers import utcnow, ensure_utc
+        from app.utils.database.sql_utils import ilike_equals
 
         email = args.email.strip().lower()
         user = User.query.filter(ilike_equals(User.email, email)).first()

@@ -3,7 +3,7 @@ Unit tests for api_helpers (get_json_safe).
 """
 import pytest
 
-from app.utils.api_helpers import get_json_safe
+from app.utils.api.api_helpers import get_json_safe
 
 
 @pytest.mark.unit

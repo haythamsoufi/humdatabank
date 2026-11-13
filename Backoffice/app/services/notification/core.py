@@ -12,9 +12,9 @@ from flask_babel import gettext as _, get_locale
 from sqlalchemy import and_, or_, desc, cast, String, select
 from sqlalchemy.exc import IntegrityError
 from app import db
-from app.utils.constants import MAX_NOTIFICATION_MESSAGE_LENGTH
-from app.utils.datetime_helpers import ensure_utc, utc_sort_key, utcnow
-from app.utils.form_localization import get_translation_key
+from app.utils.common.constants import MAX_NOTIFICATION_MESSAGE_LENGTH
+from app.utils.common.datetime_helpers import ensure_utc, utc_sort_key, utcnow
+from app.utils.forms.form_localization import get_translation_key
 from app.models import (
     Notification, EntityActivityLog, NotificationType, NotificationPreferences,
     User, Country, UserActivityLog, AdminActionLog, EmailDeliveryLog
@@ -259,7 +259,7 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
             # Translate at runtime using the current locale
             # Use force_locale if a specific locale is provided, otherwise use canonical session/request language
             from flask_babel import force_locale
-            from app.utils.form_localization import get_translation_key
+            from app.utils.forms.form_localization import get_translation_key
 
             locale_to_use = locale or get_translation_key()
 
@@ -330,7 +330,7 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
                 # work correctly and the name isn't stale from notification creation time.
                 if 'org_name' in format_params:
                     try:
-                        from app.utils.organization_helpers import get_org_name as _get_org_name
+                        from app.utils.organization.organization_helpers import get_org_name as _get_org_name
                         format_params['org_name'] = _get_org_name(locale=locale_to_use or 'en')
                     except Exception:
                         pass  # keep the stored value as fallback
@@ -343,7 +343,7 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
                             result = translated % format_params
                         locale_key = get_translation_key(locale_to_use)
                         if locale_key in {'ar', 'fa', 'he', 'ur'}:
-                            from app.utils.form_localization import normalize_arabic_lam_definite_assimilation
+                            from app.utils.forms.form_localization import normalize_arabic_lam_definite_assimilation
                             result = normalize_arabic_lam_definite_assimilation(result)
                         return result
                     except (KeyError, TypeError) as e:

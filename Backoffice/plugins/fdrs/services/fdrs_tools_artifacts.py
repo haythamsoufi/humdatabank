@@ -233,7 +233,7 @@ def _sheet_cache_put(key: Optional[tuple], value: Dict[str, Any]) -> None:
 
 
 def _open_workbook(source: Source):
-    from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
+    from app.utils.files.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
     if isinstance(source, (str, os.PathLike)):
         return load_workbook_safe(read_workbook_file_bytes(source), read_only=True, data_only=True)

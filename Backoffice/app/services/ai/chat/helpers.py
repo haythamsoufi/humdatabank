@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from sqlalchemy import func, desc, select
-from app.utils.datetime_helpers import parse_iso_utc, utcnow
+from app.utils.common.datetime_helpers import parse_iso_utc, utcnow
 from app.models import (
     User, Country, FormTemplate, FormSection, IndicatorBank,
     AssignedForm, FormData, FormItem
@@ -25,8 +25,8 @@ from app.services.ai.chat.fastpath import try_answer_value_question
 from app.services.ai.chat.integration import AIChatIntegration
 from app.services.ai.chat.telemetry import track_chatbot_interaction, get_chatbot_analytics
 from app.services.platform.app_settings_service import get_organization_name
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.database.sql_utils import safe_ilike_pattern
 from markupsafe import escape
 import uuid
 
@@ -382,7 +382,7 @@ from app.services.ai.chat.workflow_responses import (
 )
 
 # Integration helpers for future AI services
-from app.utils.ai_utils import openai_model_supports_sampling_params as _openai_model_supports_sampling_params
+from app.utils.ai.ai_utils import openai_model_supports_sampling_params as _openai_model_supports_sampling_params
 
 
 def integrate_openai_with_telemetry(message, platform_context=None, conversation_history=None, page_context=None, language='en'):
@@ -737,7 +737,7 @@ def handle_function_call(function_call):
 
     except Exception as e:
         logger.error(f"Error handling function call: {e}")
-        from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+        from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
         return GENERIC_ERROR_MESSAGE
 
 

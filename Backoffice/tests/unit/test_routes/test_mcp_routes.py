@@ -39,7 +39,7 @@ def mcp_config(app, monkeypatch):
     app.config["MCP_PROXY_AUTH_MODE"] = "public"
     mcp_module._upstream_verdict_cache.clear()
     monkeypatch.setattr(
-        "app.utils.outbound_url.resolve_host_ips",
+        "app.utils.http.outbound_url.resolve_host_ips",
         lambda host, port=None: (ipaddress.ip_address(PUBLIC_IP),),
     )
     yield app
@@ -158,7 +158,7 @@ class TestMcpUpstreamPolicy:
         import ipaddress
 
         monkeypatch.setattr(
-            "app.utils.outbound_url.resolve_host_ips",
+            "app.utils.http.outbound_url.resolve_host_ips",
             lambda host, port=None: (ipaddress.ip_address("169.254.169.254"),),
         )
         with patch("app.routes.mcp.requests.request") as mock_request:
@@ -170,7 +170,7 @@ class TestMcpUpstreamPolicy:
         import ipaddress
 
         monkeypatch.setattr(
-            "app.utils.outbound_url.resolve_host_ips",
+            "app.utils.http.outbound_url.resolve_host_ips",
             lambda host, port=None: (ipaddress.ip_address("10.1.2.3"),),
         )
         mcp_config.config["MCP_UPSTREAM_ALLOWED_NETWORKS"] = "10.1.0.0/16"

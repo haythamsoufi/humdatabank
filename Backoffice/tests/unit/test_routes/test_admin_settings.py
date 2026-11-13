@@ -271,13 +271,13 @@ class TestManageSettingsPost:
 class TestBrandingAssetsUpload:
     def test_upload_unavailable_returns_400(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=False):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=False):
             resp = logged_in_client.post("/admin/settings/branding-assets-upload", data={})
         assert resp.status_code == 400
 
     def test_upload_no_files_returns_400(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=True):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=True):
             resp = logged_in_client.post("/admin/settings/branding-assets-upload", data={})
         assert resp.status_code == 400
 
@@ -285,9 +285,9 @@ class TestBrandingAssetsUpload:
         import io
         logo_data = io.BytesIO(b"fake-png-data")
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=True), \
-             patch("app.utils.branding_visual_assets.upload_organization_logo", return_value="/path/logo.png"), \
-             patch("app.utils.branding_visual_assets.delete_branding_object_if_present"):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=True), \
+             patch("app.utils.branding.branding_visual_assets.upload_organization_logo", return_value="/path/logo.png"), \
+             patch("app.utils.branding.branding_visual_assets.delete_branding_object_if_present"):
             resp = logged_in_client.post(
                 "/admin/settings/branding-assets-upload",
                 data={"organization_logo_file": (logo_data, "logo.png")},
@@ -301,8 +301,8 @@ class TestBrandingAssetsUpload:
         import io
         logo_data = io.BytesIO(b"bad")
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=True), \
-             patch("app.utils.branding_visual_assets.upload_organization_logo", side_effect=ValueError("bad format")):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=True), \
+             patch("app.utils.branding.branding_visual_assets.upload_organization_logo", side_effect=ValueError("bad format")):
             resp = logged_in_client.post(
                 "/admin/settings/branding-assets-upload",
                 data={"organization_logo_file": (logo_data, "logo.png")},
@@ -314,8 +314,8 @@ class TestBrandingAssetsUpload:
         import io
         logo_data = io.BytesIO(b"bad")
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=True), \
-             patch("app.utils.branding_visual_assets.upload_organization_logo", side_effect=Exception("storage error")):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=True), \
+             patch("app.utils.branding.branding_visual_assets.upload_organization_logo", side_effect=Exception("storage error")):
             resp = logged_in_client.post(
                 "/admin/settings/branding-assets-upload",
                 data={"organization_logo_file": (logo_data, "logo.png")},
@@ -327,9 +327,9 @@ class TestBrandingAssetsUpload:
         import io
         fav_data = io.BytesIO(b"fake-ico-data")
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=True), \
-             patch("app.utils.branding_visual_assets.upload_organization_favicon", return_value="/path/fav.ico"), \
-             patch("app.utils.branding_visual_assets.delete_branding_object_if_present"):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=True), \
+             patch("app.utils.branding.branding_visual_assets.upload_organization_favicon", return_value="/path/fav.ico"), \
+             patch("app.utils.branding.branding_visual_assets.delete_branding_object_if_present"):
             resp = logged_in_client.post(
                 "/admin/settings/branding-assets-upload",
                 data={"organization_favicon_file": (fav_data, "favicon.ico")},
@@ -341,8 +341,8 @@ class TestBrandingAssetsUpload:
         import io
         fav_data = io.BytesIO(b"bad")
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=True), \
-             patch("app.utils.branding_visual_assets.upload_organization_favicon", side_effect=ValueError("bad fav")):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=True), \
+             patch("app.utils.branding.branding_visual_assets.upload_organization_favicon", side_effect=ValueError("bad fav")):
             resp = logged_in_client.post(
                 "/admin/settings/branding-assets-upload",
                 data={"organization_favicon_file": (fav_data, "favicon.ico")},
@@ -354,8 +354,8 @@ class TestBrandingAssetsUpload:
         import io
         fav_data = io.BytesIO(b"bad")
         with _auth(), \
-             patch("app.utils.branding_visual_assets.branding_visual_upload_available", return_value=True), \
-             patch("app.utils.branding_visual_assets.upload_organization_favicon", side_effect=Exception("error")):
+             patch("app.utils.branding.branding_visual_assets.branding_visual_upload_available", return_value=True), \
+             patch("app.utils.branding.branding_visual_assets.upload_organization_favicon", side_effect=Exception("error")):
             resp = logged_in_client.post(
                 "/admin/settings/branding-assets-upload",
                 data={"organization_favicon_file": (fav_data, "favicon.ico")},
@@ -766,7 +766,7 @@ class TestLanguagesSettings:
              patch("app.services.platform.app_settings_service.set_supported_languages", return_value=True), \
              patch("app.services.platform.app_settings_service.get_supported_languages", return_value=["en", "de"]), \
              patch("app.services.platform.app_settings_service.get_show_language_flags", return_value=True), \
-             patch("app.utils.language_flags.prefetch_language_flags_to_local_cache"):
+             patch("app.utils.i18n.language_flags.prefetch_language_flags_to_local_cache"):
             resp = logged_in_client.post(
                 "/admin/api/settings/languages",
                 json={"languages": ["en", "de"]},

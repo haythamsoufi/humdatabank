@@ -52,7 +52,7 @@ from plugins.upr.dashboards.pns_funding import (
     overrides_for_year,
     strip_pns_rows,
 )
-from app.utils.api_serialization import _resolve_matrix_cell
+from app.utils.api.api_serialization import _resolve_matrix_cell
 
 logger = logging.getLogger(__name__)
 

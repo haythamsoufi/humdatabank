@@ -913,7 +913,7 @@ def _llm_call_with_json_fallback(
     both internal reasoning *and* visible output, so we apply a higher floor
     to avoid empty responses when the reasoning budget exhausts the cap.
     """
-    from app.utils.ai_utils import openai_model_supports_sampling_params
+    from app.utils.ai.ai_utils import openai_model_supports_sampling_params
 
     is_reasoning_model = not openai_model_supports_sampling_params(model)
     effective_max = max_tokens

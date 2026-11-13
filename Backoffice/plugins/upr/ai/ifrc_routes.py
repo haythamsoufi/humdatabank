@@ -18,15 +18,15 @@ from sqlalchemy import or_
 from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk, AIEmbedding, Country, AIJob, AIJobItem
 from app.services.ai.documents.processor import AIDocumentProcessor
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.routes.admin.shared import admin_required, permission_required_any
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import (
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import (
     json_accepted, json_auth_required, json_bad_request, json_error,
     json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys,
 )
-from app.utils.sql_utils import safe_ilike_pattern
-from app.utils.constants import (
+from app.utils.database.sql_utils import safe_ilike_pattern
+from app.utils.common.constants import (
     APPEALS_TYPE_DEFAULT_IDS_STR,
     APPEALS_TYPE_DISPLAY_NAMES,
     APPEALS_TYPE_IDS,

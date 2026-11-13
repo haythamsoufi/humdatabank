@@ -12,9 +12,9 @@ from app.services.documents import public_access
 from sqlalchemy import text
 import os
 from datetime import datetime
-from app.utils.datetime_helpers import utcnow
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_error
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_error
 from app.services.platform import storage_service as storage
 
 from app.services.forms.processing_service import slugify_age_group

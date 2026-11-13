@@ -9,7 +9,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from app.models.password_reset_token import PasswordResetToken
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from tests.factories import create_test_user
 
 

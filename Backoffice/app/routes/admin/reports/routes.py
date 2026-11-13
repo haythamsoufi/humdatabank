@@ -8,7 +8,7 @@ import io
 
 from app.models import FormItem, FormTemplate, IndicatorBank
 from app import db
-from app.utils.sql_utils import ilike_contains
+from app.utils.database.sql_utils import ilike_contains
 from app.routes.admin.shared import permission_required, permission_required_any
 from app.services.data_quality.helpers import list_exploration_period_names
 from app.services.organization.authorization_service import AuthorizationService
@@ -25,11 +25,11 @@ from app.services.reports.definition_service import (
 )
 from app.services.reports.export_service import ReportExportService
 from app.services.reports.schema import default_definition
-from app.utils.api_helpers import get_json_safe
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
+from app.utils.http.request_validation import enforce_csrf_json
 
 bp = Blueprint("reports", __name__, url_prefix="/admin/reports")
 

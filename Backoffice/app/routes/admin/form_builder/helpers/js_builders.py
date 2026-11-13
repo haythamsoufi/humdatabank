@@ -13,7 +13,7 @@ from datetime import datetime
 import json
 
 
-from app.utils.sqlalchemy_grid import build_columns_config
+from app.utils.database.sqlalchemy_grid import build_columns_config
 
 
 def _get_model_columns_config(model_class, is_multilingual_name=False):

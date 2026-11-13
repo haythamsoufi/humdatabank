@@ -24,7 +24,7 @@ from app.services.email.delivery import (
 )
 from app.services.notification.core import get_default_icon_for_notification_type
 from app.services.notification.service import NotificationService
-from app.utils.datetime_helpers import ensure_utc, utc_sort_key
+from app.utils.common.datetime_helpers import ensure_utc, utc_sort_key
 
 RECORD_TYPE_NOTIFICATION = 'notification'
 RECORD_TYPE_EMAIL = 'email'

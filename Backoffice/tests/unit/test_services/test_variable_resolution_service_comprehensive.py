@@ -1034,7 +1034,7 @@ class TestResolveMetadataVariable:
         aes = self._aes()
         mock_country = MagicMock()
         with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=mock_country), \
-             patch('app.utils.form_localization.get_localized_national_society_name', return_value='French Red Cross'):
+             patch('app.utils.forms.form_localization.get_localized_national_society_name', return_value='French Red Cross'):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'national_society_name'}, aes, None)
         assert result == 'French Red Cross'
 
@@ -1048,7 +1048,7 @@ class TestResolveMetadataVariable:
         aes = self._aes()
         mock_country = MagicMock()
         with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=mock_country), \
-             patch('app.utils.form_localization.get_localized_national_society_name', return_value=None):
+             patch('app.utils.forms.form_localization.get_localized_national_society_name', return_value=None):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'national_society_name'}, aes, None)
         assert result is None
 

@@ -1,6 +1,6 @@
 """Object-level authorization for child-id form / assignment APIs.
 
-Covers the shared helpers in ``app.utils.form_authorization`` and the routes that use them:
+Covers the shared helpers in ``app.utils.forms.form_authorization`` and the routes that use them:
 repeat instances, dynamic indicators, lookup-list reads, public submissions, and the
 mobile template / access-request / suggestion endpoints.
 """
@@ -130,14 +130,14 @@ def scenario(db_session, app):
 
 
 def _bearer(user_id):
-    from app.utils.mobile_jwt import issue_access_token
+    from app.utils.mobile.mobile_jwt import issue_access_token
 
     return {"Authorization": f"Bearer {issue_access_token(user_id)}"}
 
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limits():
-    from app.utils import rate_limiting
+    from app.utils.security import rate_limiting
 
     rate_limiting._rate_limit_storage.clear()
     yield
@@ -422,7 +422,7 @@ class TestPublicSubmissionAuthorization:
 @pytest.mark.unit
 class TestAuthorizationHelpers:
     def test_check_aes_action_tri_state(self, db_session, app, scenario):
-        from app.utils.form_authorization import (
+        from app.utils.forms.form_authorization import (
             AES_ACTION_EDIT,
             AES_ACTION_VIEW,
             AUTH_FORBIDDEN,
@@ -446,7 +446,7 @@ class TestAuthorizationHelpers:
 
     def test_orphan_child_is_only_reachable_by_system_manager(self, db_session, app, scenario):
         from app.models import User
-        from app.utils.form_authorization import AES_ACTION_VIEW, AUTH_HIDDEN, AUTH_OK, authorize_child
+        from app.utils.forms.form_authorization import AES_ACTION_VIEW, AUTH_HIDDEN, AUTH_OK, authorize_child
 
         with app.app_context():
             orphan = RepeatGroupInstance(
@@ -459,7 +459,7 @@ class TestAuthorizationHelpers:
             assert authorize_child(orphan, db_session.get(User, scenario["system_manager"]), AES_ACTION_VIEW) == AUTH_OK
 
     def test_lock_aes_for_update_reports_concurrent_status_change(self, db_session, app, scenario):
-        from app.utils.form_authorization import lock_aes_for_update
+        from app.utils.forms.form_authorization import lock_aes_for_update
 
         with app.app_context():
             aes = db_session.get(AssignmentEntityStatus, scenario["aes_a"])
@@ -473,7 +473,7 @@ class TestAuthorizationHelpers:
 
     def test_user_can_access_template(self, db_session, app, scenario):
         from app.models import User
-        from app.utils.form_authorization import user_can_access_template
+        from app.utils.forms.form_authorization import user_can_access_template
 
         with app.app_context():
             owner = db_session.get(User, scenario["focal_a"])

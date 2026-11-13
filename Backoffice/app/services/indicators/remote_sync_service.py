@@ -169,7 +169,7 @@ def sync_remote_indicator_bank(
     from app.extensions import db
     from app.models import IndicatorBank, Sector, SubSector
     from .measurement_sync import backfill_fk_from_strings_bank
-    from app.utils.transactions import atomic
+    from app.utils.database.transactions import atomic
 
     if not api_url:
         raise ValueError("Missing api_url")

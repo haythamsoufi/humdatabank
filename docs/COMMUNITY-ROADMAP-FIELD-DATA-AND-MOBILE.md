@@ -367,7 +367,7 @@ Keep the Backoffice form engine in WebView. Add a submission outbox:
 - `Backoffice/app/static/js/forms/modules/ajax-save.js`
 - `Backoffice/app/routes/api/mobile/user_dashboard.py` (add submit routes here or new file)
 - `Backoffice/app/services/form_data_service.py`
-- `Backoffice/app/utils/mobile_auth.py` (JWT auth decorator)
+- `Backoffice/app/utils/mobile/mobile_auth.py` (JWT auth decorator)
 
 ---
 
@@ -485,7 +485,7 @@ Barcode/QR, sensors, background audio, full SurveyCTO-grade multimodal. Route la
 
 **Key files**
 
-- `Backoffice/app/utils/plugin_data_processor.py`
+- `Backoffice/app/utils/forms/plugin_data_processor.py`
 - `Backoffice/plugins/interactive_map/schemas.py`
 - `Backoffice/plugins/interactive_map/static/js/map_field.js`
 - `Backoffice/app/services/form_data_service.py` (upload validation ~line 1216)
@@ -805,7 +805,7 @@ Before starting any feature that sounds like SurveyCTO:
 | Plugin contracts | `Backoffice/app/plugins/base.py` |
 | Plugin manager | `Backoffice/app/plugins/manager.py` |
 | Form integration | `Backoffice/app/plugins/form_integration.py` |
-| Data persistence | `Backoffice/app/utils/plugin_data_processor.py` |
+| Data persistence | `Backoffice/app/utils/forms/plugin_data_processor.py` |
 | Interactive map plugin | `Backoffice/plugins/interactive_map/` |
 | Emergency operations plugin | `Backoffice/plugins/emergency_operations/` |
 | Plugin author docs | `Backoffice/plugins/README.md` |

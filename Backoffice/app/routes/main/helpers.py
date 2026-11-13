@@ -4,15 +4,15 @@ from app.models import Country, FormItem
 from app.models.core import UserEntityPermission
 from app.models.enums import AssignmentEntityStatusValue, EntityType
 from app.services.organization.entity_service import EntityService
-from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
-from app.utils.form_localization import (
+from app.utils.common.constants import SELECTED_COUNTRY_ID_SESSION_KEY
+from app.utils.forms.form_localization import (
     get_localized_national_society_name as _get_localized_national_society_name,
     get_localized_template_name as _get_localized_template_name,
     get_localized_indicator_name,
     get_translation_key,
 )
 from app.models.assignments import AssignmentEntityStatus
-from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
+from app.utils.organization.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from flask_babel import _
 from contextlib import suppress
 from sqlalchemy.orm import joinedload
@@ -674,7 +674,7 @@ def _resolve_selected_entity_for_focal_nav(
 
 def _format_age_group_breakdown(age_groups, fmt_number_func):
     """Format age group breakdown as plain text (detail, then total)."""
-    from app.utils.formatting import age_group_label, age_group_sort_key
+    from app.utils.common.formatting import age_group_label, age_group_sort_key
 
     non_zero_groups = [(age_group, count) for age_group, count in age_groups.items()
                       if count and count != 0]
@@ -1026,7 +1026,7 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
     else:
         return _fmt_number(value) if _is_numeric_scalar(value) else str(value)
 
-from app.utils.matrix_activity import (  # noqa: E402
+from app.utils.forms.matrix_activity import (  # noqa: E402
     MATRIX_HEADER_ACTIVITY_ROW,
     collect_matrix_activity_cell_changes,
     is_matrix_activity_payload,
@@ -1309,7 +1309,7 @@ def matrix_activity_has_visible_changes(old_value, new_value):
     return _matrix_activity_has_visible_changes(old_value, new_value)
 
 
-from app.utils.route_helpers import normalize_value_for_display as _normalize_value_for_summary_display
+from app.utils.http.route_helpers import normalize_value_for_display as _normalize_value_for_summary_display
 
 def _localized_json_text(translations):
     """First non-empty string from a translation map for the active locale."""
@@ -1457,7 +1457,7 @@ def _get_localized_indicator_bank_name_by_id(indicator_bank_id, fallback_name=No
         return fallback_name or "Unknown Indicator"
     try:
         from app.models import IndicatorBank
-        from app.utils.form_localization import get_localized_indicator_name
+        from app.utils.forms.form_localization import get_localized_indicator_name
         indicator = IndicatorBank.query.get(indicator_bank_id)
         if not indicator:
             return fallback_name or "Deleted Indicator"
@@ -1485,7 +1485,7 @@ def get_localized_field_name_by_id(form_item_id, fallback_name=None):
 
     try:
         from flask_babel import get_locale
-        from app.utils.form_localization import get_translation_key, get_localized_indicator_name
+        from app.utils.forms.form_localization import get_translation_key, get_localized_indicator_name
 
         translation_key = get_translation_key()
         locale_code = (str(get_locale()) if get_locale() else 'en').split('_', 1)[0]
@@ -1847,7 +1847,7 @@ def get_localized_national_society_name(country):
 @bp.app_template_global()
 def join_localized_entity_phrase(prefix, entity_name, locale=None):
     """Jinja helper for locale-aware prefix + entity labels (dashboard headings)."""
-    from app.utils.form_localization import join_localized_entity_phrase as _join
+    from app.utils.forms.form_localization import join_localized_entity_phrase as _join
     return _join(prefix, entity_name, locale)
 
 @bp.app_template_global()

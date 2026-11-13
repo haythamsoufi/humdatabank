@@ -38,7 +38,7 @@ def create_app(config_name=None):
     app.config.from_object(config_class)
     app.config['FLASK_CONFIG'] = selected_config_name
 
-    from app.utils.security_startup import validate_security_settings
+    from app.utils.security.security_startup import validate_security_settings
     validate_security_settings(app)
 
     env_asset_version = (
@@ -147,7 +147,7 @@ def create_app(config_name=None):
     from app.template_context import register_template_context
     register_template_context(app, config_class)
 
-    from app.utils.dev_server_port import dev_process_serves_http
+    from app.utils.common.dev_server_port import dev_process_serves_http
 
     is_reloading = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
     # Werkzeug's debug parent process must not load plugins; the reloader child

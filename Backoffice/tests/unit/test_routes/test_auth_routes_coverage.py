@@ -82,7 +82,7 @@ class TestIsAccountLockedOut:
 
     def test_locked_when_many_failures_no_success(self, app, db_session):
         from app.routes.auth import _is_account_locked_out
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
 
         with app.app_context():
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
@@ -92,10 +92,10 @@ class TestIsAccountLockedOut:
 
     def test_lockout_check_exception_returns_true(self, app):
         from app.routes.auth import _is_account_locked_out
-        from app.utils.auth_state import AuthStateUnavailable
+        from app.utils.auth.auth_state import AuthStateUnavailable
         with app.app_context():
             with patch(
-                "app.utils.auth_state.DbAuthStateBackend.get_counter",
+                "app.utils.auth.auth_state.DbAuthStateBackend.get_counter",
                 side_effect=AuthStateUnavailable("db boom"),
             ):
                 result = _is_account_locked_out("any@example.com")
@@ -552,7 +552,7 @@ class TestRemoveOwnDevice:
         ):
             login_user(User.query.get(user_id))
             with patch(
-                "app.utils.notification_push.is_notifications_push_enabled",
+                "app.utils.notifications.notification_push.is_notifications_push_enabled",
                 return_value=True,
             ):
                 resp, status = _view_result(remove_own_device(device_id))
@@ -570,7 +570,7 @@ class TestRemoveOwnDevice:
         with app.test_request_context("/account-settings/devices/999999/remove", method="DELETE"):
             login_user(User.query.get(user_id))
             with patch(
-                "app.utils.notification_push.is_notifications_push_enabled",
+                "app.utils.notifications.notification_push.is_notifications_push_enabled",
                 return_value=True,
             ), pytest.raises(NotFound):
                 remove_own_device(999999)
@@ -597,7 +597,7 @@ class TestRemoveOwnDevice:
         ):
             login_user(User.query.get(user_id))
             with patch(
-                "app.utils.notification_push.is_notifications_push_enabled",
+                "app.utils.notifications.notification_push.is_notifications_push_enabled",
                 return_value=True,
             ), patch("app.routes.auth.db") as mock_db:
                 mock_db.session.delete = MagicMock()
@@ -616,7 +616,7 @@ class TestKickoutOwnDeviceAlreadyLoggedOut:
         from app.models.system import UserDevice
         from app.routes.auth import kickout_own_device
         from app.models import User
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user_id = int(admin_user.id)
@@ -636,7 +636,7 @@ class TestKickoutOwnDeviceAlreadyLoggedOut:
         ):
             login_user(User.query.get(user_id))
             with patch(
-                "app.utils.notification_push.is_notifications_push_enabled",
+                "app.utils.notifications.notification_push.is_notifications_push_enabled",
                 return_value=True,
             ):
                 resp, status = _view_result(kickout_own_device(device_id))
@@ -664,7 +664,7 @@ class TestKickoutOwnDeviceAlreadyLoggedOut:
         ):
             login_user(User.query.get(user_id))
             with patch(
-                "app.utils.notification_push.is_notifications_push_enabled",
+                "app.utils.notifications.notification_push.is_notifications_push_enabled",
                 return_value=True,
             ), patch("app.routes.auth.db") as mock_db:
                 mock_db.session.flush.side_effect = Exception("db err")
@@ -954,7 +954,7 @@ class TestAzureCallbackCoverage:
         import time as _time
         from flask import session
         from app.routes.auth import azure_callback
-        from app.utils.session_persistence import (
+        from app.utils.auth.session_persistence import (
             B2C_ID_TOKEN_SESSION_KEY,
             pop_oauth_logout_hint,
             reset_oauth_logout_hint_cache_for_tests,
@@ -1051,8 +1051,8 @@ class TestLogoutB2c:
         from urllib.parse import parse_qs, urlparse
 
         from app.routes.auth import logout
-        from app.utils.datetime_helpers import utcnow
-        from app.utils.session_persistence import pop_oauth_logout_hint, store_oauth_logout_hint
+        from app.utils.common.datetime_helpers import utcnow
+        from app.utils.auth.session_persistence import pop_oauth_logout_hint, store_oauth_logout_hint
 
         user = MagicMock()
         user.id = 42
@@ -1166,7 +1166,7 @@ class TestLogoutB2c:
     def test_logout_with_session_duration_calculation(self, app, admin_user, db_session):
         from app.routes.auth import logout
         from app.models import User
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from datetime import timedelta
 
         with app.app_context():

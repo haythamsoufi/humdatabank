@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from flask_login import current_user
 
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 

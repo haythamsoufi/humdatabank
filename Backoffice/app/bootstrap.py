@@ -9,8 +9,8 @@ from flask_login import current_user
 from app.extensions import babel, configure_babel, csrf, db, limiter, login, mail, migrate
 from app.i18n import get_locale
 from app.logging_config import validate_email_configuration
-from app.utils.api_responses import json_error
-from app.utils.request_utils import is_json_request
+from app.utils.api.api_responses import json_error
+from app.utils.http.request_utils import is_json_request
 
 
 def init_upload_storage(app):
@@ -344,7 +344,7 @@ def init_flask_extensions(app, config_class, startup_start):
         from flask import g, session
 
         from app.models import User
-        from app.utils.request_utils import is_static_asset_request
+        from app.utils.http.request_utils import is_static_asset_request
 
         # Stylesheets and scripts do not need the User row. Loading it here
         # opened a DB connection on every asset, and dev used to re-request
@@ -395,7 +395,7 @@ def init_flask_extensions(app, config_class, startup_start):
     except Exception as e:
         app.logger.debug("AI embedding provider startup check skipped: %s", e)
 
-    from app.utils.translation_watcher import init_translation_watcher
+    from app.utils.i18n.translation_watcher import init_translation_watcher
     init_translation_watcher(app)
 
 

@@ -25,7 +25,7 @@ from app.services.projects.service import (
     ensure_project_cycle_assignment,
     parse_cycle_slot,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 from plugins.nsd_report_forms.constants import ENTITY_TYPE
 from plugins.nsd_report_forms.overview import data as overview_data

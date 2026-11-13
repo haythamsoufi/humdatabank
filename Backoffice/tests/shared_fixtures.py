@@ -544,7 +544,7 @@ def reset_in_memory_rate_limits(request):
     """
     yield
     try:
-        from app.utils.rate_limiting import _rate_limit_storage
+        from app.utils.security.rate_limiting import _rate_limit_storage
         _rate_limit_storage.clear()
     except Exception:
         pass
@@ -875,7 +875,7 @@ def logged_in_focal_client(client, focal_point_user, app):
 @pytest.fixture(scope='function')
 def mock_email():
     """Mock email sending."""
-    with patch('app.utils.email_client.send_email') as mock:
+    with patch('app.services.email.client.send_email') as mock:
         mock.return_value = True
         yield mock
 

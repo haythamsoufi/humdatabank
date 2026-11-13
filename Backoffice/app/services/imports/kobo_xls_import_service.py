@@ -37,8 +37,8 @@ from flask import current_app
 from flask_login import current_user
 from app import db
 from app.models import FormTemplate, FormSection, FormItem, FormTemplateVersion
-from app.utils.datetime_helpers import utcnow
-from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.files.safe_workbook import load_workbook_safe, safe_iter_rows
 
 try:
     import openpyxl

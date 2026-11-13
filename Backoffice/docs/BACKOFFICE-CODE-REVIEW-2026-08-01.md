@@ -148,8 +148,8 @@ Overlapping audience/template-filter logic, campaign picker, assignment filterin
 #### Error handling copy-paste — 50+ route files
 
 Existing helpers underused:
-- `app/utils/error_handling.py` — `handle_json_view_exception`
-- `app/utils/api_responses.py` — `@json_error_handler`
+- `app/utils/common/error_handling.py` — `handle_json_view_exception`
+- `app/utils/api/api_responses.py` — `@json_error_handler`
 
 Heavy manual `except Exception` blocks in: `content_management.py` (19×), `assignment_management.py` (20×), `auth.py` (13×), `notifications.py` (13×).
 
@@ -324,7 +324,7 @@ admin_emails = [
 
 ### What is working well
 
-- `app/utils/api_responses.py` vs `api_helpers.py` — intentional split with clear guidance
+- `app/utils/api/api_responses.py` vs `api_helpers.py` — intentional split with clear guidance
 - `app/plugins/plugin_utils.py` — `BasePluginRoutes`, `plugin_error_handler` reduce plugin duplication
 - `app/services/validation/dashboard_service.py` — shared by validation routes
 - Partial adoption of `handle_json_view_exception` in `forms_api.py` and admin modules

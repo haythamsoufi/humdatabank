@@ -11,11 +11,11 @@ from flask_login import current_user
 from app.extensions import csrf, db
 from app.models import User, NotificationType, Notification, NotificationCampaign
 from app.routes.admin.shared import permission_required
-from app.utils.datetime_helpers import ensure_utc
-from app.utils.export_safety import safe_csv_writer
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.common.datetime_helpers import ensure_utc
+from app.utils.files.export_safety import safe_csv_writer
+from app.utils.database.sql_utils import safe_ilike_pattern
 from app.services.notification.core import create_notification, get_default_icon_for_notification_type
-from app.utils.request_validation import enforce_api_or_csrf_protection
+from app.utils.http.request_validation import enforce_api_or_csrf_protection
 from app.services.notification.push import PushNotificationService
 from app.services.email.client import send_email as send_email_message
 from app.services.communication.center_service import (
@@ -29,7 +29,7 @@ from app.services.communication.insights_service import (
     clamp_insights_days,
     empty_communications_insights,
 )
-from app.utils.api_pagination import validate_pagination_params
+from app.utils.api.api_pagination import validate_pagination_params
 from app.services.email.delivery import (
     log_email_attempt,
     mark_email_sent,
@@ -43,15 +43,15 @@ from app.services.communication.campaign_email_templates_service import (
     get_campaign_compose_templates,
     set_all_campaign_email_templates,
 )
-from app.utils.organization_helpers import get_org_name
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_server_error
+from app.utils.organization.organization_helpers import get_org_name
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_responses import json_bad_request, json_not_found, json_ok, json_server_error
 from flask_babel import gettext as _
 from datetime import datetime, timedelta
 from sqlalchemy import cast, String
 from contextlib import suppress
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 bp = Blueprint("admin_communication", __name__, url_prefix="/admin")
 
@@ -243,7 +243,7 @@ def communication_registry():
     """
     from app.services.platform.app_settings_service import get_notification_priority
     from app.services.notification.service import NotificationService
-    from app.utils.notification_registry import build_registry_rows
+    from app.utils.notifications.notification_registry import build_registry_rows
 
     ttl_map = current_app.config.get("NOTIFICATION_TTL_DAYS", {}) or {}
 
@@ -393,7 +393,7 @@ def api_send_notifications():
         send_push = data.get('send_push', False)
         override_preferences = data.get('override_preferences', False)
 
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             PUSH_NOT_ENABLED_MESSAGE,
         )

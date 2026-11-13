@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from flask import g
 
-from app.utils.form_authorization import (
+from app.utils.forms.form_authorization import (
     redirect_if_assignment_entry_blocked,
     has_country_access,
     can_edit_assignment,
@@ -199,9 +199,9 @@ class TestCheckAssignmentAccessDecorator:
         aes.assigned_form = MagicMock(is_entry_allowed=True)
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
-                 patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(42)
         assert result == {'aes_id': 42}
@@ -211,9 +211,9 @@ class TestCheckAssignmentAccessDecorator:
         aes.assigned_form = None
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
-                 patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(42)
         assert result == {'aes_id': 42}
@@ -223,7 +223,7 @@ class TestCheckAssignmentAccessDecorator:
         aes.assigned_form = MagicMock(is_entry_allowed=False)
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q:
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q:
                 mock_q.get_or_404.return_value = aes
                 result = decorated(42)
         assert result.status_code in (301, 302, 303, 307, 308)
@@ -235,10 +235,10 @@ class TestCheckAssignmentAccessDecorator:
         aes.entity_id = 1
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=False), \
                  patch('app.services.organization.entity_service.EntityService.get_entity_display_name', return_value='Testland'), \
-                 patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(42)
         assert result.status_code in (301, 302, 303, 307, 308)
@@ -247,7 +247,7 @@ class TestCheckAssignmentAccessDecorator:
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
             with patch(
-                'app.utils.form_authorization.AssignmentEntityStatus.query.get_or_404',
+                'app.utils.forms.form_authorization.AssignmentEntityStatus.query.get_or_404',
                 side_effect=RuntimeError('boom'),
             ):
                 result = decorated(42)
@@ -267,10 +267,10 @@ class TestCheckAssignmentEditAccessDecorator:
         aes.country = MagicMock(name='Testland')
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
-                 patch('app.utils.form_authorization.can_edit_assignment', return_value=True), \
-                 patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
+                 patch('app.utils.forms.form_authorization.can_edit_assignment', return_value=True), \
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(7)
         assert result == {'edited': 7}
@@ -283,10 +283,10 @@ class TestCheckAssignmentEditAccessDecorator:
         aes.country = None
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
-                 patch('app.utils.form_authorization.can_edit_assignment', return_value=False), \
-                 patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
+                 patch('app.utils.forms.form_authorization.can_edit_assignment', return_value=False), \
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(7)
         assert result.status_code in (301, 302, 303, 307, 308)
@@ -296,7 +296,7 @@ class TestCheckAssignmentEditAccessDecorator:
         aes.assigned_form = MagicMock(is_entry_allowed=False)
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q:
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q:
                 mock_q.get_or_404.return_value = aes
                 result = decorated(7)
         assert result.status_code in (301, 302, 303, 307, 308)
@@ -308,10 +308,10 @@ class TestCheckAssignmentEditAccessDecorator:
         aes.entity_id = 1
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
-            with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
+            with patch('app.utils.forms.form_authorization.AssignmentEntityStatus.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=False), \
                  patch('app.services.organization.entity_service.EntityService.get_entity_display_name', return_value='Testland'), \
-                 patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(7)
         assert result.status_code in (301, 302, 303, 307, 308)
@@ -320,7 +320,7 @@ class TestCheckAssignmentEditAccessDecorator:
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
             with patch(
-                'app.utils.form_authorization.AssignmentEntityStatus.query.get_or_404',
+                'app.utils.forms.form_authorization.AssignmentEntityStatus.query.get_or_404',
                 side_effect=RuntimeError('boom'),
             ):
                 result = decorated(7)
@@ -356,8 +356,8 @@ class TestCheckDocumentAccessDecorator:
             with patch('app.models.SubmittedDocument.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment',
                        return_value=True), \
-                 patch('app.utils.form_authorization.can_edit_assignment', return_value=True), \
-                 patch('app.utils.form_authorization.current_user', user):
+                 patch('app.utils.forms.form_authorization.can_edit_assignment', return_value=True), \
+                 patch('app.utils.forms.form_authorization.current_user', user):
                 mock_q.get.return_value = doc
                 result = decorated(10)
         assert result == {'doc': 10}
@@ -384,7 +384,7 @@ class TestCheckDocumentAccessDecorator:
             with patch('app.models.SubmittedDocument.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment',
                        return_value=False), \
-                 patch('app.utils.form_authorization.current_user', MagicMock()):
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock()):
                 mock_q.get.return_value = doc
                 result = decorated(10)
         assert result.status_code in (301, 302, 303, 307, 308)
@@ -401,7 +401,7 @@ class TestCheckDocumentAccessDecorator:
             with patch('app.models.SubmittedDocument.query') as mock_q, \
                  patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment',
                        return_value=False), \
-                 patch('app.utils.form_authorization.current_user', MagicMock()):
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock()):
                 mock_q.get.return_value = doc
                 result = decorated(10)
         assert result.status_code in (301, 302, 303, 307, 308)
@@ -430,9 +430,9 @@ class TestCheckDocumentAccessDecorator:
         decorated = check_document_access(self._view)
         with app.test_request_context():
             with patch('app.models.SubmittedDocument.query') as mock_q, \
-                 patch('app.utils.form_authorization.has_country_access', return_value=True), \
-                 patch('app.utils.form_authorization.can_edit_assignment', return_value=False), \
-                 patch('app.utils.form_authorization.current_user', MagicMock()):
+                 patch('app.utils.forms.form_authorization.has_country_access', return_value=True), \
+                 patch('app.utils.forms.form_authorization.can_edit_assignment', return_value=False), \
+                 patch('app.utils.forms.form_authorization.current_user', MagicMock()):
                 mock_q.get.return_value = doc
                 result = decorated(10)
         assert result.status_code in (301, 302, 303, 307, 308)

@@ -1,7 +1,7 @@
 """Unit tests for API percentage 0–100 → 0–1 scaling."""
 import pytest
 
-from app.utils.api_percentage import (
+from app.utils.api.api_percentage import (
     apply_api_percentage_scale,
     is_percentage_type,
     orm_item_is_percentage,

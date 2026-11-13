@@ -18,7 +18,7 @@ from app.services.assignments.scoped_status import (
     status_value,
     sync_scoped_rows_for_entity_change,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 PARTICIPATING_SECTION_TYPES = frozenset({'standard', 'repeat', 'dynamic_indicators'})
 PAGE_ACTIONS = frozenset({'submit_page'})
@@ -575,7 +575,7 @@ def apply_page_submission_mode_change(assignment, enabled: bool, user_id: int | 
         return summary
 
     all_sections = load_published_sections(assignment)
-    from app.utils.form_authorization import lock_aes_rows_for_update
+    from app.utils.forms.form_authorization import lock_aes_rows_for_update
 
     entities = lock_aes_rows_for_update(
         [aes.id for aes in assignment.entity_statuses.all()],

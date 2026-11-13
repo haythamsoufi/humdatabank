@@ -694,8 +694,8 @@ class TestApiApproveAllAccessRequests:
 
         with patch("app.services.notification.emails.send_instant_notification_email"), \
              patch("app.services.notification.push.PushNotificationService"), \
-             patch("app.utils.ws_manager.broadcast_notification"), \
-             patch("app.utils.ws_manager.broadcast_unread_count"):
+             patch("app.utils.realtime.ws_manager.broadcast_notification"), \
+             patch("app.utils.realtime.ws_manager.broadcast_unread_count"):
             resp = logged_in_client.post(
                 "/admin/api/users/access-requests/approve-all"
             )

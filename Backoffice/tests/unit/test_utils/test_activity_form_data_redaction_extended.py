@@ -1,5 +1,5 @@
 """
-Extended tests for app/utils/activity_form_data_redaction.py.
+Extended tests for app/utils/activity/activity_form_data_redaction.py.
 
 Complements the existing test_activity_form_data_redaction.py by covering the
 remaining branches: empty / None inputs, non-string values, redact_activity_form_dict,
@@ -8,7 +8,7 @@ and edge-cases in _is_sensitive_key.
 
 from __future__ import annotations
 
-from app.utils.activity_form_data_redaction import (
+from app.utils.activity.activity_form_data_redaction import (
     _is_sensitive_key,
     redact_activity_form_data,
     redact_activity_form_dict,

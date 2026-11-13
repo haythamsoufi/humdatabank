@@ -88,7 +88,7 @@ def _ensure_annual_reporting_period(period_name: str) -> None:
         get_reporting_period,
         upsert_reporting_period,
     )
-    from app.utils.reporting_period_label_parser import parse_period_label
+    from app.utils.indicators.reporting_period_label_parser import parse_period_label
 
     name = (period_name or "").strip()
     if not name or get_reporting_period(name) is not None:

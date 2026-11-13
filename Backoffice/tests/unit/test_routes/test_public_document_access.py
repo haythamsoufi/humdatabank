@@ -459,7 +459,7 @@ class TestTemplateImageAccess:
         assert client.get(self._url(item)).status_code == 200
 
     def test_entry_url_builder_carries_public_token_only_on_public_form(self, app):
-        from app.utils.template_image_assets import build_entry_serve_url
+        from app.utils.templates.template_image_assets import build_entry_serve_url
 
         token = str(uuid4())
         with app.test_request_context(f"/forms/public/{token}"):
@@ -585,39 +585,39 @@ class TestBrandingUploadValidation:
     def _capture_uploads(self, monkeypatch):
         self.uploaded = []
         monkeypatch.setattr(
-            "app.utils.branding_visual_assets.storage.upload",
+            "app.utils.branding.branding_visual_assets.storage.upload",
             lambda category, rel, data: self.uploaded.append(rel) or rel,
         )
 
     def test_svg_logo_rejected(self, app):
-        from app.utils.branding_visual_assets import upload_organization_logo
+        from app.utils.branding.branding_visual_assets import upload_organization_logo
 
         with pytest.raises(ValueError, match="not allowed"):
             upload_organization_logo(self._file("logo.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>"))
         assert self.uploaded == []
 
     def test_svg_favicon_rejected(self, app):
-        from app.utils.branding_visual_assets import upload_organization_favicon
+        from app.utils.branding.branding_visual_assets import upload_organization_favicon
 
         with pytest.raises(ValueError, match="not allowed"):
             upload_organization_favicon(self._file("favicon.svg", b"<svg/>"))
 
     def test_valid_png_accepted(self, app):
-        from app.utils.branding_visual_assets import upload_organization_logo
+        from app.utils.branding.branding_visual_assets import upload_organization_logo
 
         rel = upload_organization_logo(self._file("Logo.PNG", PNG_BYTES))
         assert rel.startswith("branding/") and rel.endswith("_logo.png")
         assert self.uploaded == [rel]
 
     def test_html_disguised_as_png_rejected(self, app):
-        from app.utils.branding_visual_assets import upload_organization_logo
+        from app.utils.branding.branding_visual_assets import upload_organization_logo
 
         with pytest.raises(ValueError, match="valid image"):
             upload_organization_logo(self._file("logo.png", b"<html><script>alert(1)</script></html>"))
         assert self.uploaded == []
 
     def test_png_with_wrong_extension_rejected(self, app):
-        from app.utils.branding_visual_assets import upload_organization_logo
+        from app.utils.branding.branding_visual_assets import upload_organization_logo
 
         with pytest.raises(ValueError, match="does not match"):
             upload_organization_logo(self._file("logo.jpg", PNG_BYTES))
@@ -625,7 +625,7 @@ class TestBrandingUploadValidation:
     def test_ico_favicon_accepted(self, app):
         from PIL import Image
 
-        from app.utils.branding_visual_assets import upload_organization_favicon
+        from app.utils.branding.branding_visual_assets import upload_organization_favicon
 
         buf = io.BytesIO()
         Image.new("RGBA", (16, 16), (255, 0, 0, 255)).save(buf, format="ICO")
@@ -633,7 +633,7 @@ class TestBrandingUploadValidation:
         assert rel.endswith("_favicon.ico")
 
     def test_ico_not_allowed_for_logo(self, app):
-        from app.utils.branding_visual_assets import upload_organization_logo
+        from app.utils.branding.branding_visual_assets import upload_organization_logo
 
         with pytest.raises(ValueError, match="not allowed"):
             upload_organization_logo(self._file("logo.ico", b"\x00\x00\x01\x00"))
@@ -672,7 +672,7 @@ class TestExternalUrlValidation:
 
     @pytest.mark.parametrize("url", GOOD)
     def test_allowlisted_urls_pass(self, app, url):
-        from app.utils.external_url_validation import safe_external_redirect_target, validate_allowlisted_https_url
+        from app.utils.http.external_url_validation import safe_external_redirect_target, validate_allowlisted_https_url
 
         with app.app_context():
             assert validate_allowlisted_https_url(url) == (True, "")
@@ -680,7 +680,7 @@ class TestExternalUrlValidation:
 
     @pytest.mark.parametrize("url", BAD)
     def test_untrusted_urls_fail(self, app, url):
-        from app.utils.external_url_validation import safe_external_redirect_target, validate_allowlisted_https_url
+        from app.utils.http.external_url_validation import safe_external_redirect_target, validate_allowlisted_https_url
 
         with app.app_context():
             ok, reason = validate_allowlisted_https_url(url)
@@ -688,7 +688,7 @@ class TestExternalUrlValidation:
             assert safe_external_redirect_target(url) is None
 
     def test_fails_closed_without_configured_hosts(self, app):
-        from app.utils.external_url_validation import validate_allowlisted_https_url
+        from app.utils.http.external_url_validation import validate_allowlisted_https_url
 
         with app.app_context():
             previous = app.config.get("IFRC_DOCUMENT_ALLOWED_HOSTS")
@@ -703,7 +703,7 @@ class TestExternalUrlValidation:
     def test_matches_ai_documents_validator(self, app, url):
         """The AI-documents SSRF validator and the shared one must agree on every input."""
         from app.routes.ai_documents.helpers import _validate_ifrc_fetch_url
-        from app.utils.external_url_validation import validate_allowlisted_https_url
+        from app.utils.http.external_url_validation import validate_allowlisted_https_url
 
         with app.app_context():
             try:

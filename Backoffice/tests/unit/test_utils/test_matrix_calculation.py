@@ -1,7 +1,7 @@
 """Shared matrix formula language. Keep cases aligned with tests/js/forms/matrix-calculation.test.js."""
 
-from app.utils.api_serialization import _build_matrix_long_rows_from_values
-from app.utils.matrix_calculation import (
+from app.utils.api.api_serialization import _build_matrix_long_rows_from_values
+from app.utils.forms.matrix_calculation import (
     calculation_is_readonly,
     calculation_saves_value,
     column_counts_toward_row_total,

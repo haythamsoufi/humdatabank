@@ -381,7 +381,7 @@ def _apply_published_snapshot(entry: Any, payload: Dict[str, Any]) -> None:
     if not payload.get("set_published"):
         return
     from app.models.forms import FormData
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     published_value, published_disagg, published_source = _published_snapshot_fields(payload)
     entry.published_value = published_value

@@ -5,7 +5,7 @@ Stores glossary concepts/terms used by AI retrieval and classification.
 """
 
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from pgvector.sqlalchemy import Vector
 
 

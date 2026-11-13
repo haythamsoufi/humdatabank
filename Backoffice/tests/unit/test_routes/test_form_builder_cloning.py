@@ -687,7 +687,7 @@ class TestCloneTemplateStructureBetweenTemplates:
 
 class TestCloneStableKeyPreservation:
     def test_clone_preserves_item_and_section_stable_keys(self, app, db_session):
-        from app.utils.stable_key import generate_stable_key
+        from app.utils.templates.stable_key import generate_stable_key
         from app.models import FormSection, FormItem, FormTemplateVersion
 
         template = create_test_template(db_session)

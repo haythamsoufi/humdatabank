@@ -71,7 +71,7 @@ def main():
         from app.models.organization import NationalSociety
         from sqlalchemy import inspect
         from app.extensions import db
-        from app.utils.transactions import atomic
+        from app.utils.database.transactions import atomic
 
         app = create_app()
         with app.app_context():

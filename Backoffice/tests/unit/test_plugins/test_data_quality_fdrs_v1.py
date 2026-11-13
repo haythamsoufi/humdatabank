@@ -9,7 +9,7 @@ import pytest
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 from app.services.data_quality.helpers import section_name_matches
 from plugins.fdrs.data_quality.fdrs_v1 import FdrsV1Methodology
-from app.utils.data_quality_constants import is_data_quality_dashboard_enabled
+from app.utils.indicators.data_quality_constants import is_data_quality_dashboard_enabled
 
 
 def _mock_form_data(value, *, disagg_data=None, data_not_available=False, not_applicable=False):

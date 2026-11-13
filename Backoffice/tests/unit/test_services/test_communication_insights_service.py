@@ -21,7 +21,7 @@ from app.services.communication.insights_service import (
     empty_communications_insights,
 )
 from app.services.email.delivery import SKIP_ERROR_PREFIX
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 def _make_user(suffix=None):

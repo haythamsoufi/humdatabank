@@ -16,10 +16,10 @@ from app.plugins.plugin_utils import (
     cache_plugin_result,
     clear_plugin_cache,
 )
-from app.utils.api_helpers import get_json_safe
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_error, json_ok, json_server_error
 
 from pathlib import Path
 from typing import Optional

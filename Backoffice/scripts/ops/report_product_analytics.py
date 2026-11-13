@@ -138,7 +138,7 @@ def build_report(months: int, days_mau: int = 30) -> Dict[str, Any]:
         SubmittedDocument,
     )
     from app.models.rbac import RbacRole, RbacUserRole
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     # Prod images may predate ROLE_KIND_GROUP; kind column is still 'group'|'permission'.
     role_kind_group = "group"

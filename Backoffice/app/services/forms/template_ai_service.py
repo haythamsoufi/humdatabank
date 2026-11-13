@@ -36,7 +36,7 @@ from app.models import (
     LookupList,
     QuestionType,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -1501,7 +1501,7 @@ class FormTemplateAIService:
             if group:
                 col_entry["group"] = group
             if col_type == "calculated":
-                from app.utils.matrix_calculation import normalize_calculation
+                from app.utils.forms.matrix_calculation import normalize_calculation
 
                 calc = normalize_calculation(c.get("calculation"))
                 if not calc:

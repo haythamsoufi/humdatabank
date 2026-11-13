@@ -1,11 +1,11 @@
-"""Tests for app/utils/advanced_validation.py – targets 100 % coverage."""
+"""Tests for app/utils/forms/advanced_validation.py – targets 100 % coverage."""
 import io
 import pytest
 from unittest.mock import patch, MagicMock
 from flask import Flask
 from werkzeug.datastructures import FileStorage
 
-from app.utils.advanced_validation import (
+from app.utils.forms.advanced_validation import (
     AdvancedValidator,
     validate_upload_extension_and_mime,
     sanitize_input,

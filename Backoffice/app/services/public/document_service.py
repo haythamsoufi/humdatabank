@@ -14,7 +14,7 @@ from sqlalchemy.orm import joinedload
 
 from app.services.ai.documents.access import ANONYMOUS_PRINCIPAL, ai_document_read_filter
 from app.extensions import db
-from app.utils.api_errors import ClientInputError
+from app.utils.api.api_errors import ClientInputError
 from app.models import AIDocument, AIDocumentChunk
 from app.models.enums import AIDocumentProcessingStatusValue
 from app.services.ai.documents.country_detection import detect_country_id_and_name
@@ -601,7 +601,7 @@ def _apply_scope_filters_to_query(query, filters: Dict[str, Any] | None):
     if title_query:
         from sqlalchemy import or_
 
-        from app.utils.sql_utils import safe_ilike_pattern
+        from app.utils.database.sql_utils import safe_ilike_pattern
 
         pattern = safe_ilike_pattern(title_query)
         query = query.filter(

@@ -8,7 +8,7 @@ force_transaction, is_view_opted_out, is_view_forced, is_streaming_response.
 import pytest
 from unittest.mock import MagicMock, patch, call
 
-from app.utils.transactions import (
+from app.utils.database.transactions import (
     register_post_commit,
     run_post_commit_callbacks,
     safe_rollback,
@@ -161,14 +161,14 @@ class TestSafeRollback:
     def test_4xx_rollback_reason_not_logged(self, app):
         with app.app_context():
             with patch('app.extensions.db'), \
-                 patch('app.utils.transactions.logger.debug') as mock_debug:
+                 patch('app.utils.database.transactions.logger.debug') as mock_debug:
                 safe_rollback(reason='response_status_401')
             mock_debug.assert_not_called()
 
     def test_manual_rollback_reason_is_logged(self, app):
         with app.app_context():
             with patch('app.extensions.db'), \
-                 patch('app.utils.transactions.logger.debug') as mock_debug:
+                 patch('app.utils.database.transactions.logger.debug') as mock_debug:
                 safe_rollback(reason='manual_request')
             mock_debug.assert_called_once_with(
                 'db.session.rollback() executed (%s)', 'manual_request'
@@ -237,19 +237,19 @@ class TestRequestTransactionRollback:
 
     def test_calls_safe_rollback(self, app):
         with app.test_request_context():
-            with patch('app.utils.transactions.safe_rollback') as mock_rb:
+            with patch('app.utils.database.transactions.safe_rollback') as mock_rb:
                 request_transaction_rollback(reason='manual')
                 mock_rb.assert_called_once_with(reason='manual')
 
     def test_safe_rollback_called_without_reason(self, app):
         with app.test_request_context():
-            with patch('app.utils.transactions.safe_rollback') as mock_rb:
+            with patch('app.utils.database.transactions.safe_rollback') as mock_rb:
                 request_transaction_rollback()
                 # reason defaults to 'manual_request' in safe_rollback call
                 mock_rb.assert_called_once_with(reason='manual_request')
 
     def test_works_outside_request_context(self):
-        with patch('app.utils.transactions.safe_rollback') as mock_rb:
+        with patch('app.utils.database.transactions.safe_rollback') as mock_rb:
             request_transaction_rollback(reason='outside')
             mock_rb.assert_called_once_with(reason='outside')
 
@@ -270,7 +270,7 @@ class TestAtomic:
     def test_rollback_on_exception(self, app):
         with app.app_context():
             with patch('app.extensions.db') as mock_db, \
-                 patch('app.utils.transactions.safe_rollback') as mock_rb:
+                 patch('app.utils.database.transactions.safe_rollback') as mock_rb:
                 with pytest.raises(ValueError):
                     with atomic():
                         raise ValueError('fail')
@@ -279,7 +279,7 @@ class TestAtomic:
     def test_re_raises_exception(self, app):
         with app.app_context():
             with patch('app.extensions.db'), \
-                 patch('app.utils.transactions.safe_rollback'):
+                 patch('app.utils.database.transactions.safe_rollback'):
                 with pytest.raises(RuntimeError, match='expected'):
                     with atomic():
                         raise RuntimeError('expected')
@@ -287,7 +287,7 @@ class TestAtomic:
     def test_remove_session_when_flag_set(self, app):
         with app.app_context():
             with patch('app.extensions.db'), \
-                 patch('app.utils.transactions.safe_remove') as mock_remove:
+                 patch('app.utils.database.transactions.safe_remove') as mock_remove:
                 with atomic(remove_session=True):
                     pass
                 mock_remove.assert_called_once_with(reason='atomic_finally')
@@ -295,7 +295,7 @@ class TestAtomic:
     def test_no_remove_session_by_default(self, app):
         with app.app_context():
             with patch('app.extensions.db'), \
-                 patch('app.utils.transactions.safe_remove') as mock_remove:
+                 patch('app.utils.database.transactions.safe_remove') as mock_remove:
                 with atomic():
                     pass
                 mock_remove.assert_not_called()
@@ -303,8 +303,8 @@ class TestAtomic:
     def test_remove_session_called_even_on_exception(self, app):
         with app.app_context():
             with patch('app.extensions.db'), \
-                 patch('app.utils.transactions.safe_rollback'), \
-                 patch('app.utils.transactions.safe_remove') as mock_remove:
+                 patch('app.utils.database.transactions.safe_rollback'), \
+                 patch('app.utils.database.transactions.safe_remove') as mock_remove:
                 with pytest.raises(ValueError):
                     with atomic(remove_session=True):
                         raise ValueError('fail')

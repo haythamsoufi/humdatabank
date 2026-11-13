@@ -8,7 +8,7 @@ from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Bool
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship, backref, Session, attributes
 from ..extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.models.enums import DocumentStatus, DocumentStatusValue
 from app.models.enum_columns import pg_str_enum_column
 
@@ -104,7 +104,7 @@ class SubmittedDocument(db.Model):
         4. From linked_entity (e.g. NS branch → parent country) for standalone docs
         """
         if self.assignment_entity_status:
-            from app.utils.api_serialization import _country_for_aes
+            from app.utils.api.api_serialization import _country_for_aes
             return _country_for_aes(self.assignment_entity_status)
         if self.public_submission and self.public_submission.country:
             return self.public_submission.country
@@ -306,7 +306,7 @@ class ResourceTranslation(db.Model):
     @property
     def public_external_url(self):
         """Allowlisted link safe to render or redirect to, or None."""
-        from app.utils.external_url_validation import safe_resource_external_url
+        from app.utils.http.external_url_validation import safe_resource_external_url
 
         raw = self.external_url
         if not isinstance(raw, str):

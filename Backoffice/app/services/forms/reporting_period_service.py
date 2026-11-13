@@ -181,7 +181,7 @@ def ensure_reporting_period_for_label(period_name: str | None) -> ReportingPerio
     Other labels are left unchanged so sync can still clear dates when no
     catalog row exists.
     """
-    from app.utils.reporting_period_label_parser import parse_structured_period_label
+    from app.utils.indicators.reporting_period_label_parser import parse_structured_period_label
 
     parsed = parse_structured_period_label(period_name or "")
     if parsed is None:

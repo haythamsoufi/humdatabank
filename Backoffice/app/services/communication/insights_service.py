@@ -19,7 +19,7 @@ from app.extensions import db
 from app.models import EmailDeliveryLog, Notification, NotificationCampaign
 from app.services.email.delivery import SKIP_ERROR_PREFIX
 from app.services.notification.service import NotificationService
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 ALLOWED_INSIGHTS_DAYS: Tuple[int, ...] = (7, 30, 90, 365)
 DEFAULT_INSIGHTS_DAYS = 30

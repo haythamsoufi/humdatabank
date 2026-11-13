@@ -7,8 +7,8 @@ from app import db
 from app.models.validation import ValidationQuestion
 from app.services.validation.question_lifecycle import clear_answer_received, clear_review_state, mark_answer_received
 from app.routes.api import api_bp
-from app.utils.api_helpers import json_response, api_error, get_json_safe
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.api.api_helpers import json_response, api_error, get_json_safe
+from app.utils.http.request_validation import enforce_csrf_json
 
 
 def _user_can_access_entity(entity_type: str, entity_id: int) -> bool:

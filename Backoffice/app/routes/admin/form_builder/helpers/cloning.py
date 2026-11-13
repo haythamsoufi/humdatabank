@@ -6,8 +6,8 @@ from typing import Any, Dict, Optional
 from flask import current_app
 from app import db
 from app.models import FormPage, FormSection, FormItem
-from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
-from app.utils.stable_key import defer_stable_key_autogen
+from app.utils.common.json_helpers import deep_copy_json as _deep_copy_json_value
+from app.utils.templates.stable_key import defer_stable_key_autogen
 import json
 import re
 

@@ -1,10 +1,10 @@
 """
-Unit tests for app/utils/indicator_utils.py – 100% coverage target.
+Unit tests for app/utils/indicators/indicator_utils.py – 100% coverage target.
 """
 import pytest
 from unittest.mock import patch
 
-from app.utils.indicator_utils import (
+from app.utils.indicators.indicator_utils import (
     supports_disaggregation,
     get_allowed_disaggregation_modes,
     slugify_age_group,
@@ -115,7 +115,7 @@ class TestSlugifyAgeGroup:
 
     def test_delegates_to_canonical(self, app):
         with app.app_context():
-            with patch('app.utils.indicator_utils.slugify_age_group') as spy:
+            with patch('app.utils.indicators.indicator_utils.slugify_age_group') as spy:
                 # Call the real function (not patching itself), just verify delegation
                 result = slugify_age_group('5-17')
                 assert isinstance(result, str)

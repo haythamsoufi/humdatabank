@@ -3,8 +3,8 @@ import secrets
 from flask import current_app
 from flask.cli import with_appcontext
 from .extensions import db
-from app.utils.transactions import atomic
-from app.utils.sequence_utils import get_tables_with_id_column, reset_table_sequence
+from app.utils.database.transactions import atomic
+from app.utils.database.sequence_utils import get_tables_with_id_column, reset_table_sequence
 
 
 def reset_table_sequence_verbose(

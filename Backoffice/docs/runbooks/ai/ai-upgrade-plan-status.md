@@ -21,15 +21,15 @@ For configuration (providers, limits, telemetry), see [`../../setup/ai-configura
 
 ### 5C (Done)
 
-- **`app/utils/ai_pricing.py`**: Central defaults for chat and embedding (per 1M tokens); `get_chat_pricing()`, `get_embedding_pricing()`, `estimate_chat_cost()`.
+- **`app/utils/ai/ai_pricing.py`**: Central defaults for chat and embedding (per 1M tokens); `get_chat_pricing()`, `get_embedding_pricing()`, `estimate_chat_cost()`.
 - **Config**: Optional `AI_MODEL_PRICING` (JSON) overrides: `{"chat": {"model": {"input": 0.25, "output": 2.0}}, "embedding": {"model": 0.02}}`.
 - **Wired**: `ai.runtime.runtime_utils.estimate_openai_cost`, `ai.documents.embedding` cost, `OpenAIEmbeddingProvider` cost, `routes/ai.py` telemetry cost, `ai.chat.telemetry` estimate_cost.
 
 ### 5D (Done)
 
-- **`app/utils/ai_tracing.py`**: Optional OpenTelemetry spans; `span(name, attributes)` context manager, `add_event()`. No-op when `AI_OPENTELEMETRY_ENABLED` is False or opentelemetry not installed.
+- **`app/utils/ai/ai_tracing.py`**: Optional OpenTelemetry spans; `span(name, attributes)` context manager, `add_event()`. No-op when `AI_OPENTELEMETRY_ENABLED` is False or opentelemetry not installed.
 - **Config**: `AI_OPENTELEMETRY_ENABLED` (default False), `OTEL_SERVICE_NAME`.
-- **Integration**: `AIEmbeddingService.generate_embedding()` wrapped in `ai.embedding.generate` span. Other call sites (agent execute, chat route) can use `from app.utils.ai_tracing import span` the same way.
+- **Integration**: `AIEmbeddingService.generate_embedding()` wrapped in `ai.embedding.generate` span. Other call sites (agent execute, chat route) can use `from app.utils.ai.ai_tracing import span` the same way.
 
 ### 5E (Done)
 

@@ -737,7 +737,7 @@ class TestCreatePluginFormItem:
         assert item.validation_message_translations == {'fr': 'Doit être rempli'}
 
     def test_validation_message_duplicate_json_list_flattened(self, app, mock_db):
-        from app.utils.request_utils import _JsonFormProxy
+        from app.utils.http.request_utils import _JsonFormProxy
         template, section = _mock_template(), _mock_section()
         msg = 'Local Units must be higher than branches'
         form_data = _JsonFormProxy({'validation_message': [msg, msg]})

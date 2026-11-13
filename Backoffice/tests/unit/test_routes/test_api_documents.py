@@ -334,8 +334,8 @@ class TestServeBrandingAsset:
 
     def test_empty_filename_returns_404(self, client, db_session):
         # Empty path is not a valid route, but test with a space-only name
-        with patch("app.utils.branding_visual_assets.SYSTEM_BRANDING_REL_PREFIX", "branding"), \
-             patch("app.utils.branding_visual_assets.safe_branding_download_filename", return_value=""), \
+        with patch("app.utils.branding.branding_visual_assets.SYSTEM_BRANDING_REL_PREFIX", "branding"), \
+             patch("app.utils.branding.branding_visual_assets.safe_branding_download_filename", return_value=""), \
              patch("app.services.platform.storage_service.stream_response", side_effect=Exception("not found")):
             resp = client.get(_api("/uploads/branding/ "))
         assert resp.status_code == 404

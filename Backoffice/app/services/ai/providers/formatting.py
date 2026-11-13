@@ -209,7 +209,7 @@ def _render_structured_sources_block(sources: Optional[List[Dict[str, Any]]]) ->
     if not sources:
         return None
     try:
-        from app.utils.ai_sources_parser import render_sources_body_html
+        from app.utils.ai.ai_sources_parser import render_sources_body_html
         body = render_sources_body_html(sources)
     except Exception as e:
         logger.debug("format_ai_response_for_html: structured sources render failed: %s", e)
@@ -326,7 +326,7 @@ def format_ai_response_for_html(
     sources_safe_html = _render_structured_sources_block(structured_sources)
     if sources_safe_html is None and sources_block_raw is not None:
         try:
-            from app.utils.ai_sources_parser import merge_structured_sources
+            from app.utils.ai.ai_sources_parser import merge_structured_sources
             sources_safe_html = _render_structured_sources_block(
                 merge_structured_sources(answer="## Sources\n\n" + sources_block_raw)
             )

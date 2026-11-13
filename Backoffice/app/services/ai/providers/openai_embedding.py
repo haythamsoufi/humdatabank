@@ -70,7 +70,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         if self._pricing_override and self.model in self._pricing_override:
             v = self._pricing_override[self.model]
             return float(v) / 1_000_000 if v > 0.001 else v
-        from app.utils.ai_pricing import get_embedding_pricing
+        from app.utils.ai.ai_pricing import get_embedding_pricing
         return get_embedding_pricing(self.model)
 
     def _truncate_text(self, text: str, max_tokens: int = 8000) -> str:

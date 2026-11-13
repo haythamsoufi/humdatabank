@@ -26,12 +26,12 @@ from sqlalchemy.orm import aliased, contains_eager, joinedload
 from werkzeug.exceptions import NotFound
 
 from app import db
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_responses import json_bad_request, json_forbidden, json_ok, json_server_error
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_ok, json_server_error
 from app.models import AssignedForm, AssignmentEntityStatus, FormData, FormItem, FormPage, FormSection
-from app.utils.constants import LOOKUP_ROW_TEMP_ORDER
-from app.utils.datetime_helpers import utcnow
-from app.utils.form_localization import (
+from app.utils.common.constants import LOOKUP_ROW_TEMP_ORDER
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.forms.form_localization import (
     get_localized_country_name,
     get_localized_indicator_name,
     get_localized_page_name,
@@ -1007,7 +1007,7 @@ def register_validation_summary_routes(bp) -> None:
 
         # Localized display names for header
         assignment = assignment_entity_status.assigned_form
-        from app.utils.api_serialization import _country_for_aes
+        from app.utils.api.api_serialization import _country_for_aes
         country = _country_for_aes(assignment_entity_status)
         form_template = assignment.template if assignment else None
         assignment_display_name = None
@@ -1383,7 +1383,7 @@ def register_validation_summary_routes(bp) -> None:
                 return redirect(url_for("main.dashboard"))
 
             assignment = assignment_entity_status.assigned_form
-            from app.utils.api_serialization import _country_for_aes
+            from app.utils.api.api_serialization import _country_for_aes
             country = _country_for_aes(assignment_entity_status)
             form_template = assignment.template if assignment else None
             published_vid = getattr(form_template, "published_version_id", None) if form_template else None

@@ -10,7 +10,7 @@ from typing import Tuple
 from flask import current_app
 from app import db
 from app.models import FormItem, FormSection
-from app.utils.json_helpers import deep_copy_json
+from app.utils.common.json_helpers import deep_copy_json
 
 
 class ItemDuplicationService:

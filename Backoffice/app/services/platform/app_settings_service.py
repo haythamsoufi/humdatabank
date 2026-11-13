@@ -59,7 +59,7 @@ def _write_settings_json_file(settings: Dict) -> bool:
     """Persist settings to legacy JSON file (no DB / no app context)."""
     settings_path = _get_settings_path()
     try:
-        from app.utils.file_lock import atomic_json_write
+        from app.utils.files.file_lock import atomic_json_write
 
         atomic_json_write(settings_path, settings)
         return True
@@ -1155,7 +1155,7 @@ def set_mobile_min_app_version(version: str, *, user_id: Optional[int] = None) -
         return write_settings(data, user_id=user_id)
 
     try:
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         existing = SystemSettings.query.filter_by(
             setting_key=MOBILE_MIN_APP_VERSION_KEY
@@ -1407,7 +1407,7 @@ def set_fds_access_request_digest_settings(
     user_id: Optional[int] = None,
 ) -> bool:
     """Persist FDS access request digest schedule settings."""
-    from app.utils.datetime_helpers import ORG_TIMEZONE_LABEL
+    from app.utils.common.datetime_helpers import ORG_TIMEZONE_LABEL
 
     try:
         hour = int(local_hour)

@@ -1,10 +1,10 @@
 """
-Unit tests for app/utils/assignment_document_carryover.py – 100% coverage target.
+Unit tests for app/utils/documents/assignment_document_carryover.py – 100% coverage target.
 """
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.utils.assignment_document_carryover import (
+from app.utils.documents.assignment_document_carryover import (
     extract_years_from_text,
     assignment_target_years,
     document_period_year_bounds,
@@ -444,9 +444,9 @@ class TestMergeCarryoverIntoSubmittedDocumentsDict:
         result = merge_carryover_into_submitted_documents_dict({}, aes, [section])
         assert result == set()
 
-    @patch('app.utils.assignment_document_carryover.joinedload')
-    @patch('app.utils.assignment_document_carryover.FormItem')
-    @patch('app.utils.assignment_document_carryover.SubmittedDocument')
+    @patch('app.utils.documents.assignment_document_carryover.joinedload')
+    @patch('app.utils.documents.assignment_document_carryover.FormItem')
+    @patch('app.utils.documents.assignment_document_carryover.SubmittedDocument')
     def test_document_field_with_carryover(self, MockSD, MockFI, mock_joinedload):
         # Field with carryover enabled; DB query returns a matching document.
         doc = MagicMock()
@@ -527,9 +527,9 @@ class TestFindCarryoverDocumentsForField:
         result = find_carryover_documents_for_field(field, aes)
         assert result == []
 
-    @patch('app.utils.assignment_document_carryover.joinedload')
-    @patch('app.utils.assignment_document_carryover.FormItem')
-    @patch('app.utils.assignment_document_carryover.SubmittedDocument')
+    @patch('app.utils.documents.assignment_document_carryover.joinedload')
+    @patch('app.utils.documents.assignment_document_carryover.FormItem')
+    @patch('app.utils.documents.assignment_document_carryover.SubmittedDocument')
     def test_returns_matching_documents(self, MockSD, MockFI, mock_joinedload):
         field = MagicMock()
         field.id = 10

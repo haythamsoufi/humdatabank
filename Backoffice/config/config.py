@@ -328,7 +328,7 @@ class Config:
 
     # Dedicated signing key for mobile JWT tokens. Falls back to SECRET_KEY only in
     # development/testing; production/staging startup validation requires an explicit,
-    # distinct value (app/utils/security_startup.py). Using a separate secret limits
+    # distinct value (app/utils/security/security_startup.py). Using a separate secret limits
     # blast radius: rotating one key does not invalidate the other.
     _mobile_jwt_secret_env = (os.environ.get("MOBILE_JWT_SECRET") or "").strip()
     MOBILE_JWT_SECRET = _mobile_jwt_secret_env or _secret_key
@@ -961,9 +961,9 @@ class Config:
     # OpenAI Configuration (for embeddings and agent)
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     # Default LLM model (OPENAI_MODEL). Supported models depend on your OpenAI account.
-    # Some models (e.g. GPT-5 family) reject sampling params; see app.utils.ai_utils.openai_model_supports_sampling_params.
+    # Some models (e.g. GPT-5 family) reject sampling params; see app.utils.ai.ai_utils.openai_model_supports_sampling_params.
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-5-mini')
-    # Optional: override model pricing (JSON). Keys: "chat" (model -> {input, output} per 1M tokens), "embedding" (model -> per 1M tokens). See app.utils.ai_pricing.
+    # Optional: override model pricing (JSON). Keys: "chat" (model -> {input, output} per 1M tokens), "embedding" (model -> per 1M tokens). See app.utils.ai.ai_pricing.
     AI_MODEL_PRICING = os.environ.get('AI_MODEL_PRICING')  # JSON string or set in code
 
     # Embedding Configuration

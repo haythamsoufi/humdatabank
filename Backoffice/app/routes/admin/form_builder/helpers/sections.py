@@ -3,7 +3,7 @@
 from flask_login import current_user
 from app import db
 from app.models import FormSection, FormItem, FormTemplateVersion
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 def _get_descendant_section_ids(parent_section_id):

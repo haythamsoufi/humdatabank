@@ -29,7 +29,7 @@ from app.routes.auth import (
     _send_password_reset_email,
     _mobile_oauth_redirect,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from tests.factories import create_test_user
 
 
@@ -41,7 +41,7 @@ class TestAccountLockout:
             assert _is_account_locked_out(email) is False
 
     def test_locked_after_threshold_failures(self, app, db_session):
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
         with app.app_context():
             email = 'locked@example.com'
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD - 1):
@@ -51,14 +51,14 @@ class TestAccountLockout:
             assert _is_account_locked_out(email) is True
 
     def test_lockout_is_case_insensitive(self, app, db_session):
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
         with app.app_context():
             for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
                 record_login_failure('Mixed.Case@Example.com')
             assert _is_account_locked_out('mixed.case@example.com') is True
 
     def test_success_after_failures_resets_lockout(self, app, db_session):
-        from app.utils.login_security import (
+        from app.utils.auth.login_security import (
             ACCOUNT_LOCKOUT_THRESHOLD, clear_login_failures, record_login_failure,
         )
         with app.app_context():
@@ -70,9 +70,9 @@ class TestAccountLockout:
             assert _is_account_locked_out(email) is False
 
     def test_store_error_fails_closed(self, app):
-        from app.utils.auth_state import AuthStateUnavailable
+        from app.utils.auth.auth_state import AuthStateUnavailable
         with app.app_context():
-            with patch('app.utils.login_security.get_auth_state') as mock_state:
+            with patch('app.utils.auth.login_security.get_auth_state') as mock_state:
                 mock_state.return_value.get_counter.side_effect = AuthStateUnavailable('down')
                 assert _is_account_locked_out('any@example.com') is True
 
@@ -500,7 +500,7 @@ class TestPasswordResetHelpers:
 @pytest.mark.unit
 class TestMobileOAuthRedirect:
     def test_challenge_yields_code_only_redirect(self, app, db_session, test_user):
-        from app.utils.mobile_oauth_code import _challenge_for
+        from app.utils.mobile.mobile_oauth_code import _challenge_for
         challenge = _challenge_for('v' * 64)
         with app.test_request_context():
             session['session_id'] = 'web-session-123'

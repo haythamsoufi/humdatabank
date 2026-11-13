@@ -7,8 +7,8 @@ from flask_login import current_user
 
 from app.routes.admin.shared import permission_required
 from app.services.platform import storage_service as storage
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
-from app.utils.template_image_assets import (
+from app.utils.api.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.templates.template_image_assets import (
     TEMPLATE_ASSETS,
     upload_template_image,
     normalize_storage_path,
@@ -64,7 +64,7 @@ def upload_template_image_asset(template_id):
         return json_server_error("Upload failed", success=False)
 
     if current_path:
-        from app.utils.template_image_assets import delete_template_image_if_present
+        from app.utils.templates.template_image_assets import delete_template_image_if_present
 
         delete_template_image_if_present(current_path)
 

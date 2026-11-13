@@ -111,7 +111,7 @@ class TestEstimateCost:
         with app.app_context():
             svc = ChatbotTelemetryService()
             # estimate_chat_cost is lazily imported inside the method
-            with patch("app.utils.ai_pricing.estimate_chat_cost", return_value=0.05) as mock_cost:
+            with patch("app.utils.ai.ai_pricing.estimate_chat_cost", return_value=0.05) as mock_cost:
                 cost = svc.estimate_cost("openai", 100, 50, model="gpt-4o-mini")
                 assert cost == 0.05
                 mock_cost.assert_called_once()
@@ -120,7 +120,7 @@ class TestEstimateCost:
         with app.app_context():
             svc = ChatbotTelemetryService()
             with patch(
-                "app.utils.ai_pricing.estimate_chat_cost",
+                "app.utils.ai.ai_pricing.estimate_chat_cost",
                 side_effect=Exception("pricing error"),
             ):
                 cost = svc.estimate_cost("openai", 100, 50)
@@ -130,7 +130,7 @@ class TestEstimateCost:
         with app.app_context():
             app.config["OPENAI_MODEL"] = "gpt-5-mini"
             svc = ChatbotTelemetryService()
-            with patch("app.utils.ai_pricing.estimate_chat_cost", return_value=0.01) as mock_cost:
+            with patch("app.utils.ai.ai_pricing.estimate_chat_cost", return_value=0.01) as mock_cost:
                 svc.estimate_cost("openai", 10, 5, model=None)
                 call_args = mock_cost.call_args[0]
                 assert "gpt-5-mini" in call_args

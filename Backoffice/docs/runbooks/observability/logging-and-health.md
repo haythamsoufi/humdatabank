@@ -48,7 +48,7 @@ Every response carries an `X-Request-ID` header (an inbound value is honoured if
 
 ### Redaction in logs and stored payloads
 
-Sensitive keys (passwords, tokens, API keys, cookies, CSRF, secrets, JWT/Bearer values, OTP/SSN, ...) are masked by one shared policy (`app/utils/logging_security.py`) for API usage tracking, activity form data and security events. Gunicorn access and werkzeug logs mask sensitive query-string parameters. Stored API request bodies are capped at 8 KB and fall back to a keys-only summary.
+Sensitive keys (passwords, tokens, API keys, cookies, CSRF, secrets, JWT/Bearer values, OTP/SSN, ...) are masked by one shared policy (`app/utils/security/logging_security.py`) for API usage tracking, activity form data and security events. Gunicorn access and werkzeug logs mask sensitive query-string parameters. Stored API request bodies are capped at 8 KB and fall back to a keys-only summary.
 
 ### Enabling verbose form debugging
 
@@ -140,11 +140,11 @@ If an API key is set but invalid, the AI service logs an error at first use, not
 When `AI_OPENTELEMETRY_ENABLED=true` and the `opentelemetry` package is installed, AI-related code emits spans to a configured OTEL collector:
 
 - Span name for embeddings: `ai.embedding.generate`
-- Other spans can be added via `from app.utils.ai_tracing import span` in new code.
+- Other spans can be added via `from app.utils.ai.ai_tracing import span` in new code.
 - Default is **off** (`AI_OPENTELEMETRY_ENABLED=false`). Enable only if your platform has an OTEL collector configured.
 - Config: `AI_OPENTELEMETRY_ENABLED`, `OTEL_SERVICE_NAME`.
 
-See `app/utils/ai_tracing.py` for implementation.
+See `app/utils/ai/ai_tracing.py` for implementation.
 
 ---
 

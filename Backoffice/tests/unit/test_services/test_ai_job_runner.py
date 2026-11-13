@@ -22,7 +22,7 @@ from app.services.ai.ai_job_runner import (
     run_ai_job,
     signal_job_cancel,
 )
-from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+from app.utils.database.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
 pytestmark = [pytest.mark.unit]
 

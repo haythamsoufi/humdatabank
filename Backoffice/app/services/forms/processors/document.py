@@ -7,13 +7,13 @@ from flask import current_app, flash, request
 from flask_login import current_user
 from werkzeug.utils import secure_filename
 
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.models import db, FormItem, SubmittedDocument
 from app.services.notification.core import notify_document_uploaded
-from app.utils.file_paths import save_submission_document
-from app.utils.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
-from app.utils.file_scanning import scan_file_for_viruses, FileScanError
-from app.utils.transactions import register_post_commit
+from app.utils.files.file_paths import save_submission_document
+from app.utils.documents.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
+from app.utils.files.file_scanning import scan_file_for_viruses, FileScanError
+from app.utils.database.transactions import register_post_commit
 from app.services.forms.processors._common import get_english_field_name
 from app.services.monitoring.debug import debug_manager
 
@@ -101,7 +101,7 @@ class DocumentProcessorMixin:
             # 1. AdvancedValidator.sanitize_filename() - removes path components, null bytes, dangerous chars
             # 2. secure_filename() - Werkzeug's additional sanitization
             # 3. Path construction uses os.path.join() with validated components
-            from app.utils.advanced_validation import AdvancedValidator, validate_upload_extension_and_mime
+            from app.utils.forms.advanced_validation import AdvancedValidator, validate_upload_extension_and_mime
             original_filename = file.filename or ''
             if '\x00' in original_filename:
                 logger.warning(f"Null byte detected in filename: {original_filename!r}")

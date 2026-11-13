@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pytest
 from flask import Flask
 
-from app.utils import security_startup
-from app.utils.security_startup import (
+from app.utils.security import security_startup
+from app.utils.security.security_startup import (
     collect_security_findings,
     deployment_security_flag_codes,
     detect_worker_count,

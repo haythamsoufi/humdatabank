@@ -9,7 +9,7 @@ from sqlalchemy.orm import relationship, backref
 from ..extensions import db
 from app.models.enums import IndicatorSuggestionStatusValue, IndicatorSuggestionTypeValue
 from app.models.enum_columns import pg_str_enum_column
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 # Import FormItem for the template_instances property
 from .form_items import FormItem
@@ -451,14 +451,14 @@ class IndicatorBank(db.Model):
     @property
     def tags_list(self):
         """Return tags as a list."""
-        from app.utils.jsonb_text import text_list_from_jsonb
+        from app.utils.database.jsonb_text import text_list_from_jsonb
 
         return text_list_from_jsonb(self.tags)
 
     @property
     def monitoring_questions_list(self):
         """Return monitoring questions as a list."""
-        from app.utils.jsonb_text import text_list_from_jsonb
+        from app.utils.database.jsonb_text import text_list_from_jsonb
 
         return text_list_from_jsonb(self.monitoring_questions)
 

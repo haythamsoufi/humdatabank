@@ -29,8 +29,8 @@ from app.models import (
 )
 from app.services.imports.excel_service import ExcelService
 from app.services.forms.processing_service import slugify_age_group
-from app.utils.datetime_helpers import utcnow
-from app.utils.form_localization import (
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.forms.form_localization import (
     get_localized_country_name,
     get_localized_indicator_name,
     get_localized_page_name,
@@ -38,7 +38,7 @@ from app.utils.form_localization import (
     get_localized_template_name,
     get_translation_key,
 )
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from config import Config
 
 from datetime import datetime
@@ -493,7 +493,7 @@ def _static_matrix_row_id(row):
 
 def _saved_matrix_row_ids(matrix_data, column_names):
     """Row ids present in saved matrix JSON, ignoring header and metadata keys."""
-    from app.utils.api_serialization import _is_matrix_metadata_key
+    from app.utils.api.api_serialization import _is_matrix_metadata_key
 
     row_ids = []
     seen = set()
@@ -1033,7 +1033,7 @@ def build_assignment_pdf_bytes(assignment_entity_status):
     assignment = assignment_entity_status.assigned_form
     if not assignment:
         raise ValueError("Assignment is missing for PDF export.")
-    from app.utils.api_serialization import _country_for_aes
+    from app.utils.api.api_serialization import _country_for_aes
     country = _country_for_aes(assignment_entity_status)
     form_template_for_export = assignment.template
 
@@ -2094,7 +2094,7 @@ def _export_excel_impl(aes_id):
          return redirect(url_for("main.dashboard"))
 
     assignment = assignment_entity_status.assigned_form
-    from app.utils.api_serialization import _country_for_aes
+    from app.utils.api.api_serialization import _country_for_aes
     country = _country_for_aes(assignment_entity_status)
     form_template_for_export = assignment.template
 
@@ -2400,7 +2400,7 @@ def _export_excel_impl(aes_id):
                 data_sheet.column_dimensions[get_column_letter(col_idx)].autosize = True
 
     output = io.BytesIO()
-    from app.utils.export_safety import sanitize_workbook
+    from app.utils.files.export_safety import sanitize_workbook
     sanitize_workbook(workbook)
     workbook.save(output)
     output.seek(0)
@@ -2446,7 +2446,7 @@ def _import_excel_impl(aes_id):
         return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
-        from app.utils.advanced_validation import AdvancedValidator
+        from app.utils.forms.advanced_validation import AdvancedValidator
         file_ext = os.path.splitext(excel_file.filename)[1].lower()
         is_valid_mime, detected_mime = AdvancedValidator.validate_mime_type(excel_file, [file_ext])
         if not is_valid_mime:

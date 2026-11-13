@@ -540,7 +540,7 @@ def localized_indicator_label(indicator_bank, fallback: str = "") -> str:
         if isinstance(val, str) and val.strip():
             return val.strip()
     try:
-        from app.utils.form_localization import get_localized_indicator_name
+        from app.utils.forms.form_localization import get_localized_indicator_name
 
         label = (get_localized_indicator_name(indicator_bank) or "").strip()
         if label:
@@ -685,7 +685,7 @@ def localized_assignment_title(assigned) -> str:
     name = english
     if template is not None and lang != "en":
         try:
-            from app.utils.form_localization import get_localized_template_name
+            from app.utils.forms.form_localization import get_localized_template_name
 
             name = (get_localized_template_name(template, locale=lang) or "").strip() or english
         except Exception:
@@ -707,7 +707,7 @@ def localized_entity_name(entity, *, name_attr: str = "name", fallback: str = ""
     if entity is None:
         return fallback
     try:
-        from app.utils.form_localization import get_localized_name_from_translations
+        from app.utils.forms.form_localization import get_localized_name_from_translations
 
         label = (
             get_localized_name_from_translations(entity, name_attr=name_attr) or ""

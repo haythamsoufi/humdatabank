@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import wraps
 from flask import request, g, session, current_app
 from flask_login import current_user
-from app.utils.request_utils import is_static_asset_request
+from app.utils.http.request_utils import is_static_asset_request
 from app.services.platform.user_analytics_service import (
     log_user_activity,
     log_admin_action,
@@ -20,26 +20,26 @@ from app.services.platform.user_analytics_service import (
     update_session_activity,
     _update_session_activity_explicit,
 )
-from app.utils.activity_endpoint_overrides import (
+from app.utils.activity.activity_endpoint_overrides import (
     resolve_post_activity_type,
     resolve_delete_activity_type,
     description_for_activity_type,
     endpoint_last_segment,
     strip_endpoint_verb_prefix,
 )
-from app.utils.activity_endpoint_catalog import (
+from app.utils.activity.activity_endpoint_catalog import (
     resolve_activity_catalog_spec,
     fallback_description_for_unmapped,
 )
-from app.utils.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
-from app.utils.activity_form_data_redaction import redact_activity_form_data
-from app.utils.audit_context import (
+from app.utils.activity.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
+from app.utils.activity.activity_form_data_redaction import redact_activity_form_data
+from app.utils.audit.audit_context import (
     apply_audit_details_to_context,
     reset_request_audit_context,
     should_skip_request_activity_log,
 )
-from app.utils.page_view_paths import page_view_path_key_from_request
-from app.utils.activity_logging_skip import (
+from app.utils.activity.page_view_paths import page_view_path_key_from_request
+from app.utils.activity.activity_logging_skip import (
     ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING,
     ENTRY_FORM_ACTIVITY_ENDPOINTS,
     audit_endpoint_for_activity,
@@ -430,7 +430,7 @@ def _extract_entity_into_context(app, req, context_data):
                 context_data['country_id'] = aes.entity_id
                 country = Country.query.get(aes.entity_id)
             else:
-                from app.utils.api_serialization import _country_for_aes
+                from app.utils.api.api_serialization import _country_for_aes
                 country = _country_for_aes(aes)
                 if country:
                     context_data['country_id'] = country.id
@@ -463,7 +463,7 @@ def _extract_entity_into_context(app, req, context_data):
                 payload = req.form
             else:
                 try:
-                    from app.utils.request_utils import get_json_or_form
+                    from app.utils.http.request_utils import get_json_or_form
 
                     payload = get_json_or_form() or {}
                 except Exception:

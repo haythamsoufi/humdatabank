@@ -109,7 +109,7 @@ def ensure_validation_packs() -> None:
     this function does not import inactive ones. The general checks pack is
     always registered.
     """
-    from app.utils.data_quality_constants import RULE_PACK_CORE
+    from app.utils.indicators.data_quality_constants import RULE_PACK_CORE
 
     if RULE_PACK_CORE not in _PACKS:
         from app.services.validation.core_checks import register_core_validation_pack

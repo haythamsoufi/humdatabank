@@ -830,7 +830,7 @@ class AIDocumentProcessor:
             return [[None for _ in range(ncols)] for _ in range(nrows)]
 
         # Render at moderate DPI for reasonable sampling quality.
-        from app.utils.safe_image import clamp_dpi, open_image_safe, render_page_size
+        from app.utils.files.safe_image import clamp_dpi, open_image_safe, render_page_size
 
         pix = page.get_pixmap(dpi=clamp_dpi(*render_page_size(page), 150), alpha=False)
         img = open_image_safe(pix.tobytes("png")).convert("RGB")
@@ -1191,7 +1191,7 @@ class AIDocumentProcessor:
         }
 
         try:
-            from app.utils.safe_workbook import (
+            from app.utils.files.safe_workbook import (
                 load_workbook_safe,
                 read_workbook_file_bytes,
                 safe_iter_rows,
@@ -1372,7 +1372,7 @@ class AIDocumentProcessor:
 
         try:
             import pytesseract  # noqa: F401
-            from app.utils.safe_image import (
+            from app.utils.files.safe_image import (
                 clamp_dpi,
                 ocr_image_to_string,
                 open_image_safe,

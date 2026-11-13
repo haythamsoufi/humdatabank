@@ -3,7 +3,7 @@ Unit tests for api_responses helpers.
 """
 import pytest
 
-from app.utils.api_responses import (
+from app.utils.api.api_responses import (
     json_error,
     json_ok,
     json_bad_request,

@@ -417,7 +417,7 @@ class TestApiGetNotificationCount:
 
 class TestNotificationCountRateLimitKey:
     def test_keys_by_user_when_authenticated(self, app):
-        from app.utils.rate_limiting import per_user_rate_limit_key
+        from app.utils.security.rate_limiting import per_user_rate_limit_key
 
         key_func = per_user_rate_limit_key("notif_count")
         user = MagicMock(is_authenticated=True)
@@ -427,7 +427,7 @@ class TestNotificationCountRateLimitKey:
             assert key_func() == "notif_count_u42"
 
     def test_two_users_on_same_ip_get_separate_buckets(self, app):
-        from app.utils.rate_limiting import per_user_rate_limit_key
+        from app.utils.security.rate_limiting import per_user_rate_limit_key
 
         key_func = per_user_rate_limit_key("notif_count")
         keys = set()
@@ -441,7 +441,7 @@ class TestNotificationCountRateLimitKey:
         assert len(keys) == 2
 
     def test_falls_back_to_ip_when_anonymous(self, app):
-        from app.utils.rate_limiting import per_user_rate_limit_key
+        from app.utils.security.rate_limiting import per_user_rate_limit_key
 
         key_func = per_user_rate_limit_key("notif_count")
         anon = MagicMock(is_authenticated=False)
@@ -973,7 +973,7 @@ class TestRegisterDevice:
 
     def test_success_ios(self, logged_in_client, db_session):
         with patch(
-            "app.utils.notification_push.is_notifications_push_enabled",
+            "app.utils.notifications.notification_push.is_notifications_push_enabled",
             return_value=True,
         ), patch(
             "app.services.notification.push.PushNotificationService.register_device",
@@ -987,7 +987,7 @@ class TestRegisterDevice:
 
     def test_success_android(self, logged_in_client, db_session):
         with patch(
-            "app.utils.notification_push.is_notifications_push_enabled",
+            "app.utils.notifications.notification_push.is_notifications_push_enabled",
             return_value=True,
         ), patch(
             "app.services.notification.push.PushNotificationService.register_device",

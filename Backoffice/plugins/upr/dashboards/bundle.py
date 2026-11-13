@@ -10,7 +10,7 @@ from flask_login import current_user
 from app.models.assignments import AssignmentEntityStatus
 from app.models.organization import NationalSociety
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.country_utils import (
+from app.utils.organization.country_utils import (
     PART_OF_CATEGORY_TEXT,
     load_part_of_category_catalog,
 )
@@ -103,7 +103,7 @@ def list_bundles_for_bulk(assigned_form_id: int) -> list[dict[str, Any]]:
     """Bundles on one assignment: two or more countries sharing a Bundle category value."""
     from app.extensions import db
     from app.models.core import Country
-    from app.utils.country_utils import is_sandbox_country
+    from app.utils.organization.country_utils import is_sandbox_country
 
     category = bundle_category_name()
     rows = (
@@ -175,7 +175,7 @@ def build_bundle_payload_for_form(
 def _bundle_member_ids(assigned_form_id: int, bundle_value: str) -> list[int]:
     from app.extensions import db
     from app.models.core import Country
-    from app.utils.country_utils import is_sandbox_country
+    from app.utils.organization.country_utils import is_sandbox_country
 
     category = bundle_category_name()
     wanted = bundle_value.casefold()

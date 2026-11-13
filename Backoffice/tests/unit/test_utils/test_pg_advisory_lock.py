@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.utils.pg_advisory_lock import (
+from app.utils.database.pg_advisory_lock import (
     release_session_advisory_lock,
     session_holds_advisory_lock,
     try_session_advisory_lock,
@@ -60,8 +60,8 @@ class TestWaitForSessionAdvisoryLock:
     def test_returns_true_immediately_when_free(self):
         session = MagicMock()
         with patch(
-            "app.utils.pg_advisory_lock.try_session_advisory_lock", return_value=True
-        ) as mock_try, patch("app.utils.pg_advisory_lock.time.sleep") as mock_sleep:
+            "app.utils.database.pg_advisory_lock.try_session_advisory_lock", return_value=True
+        ) as mock_try, patch("app.utils.database.pg_advisory_lock.time.sleep") as mock_sleep:
             acquired = wait_for_session_advisory_lock(session, 702346, timeout_seconds=5.0)
 
         assert acquired is True
@@ -71,9 +71,9 @@ class TestWaitForSessionAdvisoryLock:
     def test_retries_until_acquired(self):
         session = MagicMock()
         with patch(
-            "app.utils.pg_advisory_lock.try_session_advisory_lock",
+            "app.utils.database.pg_advisory_lock.try_session_advisory_lock",
             side_effect=[False, False, True],
-        ) as mock_try, patch("app.utils.pg_advisory_lock.time.sleep") as mock_sleep:
+        ) as mock_try, patch("app.utils.database.pg_advisory_lock.time.sleep") as mock_sleep:
             acquired = wait_for_session_advisory_lock(
                 session, 702346, timeout_seconds=5.0, poll_interval_seconds=0.25
             )
@@ -88,7 +88,7 @@ class TestWaitForSessionAdvisoryLock:
         """Never acquires; must return False rather than block forever."""
         session = MagicMock()
         with patch(
-            "app.utils.pg_advisory_lock.try_session_advisory_lock", return_value=False
+            "app.utils.database.pg_advisory_lock.try_session_advisory_lock", return_value=False
         ):
             acquired = wait_for_session_advisory_lock(
                 session, 702346, timeout_seconds=0.05, poll_interval_seconds=0.01
@@ -99,8 +99,8 @@ class TestWaitForSessionAdvisoryLock:
     def test_zero_timeout_tries_once_and_gives_up(self):
         session = MagicMock()
         with patch(
-            "app.utils.pg_advisory_lock.try_session_advisory_lock", return_value=False
-        ) as mock_try, patch("app.utils.pg_advisory_lock.time.sleep") as mock_sleep:
+            "app.utils.database.pg_advisory_lock.try_session_advisory_lock", return_value=False
+        ) as mock_try, patch("app.utils.database.pg_advisory_lock.time.sleep") as mock_sleep:
             acquired = wait_for_session_advisory_lock(session, 702346, timeout_seconds=0.0)
 
         assert acquired is False

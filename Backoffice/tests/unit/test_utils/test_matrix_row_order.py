@@ -1,6 +1,6 @@
 """Matrix row headers: periods stay in calendar order."""
 
-from app.utils.matrix_row_order import sort_matrix_display_rows
+from app.utils.forms.matrix_row_order import sort_matrix_display_rows
 
 
 def test_period_row_headers_sort_chronologically():

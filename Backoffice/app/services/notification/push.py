@@ -1,5 +1,5 @@
 # ========== Push Notification Service ==========
-from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.common.datetime_helpers import utcnow, ensure_utc
 """
 Push notification service for sending notifications via FCM V1 API (Firebase Cloud Messaging).
 
@@ -120,7 +120,7 @@ class PushNotificationService:
         Returns:
             Dict with success status and results
         """
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             push_disabled_service_result,
         )
@@ -405,7 +405,7 @@ class PushNotificationService:
         Returns:
             Dict with success status
         """
-        from app.utils.notification_push import (
+        from app.utils.notifications.notification_push import (
             is_notifications_push_enabled,
             push_disabled_service_result,
         )
@@ -642,7 +642,7 @@ class PushNotificationService:
         Returns:
             True if update was performed, False if throttled or device not found
         """
-        from app.utils.notification_push import is_notifications_push_enabled
+        from app.utils.notifications.notification_push import is_notifications_push_enabled
 
         if not is_notifications_push_enabled():
             return False

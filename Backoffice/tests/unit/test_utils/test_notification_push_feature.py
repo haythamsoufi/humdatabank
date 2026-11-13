@@ -1,7 +1,7 @@
-"""Tests for app/utils/notification_push.py and push feature gating."""
+"""Tests for app/utils/notifications/notification_push.py and push feature gating."""
 from unittest.mock import patch
 
-from app.utils.notification_push import (
+from app.utils.notifications.notification_push import (
     PUSH_NOT_ENABLED_CODE,
     is_notifications_push_enabled,
     preferences_for_client,
@@ -46,7 +46,7 @@ class TestNotificationPushFeatureFlag:
             })()
 
             with patch(
-                'app.utils.notification_push.is_notifications_push_enabled',
+                'app.utils.notifications.notification_push.is_notifications_push_enabled',
                 return_value=False,
             ):
                 payload = preferences_for_client(prefs)
@@ -56,7 +56,7 @@ class TestNotificationPushFeatureFlag:
     def test_strip_push_preference_kwargs_when_disabled(self, app):
         with app.app_context():
             with patch(
-                'app.utils.notification_push.is_notifications_push_enabled',
+                'app.utils.notifications.notification_push.is_notifications_push_enabled',
                 return_value=False,
             ):
                 filtered = strip_push_preference_kwargs({
@@ -75,7 +75,7 @@ class TestPushServiceWhenFeatureDisabled:
 
         with app.app_context():
             with patch(
-                'app.utils.notification_push.is_notifications_push_enabled',
+                'app.utils.notifications.notification_push.is_notifications_push_enabled',
                 return_value=False,
             ):
                 result = PushNotificationService.send_push_notification(
@@ -89,7 +89,7 @@ class TestPushServiceWhenFeatureDisabled:
 
         with app.app_context():
             with patch(
-                'app.utils.notification_push.is_notifications_push_enabled',
+                'app.utils.notifications.notification_push.is_notifications_push_enabled',
                 return_value=False,
             ):
                 result = PushNotificationService.register_device(
@@ -103,7 +103,7 @@ class TestPushServiceWhenFeatureDisabled:
 
         with app.app_context():
             with patch(
-                'app.utils.notification_push.is_notifications_push_enabled',
+                'app.utils.notifications.notification_push.is_notifications_push_enabled',
                 return_value=False,
             ):
                 assert PushNotificationService.update_device_activity(user_id=1) is False

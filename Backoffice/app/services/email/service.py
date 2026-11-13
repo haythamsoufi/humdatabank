@@ -2,8 +2,8 @@ from flask import current_app, url_for
 from app.services.email.rendering import render_admin_email_template
 from app.services.email.client import send_email
 from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed_or_unknown
-from app.utils.datetime_helpers import utcnow
-from app.utils.organization_helpers import (
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.organization.organization_helpers import (
     get_org_name, get_org_short_name, get_org_copyright_year, get_org_team_email
 )
 from app.services.platform.app_settings_service import get_email_template
@@ -606,7 +606,7 @@ def send_admin_notification_email(suggestion):
 def _security_alert_fallback_html_body(context):
     """Minimal HTML when template render or sanitisation yields an empty body."""
     from markupsafe import escape
-    from app.utils.datetime_helpers import ensure_utc
+    from app.utils.common.datetime_helpers import ensure_utc
 
     ts = context.get("timestamp")
     if ts is not None and hasattr(ts, "strftime"):

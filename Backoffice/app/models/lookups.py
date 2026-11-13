@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, JSON
 from sqlalchemy.orm import relationship, backref
 from ..extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class LookupList(db.Model):

@@ -22,10 +22,10 @@ from app.services.data_quality.helpers import (
     compliance_doc_status_counts_toward_requirement,
     list_exploration_period_names,
 )
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error
-from app.utils.country_utils import exclude_sandbox_countries
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_ok, json_server_error
+from app.utils.organization.country_utils import exclude_sandbox_countries
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.fdrs import bp
 from plugins.fdrs.data_quality.fdrs_v1_catalog import (
     COMPLIANCE_DOC_TYPES,

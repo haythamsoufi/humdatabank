@@ -1,4 +1,4 @@
-"""Unit tests for app.utils.logging_handlers."""
+"""Unit tests for app.utils.monitoring.logging_handlers."""
 
 import logging
 import os
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.utils.logging_handlers import SafeRotatingFileHandler, create_app_log_formatter, create_rotating_file_handler
+from app.utils.monitoring.logging_handlers import SafeRotatingFileHandler, create_app_log_formatter, create_rotating_file_handler
 
 
 class TestSafeRotatingFileHandler:
@@ -22,13 +22,13 @@ class TestSafeRotatingFileHandler:
         handler = SafeRotatingFileHandler("dummy.log", maxBytes=10, backupCount=1)
         with (
             patch.object(handler, "baseFilename", "source.log"),
-            patch("app.utils.logging_handlers.os.name", "nt"),
+            patch("app.utils.monitoring.logging_handlers.os.name", "nt"),
             patch(
                 "logging.handlers.RotatingFileHandler.rotate",
                 side_effect=PermissionError("locked"),
             ),
-            patch("app.utils.logging_handlers.os.path.exists", return_value=True),
-            patch("app.utils.logging_handlers.shutil.copy2") as copy_mock,
+            patch("app.utils.monitoring.logging_handlers.os.path.exists", return_value=True),
+            patch("app.utils.monitoring.logging_handlers.shutil.copy2") as copy_mock,
             patch("builtins.open", create=True) as open_mock,
         ):
             handler.rotate("source.log", "dest.log")
@@ -38,7 +38,7 @@ class TestSafeRotatingFileHandler:
     def test_rotate_raises_on_non_windows_permission_error(self):
         handler = SafeRotatingFileHandler("dummy.log", maxBytes=10, backupCount=1)
         with (
-            patch("app.utils.logging_handlers.os.name", "posix"),
+            patch("app.utils.monitoring.logging_handlers.os.name", "posix"),
             patch(
                 "logging.handlers.RotatingFileHandler.rotate",
                 side_effect=PermissionError("locked"),
@@ -82,7 +82,7 @@ class TestOrgTimezoneLogging:
         assert "hello" in rendered
 
     def test_configure_process_org_timezone_sets_env(self, monkeypatch):
-        from app.utils.logging_handlers import configure_process_org_timezone
+        from app.utils.monitoring.logging_handlers import configure_process_org_timezone
 
         monkeypatch.delenv("TZ", raising=False)
         tz = configure_process_org_timezone()
@@ -92,7 +92,7 @@ class TestOrgTimezoneLogging:
     def test_werkzeug_access_log_time_uses_org_timezone(self):
         from datetime import datetime, timezone
 
-        from app.utils.logging_handlers import install_org_timezone_werkzeug_access_log
+        from app.utils.monitoring.logging_handlers import install_org_timezone_werkzeug_access_log
         from werkzeug.serving import WSGIRequestHandler
 
         assert install_org_timezone_werkzeug_access_log() is True

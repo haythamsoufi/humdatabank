@@ -31,9 +31,9 @@ from app.models import (
 )
 from app.models.assignments import AssignmentEntityStatus
 from app.extensions import db
-from app.utils.api_helpers import service_error, GENERIC_ERROR_MESSAGE
-from app.utils.datetime_helpers import utcnow
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import service_error, GENERIC_ERROR_MESSAGE
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 # Re-export from domain modules so existing "from app.services.data_retrieval.service import ..." still works.
 from .shared import (

@@ -32,7 +32,7 @@ from app.models.rbac import (
     RbacUserRole,
     RbacAccessGrant,
 )
-from app.utils.datetime_helpers import ensure_utc, naive_utc, utcnow
+from app.utils.common.datetime_helpers import ensure_utc, naive_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +189,7 @@ def _calculate_health_score(sections: Dict[str, Any]) -> Dict[str, Any]:
 def _get_ownership_metrics() -> Dict[str, Any]:
     """Focal point / data owner coverage."""
     from app.models.indicator_bank import IndicatorBank
-    from app.utils.organization_helpers import is_org_email
+    from app.utils.organization.organization_helpers import is_org_email
 
     countries = (
         Country.query

@@ -66,9 +66,9 @@ class TestHealthProbe:
              patch('app.services.monitoring.memory.log_request_memory_end'), \
              patch('app.services.monitoring.system.track_request_performance'), \
              patch('app.services.monitoring.system.log_request_performance_end'), \
-             patch('app.utils.request_utils.mark_mobile_app_webview_embed_request'), \
-             patch('app.utils.request_utils.persist_mobile_app_embed_cookie', side_effect=lambda r: r), \
-             patch('app.utils.mobile_auth._try_jwt_auth'), \
+             patch('app.utils.http.request_utils.mark_mobile_app_webview_embed_request'), \
+             patch('app.utils.http.request_utils.persist_mobile_app_embed_cookie', side_effect=lambda r: r), \
+             patch('app.utils.mobile.mobile_auth._try_jwt_auth'), \
              patch('app.i18n.update_session_activity'):
             register_request_hooks(flask_app)
 
@@ -176,8 +176,8 @@ class TestJwtAuthHook:
     def test_skips_jwt_for_static_asset(self, app):
         """Static asset requests should skip JWT auth."""
         with app.test_request_context('/static/main.css'):
-            with patch('app.utils.request_utils.is_static_asset_request', return_value=True):
-                with patch('app.utils.mobile_auth._try_jwt_auth') as mock_jwt:
+            with patch('app.utils.http.request_utils.is_static_asset_request', return_value=True):
+                with patch('app.utils.mobile.mobile_auth._try_jwt_auth') as mock_jwt:
                     # Hook returns early for static assets
                     pass
 
@@ -186,8 +186,8 @@ class TestJwtAuthHook:
         with app.test_request_context('/api/data'):
             mock_user = MagicMock(is_authenticated=False)
             with patch('flask_login.utils._get_user', return_value=mock_user):
-                with patch('app.utils.request_utils.is_static_asset_request', return_value=False):
-                    with patch('app.utils.mobile_auth._try_jwt_auth') as mock_jwt:
+                with patch('app.utils.http.request_utils.is_static_asset_request', return_value=False):
+                    with patch('app.utils.mobile.mobile_auth._try_jwt_auth') as mock_jwt:
                         pass  # Hook registered, JWT would be called in real flow
 
 

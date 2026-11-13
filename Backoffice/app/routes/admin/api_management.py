@@ -14,9 +14,9 @@ from app.models import (
 from app import db
 from app.routes.admin.shared import admin_permission_required
 from flask import current_app
-from app.utils.datetime_helpers import utcnow
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_ok, json_server_error
 from app.services.platform.api_usage_stats import (
     bulk_endpoint_usage_stats,
     chart_stats_for_period,
@@ -222,7 +222,7 @@ def _auth_for_view(view_fn) -> tuple[str, str | None]:
 
 
 def _capability_for_view(view_fn) -> str | None:
-    """API-key capability declared on a view (see app.utils.auth), following ``__wrapped__``."""
+    """API-key capability declared on a view (see app.utils.auth.auth), following ``__wrapped__``."""
     seen = 0
     while view_fn is not None and seen < 20:
         capability = getattr(view_fn, '_ep_capability', None)

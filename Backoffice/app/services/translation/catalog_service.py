@@ -13,7 +13,7 @@ from flask_login import current_user
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +209,7 @@ def upsert_string(
         if sync_po:
             _sync_po_entry(locale, msgid, new_msgstr, is_plural=is_plural, msgstr_plural=msgstr_plural)
         if compile_after:
-            from app.utils.po_persistence import finalize_translation_writes
+            from app.utils.i18n.po_persistence import finalize_translation_writes
 
             finalize_translation_writes([locale], refresh=True)
     return changed
@@ -245,7 +245,7 @@ def upsert_many(
             db.session.rollback()
             logger.exception("catalog_service.upsert_many commit failed")
             return 0, []
-        from app.utils.po_persistence import finalize_translation_writes
+        from app.utils.i18n.po_persistence import finalize_translation_writes
 
         finalize_translation_writes(updated, refresh=True)
     else:
@@ -375,7 +375,7 @@ def upsert_batch(
     for locale, msgid_map in changed_by_locale.items():
         _sync_po_entries_bulk(locale, msgid_map)
 
-    from app.utils.po_persistence import finalize_translation_writes
+    from app.utils.i18n.po_persistence import finalize_translation_writes
 
     finalize_translation_writes(updated_locales, refresh=True)
 
@@ -553,8 +553,8 @@ def compile_locale_from_db(locale: str) -> int:
         _translations_po_path,
         _translations_pot_path,
     )
-    from app.utils.po_lock import po_file_lock
-    from app.utils.po_persistence import finalize_translation_writes
+    from app.utils.i18n.po_lock import po_file_lock
+    from app.utils.i18n.po_persistence import finalize_translation_writes
 
     locale = (locale or "").strip().lower()
     if not locale:
@@ -692,7 +692,7 @@ def sync_catalogs_if_stale() -> Optional[int]:
     Returns the version materialized, or None when nothing needed doing (or the
     version could not be read).
     """
-    from app.utils.po_lock import po_file_lock
+    from app.utils.i18n.po_lock import po_file_lock
 
     db_version = read_catalog_version()
     if db_version is None:
@@ -934,8 +934,8 @@ def purge_removed_strings(msgid: Optional[str] = None) -> Dict[str, Any]:
     """
     from app.models.translation_quality import TranslationString
     from app.routes.admin.utilities.helpers import _translations_po_path
-    from app.utils.po_lock import po_file_lock
-    from app.utils.po_persistence import finalize_translation_writes
+    from app.utils.i18n.po_lock import po_file_lock
+    from app.utils.i18n.po_persistence import finalize_translation_writes
 
     removed_ids = catalog_removed_msgids()
     if msgid is not None:
@@ -1223,7 +1223,7 @@ def _sync_po_entry(
 ) -> None:
     """Keep the .po artifact in sync so Flask-Babel .mo compile stays unchanged."""
     from app.routes.admin.utilities.helpers import _translations_po_path
-    from app.utils.po_persistence import save_po_locked
+    from app.utils.i18n.po_persistence import save_po_locked
 
     po_path = _translations_po_path(locale)
     if not os.path.exists(po_path):
@@ -1262,7 +1262,7 @@ def _sync_po_entries_bulk(locale: str, msgid_to_msgstr: Dict[str, str]) -> int:
     calling _sync_po_entry in a loop would incur.
     """
     from app.routes.admin.utilities.helpers import _translations_po_path
-    from app.utils.po_persistence import save_po_locked
+    from app.utils.i18n.po_persistence import save_po_locked
 
     po_path = _translations_po_path(locale)
     if not os.path.exists(po_path) or not msgid_to_msgstr:

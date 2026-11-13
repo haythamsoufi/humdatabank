@@ -16,7 +16,7 @@ from app.extensions import db
 from app.models import ReportDefinition, User
 from app.services.reports.definition_service import ReportDefinitionService
 from app.services.reports.schema import default_definition, default_section_grid, default_widget_layout, validate_report_definition
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
 EXAMPLE_SLUG = "pb27-28-progress-example"
 

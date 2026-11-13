@@ -376,7 +376,7 @@ class TestEntryFormFormsApiPresence:
             db_session.commit()
 
             with patch("app.routes.forms_api.check_aes_access_light", return_value=True), \
-                 patch("app.utils.user_analytics.log_user_activity", return_value=None):
+                 patch("app.services.platform.user_analytics_service.log_user_activity", return_value=None):
                 resp = client.post(f"/api/forms/presence/assignment/{aes_id}/sync")
                 assert resp.status_code == 200
                 data = resp.get_json()
@@ -404,7 +404,7 @@ class TestEntryFormFormsApiPresence:
             aes_id = aes.id
             db_session.commit()
 
-            with patch("app.utils.user_analytics.log_user_activity", return_value=None):
+            with patch("app.services.platform.user_analytics_service.log_user_activity", return_value=None):
                 resp = client.post(f"/api/forms/presence/assignment/{aes_id}/leave")
                 assert resp.status_code == 200
                 data = resp.get_json()

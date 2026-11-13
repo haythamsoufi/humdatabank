@@ -131,7 +131,7 @@ class TestResolveNotificationContent:
 
 class TestCreateScheduledNotification:
     def _future_time(self, minutes=60):
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         return utcnow() + timedelta(minutes=minutes)
 
     def test_creates_notification_for_future_time(self, app, db_session):
@@ -210,7 +210,7 @@ class TestCreateScheduledNotification:
         assert result == []
 
     def test_falls_back_to_immediate_when_past_time(self, app, db_session):
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
         from app.models import User
         from app import db
 
@@ -372,7 +372,7 @@ class TestProcessScheduledNotifications:
     def test_processes_due_notifications(self, app, db_session):
         from app.models import User, Notification
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='process_sched@test.com', name='Process', active=True)
@@ -392,8 +392,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService'):
                             with patch('app.services.notification.scheduling.send_instant_notification_email'):
@@ -404,7 +404,7 @@ class TestProcessScheduledNotifications:
     def test_skips_notifications_for_disabled_type(self, app, db_session):
         from app.models import User, Notification, NotificationPreferences
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='sched_skip@test.com', name='Skip', active=True)
@@ -440,7 +440,7 @@ class TestProcessScheduledNotifications:
     def test_handles_broadcast_failure_gracefully(self, app, db_session):
         from app.models import User, Notification
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='broadcast_fail@test.com', name='BFail', active=True)
@@ -460,9 +460,9 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification',
+            with patch('app.utils.realtime.ws_manager.broadcast_notification',
                        side_effect=Exception('ws fail')):
-                with patch('app.services.notification.scheduling.broadcast_unread_count',
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count',
                            side_effect=Exception('ws fail')):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService'):
@@ -474,7 +474,7 @@ class TestProcessScheduledNotifications:
     def test_handles_push_failure_gracefully(self, app, db_session):
         from app.models import User, Notification
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='push_fail@test.com', name='PFail', active=True)
@@ -494,8 +494,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService') as MockPush:
                             MockPush.send_push_notification.side_effect = Exception('push fail')
@@ -507,7 +507,7 @@ class TestProcessScheduledNotifications:
     def test_handles_email_failure_gracefully(self, app, db_session):
         from app.models import User, Notification
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='email_fail_sched@test.com', name='EFail', active=True)
@@ -527,8 +527,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService'):
                             with patch('app.services.notification.scheduling.send_instant_notification_email',
@@ -548,7 +548,7 @@ class TestProcessScheduledNotifications:
     def test_notification_with_related_url_sends_data_to_push(self, app, db_session):
         from app.models import User, Notification
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='push_data@test.com', name='PData', active=True)
@@ -569,8 +569,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService') as MockPush:
                             MockPush.send_push_notification.return_value = {'success': True}
@@ -588,7 +588,7 @@ class TestProcessScheduledNotifications:
     def test_notification_without_user_skips_push_and_email(self, app, db_session):
         from app.models import User, Notification
         from app import db
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             user = User(email='no_user_push@test.com', name='NUP', active=True)
@@ -608,8 +608,8 @@ class TestProcessScheduledNotifications:
             db.session.add(notif)
             db.session.commit()
 
-            with patch('app.services.notification.scheduling.broadcast_notification'):
-                with patch('app.services.notification.scheduling.broadcast_unread_count'):
+            with patch('app.utils.realtime.ws_manager.broadcast_notification'):
+                with patch('app.utils.realtime.ws_manager.broadcast_unread_count'):
                     with patch('app.services.notification.scheduling.NotificationService'):
                         with patch('app.services.notification.scheduling.PushNotificationService') as MockPush:
                             with patch('app.services.notification.scheduling.send_instant_notification_email') as mock_email:

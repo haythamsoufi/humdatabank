@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 import os
 import shutil
 from pathlib import Path
-from app.utils.file_paths import get_plugin_upload_path
+from app.utils.files.file_paths import get_plugin_upload_path
 from plugins.interactive_map.schemas import (
     INTERACTIVE_MAP_CONFIG_SCHEMA,
     INTERACTIVE_MAP_DATA_SCHEMA,
@@ -22,7 +22,7 @@ from plugins.interactive_map.data_utils import (
 )
 from plugins.interactive_map.config import plugin_config
 from plugins.metadata import FirstPartyPluginMetadata
-from app.utils.schema_validation import validate_plugin_config, validate_plugin_data, sanitize_plugin_data
+from app.utils.forms.schema_validation import validate_plugin_config, validate_plugin_data, sanitize_plugin_data
 
 
 _APP_CONFIG_KEYS = ('INTERACTIVE_MAP_DEFAULT_CENTER', 'INTERACTIVE_MAP_TILE_PROVIDER')
@@ -444,7 +444,7 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
                 current_app.logger.info(f"Removed uploaded files directory: {upload_dir}")
 
             # Legacy locations used by earlier versions
-            from app.utils.file_paths import get_upload_base_path
+            from app.utils.files.file_paths import get_upload_base_path
             upload_base = Path(get_upload_base_path())
             for map_dir in ('map_tiles', 'map_exports'):
                 map_path = upload_base / map_dir

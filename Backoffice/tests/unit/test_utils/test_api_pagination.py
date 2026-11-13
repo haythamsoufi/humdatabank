@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import MagicMock, patch, call
 from werkzeug.datastructures import ImmutableMultiDict
 
-from app.utils.api_pagination import (
+from app.utils.api.api_pagination import (
     query_filter_in_batches,
     validate_pagination_params,
     parse_date_range,
@@ -20,7 +20,7 @@ from app.utils.api_pagination import (
     get_paginated_data_ids,
     fetch_paginated_rows,
 )
-from app.utils.api_helpers import MAX_PER_PAGE, DEFAULT_PER_PAGE, DEFAULT_PAGE
+from app.utils.api.api_helpers import MAX_PER_PAGE, DEFAULT_PER_PAGE, DEFAULT_PAGE
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ class TestQueryFilterInBatches:
         assert base_query.filter.call_count == 1
 
     def test_default_batch_size(self):
-        from app.utils.api_pagination import SQL_IN_BATCH_SIZE
+        from app.utils.api.api_pagination import SQL_IN_BATCH_SIZE
         base_query = MagicMock()
         base_query.filter.return_value.all.return_value = []
         query_filter_in_batches(base_query, MagicMock(), list(range(5)))
@@ -447,9 +447,9 @@ class TestGetPaginatedDataIds:
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
 
-            with patch('app.utils.api_pagination.db') as mock_db, \
-                 patch('app.utils.api_pagination.desc') as mock_desc, \
-                 patch('app.utils.api_pagination.asc') as mock_asc:
+            with patch('app.utils.api.api_pagination.db') as mock_db, \
+                 patch('app.utils.api.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api.api_pagination.asc') as mock_asc:
                 mock_db.session.query.return_value = mock_chain
                 page_rows, total = get_paginated_data_ids(assigned_q, None, page=1, per_page=10)
             assert total == 7
@@ -476,11 +476,11 @@ class TestGetPaginatedDataIds:
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
 
-            with patch('app.utils.api_pagination.db') as mock_db, \
-                 patch('app.utils.api_pagination.desc') as mock_desc, \
-                 patch('app.utils.api_pagination.asc') as mock_asc, \
-                 patch('app.utils.api_pagination.select') as mock_select, \
-                 patch('app.utils.api_pagination.func') as mock_func:
+            with patch('app.utils.api.api_pagination.db') as mock_db, \
+                 patch('app.utils.api.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api.api_pagination.asc') as mock_asc, \
+                 patch('app.utils.api.api_pagination.select') as mock_select, \
+                 patch('app.utils.api.api_pagination.func') as mock_func:
                 mock_db.session.query.return_value = mock_chain
                 # scalar() returns the mocked total count
                 mock_db.session.execute.return_value.scalar.return_value = 8
@@ -502,9 +502,9 @@ class TestGetPaginatedDataIds:
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.all.return_value = mock_rows
 
-            with patch('app.utils.api_pagination.db') as mock_db, \
-                 patch('app.utils.api_pagination.desc') as mock_desc, \
-                 patch('app.utils.api_pagination.asc') as mock_asc:
+            with patch('app.utils.api.api_pagination.db') as mock_db, \
+                 patch('app.utils.api.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api.api_pagination.asc') as mock_asc:
                 mock_db.session.query.return_value = mock_chain
                 page_rows, total = get_paginated_data_ids(
                     assigned_q, None, page=1, per_page=10, paginate=False
@@ -523,9 +523,9 @@ class TestGetPaginatedDataIds:
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
 
-            with patch('app.utils.api_pagination.db') as mock_db, \
-                 patch('app.utils.api_pagination.desc') as mock_desc, \
-                 patch('app.utils.api_pagination.asc') as mock_asc:
+            with patch('app.utils.api.api_pagination.db') as mock_db, \
+                 patch('app.utils.api.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api.api_pagination.asc') as mock_asc:
                 mock_db.session.query.return_value = mock_chain
                 # sort_field != 'submitted_at' triggers the fallback log path
                 page_rows, total = get_paginated_data_ids(
@@ -558,7 +558,7 @@ class TestFetchPaginatedRows:
         fetched = MagicMock()
         fetched.id = 1
 
-        with patch('app.utils.api_pagination.query_filter_in_batches', return_value=[fetched]):
+        with patch('app.utils.api.api_pagination.query_filter_in_batches', return_value=[fetched]):
             assigned_map, public_map = fetch_paginated_rows(assigned_q, public_q, [page_row])
 
         assert assigned_map == {1: fetched}
@@ -575,7 +575,7 @@ class TestFetchPaginatedRows:
         fetched = MagicMock()
         fetched.id = 42
 
-        with patch('app.utils.api_pagination.query_filter_in_batches', return_value=[fetched]):
+        with patch('app.utils.api.api_pagination.query_filter_in_batches', return_value=[fetched]):
             assigned_map, public_map = fetch_paginated_rows(assigned_q, public_q, [page_row])
 
         assert assigned_map == {}
@@ -598,7 +598,7 @@ class TestFetchPaginatedRows:
                 return [fetched_a]
             return [fetched_p]
 
-        with patch('app.utils.api_pagination.query_filter_in_batches', side_effect=side_effect):
+        with patch('app.utils.api.api_pagination.query_filter_in_batches', side_effect=side_effect):
             assigned_map, public_map = fetch_paginated_rows(
                 assigned_q, public_q, [row_a, row_p]
             )

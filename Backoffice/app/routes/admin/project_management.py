@@ -20,10 +20,10 @@ from app.services.projects.service import (
     sync_project_cycle_closure,
     upsert_project,
 )
-from app.utils.api_responses import json_bad_request, json_ok
-from app.utils.datetime_helpers import utcnow
-from app.utils.request_utils import is_json_request
-from app.utils.transactions import request_transaction_rollback
+from app.utils.api.api_responses import json_bad_request, json_ok
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.http.request_utils import is_json_request
+from app.utils.database.transactions import request_transaction_rollback
 
 bp = Blueprint("project_management", __name__, url_prefix="/admin/projects")
 

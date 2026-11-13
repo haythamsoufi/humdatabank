@@ -290,7 +290,7 @@ class TestLoginRouteDirectExtended:
 
     def test_login_account_locked(self, app, db_session):
         from app.routes.auth import login
-        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        from app.utils.auth.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
 
         with app.app_context():
             create_test_user(db_session, email='locked-direct@example.com', password='TestPass123!')

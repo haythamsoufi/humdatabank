@@ -33,7 +33,7 @@ def _public_dns_for_libre(monkeypatch):
     import ipaddress
 
     monkeypatch.setattr(
-        "app.utils.outbound_url.resolve_host_ips",
+        "app.utils.http.outbound_url.resolve_host_ips",
         lambda host, port=None: (ipaddress.ip_address("93.184.216.34"),),
     )
 

@@ -14,7 +14,7 @@ from app.services.platform.governance_program import (
     sync_issues,
     validate_acceptance,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 pytestmark = [pytest.mark.unit]
 

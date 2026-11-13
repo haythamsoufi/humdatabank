@@ -20,7 +20,7 @@ from app.services.communication.center_service import (
 )
 from app.services.email.delivery import get_email_delivery_logs_needing_attention
 from app.services.notification.service import NotificationService
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 def _make_user(suffix=None):

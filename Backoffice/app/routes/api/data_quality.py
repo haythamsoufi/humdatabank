@@ -5,9 +5,9 @@ from flask_login import login_required, current_user
 
 from app.routes.api import api_bp
 from app.services.data_quality.service import compute_data_quality, list_data_quality_templates_for_entity
-from app.utils.api_errors import client_error_message
-from app.utils.api_helpers import json_response, api_error
-from app.utils.data_quality_constants import is_data_quality_dashboard_enabled
+from app.utils.api.api_errors import client_error_message
+from app.utils.api.api_helpers import json_response, api_error
+from app.utils.indicators.data_quality_constants import is_data_quality_dashboard_enabled
 
 
 def _user_can_access_entity(entity_type: str, entity_id: int) -> bool:

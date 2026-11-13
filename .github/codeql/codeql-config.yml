@@ -21,6 +21,6 @@ query-filters:
   - exclude:
       id: py/stack-trace-exposure
       paths:
-        - Backoffice/app/utils/api_responses.py
-        - app/utils/api_responses.py
+        - Backoffice/app/utils/api/api_responses.py
+        - app/utils/api/api_responses.py
         - "**/api_responses.py"

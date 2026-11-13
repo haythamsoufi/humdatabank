@@ -22,7 +22,7 @@ from typing import Callable, Iterator, Optional, Sequence
 from sqlalchemy import text
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.utils.datetime_helpers import ensure_utc, utcnow
+from app.utils.common.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ def job_cancel_requested(job_id: str) -> bool:
 def _job_runner_lock(app, job_id: str) -> Iterator[bool]:
     """Acquire a session advisory lock for running *job_id* (PostgreSQL only)."""
     from app.extensions import db
-    from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+    from app.utils.database.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
     acquired = False
     lock_id = _job_lock_id(job_id)

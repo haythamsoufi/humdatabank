@@ -140,7 +140,7 @@ Tests JWT acceptance and rejection (expired, invalid Bearer), 403 on missing per
 ### `test_mobile_jwt` · 12 tests (unit — no database)
 
 **Critical functions:** token-pair issuance, encode/decode roundtrips, expiry/type/audience validation, secret-key precedence  
-**Covers:** `app.utils.mobile_jwt` in isolation.  
+**Covers:** `app.utils.mobile.mobile_jwt` in isolation.  
 Verifies tokens are distinct, all roundtrip variants work, and expected errors are raised for expired/wrong-type/wrong-audience tokens. Also confirms `MOBILE_JWT_SECRET` is preferred over the generic `SECRET_KEY`.
 
 ---
@@ -148,7 +148,7 @@ Verifies tokens are distinct, all roundtrip variants work, and expected errors a
 ### `test_mobile_responses` · 20 tests (unit — no database)
 
 **Critical functions:** JSON envelope consistency, HTTP status codes, pagination metadata, error wrappers  
-**Covers:** `app.utils.mobile_responses` helper functions.  
+**Covers:** `app.utils.mobile.mobile_responses` helper functions.  
 Asserts all response helpers (`mobile_ok`, `mobile_created`, `mobile_paginated`, `mobile_error`, `bad_request`, `auth_error`, `forbidden`, `not_found`, `server_error`) produce correct envelopes and status codes.
 
 ---

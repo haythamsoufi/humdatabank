@@ -1,0 +1,254 @@
+"""
+Rules for endpoints that should not produce automatic UserActivityLog rows.
+
+Shared by activity middleware and catalog gap tooling so skip logic stays aligned.
+"""
+
+from __future__ import annotations
+
+# Exact endpoint names to skip (mirror app.middleware.activity_middleware)
+SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
+    {
+        "auth.login",
+        "auth.logout",
+        "api.heartbeat",
+        "api.status",
+        "public.health_check",
+        "forms_api.api_presence_sync",
+        "forms_api.api_presence_leave",
+        "forms_api.api_presence_active_users",
+        "main.api_get_notifications_count",
+        "main.api_get_notifications",
+        "notifications.api_get_notification_count",
+        "notifications.api_get_notifications",
+        "notifications.api_get_notification_preferences",
+        "notifications.api_notification_stream_status",
+        "notifications.mark_notifications_read",
+        "main.mark_notifications_read",
+        "main.service_worker",
+        "form_builder.edit_item",
+        "form_builder.new_section_item",
+        "form_builder.delete_item",
+        "utilities.api_auto_translate",
+        "utilities.api_auto_translate_summary",
+        "organization.api_auto_translate_organizations",
+        "system_admin.get_filtered_indicator_count",
+        "forms.search_matrix_rows",
+        "main.load_more_activities",
+        "forms_api.api_render_pending_dynamic_indicator",
+        "ai_v1.chat",
+        "ai_v1.chat_stream",
+        "ai_v1.list_conversations",
+        "ai_v1.issue_token",
+        "notifications.device_heartbeat",
+        "mobile_api.device_heartbeat",
+        "mobile_api.screen_view",
+        "admin_analytics_api.session_logs_list_api",
+        "admin_analytics_api.session_log_page_view_paths_api",
+        "admin_analytics_api.login_logs_list_api",
+        "user_management.api_users_profile_summary",
+        "main.api_users_profile_summary",
+        "utilities.refresh_csrf_token",
+        "utilities.refresh_csrf_token_get",
+        "api.get_csrf_token",
+        "forms_api.api_assignment_completion_rate",
+        "forms_api.api_search_indicator_bank",
+        "forms_api.get_lookup_list_options",
+        "forms_api.get_lookup_list_config_ui",
+        "forms_api.api_render_dynamic_indicator",
+        "user_management.get_user_entities",
+        "user_management.get_ns_hierarchy",
+        "user_management.get_secretariat_hierarchy",
+        "user_management.get_secretariat_regions_hierarchy",
+        "ai_documents.list_ifrc_api_documents",
+        "ai_documents.list_ifrc_api_types",
+        "ai_ws",
+        "ai_management.list_system_documents",
+        "settings.api_check_updates",
+        "utilities.api_translation_services",
+        # AdminActionLog already records end_user_session (forced logout); skip duplicate UserActivityLog.
+        "admin_analytics_api.end_session_api",
+        # Legacy redirect shim only — not a user-facing action worth an activity row.
+        "admin.legacy_api_key_admin_redirect",
+        # Session keepalive for entry-form users: session['last_activity'] is updated
+        # directly inside the handler; this entry only suppresses the UserActivityLog row.
+        "forms_api.api_session_keepalive",
+        # Wizard checkpoints and UI plumbing — not reconstructable accountability events.
+        "upr_excel_import.analyze",
+        "upr_excel_import.preview",
+        "upr_excel_import.upload",
+        "upr_excel_import.cancel_job",
+        # Pre-import file check; the following import POST is the accountability event.
+        "excel.validate_upr_country_reporting_import",
+        "excel.validate_unified_country_plan_import",
+        # Admin mutations that already write AdminActionLog (avoid duplicate trail rows).
+        "analytics.end_session",
+        "analytics.cleanup_sessions",
+        "analytics.resolve_security_event",
+        "security.resolve_security_event",
+        # Read-only / UI plumbing POSTs.
+        "data_exploration.get_ai_opinions_for_rows",
+        "plugin_management.render_plugin_field_builder",
+        # Middleware skip only — assignment_narrative writes via _log_upr_generation.
+        "upr.assignment_narrative",
+        "upr.cancel",
+        "pb_progress.data_source",
+        "pb_progress.mapping_sync",
+        "utilities.preview_indicator_import",
+        "notifications.mark_notifications_unread",
+        "notifications.api_admin_check_user_devices",
+        "notifications.api_view_notification",
+        "admin_communication.api_notification_type_preview",
+        "admin_communication.api_campaign_email_templates_seed",
+        "settings.api_settings_email_templates_seed",
+        "settings.api_settings_email_template_test_send",
+        "settings.api_settings_email_template_preview",
+    }
+)
+
+# Automatic middleware should not write these (explicit log_user_activity still does).
+SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
+    {
+        "auth.complete_profile",
+        "auth.account_settings",
+    }
+)
+
+# Silent save-before-submit (action=save + ifrc_presave=1 → form_presave).
+# Explicit Save (action=save without that flag → form_saved) is logged.
+# Unmapped entry-form POSTs (no action) used to store "Completed View Assignment".
+SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_presave", "entry_form_request"})
+
+# Entry-form POSTs without a lifecycle action. Used to hide legacy "Completed View *" rows.
+# These Flask view names also handle save/submit/approve — audit logs remap them below.
+ENTRY_FORM_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
+    {
+        "forms.enter_data",
+        "forms.view_edit_form",
+        "assignments.view_assignment",
+        "forms.edit_public_submission",
+    }
+)
+
+# Dual-purpose entry-form routes keep a view_* Flask name. Audit rows should show
+# the lifecycle action, not the GET view function (form_saved ≠ view_assignment).
+ENTRY_FORM_ACTION_AUDIT_ENDPOINTS: dict[str, str] = {
+    "form_saved": "assignments.save_assignment",
+    "form_submitted": "assignments.submit_assignment",
+    "form_sent_for_review": "assignments.send_assignment_for_review",
+    "form_returned_for_revision": "assignments.return_assignment_for_revision",
+    "form_approved": "assignments.approve_assignment",
+    "form_reopened": "assignments.reopen_assignment",
+    "form_validated": "assignments.validate_assignment",
+}
+
+PUBLIC_SUBMISSION_ACTION_AUDIT_ENDPOINTS: dict[str, str] = {
+    "form_saved": "forms.save_public_submission",
+    "form_submitted": "forms.submit_public_submission",
+}
+
+# Dedicated assignment POSTs keep a main.* Flask name; show the assignments.* action.
+DEDICATED_ASSIGNMENT_AUDIT_ENDPOINTS: dict[str, str] = {
+    "main.approve_assignment": "assignments.approve_assignment",
+    "main.reopen_assignment": "assignments.reopen_assignment",
+    "main.reopen_assignment_page": "assignments.reopen_assignment",
+    "main.return_assignment_for_revision": "assignments.return_assignment_for_revision",
+    "main.return_assignment_page_for_revision": "assignments.return_assignment_for_revision",
+}
+
+# POSTs on these blueprints already write AdminActionLog — skip automatic UserActivityLog.
+ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING: tuple[str, ...] = (
+    "user_management.",
+    "form_builder.",
+    "rbac_management.",
+    "api_key_management.",
+)
+
+
+def audit_endpoint_for_activity(endpoint: str | None, activity_type: str | None) -> str | None:
+    """Return the endpoint string stored/shown on an audit row.
+
+    Entry-form save/submit POSTs hit ``assignments.view_assignment`` (same URL as
+    GET). Replace that view name with the action so the trail does not look like
+    a page view.
+    """
+    if not endpoint:
+        return endpoint
+    dedicated = DEDICATED_ASSIGNMENT_AUDIT_ENDPOINTS.get(endpoint)
+    if dedicated:
+        return dedicated
+    if endpoint not in ENTRY_FORM_ACTIVITY_ENDPOINTS:
+        return endpoint
+    from app.utils.activity.activity_types import normalize_activity_type
+
+    normalized = normalize_activity_type(activity_type) if activity_type else None
+    if endpoint == "forms.edit_public_submission":
+        return PUBLIC_SUBMISSION_ACTION_AUDIT_ENDPOINTS.get(normalized or "", endpoint)
+    return ENTRY_FORM_ACTION_AUDIT_ENDPOINTS.get(normalized or "", endpoint)
+
+SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")
+
+SKIP_ACTIVITY_ENDPOINT_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "get_workflow_tour",
+        "api_presence_heartbeat",
+        "api_presence_sync",
+        "api_presence_leave",
+        "api_notification_stream_status",
+        "api_get_notification_count",
+        "api_get_notification_preferences",
+        "service_worker",
+        "device_heartbeat",
+        "upr_documents_gallery",
+    }
+)
+
+
+def should_skip_activity_endpoint(endpoint: str | None) -> bool:
+    """Return True if automatic activity logging should not record this endpoint."""
+    if not endpoint:
+        return False
+    if endpoint in SKIP_ACTIVITY_ENDPOINTS or endpoint in SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS:
+        return True
+    for prefix in SKIP_ACTIVITY_ENDPOINT_PREFIXES:
+        if endpoint.startswith(prefix):
+            return True
+    suffix = endpoint.rsplit(".", 1)[-1]
+    if suffix in SKIP_ACTIVITY_ENDPOINT_SUFFIXES:
+        return True
+    return False
+
+
+def should_skip_activity_type(activity_type: str | None) -> bool:
+    """Return True if this inferred activity type should not write an audit row."""
+    if not activity_type:
+        return False
+    return activity_type in SKIP_ACTIVITY_TYPES
+
+
+def should_exclude_from_activity_catalog(method: str | None, endpoint: str | None) -> bool:
+    """
+    True for routes that should not appear in ENDPOINT_ACTIVITY_SPECS (generator + gap checks).
+
+    Automatic middleware only bumps session ``page_views`` for GET navigations — it never
+    writes ``UserActivityLog`` rows for ``activity_type == page_view`` (see
+    ``after_request``). Catalog rows for GET would be misleading or would have
+    incorrectly forced ``activity_type`` overrides before the guard was added.
+    """
+    if not endpoint:
+        return True
+    if should_skip_activity_endpoint(endpoint):
+        return True
+    m = (method or "GET").strip().upper()
+    if m == "GET":
+        return True
+    return False
+
+
+def should_skip_activity_path(path: str | None) -> bool:
+    """Skip JSON APIs that middleware does not log."""
+    if not path:
+        return False
+    if path.startswith("/api/v1/") or path.startswith("/api/mobile/"):
+        return True
+    return False

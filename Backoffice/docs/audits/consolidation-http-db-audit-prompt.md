@@ -28,7 +28,7 @@ Produce a **prioritized findings report** with concrete file references and reco
 
 Read the current implementation before searching elsewhere:
 
-- `Backoffice/app/utils/country_utils.py` — `get_countries_by_region_with_part_of()`
+- `Backoffice/app/utils/organization/country_utils.py` — `get_countries_by_region_with_part_of()`
 - `Backoffice/app/routes/admin/assignment_management.py` — `_manage_assignment_country_context()`
 - `Backoffice/app/static/js/admin/manage-assignment.js` — `bootstrapPartOfCategoriesFromConfig()`
 - `Backoffice/app/templates/admin/organization/index.html` — good precedent: `part_of_programs` embedded server-side to avoid `/api/part-of-programs` on load

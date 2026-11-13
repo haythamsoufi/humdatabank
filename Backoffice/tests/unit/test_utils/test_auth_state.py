@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.utils import auth_state
-from app.utils.auth_state import (
+from app.utils.auth import auth_state
+from app.utils.auth.auth_state import (
     AuthStateUnavailable,
     DbAuthStateBackend,
     RedisAuthStateBackend,

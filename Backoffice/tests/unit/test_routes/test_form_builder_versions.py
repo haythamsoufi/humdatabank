@@ -213,7 +213,7 @@ class TestDeployTemplateVersion:
         self, logged_in_client, db_session, admin_user, app
     ):
         from app.models import FormData
-        from app.utils.stable_key import generate_stable_key
+        from app.utils.templates.stable_key import generate_stable_key
         from tests.factories import create_test_assignment_entity_status, create_test_item, create_test_section
 
         _grant_template_permissions(db_session)

@@ -40,12 +40,12 @@ from app.routes.admin.shared import (
     permission_required_any,
     user_has_country_permission,
 )
-from app.utils.request_utils import is_json_request
-from app.utils.entity_groups import get_enabled_entity_groups
-from app.utils.transactions import no_auto_transaction, request_transaction_rollback
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_formatting import choices_from_query
-from app.utils.api_responses import (
+from app.utils.http.request_utils import is_json_request
+from app.utils.organization.entity_groups import get_enabled_entity_groups
+from app.utils.database.transactions import no_auto_transaction, request_transaction_rollback
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_formatting import choices_from_query
+from app.utils.api.api_responses import (
     json_bad_request,
     json_error,
     json_ok,
@@ -54,8 +54,8 @@ from app.utils.api_responses import (
     require_json_data,
     require_json_keys,
 )
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.safe_workbook import read_excel_safe
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.files.safe_workbook import read_excel_safe
 from config.config import Config
 from app.forms.organization import (
     CountryForm,
@@ -229,7 +229,7 @@ def import_countries():
 
         # SECURITY: Validate MIME type to prevent file spoofing
         try:
-            from app.utils.advanced_validation import AdvancedValidator
+            from app.utils.forms.advanced_validation import AdvancedValidator
             file_ext = os.path.splitext(file.filename)[1].lower()
             is_valid_mime, detected_mime = AdvancedValidator.validate_mime_type(file, [file_ext])
             if not is_valid_mime:
@@ -384,7 +384,7 @@ def _ns_text_category_columns(reserved):
 
     The header is the category name. Names that match a fixed column use a Text: prefix.
     """
-    from app.utils.country_utils import PART_OF_CATEGORY_TEXT, collect_part_of_category_definitions
+    from app.utils.organization.country_utils import PART_OF_CATEGORY_TEXT, collect_part_of_category_definitions
 
     columns = []
     used = set(reserved)

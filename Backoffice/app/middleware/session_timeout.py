@@ -6,10 +6,10 @@ Handles session timeout checking and user logout for inactive sessions.
 
 from flask import current_app, session, redirect, url_for, request
 from flask_login import logout_user, current_user
-from app.utils.request_utils import is_static_asset_request, is_json_request
-from app.utils.api_responses import json_auth_required
-from app.utils.mobile_auth import request_authenticated_by_jwt
-from app.utils.redirect_utils import get_current_relative_url
+from app.utils.http.request_utils import is_static_asset_request, is_json_request
+from app.utils.api.api_responses import json_auth_required
+from app.utils.mobile.mobile_auth import request_authenticated_by_jwt
+from app.utils.http.redirect_utils import get_current_relative_url
 from datetime import datetime, timezone
 from config import Config
 from app.services.platform.user_analytics_service import (
@@ -19,7 +19,7 @@ from app.services.platform.user_analytics_service import (
 )
 from contextlib import suppress
 from app import db
-from app.utils.transactions import safe_rollback
+from app.utils.database.transactions import safe_rollback
 
 
 def _session_auth_failure_response():

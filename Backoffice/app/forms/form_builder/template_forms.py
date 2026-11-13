@@ -57,7 +57,7 @@ class FormTemplateForm(BaseForm):
     def __init__(self, *args, **kwargs):
         super(FormTemplateForm, self).__init__(*args, **kwargs)
 
-        from app.utils.data_quality_constants import REGISTERED_METHODOLOGIES, REGISTERED_RULE_PACKS
+        from app.utils.indicators.data_quality_constants import REGISTERED_METHODOLOGIES, REGISTERED_RULE_PACKS
 
         self.data_quality_methodology.choices = [("", _("— None —"))] + [
             (code, code) for code in REGISTERED_METHODOLOGIES

@@ -7,19 +7,19 @@ from app.models.assignments import AssignmentEntityStatus
 from app.models.core import UserEntityPermission
 from app.models.enums import AssignmentEntityStatusValue, EntityType
 from app.models.system import CountryAccessRequestStatus
-from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
+from app.utils.common.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.forms.assignments import ReopenAssignmentForm, ApproveAssignmentForm
 from app.forms.auth_forms import RequestCountryAccessForm
 from flask_babel import _
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from app.services.assignments.workflow_service import apply_entity_status_change
-from app.utils.form_authorization import (
+from app.utils.forms.form_authorization import (
     TRANSITION_GONE,
     TRANSITION_STALE,
     begin_aes_transition,
 )
 from app.services.platform.app_settings_service import is_organization_email
-from app.utils.audit_context import set_audit_details
+from app.utils.audit.audit_context import set_audit_details
 
 from app.routes.main import bp
 
@@ -152,7 +152,7 @@ def reopen_assignment(aes_id):
             except Exception as e:
                 current_app.logger.error(f"Error sending assignment reopened notification: {e}", exc_info=True)
 
-            from app.utils.api_serialization import _country_for_aes
+            from app.utils.api.api_serialization import _country_for_aes
             aes_country = _country_for_aes(assignment_entity_status)
             entity_name = aes_country.name if aes_country else "N/A"
             template_name = (
@@ -380,7 +380,7 @@ def approve_assignment(aes_id):
             except Exception as e:
                 current_app.logger.error(f"Error sending assignment approved notification: {e}", exc_info=True)
 
-            from app.utils.api_serialization import _country_for_aes
+            from app.utils.api.api_serialization import _country_for_aes
             _approved_country = _country_for_aes(assignment_entity_status)
             flash(f"Assignment '{assignment_entity_status.assigned_form.template.name if assignment_entity_status.assigned_form.template else 'Template Missing'}' for {_approved_country.name if _approved_country else 'N/A'} has been approved.", "success")
             current_app.logger.info(f"AssignmentEntityStatus ID {aes_id} status changed to 'approved' by admin {current_user.email}.")

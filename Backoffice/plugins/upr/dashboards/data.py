@@ -7,7 +7,7 @@ from typing import Any
 from app.models.assignments import AssignmentEntityStatus
 from app.models.form_items import FormItem
 from app.models.forms import FormData
-from app.utils.api_serialization import _country_for_aes
+from app.utils.api.api_serialization import _country_for_aes
 from plugins.upr.dashboards.bulk import (
     collect_narrative_uploads,
     get_assigned_form_for_bulk,

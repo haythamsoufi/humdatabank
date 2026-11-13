@@ -20,11 +20,11 @@ from app.services.ai.documents.chunking import AIChunkingService
 from app.services.ai.documents.metadata import enrich_document_metadata, classify_chunk_semantic_type, build_heading_hierarchy, truncate_section_title, sanitize_chunk_content_for_fts
 from app.services.ai.documents.embedding import AIEmbeddingService, EmbeddingError
 from app.services.ai.documents.vector_store import AIVectorStore
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.routes.admin.shared import admin_required, permission_required_any
-from app.utils.advanced_validation import AdvancedValidator
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_accepted, json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.forms.advanced_validation import AdvancedValidator
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_accepted, json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
 from app.services.platform import storage_service as _storage
 
 from . import ai_docs_bp

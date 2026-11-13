@@ -29,8 +29,8 @@ from sqlalchemy.orm import contains_eager
 from app.extensions import db
 from app.models import AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, User
 from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
-from app.utils.datetime_helpers import utcnow
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.common.datetime_helpers import utcnow
 from plugins.fdrs.services.fdrs_publication_analysis import (
     analyze_publication_rows,
     coerce_numeric,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.utils.discussion_comments import (
+from app.utils.discussion.discussion_comments import (
     DISCUSSION_SOURCE_UPR_EXCEL,
     discussion_comment_author_label,
     discussion_comment_can_be_managed_by,

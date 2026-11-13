@@ -4,7 +4,7 @@ import logging
 import re
 from logging import Filter
 
-from app.utils.logging_security import redact_query_params_in_text
+from app.utils.security.logging_security import redact_query_params_in_text
 
 # Gunicorn access log request-line fragments for probe/health endpoints.
 _NOISY_ACCESS_REQUEST_FRAGMENTS = (

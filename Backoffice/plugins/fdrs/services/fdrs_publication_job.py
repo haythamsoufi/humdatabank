@@ -22,7 +22,7 @@ from app.services.imports.async_import_job_store import (
     get_import_job,
     update_import_job,
 )
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.fdrs.services.fdrs_publication_service import (
     ALL_DIFF_KINDS,
     _empty_counts,

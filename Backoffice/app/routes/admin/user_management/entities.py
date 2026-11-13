@@ -13,10 +13,10 @@ from app.models.enums import EntityType
 from app.routes.admin.shared import permission_required
 from app.routes.admin.user_management.helpers import entity_grant_scope_denial
 from app.services.organization.entity_service import EntityService
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_ok_result, json_server_error, json_error, require_json_keys
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_ok_result, json_server_error, json_error, require_json_keys
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 from . import bp
 

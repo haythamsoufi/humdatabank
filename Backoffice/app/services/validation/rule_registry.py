@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.utils.data_quality_constants import RULE_PACK_CORE, RULE_PACK_FDRS_MATRIX_V1
+from app.utils.indicators.data_quality_constants import RULE_PACK_CORE, RULE_PACK_FDRS_MATRIX_V1
 
 
 @dataclass(frozen=True)

@@ -79,7 +79,7 @@ class UprCountryReportingExcelService:
             _load_assignment_meta,
         )
 
-        from app.utils.safe_workbook import load_workbook_safe
+        from app.utils.files.safe_workbook import load_workbook_safe
 
         _, country_name, _iso3, period = _load_assignment_meta(int(aes.id))
         try:

@@ -149,7 +149,7 @@ class EntityService:
         if not entity:
             return None
         if entity_type == EntityType.country.value:
-            from app.utils.form_localization import get_localized_country_name
+            from app.utils.forms.form_localization import get_localized_country_name
             return get_localized_country_name(entity)
         return entity.name
 
@@ -216,7 +216,7 @@ class EntityService:
         if not entity:
             return f"Unknown {entity_type}"
 
-        from app.utils.form_localization import get_localized_country_name
+        from app.utils.forms.form_localization import get_localized_country_name
         hierarchy_parts = []
 
         if entity_type == EntityType.country.value:
@@ -440,7 +440,7 @@ class EntityService:
 
         # Use localized name for countries
         if entity_type == EntityType.country.value:
-            from app.utils.form_localization import get_localized_country_name
+            from app.utils.forms.form_localization import get_localized_country_name
             return get_localized_country_name(entity)
 
         # For other entity types, return the name (no translations yet)

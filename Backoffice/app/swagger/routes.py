@@ -7,7 +7,7 @@ requires that operation's own API key or session.
 """
 from flask import Blueprint, current_app, jsonify, render_template
 from app.swagger.openapi_spec import get_openapi_spec
-from app.utils.api_responses import json_error, json_ok, json_server_error
+from app.utils.api.api_responses import json_error, json_ok, json_server_error
 
 swagger_bp = Blueprint('swagger', __name__, url_prefix='/api-docs')
 

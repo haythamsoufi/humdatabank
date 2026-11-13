@@ -11,7 +11,7 @@ from app.models import (
     NotificationType,
     User,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.services.notification.emails import retry_email_delivery_log, send_instant_notification_email
 from app.services.notification.core import create_notification, cleanup_old_notifications, cleanup_old_email_delivery_logs
 

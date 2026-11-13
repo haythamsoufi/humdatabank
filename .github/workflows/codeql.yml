@@ -24,6 +24,18 @@ jobs:
           languages: javascript-typescript, python
           config-file: ./.github/codeql/codeql-config.yml
 
+      # The compare API stops at 300 files, so init skips diff-informed
+      # analysis on a large pull request and every existing alert is reported
+      # as new. Write the full diff from git before analyze reads it.
+      - name: Record the full pull request diff for CodeQL
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          python .github/codeql/write_pr_diff_ranges.py "$PR_BASE_SHA"
+
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 

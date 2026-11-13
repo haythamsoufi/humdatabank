@@ -36,11 +36,11 @@ from app.services.indicators.bank_service import (
 from app.services.indicators.resolution_service import IndicatorResolutionService
 from app.services.platform import storage_service as storage
 from app.services.security.api_key_permissions import INDICATORS_SUGGEST, REFERENCE_READ
-from app.utils.api_helpers import api_error, get_json_safe
-from app.utils.auth import require_api_key
-from app.utils.datetime_helpers import utcnow
-from app.utils.rate_limiting import api_rate_limit
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import api_error, get_json_safe
+from app.utils.auth.auth import require_api_key
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.security.rate_limiting import api_rate_limit
+from app.utils.database.sql_utils import safe_ilike_pattern
 
 indicator_bank_compat_bp = Blueprint("indicator_bank_compat", __name__)
 
@@ -318,7 +318,7 @@ def _build_legacy_excel_export(locale: str) -> bytes:
         ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
 
     output = io.BytesIO()
-    from app.utils.export_safety import sanitize_workbook
+    from app.utils.files.export_safety import sanitize_workbook
     sanitize_workbook(wb)
     wb.save(output)
     return output.getvalue()

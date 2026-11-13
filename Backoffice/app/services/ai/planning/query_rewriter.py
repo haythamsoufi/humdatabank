@@ -16,7 +16,7 @@ from typing import List, Dict, Any, Optional, Tuple
 
 from flask import current_app
 
-from app.utils.ai_utils import openai_model_supports_sampling_params
+from app.utils.ai.ai_utils import openai_model_supports_sampling_params
 from app.services.ai.providers import scrub_pii_text
 
 logger = logging.getLogger(__name__)

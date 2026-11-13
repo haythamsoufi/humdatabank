@@ -35,7 +35,7 @@ if str(_BACKOFFICE_ROOT) not in sys.path:
 from app import create_app
 from app.services.ai.documents.processor import AIDocumentProcessor
 from plugins.upr.ai.visual_chunking import extract_upr_visual_blocks
-from app.utils.constants import DEFAULT_MAX_COMPLETION_TOKENS
+from app.utils.common.constants import DEFAULT_MAX_COMPLETION_TOKENS
 
 logger = logging.getLogger(__name__)
 

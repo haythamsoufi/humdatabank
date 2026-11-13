@@ -26,7 +26,7 @@ from .assignments import (
     user_assignment_template_access,
 )
 from contextlib import suppress
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 # Legacy user_countries association removed; countries are now derived via user_entity_permissions
 
@@ -444,7 +444,7 @@ class User(UserMixin, db.Model):
 
     def generate_profile_color(self):
         """Generate a profile color based on the user's email."""
-        from app.utils.profile_utils import generate_color_from_email
+        from app.utils.profiles.profile_utils import generate_color_from_email
         if not self.profile_color or self.profile_color == '#3B82F6':
             self.profile_color = generate_color_from_email(self.email)
         return self.profile_color
@@ -848,7 +848,7 @@ class UserSessionLog(db.Model):
 
     # Session statistics
     page_views = db.Column(db.Integer, default=0, nullable=False)
-    # Histogram of canonical path keys (resolved request path; mobile /m/...); see app.utils.page_view_paths
+    # Histogram of canonical path keys (resolved request path; mobile /m/...); see app.utils.activity.page_view_paths
     page_view_path_counts = db.Column(db.JSON, nullable=True)
     actions_performed = db.Column(db.Integer, default=0, nullable=False)
     forms_submitted = db.Column(db.Integer, default=0, nullable=False)

@@ -47,7 +47,7 @@ from app.services.organization.rbac_seed_service import (
 # combo decorators) on the decorated view function.
 _DECORATOR_LIST_ATTRS = ("_rbac_permissions_required", "_rbac_permissions_any_required")
 
-# Attribute set by app/utils/mobile_auth.py's mobile_auth_required(permission=...,
+# Attribute set by app/utils/mobile/mobile_auth.py's mobile_auth_required(permission=...,
 # permissions=(...)) on the decorated view function.
 _MOBILE_LIST_ATTRS = ("_ep_permissions",)
 

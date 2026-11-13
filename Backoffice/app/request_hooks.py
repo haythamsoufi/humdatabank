@@ -4,17 +4,17 @@ from flask import current_app, g, redirect, request, session, url_for
 from flask_login import current_user
 
 from app.i18n import persist_queued_language_cookie, update_session_activity
-from app.utils.session_persistence import (
+from app.utils.auth.session_persistence import (
     SUPPRESS_SESSION_COOKIE_FLAG,
     install_suppressable_session_interface,
     log_oversized_session_cookie,
     migrate_oauth_logout_hint_from_session,
     strip_session_set_cookie,
 )
-from app.utils.activity_logging_skip import should_skip_activity_endpoint, should_skip_activity_path
-from app.utils.api_responses import json_ok
-from app.utils.datetime_helpers import utcnow
-from app.utils.request_utils import (
+from app.utils.activity.activity_logging_skip import should_skip_activity_endpoint, should_skip_activity_path
+from app.utils.api.api_responses import json_ok
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.http.request_utils import (
     is_json_request,
     is_static_asset_request,
     mark_mobile_app_webview_embed_request,
@@ -83,7 +83,7 @@ def register_request_hooks(app):
 
     @app.before_request
     def track_request_pressure():
-        from app.utils.request_utils import is_static_asset_request as _is_static
+        from app.utils.http.request_utils import is_static_asset_request as _is_static
         if _is_static():
             return
         from app.services.monitoring.request_pressure import record_traffic, track_pressure_start
@@ -150,12 +150,12 @@ def register_request_hooks(app):
 
     @app.before_request
     def _jwt_auth_from_bearer():
-        from app.utils.request_utils import is_static_asset_request as _is_static
+        from app.utils.http.request_utils import is_static_asset_request as _is_static
         if _is_static():
             return
         if not (request.headers.get("Authorization") or "").startswith("Bearer "):
             return
-        from app.utils.mobile_auth import _try_jwt_auth, bearer_jwt_allowed_for_path
+        from app.utils.mobile.mobile_auth import _try_jwt_auth, bearer_jwt_allowed_for_path
         if not bearer_jwt_allowed_for_path(request.path):
             return
         _try_jwt_auth()

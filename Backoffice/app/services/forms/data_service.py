@@ -1,5 +1,5 @@
 # ========== Form Data Processing Service ==========
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 """
 Centralized service for processing form data submissions.
 Extracted from the massive handle_assignment_form function to improve maintainability.
@@ -31,14 +31,14 @@ from .processing_service import (
     FormItemProcessor,
     _create_dynamic_indicator_object,
 )
-from app.utils.api_helpers import service_error, GENERIC_ERROR_MESSAGE
-from app.utils.form_localization import get_localized_indicator_name
+from app.utils.api.api_helpers import service_error, GENERIC_ERROR_MESSAGE
+from app.utils.forms.form_localization import get_localized_indicator_name
 from datetime import datetime
 import json
 import os
 from typing import Dict, List, Tuple, Any, Optional
 from app.models.enums import AssignmentEntityStatusValue
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from app.services.forms.processors import (
     PluginProcessorMixin,
     IndicatorProcessorMixin,
@@ -62,7 +62,7 @@ from app.services.forms.processors._common import (  # noqa: F401 re-export
 def _document_field_satisfied_by_repository(field, assignment_entity_status) -> bool:
     """True when another assignment already holds a document whose period covers this one."""
     cfg = field.config if isinstance(getattr(field, "config", None), dict) else {}
-    from app.utils.assignment_document_carryover import (
+    from app.utils.documents.assignment_document_carryover import (
         _config_bool_true,
         repository_satisfied_field_ids,
     )
@@ -1851,7 +1851,7 @@ class FormDataService(
                     matrix_data = {}
 
             if matrix_data:
-                from app.utils.api_serialization import prune_stale_matrix_cell_keys
+                from app.utils.api.api_serialization import prune_stale_matrix_cell_keys
                 matrix_config = (matrix.config or {}).get('matrix_config') or {}
                 # Cell keys are built from the resolved column codes ("[assignment_period] Planned"
                 # -> "2026 Planned"), so match them against the config resolved for this assignment.
@@ -1965,7 +1965,7 @@ class FormDataService(
                     diff_old = old_value
                     diff_new = new_value_for_comparison
                     if isinstance(old_value, dict) and isinstance(new_value_for_comparison, dict):
-                        from app.utils.matrix_activity import (
+                        from app.utils.forms.matrix_activity import (
                             matrix_cell_activity_values_differ,
                             matrix_cell_display_value,
                         )

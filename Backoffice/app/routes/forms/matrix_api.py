@@ -11,13 +11,13 @@ from sqlalchemy.orm import joinedload
 
 from app import get_locale
 from app.models import Country, LookupList, LookupListRow, db
-from app.utils.api_helpers import get_json_safe
-from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_server_error, require_json_keys
-from app.utils.constants import DEFAULT_LOOKUP_ROW_LIMIT
-from app.utils.form_authorization import AES_ACTION_VIEW, load_aes_for_user, user_can_read_lookup_list
-from app.utils.form_localization import get_localized_country_name
-from app.utils.request_validation import enforce_csrf_json
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.api.api_helpers import get_json_safe
+from app.utils.api.api_responses import json_bad_request, json_not_found, json_ok, json_server_error, require_json_keys
+from app.utils.common.constants import DEFAULT_LOOKUP_ROW_LIMIT
+from app.utils.forms.form_authorization import AES_ACTION_VIEW, load_aes_for_user, user_can_read_lookup_list
+from app.utils.forms.form_localization import get_localized_country_name
+from app.utils.http.request_validation import enforce_csrf_json
+from app.utils.database.sql_utils import safe_ilike_pattern
 from app.routes.forms_api import MAX_LOOKUP_OPTIONS_ROWS, get_plugin_lookup_list_options
 
 
@@ -150,7 +150,7 @@ def register_matrix_api_routes(bp):
                         with suppress((ValueError, TypeError)):
                             aes = load_aes_for_user(assignment_entity_status_id, current_user, AES_ACTION_VIEW)
                             if aes:
-                                from app.utils.api_serialization import _country_for_aes
+                                from app.utils.api.api_serialization import _country_for_aes
                                 country = _country_for_aes(aes)
                                 if country:
                                     return country.iso2 or country.iso3
@@ -161,7 +161,7 @@ def register_matrix_api_routes(bp):
                         with suppress((ValueError, TypeError)):
                             aes = load_aes_for_user(int(m.group(1)), current_user, AES_ACTION_VIEW)
                             if aes:
-                                from app.utils.api_serialization import _country_for_aes
+                                from app.utils.api.api_serialization import _country_for_aes
                                 country = _country_for_aes(aes)
                                 if country:
                                     return country.iso2 or country.iso3
@@ -219,7 +219,7 @@ def register_matrix_api_routes(bp):
                 if lookup_list_id in ('country_map', 'national_society', 'indicator_bank'):
                     from app.models.organization import NationalSociety
                     from app.models.indicator_bank import IndicatorBank
-                    from app.utils.sqlalchemy_grid import build_columns_config as _get_model_columns_config, model_to_dict as _model_to_dict
+                    from app.utils.database.sqlalchemy_grid import build_columns_config as _get_model_columns_config, model_to_dict as _model_to_dict
 
                     current_locale = session.get('language', 'en')
                     if not current_locale:

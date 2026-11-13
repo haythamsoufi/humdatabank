@@ -10,7 +10,7 @@ pytestmark = [pytest.mark.unit]
 
 def _make_jwt_headers(app, user_id, session_id='org-test-sid'):
     """Issue a JWT access token and return the Authorization header dict."""
-    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_jwt import issue_token_pair
     with app.app_context():
         tokens = issue_token_pair(user_id, session_id=session_id)
     return {'Authorization': f'Bearer {tokens["access_token"]}'}
@@ -29,7 +29,7 @@ class TestListBranches:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = list_branches(999)
 
@@ -54,7 +54,7 @@ class TestListBranches:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = list_branches(0)
 
@@ -84,7 +84,7 @@ class TestListSubbranches:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = list_subbranches(999)
 
@@ -109,7 +109,7 @@ class TestListSubbranches:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = list_subbranches(0)
 
@@ -135,7 +135,7 @@ class TestOrgStructure:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = org_structure()
 
@@ -163,7 +163,7 @@ class TestOrgStructure:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch('app.models.Country') as mock_country:
                 mock_country.query.order_by.return_value.all.side_effect = RuntimeError('db error')
@@ -192,7 +192,7 @@ class TestOrgStructure:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=False):
                 resp = org_structure()
 

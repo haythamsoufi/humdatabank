@@ -9,7 +9,7 @@ from app import db
 from app.models.core import User, UserEntityPermission
 from app.services.email.client import send_email
 from app.services.organization.entity_service import EntityService
-from app.utils.organization_helpers import is_org_email
+from app.utils.organization.organization_helpers import is_org_email
 from app.services.organization.authorization_service import AuthorizationService
 
 

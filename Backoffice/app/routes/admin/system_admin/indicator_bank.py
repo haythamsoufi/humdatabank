@@ -1,16 +1,16 @@
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from contextlib import suppress
-from app.utils.datetime_helpers import utcnow
-from app.utils.sql_utils import ilike_contains, like_contains
-from app.utils.safe_workbook import read_excel_safe
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.file_parsing import EXCEL_EXTENSIONS
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import (
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.database.sql_utils import ilike_contains, like_contains
+from app.utils.files.safe_workbook import read_excel_safe
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.files.file_parsing import EXCEL_EXTENSIONS
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api.api_responses import (
     json_bad_request, json_forbidden, json_ok, json_ok_result,
     json_server_error, json_form_errors, require_json_data,
 )
-from app.utils.sector_logo_urls import spef_icon_url
+from app.utils.branding.sector_logo_urls import spef_icon_url
 from flask import (
     render_template, request, flash, redirect, url_for,
     current_app, make_response, send_file,
@@ -36,7 +36,7 @@ from app.models.enums import IndicatorSuggestionStatusValue
 from sqlalchemy.orm import joinedload
 from app.forms.system import IndicatorBankForm, CommonWordForm
 from app.routes.admin.shared import permission_required, user_has_permission
-from app.utils.request_utils import get_json_or_form, is_json_request, get_request_data
+from app.utils.http.request_utils import get_json_or_form, is_json_request, get_request_data
 from sqlalchemy import func, or_, cast, String
 from app.services.indicators.neural_map import build_embedding_scatter, probe_query_embedding
 from openpyxl import Workbook
@@ -1174,7 +1174,7 @@ def export_indicators():
         _autofit(ws_cw)
 
         output = BytesIO()
-        from app.utils.export_safety import sanitize_workbook
+        from app.utils.files.export_safety import sanitize_workbook
         sanitize_workbook(wb)
         wb.save(output)
         output.seek(0)
@@ -1503,7 +1503,7 @@ def export_common_words():
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            from app.utils.export_safety import sanitize_dataframe
+            from app.utils.files.export_safety import sanitize_dataframe
             sanitize_dataframe(df).to_excel(writer, sheet_name='Common Words', index=False)
 
             worksheet = writer.sheets['Common Words']
@@ -1681,7 +1681,7 @@ def download_common_words_template():
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            from app.utils.export_safety import sanitize_dataframe
+            from app.utils.files.export_safety import sanitize_dataframe
             sanitize_dataframe(df).to_excel(writer, sheet_name='Common Words Template', index=False)
 
             worksheet = writer.sheets['Common Words Template']

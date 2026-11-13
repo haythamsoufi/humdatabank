@@ -60,11 +60,11 @@ from plugins.upr.dashboards.library import (
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_required, permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.api_responses import GENERIC_ERROR_MESSAGE, json_accepted, json_bad_request, json_ok
-from app.utils.client_ip import get_client_ip
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.rate_limiting import rate_limit
-from app.utils.session_persistence import suppress_session_cookie_for_request
+from app.utils.api.api_responses import GENERIC_ERROR_MESSAGE, json_accepted, json_bad_request, json_ok
+from app.utils.security.client_ip import get_client_ip
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.security.rate_limiting import rate_limit
+from app.utils.auth.session_persistence import suppress_session_cookie_for_request
 
 MAX_BULK_AES_IDS = 250
 MAX_BULK_DASHBOARDS = 20
@@ -326,7 +326,7 @@ def secondary_refresh(source_id: str):
         return json_ok(result=result, settings=upr_settings_status())
     except Exception as error:
         current_app.logger.exception("UPR secondary refresh failed for %s", source_id)
-        return json_bad_request(str(error))
+        return json_bad_request("The request could not be completed.")
 
 
 @bp.route("/admin/plugins/upr/secondary/upload/<source_id>", methods=["POST"])
@@ -366,7 +366,7 @@ def secondary_upload(source_id: str):
         return json_ok(result=result, settings=upr_settings_status())
     except Exception as error:
         current_app.logger.exception("UPR secondary upload failed for %s", source_id)
-        return json_bad_request(str(error))
+        return json_bad_request("The request could not be completed.")
 
 
 @bp.route("/admin/plugins/upr/secondary/round/<kind>/<round_code>", methods=["DELETE"])
@@ -398,7 +398,7 @@ def secondary_preview(source_id: str):
         return json_bad_request(str(error))
     except Exception as error:
         current_app.logger.exception("UPR secondary preview failed for %s", source_id)
-        return json_bad_request(str(error))
+        return json_bad_request("The request could not be completed.")
     return json_ok(preview=payload)
 
 
@@ -1143,7 +1143,7 @@ def global_plan_overlay_save():
         saved = save_overlay(overlay)
     except Exception as error:  # noqa: BLE001
         current_app.logger.exception("UPR Global Plan overlay save failed")
-        return json_bad_request(str(error))
+        return json_bad_request("The request could not be completed.")
     return json_ok(overlay=saved, settings=upr_settings_status())
 
 def _support_flow_public():

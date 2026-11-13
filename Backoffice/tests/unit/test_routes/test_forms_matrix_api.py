@@ -420,8 +420,8 @@ class TestMatrixSearchSystemLists:
         with patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test Country"), \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test Country", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [mock_country]
             resp = _post(client, {
@@ -442,8 +442,8 @@ class TestMatrixSearchSystemLists:
         mock_ns.get_name_translation.return_value = "Test NS"
 
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test NS", "id": 1, "_id": 1}, create=True):
             with patch("app.models.organization.NationalSociety.query") as mock_q:
                 mock_q.options.return_value.order_by.return_value.all.return_value = [mock_ns]
@@ -506,9 +506,9 @@ class TestBuildOptionsFromRows:
 
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test"), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test", "region": "Europe", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [self._mock_country("Test", 1)]
             resp = _post(client, {
@@ -526,9 +526,9 @@ class TestBuildOptionsFromRows:
 
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test"), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test", "region": "Europe", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [self._mock_country("Test", 1)]
             resp = _post(client, {
@@ -548,9 +548,9 @@ class TestBuildOptionsFromRows:
 
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test"), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test", "region": "European", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [self._mock_country("Test", 1)]
             resp = _post(client, {
@@ -566,9 +566,9 @@ class TestBuildOptionsFromRows:
 
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test"), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test", "region": "European", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [self._mock_country("Test", 1)]
             resp = _post(client, {
@@ -587,9 +587,9 @@ class TestBuildOptionsFromRows:
         # row_data does not have the filter column
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test"), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [self._mock_country("Test", 1)]
             resp = _post(client, {
@@ -609,9 +609,9 @@ class TestBuildOptionsFromRows:
         # row has 'desc' instead of 'description'
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test"), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test", "desc": "Desc text", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [self._mock_country("Test", 1)]
             resp = _post(client, {
@@ -630,9 +630,9 @@ class TestBuildOptionsFromRows:
 
         with patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None), \
              patch("app.routes.forms.matrix_api.Country.query") as mock_q, \
-             patch("app.utils.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
+             patch("app.utils.database.sqlalchemy_grid.build_columns_config", return_value=[], create=True), \
              patch("app.routes.forms.matrix_api.get_localized_country_name", return_value="Test"), \
-             patch("app.utils.sqlalchemy_grid.model_to_dict",
+             patch("app.utils.database.sqlalchemy_grid.model_to_dict",
                    return_value={"name": "Test", "notes": "Some notes", "id": 1, "_id": 1}, create=True):
             mock_q.order_by.return_value.all.return_value = [self._mock_country("Test", 1)]
             resp = _post(client, {

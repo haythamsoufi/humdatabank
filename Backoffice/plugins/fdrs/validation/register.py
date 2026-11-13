@@ -7,7 +7,7 @@ from plugins.fdrs.validation.fdrs_matrix.rules import NON_ZERO_KPI_CODES, run_fd
 from app.services.validation.pack_registry import ValidationPack, register_pack
 from plugins.fdrs.validation.tracker import FDRS_TRACKER
 from app.services.validation.rule_registry import FDRS_MATRIX_V1_RULES
-from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
+from app.utils.indicators.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
 
 FDRS_THRESHOLD_KPI_CODES = tuple(sorted(
     set(cat.GOVERNANCE_KPI_CODES)

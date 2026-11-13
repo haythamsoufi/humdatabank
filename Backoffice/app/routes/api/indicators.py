@@ -1,8 +1,8 @@
-from app.utils.transactions import request_transaction_rollback
+from app.utils.database.transactions import request_transaction_rollback
 from contextlib import suppress
 # Backoffice/app/routes/api/indicators.py
-from app.utils.datetime_helpers import utcnow
-from app.utils.sector_logo_urls import sector_logo_url
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.branding.sector_logo_urls import sector_logo_url
 """
 Indicator Bank, Suggestions, and Sector API endpoints.
 Part of the /api/v1 blueprint.
@@ -29,20 +29,20 @@ from app.models import (
     Sector,
     SubSector,
 )
-from app.utils.auth import require_api_key
+from app.utils.auth.auth import require_api_key
 from app.services.security.api_authentication import redact_request_params
 from app.services.security.api_key_permissions import (
     INDICATORS_MANAGE,
     INDICATORS_SUGGEST,
     REFERENCE_READ,
 )
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.security.rate_limiting import api_rate_limit
 from app import db
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error, get_json_safe
-from app.utils.api_responses import require_json_data, require_json_keys
-from app.utils.form_localization import get_localized_indicator_type, get_localized_indicator_unit
+from app.utils.api.api_helpers import json_response, api_error, get_json_safe
+from app.utils.api.api_responses import require_json_data, require_json_keys
+from app.utils.forms.form_localization import get_localized_indicator_type, get_localized_indicator_unit
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.indicators.bank_service import (
     IndicatorBankFilters,
@@ -88,7 +88,7 @@ def get_indicator_bank():
             emergency=request.args.get('emergency', default='', type=str).strip(),
             archived=request.args.get('archived', default=None),
         )
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
 
         page, per_page = validate_pagination_params(
             request.args, default_per_page=100, max_per_page=500
@@ -258,7 +258,7 @@ def get_indicator_suggestions():
     """Get all indicator suggestions (admin only)."""
     try:
         # Get query parameters
-        from app.utils.api_pagination import validate_pagination_params
+        from app.utils.api.api_pagination import validate_pagination_params
         status = request.args.get('status')
         suggestion_type = request.args.get('suggestion_type')
         page, per_page = validate_pagination_params(request.args, default_per_page=20, max_per_page=500)

@@ -248,7 +248,7 @@ class TestEndSession:
             method='POST',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.routes.api.mobile.admin_analytics.execute_end_session', return_value=EndSessionResult(ok=False, error='not_found')):
                 resp = end_session(99999)
 
@@ -263,7 +263,7 @@ class TestEndSession:
             method='POST',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
                  patch('app.routes.api.mobile.admin_analytics.execute_end_session', side_effect=RuntimeError('fail')):
                 resp = end_session(1)
 
@@ -333,7 +333,7 @@ class TestAdminSendNotification:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = admin_send_notification()
 
         _, status = _parse(resp)
@@ -349,7 +349,7 @@ class TestAdminSendNotification:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = admin_send_notification()
 
         _, status = _parse(resp)
@@ -365,7 +365,7 @@ class TestAdminSendNotification:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'):
                 resp = admin_send_notification()
 
         _, status = _parse(resp)
@@ -385,8 +385,8 @@ class TestAdminSendNotification:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.utils.notification_push.is_notifications_push_enabled',
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
+                 patch('app.utils.notifications.notification_push.is_notifications_push_enabled',
                        return_value=True), \
                  patch('app.routes.api.mobile.admin_analytics.PushNotificationService'
                        '.send_bulk_push_notifications',
@@ -407,8 +407,8 @@ class TestAdminSendNotification:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.utils.notification_push.is_notifications_push_enabled',
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
+                 patch('app.utils.notifications.notification_push.is_notifications_push_enabled',
                        return_value=True):
                 resp = admin_send_notification()
 
@@ -429,8 +429,8 @@ class TestAdminSendNotification:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.utils.notification_push.is_notifications_push_enabled',
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
+                 patch('app.utils.notifications.notification_push.is_notifications_push_enabled',
                        return_value=True), \
                  patch('app.routes.api.mobile.admin_analytics.PushNotificationService'
                        '.send_bulk_push_notifications',
@@ -454,8 +454,8 @@ class TestAdminSendNotification:
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.utils.notification_push.is_notifications_push_enabled',
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection'), \
+                 patch('app.utils.notifications.notification_push.is_notifications_push_enabled',
                        return_value=True), \
                  patch('app.routes.api.mobile.admin_analytics.PushNotificationService'
                        '.send_bulk_push_notifications',

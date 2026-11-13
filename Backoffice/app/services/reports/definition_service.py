@@ -14,7 +14,7 @@ from app.services.security.api_authentication import (
     _get_user_allowed_country_ids,
     get_user_allowed_template_ids,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 REPORTS_VIEW = "admin.reports.view"
 REPORTS_EDIT = "admin.reports.edit"

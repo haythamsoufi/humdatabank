@@ -232,7 +232,7 @@ def _get_user_language() -> str:
     """
     Get current UI language from session (canonical session/request language).
     """
-    from app.utils.form_localization import get_translation_key
+    from app.utils.forms.form_localization import get_translation_key
     return get_translation_key()
 
 

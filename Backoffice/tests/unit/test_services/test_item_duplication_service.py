@@ -318,11 +318,11 @@ class TestItemDuplicationServiceDuplicateItemObject:
 class TestItemDuplicationServiceDeepCopyJsonField:
 
     def test_none_returns_none(self):
-        from app.utils.json_helpers import deep_copy_json
+        from app.utils.common.json_helpers import deep_copy_json
         assert deep_copy_json(None) is None
 
     def test_dict_deep_copied(self):
-        from app.utils.json_helpers import deep_copy_json
+        from app.utils.common.json_helpers import deep_copy_json
         original = {"a": 1, "b": {"c": 2}}
         result = deep_copy_json(original)
         assert result == original
@@ -331,13 +331,13 @@ class TestItemDuplicationServiceDeepCopyJsonField:
         assert original["b"]["c"] == 2
 
     def test_list_deep_copied(self):
-        from app.utils.json_helpers import deep_copy_json
+        from app.utils.common.json_helpers import deep_copy_json
         original = [1, 2, {"key": "val"}]
         result = deep_copy_json(original)
         assert result == original
 
     def test_string_roundtripped(self):
-        from app.utils.json_helpers import deep_copy_json
+        from app.utils.common.json_helpers import deep_copy_json
         original = '{"key": "value"}'
         result = deep_copy_json(original)
         # JSON string should be parsed and returned as dict

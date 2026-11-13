@@ -1,10 +1,10 @@
 """
-Unit tests for app/utils/datetime_helpers.py – 100% coverage target.
+Unit tests for app/utils/common/datetime_helpers.py – 100% coverage target.
 """
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from app.utils.datetime_helpers import (
+from app.utils.common.datetime_helpers import (
     ORG_TIMEZONE_LABEL,
     ORG_TIMEZONE_NAME,
     ensure_utc,

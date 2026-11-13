@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Optional
 
-from app.utils.api_data_filters import parse_assignment_id_filters
-from app.utils.api_helpers import api_error
+from app.utils.api.api_data_filters import parse_assignment_id_filters
+from app.utils.api.api_helpers import api_error
 
 PUBLIC_DATA_MAX_PER_PAGE = 5000
 

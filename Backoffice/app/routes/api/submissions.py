@@ -16,14 +16,14 @@ from app.routes.api import api_bp
 # Import models
 from app.models import FormData, PublicSubmission, AssignedForm
 from app.models.assignments import AssignmentEntityStatus
-from app.utils.auth import api_capability
+from app.utils.auth.auth import api_capability
 from app.services.security.api_key_permissions import DOCUMENTS_READ, SUBMISSIONS_READ
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.security.rate_limiting import api_rate_limit
 from app import db
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error
-from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes, format_country_info
+from app.utils.api.api_helpers import json_response, api_error
+from app.utils.api.api_serialization import batch_countries_for_aes_list, _country_for_aes, format_country_info
 from app.services.security.api_authentication import (
     api_key_can_read_personal_data,
     api_key_has_capability,
@@ -35,9 +35,9 @@ from app.services.security.api_authentication import (
     redact_request_params,
     _get_user_allowed_country_ids,
 )
-from app.utils.api_pagination import validate_pagination_params
-from app.utils.api_formatting import format_form_data_response
-from app.utils.api_serialization import format_indicator_details
+from app.utils.api.api_pagination import validate_pagination_params
+from app.utils.api.api_formatting import format_form_data_response
+from app.utils.api.api_serialization import format_indicator_details
 from app.services import get_assignments_for_country
 from app.services.assignments.access_service import (
     assignment_access_clause,

@@ -35,7 +35,7 @@ from app.models import (
     RepeatGroupData,
     RepeatGroupInstance,
 )
-from app.utils.matrix_calculation import rename_formula_refs
+from app.utils.forms.matrix_calculation import rename_formula_refs
 
 logger = logging.getLogger(__name__)
 

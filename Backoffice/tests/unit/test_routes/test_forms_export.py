@@ -94,7 +94,7 @@ def _country_patch():
     country.name = "Test Country"
     country.iso3 = "TST"
     country.iso2 = "TS"
-    return patch("app.utils.api_serialization._country_for_aes", return_value=country)
+    return patch("app.utils.api.api_serialization._country_for_aes", return_value=country)
 
 
 # ---------------------------------------------------------------------------
@@ -1664,8 +1664,8 @@ class TestImportExcelImpl:
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"), \
-                 patch("app.utils.advanced_validation.AdvancedValidator", mock_av), \
-                 patch.dict("sys.modules", {"app.utils.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
+                 patch("app.utils.forms.advanced_validation.AdvancedValidator", mock_av), \
+                 patch.dict("sys.modules", {"app.utils.forms.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
 
                 mock_cls.query.get_or_404.return_value = aes
                 mock_auth.can_edit_assignment.return_value = True
@@ -1700,7 +1700,7 @@ class TestImportExcelImpl:
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"), \
-                 patch.dict("sys.modules", {"app.utils.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
+                 patch.dict("sys.modules", {"app.utils.forms.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
 
                 mock_cls.query.get_or_404.return_value = aes
                 mock_auth.can_edit_assignment.return_value = True
@@ -1738,7 +1738,7 @@ class TestImportExcelImpl:
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"), \
                  patch("app.routes.forms.export.ExcelService") as mock_es, \
-                 patch.dict("sys.modules", {"app.utils.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
+                 patch.dict("sys.modules", {"app.utils.forms.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
 
                 mock_cls.query.get_or_404.return_value = aes
                 mock_auth.can_edit_assignment.return_value = True
@@ -1777,7 +1777,7 @@ class TestImportExcelImpl:
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"), \
                  patch("app.routes.forms.export.ExcelService") as mock_es, \
-                 patch.dict("sys.modules", {"app.utils.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
+                 patch.dict("sys.modules", {"app.utils.forms.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
 
                 mock_cls.query.get_or_404.return_value = aes
                 mock_auth.can_edit_assignment.return_value = True
@@ -1821,7 +1821,7 @@ class TestImportExcelImpl:
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"), \
                  patch("app.routes.forms.export.ExcelService") as mock_es, \
-                 patch.dict("sys.modules", {"app.utils.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
+                 patch.dict("sys.modules", {"app.utils.forms.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
 
                 mock_cls.query.get_or_404.return_value = aes
                 mock_auth.can_edit_assignment.return_value = True
@@ -1864,7 +1864,7 @@ class TestImportExcelImpl:
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"), \
                  patch("app.routes.forms.export.ExcelService") as mock_es, \
-                 patch.dict("sys.modules", {"app.utils.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
+                 patch.dict("sys.modules", {"app.utils.forms.advanced_validation": MagicMock(AdvancedValidator=mock_av)}):
 
                 mock_cls.query.get_or_404.return_value = aes
                 mock_auth.can_edit_assignment.return_value = True

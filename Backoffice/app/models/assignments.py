@@ -17,7 +17,7 @@ from sqlalchemy.orm import relationship, backref, foreign
 from sqlalchemy import and_
 from ..extensions import db
 from .enums import AssignmentEntityStatusValue, AssignmentSectionStatusValue, PublicSubmissionStatus
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 assigned_form_submission_review_recipient = Table(
     'assigned_form_submission_review_recipient',
@@ -287,7 +287,7 @@ class AssignedForm(db.Model):
     @property
     def countries(self):
         """Get countries for country-level entity statuses (AES)."""
-        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+        from app.utils.api.api_serialization import batch_countries_for_aes_list, _country_for_aes
 
         statuses = self.country_statuses.all()
         if not statuses:
@@ -303,7 +303,7 @@ class AssignedForm(db.Model):
     @property
     def public_countries(self):
         """Get countries that are available for public reporting (AES)."""
-        from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes
+        from app.utils.api.api_serialization import batch_countries_for_aes_list, _country_for_aes
 
         statuses = self.country_statuses.filter_by(is_public_available=True).all()
         if not statuses:
@@ -414,7 +414,7 @@ class AssignedForm(db.Model):
         if self.custom_name:
             from contextlib import suppress
             with suppress(Exception):
-                from app.utils.form_localization import get_translation_key
+                from app.utils.forms.form_localization import get_translation_key
                 lang = get_translation_key()
                 if lang and lang != 'en' and self.custom_name_translations:
                     val = self.custom_name_translations.get(lang)

@@ -26,7 +26,7 @@ uses an atomic ``SET key val NX EX window_seconds`` so all workers (and all
 app instances behind the same Redis) share a single cooldown window and only
 one alert is sent for the whole fleet. Without Redis, it falls back to a
 per-process in-memory gate (same pattern as
-``app.services.monitoring.request_pressure`` and ``app.utils.ws_helpers``).
+``app.services.monitoring.request_pressure`` and ``app.utils.realtime.ws_helpers``).
 
 Fail-open: any error talking to Redis (or anything else going wrong here)
 falls back to allowing the send, so a bug or outage in this module can never

@@ -11,8 +11,8 @@ from app.models.enum_columns import pg_str_enum_column
 from config import Config
 import json
 from sqlalchemy import event
-from app.utils.datetime_helpers import utcnow
-from app.utils.stable_key import generate_stable_key
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.templates.stable_key import generate_stable_key
 
 
 class FormTemplate(db.Model):
@@ -1083,7 +1083,7 @@ class FormData(DataEntryMixin, db.Model):
         status_info = self.assignment_entity_status
         country_name = 'N/A'
         if status_info:
-            from app.utils.api_serialization import _country_for_aes
+            from app.utils.api.api_serialization import _country_for_aes
             _c = _country_for_aes(status_info)
             country_name = _c.name if _c else 'N/A'
         assignment_id = status_info.assigned_form_id if status_info else 'N/A'
@@ -1220,7 +1220,7 @@ class DynamicIndicatorData(DataEntryMixin, db.Model):
 
         country_name = None
         if self.assignment_entity_status:
-            from app.utils.api_serialization import _country_for_aes
+            from app.utils.api.api_serialization import _country_for_aes
             _c = _country_for_aes(self.assignment_entity_status)
             country_name = _c.name if _c else None
         return f'<DynamicIndicatorData {self.indicator_bank.name} for {country_name or "N/A"} Value:{display_value}>'

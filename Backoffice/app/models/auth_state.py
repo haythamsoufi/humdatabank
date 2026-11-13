@@ -10,7 +10,7 @@ class AuthStateEntry(db.Model):
     Holds consumed refresh-token JTIs, revoked token families/sessions, single-use
     mobile OAuth codes, login-failure counters and DB-backed rate-limit buckets.
     Rows are meaningless after ``expires_at`` and are purged opportunistically
-    (``app.utils.auth_state``).
+    (``app.utils.auth.auth_state``).
     """
 
     __tablename__ = 'auth_state_entry'

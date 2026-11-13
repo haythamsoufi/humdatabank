@@ -22,7 +22,7 @@ class AccountSettingsForm(FlaskForm):
     def __init__(self, *args, **kwargs):
         super(AccountSettingsForm, self).__init__(*args, **kwargs)
         # Import here to avoid circular imports
-        from app.utils.profile_utils import PROFILE_COLORS
+        from app.utils.profiles.profile_utils import PROFILE_COLORS
 
         # Color names mapping
         color_names = {

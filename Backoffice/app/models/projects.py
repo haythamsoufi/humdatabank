@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.extensions import db
 from app.models.enums import EntityType
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 class Project(db.Model):

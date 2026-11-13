@@ -8,7 +8,7 @@
 //   GET /api/v1/templates    (Templates & Form Items, not rate-limited)
 //
 // Auth is via Authorization: Bearer <key>. Query-string keys are rejected by
-// Backoffice/app/utils/auth.py:_extract_api_key().
+// Backoffice/app/utils/auth/auth.py:_extract_api_key().
 //
 // If K6_BACKOFFICE_API_KEY is unset, the script aborts in setup().
 //

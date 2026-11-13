@@ -5,7 +5,7 @@ import pytest
 from flask import g
 from flask_login import login_user
 
-from app.utils.mobile_auth import _try_jwt_auth, mobile_auth_required
+from app.utils.mobile.mobile_auth import _try_jwt_auth, mobile_auth_required
 
 pytestmark = [pytest.mark.unit, pytest.mark.auth_security]
 
@@ -152,7 +152,7 @@ class TestMobileAuthRequiredDecorator:
             user = create_test_user(db_session, email='csrf-mobile@test.com', password='Pass123!')
         with app.test_request_context(method='POST'):
             login_user(user)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection') as mock_csrf:
+            with patch('app.utils.mobile.mobile_auth.enforce_api_or_csrf_protection') as mock_csrf:
                 result = view()
             mock_csrf.assert_called_once()
         assert result == {'ok': True}
@@ -183,7 +183,7 @@ class TestMobileAuthRequiredDecorator:
 
         import jwt as pyjwt
         from tests.factories import create_test_user
-        from app.utils.mobile_jwt import (
+        from app.utils.mobile.mobile_jwt import (
             _jwt_secret, MOBILE_TOKEN_AUDIENCE, MOBILE_TOKEN_ISSUER, MOBILE_TOKEN_ALGORITHM,
         )
         with app.app_context():
@@ -222,7 +222,7 @@ class TestMobileAuthRequiredDecorator:
 
     def test_try_jwt_auth_user_not_found(self, app, db_session):
         import jwt as pyjwt
-        from app.utils.mobile_jwt import (
+        from app.utils.mobile.mobile_jwt import (
             _jwt_secret, MOBILE_TOKEN_AUDIENCE, MOBILE_TOKEN_ISSUER, MOBILE_TOKEN_ALGORITHM,
         )
         payload = {

@@ -9,16 +9,16 @@ from typing import Any, Callable
 from flask import g, jsonify, render_template, request, send_from_directory, url_for
 from flask_login import current_user
 
-from app.utils.api_responses import (
+from app.utils.api.api_responses import (
     GENERIC_ERROR_MESSAGE,
     json_auth_required,
     json_bad_request,
     json_forbidden,
     json_not_found,
 )
-from app.utils.client_ip import get_client_ip
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.rate_limiting import rate_limit
+from app.utils.security.client_ip import get_client_ip
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.security.rate_limiting import rate_limit
 from plugins.ifrc.decisions import _PLUGIN_DIR, bp
 from plugins.ifrc.decisions import service
 from plugins.ifrc.decisions.access import AccessContext, resolve_access_context

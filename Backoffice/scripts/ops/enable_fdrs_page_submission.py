@@ -48,7 +48,7 @@ from app.services.assignments.page_submission_service import (
     participating_page_ids,
     load_published_sections,
 )
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
 
 def _assignment_snapshot(assignment: AssignedForm) -> dict:

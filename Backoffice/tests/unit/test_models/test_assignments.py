@@ -21,7 +21,7 @@ from tests.factories import (
     create_test_assignment_entity_status,
     create_test_public_submission,
 )
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 
 @pytest.mark.unit

@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.utils.profile_summary_payload import (
+from app.utils.profiles.profile_summary_payload import (
     focal_scope_display_lines,
     profile_summary_scope_fields,
     role_badge_key_from_rbac_codes,

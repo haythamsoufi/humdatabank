@@ -17,8 +17,8 @@ from flask import current_app, request
 from flask_login import current_user
 
 from app.routes.admin.shared import permission_required_any
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.api_responses import json_bad_request, json_forbidden, json_ok, json_server_error
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_ok, json_server_error
 
 from . import bp
 

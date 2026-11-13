@@ -8,7 +8,7 @@ import uuid as _uuid_mod
 from flask import current_app, flash, redirect, render_template, request, url_for
 from flask_babel import _
 from flask_login import current_user
-from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes, safe_iter_rows
+from app.utils.files.safe_workbook import load_workbook_safe, read_workbook_file_bytes, safe_iter_rows
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -26,13 +26,13 @@ from app.models.enums import IndicatorSuggestionStatusValue
 from app.routes.admin.shared import permission_required
 from app.routes.admin.system_admin.helpers import indicator_bank_history_snapshot
 from app.routes.admin.utilities import bp
-from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok
-from app.utils.datetime_helpers import utcnow
-from app.utils.error_handling import handle_json_view_exception
-from app.utils.file_parsing import EXCEL_EXTENSIONS
-from app.utils.transactions import request_transaction_rollback
+from app.utils.forms.advanced_validation import validate_upload_extension_and_mime
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_ok
+from app.utils.common.datetime_helpers import utcnow
+from app.utils.common.error_handling import handle_json_view_exception
+from app.utils.files.file_parsing import EXCEL_EXTENSIONS
+from app.utils.database.transactions import request_transaction_rollback
 from app.services.indicators.measurement_sync import backfill_fk_from_strings_bank
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 def _get_import_temp_path(token: str) -> str:
     """Return the expected temp file path for a given import token."""
-    from app.utils.file_paths import get_temp_upload_path
+    from app.utils.files.file_paths import get_temp_upload_path
     temp_dir = get_temp_upload_path()
     os.makedirs(temp_dir, exist_ok=True)
     return os.path.join(temp_dir, f"import_{token}.xlsx")
@@ -178,7 +178,7 @@ def indicator_change_history():
 @permission_required('admin.indicator_bank.suggestions.review')
 def manage_indicator_suggestions():
     """Manage indicator suggestions from users"""
-    from app.utils.api_pagination import validate_pagination_params
+    from app.utils.api.api_pagination import validate_pagination_params
     page, per_page = validate_pagination_params(request.args, default_per_page=20, max_per_page=100)
     status_filter = request.args.get('status', '')
     suggestion_type_filter = request.args.get('suggestion_type', '')

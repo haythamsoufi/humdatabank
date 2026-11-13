@@ -12,7 +12,7 @@ from app.extensions import db
 from app.models import AssignedForm, Country, FormData, FormItem, IndicatorBank
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue
-from app.utils.sql_utils import ilike_contains
+from app.utils.database.sql_utils import ilike_contains
 
 
 @dataclass

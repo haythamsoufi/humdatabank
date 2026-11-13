@@ -14,7 +14,7 @@ from tests.factories import create_test_user, create_test_admin, create_test_api
 from tests.helpers import assert_api_response, assert_error_response
 
 from app.models.password_reset_token import PasswordResetToken
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.models import User
 
 
@@ -126,7 +126,7 @@ class TestAPIAuthentication:
     def test_api_key_authentication_expired_key(self, client, db_session, app):
         """Test that expired API keys are rejected."""
         from datetime import timedelta
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.common.datetime_helpers import utcnow
 
         with app.app_context():
             api_key_obj, full_key = create_test_api_key(db_session)

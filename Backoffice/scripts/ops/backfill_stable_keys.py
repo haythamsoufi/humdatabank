@@ -28,13 +28,13 @@ if str(_BACKOFFICE_ROOT) not in sys.path:
 from app import create_app
 from app.extensions import db
 from app.models import FormItem, FormSection, FormTemplateVersion
-from app.utils.stable_key import (
+from app.utils.templates.stable_key import (
     T22_FUNDING_MATRIX_STABLE_KEY,
     T22_STAFF_MATRIX_COLUMN,
     T22_STAFF_MATRIX_STABLE_KEY,
     generate_stable_key,
 )
-from app.utils.stable_key_backfill import (
+from app.utils.templates.stable_key_backfill import (
     align_stable_key,
     fill_null_stable_keys,
     index_by_position,

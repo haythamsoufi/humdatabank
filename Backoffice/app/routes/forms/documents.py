@@ -9,7 +9,7 @@ from werkzeug.exceptions import HTTPException
 from app.extensions import limiter
 from app.services.documents import public_access
 from app.services.documents.service import DocumentService
-from app.utils.redirect_utils import is_safe_redirect_url
+from app.utils.http.redirect_utils import is_safe_redirect_url
 
 
 def register_document_routes(bp):

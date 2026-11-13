@@ -10,7 +10,7 @@ from app.services.notification.core import (
     IN_APP_ONLY_NOTIFICATION_TYPES,
     translate_notification_message,
 )
-from app.utils.organization_helpers import get_org_name
+from app.utils.organization.organization_helpers import get_org_name
 
 
 _PREVIEW_VARIANT_SUFFIXES: Dict[str, List[tuple[str, str]]] = {
@@ -194,7 +194,7 @@ def _preview_note(type_key: str, sends_email: bool, priority: str) -> str:
 
 def preview_variants_by_type_key() -> Dict[str, List[Dict[str, Any]]]:
     """Map of type_key -> preview variants for registry bootstrap."""
-    from app.utils.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
+    from app.utils.notifications.notification_registry import NOTIFICATION_TYPE_REGISTRY_SPECS
 
     out: Dict[str, List[Dict[str, Any]]] = {}
     for spec in NOTIFICATION_TYPE_REGISTRY_SPECS:

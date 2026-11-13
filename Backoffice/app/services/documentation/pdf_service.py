@@ -22,9 +22,9 @@ from werkzeug.exceptions import ServiceUnavailable
 from app.services.documentation import service as docs
 from .service import _prettify_stem
 from app.services.platform.app_settings_service import _strip_visual_path_prefixes
-from app.utils.branding_visual_assets import relative_path_under_branding
-from app.utils.datetime_helpers import get_org_timezone, utcnow
-from app.utils.organization_helpers import get_org_name
+from app.utils.branding.branding_visual_assets import relative_path_under_branding
+from app.utils.common.datetime_helpers import get_org_timezone, utcnow
+from app.utils.organization.organization_helpers import get_org_name
 
 _PDF_HEADER_LOGO_STATIC = "IFRC_logo_square.svg"
 
@@ -33,7 +33,7 @@ _RTL_LANGS = frozenset({"ar", "fa", "he", "ur"})
 
 
 def _current_language() -> str:
-    from app.utils.form_localization import get_translation_key
+    from app.utils.forms.form_localization import get_translation_key
 
     return (get_translation_key() or "en").split("-")[0].lower()
 

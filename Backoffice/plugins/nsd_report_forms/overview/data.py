@@ -18,7 +18,7 @@ from app import db
 from app.models import (AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, FormTemplate,
                         FormTemplateVersion)
 from app.models.projects import Project
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 from plugins.nsd_report_forms.constants import ENTITY_TYPE, FINAL_SLOT
 from plugins.nsd_report_forms.importer import layout

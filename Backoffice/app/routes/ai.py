@@ -26,10 +26,10 @@ from contextlib import suppress
 from flask import Blueprint, Response, current_app, g, jsonify, request, send_file, stream_with_context, session
 from flask_login import login_required, current_user, login_user, logout_user
 
-from app.utils.ai_request_user import bearer_identity_needs_login, resolve_ai_identity
-from app.utils.ai_tokens import issue_ai_token
-from app.utils.ai_pricing import estimate_chat_cost
-from app.utils.outbound_url import is_local_dev_environment
+from app.utils.ai.ai_request_user import bearer_identity_needs_login, resolve_ai_identity
+from app.utils.ai.ai_tokens import issue_ai_token
+from app.utils.ai.ai_pricing import estimate_chat_cost
+from app.utils.http.outbound_url import is_local_dev_environment
 from app.services.ai.policies.usage_budget import (
     budget_exceeded_payload,
     check_daily_cost_budget,
@@ -41,15 +41,15 @@ from app.services.ai.policies.access_policy import (
     set_request_policy,
     trusted_form_builder_context,
 )
-from app.utils.ai_utils import (
+from app.utils.ai.ai_utils import (
     is_form_builder_assistant_context,
     sanitize_page_context,
     openai_model_supports_sampling_params,
 )
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.request_utils import WafJsonUnwrapError, unwrap_waf_json_envelope
-from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
-from app.utils.request_validation import enforce_csrf_json
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.http.request_utils import WafJsonUnwrapError, unwrap_waf_json_envelope
+from app.utils.api.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.http.request_validation import enforce_csrf_json
 from app.services.ai.chat.request import (
     parse_chat_request,
     resolve_conversation_and_history,
@@ -62,7 +62,7 @@ from app.services.ai.chat.request import (
 )
 from app.services.ai.chat.inflight_turns import begin_turn, finish_turn, get_running_turn, get_turn
 from sqlalchemy.orm.attributes import flag_modified
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 from app.extensions import db, limiter
 from app.models.ai_chat import AIConversation, AIMessage
 from app.models import AIReasoningTrace
@@ -74,7 +74,7 @@ from app.services.ai.chat.fastpath import try_answer_value_question
 # Telemetry tracking
 from app.services.ai.chat.telemetry import ChatbotTelemetryService, ChatbotMetrics
 from app.services.platform.user_analytics_service import get_client_ip
-from app.utils.client_ip import is_loopback_ip
+from app.utils.security.client_ip import is_loopback_ip
 
 # AI Agent integration (RAG + agentic reasoning)
 # Lazy-loaded to avoid import errors if dependencies are missing
@@ -3215,7 +3215,7 @@ def export_table_as_excel():
         logger.debug("Column width auto-fit failed: %s", e)
 
     output = io.BytesIO()
-    from app.utils.export_safety import sanitize_workbook
+    from app.utils.files.export_safety import sanitize_workbook
     sanitize_workbook(wb)
     wb.save(output)
     output.seek(0)

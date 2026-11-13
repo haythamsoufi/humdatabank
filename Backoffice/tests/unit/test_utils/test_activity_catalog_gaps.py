@@ -1,16 +1,16 @@
 """Strict check: merged catalog covers every candidate (method, endpoint) from url_map."""
 
 from app import create_app
-from app.utils.activity_logging_skip import (
+from app.utils.activity.activity_logging_skip import (
     should_exclude_from_activity_catalog,
     should_skip_activity_path,
 )
-from app.utils.activity_endpoint_overrides import (
+from app.utils.activity.activity_endpoint_overrides import (
     resolve_delete_activity_type,
     resolve_post_activity_type,
 )
-from app.utils.activity_endpoint_catalog import ENDPOINT_ACTIVITY_SPECS
-from app.utils.activity_endpoint_catalog.spec import lookup_activity_endpoint_spec
+from app.utils.activity.activity_endpoint_catalog import ENDPOINT_ACTIVITY_SPECS
+from app.utils.activity.activity_endpoint_catalog.spec import lookup_activity_endpoint_spec
 
 
 def test_get_handlers_excluded_from_catalog_coverage():

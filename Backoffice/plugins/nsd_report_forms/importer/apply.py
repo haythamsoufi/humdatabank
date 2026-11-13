@@ -24,7 +24,7 @@ from app.models.organization import NationalSociety
 from app.models.projects import Project
 from app.services.assignments.completion_service import AssignmentCompletionService
 from app.services.assignments.workflow_service import apply_entity_status_change
-from app.utils.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow
 
 from plugins.nsd_report_forms.constants import ENTITY_TYPE, FINAL_SLOT
 from plugins.nsd_report_forms import schedule as nsd_schedule

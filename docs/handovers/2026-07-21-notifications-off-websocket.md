@@ -42,7 +42,7 @@ Related context:
 | WS status gate | `layout.html` / `template_context.py` / `components.js` | `window.NOTIFY_WS_ENABLED` / `notify_websocket_enabled`; may skip `/notifications/api/stream/status` |
 | Server WS endpoint | `Backoffice/app/routes/notifications_ws.py` | Registers `/api/notifications/ws`, heartbeats ~15s, uses `ws_manager` channel `notifications` |
 | Broadcast on create | `Backoffice/app/services/notification/core.py` | Calls `broadcast_notification` / `broadcast_unread_count` via `ws_manager` |
-| Shared WS pool | `Backoffice/app/utils/ws_manager.py` | Per-worker total + per-user caps; notifications share budget with AI channels |
+| Shared WS pool | `Backoffice/app/utils/realtime/ws_manager.py` | Per-worker total + per-user caps; notifications share budget with AI channels |
 | Config | `WEBSOCKET_ENABLED`, stream status in `Backoffice/app/routes/notifications.py` | Global-ish enablement — be careful not to break AI |
 
 ---

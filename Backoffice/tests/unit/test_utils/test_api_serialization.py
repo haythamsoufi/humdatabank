@@ -14,7 +14,7 @@ import pytest
 from datetime import datetime
 from unittest.mock import MagicMock, patch, PropertyMock
 
-from app.utils.api_serialization import (
+from app.utils.api.api_serialization import (
     format_country_info,
     format_country_info_minimal,
     format_national_society_info,
@@ -340,7 +340,7 @@ class TestFormatFormItemInfo:
         bank.emergency = False; bank.related_programs_list = []; bank.archived = False
         fi.indicator_bank = bank
 
-        with patch('app.utils.api_serialization.get_localized_indicator_name', return_value='Bank Name'):
+        with patch('app.utils.api.api_serialization.get_localized_indicator_name', return_value='Bank Name'):
             result = format_form_item_info(fi)
         assert 'bank_details' in result
         assert result['bank_details']['type'] == 'numeric'
@@ -348,7 +348,7 @@ class TestFormatFormItemInfo:
     def test_indicator_type_without_bank(self):
         fi = _make_form_item(is_indicator=True)
         fi.indicator_bank = None
-        with patch('app.utils.api_serialization.get_localized_indicator_name', return_value=None):
+        with patch('app.utils.api.api_serialization.get_localized_indicator_name', return_value=None):
             result = format_form_item_info(fi)
         assert result['bank_details'] is None
 
@@ -390,7 +390,7 @@ class TestFormatIndicatorDetails:
         bank.related_programs_list = ['PROG1']; bank.archived = False
         fi.indicator_bank = bank
 
-        with patch('app.utils.api_serialization.get_localized_indicator_name', return_value='Indicator Name'):
+        with patch('app.utils.api.api_serialization.get_localized_indicator_name', return_value='Indicator Name'):
             result = format_indicator_details(fi)
         assert result is not None
         assert result['id'] == 10
@@ -401,7 +401,7 @@ class TestFormatIndicatorDetails:
     def test_indicator_without_bank(self):
         fi = _make_form_item(is_indicator=True)
         fi.indicator_bank = None
-        with patch('app.utils.api_serialization.get_localized_indicator_name', return_value=None):
+        with patch('app.utils.api.api_serialization.get_localized_indicator_name', return_value=None):
             result = format_indicator_details(fi)
         assert result['bank_details']['id'] is None
         assert result['bank_details']['name'] is None
@@ -442,7 +442,7 @@ class TestSerializeAssignedDataItem:
 
     def test_basic_serialization(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 result = serialize_assigned_data_item(item)
         assert result['id'] == 1
@@ -452,7 +452,7 @@ class TestSerializeAssignedDataItem:
 
     def test_percentage_form_item_returns_decimal(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item(value='25')
                 form_item = MagicMock()
                 form_item.type = 'percentage'
@@ -465,7 +465,7 @@ class TestSerializeAssignedDataItem:
 
     def test_data_not_available_sets_status(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item(data_not_avail=True)
                 result = serialize_assigned_data_item(item)
         assert result['data_status'] == 'data_not_available'
@@ -473,7 +473,7 @@ class TestSerializeAssignedDataItem:
 
     def test_not_applicable_sets_status(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item(not_applic=True)
                 result = serialize_assigned_data_item(item)
         assert result['data_status'] == 'not_applicable'
@@ -481,14 +481,14 @@ class TestSerializeAssignedDataItem:
 
     def test_submitted_at_isoformat(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 result = serialize_assigned_data_item(item)
         assert result['submitted_at'] == '2024-03-15T00:00:00'
 
     def test_submitted_at_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.submitted_at = None
                 result = serialize_assigned_data_item(item)
@@ -496,16 +496,16 @@ class TestSerializeAssignedDataItem:
 
     def test_minimal_country_info_used_when_flag_set(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info_minimal', return_value={'id': 1}) as mock_min, \
-                 patch('app.utils.api_serialization.format_country_info', return_value={'id': 1, 'name': 'full'}):
+            with patch('app.utils.api.api_serialization.format_country_info_minimal', return_value={'id': 1}) as mock_min, \
+                 patch('app.utils.api.api_serialization.format_country_info', return_value={'id': 1, 'name': 'full'}):
                 item = self._make_item()
                 result = serialize_assigned_data_item(item, minimal_country_info=True)
                 mock_min.assert_called_once()
 
     def test_include_full_info_adds_form_item_info(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value={'field': 'data'}):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value={'field': 'data'}):
                 item = self._make_item()
                 form_item = MagicMock()
                 form_item.form_section = MagicMock()
@@ -515,7 +515,7 @@ class TestSerializeAssignedDataItem:
 
     def test_standard_disagg_sex(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {'mode': 'sex', 'values': {'male': 10, 'female': 20}}
                 result = serialize_assigned_data_item(item)
@@ -531,7 +531,7 @@ class TestSerializeAssignedDataItem:
 
     def test_none_disagg_data_returns_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = None
                 result = serialize_assigned_data_item(item)
@@ -539,7 +539,7 @@ class TestSerializeAssignedDataItem:
 
     def test_non_dict_disagg_returns_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = 'not-a-dict'
                 result = serialize_assigned_data_item(item)
@@ -547,7 +547,7 @@ class TestSerializeAssignedDataItem:
 
     def test_bad_values_type_uses_empty_dict(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {'mode': 'sex', 'values': 'bad-values'}
                 result = serialize_assigned_data_item(item)
@@ -556,7 +556,7 @@ class TestSerializeAssignedDataItem:
     def test_matrix_flat_format_normalised(self, app):
         """Flat matrix disagg_data (no 'values' key) is wrapped as mode='matrix'."""
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {'_table': 'ns', '10_SP2': 4107000, '11_SP2': 3000000}
                 result = serialize_assigned_data_item(item)
@@ -569,7 +569,7 @@ class TestSerializeAssignedDataItem:
     def test_disability_merged_disagg(self, app):
         """Disability questions merged into values dict are preserved."""
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {
                     'mode': 'total',
@@ -583,7 +583,7 @@ class TestSerializeAssignedDataItem:
 
     def test_no_assigned_form_template_name_is_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.assignment_entity_status.assigned_form = None
                 result = serialize_assigned_data_item(item)
@@ -591,7 +591,7 @@ class TestSerializeAssignedDataItem:
 
     def test_imputed_value_included(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.imputed_value = 99
                 result = serialize_assigned_data_item(item)
@@ -635,7 +635,7 @@ class TestSerializePublicDataItem:
 
     def test_basic_serialization(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 result = serialize_public_data_item(item)
         assert result['submission_type'] == 'public'
@@ -644,28 +644,28 @@ class TestSerializePublicDataItem:
 
     def test_data_not_available_status(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item(data_not_avail=True)
                 result = serialize_public_data_item(item)
         assert result['data_status'] == 'data_not_available'
 
     def test_not_applicable_status(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item(not_applic=True)
                 result = serialize_public_data_item(item)
         assert result['data_status'] == 'not_applicable'
 
     def test_submitted_at_from_submission(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 result = serialize_public_data_item(item)
         assert result['submitted_at'] == '2024-06-01T00:00:00'
 
     def test_submission_none(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.public_submission = None
                 result = serialize_public_data_item(item)
@@ -674,14 +674,14 @@ class TestSerializePublicDataItem:
 
     def test_template_name_from_assignment(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 result = serialize_public_data_item(item)
         assert result['template_name'] == 'Public Template'
 
     def test_include_disagg(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {'mode': 'age', 'values': {'0-18': 3}}
                 result = serialize_public_data_item(item)
@@ -689,16 +689,16 @@ class TestSerializePublicDataItem:
 
     def test_minimal_country_info(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info_minimal', return_value={'id': 2}) as mock_min, \
-                 patch('app.utils.api_serialization.format_country_info', return_value={'id': 2, 'name': 'full'}):
+            with patch('app.utils.api.api_serialization.format_country_info_minimal', return_value={'id': 2}) as mock_min, \
+                 patch('app.utils.api.api_serialization.format_country_info', return_value={'id': 2, 'name': 'full'}):
                 item = self._make_item()
                 serialize_public_data_item(item, minimal_country_info=True)
                 mock_min.assert_called_once()
 
     def test_include_full_info(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization.format_form_item_info', return_value={'fi': 'data'}):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization.format_form_item_info', return_value={'fi': 'data'}):
                 item = self._make_item()
                 fi = MagicMock()
                 fi.form_section = MagicMock()
@@ -752,8 +752,8 @@ class TestSerializeDynamicDataItem:
 
     def test_section_level_dynamic_fields(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
-                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
                 result = serialize_dynamic_data_item(self._make_dynamic_item())
         assert result['field_type'] == 'dynamic'
         assert result['form_item_id'] is None
@@ -770,8 +770,8 @@ class TestSerializeDynamicDataItem:
         bank.type = 'percentage'
         item.indicator_bank = bank
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
-                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
                 result = serialize_dynamic_data_item(item)
         assert result['value'] == 0.25
         assert result['num_value'] == 0.25
@@ -785,8 +785,8 @@ class TestSerializeDynamicDataItem:
             },
         }
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
-                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
                 result = serialize_dynamic_data_item(item, dynamic_context=dynamic_context)
         assert result['field_type'] == 'repeat_dynamic'
         assert result['repeat_instance_number'] == 2
@@ -838,8 +838,8 @@ class TestSerializeRepeatDataItem:
         item.repeat_instance = instance
 
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
-                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
                 result = serialize_repeat_data_item(item)
         assert result['field_type'] == 'repeat_static'
         assert result['section_stable_key'] == 'repeat-section-uuid'
@@ -877,8 +877,8 @@ class TestSerializeDynamicSectionContext:
 class TestSerializeAssignedFieldType:
     def test_static_field_type(self, app):
         with app.test_request_context():
-            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
-                 patch('app.utils.api_serialization._country_for_aes', return_value=None):
+            with patch('app.utils.api.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api.api_serialization._country_for_aes', return_value=None):
                 item = MagicMock()
                 item.id = 1
                 item.form_item_id = 10
@@ -1060,7 +1060,7 @@ class TestFormatDimSubmissionAssigned:
         aes.sent_for_review_at = None
         aes.published_at = None
         with patch(
-            'app.utils.api_serialization.assignment_data_last_modified_map',
+            'app.utils.api.api_serialization.assignment_data_last_modified_map',
             return_value={4: datetime(2024, 3, 1)},
         ):
             rows = format_assignment_statuses([aes])
@@ -1079,7 +1079,7 @@ class TestFormatDimSubmissionAssigned:
         aes.sent_for_review_at = None
         aes.published_at = None
         with patch(
-            'app.utils.api_serialization.assignment_data_last_modified_map',
+            'app.utils.api.api_serialization.assignment_data_last_modified_map',
             return_value={5: datetime(2024, 2, 1)},
         ):
             rows = format_assignment_statuses([aes])
@@ -2192,11 +2192,11 @@ class TestBuildStarSchemaTables:
             mock_aes.due_date = None
             mock_aes.assigned_form_id = 10
 
-            with patch('app.utils.api_serialization._joinedload_impl') as _mock_jl, \
-                 patch('app.utils.api_serialization.FormTemplate') as mock_ft_cls, \
-                 patch('app.utils.api_serialization.AssignedForm') as mock_af_cls, \
-                 patch('app.utils.api_serialization.AssignmentEntityStatus') as mock_aes_cls, \
-                 patch('app.utils.api_serialization.PublicSubmission') as mock_ps_cls:
+            with patch('app.utils.api.api_serialization._joinedload_impl') as _mock_jl, \
+                 patch('app.utils.api.api_serialization.FormTemplate') as mock_ft_cls, \
+                 patch('app.utils.api.api_serialization.AssignedForm') as mock_af_cls, \
+                 patch('app.utils.api.api_serialization.AssignmentEntityStatus') as mock_aes_cls, \
+                 patch('app.utils.api.api_serialization.PublicSubmission') as mock_ps_cls:
 
                 mock_ft_cls.query.options.return_value.filter.return_value.all.return_value = [mock_template]
                 mock_af_cls.query.filter.return_value.all.return_value = [mock_assigned_form]

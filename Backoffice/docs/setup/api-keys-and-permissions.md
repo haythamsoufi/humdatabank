@@ -4,7 +4,7 @@ How database API keys authorize requests to `/api/v1/*` (and the legacy indicato
 
 **Where to manage keys:** Admin → API Management → **API Key Management** (`/admin/api-management/api-keys`). Requires `admin.api.manage` (or System Manager).
 
-Code map: vocabulary and parser `app/services/security/api_key_permissions.py`; request pipeline and enforcement `app/services/security/api_authentication.py`; decorators `app/utils/auth.py`; live route catalog `app/services/security/api_key_route_catalog.py`; migration `migrations/versions/api_key_permissions_v2.py`.
+Code map: vocabulary and parser `app/services/security/api_key_permissions.py`; request pipeline and enforcement `app/services/security/api_authentication.py`; decorators `app/utils/auth/auth.py`; live route catalog `app/services/security/api_key_route_catalog.py`; migration `migrations/versions/api_key_permissions_v2.py`.
 
 ## 1. The model in plain language
 
@@ -50,7 +50,7 @@ Names, email addresses and contact details are returned only to keys holding `us
 
 ### Pagination ceilings
 
-Key-authenticated requests always paginate. Maximum `per_page`: `API_KEY_MAX_PER_PAGE` (default 10000). `MAX_PER_PAGE` in `app/utils/api_helpers.py` is 10000 for all callers (was 100000). `/users`, `/indicator-suggestions` and `/resources` are capped at 500.
+Key-authenticated requests always paginate. Maximum `per_page`: `API_KEY_MAX_PER_PAGE` (default 10000). `MAX_PER_PAGE` in `app/utils/api/api_helpers.py` is 10000 for all callers (was 100000). `/users`, `/indicator-suggestions` and `/resources` are capped at 500.
 
 ### Rate limits
 

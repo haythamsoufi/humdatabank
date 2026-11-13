@@ -9,7 +9,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def _jwt_headers(app, user_id, sid=None):
-    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile.mobile_jwt import issue_token_pair
     with app.app_context():
         tokens = issue_token_pair(user_id, session_id=sid or f'req-sid-{user_id}')
     return {'Authorization': f'Bearer {tokens["access_token"]}'}
@@ -34,7 +34,7 @@ class TestListAccessRequests:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = list_access_requests()
 
@@ -62,7 +62,7 @@ class TestListAccessRequests:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=False):
                 resp = list_access_requests()
 
@@ -92,7 +92,7 @@ class TestListAccessRequests:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = list_access_requests()
 
@@ -118,7 +118,7 @@ class TestApproveAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = approve_access_request(99999)
 
@@ -147,7 +147,7 @@ class TestApproveAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = approve_access_request(car.id)
 
@@ -176,7 +176,7 @@ class TestApproveAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch('app.models.User.query') as mock_uq:
                 mock_uq.get.return_value = None
@@ -207,7 +207,7 @@ class TestApproveAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch.object(requester.__class__, 'add_entity_permission', create=True):
                 resp = approve_access_request(car.id)
@@ -237,10 +237,10 @@ class TestApproveAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch('app.models.User.query') as mock_uq, \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 mock_uq.get.side_effect = RuntimeError('db failure')
                 resp = approve_access_request(car.id)
 
@@ -261,7 +261,7 @@ class TestRejectAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = reject_access_request(99999)
 
@@ -290,7 +290,7 @@ class TestRejectAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = reject_access_request(car.id)
 
@@ -319,7 +319,7 @@ class TestRejectAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = reject_access_request(car.id)
 
@@ -348,11 +348,11 @@ class TestRejectAccessRequest:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch('app.routes.api.mobile.admin_requests.log_admin_action',
                        side_effect=RuntimeError('audit error')), \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 resp = reject_access_request(car.id)
 
         _, status = _unpack(resp)
@@ -372,7 +372,7 @@ class TestApproveAllAccessRequests:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True):
                 resp = approve_all_access_requests()
 
@@ -403,7 +403,7 @@ class TestApproveAllAccessRequests:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch.object(requester.__class__, 'add_entity_permission', create=True):
                 resp = approve_all_access_requests()
@@ -435,7 +435,7 @@ class TestApproveAllAccessRequests:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch('app.models.User.query') as mock_uq:
                 mock_uq.get.return_value = None
@@ -468,11 +468,11 @@ class TestApproveAllAccessRequests:
             headers=headers,
         ):
             login_user(admin)
-            with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
+            with patch('app.utils.mobile.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
                  patch('app.routes.api.mobile.admin_requests.log_admin_action',
                        side_effect=RuntimeError('bulk failure')), \
-                 patch('app.utils.transactions.request_transaction_rollback'):
+                 patch('app.utils.database.transactions.request_transaction_rollback'):
                 resp = approve_all_access_requests()
 
         _, status = _unpack(resp)

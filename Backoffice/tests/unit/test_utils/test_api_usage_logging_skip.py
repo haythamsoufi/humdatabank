@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.utils.api_usage_logging_skip import should_skip_api_usage_path
+from app.utils.api.api_usage_logging_skip import should_skip_api_usage_path
 
 
 @pytest.mark.parametrize(

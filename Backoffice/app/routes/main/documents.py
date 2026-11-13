@@ -2,11 +2,11 @@ from flask import render_template, request, redirect, url_for, flash, session, c
 from flask_login import login_required, current_user
 from app.models.enums import EntityType
 from app.services.organization.entity_service import EntityService
-from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
+from app.utils.common.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from flask_babel import _
 from config import Config
-from app.utils.entity_groups import get_enabled_entity_groups
-from app.utils.request_utils import is_top_level_navigation
+from app.utils.organization.entity_groups import get_enabled_entity_groups
+from app.utils.http.request_utils import is_top_level_navigation
 from contextlib import suppress
 
 from app.routes.main import bp

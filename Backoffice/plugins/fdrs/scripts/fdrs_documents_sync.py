@@ -204,7 +204,7 @@ def _save_fdrs_document_bytes(
     entity_id: int,
 ) -> str:
     """Persist downloaded bytes using the same layout as manual submission uploads."""
-    from app.utils.file_paths import save_submission_document
+    from app.utils.files.file_paths import save_submission_document
 
     file_storage = FileStorage(stream=BytesIO(data), filename=filename)
     return save_submission_document(
@@ -1172,7 +1172,7 @@ def upsert_fdrs_document_metadata(
             existing = existing_by_key.get(import_key)
             previous_status = stored_document_status(existing.status) if existing is not None else None
             modified_at = _parse_fdrs_modified_at(row.get("modified_at"))
-            from app.utils.datetime_helpers import utcnow
+            from app.utils.common.datetime_helpers import utcnow
 
             uploaded_at = modified_at or utcnow()
             doc_status = DocumentStatus.normalize(

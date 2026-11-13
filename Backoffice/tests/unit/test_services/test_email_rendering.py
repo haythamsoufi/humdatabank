@@ -62,14 +62,16 @@ class TestDatetimeformatFilter:
         assert result  # returns str(value)
 
     def test_date_strftime_exception(self):
-        d = date(2024, 1, 1)
-        with patch.object(d.__class__, "strftime", side_effect=Exception("fail")):
-            result = _datetimeformat_filter(d)
-            assert result  # falls back to str(value)
+        class Boom(date):
+            def strftime(self, fmt):
+                raise Exception("fail")
+
+        result = _datetimeformat_filter(Boom(2024, 1, 1))
+        assert result  # falls back to str(value)
 
     def test_datetime_ensure_utc_exception(self):
         dt = datetime(2024, 1, 1, 12, 0, 0)
-        with patch("app.services.email.rendering.ensure_utc", side_effect=Exception("tz fail")):
+        with patch("app.utils.common.datetime_helpers.ensure_utc", side_effect=Exception("tz fail")):
             result = _datetimeformat_filter(dt)
             # falls back to str(dt)
             assert result

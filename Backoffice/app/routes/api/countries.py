@@ -19,16 +19,16 @@ from app.routes.api import api_bp
 from app.models import Country, AssignedForm, PublicSubmission
 from app.models.organization import NationalSociety
 from app.models.assignments import AssignmentEntityStatus
-from app.utils.auth import require_api_key, require_api_key_or_session
+from app.utils.auth.auth import require_api_key, require_api_key_or_session
 from app.services.security.api_key_permissions import REFERENCE_READ
-from app.utils.rate_limiting import rate_limit, api_rate_limit
+from app.utils.security.rate_limiting import rate_limit, api_rate_limit
 from app.services.platform.user_analytics_service import get_client_ip
 from app import db
 from sqlalchemy.orm import joinedload
 
 # Import utility functions
-from app.utils.api_helpers import json_response, api_error
-from app.utils.api_pagination import validate_pagination_params
+from app.utils.api.api_helpers import json_response, api_error
+from app.utils.api.api_pagination import validate_pagination_params
 from app.services.forms.reporting_period_service import sort_period_names
 
 # ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ def get_periods():
 
         # Resolve iso filters to country_id if provided
         if (country_iso2 or country_iso3) and not country_id:
-            from app.utils.country_utils import resolve_country_from_iso
+            from app.utils.organization.country_utils import resolve_country_from_iso
             resolved_id, error = resolve_country_from_iso(iso2=country_iso2, iso3=country_iso3)
             if error:
                 # Determine status code based on error type

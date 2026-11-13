@@ -3,8 +3,8 @@
 from flask import request
 
 from app.routes.api.mobile import mobile_bp
-from app.utils.mobile_auth import mobile_auth_required
-from app.utils.mobile_responses import (
+from app.utils.mobile.mobile_auth import mobile_auth_required
+from app.utils.mobile.mobile_responses import (
     mobile_bad_request,
     mobile_forbidden,
     mobile_not_found,
@@ -12,7 +12,7 @@ from app.utils.mobile_responses import (
     mobile_paginated,
     mobile_server_error,
 )
-from app.utils.api_pagination import validate_pagination_params
+from app.utils.api.api_pagination import validate_pagination_params
 
 
 @mobile_bp.route('/user/entity-documents', methods=['GET'])

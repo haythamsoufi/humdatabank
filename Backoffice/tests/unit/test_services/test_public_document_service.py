@@ -1824,7 +1824,7 @@ class TestStreamPublicAiDocumentDownload:
         from unittest.mock import patch
 
         from app.services.public import document_service as svc
-        from app.utils.api_errors import ClientInputError
+        from app.utils.api.api_errors import ClientInputError
 
         doc = SimpleNamespace(
             id=11,

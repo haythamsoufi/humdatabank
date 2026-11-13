@@ -14,9 +14,9 @@ from app.services.documents.guidance_document_service import (
     save_guidance_document,
 )
 from app.services.platform import storage_service as storage
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
-from app.utils.error_handling import handle_json_view_exception
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
+from app.utils.common.error_handling import handle_json_view_exception
 from plugins.upr import bp
 
 OWNER_KEY = "upr"

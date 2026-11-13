@@ -52,7 +52,7 @@ def user_can_read_disaggregation_template(user, template_id) -> bool:
     dedicated role.
     """
     from app.services.organization.authorization_service import AuthorizationService
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
 
     try:
         if int(template_id) != int(FDRS_TEMPLATE_ID):

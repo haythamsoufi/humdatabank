@@ -50,7 +50,7 @@ class TestNormalizeEmopsConfig:
 def test_country_iso_prefers_iso2(monkeypatch):
     country = SimpleNamespace(iso2="UG", iso3="UGA")
     monkeypatch.setattr(
-        "app.utils.api_serialization._country_for_aes",
+        "app.utils.api.api_serialization._country_for_aes",
         lambda aes: country,
     )
     assert _country_iso_for_aes(object()) == "UG"

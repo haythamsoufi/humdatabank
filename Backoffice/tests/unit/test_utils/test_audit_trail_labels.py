@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def test_known_types_use_friendly_labels(app):
-    from app.utils.audit_trail_labels import activity_type_display_label
+    from app.utils.audit.audit_trail_labels import activity_type_display_label
 
     with app.app_context():
         assert activity_type_display_label("admin_ai") == "AI"
@@ -17,7 +17,7 @@ def test_known_types_use_friendly_labels(app):
 
 
 def test_unknown_type_is_readable(app):
-    from app.utils.audit_trail_labels import activity_type_display_label
+    from app.utils.audit.audit_trail_labels import activity_type_display_label
 
     with app.app_context():
         assert activity_type_display_label("admin_custom") == "Custom"

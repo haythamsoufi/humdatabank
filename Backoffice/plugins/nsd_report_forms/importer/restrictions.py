@@ -213,7 +213,7 @@ def ensure_pm_overview_role() -> RbacRole:
 def attach_groups_to_assignment(assigned_form_id: int, groups: List[RbacRole]) -> None:
     """Ensure each Access Group is listed on the assignment audience (idempotent add)."""
     from app.models.assignments import assigned_form_allowed_role
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     if not groups:
         return
@@ -250,7 +250,7 @@ def sync_nsd_audience_on_assignment(
     - Quarter cycles: PMs only
     """
     from app.models.assignments import assigned_form_allowed_role
-    from app.utils.datetime_helpers import utcnow
+    from app.utils.common.datetime_helpers import utcnow
 
     groups = ensure_nsd_access_groups()
     managed = {int(groups["focal"].id), int(groups["pm"].id)}

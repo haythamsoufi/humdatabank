@@ -487,7 +487,7 @@ class TestLogPlatformError:
 
     def test_request_too_large_returns_413(self, client, db_session):
         """Content-Length exceeding limit returns 413."""
-        from app.utils.constants import MAX_ERROR_LOG_REQUEST_BYTES
+        from app.utils.common.constants import MAX_ERROR_LOG_REQUEST_BYTES
         resp = client.post(
             _api("/platform-error"),
             data=b"x" * (MAX_ERROR_LOG_REQUEST_BYTES + 1),

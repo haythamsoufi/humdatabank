@@ -18,7 +18,7 @@ from app.services.security.api_key_permissions import (
     build_permissions_document,
     parse_key_permissions,
 )
-from app.utils.datetime_helpers import ensure_utc, utcnow
+from app.utils.common.datetime_helpers import ensure_utc, utcnow
 
 
 class APIKeyPermissionsForm(FlaskForm):

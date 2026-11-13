@@ -13,11 +13,11 @@ from app.models import (FormTemplate, FormSection, FormItem, IndicatorBank,
     FormTemplateVersion)
 from app.forms.form_builder import IndicatorForm, QuestionForm, DocumentFieldForm
 from app.routes.admin.shared import permission_required
-from app.utils.request_utils import is_json_request, get_request_data, get_request_int
+from app.utils.http.request_utils import is_json_request, get_request_data, get_request_int
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.transactions import request_transaction_rollback, register_post_commit, safe_remove
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import (json_forbidden, json_bad_request, json_ok,
+from app.utils.database.transactions import request_transaction_rollback, register_post_commit, safe_remove
+from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api.api_responses import (json_forbidden, json_bad_request, json_ok,
     json_server_error, json_form_errors)
 from app.services.forms.item_duplication_service import ItemDuplicationService
 from app.services.forms.matrix_column_validation import validate_matrix_config
@@ -728,7 +728,7 @@ def delete_item(item_id):
         else:
             # Actually delete the item
             if form_item.item_type == 'image':
-                from app.utils.template_image_assets import delete_all_image_sources_from_config
+                from app.utils.templates.template_image_assets import delete_all_image_sources_from_config
                 delete_all_image_sources_from_config(form_item.config)
             db.session.delete(form_item)
             _update_version_timestamp(version_id)

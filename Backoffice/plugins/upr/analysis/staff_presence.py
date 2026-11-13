@@ -34,7 +34,7 @@ def clear_staff_presence_cache() -> None:
 def _resolve_staff_item_id() -> int | None:
     """Published T22 staff matrix id (stable_key, then staff column, then label)."""
     from app.models import FormItem, FormTemplate
-    from app.utils.stable_key import T22_STAFF_MATRIX_COLUMN, T22_STAFF_MATRIX_STABLE_KEY, resolve_published_form_item_id
+    from app.utils.templates.stable_key import T22_STAFF_MATRIX_COLUMN, T22_STAFF_MATRIX_STABLE_KEY, resolve_published_form_item_id
 
     item_id = resolve_published_form_item_id(PNS_PLAN_TEMPLATE_ID, T22_STAFF_MATRIX_STABLE_KEY)
     if item_id:

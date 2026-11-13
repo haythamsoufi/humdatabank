@@ -19,7 +19,7 @@ from app import create_app
 from app.extensions import db
 from app.models.assignments import AssignedForm, ReportingPeriod
 from app.services.forms.reporting_period_service import upsert_reporting_period
-from app.utils.reporting_period_label_parser import parse_period_label
+from app.utils.indicators.reporting_period_label_parser import parse_period_label
 
 
 def seed_reporting_period_catalog(*, dry_run: bool = False) -> dict[str, int]:

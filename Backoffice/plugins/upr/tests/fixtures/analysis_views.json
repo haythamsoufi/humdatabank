@@ -124,6 +124,7 @@
     },
     "panels": null,
     "gaps": null,
+    "overview": null,
     "table": {
      "title": "Participation (coverage)",
      "note": "",
@@ -256,6 +257,7 @@
     },
     "panels": null,
     "gaps": null,
+    "overview": null,
     "table": {
      "title": "Funding ambition & delivery",
      "note": "Same mix as the Financial Overview network block. Planned requirement is the country plan: host National Society + IFRC Secretariat + PNS lines recorded on that plan. Reported funding is PNS self-reported funding + other sources on the country report + IFRC Secretariat actuals (2025 and 2026 snapshots; earlier years have none). Reported expenditure is PNS self-reported expenditure + those IFRC actuals. Host National Society strategic-priority totals are not added on top. Transfers are not counted as expenditure.",
@@ -376,6 +378,7 @@
     },
     "panels": null,
     "gaps": null,
+    "overview": null,
     "table": {
      "title": "People to be reached",
      "note": "",
@@ -505,6 +508,7 @@
     },
     "panels": null,
     "gaps": null,
+    "overview": null,
     "table": {
      "title": "Partners engaged",
      "note": "All data sources adds what the host National Society recorded and what Participating Societies self-report, counting each society once. PNS reported data is only the self-report. Country data is only the host's record. Planning funding is that year's PNS funding requirement (a stored total is used instead of its breakdown). Reporting funding is funding reported. Under a country, the partner count is the societies supporting that country.",
@@ -1265,6 +1269,7 @@
      }
     ],
     "gaps": null,
+    "overview": null,
     "table": {
      "title": "National Society capacity",
      "note": "",
@@ -1481,6 +1486,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "Participation by stage",
       "note": "",
@@ -1691,6 +1697,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "How countries take part",
       "note": "",
@@ -1886,6 +1893,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "From internal to public",
       "note": "",
@@ -2061,6 +2069,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "How consistently countries take part",
       "note": "National Societies by the number of completed rounds (plans, mid-year and annual reports) they took part in. Rounds still open or only partly covered by the sources are left out.",
@@ -2196,6 +2205,7 @@
        }
       }
      ],
+     "overview": null,
      "table": {
       "title": "Country by round",
       "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",
@@ -2408,6 +2418,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "Participation by stage",
       "note": "",
@@ -2579,6 +2590,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "How countries take part",
       "note": "",
@@ -2741,6 +2753,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "From internal to public",
       "note": "",
@@ -2924,6 +2937,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "Retention year on year",
       "note": "",
@@ -3109,6 +3123,7 @@
        }
       }
      ],
+     "overview": null,
      "table": {
       "title": "Country by round",
       "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",
@@ -3281,6 +3296,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "Participation by stage",
       "note": "",
@@ -3358,6 +3374,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "How countries take part",
       "note": "",
@@ -3440,6 +3457,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "From internal to public",
       "note": "",
@@ -3526,6 +3544,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "Retention year on year",
       "note": "",
@@ -3552,6 +3571,7 @@
      "chart": null,
      "panels": null,
      "gaps": [],
+     "overview": null,
      "table": {
       "title": "Country by round",
       "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",
@@ -3759,6 +3779,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "Participation by stage",
       "note": "",
@@ -3880,6 +3901,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "How countries take part",
       "note": "",
@@ -4000,6 +4022,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "From internal to public",
       "note": "",
@@ -4121,6 +4144,7 @@
      },
      "panels": null,
      "gaps": null,
+     "overview": null,
      "table": {
       "title": "Retention year on year",
       "note": "",
@@ -4257,6 +4281,7 @@
        }
       }
      ],
+     "overview": null,
      "table": {
       "title": "Country by round",
       "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",

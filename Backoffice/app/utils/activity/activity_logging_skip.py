@@ -34,6 +34,8 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "organization.api_auto_translate_organizations",
         "system_admin.get_filtered_indicator_count",
         "forms.search_matrix_rows",
+        # On-demand preview of a free-text answer. Nothing is saved.
+        "forms.field_text_translation_preview",
         "main.load_more_activities",
         "forms_api.api_render_pending_dynamic_indicator",
         "ai_v1.chat",

@@ -30,6 +30,9 @@ const DEBUG_MODULES = (() => {
 // Formatting should be available as early as possible (runs immediately + observers)
 import './modules/numeric-formatting.js';
 
+// Preview-only translation icon for free-text answers in another language.
+import './modules/field-translation-preview.js';
+
 // Sidebar UX / navigation
 import './modules/sidebar-collapse.js';
 import './modules/section-nav-scroll.js';

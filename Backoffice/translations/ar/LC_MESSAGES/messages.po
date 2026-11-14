@@ -37779,3 +37779,28 @@ msgstr "✓"
 #~ "Show every endpoint in the registry: External /v1, Mobile, AI, the Indicator"
 #~ " Bank app, and the FDRS public frontend."
 #~ msgstr ""
+
+#: app/templates/forms/entry_form/entry_form.html
+msgid "Hide translation preview"
+msgstr ""
+
+#: app/templates/forms/entry_form/entry_form.html
+#, python-format
+msgid "Preview in %(language)s"
+msgstr ""
+
+#: app/templates/forms/entry_form/entry_form.html
+msgid "Preview only. This does not change the saved text."
+msgstr ""
+
+#: app/templates/forms/entry_form/entry_form.html
+msgid "Preview shows the beginning of this text."
+msgstr ""
+
+#: app/templates/forms/entry_form/entry_form.html
+msgid "Show translation preview"
+msgstr ""
+
+#: app/templates/forms/entry_form/entry_form.html
+msgid "Translation is unavailable right now."
+msgstr ""

@@ -42,6 +42,15 @@ def test_latin_sentences_follow_the_display_language():
     assert translation_preview_decision(SPANISH, "en")["offer"] is True
 
 
+def test_urls_and_repeated_punctuation_stay_cheap():
+    sentence = (
+        "The distribution was delayed because of flooding in the area. "
+        "See https://example.org/report and write ops@example.org"
+    )
+    assert detect_field_text_language(sentence)[0] == "en"
+    assert detect_field_text_language("!@" * 4000)[0] is None
+
+
 def test_non_latin_scripts():
     assert detect_field_text_language(RUSSIAN)[0] == "ru"
     assert detect_field_text_language(CHINESE)[0] == "zh"

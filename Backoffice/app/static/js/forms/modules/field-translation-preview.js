@@ -81,6 +81,22 @@ let scanTimer = 0;
 let panelSeq = 0;
 let openField = null;
 
+function stripUrlsAndEmails(text) {
+    return String(text || '').split(/\s+/).filter((token) => {
+        const lowered = token.toLowerCase();
+        if (lowered.startsWith('http://') || lowered.startsWith('https://') || lowered.startsWith('www.')) {
+            return false;
+        }
+        const at = token.indexOf('@');
+        if (at > 0 && token.indexOf('@', at + 1) === -1) {
+            const domain = token.slice(at + 1);
+            const dot = domain.lastIndexOf('.');
+            if (dot > 0 && dot < domain.length - 1) return false;
+        }
+        return true;
+    }).join(' ');
+}
+
 export function normalizeLanguageCode(lang, fallback = 'en') {
     const base = String(lang || '').trim().toLowerCase().replace(/-/g, '_').split('_')[0];
     return /^[a-z]{2,3}$/.test(base) ? base : fallback;
@@ -176,9 +192,7 @@ export function detectFieldTextLanguage(text) {
     const script = scriptLanguage(raw);
     if (script) return { language: script, confidence: 0.92 };
 
-    const cleaned = raw
-        .replace(/https?:\/\/\S+|www\.\S+/gi, ' ')
-        .replace(/\S+@\S+\.\S+/g, ' ');
+    const cleaned = stripUrlsAndEmails(raw);
     const words = (cleaned.match(WORD_RE) || []).map((word) => word.toLowerCase());
     if (words.length < 3) return { language: null, confidence: 0 };
 

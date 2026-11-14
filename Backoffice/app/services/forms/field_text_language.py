@@ -19,8 +19,6 @@ from typing import Optional
 PREVIEW_CONFIDENCE = 0.55
 
 _WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+", re.UNICODE)
-_URL_RE = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
-_EMAIL_RE = re.compile(r"\S+@\S+\.\S+")
 
 # Letters that identify a language inside an Arabic-script run.
 _URDU_CHARS = frozenset("ٹڈڑں")
@@ -85,6 +83,23 @@ _DISTINCTIVE = {
     "fr": frozenset("œæ"),
     "de": frozenset("äöüß"),
 }
+
+
+def _strip_urls_and_emails(text: str) -> str:
+    """Drop URL and email tokens. Linear in the text length; no nested regex."""
+    kept = []
+    for token in text.split():
+        lowered = token.lower()
+        if lowered.startswith(("http://", "https://", "www.")):
+            continue
+        at = token.find("@")
+        if at > 0 and token.find("@", at + 1) == -1:
+            domain = token[at + 1:]
+            dot = domain.rfind(".")
+            if 0 < dot < len(domain) - 1:
+                continue
+        kept.append(token)
+    return " ".join(kept)
 
 
 def normalize_language_code(lang: Optional[str], *, default: str = "en") -> str:
@@ -193,8 +208,7 @@ def detect_field_text_language(text: str) -> tuple[Optional[str], float]:
     if script:
         return script, 0.92
 
-    cleaned = _URL_RE.sub(" ", raw)
-    cleaned = _EMAIL_RE.sub(" ", cleaned)
+    cleaned = _strip_urls_and_emails(raw)
     words = [w.lower() for w in _WORD_RE.findall(cleaned)]
     if len(words) < 3:
         return None, 0.0

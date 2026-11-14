@@ -72,7 +72,20 @@
      data-ui-style="legacy"
      data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}"
      data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}"
-     data-public-token="{{ public_token if is_public_submission else '' }}">
+     data-public-token="{{ public_token if is_public_submission else '' }}"
+     {% if current_user.is_authenticated %}
+     data-field-translation-url="{{ url_for('forms.field_text_translation_preview') }}"
+     data-i18n-show-translation="{{ _('Show translation preview') }}"
+     data-i18n-hide-translation="{{ _('Hide translation preview') }}"
+     data-i18n-translating="{{ _('Translating…') }}"
+     data-i18n-preview-note="{{ _('Preview only. This does not change the saved text.') }}"
+     data-i18n-unavailable="{{ _('Translation is unavailable right now.') }}"
+     data-i18n-preview-title="{{ _('Preview in %(language)s') }}"
+     data-i18n-truncated="{{ _('Preview shows the beginning of this text.') }}"
+     {% endif %}
+     {% if is_public_submission and submission is defined and submission and submission.id %}
+     data-public-submission-id="{{ submission.id }}"
+     {% endif %}>
 <script nonce="{{ csp_nonce() }}">
 (function () {
     var root = document.getElementById('entry-form-root');

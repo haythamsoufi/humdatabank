@@ -1,4 +1,5 @@
 import 'assignment.dart';
+import 'dashboard_activity.dart';
 import 'entity.dart';
 import 'focal_point_contact.dart';
 
@@ -11,6 +12,8 @@ class DashboardData {
   final List<FocalPointContact> nsFocalPoints;
   final List<FocalPointContact> orgFocalPoints;
   final List<FocalPointContact> fdsMembers;
+  final List<DashboardActivity> recentActivities;
+  final bool recentActivitiesHasMore;
   final DateTime? timestamp;
 
   DashboardData({
@@ -21,6 +24,8 @@ class DashboardData {
     this.nsFocalPoints = const [],
     this.orgFocalPoints = const [],
     this.fdsMembers = const [],
+    this.recentActivities = const [],
+    this.recentActivitiesHasMore = false,
     this.timestamp,
   });
 }

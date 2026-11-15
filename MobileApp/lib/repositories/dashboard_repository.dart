@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import '../models/shared/assignment.dart';
+import '../models/shared/dashboard_activity.dart';
 import '../models/shared/dashboard_data.dart';
 import '../models/shared/entity.dart';
 import '../models/shared/focal_point_contact.dart';
@@ -34,28 +35,32 @@ class DashboardRepository {
     String endpoint = AppConfig.dashboardApiEndpoint;
     if (entity != null) {
       final uri = Uri.parse(endpoint);
-      final updatedUri = uri.replace(queryParameters: {
-        'entity_type': entity.entityType,
-        'entity_id': entity.entityId.toString(),
-      });
+      final updatedUri = uri.replace(
+        queryParameters: {
+          'entity_type': entity.entityType,
+          'entity_id': entity.entityId.toString(),
+        },
+      );
       endpoint = updatedUri.toString();
-      DebugLogger.logDashboard('Loading dashboard with entity: ${entity.selectionKey}');
+      DebugLogger.logDashboard(
+        'Loading dashboard with entity: ${entity.selectionKey}',
+      );
     }
 
-    final response =
-        await _errorHandler.executeWithErrorHandling<http.Response>(
-      apiCall: () => _api.get(endpoint),
-      context: 'Dashboard',
-      defaultValue: null,
-      maxRetries: 2,
-      handleAuthErrors: true,
-    );
+    final response = await _errorHandler
+        .executeWithErrorHandling<http.Response>(
+          apiCall: () => _api.get(endpoint),
+          context: 'Dashboard',
+          defaultValue: null,
+          maxRetries: 2,
+          handleAuthErrors: true,
+        );
 
     if (response == null || response.statusCode != 200) {
       DebugLogger.logWarn(
         'DASHBOARD',
         'Failed to load dashboard: status=${response?.statusCode}, '
-        'endpoint=$endpoint',
+            'endpoint=$endpoint',
       );
       return null;
     }
@@ -98,7 +103,9 @@ class DashboardRepository {
             inner.containsKey('past_assignments') ||
             inner.containsKey('entities'))) {
       root = inner;
-      DebugLogger.logDashboard('Unwrapped mobile_ok `data` envelope for dashboard payload');
+      DebugLogger.logDashboard(
+        'Unwrapped mobile_ok `data` envelope for dashboard payload',
+      );
     }
 
     final topKeys = root.keys.toList()..sort();
@@ -108,8 +115,8 @@ class DashboardRepository {
       DebugLogger.logWarn(
         'DASHBOARD',
         'Response looks like admin platform stats (user_count) — not assignment lists. '
-        'AppConfig.dashboardApiEndpoint must be mobileUserDashboardEndpoint '
-        '(/user/dashboard), not admin analytics dashboard-stats.',
+            'AppConfig.dashboardApiEndpoint must be mobileUserDashboardEndpoint '
+            '(/user/dashboard), not admin analytics dashboard-stats.',
       );
     }
 
@@ -119,42 +126,77 @@ class DashboardRepository {
     final nsFocalPoints = <FocalPointContact>[];
     final orgFocalPoints = <FocalPointContact>[];
     final fdsMembers = <FocalPointContact>[];
+    final recentActivities = <DashboardActivity>[];
     Entity? selectedEntity;
 
     if (root.containsKey('current_assignments')) {
-      currentAssignments.addAll((root['current_assignments'] as List)
-          .map((item) => Assignment.fromJson(item as Map<String, dynamic>))
-          .toList());
+      currentAssignments.addAll(
+        (root['current_assignments'] as List)
+            .map((item) => Assignment.fromJson(item as Map<String, dynamic>))
+            .toList(),
+      );
     }
 
     if (root.containsKey('past_assignments')) {
-      pastAssignments.addAll((root['past_assignments'] as List)
-          .map((item) => Assignment.fromJson(item as Map<String, dynamic>))
-          .toList());
+      pastAssignments.addAll(
+        (root['past_assignments'] as List)
+            .map((item) => Assignment.fromJson(item as Map<String, dynamic>))
+            .toList(),
+      );
     }
 
     if (root.containsKey('entities')) {
-      entities.addAll((root['entities'] as List)
-          .map((item) => Entity.fromJson(item as Map<String, dynamic>))
-          .toList());
+      entities.addAll(
+        (root['entities'] as List)
+            .map((item) => Entity.fromJson(item as Map<String, dynamic>))
+            .toList(),
+      );
     }
 
     if (root.containsKey('ns_focal_points')) {
-      nsFocalPoints.addAll((root['ns_focal_points'] as List)
-          .map((item) => FocalPointContact.fromJson(item as Map<String, dynamic>))
-          .toList());
+      nsFocalPoints.addAll(
+        (root['ns_focal_points'] as List)
+            .map(
+              (item) =>
+                  FocalPointContact.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+      );
     }
 
     if (root.containsKey('org_focal_points')) {
-      orgFocalPoints.addAll((root['org_focal_points'] as List)
-          .map((item) => FocalPointContact.fromJson(item as Map<String, dynamic>))
-          .toList());
+      orgFocalPoints.addAll(
+        (root['org_focal_points'] as List)
+            .map(
+              (item) =>
+                  FocalPointContact.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+      );
     }
 
     if (root.containsKey('fds_members')) {
-      fdsMembers.addAll((root['fds_members'] as List)
-          .map((item) => FocalPointContact.fromJson(item as Map<String, dynamic>))
-          .toList());
+      fdsMembers.addAll(
+        (root['fds_members'] as List)
+            .map(
+              (item) =>
+                  FocalPointContact.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+      );
+    }
+
+    final rawActivities = root['recent_activities'];
+    if (rawActivities is List) {
+      recentActivities.addAll(
+        rawActivities
+            .whereType<Map>()
+            .map(
+              (item) =>
+                  DashboardActivity.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList(),
+      );
     }
 
     // Handle selected_entity from API response
@@ -165,18 +207,21 @@ class DashboardRepository {
       selectedEntity = Entity.fromJson(selectedEntityJson);
       // Save selected entity to storage
       _storage.setString(
-          AppConfig.selectedEntityTypeKey, selectedEntity.entityType);
-      _storage.setInt(
-          AppConfig.selectedEntityIdKey, selectedEntity.entityId);
+        AppConfig.selectedEntityTypeKey,
+        selectedEntity.entityType,
+      );
+      _storage.setInt(AppConfig.selectedEntityIdKey, selectedEntity.entityId);
     } else if (entities.isNotEmpty) {
       // Default to first entity if none selected
       selectedEntity = entities.first;
     }
 
     DebugLogger.logDashboard(
-        'Parsed ${currentAssignments.length} current and ${pastAssignments.length} past assignments');
+      'Parsed ${currentAssignments.length} current and ${pastAssignments.length} past assignments',
+    );
     DebugLogger.logDashboard(
-        'Parsed ${entities.length} entities, selectedEntity: ${selectedEntity?.displayLabel ?? "null"}');
+      'Parsed ${entities.length} entities, selectedEntity: ${selectedEntity?.displayLabel ?? "null"}',
+    );
 
     return DashboardData(
       currentAssignments: currentAssignments,
@@ -186,6 +231,8 @@ class DashboardRepository {
       nsFocalPoints: nsFocalPoints,
       orgFocalPoints: orgFocalPoints,
       fdsMembers: fdsMembers,
+      recentActivities: recentActivities,
+      recentActivitiesHasMore: root['recent_activities_has_more'] == true,
       timestamp: DateTime.now(),
     );
   }
@@ -196,10 +243,11 @@ class DashboardRepository {
   /// When [ignoreExpiry] is true, a snapshot older than [AppConfig.cacheExpiration]
   /// is still returned (used for offline pull-to-refresh so the UI can reload
   /// from disk without hitting the network).
-  Future<DashboardData?> loadDashboardFromCache({bool ignoreExpiry = false}) async {
+  Future<DashboardData?> loadDashboardFromCache({
+    bool ignoreExpiry = false,
+  }) async {
     try {
-      final cachedData =
-          await _storage.getString(AppConfig.cachedDashboardKey);
+      final cachedData = await _storage.getString(AppConfig.cachedDashboardKey);
       if (cachedData == null) {
         return null;
       }
@@ -223,15 +271,29 @@ class DashboardRepository {
           .toList();
 
       final nsFocalPoints = (data['ns_focal_points'] as List? ?? const [])
-          .map((json) => FocalPointContact.fromJson(json as Map<String, dynamic>))
+          .map(
+            (json) => FocalPointContact.fromJson(json as Map<String, dynamic>),
+          )
           .toList();
 
       final orgFocalPoints = (data['org_focal_points'] as List? ?? const [])
-          .map((json) => FocalPointContact.fromJson(json as Map<String, dynamic>))
+          .map(
+            (json) => FocalPointContact.fromJson(json as Map<String, dynamic>),
+          )
           .toList();
 
       final fdsMembers = (data['fds_members'] as List? ?? const [])
-          .map((json) => FocalPointContact.fromJson(json as Map<String, dynamic>))
+          .map(
+            (json) => FocalPointContact.fromJson(json as Map<String, dynamic>),
+          )
+          .toList();
+
+      final recentActivities = (data['recent_activities'] as List? ?? const [])
+          .whereType<Map>()
+          .map(
+            (json) =>
+                DashboardActivity.fromJson(Map<String, dynamic>.from(json)),
+          )
           .toList();
 
       // Try to load entities from cache
@@ -240,8 +302,9 @@ class DashboardRepository {
       // Try to load selected entity
       Entity? selectedEntity;
       if (entities.isNotEmpty) {
-        final entityType =
-            await _storage.getString(AppConfig.selectedEntityTypeKey);
+        final entityType = await _storage.getString(
+          AppConfig.selectedEntityTypeKey,
+        );
         final entityId = await _storage.getInt(AppConfig.selectedEntityIdKey);
 
         if (entityType != null && entityId != null) {
@@ -263,6 +326,8 @@ class DashboardRepository {
         nsFocalPoints: nsFocalPoints,
         orgFocalPoints: orgFocalPoints,
         fdsMembers: fdsMembers,
+        recentActivities: recentActivities,
+        recentActivitiesHasMore: data['recent_activities_has_more'] == true,
         timestamp: cacheTime,
       );
     } catch (e) {
@@ -276,22 +341,33 @@ class DashboardRepository {
     try {
       final cacheData = {
         'timestamp': (data.timestamp ?? DateTime.now()).toIso8601String(),
-        'current_assignments':
-            data.currentAssignments.map((a) => a.toJson()).toList(),
-        'past_assignments': data.pastAssignments.map((a) => a.toJson()).toList(),
+        'current_assignments': data.currentAssignments
+            .map((a) => a.toJson())
+            .toList(),
+        'past_assignments': data.pastAssignments
+            .map((a) => a.toJson())
+            .toList(),
         'ns_focal_points': data.nsFocalPoints.map((fp) => fp.toJson()).toList(),
-        'org_focal_points': data.orgFocalPoints.map((fp) => fp.toJson()).toList(),
+        'org_focal_points': data.orgFocalPoints
+            .map((fp) => fp.toJson())
+            .toList(),
         'fds_members': data.fdsMembers.map((fp) => fp.toJson()).toList(),
+        'recent_activities': data.recentActivities
+            .map((activity) => activity.toJson())
+            .toList(),
+        'recent_activities_has_more': data.recentActivitiesHasMore,
       };
       await _storage.setString(
-          AppConfig.cachedDashboardKey, jsonEncode(cacheData));
+        AppConfig.cachedDashboardKey,
+        jsonEncode(cacheData),
+      );
 
       // Also save entities to cache
       if (data.entities.isNotEmpty) {
         await _storage.setString(
           AppConfig.cachedEntitiesKey,
           jsonEncode({
-            'entities': data.entities.map((e) => e.toJson()).toList()
+            'entities': data.entities.map((e) => e.toJson()).toList(),
           }),
         );
       }
@@ -327,14 +403,14 @@ class DashboardRepository {
     final endpoint =
         '${AppConfig.mobileUserDashboardEndpoint}/offline-entities'
         '?template_ids=$ids&limit=$limit';
-    final response =
-        await _errorHandler.executeWithErrorHandling<http.Response>(
-      apiCall: () => _api.get(endpoint),
-      context: 'Offline entity dashboards',
-      defaultValue: null,
-      maxRetries: 1,
-      handleAuthErrors: true,
-    );
+    final response = await _errorHandler
+        .executeWithErrorHandling<http.Response>(
+          apiCall: () => _api.get(endpoint),
+          context: 'Offline entity dashboards',
+          defaultValue: null,
+          maxRetries: 1,
+          handleAuthErrors: true,
+        );
     if (response == null || response.statusCode != 200) {
       DebugLogger.logWarn(
         'DASHBOARD',
@@ -376,11 +452,62 @@ class DashboardRepository {
     ];
   }
 
+  /// The next page of recent activities for [entity], after [offset] rows.
+  ///
+  /// Returns null when the request fails. The caller keeps the rows it already
+  /// has.
+  Future<DashboardActivityPage?> loadMoreRecentActivities({
+    required Entity entity,
+    required int offset,
+    int limit = 10,
+  }) async {
+    final uri = Uri.parse('${AppConfig.mobileUserDashboardEndpoint}/activities')
+        .replace(
+          queryParameters: {
+            'entity_type': entity.entityType,
+            'entity_id': entity.entityId.toString(),
+            'offset': offset.toString(),
+            'limit': limit.toString(),
+          },
+        );
+    final response = await _errorHandler
+        .executeWithErrorHandling<http.Response>(
+          apiCall: () => _api.get(uri.toString()),
+          context: 'Dashboard activities',
+          defaultValue: null,
+          maxRetries: 1,
+          handleAuthErrors: true,
+        );
+    if (response == null || response.statusCode != 200) {
+      DebugLogger.logWarn(
+        'DASHBOARD',
+        'Failed to load more activities: status=${response?.statusCode}',
+      );
+      return null;
+    }
+    try {
+      final json = jsonDecode(response.body);
+      if (json is! Map) return null;
+      var root = Map<String, dynamic>.from(json);
+      final inner = root['data'];
+      if (inner is Map &&
+          (inner.containsKey('recent_activities') ||
+              inner.containsKey('has_more'))) {
+        root = Map<String, dynamic>.from(inner);
+      }
+      return DashboardActivityPage.fromJson(root);
+    } catch (e) {
+      DebugLogger.logWarn('DASHBOARD', 'Unreadable activities page: $e');
+      return null;
+    }
+  }
+
   /// Load entities from cache.
   Future<List<Entity>> loadEntitiesFromCache() async {
     try {
-      final cachedEntities =
-          await _storage.getString(AppConfig.cachedEntitiesKey);
+      final cachedEntities = await _storage.getString(
+        AppConfig.cachedEntitiesKey,
+      );
       if (cachedEntities != null) {
         final data = jsonDecode(cachedEntities);
         return (data['entities'] as List)
@@ -409,8 +536,13 @@ class DashboardRepository {
   /// Update selected entity in local storage only.
   /// The API will update the session when entity is passed as query parameter.
   Future<void> updateSelectedEntityStorage(Entity entity) async {
-    DebugLogger.logDashboard('Saving selected entity to storage: ${entity.selectionKey}');
-    await _storage.setString(AppConfig.selectedEntityTypeKey, entity.entityType);
+    DebugLogger.logDashboard(
+      'Saving selected entity to storage: ${entity.selectionKey}',
+    );
+    await _storage.setString(
+      AppConfig.selectedEntityTypeKey,
+      entity.entityType,
+    );
     await _storage.setInt(AppConfig.selectedEntityIdKey, entity.entityId);
   }
 
@@ -420,8 +552,9 @@ class DashboardRepository {
       return null;
     }
 
-    final entityType =
-        await _storage.getString(AppConfig.selectedEntityTypeKey);
+    final entityType = await _storage.getString(
+      AppConfig.selectedEntityTypeKey,
+    );
     final entityId = await _storage.getInt(AppConfig.selectedEntityIdKey);
 
     if (entityType != null && entityId != null) {

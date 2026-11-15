@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hum_databank_app/models/shared/assignment.dart';
+import 'package:hum_databank_app/models/shared/dashboard_activity.dart';
 import 'package:hum_databank_app/models/shared/dashboard_data.dart';
 import 'package:hum_databank_app/models/shared/entity.dart';
 import 'package:hum_databank_app/providers/shared/dashboard_provider.dart';
@@ -8,19 +9,21 @@ import 'package:hum_databank_app/services/offline/entity_dashboard_store.dart';
 
 void main() {
   group('DashboardProvider offline fallback', () {
-    test('force refresh hydrates an expired snapshot before a failed API call',
-        () async {
-      final cached = _dashboardWithAssignment(1, 'Saved assignment');
-      final repository = _FakeDashboardRepository(staleCache: cached);
-      final provider = DashboardProvider(repository: repository);
+    test(
+      'force refresh hydrates an expired snapshot before a failed API call',
+      () async {
+        final cached = _dashboardWithAssignment(1, 'Saved assignment');
+        final repository = _FakeDashboardRepository(staleCache: cached);
+        final provider = DashboardProvider(repository: repository);
 
-      await provider.loadDashboard(forceRefresh: true);
+        await provider.loadDashboard(forceRefresh: true);
 
-      expect(provider.currentAssignments, hasLength(1));
-      expect(provider.currentAssignments.single.name, 'Saved assignment');
-      expect(provider.error, isNull);
-      expect(repository.cacheRequests, [true]);
-    });
+        expect(provider.currentAssignments, hasLength(1));
+        expect(provider.currentAssignments.single.name, 'Saved assignment');
+        expect(provider.error, isNull);
+        expect(repository.cacheRequests, [true]);
+      },
+    );
 
     test('failed normal refresh retries an expired snapshot', () async {
       final cached = _dashboardWithAssignment(2, 'Older assignment');
@@ -34,38 +37,68 @@ void main() {
       expect(repository.cacheRequests, [false, true]);
     });
 
-    test('failed refresh still reports an error when no snapshot exists',
-        () async {
+    test(
+      'failed refresh still reports an error when no snapshot exists',
+      () async {
+        final provider = DashboardProvider(
+          repository: _FakeDashboardRepository(),
+        );
+
+        await provider.loadDashboard(forceRefresh: true);
+
+        expect(provider.currentAssignments, isEmpty);
+        expect(
+          provider.error,
+          'Unable to load dashboard. Please check your connection and try again.',
+        );
+      },
+    );
+
+    test('api payload keeps recent activities on the provider', () async {
+      const activity = DashboardActivity(
+        id: '9',
+        summary: 'Updated 1 field in Plan',
+        assignmentTitle: 'Plan – 2026',
+      );
       final provider = DashboardProvider(
-        repository: _FakeDashboardRepository(),
+        repository: _FakeDashboardRepository(
+          apiData: DashboardData(
+            currentAssignments: const [],
+            pastAssignments: const [],
+            entities: const [],
+            recentActivities: [activity],
+            recentActivitiesHasMore: true,
+            timestamp: DateTime(2026),
+          ),
+        ),
       );
 
-      await provider.loadDashboard(forceRefresh: true);
+      await provider.loadDashboard();
 
-      expect(provider.currentAssignments, isEmpty);
-      expect(
-        provider.error,
-        'Unable to load dashboard. Please check your connection and try again.',
-      );
+      expect(provider.recentActivities, hasLength(1));
+      expect(provider.recentActivities.single.summary, contains('Plan'));
+      expect(provider.recentActivitiesHasMore, isTrue);
     });
 
-    test('empty cached dashboard is treated as a valid offline snapshot',
-        () async {
-      final emptySnapshot = DashboardData(
-        currentAssignments: const [],
-        pastAssignments: const [],
-        entities: const [],
-        timestamp: DateTime(2026),
-      );
-      final provider = DashboardProvider(
-        repository: _FakeDashboardRepository(staleCache: emptySnapshot),
-      );
+    test(
+      'empty cached dashboard is treated as a valid offline snapshot',
+      () async {
+        final emptySnapshot = DashboardData(
+          currentAssignments: const [],
+          pastAssignments: const [],
+          entities: const [],
+          timestamp: DateTime(2026),
+        );
+        final provider = DashboardProvider(
+          repository: _FakeDashboardRepository(staleCache: emptySnapshot),
+        );
 
-      await provider.loadDashboard(forceRefresh: true);
+        await provider.loadDashboard(forceRefresh: true);
 
-      expect(provider.currentAssignments, isEmpty);
-      expect(provider.error, isNull);
-    });
+        expect(provider.currentAssignments, isEmpty);
+        expect(provider.error, isNull);
+      },
+    );
   });
 
   group('DashboardProvider entity selection', () {
@@ -242,6 +275,13 @@ class _FakeDashboardRepository implements DashboardRepository {
     required Set<int> templateIds,
     int limit = 50,
   }) async => const [];
+
+  @override
+  Future<DashboardActivityPage?> loadMoreRecentActivities({
+    required Entity entity,
+    required int offset,
+    int limit = 10,
+  }) async => null;
 
   @override
   Future<void> updateSelectedEntityStorage(Entity entity) async {}

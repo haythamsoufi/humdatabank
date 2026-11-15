@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../models/shared/assignment.dart';
+import '../../models/shared/dashboard_activity.dart';
 import '../../models/shared/dashboard_data.dart';
 import '../../models/shared/entity.dart';
 import '../../models/shared/focal_point_contact.dart';
@@ -19,6 +20,8 @@ class EntityDashboardSnapshot {
     this.nsFocalPoints = const [],
     this.orgFocalPoints = const [],
     this.fdsMembers = const [],
+    this.recentActivities = const [],
+    this.recentActivitiesHasMore = false,
     this.savedAt,
   });
 
@@ -28,6 +31,8 @@ class EntityDashboardSnapshot {
   final List<FocalPointContact> nsFocalPoints;
   final List<FocalPointContact> orgFocalPoints;
   final List<FocalPointContact> fdsMembers;
+  final List<DashboardActivity> recentActivities;
+  final bool recentActivitiesHasMore;
   final DateTime? savedAt;
 
   /// Every assignment of the entity, current first.
@@ -44,6 +49,8 @@ class EntityDashboardSnapshot {
         nsFocalPoints: data.nsFocalPoints,
         orgFocalPoints: data.orgFocalPoints,
         fdsMembers: data.fdsMembers,
+        recentActivities: data.recentActivities,
+        recentActivitiesHasMore: data.recentActivitiesHasMore,
         savedAt: data.timestamp,
       );
 
@@ -60,6 +67,8 @@ class EntityDashboardSnapshot {
       nsFocalPoints: list('ns_focal_points', FocalPointContact.fromJson),
       orgFocalPoints: list('org_focal_points', FocalPointContact.fromJson),
       fdsMembers: list('fds_members', FocalPointContact.fromJson),
+      recentActivities: list('recent_activities', DashboardActivity.fromJson),
+      recentActivitiesHasMore: json['recent_activities_has_more'] == true,
       savedAt: DateTime.now(),
     );
   }
@@ -73,6 +82,8 @@ class EntityDashboardSnapshot {
       nsFocalPoints: snapshot.nsFocalPoints,
       orgFocalPoints: snapshot.orgFocalPoints,
       fdsMembers: snapshot.fdsMembers,
+      recentActivities: snapshot.recentActivities,
+      recentActivitiesHasMore: snapshot.recentActivitiesHasMore,
       savedAt: DateTime.tryParse(json['saved_at']?.toString() ?? ''),
     );
   }
@@ -85,6 +96,8 @@ class EntityDashboardSnapshot {
     'ns_focal_points': [for (final c in nsFocalPoints) c.toJson()],
     'org_focal_points': [for (final c in orgFocalPoints) c.toJson()],
     'fds_members': [for (final c in fdsMembers) c.toJson()],
+    'recent_activities': [for (final a in recentActivities) a.toJson()],
+    'recent_activities_has_more': recentActivitiesHasMore,
   };
 
   DashboardData toDashboardData({required List<Entity> entities}) =>
@@ -96,6 +109,8 @@ class EntityDashboardSnapshot {
         nsFocalPoints: nsFocalPoints,
         orgFocalPoints: orgFocalPoints,
         fdsMembers: fdsMembers,
+        recentActivities: recentActivities,
+        recentActivitiesHasMore: recentActivitiesHasMore,
         timestamp: savedAt,
       );
 
@@ -120,6 +135,12 @@ class EntityDashboardSnapshot {
       nsFocalPoints: fresh.nsFocalPoints,
       orgFocalPoints: fresh.orgFocalPoints,
       fdsMembers: fresh.fdsMembers,
+      recentActivities: fresh.recentActivities.isNotEmpty
+          ? fresh.recentActivities
+          : recentActivities,
+      recentActivitiesHasMore: fresh.recentActivities.isNotEmpty
+          ? fresh.recentActivitiesHasMore
+          : recentActivitiesHasMore,
       savedAt: fresh.savedAt,
     );
   }

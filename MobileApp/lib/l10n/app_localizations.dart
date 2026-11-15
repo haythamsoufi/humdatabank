@@ -539,6 +539,11 @@ class AppLocalizations {
       'trend_analysis': 'Trend Analysis',
       'recent_activities': 'Recent Activities',
       'last_7_days': 'Last 7 days',
+      'last_month': 'Last month',
+      'filter_by_user': 'Filter by User',
+      'filter_by_assignment': 'Filter by Assignment',
+      'all_assignments': 'All Assignments',
+      'more_changes': 'more changes',
       'unknown_user': 'Unknown User',
       'added': 'Added',
       'updated': 'Updated',
@@ -1882,6 +1887,11 @@ class AppLocalizations {
       'trend_analysis': 'Análisis de Tendencias',
       'recent_activities': 'Actividades Recientes',
       'last_7_days': 'Últimos 7 días',
+      'last_month': 'Último mes',
+      'filter_by_user': 'Filtrar por usuario',
+      'filter_by_assignment': 'Filtrar por asignación',
+      'all_assignments': 'Todas las asignaciones',
+      'more_changes': 'más cambios',
       'unknown_user': 'Usuario Desconocido',
       'added': 'Agregado',
       'updated': 'Actualizado',
@@ -2932,6 +2942,11 @@ class AppLocalizations {
       'trend_analysis': 'Analyse des Tendances',
       'recent_activities': 'Activités Récentes',
       'last_7_days': '7 derniers jours',
+      'last_month': 'Dernier mois',
+      'filter_by_user': 'Filtrer par utilisateur',
+      'filter_by_assignment': 'Filtrer par affectation',
+      'all_assignments': 'Toutes les affectations',
+      'more_changes': 'autres changements',
       'unknown_user': 'Utilisateur Inconnu',
       'added': 'Ajouté',
       'updated': 'Mis à Jour',
@@ -3972,6 +3987,11 @@ class AppLocalizations {
       'trend_analysis': 'تحليل الاتجاه',
       'recent_activities': 'الأنشطة الأخيرة',
       'last_7_days': 'آخر 7 أيام',
+      'last_month': 'الشهر الماضي',
+      'filter_by_user': 'تصفية حسب المستخدم',
+      'filter_by_assignment': 'تصفية حسب المهمة',
+      'all_assignments': 'جميع المهام',
+      'more_changes': 'تغييرات أخرى',
       'unknown_user': 'مستخدم غير معروف',
       'added': 'تمت الإضافة',
       'updated': 'تم التحديث',
@@ -4989,6 +5009,11 @@ class AppLocalizations {
       'trend_analysis': 'रुझान विश्लेषण',
       'recent_activities': 'हाल की गतिविधियां',
       'last_7_days': 'पिछले 7 दिन',
+      'last_month': 'पिछला महीना',
+      'filter_by_user': 'उपयोगकर्ता के अनुसार फ़िल्टर करें',
+      'filter_by_assignment': 'असाइनमेंट के अनुसार फ़िल्टर करें',
+      'all_assignments': 'सभी असाइनमेंट',
+      'more_changes': 'और परिवर्तन',
       'unknown_user': 'अज्ञात उपयोगकर्ता',
       'added': 'जोड़ा गया',
       'updated': 'अद्यतन किया गया',
@@ -6031,6 +6056,11 @@ class AppLocalizations {
       'trend_analysis': 'Анализ Тренда',
       'recent_activities': 'Недавняя Активность',
       'last_7_days': 'Последние 7 дней',
+      'last_month': 'Прошлый месяц',
+      'filter_by_user': 'Фильтр по пользователю',
+      'filter_by_assignment': 'Фильтр по назначению',
+      'all_assignments': 'Все назначения',
+      'more_changes': 'изменений',
       'unknown_user': 'Неизвестный Пользователь',
       'added': 'Добавлено',
       'updated': 'Обновлено',
@@ -7048,6 +7078,11 @@ class AppLocalizations {
       'trend_analysis': '趋势分析',
       'recent_activities': '最近活动',
       'last_7_days': '过去7天',
+      'last_month': '上个月',
+      'filter_by_user': '按用户筛选',
+      'filter_by_assignment': '按任务筛选',
+      'all_assignments': '所有任务',
+      'more_changes': '更多更改',
       'unknown_user': '未知用户',
       'added': '已添加',
       'updated': '已更新',
@@ -8370,6 +8405,11 @@ class AppLocalizations {
   String get trendAnalysis => translate('trend_analysis');
   String get recentActivities => translate('recent_activities');
   String get last7Days => translate('last_7_days');
+  String get lastMonth => translate('last_month');
+  String get filterByUser => translate('filter_by_user');
+  String get filterByAssignment => translate('filter_by_assignment');
+  String get allAssignments => translate('all_assignments');
+  String get moreChanges => translate('more_changes');
   String get unknownUser => translate('unknown_user');
   String get added => translate('added');
   String get updated => translate('updated');

@@ -25,6 +25,7 @@ import '../../widgets/loading_indicator.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/app_fade_in_up.dart';
 import '../../widgets/dashboard_focal_points_section.dart';
+import '../../widgets/dashboard_recent_activities_section.dart';
 import '../../widgets/entity_selector_bottom_sheet.dart';
 import '../../services/assignment_offline_bundle_service.dart';
 import '../../services/offline/offline_forms_controller.dart';
@@ -366,6 +367,36 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   bool _showEntityDocumentRepository(AuthProvider authProvider) {
     return authProvider.user?.canOpenEntityDocumentRepository ?? false;
+  }
+
+  /// Opens the assignment an activity row points at. Uses the saved form when
+  /// that assignment is already on the dashboard, so offline entry still works.
+  void _openActivityAssignment(
+    BuildContext context,
+    DashboardProvider provider,
+    int assignmentId,
+  ) {
+    final lists = [
+      ...provider.currentAssignments,
+      ...provider.pastAssignments,
+    ];
+    for (final assignment in lists) {
+      if (assignment.id == assignmentId) {
+        unawaited(_openAssignmentForm(context, assignment));
+        return;
+      }
+    }
+    final loc = AppLocalizations.of(context)!;
+    if (shouldDeferRemoteFetch) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.offlineFormNotDownloaded)),
+      );
+      return;
+    }
+    Navigator.of(context).pushNamed(
+      AppRoutes.webview,
+      arguments: AppRoutes.formEntry(assignmentId),
+    );
   }
 
   Widget _buildEntityDocumentRepositoryRow({
@@ -1471,13 +1502,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   offline: offlineProvider,
                                 ),
 
-                              if (_showEntityDocumentRepository(authProvider) &&
-                                  _hasLoadedOnce)
-                                _buildEntityDocumentRepositoryRow(
-                                  localizations: localizations,
-                                  provider: provider,
-                                ),
-
                               // Open assignments (collapsible; title: "You have …")
                               if (provider.currentAssignments.isNotEmpty ||
                                   provider.pastAssignments.isNotEmpty ||
@@ -1504,13 +1528,53 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     final entity =
                                         provider.selectedEntity ??
                                         provider.entities.first;
-                                    return DashboardFocalPointsSection(
-                                      entityLabel: entity.displayLabel,
-                                      nsFocalPoints: provider.nsFocalPoints,
-                                      orgFocalPoints: provider.orgFocalPoints,
-                                      fdsMembers: provider.fdsMembers,
+                                    final canLoadMore =
+                                        provider.recentActivitiesHasMore &&
+                                        offlineProvider.isOnline &&
+                                        !shouldDeferRemoteFetch;
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        DashboardRecentActivitiesSection(
+                                          key: ValueKey(entity.selectionKey),
+                                          entityLabel: entity.displayLabel,
+                                          activities:
+                                              provider.recentActivities,
+                                          hasMore: canLoadMore,
+                                          isLoading: provider.isLoading,
+                                          isLoadingMore: provider
+                                              .isLoadingMoreActivities,
+                                          onOpenAssignment: (assignmentId) =>
+                                              _openActivityAssignment(
+                                                context,
+                                                provider,
+                                                assignmentId,
+                                              ),
+                                          onLoadMore: canLoadMore
+                                              ? () => unawaited(
+                                                  provider
+                                                      .loadMoreRecentActivities(),
+                                                )
+                                              : null,
+                                        ),
+                                        DashboardFocalPointsSection(
+                                          entityLabel: entity.displayLabel,
+                                          nsFocalPoints:
+                                              provider.nsFocalPoints,
+                                          orgFocalPoints:
+                                              provider.orgFocalPoints,
+                                          fdsMembers: provider.fdsMembers,
+                                        ),
+                                      ],
                                     );
                                   },
+                                ),
+
+                              if (_showEntityDocumentRepository(authProvider))
+                                _buildEntityDocumentRepositoryRow(
+                                  localizations: localizations,
+                                  provider: provider,
                                 ),
 
                               // Clears the floating tab bar (padding.bottom is its

@@ -542,6 +542,8 @@ class TestGetDashboard:
         assert isinstance(data["entities"], list)
         assert isinstance(data["ns_focal_points"], list)
         assert isinstance(data["org_focal_points"], list)
+        assert isinstance(data["recent_activities"], list)
+        assert isinstance(data["recent_activities_has_more"], bool)
 
     def test_selected_entity_key_present(self, client, db_session, app):
         with app.app_context():

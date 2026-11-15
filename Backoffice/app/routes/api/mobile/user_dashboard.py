@@ -7,7 +7,11 @@ from flask import Response
 from app.routes.api.mobile import mobile_bp
 from app.utils.mobile.mobile_auth import mobile_auth_required
 from app.utils.mobile.mobile_responses import mobile_ok, mobile_server_error
-from app.routes.api.users import get_dashboard, get_dashboard_offline_entities
+from app.routes.api.users import (
+    get_dashboard,
+    get_dashboard_activities,
+    get_dashboard_offline_entities,
+)
 
 
 def _wrap_inner(inner, error_fallback):
@@ -43,6 +47,24 @@ def mobile_user_dashboard():
     except Exception as e:
         from flask import current_app
         current_app.logger.error("mobile_user_dashboard: %s", e, exc_info=True)
+        return mobile_server_error()
+
+
+@mobile_bp.route('/user/dashboard/activities', methods=['GET'])
+@mobile_auth_required
+def mobile_user_dashboard_activities():
+    """Next page of recent activities. See ``get_dashboard_activities``."""
+    try:
+        inner = get_dashboard_activities()
+        if isinstance(inner, tuple):
+            return _wrap_inner(inner, 'Recent activities unavailable.')
+        status = getattr(inner, 'status_code', None) or 200
+        return _wrap_inner((inner, status), 'Recent activities unavailable.')
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(
+            "mobile_user_dashboard_activities: %s", e, exc_info=True,
+        )
         return mobile_server_error()
 
 

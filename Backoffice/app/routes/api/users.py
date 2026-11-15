@@ -1032,6 +1032,23 @@ def get_dashboard():
             }
         ],
         "org_focal_points": [...] // Same structure as ns_focal_points
+        "fds_members": [...] // Same structure as ns_focal_points
+        "recent_activities": [
+            {
+                "id": int,
+                "timestamp": ISO datetime string | null,
+                "user": {"id": int, "name": string | null, "email": string, "title": string | null} | null,
+                "assignment_id": int | null,
+                "assignment_title": string | null,
+                "template_period": string | null,
+                "summary_key": string | null,
+                "change_type": "added" | "updated" | "removed" | null,
+                "change_count": int | null,
+                "summary": string,
+                "changes": [{"change_type": string, "text": string}]
+            }
+        ],
+        "recent_activities_has_more": bool
     }
     """
     try:
@@ -1131,6 +1148,25 @@ def get_dashboard():
                 selected_entity['entity_type'], selected_entity['entity_id']
             )
 
+        recent_activities = []
+        recent_activities_has_more = False
+        if selected_entity:
+            try:
+                from app.utils.organization.dashboard_activities import (
+                    load_dashboard_recent_activities,
+                )
+                recent_activities, recent_activities_has_more = (
+                    load_dashboard_recent_activities(
+                        selected_entity['entity_type'],
+                        selected_entity['entity_id'],
+                    )
+                )
+            except Exception as activity_err:
+                current_app.logger.warning(
+                    "Failed to load dashboard recent activities: %s",
+                    activity_err,
+                )
+
         return json_response({
             'current_assignments': current_assignments,
             'past_assignments': past_assignments,
@@ -1139,8 +1175,52 @@ def get_dashboard():
             'ns_focal_points': ns_focal_points,
             'org_focal_points': org_focal_points,
             'fds_members': fds_members,
+            'recent_activities': recent_activities,
+            'recent_activities_has_more': recent_activities_has_more,
         })
 
     except Exception as e:
         current_app.logger.error(f"Error fetching dashboard data: {e}", exc_info=True)
         return api_error('Could not fetch dashboard data', 500)
+
+
+@api_bp.route('/dashboard/activities', methods=['GET'])
+@login_required
+def get_dashboard_activities():
+    """Next page of recent activities for one entity the user can open.
+
+    Query parameters: ``entity_type``, ``entity_id``, ``offset`` (default 0),
+    ``limit`` (default 10, at most 50).
+
+    Returns ``recent_activities`` and ``recent_activities_has_more``.
+    """
+    from app.utils.organization.dashboard_activities import (
+        load_dashboard_recent_activities,
+    )
+
+    entity_type = (request.args.get('entity_type') or '').strip()
+    entity_id = request.args.get('entity_id', type=int)
+    if not entity_type or not entity_id:
+        return api_error('entity_type and entity_id are required', 400)
+    if not current_user.has_entity_access(entity_type, entity_id):
+        return api_error('Access denied', 403)
+
+    offset = request.args.get('offset', default=0, type=int) or 0
+    limit = request.args.get('limit', default=10, type=int) or 10
+    try:
+        activities, has_more = load_dashboard_recent_activities(
+            entity_type,
+            entity_id,
+            offset=offset,
+            limit=limit,
+        )
+    except Exception as exc:
+        current_app.logger.error(
+            "Error fetching dashboard activities: %s", exc, exc_info=True,
+        )
+        return api_error('Could not fetch recent activities', 500)
+
+    return json_response({
+        'recent_activities': activities,
+        'recent_activities_has_more': has_more,
+    })

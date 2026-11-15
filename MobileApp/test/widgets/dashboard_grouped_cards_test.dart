@@ -5,6 +5,7 @@ import 'package:hum_databank_app/models/shared/assignment.dart';
 import 'package:hum_databank_app/models/shared/project_dashboard_group.dart';
 import 'package:hum_databank_app/models/shared/focal_point_contact.dart';
 import 'package:hum_databank_app/theme/grouped_dashboard_palette.dart';
+import 'package:hum_databank_app/utils/constants.dart';
 import 'package:hum_databank_app/widgets/dashboard_focal_points_section.dart';
 import 'package:hum_databank_app/widgets/dashboard_grouped_assignment_card.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -159,29 +160,30 @@ void main() {
     expect(bar.color, GroupedDashboardPalette.danger.accent);
   });
 
-  testWidgets('completion bar sits on the last line beside download and enter data', (
-    tester,
-  ) async {
-    await _pump(
-      tester,
-      DashboardGroupedAssignmentCard(
-        assignment: _assignment('pending'),
-        showEnterDataButton: true,
-        onEnterData: () {},
-        onDownloadForOffline: () {},
-      ),
-    );
+  testWidgets(
+    'completion bar sits on the last line beside download and enter data',
+    (tester) async {
+      await _pump(
+        tester,
+        DashboardGroupedAssignmentCard(
+          assignment: _assignment('pending'),
+          showEnterDataButton: true,
+          onEnterData: () {},
+          onDownloadForOffline: () {},
+        ),
+      );
 
-    final bar = tester.getRect(find.byType(LinearProgressIndicator));
-    final download = tester.getRect(find.byIcon(Icons.download_rounded));
-    final enter = tester.getRect(find.text('Enter Data'));
-    final label = tester.getRect(find.text('73% completed'));
+      final bar = tester.getRect(find.byType(LinearProgressIndicator));
+      final download = tester.getRect(find.byIcon(Icons.download_rounded));
+      final enter = tester.getRect(find.text('Enter Data'));
+      final label = tester.getRect(find.text('73% completed'));
 
-    expect(label.bottom, lessThanOrEqualTo(bar.top));
-    expect(bar.right, lessThan(download.left));
-    expect(enter.left - download.right, lessThan(24));
-    expect((bar.center.dy - enter.center.dy).abs(), lessThan(24));
-  });
+      expect(label.bottom, lessThanOrEqualTo(bar.top));
+      expect(bar.right, lessThan(download.left));
+      expect(enter.left - download.right, lessThan(24));
+      expect((bar.center.dy - enter.center.dy).abs(), lessThan(24));
+    },
+  );
 
   testWidgets('downloaded assignment shows only the saved cloud icon', (
     tester,
@@ -294,8 +296,24 @@ void main() {
     expect(find.text('NSD-7'), findsOneWidget);
     expect(find.text('Reporting cycle: Y1Q2'), findsOneWidget);
     expect(find.text('Quarterly — Y1Q2'), findsNothing);
-    expect(find.text('Cycles'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
+    expect(find.text('Cycles'), findsNothing);
+    expect(find.byIcon(Icons.expand_more_rounded), findsOneWidget);
+
+    final card = tester.getRect(find.byType(DashboardProjectGroupCard));
+    final title = tester.getRect(find.text('Health systems'));
+    final status = tester.getRect(find.text('In Progress'));
+    final cycleLine = tester.getRect(find.text('Reporting cycle: Y1Q2'));
+    final icon = tester.getRect(find.byIcon(Icons.expand_more_rounded));
+    final due = tester.getRect(find.textContaining('Due Date'));
+
+    // Label inset is the card padding plus the chip's own horizontal padding.
+    expect(card.right - status.right, lessThan(28));
+    expect(status.top - card.top, lessThan(24));
+    expect(status.left, greaterThan(title.right));
+    expect(status.bottom, lessThan(cycleLine.top));
+    expect((cycleLine.center.dy - icon.center.dy).abs(), lessThan(8));
+    expect(icon.left - cycleLine.right, inInclusiveRange(-2, 8));
+    expect(due.top, greaterThan(cycleLine.bottom - 1));
   });
 
   testWidgets('a closed project is not marked overdue', (tester) async {
@@ -311,6 +329,8 @@ void main() {
 
     expect(find.text('Overdue'), findsNothing);
     expect(find.text('In Progress'), findsOneWidget);
+    expect(find.byIcon(Icons.expand_more_rounded), findsNothing);
+    expect(find.text('Reporting cycle: Y1Q1'), findsOneWidget);
 
     final colors = tester
         .widgetList<Material>(find.byType(Material))
@@ -321,6 +341,7 @@ void main() {
   testWidgets('choosing another cycle updates the reporting line', (
     tester,
   ) async {
+    var opened = 0;
     await _pump(
       tester,
       DashboardProjectGroupCard(
@@ -332,14 +353,50 @@ void main() {
             cycle(2, 'Y1Q2', DateTime(2026, 8, 1)),
           ],
         ),
+        onOpen: (_) => opened++,
       ),
     );
 
-    await tester.tap(find.text('Cycles'));
+    await tester.tap(find.text('Reporting cycle: Y1Q1'));
     await tester.pumpAndSettle();
+    expect(opened, 0);
+    expect(find.text('Reporting cycles'), findsOneWidget);
+
     await tester.tap(find.text('Y1Q2'));
     await tester.pumpAndSettle();
 
     expect(find.text('Reporting cycle: Y1Q2'), findsOneWidget);
+    expect(opened, 0);
+
+    await tester.tap(find.text('Health systems'));
+    await tester.pumpAndSettle();
+    expect(opened, 1);
+  });
+
+  testWidgets('a late round keeps a dot on the cycle code', (tester) async {
+    await _pump(
+      tester,
+      DashboardProjectGroupCard(
+        group: projectGroup(
+          closed: false,
+          active: 1,
+          cycles: [
+            cycle(1, 'Y1Q1', DateTime(2020, 1, 1)),
+            cycle(2, 'Y1Q2', DateTime(2026, 12, 1)),
+          ],
+        ),
+      ),
+    );
+
+    expect(
+      find.byWidgetPredicate((widget) {
+        if (widget is! DecoratedBox) return false;
+        final decoration = widget.decoration;
+        if (decoration is! BoxDecoration) return false;
+        return decoration.shape == BoxShape.circle &&
+            decoration.color == const Color(AppConstants.defaultRed);
+      }),
+      findsOneWidget,
+    );
   });
 }

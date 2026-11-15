@@ -49,6 +49,7 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
     this.offlineBundleOutdated = false,
     this.isDownloadingOfflineForm = false,
     this.showTitle = true,
+    this.showStatus = true,
     this.ignoreOverdue = false,
     this.embedded = false,
   });
@@ -66,6 +67,9 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
 
   /// Project cards draw the project name themselves and hide this title.
   final bool showTitle;
+
+  /// Project cards draw the status beside the project title.
+  final bool showStatus;
 
   /// Closed projects stay on the dashboard but are not drawn as overdue.
   final bool ignoreOverdue;
@@ -103,25 +107,27 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showTitle)
-              Expanded(
-                child: Text(
-                  _displayTitle(assignment),
-                  style: IOSTextStyle.callout(context).copyWith(
-                    fontWeight: FontWeight.w600,
-                    height: 1.25,
-                    color: titleColor,
+        if (showTitle || showStatus)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showTitle)
+                Expanded(
+                  child: Text(
+                    _displayTitle(assignment),
+                    style: IOSTextStyle.callout(context).copyWith(
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                      color: titleColor,
+                    ),
                   ),
                 ),
-              ),
-            if (showTitle) const SizedBox(width: 10),
-            _StatusChip(label: tone.label, tone: tone),
-          ],
-        ),
-        if (_dueLine(context, localizations, assignment) case final dueLine?) ...[
+              if (showTitle && showStatus) const SizedBox(width: 10),
+              if (showStatus) _StatusChip(label: tone.label, tone: tone),
+            ],
+          ),
+        if (_dueLine(context, localizations, assignment)
+            case final dueLine?) ...[
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -499,8 +505,9 @@ class _OfflineActions extends StatelessWidget {
   }
 }
 
-/// One card per project. The active reporting cycle fills the body; other
-/// rounds open from the Cycles control. A closed project is not drawn overdue.
+/// One card per project. The active reporting cycle fills the body. When more
+/// than one round is on the card, the cycle code on the reporting line opens
+/// the others. A closed project is not drawn overdue.
 class DashboardProjectGroupCard extends StatefulWidget {
   const DashboardProjectGroupCard({
     super.key,
@@ -548,7 +555,10 @@ class _DashboardProjectGroupCardState extends State<DashboardProjectGroupCard> {
   @override
   void didUpdateWidget(DashboardProjectGroupCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final sameCycles = _sameCycleIds(oldWidget.group.cycles, widget.group.cycles);
+    final sameCycles = _sameCycleIds(
+      oldWidget.group.cycles,
+      widget.group.cycles,
+    );
     if (!sameCycles ||
         oldWidget.group.activeCycleIndex != widget.group.activeCycleIndex) {
       _index = _clamped(widget.group.activeCycleIndex);
@@ -599,6 +609,9 @@ class _DashboardProjectGroupCardState extends State<DashboardProjectGroupCard> {
         : cardTone.border;
     final period = (cycle.periodName ?? '').trim();
     final showCycles = group.cycles.length > 1;
+    final void Function()? openAssignment = widget.onOpen == null
+        ? null
+        : () => widget.onOpen!(cycle);
     final anyLate = group.cycles.any(
       (item) => projectCycleIsLate(item, DateTime.now()),
     );
@@ -629,81 +642,93 @@ class _DashboardProjectGroupCardState extends State<DashboardProjectGroupCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   InkWell(
-                    onTap: widget.onOpen == null
-                        ? null
-                        : () => widget.onOpen!(cycle),
-                    child: Column(
+                    onTap: openAssignment,
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                  Text(
-                    group.displayTitle,
-                    style: IOSTextStyle.callout(context).copyWith(
-                      fontWeight: FontWeight.w600,
-                      height: 1.25,
-                      color: titleColor,
-                    ),
-                  ),
-                  if (group.showReference) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      group.reference,
-                      style: IOSTextStyle.caption1(context).copyWith(
-                        color: metaColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Text(
-                    period.isEmpty
-                        ? localizations.reportingCycle
-                        : '${localizations.reportingCycle}: $period',
-                    style: IOSTextStyle.footnote(context).copyWith(
-                      color: titleColor,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  DashboardGroupedAssignmentCard(
-                    assignment: cycle,
-                    embedded: true,
-                    showTitle: false,
-                    ignoreOverdue: group.projectClosed,
-                    showEnterDataButton:
-                        widget.showEnterDataButton?.call(cycle) ?? false,
-                    enterDataButtonText: widget.enterDataButtonText,
-                    onEnterData: widget.onEnterData == null
-                        ? null
-                        : () => widget.onEnterData!(cycle),
-                    onDownloadForOffline:
-                        widget.onDownloadForOffline != null &&
-                            (widget.canSaveOffline?.call(cycle) ?? false)
-                        ? () => widget.onDownloadForOffline!(cycle)
-                        : null,
-                    onOfflineBundleDetails:
-                        widget.onOfflineBundleDetails != null &&
-                            (widget.hasOfflineFormSnapshot?.call(cycle) ?? false)
-                        ? () => widget.onOfflineBundleDetails!(cycle)
-                        : null,
-                    hasOfflineFormSnapshot:
-                        widget.hasOfflineFormSnapshot?.call(cycle) ?? false,
-                    offlineBundleOutdated:
-                        widget.offlineBundleOutdated?.call(cycle) ?? false,
-                    isDownloadingOfflineForm:
-                        widget.isDownloadingOfflineForm?.call(cycle) ?? false,
-                  ),
-                  if (showCycles) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: _CyclesButton(
-                        count: group.cycles.length,
-                        showOverdueDot: anyLate && !group.projectClosed,
-                        onPressed: () => _openCycleSheet(context, cycle),
-                      ),
-                    ),
-                  ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                group.displayTitle,
+                                style: IOSTextStyle.callout(context).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.25,
+                                  color: titleColor,
+                                ),
+                              ),
+                              if (group.showReference) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  group.reference,
+                                  style: IOSTextStyle.caption1(context)
+                                      .copyWith(
+                                        color: metaColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _StatusChip(label: tone.label, tone: tone),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (showCycles)
+                    _ReportingCycleLink(
+                      label: localizations.reportingCycle,
+                      code: period,
+                      color: titleColor,
+                      showOverdueDot: anyLate && !group.projectClosed,
+                      onPressed: () => _openCycleSheet(context, cycle),
+                    )
+                  else
+                    InkWell(
+                      onTap: openAssignment,
+                      child: Text(
+                        period.isEmpty
+                            ? localizations.reportingCycle
+                            : '${localizations.reportingCycle}: $period',
+                        style: IOSTextStyle.footnote(
+                          context,
+                        ).copyWith(color: titleColor, height: 1.3),
+                      ),
+                    ),
+                  InkWell(
+                    onTap: openAssignment,
+                    child: DashboardGroupedAssignmentCard(
+                      assignment: cycle,
+                      embedded: true,
+                      showTitle: false,
+                      showStatus: false,
+                      ignoreOverdue: group.projectClosed,
+                      showEnterDataButton:
+                          widget.showEnterDataButton?.call(cycle) ?? false,
+                      enterDataButtonText: widget.enterDataButtonText,
+                      onEnterData: widget.onEnterData == null
+                          ? null
+                          : () => widget.onEnterData!(cycle),
+                      onDownloadForOffline:
+                          widget.onDownloadForOffline != null &&
+                              (widget.canSaveOffline?.call(cycle) ?? false)
+                          ? () => widget.onDownloadForOffline!(cycle)
+                          : null,
+                      onOfflineBundleDetails:
+                          widget.onOfflineBundleDetails != null &&
+                              (widget.hasOfflineFormSnapshot?.call(cycle) ??
+                                  false)
+                          ? () => widget.onOfflineBundleDetails!(cycle)
+                          : null,
+                      hasOfflineFormSnapshot:
+                          widget.hasOfflineFormSnapshot?.call(cycle) ?? false,
+                      offlineBundleOutdated:
+                          widget.offlineBundleOutdated?.call(cycle) ?? false,
+                      isDownloadingOfflineForm:
+                          widget.isDownloadingOfflineForm?.call(cycle) ?? false,
                     ),
                   ),
                 ],
@@ -715,7 +740,10 @@ class _DashboardProjectGroupCardState extends State<DashboardProjectGroupCard> {
     );
   }
 
-  Future<void> _openCycleSheet(BuildContext context, Assignment selected) async {
+  Future<void> _openCycleSheet(
+    BuildContext context,
+    Assignment selected,
+  ) async {
     final localizations = AppLocalizations.of(context)!;
     final group = widget.group;
     final today = DateTime.now();
@@ -762,66 +790,92 @@ class _DashboardProjectGroupCardState extends State<DashboardProjectGroupCard> {
   }
 }
 
-class _CyclesButton extends StatelessWidget {
-  const _CyclesButton({
-    required this.count,
+/// Cycle code on the reporting line. The chevron marks it as the control that
+/// opens the other rounds; a dot means one of those rounds is late.
+class _ReportingCycleLink extends StatelessWidget {
+  const _ReportingCycleLink({
+    required this.label,
+    required this.code,
+    required this.color,
     required this.showOverdueDot,
     required this.onPressed,
   });
 
-  final int count;
+  final String label;
+  final String code;
+  final Color color;
   final bool showOverdueDot;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: localizations.browseReportingCycles,
-      child: OutlinedButton(
-      onPressed: () {
-        HapticFeedback.selectionClick();
-        onPressed();
-      },
-      style: OutlinedButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.layers_outlined, size: 16, color: scheme.onSurface.withValues(alpha: 0.7)),
-          const SizedBox(width: 6),
-          Text(localizations.cycles),
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(
-              color: scheme.onSurface.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              '$count',
-              style: IOSTextStyle.caption1(context).copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+    final shown = code.trim();
+    final base = IOSTextStyle.footnote(
+      context,
+    ).copyWith(color: color, height: 1.3);
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Tooltip(
+        message: localizations.browseReportingCycles,
+        child: TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: color,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 28),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            alignment: AlignmentDirectional.centerStart,
           ),
-          if (showOverdueDot) ...[
-            const SizedBox(width: 6),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Color(AppConstants.defaultRed),
-                shape: BoxShape.circle,
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            onPressed();
+          },
+          child: Row(
+            children: [
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text.rich(
+                        TextSpan(
+                          style: base,
+                          children: [
+                            TextSpan(text: shown.isEmpty ? label : '$label: '),
+                            if (shown.isNotEmpty)
+                              TextSpan(
+                                text: shown,
+                                style: base.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Icon(Icons.expand_more_rounded, size: 18, color: color),
+                    if (showOverdueDot) ...[
+                      const SizedBox(width: 4),
+                      const SizedBox(
+                        width: 8,
+                        height: 8,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Color(AppConstants.defaultRed),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ],
-      ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -847,8 +901,9 @@ class _CycleTile extends StatelessWidget {
     final title = period.isEmpty ? localizations.cycleFallback : period;
     final due = cycle.dueDate == null
         ? null
-        : DateFormat.yMMMd(Localizations.localeOf(context).toString())
-            .format(cycle.dueDate!.toLocal());
+        : DateFormat.yMMMd(
+            Localizations.localeOf(context).toString(),
+          ).format(cycle.dueDate!.toLocal());
     final status = localizations.localizeStatus(cycle.status);
     final detail = due == null
         ? status
@@ -906,10 +961,9 @@ class _CycleTag extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: IOSTextStyle.caption1(context).copyWith(
-          color: foreground,
-          fontWeight: FontWeight.w600,
-        ),
+        style: IOSTextStyle.caption1(
+          context,
+        ).copyWith(color: foreground, fontWeight: FontWeight.w600),
       ),
     );
   }

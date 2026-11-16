@@ -93,26 +93,18 @@ Once that flag is on, the same workflow KPIs should be imported as `assignment_p
 
 Per page: validated/published → `approved`, submitted → `submitted`, started only → `in_progress`. The whole-assignment status stays the rollup of those three pages. That page import is **not built yet**; sync still writes only `assignment_entity_status`. Page names are on `FDRS_SECTION_WORKFLOW_SPECS`.
 
-### Documents (metadata only)
+### Documents (metadata and file bytes)
 
-- API: `GET /api/documents?apiKey=…&showunpublished=true&force=true[&year=YYYY]`
+- API: `GET /api/DocumentAdmin?apiKey=…`
 - Module: `Backoffice/plugins/fdrs/scripts/fdrs_documents_sync.py`
+- Catalog only. There is no fallback to `GET /api/documents`. The file URL is the row's `Migrationlink` (a YouTube `Link` when `Migrationlink` is empty). `NewName` is not turned into a URL.
 - Questionnaire slots map FDRS `document_type` → form items 923, 933, 1309, 1310 (one winner per country/year/type).
 - Other National Society types (`Other`, statutes/laws, Picture of the Year, …) import as library `SubmittedDocument` rows on the same assignment (`form_item_id=NULL`), one row per catalog file.
 - Global publication types (`EveryoneCounts`, `Analysis`, videos, guides) are skipped here — resource sync owns those.
-- Creates/updates `SubmittedDocument` with `source_url`, `file_pending=true`, `storage_path=NULL`.
-- Idempotency: `fdrs_import_key` (unique).
-- **File URLs return HTTP 403** from `https://data-api.ifrc.org/documents/…` — awaiting IFRC fix; then re-run sync to download bytes into storage. A small subset of 403s are stale `_N` duplicate-filename suffixes from the API catalog; download retries once without that suffix.
+- Creates/updates `SubmittedDocument` metadata and downloads the `Migrationlink` file. Private `Public` codes stay non-public and are still downloaded.
+- Idempotency: `fdrs_import_key` (unique). The key uses the catalog `Name`, not `Migrationlink`.
 
 Migration: `add_fdrs_submitted_document_metadata.py` (`source_url`, `thumbnail_source_url`, `fdrs_import_key`, `file_pending`, nullable `storage_path`).
-
-## Blocked / not implemented
-
-### Document file bytes
-
-- **Blocker:** IFRC static document URLs not served (403).
-- **Action:** IFRC fixes URL serving or documents authenticated download endpoint.
-- **Then:** Re-run FDRS sync; extend `fdrs_documents_sync.py` to download → `save_submission_document` and clear `file_pending`.
 
 ## How to run
 

@@ -1,7 +1,7 @@
-"""Copy global FDRS resources (data.ifrc.org) into Manage Resources.
+"""Copy global FDRS resources into Manage Resources.
 
-The legacy catalog is ``GET /api/documents?isglobal=true`` on
-``https://data-api.ifrc.org``. Each row is one file or one video, not one
+The catalog is ``GET /api/DocumentAdmin`` on ``https://data-api.ifrc.org``.
+Global rows (``IsGlobal``) are kept. Each row is one file or one video, not one
 library record. This groups language copies of the same publication.
 ``apply_plan`` writes every FDRS resource: a stored file or cover is kept
 only when the blob is actually in storage, and a missing blob is downloaded
@@ -136,38 +136,32 @@ def _display_title(name: str) -> str:
     return (text or stem).strip()[:255] or "Untitled"
 
 
-def parse_catalog(payload: Any) -> list[FdrsResourceDoc]:
-    """Flatten ``[{code, documents}]`` into resource rows. Society documents are ignored."""
-    if not isinstance(payload, list):
+def parse_catalog(rows: Any) -> list[FdrsResourceDoc]:
+    """Turn the rows from :func:`fetch_global_catalog` into resource rows."""
+    if not isinstance(rows, list):
         return []
     docs: list[FdrsResourceDoc] = []
-    for block in payload:
-        if not isinstance(block, dict):
+    for row in rows:
+        if not isinstance(row, dict):
             continue
-        code = (block.get("code") or "").strip()
-        if code:
+        url = (row.get("url") or "").strip()
+        name = (row.get("name") or "").strip()
+        if not url or not name:
             continue
-        for row in block.get("documents") or []:
-            if not isinstance(row, dict):
-                continue
-            url = (row.get("url") or "").strip()
-            name = (row.get("name") or row.get("title") or "").strip()
-            if not url or not name:
-                continue
-            year_raw = row.get("year")
-            try:
-                year = int(year_raw) if year_raw not in (None, "") else None
-            except (TypeError, ValueError):
-                year = None
-            docs.append(FdrsResourceDoc(
-                document_type=(row.get("document_type") or "DocumentGuide").strip() or "DocumentGuide",
-                year=year,
-                language=normalize_language(row.get("LangCode") or row.get("language")),
-                name=name,
-                description=(row.get("Description") or row.get("description") or "").strip(),
-                url=url,
-                thumbnail=(row.get("thumbnail") or row.get("Thumbnail") or "").strip(),
-            ))
+        year_raw = row.get("year")
+        try:
+            year = int(year_raw) if year_raw not in (None, "") else None
+        except (TypeError, ValueError):
+            year = None
+        docs.append(FdrsResourceDoc(
+            document_type=(row.get("document_type") or "DocumentGuide").strip() or "DocumentGuide",
+            year=year,
+            language=normalize_language(row.get("LangCode")),
+            name=name,
+            description="",
+            url=url,
+            thumbnail=(row.get("thumbnail") or "").strip(),
+        ))
     return docs
 
 
@@ -378,7 +372,7 @@ def build_plan(
 def publication_date_for_catalog_year(year: Any) -> Optional[date]:
     """1 January of a catalog year.
 
-    The legacy list uses ``0`` when a file has no reporting year. That is not a
+    The catalog uses ``0`` when a file has no reporting year. That is not a
     date, and neither is a value outside 1900–2100.
     """
     try:
@@ -390,19 +384,20 @@ def publication_date_for_catalog_year(year: Any) -> Optional[date]:
     return date(number, 1, 1)
 
 
-def fetch_global_catalog(base_url: str, api_key: str, *, timeout: int = 180) -> Any:
-    """Download the global FDRS document list. The key is not logged."""
-    import json
-    import urllib.request
+def fetch_global_catalog(base_url: str, api_key: str, *, timeout: int = 180) -> list[dict[str, Any]]:
+    """Global FDRS documents from ``GET /api/DocumentAdmin``. The key is not logged."""
+    from fdrs_sync_constants import fdrs_document_type_is_global
 
-    base = (base_url or "https://data-api.ifrc.org").rstrip("/")
-    query = urllib.parse.urlencode({"apiKey": api_key, "isglobal": "true"})
-    request = urllib.request.Request(
-        f"{base}/api/documents?{query}",
-        headers={"User-Agent": "HumanitarianDatabank-FDRS-resource-sync/1.0"},
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - operator base
-        return json.loads(response.read().decode("utf-8"))
+    from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
+
+    ensure_fdrs_scripts_in_path()
+    from fdrs_documents_sync import fetch_fdrs_documents_api
+
+    return [
+        row
+        for row in fetch_fdrs_documents_api(base_url, api_key, timeout=timeout)
+        if fdrs_document_type_is_global(row.get("document_type") or "")
+    ]
 
 
 def download_bytes(url: str, *, timeout: int = 120) -> bytes:
@@ -417,7 +412,7 @@ def download_bytes(url: str, *, timeout: int = 120) -> bytes:
     encoded = urllib.parse.urlunsplit((
         parts.scheme,
         parts.netloc,
-        urllib.parse.quote(parts.path, safe="/"),
+        urllib.parse.quote(urllib.parse.unquote(parts.path), safe="/"),
         parts.query,
         parts.fragment,
     ))

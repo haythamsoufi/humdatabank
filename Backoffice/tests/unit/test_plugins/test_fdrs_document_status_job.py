@@ -30,6 +30,28 @@ class TestCreateFdrsDocumentStatusJob:
         assert job.total_items == 1
         assert len(job.items) == 1
         assert job.items[0].payload["limit"] == 50
+        assert job.items[0].payload["year"] is None
+
+    def test_stores_scan_year_on_job(self, db_session, admin_user):
+        job_id = create_fdrs_document_status_job(
+            user_id=admin_user.id,
+            output_path="/tmp/docs.xlsx",
+            year=2024,
+        )
+        job = AIJob.query.get(job_id)
+        assert job.meta["year"] == 2024
+        assert job.items[0].payload["year"] == 2024
+        assert job.items[0].payload["retry_failed"] is False
+
+    def test_stores_retry_failed_flag(self, db_session, admin_user):
+        job_id = create_fdrs_document_status_job(
+            user_id=admin_user.id,
+            output_path="/tmp/docs.xlsx",
+            retry_failed=True,
+        )
+        job = AIJob.query.get(job_id)
+        assert job.meta["retry_failed"] is True
+        assert job.items[0].payload["retry_failed"] is True
 
 
 class TestGetActiveDocumentStatusJobs:

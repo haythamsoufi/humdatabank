@@ -166,6 +166,12 @@ def load_verify_latest_meta(template_id: int) -> Optional[Dict[str, Any]]:
     return load_json(verify_meta_rel(template_id))
 
 
+def clear_documents_latest() -> None:
+    """Delete the stored document URL scan workbook and its sidecar."""
+    storage_service.delete(STORAGE_CATEGORY, documents_xlsx_rel())
+    storage_service.delete(STORAGE_CATEGORY, documents_meta_rel())
+
+
 def load_documents_latest_meta() -> Optional[Dict[str, Any]]:
     if not documents_latest_exists():
         return None

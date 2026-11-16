@@ -59,6 +59,8 @@ def create_fdrs_document_status_job(
     user_id: int,
     output_path: str,
     limit: Optional[int] = None,
+    year: Optional[int] = None,
+    retry_failed: bool = False,
     workers: int = 20,
 ) -> str:
     job_id = uuid.uuid4().hex
@@ -77,10 +79,14 @@ def create_fdrs_document_status_job(
         "started_ts": now_ts,
         "updated_ts": now_ts,
         "limit": limit,
+        "year": year,
+        "retry_failed": bool(retry_failed),
     }
     payload = {
         "output_path": output_path,
         "limit": limit,
+        "year": year,
+        "retry_failed": bool(retry_failed),
         "workers": int(workers),
     }
     job = AIJob(
@@ -253,6 +259,8 @@ def _process_fdrs_document_status_item(app, *, job_id: str, item_id: int) -> Non
                     "failed",
                     "cancelled",
                     "fetch_catalog",
+                    "filter_year",
+                    "load_previous",
                     "migration_lookup",
                     "write_excel",
                 )
@@ -289,7 +297,13 @@ def _process_fdrs_document_status_item(app, *, job_id: str, item_id: int) -> Non
             worker_pid=os.getpid(),
         )
         _touch_item_heartbeat(item_id)
-        app.logger.info("FDRS document status %s: starting (limit=%s)", job_id, payload.get("limit"))
+        app.logger.info(
+            "FDRS document status %s: starting (limit=%s year=%s retry_failed=%s)",
+            job_id,
+            payload.get("limit"),
+            payload.get("year"),
+            payload.get("retry_failed"),
+        )
 
         terminal_item_status = "failed"
         FdrsDocumentScanCancelled = None
@@ -303,11 +317,26 @@ def _process_fdrs_document_status_item(app, *, job_id: str, item_id: int) -> Non
             )
 
             api_key = (app.config.get("FDRS_DATA_API_KEY") or os.environ.get("FDRS_DATA_API_KEY") or "").strip()
+            retry_failed = bool(payload.get("retry_failed"))
+            source_path = None
+            if retry_failed:
+                import tempfile
+
+                from plugins.fdrs.services import fdrs_tools_artifacts as artifacts
+
+                if not artifacts.documents_latest_exists():
+                    raise RuntimeError("No previous document scan to retry.")
+                source_path = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name
+                with open(source_path, "wb") as handle:
+                    handle.write(artifacts.download_bytes(artifacts.documents_xlsx_rel()))
             stats = execute_document_url_status_scan(
                 output_path=str(output_path),
                 api_key=api_key or None,
                 workers=int(payload.get("workers") or 20),
                 limit=payload.get("limit"),
+                year=payload.get("year"),
+                retry_failed=retry_failed,
+                source_path=source_path,
                 progress_cb=_progress_cb,
                 cancel_check=_cancel_check,
             )
@@ -319,7 +348,12 @@ def _process_fdrs_document_status_item(app, *, job_id: str, item_id: int) -> Non
                     artifacts.persist_documents_latest(
                         local_xlsx_path=str(output_path),
                         stats=dict(stats or {}),
-                        extra={"job_id": job_id, "limit": payload.get("limit")},
+                        extra={
+                            "job_id": job_id,
+                            "limit": payload.get("limit"),
+                            "year": (stats or {}).get("scan_year", payload.get("year")),
+                            "retry_failed": bool(payload.get("retry_failed")),
+                        },
                     )
                     persisted = True
                 except Exception:

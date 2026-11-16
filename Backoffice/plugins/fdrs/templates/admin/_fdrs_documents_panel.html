@@ -1,44 +1,58 @@
 {# FDRS document URL / availability log — injected by plugins.fdrs.routes.fdrs_tools. #}
 {% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
+{% from "macros/modal_shell.html" import modal_shell %}
 <style nonce="{{ csp_nonce() }}">
-#fdrs-docs-run-details > summary { list-style: none; }
-#fdrs-docs-run-details > summary::-webkit-details-marker { display: none; }
 #fdrs-docs-grid-toolbar {
   align-items: center !important;
   flex-wrap: wrap !important;
+}
+/* Cell backgrounds cover the row, so paint the cells. */
+#fdrsDocsGrid .ag-row.fdrs-docs-not-downloadable .ag-cell {
+  background-color: #fee2e2 !important;
 }
 </style>
 {% set docs_latest = fdrs_documents_latest or None %}
 {% set docs_stats = (docs_latest.stats if docs_latest else None) or {} %}
 <div id="fdrs-documents-root">
-  <details id="fdrs-docs-run-details" class="group mb-4 border border-gray-200 rounded-md bg-white"{% if not docs_latest %} open{% endif %}>
-    <summary class="flex flex-wrap items-center gap-x-3 gap-y-1.5 cursor-pointer list-none select-none px-3 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
-      <span class="inline-flex items-center gap-2">
-        <i class="fas fa-chevron-right text-xs text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true"></i>
-        <i class="fas fa-search text-blue-600" aria-hidden="true"></i>
-        <span>{{ _('Scan document URLs') }}</span>
-      </span>
-      <div id="fdrs-docs-last-run" class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 font-normal{% if not docs_latest %} hidden{% endif %}"
-           data-completed-at="{{ (docs_latest.completed_at if docs_latest else '')|e }}">
-        <span class="text-sm text-gray-600">
-          <i class="fas fa-history mr-1 text-gray-400" aria-hidden="true"></i>{{ _('Last scan') }}
-          <span id="fdrs-docs-last-run-date">
-            {% if docs_latest and docs_latest.completed_at %}
-              · {{ docs_latest.completed_at }}
-            {% endif %}
-          </span>
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <button type="button" id="fdrs-docs-open-scan" class="btn btn-primary">
+      <i class="fas fa-search mr-1.5" aria-hidden="true"></i>{{ _('Scan document URLs') }}
+    </button>
+    <div id="fdrs-docs-last-run" class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 font-normal{% if not docs_latest %} hidden{% endif %}"
+         data-completed-at="{{ (docs_latest.completed_at if docs_latest else '')|e }}">
+      <span class="text-sm text-gray-600">
+        <i class="fas fa-history mr-1 text-gray-400" aria-hidden="true"></i>{{ _('Last scan') }}
+        <span id="fdrs-docs-last-run-year">
+          {% if docs_stats.scan_year %}
+            · {{ docs_stats.scan_year }}
+          {% elif docs_latest %}
+            · {{ _('all years') }}
+          {% endif %}
         </span>
+        <span id="fdrs-docs-last-run-date">
+          {% if docs_latest and docs_latest.completed_at %}
+            · {{ docs_latest.completed_at }}
+          {% endif %}
+        </span>
+      </span>
         <button type="button" id="fdrs-docs-header-scan-again" class="text-sm text-gray-700 hover:text-gray-900">
           <i class="fas fa-redo mr-1" aria-hidden="true"></i>{{ _('Scan again') }}
         </button>
-        <a id="fdrs-docs-last-run-download" href="{{ url_for('fdrs.document_status_latest_download') }}"
-           class="text-sm text-blue-700 hover:underline{% if not docs_latest %} hidden{% endif %}">
-          <i class="fas fa-download mr-1"></i>{{ _('Download Excel') }}
-        </a>
-      </div>
-    </summary>
-    <div class="px-3 pb-3 pt-1 border-t border-gray-100">
-      <p class="text-sm text-gray-600">{{ _('Probe every FDRS catalog document URL (the same scan as the Excel export), compare each against Backoffice submitted documents (migrated vs still pending / missing), and keep a filterable log here. Results are stored in blob storage so they survive deploys and page reloads.') }}</p>
+        <button type="button" id="fdrs-docs-header-retry-failed"
+                class="text-sm text-gray-700 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed{% if not docs_latest %} hidden{% endif %}"
+                {% if not (docs_stats.failed_count or 0) %}disabled{% endif %}
+                title="{{ _('Re-probe public 403s, 404s, and other URL errors from the last scan. Expected private 403s are skipped.') }}">
+          <i class="fas fa-sync-alt mr-1" aria-hidden="true"></i><span id="fdrs-docs-header-retry-failed-text">{{ _('Retry failed URLs') }}{% if docs_stats.failed_count %} ({{ docs_stats.failed_count }}){% endif %}</span>
+        </button>
+      <a id="fdrs-docs-last-run-download" href="{{ url_for('fdrs.document_status_latest_download') }}"
+         class="text-sm text-blue-700 hover:underline{% if not docs_latest %} hidden{% endif %}">
+        <i class="fas fa-download mr-1"></i>{{ _('Download Excel') }}
+      </a>
+    </div>
+  </div>
+
+  {% call modal_shell('fdrs-docs-scan-modal', _('Scan document URLs'), max_width='max-w-2xl', close_id='fdrs-docs-scan-modal-close') %}
+      <p class="text-sm text-gray-600">{{ _('Probe FDRS catalog document URLs (the same scan as the Excel export), compare each against Backoffice submitted documents (migrated vs still pending / missing), and keep a filterable log here. Choose a year to scan that slice only, or All years for a full catalog pass. Results are stored in blob storage so they survive deploys and page reloads.') }}</p>
 
       <div id="fdrs-docs-progress" class="mt-3 hidden">
         <div class="text-sm text-gray-700 mb-1.5">
@@ -58,7 +72,21 @@
       </div>
 
       <div class="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
-        <div id="fdrs-docs-settings">
+        <div id="fdrs-docs-settings" class="flex flex-wrap items-end gap-4">
+          {% set docs_years_start = fdrs_years_start if fdrs_years_start else 2010 %}
+          {% set docs_years_end = fdrs_years_end if fdrs_years_end else 2025 %}
+          <div>
+            <label for="fdrs-docs-year" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Year') }}</label>
+            <select id="fdrs-docs-year" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white">
+              <option value="">{{ _('All years') }}</option>
+              {% if docs_years_end >= docs_years_start %}
+              {% for year in range(docs_years_end, docs_years_start - 1, -1) %}
+              <option value="{{ year }}">{{ year }}</option>
+              {% endfor %}
+              {% endif %}
+            </select>
+            <p class="text-xs text-gray-600 mt-0.5">{{ _('Leave as All years to probe the full catalog.') }}</p>
+          </div>
           <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
             <input type="checkbox" id="fdrs-docs-test" class="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
             <span>
@@ -67,7 +95,14 @@
             </span>
           </label>
         </div>
-        <div id="fdrs-docs-footer-settings" class="ml-auto">
+        <div id="fdrs-docs-footer-settings" class="ml-auto flex flex-wrap items-center gap-2">
+          <button type="button" id="fdrs-docs-retry-btn"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed{% if not docs_latest %} hidden{% endif %}"
+                  {% if not (docs_stats.failed_count or 0) %}disabled{% endif %}
+                  title="{{ _('Re-probe public 403s, 404s, and other URL errors from the last scan. Expected private 403s are skipped.') }}">
+            <i class="fas fa-sync-alt mr-2" aria-hidden="true"></i>
+            <span id="fdrs-docs-retry-btn-text">{{ _('Retry failed URLs') }}{% if docs_stats.failed_count %} ({{ docs_stats.failed_count }}){% endif %}</span>
+          </button>
           <button type="button" id="fdrs-docs-run-btn" class="btn btn-primary">
             <i class="fas fa-search mr-2"></i>
             <span id="fdrs-docs-run-btn-text">{{ _('Scan document URLs') }}</span>
@@ -87,8 +122,7 @@
           </button>
         </div>
       </div>
-    </div>
-  </details>
+  {% endcall %}
 
   <div id="fdrs-docs-empty" class="{% if docs_latest %}hidden {% endif %}border border-dashed border-gray-300 rounded-md bg-gray-50 px-4 py-8 text-center">
     <p class="text-sm text-gray-600">{{ _('No document URL scan yet. Open Scan document URLs above to probe catalog links.') }}</p>
@@ -103,11 +137,29 @@
       </div>
       <div class="border rounded-md px-3 py-2 border-green-200 bg-green-50 text-green-800">
         <div class="text-xs uppercase tracking-wide font-medium">{{ _('Downloadable') }}</div>
-        <div class="text-lg font-semibold">{{ docs_stats.downloadable_count or 0 }}</div>
+        <div class="text-lg font-semibold">
+          {{ docs_stats.downloadable_count or 0 }}{% if docs_stats.total_documents %} / {{ docs_stats.total_documents }}{% endif %}
+        </div>
+        {% set _dl_tot = docs_stats.total_documents or 0 %}
+        {% set _dl = docs_stats.downloadable_count or 0 %}
+        {% set _stored_dl_pct = docs_stats.downloadable_pct|default(none) %}
+        {% set _dl_pct = _stored_dl_pct if _stored_dl_pct is not none else ((100.0 * _dl / _dl_tot) if _dl_tot else none) %}
+        {% if _dl_pct is not none %}
+        <div class="text-xs mt-0.5 text-green-800">{{ '%.1f'|format(_dl_pct) }}%</div>
+        {% endif %}
       </div>
       <div class="border rounded-md px-3 py-2 border-green-200 bg-green-50 text-green-900">
         <div class="text-xs uppercase tracking-wide font-medium">{{ _('Migrated') }}</div>
-        <div class="text-lg font-semibold">{{ docs_stats.file_migrated_count or 0 }}</div>
+        <div class="text-lg font-semibold">
+          {{ docs_stats.file_migrated_count or 0 }}{% if docs_stats.total_documents %} / {{ docs_stats.total_documents }}{% endif %}
+        </div>
+        {% set _tot = docs_stats.total_documents or 0 %}
+        {% set _mig = docs_stats.file_migrated_count or 0 %}
+        {% set _stored_pct = docs_stats.migrated_pct|default(none) %}
+        {% set _mig_pct = _stored_pct if _stored_pct is not none else ((100.0 * _mig / _tot) if _tot else none) %}
+        {% if _mig_pct is not none %}
+        <div class="text-xs mt-0.5 text-green-800">{{ '%.1f'|format(_mig_pct) }}%</div>
+        {% endif %}
       </div>
       <div class="border rounded-md px-3 py-2 border-red-200 bg-red-50 text-red-800">
         <div class="text-xs uppercase tracking-wide font-medium">{{ _('Not migrated') }}</div>

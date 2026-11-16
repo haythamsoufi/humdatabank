@@ -85,3 +85,24 @@ def test_plan_keeps_existing_files_and_lists_databank_only_copies():
     stored_group = next(action for action in plan["sync"] if action["resource_id"] == 3)
     assert stored_group["files"][0]["url"] == "https://data-api.ifrc.org/covid.pdf"
     assert {action["resource_id"] for action in plan["sync"]} == {3, None}
+
+
+def test_global_catalog_comes_from_document_admin_only(monkeypatch):
+    from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
+    from plugins.fdrs.services import fdrs_resource_sync as sync
+
+    ensure_fdrs_scripts_in_path()
+    seen = []
+
+    def _fetch(base_url, api_key, *, timeout=180):
+        seen.append(base_url)
+        return [
+            {"document_type": "EveryoneCounts", "name": "EC 2024.pdf", "url": "https://data-api.ifrc.org/a.pdf", "LangCode": "en", "year": 2024, "thumbnail": ""},
+            {"document_type": "Annual Report", "name": "AR.pdf", "url": "https://data-api.ifrc.org/b.pdf", "LangCode": "en", "year": 2024, "thumbnail": ""},
+        ]
+
+    monkeypatch.setattr("fdrs_documents_sync.fetch_fdrs_documents_api", _fetch)
+    rows = sync.fetch_global_catalog("https://data-api.ifrc.org", "key")
+    docs = sync.parse_catalog(rows)
+    assert seen == ["https://data-api.ifrc.org"]
+    assert [doc.name for doc in docs] == ["EC 2024.pdf"]

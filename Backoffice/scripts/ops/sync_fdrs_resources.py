@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Sync global FDRS resources from data.ifrc.org into Manage Resources.
+"""Sync global FDRS resources into Manage Resources.
 
-The source is the legacy catalog:
+The source is DocumentAdmin:
 
-    GET https://data-api.ifrc.org/api/documents?isglobal=true
+    GET https://data-api.ifrc.org/api/DocumentAdmin?apiKey=…
 
 That list is Everyone Counts, analysis notes, user guides, and videos.
 Every FDRS resource is checked. A file or cover already stored is kept only

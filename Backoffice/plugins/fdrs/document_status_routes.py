@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from typing import Any, Optional, Tuple
 
 from flask import current_app, request
 from flask_login import current_user
@@ -56,6 +57,27 @@ def _latest_table_payload():
     return artifacts.download_bytes(artifacts.documents_xlsx_rel())
 
 
+_SCAN_YEAR_MIN = 1990
+_SCAN_YEAR_MAX = 2100
+
+
+def _parse_scan_year(raw: Any) -> Tuple[Optional[int], Optional[Any]]:
+    """Return ``(year, error_response)``. ``year`` is None for a full scan."""
+    if raw in (None, ""):
+        return None, None
+    if isinstance(raw, str):
+        raw = raw.strip()
+        if not raw or raw.lower() == "all":
+            return None, None
+    try:
+        year = int(raw)
+    except (TypeError, ValueError):
+        return None, json_bad_request("Invalid year")
+    if year < _SCAN_YEAR_MIN or year > _SCAN_YEAR_MAX:
+        return None, json_bad_request("Invalid year")
+    return year, None
+
+
 def _parse_table_args():
     sheet = (request.args.get("sheet") or "documents").strip()
     search = (request.args.get("q") or request.args.get("search") or "").strip()
@@ -91,6 +113,12 @@ def run_document_status():
                 limit = max(1, int(limit_raw))
             except (TypeError, ValueError):
                 return json_bad_request("Invalid limit")
+        year, year_err = _parse_scan_year(data.get("year"))
+        if year_err is not None:
+            return year_err
+        retry_failed = bool(data.get("retry_failed", False))
+        if retry_failed and not artifacts.documents_latest_exists():
+            return json_bad_request("No previous document scan to retry.")
 
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         tmp.close()
@@ -99,6 +127,8 @@ def run_document_status():
             user_id=int(getattr(current_user, "id", 0) or 0),
             output_path=tmp.name,
             limit=limit,
+            year=year,
+            retry_failed=retry_failed,
         )
         worker_app = current_app._get_current_object()
         if current_app.config.get("TESTING"):

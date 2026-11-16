@@ -1,15 +1,16 @@
 """
 Export all FDRS document URLs with HTTP probe status to Excel.
 
-Works in this repo or as a single copied file (no Backoffice app required).
+The catalog is ``GET /api/DocumentAdmin`` (via ``fdrs_documents_sync``), the same
+call the document importer uses. Run it from ``plugins/fdrs/scripts``.
 
-Standalone:
     pip install pandas openpyxl
     python export_fdrs_document_url_status.py --api-key YOUR_KEY
 
 In Backoffice (reads FDRS_DATA_API_KEY from env / .env):
-    python scripts/dev/export_fdrs_document_url_status.py
-    python scripts/dev/export_fdrs_document_url_status.py --limit 50
+    python plugins/fdrs/scripts/export_fdrs_document_url_status.py
+    python plugins/fdrs/scripts/export_fdrs_document_url_status.py --year 2024
+    python plugins/fdrs/scripts/export_fdrs_document_url_status.py --limit 50
 
 Also reports Backoffice migration status when run with a Flask app context:
 whether each catalog document exists as a SubmittedDocument (``fdrs_import_key``)
@@ -22,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import os
 import re
 import urllib.error
@@ -52,6 +52,9 @@ DEFAULT_OUTPUT = (
     else os.path.join(os.getcwd(), "fdrs_document_url_status.xlsx")
 )
 _DUP_SUFFIX_RE = re.compile(r"_([1-9]\d?)(\.[A-Za-z0-9]+)$")
+_YEAR_IN_TEXT_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
+SCAN_YEAR_MIN = 1990
+SCAN_YEAR_MAX = 2100
 
 
 class FdrsDocumentScanCancelled(Exception):
@@ -94,8 +97,9 @@ def _load_api_key(explicit: Optional[str]) -> str:
 
 
 def encode_document_url(url: str) -> str:
+    # Decode first: some catalog links are already percent-encoded.
     parts = urllib.parse.urlsplit(url)
-    path = urllib.parse.quote(parts.path, safe="/")
+    path = urllib.parse.quote(urllib.parse.unquote(parts.path), safe="/")
     return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
 
 
@@ -137,59 +141,78 @@ def probe_url(url: str, *, timeout: int = 25) -> Tuple[int, str]:
         return -1, type(e).__name__
 
 
-def _json_get(url: str, *, timeout: int) -> Any:
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "HumanitarianDatabank-FDRS-url-export/1.0"}
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-
-def _fetch_country_map(base_url: str, api_key: str) -> Dict[str, str]:
-    qs = urllib.parse.urlencode({"apiKey": api_key})
-    url = f"{base_url.rstrip('/')}/api/entities/ns?{qs}"
-    try:
-        data = _json_get(url, timeout=120)
-    except Exception as e:
-        print(f"Warning: country map failed ({type(e).__name__}); ISO3 may be blank.", flush=True)
-        return {}
-    rows = data if isinstance(data, list) else []
-    out: Dict[str, str] = {}
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        don = (row.get("KPI_DON_code") or row.get("DonCode") or "").strip()
-        iso3 = (row.get("iso_3") or row.get("ISO3") or "").strip()
-        if don:
-            out[don] = iso3
-    return out
-
-
 def fetch_fdrs_documents(base_url: str, api_key: str) -> List[Dict[str, Any]]:
+    """DocumentAdmin catalog, shared with the FDRS document importer."""
     print("Fetching FDRS document catalog...", flush=True)
-    qs = urllib.parse.urlencode(
-        {"apiKey": api_key, "showunpublished": "true", "force": "true"}
-    )
-    url = f"{base_url.rstrip('/')}/api/documents?{qs}"
-    payload = _json_get(url, timeout=180)
-    if not isinstance(payload, list):
-        raise SystemExit("Unexpected documents API response (not a list).")
-    don_to_iso = _fetch_country_map(base_url, api_key)
-    flat: List[Dict[str, Any]] = []
-    for ns_block in payload:
-        if not isinstance(ns_block, dict):
-            continue
-        don_code = (ns_block.get("code") or "").strip()
-        iso3 = don_to_iso.get(don_code, "")
-        for doc in ns_block.get("documents") or []:
-            if not isinstance(doc, dict):
-                continue
-            rec = dict(doc)
-            rec["don_code"] = don_code
-            rec["iso3"] = iso3
-            flat.append(rec)
+    from fdrs_documents_sync import fetch_fdrs_documents_api
+
+    flat = fetch_fdrs_documents_api(base_url, api_key)
     print(f"Loaded {len(flat)} documents.", flush=True)
     return flat
+
+
+def parse_scan_year(raw: Any) -> Optional[int]:
+    """Return a catalog year, or ``None`` for a full scan.
+
+    Accepts ``None``, ``""``, and ``"all"`` as full scan. Raises ``ValueError``
+    for values that are not a 4-digit year in ``SCAN_YEAR_MIN``–``SCAN_YEAR_MAX``.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        raise ValueError("Invalid year")
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text or text.lower() == "all":
+            return None
+        raw = text
+    try:
+        year = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Invalid year") from exc
+    if year < SCAN_YEAR_MIN or year > SCAN_YEAR_MAX:
+        raise ValueError("Invalid year")
+    return year
+
+
+def _parse_year_token(raw: Any) -> Optional[int]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except (TypeError, ValueError):
+        match = _YEAR_IN_TEXT_RE.search(text)
+        return int(match.group(1)) if match else None
+
+
+def document_matches_scan_year(doc: Dict[str, Any], year: int) -> bool:
+    """True when a catalog document belongs to *year*.
+
+    Matches the numeric API ``year`` field, or a YearText range that includes
+    *year* (so a 2021–2024 annual report is included in a 2024 scan).
+    """
+    api_year = _parse_year_token(doc.get("year"))
+    if api_year == year:
+        return True
+    year_text = doc.get("YearText") if doc.get("YearText") not in (None, "") else doc.get("year_text")
+    nums = [int(token) for token in _YEAR_IN_TEXT_RE.findall(str(year_text or ""))]
+    if not nums:
+        return False
+    return min(nums) <= year <= max(nums)
+
+
+def filter_documents_for_scan_year(
+    documents: List[Dict[str, Any]],
+    year: Optional[int],
+) -> List[Dict[str, Any]]:
+    """Return *documents* unchanged when *year* is None, else the year slice."""
+    if year is None:
+        return documents
+    year_i = int(year)
+    return [doc for doc in documents if document_matches_scan_year(doc, year_i)]
 
 
 def document_is_public(approval_status: Any, public_code: Any) -> bool:
@@ -371,13 +394,15 @@ def _probe_row(doc: Dict[str, Any]) -> Dict[str, Any]:
     fallback_url = ""
     fallback_http_status: Optional[int] = None
     if status in (403, 404):
-        alt = url_without_duplicate_suffix(url)
-        if alt:
+        from fdrs_documents_sync import fdrs_alternate_urls
+
+        for alt in fdrs_alternate_urls(url):
             fallback_url = alt
             fb_status, fb_detail = probe_url(alt)
             fallback_http_status = fb_status
             if fb_status in (200, 206):
                 status, detail = fb_status, fb_detail
+                break
     is_public = document_is_public(doc.get("ApprovalStatus"), doc.get("Public"))
     return {
         "don_code": doc.get("don_code") or "",
@@ -402,6 +427,151 @@ def _probe_row(doc: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def ratio_pct(part: int, whole: int, *, digits: int = 1) -> float:
+    if whole <= 0:
+        return 0.0
+    return round(100.0 * int(part) / int(whole), digits)
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    text = str(value).strip().lower()
+    return text in ("true", "1", "yes")
+
+
+def _http_status_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def row_is_probe_failure(row: Dict[str, Any]) -> bool:
+    """True when a stored scan row should be retried after an IFRC URL fix.
+
+    Downloadable (200/206) rows are left alone. Expected private 403s are also
+    skipped — they are not endpoint defects. Public 403s, 404s, 5xx, and
+    network errors are retried.
+    """
+    if _as_bool(row.get("downloadable")):
+        return False
+    if _http_status_int(row.get("http_status")) == 403 and not _as_bool(row.get("is_public")):
+        return False
+    return True
+
+
+def stored_row_to_catalog_doc(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Map a documents-sheet row back to the catalog shape ``_probe_row`` expects."""
+    return {
+        "don_code": row.get("don_code") or "",
+        "iso3": row.get("iso3") or "",
+        "year": row.get("year"),
+        "YearText": row.get("year_text") if row.get("year_text") not in (None, "") else row.get("YearText") or "",
+        "document_type": row.get("document_type") or "",
+        "document_typeId": row.get("document_type_id") if row.get("document_type_id") not in (None, "") else row.get("document_typeId"),
+        "name": row.get("name") or "",
+        "LangCode": row.get("lang_code") if row.get("lang_code") not in (None, "") else row.get("LangCode") or "",
+        "ApprovalStatus": row.get("approval_status") if row.get("approval_status") not in (None, "") else row.get("ApprovalStatus") or "",
+        "Public": row.get("public") if row.get("public") not in (None, "") else row.get("Public"),
+        "ModifiedAt": row.get("modified_at") if row.get("modified_at") not in (None, "") else row.get("ModifiedAt") or "",
+        "url": (row.get("url") or "").strip(),
+    }
+
+
+def _cell_value(value: Any) -> Any:
+    if value is None:
+        return None
+    try:
+        import pandas as pd
+
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+def load_documents_sheet_rows(path: str) -> List[Dict[str, Any]]:
+    import pandas as pd
+
+    df = pd.read_excel(path, sheet_name="documents")
+    rows: List[Dict[str, Any]] = []
+    for rec in df.to_dict(orient="records"):
+        rows.append({str(k): _cell_value(v) for k, v in rec.items()})
+    return rows
+
+
+def load_scan_year_from_workbook(path: str) -> Optional[int]:
+    import pandas as pd
+
+    try:
+        meta = pd.read_excel(path, sheet_name="meta")
+    except Exception:
+        return None
+    for rec in meta.to_dict(orient="records"):
+        if str(rec.get("key") or "").strip() != "scan_year":
+            continue
+        try:
+            return parse_scan_year(rec.get("value"))
+        except ValueError:
+            return None
+    return None
+
+
+def _probe_document_list(
+    documents: List[Dict[str, Any]],
+    *,
+    workers: int,
+    progress: Callable[[Dict[str, Any]], None],
+    cancelled: Callable[[], bool],
+    message: str,
+) -> List[Dict[str, Any]]:
+    total = len(documents)
+    rows: List[Optional[Dict[str, Any]]] = [None] * total
+    done = 0
+    workers = max(1, min(int(workers), 64))
+    progress({
+        "stage": "probe",
+        "message": message,
+        "current": 0,
+        "total": total,
+        "percent": 5.0,
+    })
+    pool = ThreadPoolExecutor(max_workers=workers)
+    try:
+        futures = {pool.submit(_probe_row, doc): i for i, doc in enumerate(documents)}
+        for fut in as_completed(futures):
+            if cancelled():
+                raise FdrsDocumentScanCancelled()
+            idx = futures[fut]
+            rows[idx] = fut.result()
+            done += 1
+            if done == 1 or done % 50 == 0 or done == total:
+                pct = 5.0 + (90.0 * done / total) if total else 95.0
+                progress({
+                    "stage": "probe",
+                    "message": f"Probed {done}/{total} document URLs",
+                    "current": done,
+                    "total": total,
+                    "percent": pct,
+                })
+                if done == 1 or done % 250 == 0 or done == total:
+                    print(f"Probed {done}/{total}...", flush=True)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    if cancelled():
+        raise FdrsDocumentScanCancelled()
+    assert all(r is not None for r in rows)
+    return list(rows)  # type: ignore[arg-type]
+
+
 def execute_document_url_status_scan(
     *,
     output_path: str,
@@ -409,13 +579,19 @@ def execute_document_url_status_scan(
     base_url: str = DEFAULT_BASE,
     workers: int = 20,
     limit: Optional[int] = None,
+    year: Optional[int] = None,
+    retry_failed: bool = False,
+    source_path: Optional[str] = None,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
 ) -> Dict[str, Any]:
     """Probe the FDRS document catalog and write the status Excel.
 
-    Returns a stats dict (total_documents, downloadable_count, …). Raises
-    ``FdrsDocumentScanCancelled`` when *cancel_check* returns True.
+    *year* limits the probe to documents for that catalog / YearText year.
+    ``None`` scans every document. *retry_failed* re-probes unexpected URL
+    failures from *source_path* (the previous scan workbook) and merges them
+    back. Returns a stats dict (total_documents, downloadable_count, …).
+    Raises ``FdrsDocumentScanCancelled`` when *cancel_check* returns True.
     """
     import pandas as pd
 
@@ -429,60 +605,108 @@ def execute_document_url_status_scan(
     if _cancelled():
         raise FdrsDocumentScanCancelled()
 
-    key = _load_api_key(api_key)
-    _progress({"stage": "fetch_catalog", "message": "Fetching FDRS document catalog...", "percent": 2.0})
-    documents = fetch_fdrs_documents(base_url, key)
-    if limit is not None:
-        documents = documents[: int(limit)]
-
-    total = len(documents)
-    if total == 0:
-        raise RuntimeError("No documents returned from FDRS API.")
-
-    rows: List[Optional[Dict[str, Any]]] = [None] * total
-    done = 0
+    scan_year = parse_scan_year(year)
+    retry_attempted = 0
+    retry_recovered = 0
     workers = max(1, min(int(workers), 64))
 
-    _progress({
-        "stage": "probe",
-        "message": f"Probing {total} document URLs...",
-        "current": 0,
-        "total": total,
-        "percent": 5.0,
-    })
+    if retry_failed:
+        src = (source_path or "").strip()
+        if not src or not os.path.isfile(src):
+            raise RuntimeError("No previous document scan to retry.")
+        _progress({
+            "stage": "load_previous",
+            "message": "Loading previous scan to retry failed URLs...",
+            "percent": 2.0,
+        })
+        existing_rows = load_documents_sheet_rows(src)
+        if not existing_rows:
+            raise RuntimeError("Previous document scan has no rows to retry.")
+        requested_year = scan_year
+        if scan_year is None:
+            scan_year = load_scan_year_from_workbook(src)
+        failed_idxs = [
+            i for i, row in enumerate(existing_rows)
+            if row_is_probe_failure(row)
+        ]
+        if requested_year is not None:
+            failed_idxs = [
+                i for i in failed_idxs
+                if document_matches_scan_year(
+                    {
+                        "year": existing_rows[i].get("year"),
+                        "YearText": existing_rows[i].get("year_text")
+                        or existing_rows[i].get("YearText")
+                        or "",
+                    },
+                    requested_year,
+                )
+            ]
+        if limit is not None:
+            failed_idxs = failed_idxs[: int(limit)]
+        retry_attempted = len(failed_idxs)
+        if retry_attempted == 0:
+            raise RuntimeError("No failed document URLs to retry.")
+        retry_msg = f"Retrying {retry_attempted} failed document URLs..."
+        if scan_year is not None:
+            retry_msg = f"Retrying {retry_attempted} failed document URLs (year {scan_year})..."
+        probed = _probe_document_list(
+            [stored_row_to_catalog_doc(existing_rows[i]) for i in failed_idxs],
+            workers=workers,
+            progress=_progress,
+            cancelled=_cancelled,
+            message=retry_msg,
+        )
+        typed_rows = list(existing_rows)
+        for idx, new_row in zip(failed_idxs, probed):
+            was_ok = _as_bool(existing_rows[idx].get("downloadable"))
+            typed_rows[idx] = new_row
+            if (not was_ok) and _as_bool(new_row.get("downloadable")):
+                retry_recovered += 1
+    else:
+        key = _load_api_key(api_key)
+        catalog_msg = "Fetching FDRS document catalog..."
+        if scan_year is not None:
+            catalog_msg = f"Fetching FDRS document catalog (year {scan_year})..."
+        _progress({"stage": "fetch_catalog", "message": catalog_msg, "percent": 2.0})
+        documents = fetch_fdrs_documents(base_url, key)
+        catalog_total = len(documents)
+        documents = filter_documents_for_scan_year(documents, scan_year)
+        if scan_year is not None:
+            _progress({
+                "stage": "filter_year",
+                "message": (
+                    f"Year {scan_year}: {len(documents)} of {catalog_total} catalog documents"
+                ),
+                "percent": 4.0,
+            })
+        if limit is not None:
+            documents = documents[: int(limit)]
 
-    pool = ThreadPoolExecutor(max_workers=workers)
-    try:
-        futures = {pool.submit(_probe_row, doc): i for i, doc in enumerate(documents)}
-        for fut in as_completed(futures):
-            if _cancelled():
-                raise FdrsDocumentScanCancelled()
-            idx = futures[fut]
-            rows[idx] = fut.result()
-            done += 1
-            if done == 1 or done % 50 == 0 or done == total:
-                pct = 5.0 + (90.0 * done / total) if total else 95.0
-                _progress({
-                    "stage": "probe",
-                    "message": f"Probed {done}/{total} document URLs",
-                    "current": done,
-                    "total": total,
-                    "percent": pct,
-                })
-                if done == 1 or done % 250 == 0 or done == total:
-                    print(f"Probed {done}/{total}...", flush=True)
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
+        total = len(documents)
+        if total == 0:
+            if scan_year is not None:
+                raise RuntimeError(f"No FDRS documents found for year {scan_year}.")
+            raise RuntimeError("No documents returned from FDRS API.")
+
+        probe_msg = f"Probing {total} document URLs..."
+        if scan_year is not None:
+            probe_msg = f"Probing {total} document URLs (year {scan_year})..."
+        typed_rows = _probe_document_list(
+            documents,
+            workers=workers,
+            progress=_progress,
+            cancelled=_cancelled,
+            message=probe_msg,
+        )
 
     if _cancelled():
         raise FdrsDocumentScanCancelled()
 
-    assert all(r is not None for r in rows)
-    typed_rows: List[Dict[str, Any]] = list(rows)  # type: ignore[arg-type]
-
-    if _cancelled():
-        raise FdrsDocumentScanCancelled()
-
+    total = len(typed_rows)
+    for row in typed_rows:
+        row["is_public"] = _as_bool(row.get("is_public"))
+        row["downloadable"] = _as_bool(row.get("downloadable"))
     _progress({
         "stage": "migration_lookup",
         "message": "Checking Backoffice migration status...",
@@ -496,9 +720,7 @@ def execute_document_url_status_scan(
     df = pd.DataFrame(typed_rows)
 
     def _pct(part: int, whole: int) -> str:
-        if whole <= 0:
-            return "0.0%"
-        return f"{100.0 * part / whole:.1f}%"
+        return f"{ratio_pct(part, whole):.1f}%"
 
     summary = df["http_status"].value_counts().sort_index()
     print("\nStatus summary:")
@@ -530,7 +752,8 @@ def execute_document_url_status_scan(
             f"migrated={migration_counts['file_migrated_count']}, "
             f"pending_download={migration_counts['pending_download_count']}, "
             f"not_in_backoffice={migration_counts['not_in_backoffice_count']} "
-            f"(not migrated={migration_counts['not_migrated_count']}/{total})",
+            f"(not migrated={migration_counts['not_migrated_count']}/{total}, "
+            f"migrated={ratio_pct(int(migration_counts['file_migrated_count']), total):.1f}%)",
             flush=True,
         )
     else:
@@ -542,6 +765,10 @@ def execute_document_url_status_scan(
     _progress({"stage": "write_excel", "message": "Writing Excel...", "percent": 96.0, "current": total, "total": total})
     os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
     scanned_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    migrated_n = int(migration_counts.get("file_migrated_count") or 0)
+    migrated_pct = ratio_pct(migrated_n, total)
+    downloadable_pct = ratio_pct(ok, total)
+    failed_count = sum(1 for row in typed_rows if row_is_probe_failure(row))
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         df.sort_values(["year", "iso3", "document_type", "name"], na_position="last").to_excel(
@@ -557,7 +784,7 @@ def execute_document_url_status_scan(
                 {
                     "http_status": str(code),
                     "count": count_i,
-                    "pct_of_total": round(100.0 * count_i / total, 1) if total else 0.0,
+                    "pct_of_total": ratio_pct(count_i, total),
                     "public": pub,
                     "public_pct": round(100.0 * pub / count_i, 1) if count_i else 0.0,
                     "private": priv,
@@ -575,13 +802,35 @@ def execute_document_url_status_scan(
                     {
                         "http_status": f"migration:{status_key}",
                         "count": count_i,
-                        "pct_of_total": round(100.0 * count_i / total, 1) if total else 0.0,
+                        "pct_of_total": ratio_pct(count_i, total),
                         "public": "",
                         "public_pct": "",
                         "private": "",
                         "private_pct": "",
                     }
                 )
+        summary_rows.append(
+            {
+                "http_status": "probe:downloadable",
+                "count": ok,
+                "pct_of_total": downloadable_pct,
+                "public": "",
+                "public_pct": "",
+                "private": "",
+                "private_pct": "",
+            }
+        )
+        summary_rows.append(
+            {
+                "http_status": "probe:failed",
+                "count": failed_count,
+                "pct_of_total": ratio_pct(failed_count, total),
+                "public": "",
+                "public_pct": "",
+                "private": "",
+                "private_pct": "",
+            }
+        )
         summary_df = pd.DataFrame(summary_rows)
         summary_df.to_excel(writer, sheet_name="summary", index=False)
         blocked = df[df["http_status"] == 403]
@@ -590,9 +839,16 @@ def execute_document_url_status_scan(
         priv403 = int((~blocked["is_public"]).sum())
         meta_rows = [
             {"key": "scanned_at_utc", "value": scanned_at},
+            {"key": "scan_year", "value": scan_year if scan_year is not None else "all"},
+            {"key": "retry_failed", "value": bool(retry_failed)},
+            {"key": "retry_attempted", "value": retry_attempted},
+            {"key": "retry_recovered", "value": retry_recovered},
             {"key": "total_documents", "value": total},
             {"key": "downloadable_count", "value": ok},
-            {"key": "file_migrated_count", "value": migration_counts.get("file_migrated_count", "")},
+            {"key": "downloadable_pct", "value": downloadable_pct},
+            {"key": "failed_count", "value": failed_count},
+            {"key": "file_migrated_count", "value": migrated_n},
+            {"key": "migrated_pct", "value": migrated_pct},
             {"key": "pending_download_count", "value": migration_counts.get("pending_download_count", "")},
             {"key": "not_in_backoffice_count", "value": migration_counts.get("not_in_backoffice_count", "")},
             {"key": "not_migrated_count", "value": migration_counts.get("not_migrated_count", "")},
@@ -601,9 +857,9 @@ def execute_document_url_status_scan(
                 "value": bool(migration_counts.get("migration_lookup_available")),
             },
             {"key": "http_403_public_unexpected", "value": pub403},
-            {"key": "http_403_public_unexpected_pct", "value": round(100.0 * pub403 / n403, 1) if n403 else 0.0},
+            {"key": "http_403_public_unexpected_pct", "value": ratio_pct(pub403, n403)},
             {"key": "http_403_private_expected", "value": priv403},
-            {"key": "http_403_private_expected_pct", "value": round(100.0 * priv403 / n403, 1) if n403 else 0.0},
+            {"key": "http_403_private_expected_pct", "value": ratio_pct(priv403, n403)},
             {"key": "suffix_fallback_tried", "value": fallback_tried},
             {"key": "suffix_fallback_recovered", "value": fallback_ok},
             {"key": "workers", "value": workers},
@@ -631,9 +887,16 @@ def execute_document_url_status_scan(
     )
     stats = {
         "scanned_at_utc": scanned_at,
+        "scan_year": scan_year,
+        "retry_failed": bool(retry_failed),
+        "retry_attempted": retry_attempted,
+        "retry_recovered": retry_recovered,
         "total_documents": total,
         "downloadable_count": ok,
-        "file_migrated_count": int(migration_counts.get("file_migrated_count") or 0),
+        "downloadable_pct": downloadable_pct,
+        "failed_count": failed_count,
+        "file_migrated_count": migrated_n,
+        "migrated_pct": migrated_pct,
         "pending_download_count": int(migration_counts.get("pending_download_count") or 0),
         "not_in_backoffice_count": int(migration_counts.get("not_in_backoffice_count") or 0),
         "not_migrated_count": int(migration_counts.get("not_migrated_count") or 0),
@@ -645,6 +908,7 @@ def execute_document_url_status_scan(
         "workers": workers,
         "base_url": base_url,
         "limit": limit,
+        "year": scan_year,
         "filter_options": {
             "years": years,
             "document_types": document_types,
@@ -663,6 +927,9 @@ def export_url_status_excel(
     base_url: str = DEFAULT_BASE,
     workers: int = 20,
     limit: Optional[int] = None,
+    year: Optional[int] = None,
+    retry_failed: bool = False,
+    source_path: Optional[str] = None,
 ) -> str:
     execute_document_url_status_scan(
         output_path=output_path,
@@ -670,6 +937,9 @@ def export_url_status_excel(
         base_url=base_url,
         workers=workers,
         limit=limit,
+        year=year,
+        retry_failed=retry_failed,
+        source_path=source_path,
     )
     return output_path
 
@@ -679,7 +949,7 @@ def main() -> None:
         description="Export FDRS document URL HTTP status to Excel.",
         epilog=(
             "Standalone:  python export_fdrs_document_url_status.py --api-key YOUR_KEY\n"
-            "Backoffice:  python scripts/dev/export_fdrs_document_url_status.py"
+            "Backoffice:  python plugins/fdrs/scripts/export_fdrs_document_url_status.py"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -688,6 +958,22 @@ def main() -> None:
     parser.add_argument("--base-url", default=DEFAULT_BASE, help="FDRS data API base URL")
     parser.add_argument("--workers", type=int, default=20, help="Concurrent probe workers")
     parser.add_argument("--limit", type=int, default=None, help="Probe only first N documents (testing)")
+    parser.add_argument(
+        "--year",
+        type=int,
+        default=None,
+        help="Probe only documents for this catalog year (default: all years)",
+    )
+    parser.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="Re-probe unexpected URL failures from a previous workbook (see --source)",
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        help="Previous .xlsx to retry (default: --output path)",
+    )
     args = parser.parse_args()
     try:
         export_url_status_excel(
@@ -696,6 +982,9 @@ def main() -> None:
             base_url=args.base_url,
             workers=args.workers,
             limit=args.limit,
+            year=args.year,
+            retry_failed=args.retry_failed,
+            source_path=args.source or (args.output if args.retry_failed else None),
         )
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc

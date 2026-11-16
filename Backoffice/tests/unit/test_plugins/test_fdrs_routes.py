@@ -69,6 +69,35 @@ def test_sync_verify_routes_are_registered(app):
     assert endpoint == "fdrs.document_status_latest"
 
 
+class TestParseDocumentScanYear:
+    def test_blank_and_all_mean_full_scan(self):
+        from plugins.fdrs.document_status_routes import _parse_scan_year
+
+        assert _parse_scan_year(None) == (None, None)
+        assert _parse_scan_year("") == (None, None)
+        assert _parse_scan_year("all") == (None, None)
+        assert _parse_scan_year("  ALL  ") == (None, None)
+
+    def test_valid_year(self):
+        from plugins.fdrs.document_status_routes import _parse_scan_year
+
+        year, err = _parse_scan_year("2024")
+        assert year == 2024
+        assert err is None
+        year, err = _parse_scan_year(2018)
+        assert year == 2018
+        assert err is None
+
+    def test_invalid_year_returns_bad_request(self, app):
+        from plugins.fdrs.document_status_routes import _parse_scan_year
+
+        with app.app_context():
+            year, err = _parse_scan_year("nope")
+        assert year is None
+        assert err is not None
+        assert err.status_code == 400
+
+
 class TestJobLooksActivelyRunning:
     """_job_looks_actively_running lets status polls skip stale-job reconciliation
     (thread-liveness probing, stuck-item recovery) while a sync is healthy — see

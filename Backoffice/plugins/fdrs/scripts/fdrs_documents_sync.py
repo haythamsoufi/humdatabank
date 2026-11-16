@@ -1,7 +1,13 @@
 """
 FDRS documents API → SubmittedDocument import (metadata + file bytes when URL is reachable).
 
-GET https://data-api.ifrc.org/api/documents?apiKey=...&showunpublished=true&force=true[&year=YYYY]
+Catalog:
+GET https://data-api.ifrc.org/api/DocumentAdmin?apiKey=...
+
+DocumentAdmin is a flat list and the only FDRS catalog call. Each row's
+``Migrationlink`` is the file URL (a YouTube ``Link`` when that field is empty).
+``NewName`` is not turned into a URL, and ``/api/documents`` is not called.
+Private rows stay non-public and are still downloaded.
 
 Every National Society catalog file is imported. Questionnaire types map onto
 the FDRS template document fields and keep their own language, period, and
@@ -43,6 +49,8 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 from werkzeug.datastructures import FileStorage
 
 from fdrs_sync_constants import (
+    FDRS_DOCUMENT_DOWNLOAD_PUBLIC_CODES,
+    FDRS_PUBLIC_CODE_LABEL,
     FdrsSyncCancelled,
     fdrs_approval_is_importable,
     fdrs_clean_approval_text,
@@ -56,7 +64,9 @@ from fdrs_sync_constants import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DOCUMENTS_PATH = "/api/documents"
+DEFAULT_DOCUMENTS_ADMIN_PATH = "/api/DocumentAdmin"
+DEFAULT_DATA_API_BASE = "https://data-api.ifrc.org"
+CATALOG_SOURCE = "document_admin"
 
 
 def _format_documents_upsert_progress(index: int, total: int, stats: Dict[str, int]) -> str:
@@ -100,9 +110,14 @@ _DUP_FILENAME_SUFFIX_RE = re.compile(r"_([1-9]\d?)(\.[A-Za-z0-9]+)$")
 
 
 def encode_fdrs_document_url(url: str) -> str:
-    """Percent-encode FDRS document URL paths (API returns unencoded spaces)."""
+    """Percent-encode FDRS document URL paths.
+
+    DocumentAdmin returns some links with raw spaces and others already encoded
+    (``Plano%20Estrat%C3%A9gico``). The path is decoded first so an encoded link
+    is not encoded twice (``%2520``), which the file host answers with 404.
+    """
     parts = urllib.parse.urlsplit((url or "").strip())
-    path = urllib.parse.quote(parts.path, safe="/")
+    path = urllib.parse.quote(urllib.parse.unquote(parts.path), safe="/")
     return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
 
 
@@ -128,6 +143,36 @@ def fdrs_url_without_duplicate_suffix(url: str) -> Optional[str]:
     return urllib.parse.urlunsplit(
         (parts.scheme, parts.netloc, new_path, parts.query, parts.fragment)
     )
+
+
+def fdrs_url_with_noiso_folder(url: str) -> Optional[str]:
+    """
+    Return *url* with the empty country folder filled in, or ``None``.
+
+    Global files (Everyone Counts, guides) come back as ``…/documents//name.pdf``.
+    The file host keeps them under ``…/documents/noiso/name.pdf``.
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return None
+    parts = urllib.parse.urlsplit(raw)
+    if not (parts.path or "").startswith("/documents//"):
+        return None
+    new_path = "/documents/noiso/" + parts.path[len("/documents//"):]
+    return urllib.parse.urlunsplit(
+        (parts.scheme, parts.netloc, new_path, parts.query, parts.fragment)
+    )
+
+
+def fdrs_alternate_urls(url: str) -> List[str]:
+    """Other addresses worth trying after a 403/404 on *url* (de-duplicated, in order)."""
+    candidates: List[str] = []
+    no_suffix = fdrs_url_without_duplicate_suffix(url)
+    noiso = fdrs_url_with_noiso_folder(url)
+    for candidate in (no_suffix, noiso, fdrs_url_with_noiso_folder(no_suffix or "")):
+        if candidate and candidate != url and candidate not in candidates:
+            candidates.append(candidate)
+    return candidates
 
 
 def _fetch_fdrs_document_bytes_once(
@@ -179,19 +224,17 @@ def fetch_fdrs_document_bytes(
     )
     if status not in (403, 404):
         return data, status
-    alt = fdrs_url_without_duplicate_suffix(raw)
-    if not alt:
-        return data, status
-    alt_data, alt_status = _fetch_fdrs_document_bytes_once(
-        alt, timeout=timeout, dry_run=dry_run
-    )
-    if alt_status in (200, 206):
-        logger.info(
-            "FDRS document URL HTTP %s; succeeded without duplicate suffix: %s",
-            status,
-            alt[:160],
+    for alt in fdrs_alternate_urls(raw):
+        alt_data, alt_status = _fetch_fdrs_document_bytes_once(
+            alt, timeout=timeout, dry_run=dry_run
         )
-        return alt_data, alt_status
+        if alt_status in (200, 206):
+            logger.info(
+                "FDRS document URL HTTP %s; succeeded with alternate URL: %s",
+                status,
+                alt[:160],
+            )
+            return alt_data, alt_status
     return data, status
 
 
@@ -231,7 +274,8 @@ def _should_attempt_download(
     row: Dict[str, Any],
     existing: Optional[Any],
 ) -> bool:
-    if not row.get("is_public"):
+    # Private rows are downloaded only when DocumentAdmin gave a non-file-host link.
+    if not row.get("is_public") and not row.get("download_private"):
         return False
     source_url = (row.get("source_url") or "").strip()
     if not source_url:
@@ -427,54 +471,92 @@ def _record_import_issue(
     )
 
 
-def fetch_fdrs_documents_api(
-    base_url: str,
-    api_key: str,
-    *,
-    years: Optional[List[int]] = None,
-    show_unpublished: bool = True,
-) -> List[Dict[str, Any]]:
+def _admin_year_text(year: Any, end_year: Any) -> str:
+    """YearText equivalent of DocumentAdmin ``Year`` / ``EndYear``."""
+    start = _parse_api_year(year)
+    end = _parse_api_year(end_year)
+    if start is None:
+        return ""
+    if end is None or end == start:
+        return str(start)
+    return f"{start}-{end}"
+
+
+def document_admin_file_url(row: Dict[str, Any]) -> str:
+    """File address carried on the DocumentAdmin row.
+
+    ``Migrationlink`` is that address. It is not a second catalog call, and
+    ``NewName`` is not expanded into a path. A YouTube ``Link`` is used only
+    when ``Migrationlink`` is empty.
     """
-    Return flat document records with don_code, iso3, and normalized metadata.
+    migration = row.get("Migrationlink") if isinstance(row.get("Migrationlink"), str) else ""
+    migration = migration.strip()
+    if migration:
+        return migration
+    link = row.get("Link") if isinstance(row.get("Link"), str) else ""
+    link = link.strip()
+    lowered = link.casefold()
+    if link and ("youtube.com" in lowered or "youtu.be" in lowered):
+        return link
+    return ""
 
-    The API ``year`` query param only matches the numeric ``year`` field on each
-    document, not YearText ranges (e.g. Bahrain annual report ``2021-2024`` has
-    ``year=2021``). We always fetch the full catalog. ``build_document_import_plan``
-    stores a range on its first year and still includes it when a synced year
-    falls inside that range.
+
+def normalize_document_admin_record(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Map one DocumentAdmin row onto the catalog shape the importer already uses.
+
+    ``Ns`` is the donor code (``DAO001``) and ``Iso`` is ISO3, so import keys
+    stay stable. ``url`` is ``Migrationlink``, or a YouTube ``Link`` when that
+    is empty. ``is_public`` is still decided from ``Public``.
     """
-    from fdrs_data_fetcher import fetch_country_map
-
-    base = (base_url or "").strip().rstrip("/")
-    country_map = fetch_country_map(base_url=base, api_key=api_key)
-    don_to_iso = {don: iso for don, iso in country_map.items() if don and iso}
-
-    del years  # reserved; filtering happens in build_document_import_plan
-    flat: List[Dict[str, Any]] = []
-
-    params = {
-        "apiKey": api_key,
-        "showunpublished": "true" if show_unpublished else "false",
-        "force": "true",
+    public = row.get("Public")
+    code = fdrs_public_code(public)
+    label = FDRS_PUBLIC_CODE_LABEL.get(code, "") if code is not None else ""
+    file_url = document_admin_file_url(row)
+    private_file = bool(file_url) and code not in FDRS_DOCUMENT_DOWNLOAD_PUBLIC_CODES
+    year = row.get("Year")
+    return {
+        "don_code": (row.get("Ns") or "").strip(),
+        "iso3": (row.get("Iso") or "").strip(),
+        "year": "" if year in (None, "") else year,
+        "YearText": _admin_year_text(year, row.get("EndYear")),
+        "EndYear": row.get("EndYear"),
+        "document_type": (row.get("DocumentType") or "").strip(),
+        "document_typeId": row.get("DocumentTypeId"),
+        "name": (row.get("Name") or row.get("FileName") or "").strip(),
+        "url": file_url,
+        "thumbnail": "",
+        "LangCode": (row.get("LangCode") or "").strip(),
+        "ApprovalStatus": label,
+        "Public": public,
+        "ModifiedAt": row.get("ModifiedAt"),
+        "download_private": private_file,
+        "catalog_source": CATALOG_SOURCE,
     }
-    qs = urllib.parse.urlencode(params)
-    url = f"{base}{DEFAULT_DOCUMENTS_PATH}?{qs}"
-    with urllib.request.urlopen(url, timeout=180) as resp:
+
+
+def fetch_fdrs_documents_api(base_url: str, api_key: str, *, timeout: int = 180) -> List[Dict[str, Any]]:
+    """
+    Return flat, normalized document records (``don_code``, ``iso3``, ``url``, …).
+
+    This is the only FDRS document catalog call: ``GET /api/DocumentAdmin``.
+    No year is sent, because the server filter matches the numeric year only, not
+    a period range (a 2021–2024 report is stored with ``year=2021``).
+    ``build_document_import_plan`` places a range on its first year and still
+    includes it when a synced year falls inside that range.
+    """
+    base = (base_url or "").strip().rstrip("/") or DEFAULT_DATA_API_BASE
+    qs = urllib.parse.urlencode({"apiKey": api_key})
+    req = urllib.request.Request(
+        f"{base}{DEFAULT_DOCUMENTS_ADMIN_PATH}?{qs}",
+        headers={"User-Agent": _FDRS_DOC_USER_AGENT},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
     if not isinstance(payload, list):
-        logger.warning("Unexpected documents API payload type: %s", type(payload))
-        return flat
-    for ns_block in payload:
-        don_code = (ns_block.get("code") or "").strip()
-        iso3 = don_to_iso.get(don_code, "")
-        for doc in ns_block.get("documents") or []:
-            if not isinstance(doc, dict):
-                continue
-            rec = dict(doc)
-            rec["don_code"] = don_code
-            rec["iso3"] = iso3
-            flat.append(rec)
-    return flat
+        raise ValueError(f"DocumentAdmin payload type {type(payload).__name__}")
+    documents = [normalize_document_admin_record(row) for row in payload if isinstance(row, dict)]
+    logger.info("FDRS documents: DocumentAdmin returned %s rows", len(documents))
+    return documents
 
 
 def _doc_approval_raw(doc: Dict[str, Any]) -> Any:
@@ -526,6 +608,7 @@ def _plan_row_from_doc(
             approval_raw,
             public_code=public_raw,
         ),
+        "download_private": bool(doc.get("download_private")),
         "iso3": iso3,
         "year": year_str,
         "fdrs_document_type": doc_type,
@@ -582,6 +665,7 @@ def build_document_import_plan(
         "issue_count": 0,
         "issues_by_code": {},
         "issues": [],
+        "catalog_source": CATALOG_SOURCE if documents else "",
     }
     # Import keys written or retained by this catalog. Removal uses this set.
     # Popped before the summary is stored on the job.
@@ -1189,7 +1273,7 @@ def upsert_fdrs_document_metadata(
             is_public_doc = bool(row.get("is_public"))
             download_status: Optional[int] = None
 
-            if not is_public_doc:
+            if not is_public_doc and not row.get("download_private"):
                 file_pending = False
                 if existing and existing.storage_path and _fdrs_local_file_exists(existing.storage_path):
                     storage_path = existing.storage_path
@@ -1389,7 +1473,7 @@ def run_fdrs_documents_sync(
         current=0,
         total=0,
     )
-    documents = fetch_fdrs_documents_api(base_url, api_key, years=years)
+    documents = fetch_fdrs_documents_api(base_url, api_key)
     plan, summary = build_document_import_plan(documents, assignment_rows, sync_years=years)
     present_keys = set(summary.pop("present_import_keys", ()) or ())
     planned = int(summary.get("planned") or 0)

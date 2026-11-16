@@ -2634,9 +2634,9 @@ def run_import(
 
                 doc_user_id = _resolve_fdrs_sync_user_id(sync_user_id)
                 doc_result = run_fdrs_documents_sync(
-                    base_url=base_data if fdrs_from_data_api else (fdrs_data_api_base or DEFAULT_FDRS_DATA_API_BASE),
-                    api_key=fdrs_api_key if fdrs_from_data_api else (fdrs_data_api_key or DEFAULT_FDRS_DATA_API_KEY or ""),
-                    assignment_rows=assignment_rows if fdrs_from_data_api else [],
+                    base_url=base_data,
+                    api_key=fdrs_api_key,
+                    assignment_rows=assignment_rows,
                     years=fdrs_years,
                     uploaded_by_user_id=doc_user_id,
                     dry_run=dry_run,

@@ -28,7 +28,9 @@ from fdrs_documents_sync import (  # noqa: E402
     clean_fdrs_document_period,
     encode_fdrs_document_url,
     fetch_fdrs_document_bytes,
+    fetch_fdrs_documents_api,
     fdrs_document_removal_allowed,
+    normalize_document_admin_record,
     fdrs_pending_slot_siblings,
     fdrs_url_without_duplicate_suffix,
     public_document_sync_summary,
@@ -1486,6 +1488,208 @@ def test_should_attempt_download_skips_private_documents():
     assert _should_attempt_download(row, None) is False
 
 
+def test_should_attempt_download_fetches_private_document_admin_file():
+    row = {
+        "source_url": "https://data-api.ifrc.org/documents/AO/SP_Angola_2006-2011.pdf",
+        "is_public": False,
+        "download_private": True,
+    }
+    assert _should_attempt_download(row, None) is True
+
+
+def test_normalize_document_admin_private_file_matches_legacy_import_key():
+    row = normalize_document_admin_record(
+        {
+            "Iso": "AO",
+            "Ns": "DAO001",
+            "Name": "SP_Angola_2006-2011.pdf",
+            "LangCode": "pt",
+            "Year": 2006,
+            "EndYear": 2011,
+            "DocumentType": "Our Strategic Plan",
+            "DocumentTypeId": 3,
+            "Public": 0,
+            "NewName": "Strategic Plan_Angola_2006-2011_pt.pdf",
+            "Migrationlink": "https://data-api.ifrc.org/documents/AO/SP_Angola_2006-2011.pdf",
+            "ModifiedAt": "2011-10-05T08:35:36",
+        }
+    )
+    assert row["don_code"] == "DAO001"
+    assert row["iso3"] == "AO"
+    assert row["name"] == "SP_Angola_2006-2011.pdf"
+    assert row["year"] == 2006
+    assert row["YearText"] == "2006-2011"
+    assert row["ApprovalStatus"] == "Validated (Private)"
+    assert row["download_private"] is True
+    assert row["catalog_source"] == "document_admin"
+    assert row["url"] == "https://data-api.ifrc.org/documents/AO/SP_Angola_2006-2011.pdf"
+    legacy = {
+        "don_code": "DAO001",
+        "year": 2006,
+        "document_typeId": 3,
+        "name": "SP_Angola_2006-2011.pdf",
+    }
+    assert _fdrs_document_import_key(row) == _fdrs_document_import_key(legacy)
+    plan, summary = build_document_import_plan(
+        [row],
+        [{"period_name": "2006", "iso3": "AO", "assignment_entity_status_id": 7}],
+    )
+    assert summary["catalog_source"] == "document_admin"
+    assert summary["planned"] == 1
+    assert plan[0]["is_public"] is False
+    assert plan[0]["download_private"] is True
+    assert plan[0]["source_url"] == "https://data-api.ifrc.org/documents/AO/SP_Angola_2006-2011.pdf"
+    assert plan[0]["status"] == "approved"
+    assert plan[0]["year"] == "2006"
+
+
+def test_normalize_document_admin_public_and_code_five():
+    public = normalize_document_admin_record(
+        {
+            "Iso": "BF",
+            "Ns": "DBF001",
+            "Name": "AR_BurkinaFaso_2013.pdf",
+            "LangCode": "fr",
+            "Year": 2013,
+            "EndYear": 2013,
+            "DocumentType": "Our Annual Report",
+            "DocumentTypeId": 1,
+            "Public": 1,
+            "NewName": "AR_BurkinaFaso_2013.pdf",
+            "Migrationlink": "https://data-api.ifrc.org/documents/BF/OLD_AR_BurkinaFaso_2013.pdf",
+        }
+    )
+    assert public["url"] == "https://data-api.ifrc.org/documents/BF/OLD_AR_BurkinaFaso_2013.pdf"
+    assert public["download_private"] is False
+    assert public["YearText"] == "2013"
+    assert public["ApprovalStatus"] == "Validated (Public)"
+    assert public["download_private"] is False
+
+    unknown = normalize_document_admin_record(
+        {
+            "Iso": "IR",
+            "Ns": "DIR001",
+            "Name": "2024.pdf",
+            "LangCode": "en",
+            "Year": 2024,
+            "DocumentType": "Our Audited Financial Statements",
+            "DocumentTypeId": 2,
+            "Public": 5,
+            "NewName": "2024.pdf",
+            "Migrationlink": "https://data-api.ifrc.org/documents/IR/OLD_2024.pdf",
+        }
+    )
+    assert unknown["url"] == "https://data-api.ifrc.org/documents/IR/OLD_2024.pdf"
+    assert unknown["download_private"] is True
+    assert unknown["ApprovalStatus"] == ""
+    assert fdrs_approval_is_importable(None, 5) is True
+    assert fdrs_document_is_public_visibility(public_code=5) is False
+    assert fdrs_document_status_from_approval(public_code=5) == "pending"
+
+    placeholder = normalize_document_admin_record(
+        {
+            "Name": "FDRS User Guide 2024_EN.pdf",
+            "DocumentType": "DocumentGuide",
+            "DocumentTypeId": 9,
+            "Public": 1,
+            "Year": 2024,
+            "Migrationlink": "https://data-api.ifrc.org/documents//FDRS%20User%20Guide%202024_EN.pdf",
+        }
+    )
+    assert placeholder["url"] == "https://data-api.ifrc.org/documents//FDRS%20User%20Guide%202024_EN.pdf"
+    assert placeholder["download_private"] is False
+
+    youtube = normalize_document_admin_record(
+        {
+            "Name": "intro",
+            "DocumentType": "FrontendVideo",
+            "DocumentTypeId": 11,
+            "Public": 1,
+            "Year": 2024,
+            "Link": "https://www.youtube.com/watch?v=abc",
+        }
+    )
+    assert youtube["url"] == "https://www.youtube.com/watch?v=abc"
+
+    new_name_only = normalize_document_admin_record(
+        {
+            "Iso": "LA",
+            "Ns": "DLA001",
+            "Name": "SP_Lao.pdf",
+            "NewName": "Strategic Plan_Lao.pdf",
+            "DocumentType": "Our Strategic Plan",
+            "DocumentTypeId": 3,
+            "Public": 1,
+            "Year": 2016,
+        }
+    )
+    assert new_name_only["url"] == ""
+
+
+def test_fetch_fdrs_documents_api_prefers_document_admin(monkeypatch):
+    payload = [
+        {
+            "Iso": "AO",
+            "Ns": "DAO001",
+            "Name": "SP_Angola_2006-2011.pdf",
+            "LangCode": "pt",
+            "Year": 2006,
+            "EndYear": 2011,
+            "DocumentType": "Our Strategic Plan",
+            "DocumentTypeId": 3,
+            "Public": 0,
+            "NewName": "Strategic Plan_Angola_2006-2011_pt.pdf",
+            "Migrationlink": "https://data-api.ifrc.org/documents/AO/SP_Angola_2006-2011.pdf",
+        }
+    ]
+
+    class Resp:
+        def read(self):
+            return json.dumps(payload).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    seen = []
+
+    def _open(req, timeout=180):
+        seen.append(req.full_url)
+        return Resp()
+
+    monkeypatch.setattr("fdrs_documents_sync.urllib.request.urlopen", _open)
+    docs = fetch_fdrs_documents_api("https://data-api.ifrc.org", "secret-key")
+    assert len(seen) == 1
+    assert "/api/DocumentAdmin?" in seen[0]
+    assert "apiKey=secret-key" in seen[0]
+    assert docs[0]["download_private"] is True
+    assert docs[0]["url"] == "https://data-api.ifrc.org/documents/AO/SP_Angola_2006-2011.pdf"
+    assert docs[0]["iso3"] == "AO"
+
+
+def test_fetch_fdrs_documents_api_does_not_call_legacy_catalog(monkeypatch):
+    import urllib.error
+
+    calls = []
+
+    def _open(req, timeout=180):
+        calls.append(req.full_url)
+        raise urllib.error.URLError("down")
+
+    monkeypatch.setattr("fdrs_documents_sync.urllib.request.urlopen", _open)
+    try:
+        fetch_fdrs_documents_api("https://data-api.ifrc.org", "secret-key")
+    except urllib.error.URLError:
+        pass
+    else:
+        raise AssertionError("DocumentAdmin failure must surface")
+    assert len(calls) == 1
+    assert "/api/DocumentAdmin?" in calls[0]
+    assert "/api/documents?" not in calls[0]
+
+
 def test_should_attempt_download_retries_when_storage_path_missing_on_disk(monkeypatch):
     class Doc:
         file_pending = False
@@ -1677,3 +1881,26 @@ def test_plan_missing_fdrs_assignments_noop_when_complete():
     assert plan["periods_to_create"] == []
     assert plan["aes_to_create"] == []
     assert plan["target_pairs"] == 1
+
+
+def test_encode_fdrs_document_url_does_not_double_encode():
+    from fdrs_documents_sync import encode_fdrs_document_url
+
+    already = "https://data-api.ifrc.org/documents/AO/Plano%20Estrat%C3%A9gico%202030.pdf"
+    assert encode_fdrs_document_url(already) == already
+    raw = "https://data-api.ifrc.org/documents/AO/Plano Estratégico 2030.pdf"
+    assert encode_fdrs_document_url(raw) == already
+
+
+def test_fdrs_alternate_urls_fill_empty_country_folder():
+    from fdrs_documents_sync import fdrs_alternate_urls, fdrs_url_with_noiso_folder
+
+    url = "https://data-api.ifrc.org/documents//EveryoneCounts2024_AR_LR.pdf"
+    assert fdrs_url_with_noiso_folder(url) == (
+        "https://data-api.ifrc.org/documents/noiso/EveryoneCounts2024_AR_LR.pdf"
+    )
+    assert fdrs_url_with_noiso_folder("https://data-api.ifrc.org/documents/AO/a.pdf") is None
+    assert fdrs_alternate_urls(url) == [
+        "https://data-api.ifrc.org/documents/noiso/EveryoneCounts2024_AR_LR.pdf"
+    ]
+    assert fdrs_alternate_urls("https://data-api.ifrc.org/documents/AO/a.pdf") == []

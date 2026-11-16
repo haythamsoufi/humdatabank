@@ -1,0 +1,170 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}US Macro Awards{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    {{ page_header(
+        title="US Macro Awards",
+        icon='fas fa-clipboard-list',
+        breadcrumbs=[
+            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': 'Plugins', 'url': url_for('admin.plugin_management')},
+            {'name': 'US Macro Awards'}
+        ]
+    ) }}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {% include "plugins/_plugin_info_card.html" %}
+
+        <div class="bg-white p-6 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                <i class="fas fa-sitemap text-gray-600 mr-2"></i>
+                Logframe
+            </h3>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-gray-600">Template</span>
+                    <span class="font-medium text-gray-900">{{ settings.template_name }}</span>
+                </div>
+                <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-gray-600">Sections</span>
+                    <span class="font-medium text-gray-900">{{ settings.section_count }}</span>
+                </div>
+                <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-gray-600">Bank indicators</span>
+                    <span class="font-medium text-gray-900">{{ settings.indicator_count }}</span>
+                </div>
+                <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-gray-600">Questions</span>
+                    <span class="font-medium text-gray-900">{{ settings.question_count }}</span>
+                </div>
+                <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-gray-600">Country projects</span>
+                    <span class="font-medium text-gray-900">{{ settings.project_count }}</span>
+                </div>
+            </div>
+            <div class="mt-4 space-y-3">
+                {% if template_url %}
+                <a href="{{ template_url }}"
+                   class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
+                    <i class="fas fa-edit mr-2"></i>
+                    Open the form template
+                </a>
+                {% endif %}
+                <a href="{{ projects_url }}"
+                   class="flex items-center w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg">
+                    <i class="fas fa-folder-open mr-2"></i>
+                    Admin → Projects
+                </a>
+            </div>
+            <p class="mt-4 text-sm text-gray-600">
+                Portfolio <strong>{{ settings.portfolio }}</strong>, fund <strong>{{ settings.fund }}</strong>.
+                Re-importing updates this published template in place. Lines that match the indicator bank
+                stay indicators; the others are questions.
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg border border-gray-200 mt-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">
+            <i class="fas fa-file-import text-red-600 mr-2"></i>
+            Import logframe
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">
+            Workbook on disk:
+            <span class="font-medium text-gray-900">{{ settings.workbook_name }}</span>
+            {% if settings.workbook_found %}(found){% else %}(not found){% endif %}.
+            The sheet used is <code>Logframe_Mastersheet</code>.
+        </p>
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="flex items-center text-sm text-gray-700">
+                <input type="checkbox" name="dry_run" value="1" class="mr-2"
+                       {% if report and report.dry_run %}checked{% endif %}>
+                Preview only (do not save)
+            </label>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1" for="logframe-file">Replacement workbook</label>
+                <input id="logframe-file" type="file" name="file" accept=".xlsx,.xlsm"
+                       class="block w-full text-sm text-gray-700">
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <button type="submit" name="action" value="repo"
+                        class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg">
+                    Import workbook on disk
+                </button>
+                <button type="submit" name="action" value="upload"
+                        class="bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
+                    Upload and import
+                </button>
+            </div>
+        </form>
+
+        {% if report %}
+        <div class="mt-6 pt-4 border-t border-gray-200 text-sm">
+            <p class="font-medium text-gray-900 mb-2">
+                Preview: {{ report.sections }} sections,
+                {{ report.linked }} linked to the bank,
+                {{ report.questions }} questions,
+                {{ report.projects_upserted }} country projects.
+            </p>
+            {% if report.unmatched_countries %}
+            <p class="text-gray-700 mb-3">No country match: {{ report.unmatched_countries | join(', ') }}</p>
+            {% endif %}
+            {% if report.links %}
+            <h4 class="font-semibold text-gray-700 mb-2">Linked to the indicator bank</h4>
+            <div class="overflow-x-auto mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-600">
+                            <th class="py-1 pr-3">Code</th>
+                            <th class="py-1 pr-3">Bank</th>
+                            <th class="py-1 pr-3">How</th>
+                            <th class="py-1">Indicator</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in report.links %}
+                        <tr class="border-t border-gray-200">
+                            <td class="py-1 pr-3">{{ row.code }}</td>
+                            <td class="py-1 pr-3">#{{ row.bank_id }}</td>
+                            <td class="py-1 pr-3">{{ row.method }}</td>
+                            <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            {% if report.created_questions %}
+            <h4 class="font-semibold text-gray-700 mb-2">Questions (no bank match)</h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-600">
+                            <th class="py-1 pr-3">Code</th>
+                            <th class="py-1 pr-3">Type</th>
+                            <th class="py-1 pr-3">Section</th>
+                            <th class="py-1">Question</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in report.created_questions %}
+                        <tr class="border-t border-gray-200">
+                            <td class="py-1 pr-3">{{ row.code or '—' }}</td>
+                            <td class="py-1 pr-3">{{ row.question_type }}</td>
+                            <td class="py-1 pr-3">{{ row.section }}</td>
+                            <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

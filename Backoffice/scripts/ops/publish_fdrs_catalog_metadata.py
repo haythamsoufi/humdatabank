@@ -4,7 +4,7 @@
 Some Manage Resources rows already hold the production file, but they were
 saved with no subcategory or no publication date. ``/api/documents?type=``
 then skips them, and the Everyone Counts page cannot build a year. This fills
-only the blank fields from the legacy catalog. It does not replace a date or
+only the blank fields from the FDRS DocumentAdmin catalog. It does not replace a date or
 a subcategory that is already set, and it does not download files.
 
 A catalog row that is not in Databank at all (the FDRS videos playlist) is

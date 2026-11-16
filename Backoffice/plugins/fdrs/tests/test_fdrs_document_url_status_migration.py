@@ -5,6 +5,8 @@ import hashlib
 import os
 import sys
 
+import pytest
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 backoffice_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_dir)))
 fdrs_scripts = os.path.join(backoffice_dir, "plugins", "fdrs", "scripts")
@@ -17,7 +19,13 @@ from export_fdrs_document_url_status import (  # noqa: E402
     MIGRATION_NOT_IN_BACKOFFICE,
     MIGRATION_PENDING_DOWNLOAD,
     document_import_key,
+    document_matches_scan_year,
     enrich_rows_with_backoffice_migration,
+    filter_documents_for_scan_year,
+    parse_scan_year,
+    ratio_pct,
+    row_is_probe_failure,
+    stored_row_to_catalog_doc,
 )
 
 
@@ -32,6 +40,84 @@ def _expected_sync_import_key(doc: dict) -> str:
         ]
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:64]
+
+
+def test_parse_scan_year_treats_blank_and_all_as_full_scan():
+    assert parse_scan_year(None) is None
+    assert parse_scan_year("") is None
+    assert parse_scan_year("all") is None
+    assert parse_scan_year("ALL") is None
+    assert parse_scan_year("  ") is None
+
+
+def test_parse_scan_year_accepts_four_digit_year():
+    assert parse_scan_year(2024) == 2024
+    assert parse_scan_year("2024") == 2024
+
+
+@pytest.mark.parametrize("raw", ["abc", "12", 1899, 2101, True])
+def test_parse_scan_year_rejects_invalid_values(raw):
+    with pytest.raises(ValueError, match="Invalid year"):
+        parse_scan_year(raw)
+
+
+def test_document_matches_scan_year_on_api_year_and_yeartext_range():
+    assert document_matches_scan_year({"year": 2024, "YearText": ""}, 2024)
+    assert not document_matches_scan_year({"year": 2023, "YearText": ""}, 2024)
+    assert document_matches_scan_year({"year": 2021, "YearText": "2021-2024"}, 2024)
+    assert document_matches_scan_year({"year": 2021, "YearText": "2021-2024"}, 2021)
+    assert not document_matches_scan_year({"year": 2021, "YearText": "2021-2024"}, 2025)
+
+
+def test_ratio_pct_is_migrated_over_all():
+    assert ratio_pct(12, 25) == 48.0
+    assert ratio_pct(0, 10) == 0.0
+    assert ratio_pct(3, 0) == 0.0
+    assert ratio_pct(1, 3) == 33.3
+
+
+def test_row_is_probe_failure_skips_ok_and_expected_private_403():
+    assert not row_is_probe_failure({"downloadable": True, "http_status": 200, "is_public": True})
+    assert not row_is_probe_failure({"downloadable": False, "http_status": 403, "is_public": False})
+    assert row_is_probe_failure({"downloadable": False, "http_status": 403, "is_public": True})
+    assert row_is_probe_failure({"downloadable": False, "http_status": 404, "is_public": True})
+    assert row_is_probe_failure({"downloadable": False, "http_status": -1, "is_public": True})
+    assert row_is_probe_failure({"downloadable": "false", "http_status": "404", "is_public": "true"})
+
+
+def test_stored_row_to_catalog_doc_maps_sheet_columns():
+    doc = stored_row_to_catalog_doc(
+        {
+            "don_code": "DKI001",
+            "iso3": "KIR",
+            "year": 2024,
+            "year_text": "2024-2024",
+            "document_type": "Annual Report",
+            "document_type_id": 12,
+            "name": "AR.pdf",
+            "lang_code": "en",
+            "approval_status": "Validated (Public)",
+            "public": 1,
+            "modified_at": "2025-01-01",
+            "url": "https://example.test/ar.pdf",
+        }
+    )
+    assert doc["document_typeId"] == 12
+    assert doc["YearText"] == "2024-2024"
+    assert doc["ApprovalStatus"] == "Validated (Public)"
+    assert doc["url"] == "https://example.test/ar.pdf"
+
+
+def test_filter_documents_for_scan_year_keeps_matching_slice_only():
+    docs = [
+        {"name": "a", "year": 2023, "YearText": "2023"},
+        {"name": "b", "year": 2024, "YearText": "2024-2024"},
+        {"name": "c", "year": 2021, "YearText": "2021-2024"},
+        {"name": "d", "year": 2020, "YearText": ""},
+    ]
+    assert [d["name"] for d in filter_documents_for_scan_year(docs, None)] == ["a", "b", "c", "d"]
+    assert [d["name"] for d in filter_documents_for_scan_year(docs, 2024)] == ["b", "c"]
+    assert [d["name"] for d in filter_documents_for_scan_year(docs, 2020)] == ["d"]
 
 
 def test_document_import_key_matches_sync_helper():

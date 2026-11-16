@@ -157,12 +157,13 @@ def fdrs_document_form_item_id(document_type: str) -> Optional[int]:
     return int(item_id) if item_id is not None else None
 
 # ApprovalStatus / Public values treated as importable.
-# FDRS ``Public`` codes (observed on GET /api/documents):
+# FDRS ``Public`` codes (observed on GET /api/DocumentAdmin):
 #   0 = Validated (Private)
 #   1 = Validated (Public)
 #   2 = Under Validation (Public)
 #   3 = Rejected (Public)
 #   4 = Under Validation (Private)
+#   5 = seen on a handful of DocumentAdmin rows (no label). Imported, not public.
 FDRS_DOCUMENT_APPROVAL_OK = frozenset(
     {
         "Validated (Public)",
@@ -173,10 +174,19 @@ FDRS_DOCUMENT_APPROVAL_OK = frozenset(
         "Rejected (Private)",
     }
 )
-FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2, 3, 4})
+FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2, 3, 4, 5})
 
-# FDRS ``Public`` codes where the file may be fetched from ``url`` (metadata import still
-# includes private codes in FDRS_DOCUMENT_PUBLIC_OK above).
+# Labels for DocumentAdmin, which sends ``Public`` and no ApprovalStatus text.
+FDRS_PUBLIC_CODE_LABEL = {
+    0: "Validated (Private)",
+    1: "Validated (Public)",
+    2: "Under Validation (Public)",
+    3: "Rejected (Public)",
+    4: "Under Validation (Private)",
+}
+
+# Public codes whose file is on the public URL and whose databank row is public.
+# Private codes are still imported. DocumentAdmin downloads those files separately.
 FDRS_DOCUMENT_DOWNLOAD_PUBLIC_CODES = frozenset({1, 2, 3})
 
 
@@ -238,10 +248,12 @@ def fdrs_document_is_public_visibility(
     public_code: Any = None,
 ) -> bool:
     """
-    Whether FDRS document bytes may be downloaded from ``url``.
+    Whether the FDRS document is publicly visible in the databank.
 
-    Private (Validated Private, Public code 0) → metadata only, no file fetch.
-    Public codes 1–3 or ApprovalStatus ending in ``(Public)`` → fetch allowed.
+    Public codes 1–3 or an ApprovalStatus ending in ``(Public)`` are public.
+    Private codes stay non-public. DocumentAdmin can still supply the file
+    bytes for those rows; that decision is ``download_private`` on the plan,
+    not this flag.
     """
     approval = fdrs_clean_approval_text(approval_status)
     if approval.endswith("(Private)"):

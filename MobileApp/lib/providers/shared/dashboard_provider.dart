@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../models/shared/assignment.dart';
+import '../../models/shared/dashboard_activity.dart';
 import '../../models/shared/focal_point_contact.dart';
 import '../../models/shared/dashboard_data.dart';
 import '../../models/shared/entity.dart';
@@ -13,7 +14,7 @@ class DashboardProvider with ChangeNotifier {
   final DashboardRepository _repository;
 
   DashboardProvider({DashboardRepository? repository})
-      : _repository = repository ?? DashboardRepository();
+    : _repository = repository ?? DashboardRepository();
 
   List<Assignment> _currentAssignments = [];
   List<Assignment> _pastAssignments = [];
@@ -21,6 +22,9 @@ class DashboardProvider with ChangeNotifier {
   List<FocalPointContact> _nsFocalPoints = [];
   List<FocalPointContact> _orgFocalPoints = [];
   List<FocalPointContact> _fdsMembers = [];
+  List<DashboardActivity> _recentActivities = [];
+  bool _recentActivitiesHasMore = false;
+  bool _isLoadingMoreActivities = false;
   Entity? _selectedEntity;
   bool _isLoading = false;
   String? _error;
@@ -31,6 +35,9 @@ class DashboardProvider with ChangeNotifier {
   List<FocalPointContact> get nsFocalPoints => _nsFocalPoints;
   List<FocalPointContact> get orgFocalPoints => _orgFocalPoints;
   List<FocalPointContact> get fdsMembers => _fdsMembers;
+  List<DashboardActivity> get recentActivities => _recentActivities;
+  bool get recentActivitiesHasMore => _recentActivitiesHasMore;
+  bool get isLoadingMoreActivities => _isLoadingMoreActivities;
   Entity? get selectedEntity => _selectedEntity;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -84,10 +91,9 @@ class DashboardProvider with ChangeNotifier {
 
     // Fetch from API
     // Pass entity if provided (for direct selection) or if preserving and we have one
-    final entityToPass = entity ?? (preserveSelectedEntity ? _selectedEntity : null);
-    final data = await _repository.loadDashboardFromApi(
-      entity: entityToPass,
-    );
+    final entityToPass =
+        entity ?? (preserveSelectedEntity ? _selectedEntity : null);
+    final data = await _repository.loadDashboardFromApi(entity: entityToPass);
 
     if (data == null) {
       // The normal cache read above can reject an expired snapshot. Retry without
@@ -113,7 +119,7 @@ class DashboardProvider with ChangeNotifier {
       DebugLogger.logWarn(
         'DASHBOARD',
         'API returned null — keeping prior state (current=${_currentAssignments.length}, '
-        'past=${_pastAssignments.length})',
+            'past=${_pastAssignments.length})',
       );
       // API call failed - check if we have cached data to display
       if (!hasLocalSnapshot &&
@@ -148,9 +154,7 @@ class DashboardProvider with ChangeNotifier {
   /// network timeouts and retries. When [allowStale] is true, snapshots older
   /// than the normal cache TTL are still applied if present on disk.
   Future<void> refreshFromDiskOnly({bool allowStale = false}) async {
-    DebugLogger.logDashboard(
-      'refreshFromDiskOnly(allowStale=$allowStale)',
-    );
+    DebugLogger.logDashboard('refreshFromDiskOnly(allowStale=$allowStale)');
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -171,14 +175,19 @@ class DashboardProvider with ChangeNotifier {
   }
 
   /// Update provider state from repository data.
-  void _updateStateFromData(DashboardData data, {bool preserveSelectedEntity = false}) {
+  void _updateStateFromData(
+    DashboardData data, {
+    bool preserveSelectedEntity = false,
+  }) {
     // Cancelled assignments always belong in the past list, regardless of API/cache grouping.
     bool isCancelled(Assignment a) {
       final s = a.status.toLowerCase().trim();
       return s == 'cancelled' || s == 'canceled';
     }
 
-    _currentAssignments = data.currentAssignments.where((a) => !isCancelled(a)).toList();
+    _currentAssignments = data.currentAssignments
+        .where((a) => !isCancelled(a))
+        .toList();
     _pastAssignments = [
       ...data.pastAssignments,
       ...data.currentAssignments.where(isCancelled),
@@ -187,6 +196,8 @@ class DashboardProvider with ChangeNotifier {
     _nsFocalPoints = data.nsFocalPoints;
     _orgFocalPoints = data.orgFocalPoints;
     _fdsMembers = data.fdsMembers;
+    _recentActivities = data.recentActivities;
+    _recentActivitiesHasMore = data.recentActivitiesHasMore;
     // Preserve current selection if flag is set, otherwise use API response or keep current
     if (preserveSelectedEntity) {
       // Keep the current selection - don't overwrite it
@@ -199,8 +210,8 @@ class DashboardProvider with ChangeNotifier {
           DebugLogger.logWarn(
             'DASHBOARD',
             'API returned different selected entity (${data.selectedEntity!.selectionKey}) '
-            'than what we set (${_selectedEntity!.selectionKey}). '
-            'Session may not be updated yet, but keeping our selection.'
+                'than what we set (${_selectedEntity!.selectionKey}). '
+                'Session may not be updated yet, but keeping our selection.',
           );
         }
       }
@@ -209,13 +220,14 @@ class DashboardProvider with ChangeNotifier {
     }
   }
 
-
   /// Load entities from cache.
   /// Entities are typically loaded as part of dashboard data.
   Future<void> loadEntities() async {
     _entities = await _repository.loadEntitiesFromCache();
     if (_entities.isNotEmpty && _selectedEntity == null) {
-      _selectedEntity = await _repository.loadSelectedEntityFromStorage(_entities);
+      _selectedEntity = await _repository.loadSelectedEntityFromStorage(
+        _entities,
+      );
     }
     notifyListeners();
   }
@@ -232,7 +244,8 @@ class DashboardProvider with ChangeNotifier {
 
     // Store previous entity to detect changes
     final previousEntity = _selectedEntity;
-    final entityChanged = previousEntity == null ||
+    final entityChanged =
+        previousEntity == null ||
         previousEntity.entityType != entity.entityType ||
         previousEntity.entityId != entity.entityId;
 
@@ -278,12 +291,17 @@ class DashboardProvider with ChangeNotifier {
     // Reload dashboard to get updated data for selected entity
     // Pass the entity directly to the API via query parameters
     // The API will use the entity from query params and update the session automatically
-    await loadDashboard(forceRefresh: true, preserveSelectedEntity: true, entity: entity);
+    await loadDashboard(
+      forceRefresh: true,
+      preserveSelectedEntity: true,
+      entity: entity,
+    );
 
     DebugLogger.logDashboard(
-        'After reload: selected entity is ${_selectedEntity?.selectionKey ?? "null"}, '
-        'current assignments: ${_currentAssignments.length}, '
-        'past assignments: ${_pastAssignments.length}');
+      'After reload: selected entity is ${_selectedEntity?.selectionKey ?? "null"}, '
+      'current assignments: ${_currentAssignments.length}, '
+      'past assignments: ${_pastAssignments.length}',
+    );
   }
 
   void _applyEntitySnapshot(EntityDashboardSnapshot snapshot) {
@@ -297,7 +315,44 @@ class DashboardProvider with ChangeNotifier {
     _nsFocalPoints = snapshot.nsFocalPoints;
     _orgFocalPoints = snapshot.orgFocalPoints;
     _fdsMembers = snapshot.fdsMembers;
+    _recentActivities = snapshot.recentActivities;
+    _recentActivitiesHasMore = snapshot.recentActivitiesHasMore;
     notifyListeners();
+  }
+
+  /// Appends the next page of recent activities for the selected entity.
+  ///
+  /// A refresh that replaces the list while this request is in flight wins:
+  /// the older page is discarded instead of being stitched onto the new one.
+  Future<void> loadMoreRecentActivities() async {
+    final entity = _selectedEntity;
+    if (entity == null ||
+        !_recentActivitiesHasMore ||
+        _isLoadingMoreActivities) {
+      return;
+    }
+    final entityKey = entity.selectionKey;
+    final offset = _recentActivities.length;
+    _isLoadingMoreActivities = true;
+    notifyListeners();
+    try {
+      final page = await _repository.loadMoreRecentActivities(
+        entity: entity,
+        offset: offset,
+      );
+      if (page == null || _selectedEntity?.selectionKey != entityKey) return;
+      if (_recentActivities.length != offset) return;
+      final seen = _recentActivities.map((activity) => activity.id).toSet();
+      _recentActivities = [
+        ..._recentActivities,
+        for (final activity in page.activities)
+          if (activity.id.isEmpty || !seen.contains(activity.id)) activity,
+      ];
+      _recentActivitiesHasMore = page.hasMore;
+    } finally {
+      _isLoadingMoreActivities = false;
+      notifyListeners();
+    }
   }
 
   static bool _isCancelled(Assignment a) {
@@ -312,8 +367,9 @@ class DashboardProvider with ChangeNotifier {
       return;
     }
 
-    _selectedEntity =
-        await _repository.loadSelectedEntityFromStorage(_entities);
+    _selectedEntity = await _repository.loadSelectedEntityFromStorage(
+      _entities,
+    );
     notifyListeners();
   }
 
@@ -326,6 +382,8 @@ class DashboardProvider with ChangeNotifier {
     _nsFocalPoints = [];
     _orgFocalPoints = [];
     _fdsMembers = [];
+    _recentActivities = [];
+    _recentActivitiesHasMore = false;
     _selectedEntity = null;
     notifyListeners();
   }
@@ -339,6 +397,8 @@ class DashboardProvider with ChangeNotifier {
     _nsFocalPoints = [];
     _orgFocalPoints = [];
     _fdsMembers = [];
+    _recentActivities = [];
+    _recentActivitiesHasMore = false;
     notifyListeners();
   }
 

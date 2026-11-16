@@ -1,4 +1,4 @@
-"""Tests for app/static_serving.py — all cache header branches."""
+"""Tests for app/assets/static_serving.py — all cache header branches."""
 
 import os
 import pytest
@@ -8,7 +8,7 @@ from flask import Flask
 
 def _make_app_with_static(static_folder, debug=False):
     """Build a minimal Flask app with register_static_route applied."""
-    from app.static_serving import register_static_route
+    from app.assets.static_serving import register_static_route
 
     flask_app = Flask(__name__, static_folder=None, static_url_path=None)
     flask_app.config['DEBUG'] = debug

@@ -281,7 +281,7 @@ class DebugManager:
         # (pipeline steps + per-table glyph subsetting). They also attach
         # their own stderr handlers, which Azure Log Stream paints red even
         # though the records are INFO, not errors.
-        from app.logging_config import WeasyprintCssIgnoreFilter
+        from app.runtime.logging_config import WeasyprintCssIgnoreFilter
 
         for _noisy_pdf in (
             "weasyprint",

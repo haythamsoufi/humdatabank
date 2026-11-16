@@ -42,7 +42,7 @@
     icon='fas fa-pen' if assignment else 'fas fa-plus-circle',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Assignment Management'), 'url': url_for('assignment_management.manage_assignments')},
+        {'name': _('Assignments'), 'url': url_for('assignment_management.manage_assignments')},
         {'name': assignment_page_title}
     ],
     actions=header_actions.items,

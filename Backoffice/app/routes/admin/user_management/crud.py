@@ -212,7 +212,7 @@ def manage_users():
 
     return render_template("admin/user_management/users.html",
                            users=users,
-                           title="Manage Users",
+                           title="Users",
                            Country=Country,
                            countries_by_region=countries_by_region,
                            get_localized_country_name=get_localized_country_name,

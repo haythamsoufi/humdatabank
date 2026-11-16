@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/cli.py — targets 100% coverage.
+Comprehensive tests for app/cli_commands/cli.py — targets 100% coverage.
 
 Covers:
 - reset_table_sequence_verbose (verbose/non-verbose, ok/fail paths)
@@ -53,9 +53,9 @@ class TestResetTableSequenceVerbose:
     """Tests for reset_table_sequence_verbose helper."""
 
     def test_returns_true_when_ok(self):
-        from app.cli import reset_table_sequence_verbose
+        from app.cli_commands.cli import reset_table_sequence_verbose
 
-        with patch("app.cli.reset_table_sequence", return_value=(True, "reset")) as mock_rts:
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(True, "reset")) as mock_rts:
             ok, reason = reset_table_sequence_verbose("my_table", schema="public", verbose=True)
 
         assert ok is True
@@ -63,9 +63,9 @@ class TestResetTableSequenceVerbose:
         mock_rts.assert_called_once_with("my_table", schema="public")
 
     def test_no_echo_when_ok(self, capsys):
-        from app.cli import reset_table_sequence_verbose
+        from app.cli_commands.cli import reset_table_sequence_verbose
 
-        with patch("app.cli.reset_table_sequence", return_value=(True, "reset")):
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(True, "reset")):
             reset_table_sequence_verbose("my_table", verbose=True)
 
         captured = capsys.readouterr()
@@ -73,10 +73,10 @@ class TestResetTableSequenceVerbose:
 
     def test_echoes_error_when_verbose_and_not_ok(self):
         """When ok=False and verbose=True, should echo to stderr."""
-        from app.cli import reset_table_sequence_verbose
+        from app.cli_commands.cli import reset_table_sequence_verbose
 
-        with patch("app.cli.reset_table_sequence", return_value=(False, "table not found")):
-            with patch("app.cli.click.echo") as mock_echo:
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(False, "table not found")):
+            with patch("app.cli_commands.cli.click.echo") as mock_echo:
                 ok, reason = reset_table_sequence_verbose("bad_table", verbose=True)
 
         assert ok is False
@@ -85,19 +85,19 @@ class TestResetTableSequenceVerbose:
 
     def test_no_echo_when_not_verbose_and_not_ok(self):
         """When ok=False and verbose=False, should NOT echo."""
-        from app.cli import reset_table_sequence_verbose
+        from app.cli_commands.cli import reset_table_sequence_verbose
 
-        with patch("app.cli.reset_table_sequence", return_value=(False, "no sequence")):
-            with patch("app.cli.click.echo") as mock_echo:
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(False, "no sequence")):
+            with patch("app.cli_commands.cli.click.echo") as mock_echo:
                 ok, reason = reset_table_sequence_verbose("bad_table", verbose=False)
 
         assert ok is False
         mock_echo.assert_not_called()
 
     def test_default_schema_is_public(self):
-        from app.cli import reset_table_sequence_verbose
+        from app.cli_commands.cli import reset_table_sequence_verbose
 
-        with patch("app.cli.reset_table_sequence", return_value=(True, "reset")) as mock_rts:
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(True, "reset")) as mock_rts:
             reset_table_sequence_verbose("any_table")
 
         mock_rts.assert_called_once_with("any_table", schema="public")
@@ -107,25 +107,25 @@ class TestResetFormDataSequenceHelper:
     """Tests for reset_form_data_sequence_helper."""
 
     def test_returns_true_on_success(self):
-        from app.cli import reset_form_data_sequence_helper
+        from app.cli_commands.cli import reset_form_data_sequence_helper
 
-        with patch("app.cli.reset_table_sequence", return_value=(True, "reset")):
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(True, "reset")):
             result = reset_form_data_sequence_helper()
 
         assert result is True
 
     def test_returns_false_on_failure(self):
-        from app.cli import reset_form_data_sequence_helper
+        from app.cli_commands.cli import reset_form_data_sequence_helper
 
-        with patch("app.cli.reset_table_sequence", return_value=(False, "no sequence")):
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(False, "no sequence")):
             result = reset_form_data_sequence_helper()
 
         assert result is False
 
     def test_calls_reset_for_form_data(self):
-        from app.cli import reset_form_data_sequence_helper
+        from app.cli_commands.cli import reset_form_data_sequence_helper
 
-        with patch("app.cli.reset_table_sequence", return_value=(True, "reset")) as mock_rts:
+        with patch("app.cli_commands.cli.reset_table_sequence", return_value=(True, "reset")) as mock_rts:
             reset_form_data_sequence_helper()
 
         mock_rts.assert_called_once_with("form_data")
@@ -183,7 +183,7 @@ class TestGenerateApiKeyCommand:
         with app.app_context():
             with patch("app.models.User") as mock_user_class:
                 mock_user_class.query.filter_by.return_value.first.return_value = None
-                with patch("app.cli.db"):
+                with patch("app.cli_commands.cli.db"):
                     result = runner.invoke(args=["generate-api-key", "missing@example.com"])
 
         assert result.exit_code == 0
@@ -193,14 +193,14 @@ class TestGenerateApiKeyCommand:
         mock_user = MagicMock()
         mock_user.email = "found@example.com"
 
-        with patch("app.cli.db") as mock_db:
-            with patch("app.cli.atomic") as mock_atomic:
+        with patch("app.cli_commands.cli.db") as mock_db:
+            with patch("app.cli_commands.cli.atomic") as mock_atomic:
                 mock_atomic.return_value.__enter__ = MagicMock(return_value=None)
                 mock_atomic.return_value.__exit__ = MagicMock(return_value=False)
                 # Patch the User import inside the command
                 with patch.dict("sys.modules", {}):
                     import importlib
-                    import app.cli as cli_mod
+                    import app.cli_commands.cli as cli_mod
                     with patch.object(cli_mod, "__builtins__", cli_mod.__builtins__):
                         # We need to patch the User.query inside the command context
                         with app.app_context():
@@ -227,14 +227,14 @@ class TestResetActivitySequenceCommand:
     """Tests for `flask reset-activity-sequence`."""
 
     def test_success_path(self, runner):
-        with patch("app.cli.reset_table_sequence_verbose", return_value=(True, "reset")):
+        with patch("app.cli_commands.cli.reset_table_sequence_verbose", return_value=(True, "reset")):
             result = runner.invoke(args=["reset-activity-sequence"])
 
         assert result.exit_code == 0
         assert "Reset sequence for user_activity_log successfully" in result.output
 
     def test_skip_path(self, runner):
-        with patch("app.cli.reset_table_sequence_verbose", return_value=(False, "no sequence")):
+        with patch("app.cli_commands.cli.reset_table_sequence_verbose", return_value=(False, "no sequence")):
             result = runner.invoke(args=["reset-activity-sequence"])
 
         assert result.exit_code == 0
@@ -242,7 +242,7 @@ class TestResetActivitySequenceCommand:
 
     def test_exception_path(self, runner):
         with patch(
-            "app.cli.reset_table_sequence_verbose",
+            "app.cli_commands.cli.reset_table_sequence_verbose",
             side_effect=RuntimeError("DB error"),
         ):
             result = runner.invoke(args=["reset-activity-sequence"])
@@ -255,14 +255,14 @@ class TestResetFormDataSequenceCommand:
     """Tests for `flask reset-form-data-sequence`."""
 
     def test_success_path(self, runner):
-        with patch("app.cli.reset_table_sequence_verbose", return_value=(True, "reset")):
+        with patch("app.cli_commands.cli.reset_table_sequence_verbose", return_value=(True, "reset")):
             result = runner.invoke(args=["reset-form-data-sequence"])
 
         assert result.exit_code == 0
         assert "Reset sequence for form_data successfully" in result.output
 
     def test_skip_path(self, runner):
-        with patch("app.cli.reset_table_sequence_verbose", return_value=(False, "no id col")):
+        with patch("app.cli_commands.cli.reset_table_sequence_verbose", return_value=(False, "no id col")):
             result = runner.invoke(args=["reset-form-data-sequence"])
 
         assert result.exit_code == 0
@@ -270,7 +270,7 @@ class TestResetFormDataSequenceCommand:
 
     def test_exception_path(self, runner):
         with patch(
-            "app.cli.reset_table_sequence_verbose",
+            "app.cli_commands.cli.reset_table_sequence_verbose",
             side_effect=Exception("boom"),
         ):
             result = runner.invoke(args=["reset-form-data-sequence"])
@@ -284,7 +284,7 @@ class TestResetAllSequencesCommand:
 
     def test_list_tables_success(self, runner):
         with patch(
-            "app.cli.get_tables_with_id_column",
+            "app.cli_commands.cli.get_tables_with_id_column",
             return_value=["user", "country"],
         ):
             result = runner.invoke(args=["reset-all-sequences", "--list-tables"])
@@ -294,7 +294,7 @@ class TestResetAllSequencesCommand:
         assert "country" in result.output
 
     def test_list_tables_empty(self, runner):
-        with patch("app.cli.get_tables_with_id_column", return_value=[]):
+        with patch("app.cli_commands.cli.get_tables_with_id_column", return_value=[]):
             result = runner.invoke(args=["reset-all-sequences", "--list-tables"])
 
         assert result.exit_code == 0
@@ -302,7 +302,7 @@ class TestResetAllSequencesCommand:
 
     def test_list_tables_exception(self, runner):
         with patch(
-            "app.cli.get_tables_with_id_column",
+            "app.cli_commands.cli.get_tables_with_id_column",
             side_effect=Exception("cannot query"),
         ):
             result = runner.invoke(args=["reset-all-sequences", "--list-tables"])
@@ -311,9 +311,9 @@ class TestResetAllSequencesCommand:
         assert "Could not list tables" in result.output
 
     def test_reset_all_success(self, runner):
-        with patch("app.cli.get_tables_with_id_column", return_value=["user", "country"]):
+        with patch("app.cli_commands.cli.get_tables_with_id_column", return_value=["user", "country"]):
             with patch(
-                "app.cli.reset_table_sequence_verbose",
+                "app.cli_commands.cli.reset_table_sequence_verbose",
                 return_value=(True, "reset"),
             ):
                 result = runner.invoke(args=["reset-all-sequences"])
@@ -322,9 +322,9 @@ class TestResetAllSequencesCommand:
         assert "Reset sequences for 2 tables" in result.output
 
     def test_reset_all_with_skip(self, runner):
-        with patch("app.cli.get_tables_with_id_column", return_value=["user"]):
+        with patch("app.cli_commands.cli.get_tables_with_id_column", return_value=["user"]):
             with patch(
-                "app.cli.reset_table_sequence_verbose",
+                "app.cli_commands.cli.reset_table_sequence_verbose",
                 return_value=(False, "no sequence"),
             ):
                 result = runner.invoke(args=["reset-all-sequences"])
@@ -334,9 +334,9 @@ class TestResetAllSequencesCommand:
         assert "Reset sequences for 0 tables" in result.output
 
     def test_reset_all_with_table_exception(self, runner):
-        with patch("app.cli.get_tables_with_id_column", return_value=["bad_table"]):
+        with patch("app.cli_commands.cli.get_tables_with_id_column", return_value=["bad_table"]):
             with patch(
-                "app.cli.reset_table_sequence_verbose",
+                "app.cli_commands.cli.reset_table_sequence_verbose",
                 side_effect=Exception("db error"),
             ):
                 result = runner.invoke(args=["reset-all-sequences"])
@@ -345,8 +345,8 @@ class TestResetAllSequencesCommand:
         assert "[FAIL]" in result.output
 
     def test_reset_all_zero_tables_warning(self, runner):
-        with patch("app.cli.get_tables_with_id_column", return_value=[]):
-            with patch("app.cli.reset_table_sequence_verbose"):
+        with patch("app.cli_commands.cli.get_tables_with_id_column", return_value=[]):
+            with patch("app.cli_commands.cli.reset_table_sequence_verbose"):
                 result = runner.invoke(args=["reset-all-sequences"])
 
         assert result.exit_code == 0
@@ -354,9 +354,9 @@ class TestResetAllSequencesCommand:
         assert "No tables were reset" in result.output
 
     def test_verbose_flag_passed_through(self, runner):
-        with patch("app.cli.get_tables_with_id_column", return_value=["user"]):
+        with patch("app.cli_commands.cli.get_tables_with_id_column", return_value=["user"]):
             with patch(
-                "app.cli.reset_table_sequence_verbose",
+                "app.cli_commands.cli.reset_table_sequence_verbose",
                 return_value=(True, "reset"),
             ) as mock_rtv:
                 runner.invoke(args=["reset-all-sequences", "--verbose"])
@@ -364,8 +364,8 @@ class TestResetAllSequencesCommand:
         mock_rtv.assert_called_once_with("user", schema="public", verbose=True)
 
     def test_custom_schema(self, runner):
-        with patch("app.cli.get_tables_with_id_column", return_value=[]) as mock_gtc:
-            with patch("app.cli.reset_table_sequence_verbose"):
+        with patch("app.cli_commands.cli.get_tables_with_id_column", return_value=[]) as mock_gtc:
+            with patch("app.cli_commands.cli.reset_table_sequence_verbose"):
                 runner.invoke(args=["reset-all-sequences", "--schema", "myschema"])
 
         mock_gtc.assert_called_once_with(schema="myschema")
@@ -719,7 +719,7 @@ class TestRbacSeedCommand:
     """Tests for `flask rbac seed` as wired up on the real app.
 
     The command's implementation lives in app/cli_commands/rbac.py
-    (register_rbac_commands); app/cli.py's register_commands() calls it rather
+    (register_rbac_commands); app/cli_commands/cli.py's register_commands() calls it rather
     than defining its own `rbac` group inline. This test exercises the *real*
     `runner` fixture (built from the actual app factory) specifically to catch
     wiring regressions -- e.g. register_rbac_commands never being called, or a

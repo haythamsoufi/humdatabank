@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/scheduler.py — targets 100% coverage.
+Comprehensive tests for app/runtime/scheduler.py — targets 100% coverage.
 
 All tests use heavy mocking; no real APScheduler or thread is started.
 """
@@ -9,12 +9,12 @@ import threading
 import pytest
 from unittest.mock import MagicMock, patch, call
 
-from app.scheduler_lock import SchedulerLockResult
+from app.runtime.scheduler_lock import SchedulerLockResult
 
 
 def _patch_scheduler_lock_acquired():
     return patch(
-        'app.scheduler.try_acquire_scheduler_lock',
+        'app.runtime.scheduler.try_acquire_scheduler_lock',
         return_value=SchedulerLockResult.ACQUIRED,
     )
 
@@ -27,7 +27,7 @@ class TestGracefulShutdown:
     """Tests for the _graceful_shutdown atexit helper."""
 
     def _import(self):
-        from app.scheduler import _graceful_shutdown
+        from app.runtime.scheduler import _graceful_shutdown
         return _graceful_shutdown
 
     def test_shuts_down_running_scheduler(self):
@@ -83,7 +83,7 @@ class TestGracefulShutdown:
         mock_scheduler.running = False
         mock_app = MagicMock()
 
-        with patch("app.scheduler.release_scheduler_lock") as mock_release:
+        with patch("app.runtime.scheduler.release_scheduler_lock") as mock_release:
             fn(mock_scheduler, mock_app)
         mock_release.assert_called_once()
 
@@ -96,7 +96,7 @@ class TestInitScheduler:
     """Tests for init_scheduler."""
 
     def _import(self):
-        from app.scheduler import init_scheduler
+        from app.runtime.scheduler import init_scheduler
         return init_scheduler
 
     # ------------------------------------------------------------------
@@ -108,7 +108,7 @@ class TestInitScheduler:
         original = app.config.get("TESTING")
         try:
             app.config["TESTING"] = True
-            with patch("app.scheduler.threading.Thread") as mock_thread:
+            with patch("app.runtime.scheduler.threading.Thread") as mock_thread:
                 init_scheduler(app, is_reloader=False)
             mock_thread.assert_not_called()
         finally:
@@ -120,7 +120,7 @@ class TestInitScheduler:
         try:
             app.config["TESTING"] = False
             with patch.dict(os.environ, {"RUNNING_MIGRATION": "1"}):
-                with patch("app.scheduler.threading.Thread") as mock_thread:
+                with patch("app.runtime.scheduler.threading.Thread") as mock_thread:
                     init_scheduler(app, is_reloader=False)
             mock_thread.assert_not_called()
         finally:
@@ -135,7 +135,7 @@ class TestInitScheduler:
             app.config["TESTING"] = False
             app.config["DEBUG"] = True
             os.environ.pop("RUNNING_MIGRATION", None)
-            with patch("app.scheduler.threading.Thread") as mock_thread:
+            with patch("app.runtime.scheduler.threading.Thread") as mock_thread:
                 init_scheduler(app, is_reloader=False)
             mock_thread.assert_not_called()
         finally:
@@ -151,7 +151,7 @@ class TestInitScheduler:
             app.config["DEBUG"] = False
             os.environ.pop("RUNNING_MIGRATION", None)
             app.scheduler = MagicMock()  # scheduler already set
-            with patch("app.scheduler.threading.Thread") as mock_thread:
+            with patch("app.runtime.scheduler.threading.Thread") as mock_thread:
                 init_scheduler(app, is_reloader=False)
             mock_thread.assert_not_called()
         finally:
@@ -175,7 +175,7 @@ class TestInitScheduler:
                 del app._scheduler_lock
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread") as mock_thread:
+                with patch("app.runtime.scheduler.threading.Thread") as mock_thread:
                     mock_thread_instance = MagicMock()
                     mock_thread.return_value = mock_thread_instance
                     init_scheduler(app, is_reloader=False)
@@ -218,7 +218,7 @@ class TestInitScheduler:
                 return mock_thread_obj
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", side_effect=capture_thread):
+                with patch("app.runtime.scheduler.threading.Thread", side_effect=capture_thread):
                     init_scheduler(app, is_reloader=False)
 
             return captured_target.get("fn")
@@ -241,7 +241,7 @@ class TestInitScheduler:
 
             mock_thread_instance = MagicMock()
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", return_value=mock_thread_instance):
+                with patch("app.runtime.scheduler.threading.Thread", return_value=mock_thread_instance):
                     init_scheduler(app, is_reloader=False)
 
             mock_thread_instance.start.assert_called_once()
@@ -264,7 +264,7 @@ class TestInitScheduler:
             if hasattr(app, "_scheduler_lock"):
                 del app._scheduler_lock
 
-            from app.scheduler import init_scheduler
+            from app.runtime.scheduler import init_scheduler
 
             captured = {}
 
@@ -280,15 +280,15 @@ class TestInitScheduler:
             mock_scheduler.running = False
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", CapturingThread):
+                with patch("app.runtime.scheduler.threading.Thread", CapturingThread):
                     init_scheduler(app, is_reloader=False)
 
             assert "target" in captured
 
             # Now execute the task synchronously
             with patch("apscheduler.schedulers.background.BackgroundScheduler", return_value=mock_scheduler):
-                with patch("app.scheduler.atexit.register"):
-                    with patch("app.scheduler.os.getpid", return_value=12345):
+                with patch("app.runtime.scheduler.atexit.register"):
+                    with patch("app.runtime.scheduler.os.getpid", return_value=12345):
                         with patch("time.sleep"):
                             captured["target"]()
 
@@ -313,7 +313,7 @@ class TestInitScheduler:
             if hasattr(app, "_scheduler_lock"):
                 del app._scheduler_lock
 
-            from app.scheduler import init_scheduler
+            from app.runtime.scheduler import init_scheduler
 
             captured = {}
 
@@ -325,7 +325,7 @@ class TestInitScheduler:
                     pass
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", CapturingThread):
+                with patch("app.runtime.scheduler.threading.Thread", CapturingThread):
                     init_scheduler(app, is_reloader=False)
 
             # Set scheduler before running the task to simulate "already initialized"
@@ -356,7 +356,7 @@ class TestInitScheduler:
             if hasattr(app, "_scheduler_lock"):
                 del app._scheduler_lock
 
-            from app.scheduler import init_scheduler
+            from app.runtime.scheduler import init_scheduler
 
             captured = {}
 
@@ -368,7 +368,7 @@ class TestInitScheduler:
                     pass
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", CapturingThread):
+                with patch("app.runtime.scheduler.threading.Thread", CapturingThread):
                     init_scheduler(app, is_reloader=False)
 
             with patch(
@@ -398,7 +398,7 @@ class TestInitScheduler:
             if hasattr(app, "_scheduler_lock"):
                 del app._scheduler_lock
 
-            from app.scheduler import init_scheduler
+            from app.runtime.scheduler import init_scheduler
 
             captured = {}
 
@@ -413,11 +413,11 @@ class TestInitScheduler:
             mock_scheduler.running = True  # already running
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", CapturingThread):
+                with patch("app.runtime.scheduler.threading.Thread", CapturingThread):
                     init_scheduler(app, is_reloader=False)
 
             with patch("apscheduler.schedulers.background.BackgroundScheduler", return_value=mock_scheduler):
-                with patch("app.scheduler.atexit.register"):
+                with patch("app.runtime.scheduler.atexit.register"):
                     with patch("time.sleep"):
                         captured["target"]()
 
@@ -443,7 +443,7 @@ class TestInitScheduler:
             if hasattr(app, "_scheduler_lock"):
                 del app._scheduler_lock
 
-            from app.scheduler import init_scheduler
+            from app.runtime.scheduler import init_scheduler
 
             captured = {}
 
@@ -458,11 +458,11 @@ class TestInitScheduler:
             mock_scheduler.running = False
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", CapturingThread):
+                with patch("app.runtime.scheduler.threading.Thread", CapturingThread):
                     init_scheduler(app, is_reloader=False)
 
             with patch("apscheduler.schedulers.background.BackgroundScheduler", return_value=mock_scheduler) as mock_bg:
-                with patch("app.scheduler.atexit.register"):
+                with patch("app.runtime.scheduler.atexit.register"):
                     with patch("time.sleep"):
                         captured["target"]()
 
@@ -483,7 +483,7 @@ class TestInitScheduler:
 
 class TestInitSchedulerLockBehavior:
     def test_skips_when_lock_held_by_live_owner(self, app):
-        from app.scheduler import init_scheduler
+        from app.runtime.scheduler import init_scheduler
 
         original_testing = app.config.get("TESTING")
         original_debug = app.config.get("DEBUG")
@@ -492,10 +492,10 @@ class TestInitSchedulerLockBehavior:
             app.config["DEBUG"] = False
             os.environ.pop("RUNNING_MIGRATION", None)
             with patch(
-                "app.scheduler.try_acquire_scheduler_lock",
+                "app.runtime.scheduler.try_acquire_scheduler_lock",
                 return_value=SchedulerLockResult.HELD_BY_LIVE_OWNER,
             ):
-                with patch("app.scheduler.threading.Thread") as mock_thread:
+                with patch("app.runtime.scheduler.threading.Thread") as mock_thread:
                     init_scheduler(app, is_reloader=False)
             mock_thread.assert_not_called()
         finally:
@@ -516,7 +516,7 @@ class TestScheduledJobInnerFunctions:
 
     def _run_init_and_capture_jobs(self, app):
         """Returns a dict {job_id: func} of all registered job functions."""
-        from app.scheduler import init_scheduler
+        from app.runtime.scheduler import init_scheduler
 
         original_testing = app.config.get("TESTING")
         original_debug = app.config.get("DEBUG")
@@ -548,14 +548,14 @@ class TestScheduledJobInnerFunctions:
             mock_scheduler.add_job.side_effect = capture_add_job
 
             with _patch_scheduler_lock_acquired():
-                with patch("app.scheduler.threading.Thread", CapturingThread):
+                with patch("app.runtime.scheduler.threading.Thread", CapturingThread):
                     init_scheduler(app, is_reloader=False)
 
             with patch(
                 "apscheduler.schedulers.background.BackgroundScheduler",
                 return_value=mock_scheduler,
             ):
-                with patch("app.scheduler.atexit.register"):
+                with patch("app.runtime.scheduler.atexit.register"):
                     with patch("time.sleep"):
                         captured["target"]()
 

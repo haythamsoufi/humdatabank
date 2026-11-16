@@ -1,10 +1,10 @@
-"""Access-log query-string redaction (app/logging_config.py SensitiveQueryFilter)."""
+"""Access-log query-string redaction (app/runtime/logging_config.py SensitiveQueryFilter)."""
 
 from __future__ import annotations
 
 import logging
 
-from app.logging_config import SensitiveQueryFilter
+from app.runtime.logging_config import SensitiveQueryFilter
 
 
 def _record(msg, args):

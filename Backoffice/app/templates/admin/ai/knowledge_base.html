@@ -9,7 +9,7 @@
 {% from "components/ag_grid_includes.html" import ag_grid_container %}
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 
-{% block title %}{{ _('AI Knowledge Base') }}{% endblock %}
+{% block title %}{{ _('Knowledge Base') }}{% endblock %}
 
 {% block head %}
 <script type="importmap" nonce="{{ csp_nonce() }}">{{ knowledge_base_import_map() | tojson }}</script>
@@ -22,7 +22,7 @@
 
 {% block content %}
 {{ page_header(
-    title=_('AI Knowledge Base'),
+    title=_('Knowledge Base'),
     icon='fas fa-brain',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
@@ -345,7 +345,7 @@
                     <div class="px-6 pt-6 flex-shrink-0">
                         <p class="text-sm text-gray-600 mb-4">
                             <i class="fas fa-info-circle text-blue-500 mr-1"></i>
-                            {{ _('Import and process existing documents from the Document Management system') }}
+                            {{ _('Import and process documents already stored in Documents') }}
                         </p>
                         <p class="text-xs text-gray-500 mb-4">
                             {{ _('Documents with unreachable FDRS file URLs (tagged during FDRS sync) are excluded from selection until IFRC fixes the URL and you re-run sync.') }}

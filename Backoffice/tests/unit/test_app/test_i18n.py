@@ -1,4 +1,4 @@
-"""Tests for app/i18n.py — 100% coverage including the missing branch."""
+"""Tests for app/i18n/__init__.py — 100% coverage including the missing branch."""
 
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock

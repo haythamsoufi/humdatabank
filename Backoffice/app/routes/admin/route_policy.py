@@ -1,6 +1,6 @@
 """Declarative RBAC policy for high-risk admin routes.
 
-The startup guard audit (``app.startup_tasks.audit_admin_route_guards``) and the guard-coverage
+The startup guard audit (``app.runtime.startup_tasks.audit_admin_route_guards``) and the guard-coverage
 tests read these tables so that a regression of a known class of issue (dangerous action behind a
 read permission, GET with side effects, plugin code changes without System Manager, ...) is
 reported as soon as a route is added or a decorator is dropped.

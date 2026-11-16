@@ -11,7 +11,7 @@
 {% set can_manage_lists = can_edit_template %}
 
 {% from "components/_page_header.html" import page_header %}
-{% block title %}{{ _('Manage Templates') }}{% endblock %}
+{% block title %}{{ _('Templates') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -42,11 +42,11 @@
 {% endif %}
 
 {{ page_header(
-    title=_('Manage Templates'),
+    title=_('Templates'),
     icon='fas fa-file-alt',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Template Management')}
+        {'name': _('Templates')}
     ],
     info_tooltip=_('Create and manage form templates that define the structure and fields for data collection. Templates serve as blueprints for assignments and can include various field types, validation rules, and conditional logic. Use templates to standardize data collection across different periods and ensure consistency in your reporting workflows.'),
     actions=header_actions.items

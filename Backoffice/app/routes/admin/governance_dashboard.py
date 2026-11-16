@@ -44,7 +44,7 @@ def governance_dashboard():
         part_of_programs=part_of_programs,
         part_of_category_to_countries=part_of_category_to_countries,
         part_of_text_groups=part_of_text_groups,
-        title=_("Data governance"),
+        title=_("Governance"),
     )
 
 

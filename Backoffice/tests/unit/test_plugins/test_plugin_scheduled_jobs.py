@@ -5,7 +5,7 @@ import pytest
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.plugins.base import ScheduledJob
-from app.scheduler import _register_plugin_jobs, _run_scheduled_job
+from app.runtime.scheduler import _register_plugin_jobs, _run_scheduled_job
 
 
 def _app_with_plugins(plugins, active=()):

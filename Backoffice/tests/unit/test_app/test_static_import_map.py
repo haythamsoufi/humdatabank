@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from app.static_import_map import (
+from app.assets.static_import_map import (
     FORM_BUILDER_TEMPLATE_MODULES,
     KNOWLEDGE_BASE_IMPORT_TREES,
     build_scoped_import_map,
@@ -178,7 +178,7 @@ def test_form_builder_import_map_is_first_in_head():
 
 def test_layout_map_versions_chatbot_modules_and_shared_lib(app):
     """Chatbot modules load on every page via layout.html; transport.js imports ../lib/."""
-    from app.static_import_map import layout_import_map
+    from app.assets.static_import_map import layout_import_map
 
     clear_import_map_cache()
     app.config["STATIC_CDN_URL"] = "https://blob.example/static"
@@ -197,7 +197,7 @@ def test_layout_map_versions_chatbot_modules_and_shared_lib(app):
 
 def test_page_maps_include_layout_trees():
     """Pages that set page_import_map replace the layout map, so they must cover chatbot too."""
-    from app.static_import_map import (
+    from app.assets.static_import_map import (
         FORM_BUILDER_IMPORT_TREES,
         FORMS_IMPORT_TREES,
         LAYOUT_IMPORT_TREES,

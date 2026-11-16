@@ -399,24 +399,32 @@ def test_fonts_css_is_shared_typography():
 
 
 @pytest.mark.unit
-def test_plugin_asset_version_tracks_css_mtime():
-    from plugins.upr.routes import _plugin_asset_version
+def test_upr_static_url_is_versioned_by_content():
+    from flask import Flask
 
-    version = _plugin_asset_version("css/upr.css")
-    assert version.isdigit()
-    assert int(version) > 0
+    from plugins.upr.routes import upr_static_url
+
+    app = Flask(__name__)
+    app.config["ASSET_VERSION"] = "d1"
+    app.add_url_rule("/upr/static/<path:filename>", endpoint="upr.static_file", view_func=lambda filename: "")
+    with app.test_request_context("/"):
+        url = upr_static_url("js/upr-emergency-coverage.js")
+    deploy_and_hash = url.split("?v=")[1]
+    deploy, _, token = deploy_and_hash.partition(".")
+    assert url.startswith("/upr/static/js/upr-emergency-coverage.js?v=")
+    assert deploy == "d1" and len(token) == 12
 
 
 @pytest.mark.unit
 def test_plugin_static_cache_disabled_in_debug():
     from flask import Flask, Response
 
-    from plugins.upr.routes import _apply_plugin_static_cache
+    from app.assets.plugin_static import apply_plugin_static_cache
 
     app = Flask(__name__)
     app.config["DEBUG"] = True
     with app.test_request_context("/upr/static/css/upr.css"):
-        response = _apply_plugin_static_cache(Response("body", mimetype="text/css"))
+        response = apply_plugin_static_cache(Response("body", mimetype="text/css"))
     assert "no-store" in response.headers["Cache-Control"]
 
 

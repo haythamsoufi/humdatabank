@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/startup_tasks.py — targets 100% coverage.
+Comprehensive tests for app/runtime/startup_tasks.py — targets 100% coverage.
 
 All external I/O (DB, threads, RBAC service) is mocked.
 """
@@ -30,7 +30,7 @@ class TestDeferredStartupCleanup:
     """Tests for deferred_startup_cleanup."""
 
     def _import(self):
-        from app.startup_tasks import deferred_startup_cleanup
+        from app.runtime.startup_tasks import deferred_startup_cleanup
         return deferred_startup_cleanup
 
     def _run_cleanup_task_synchronously(self, app, mock_engine=None):
@@ -48,7 +48,7 @@ class TestDeferredStartupCleanup:
             def start(self):
                 pass
 
-        with patch("app.startup_tasks.threading.Thread", CapturingThread):
+        with patch("app.runtime.startup_tasks.threading.Thread", CapturingThread):
             fn(app)
 
         return captured.get("target")
@@ -57,7 +57,7 @@ class TestDeferredStartupCleanup:
         fn = self._import()
         app = _mock_app()
 
-        with patch("app.startup_tasks.threading.Thread") as mock_thread:
+        with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
             fn(app)
@@ -83,7 +83,7 @@ class TestDeferredStartupCleanup:
         mock_db.engine.connect.return_value = mock_engine_ctx
         mock_db.text.return_value = "SELECT 1"
 
-        with patch("app.startup_tasks.db", mock_db):
+        with patch("app.runtime.startup_tasks.db", mock_db):
             with patch(
                 "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
                 return_value=5,
@@ -109,7 +109,7 @@ class TestDeferredStartupCleanup:
         mock_db.engine.connect.return_value = mock_engine_ctx
         mock_db.text.return_value = "SELECT 1"
 
-        with patch("app.startup_tasks.db", mock_db):
+        with patch("app.runtime.startup_tasks.db", mock_db):
             with patch(
                 "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
                 return_value=0,
@@ -131,7 +131,7 @@ class TestDeferredStartupCleanup:
         mock_db = MagicMock()
         mock_db.engine.connect.side_effect = Exception("db not ready")
 
-        with patch("app.startup_tasks.db", mock_db):
+        with patch("app.runtime.startup_tasks.db", mock_db):
             task()
 
         app.logger.warning.assert_called()
@@ -145,7 +145,7 @@ class TestDeferredRbacSeed:
     """Tests for deferred_rbac_seed."""
 
     def _import(self):
-        from app.startup_tasks import deferred_rbac_seed
+        from app.runtime.startup_tasks import deferred_rbac_seed
         return deferred_rbac_seed
 
     def test_returns_early_when_auto_seed_false(self):
@@ -153,7 +153,7 @@ class TestDeferredRbacSeed:
         app = _mock_app()
 
         with patch.dict(os.environ, {"AUTO_SEED_RBAC_ON_STARTUP": "false"}):
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 fn(app, "development", is_reloader=False)
 
         mock_thread.assert_not_called()
@@ -166,7 +166,7 @@ class TestDeferredRbacSeed:
             os.environ.pop("AUTO_SEED_RBAC_ON_STARTUP", None)
             os.environ.pop("RUNNING_MIGRATION", None)
             os.environ.pop("FLASK_RUN_FROM_CLI", None)
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 mock_instance = MagicMock()
                 mock_thread.return_value = mock_instance
                 fn(app, "development", is_reloader=False)
@@ -179,7 +179,7 @@ class TestDeferredRbacSeed:
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("AUTO_SEED_RBAC_ON_STARTUP", None)
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 mock_instance = MagicMock()
                 mock_thread.return_value = mock_instance
                 fn(app, "production", is_reloader=False)
@@ -192,7 +192,7 @@ class TestDeferredRbacSeed:
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("AUTO_SEED_RBAC_ON_STARTUP", None)
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 mock_instance = MagicMock()
                 mock_thread.return_value = mock_instance
                 fn(app, "staging", is_reloader=False)
@@ -204,7 +204,7 @@ class TestDeferredRbacSeed:
         app = _mock_app(testing=True)
 
         with patch.dict(os.environ, {"AUTO_SEED_RBAC_ON_STARTUP": "true"}):
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 fn(app, "production", is_reloader=False)
 
         mock_thread.assert_not_called()
@@ -217,7 +217,7 @@ class TestDeferredRbacSeed:
             "AUTO_SEED_RBAC_ON_STARTUP": "true",
             "RUNNING_MIGRATION": "1",
         }):
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 fn(app, "production", is_reloader=False)
 
         mock_thread.assert_not_called()
@@ -239,7 +239,7 @@ class TestDeferredRbacSeed:
             "FLASK_RUN_FROM_CLI": "true",
         }):
             os.environ.pop("RUNNING_MIGRATION", None)
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 mock_instance = MagicMock()
                 mock_thread.return_value = mock_instance
                 fn(app, "production", is_reloader=False)
@@ -252,7 +252,7 @@ class TestDeferredRbacSeed:
 
         with patch.dict(os.environ, {"AUTO_SEED_RBAC_ON_STARTUP": "true"}):
             os.environ.pop("RUNNING_MIGRATION", None)
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 fn(app, "production", is_reloader=False)
 
         mock_thread.assert_not_called()
@@ -263,7 +263,7 @@ class TestDeferredRbacSeed:
 
         with patch.dict(os.environ, {"AUTO_SEED_RBAC_ON_STARTUP": "true"}):
             os.environ.pop("RUNNING_MIGRATION", None)
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 mock_instance = MagicMock()
                 mock_thread.return_value = mock_instance
                 fn(app, "production", is_reloader=True)
@@ -284,7 +284,7 @@ class TestDeferredRbacSeed:
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("AUTO_SEED_RBAC_ON_STARTUP", None)
             os.environ.pop("RUNNING_MIGRATION", None)
-            with patch("app.startup_tasks.threading.Thread", CapturingThread):
+            with patch("app.runtime.startup_tasks.threading.Thread", CapturingThread):
                 fn(app, config_name, is_reloader=False)
 
         return captured.get("target")
@@ -317,7 +317,7 @@ class TestDeferredRbacSeed:
             "deleted_role_permission_links": 3,
         }
 
-        with patch("app.startup_tasks.db", mock_db):
+        with patch("app.runtime.startup_tasks.db", mock_db):
             with patch(
                 "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
                 return_value=stats,
@@ -343,7 +343,7 @@ class TestDeferredRbacSeed:
         mock_db.engine.connect.return_value = mock_engine_ctx
         mock_db.text.return_value = "SELECT 1"
 
-        with patch("app.startup_tasks.db", mock_db):
+        with patch("app.runtime.startup_tasks.db", mock_db):
             with patch(
                 "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
                 return_value={"skipped_due_to_lock": True},
@@ -378,8 +378,8 @@ class TestDeferredRbacSeed:
         mock_db.engine.connect.side_effect = engine_connect
         mock_db.text.return_value = "SELECT 1"
 
-        with patch("app.startup_tasks.db", mock_db):
-            with patch("app.startup_tasks._time.sleep"):
+        with patch("app.runtime.startup_tasks.db", mock_db):
+            with patch("app.runtime.startup_tasks._time.sleep"):
                 with patch(
                     "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
                     return_value={},
@@ -402,8 +402,8 @@ class TestDeferredRbacSeed:
         mock_db.engine.connect.side_effect = Exception("connection refused")
         mock_db.text.return_value = "SELECT 1"
 
-        with patch("app.startup_tasks.db", mock_db):
-            with patch("app.startup_tasks._time.sleep"):
+        with patch("app.runtime.startup_tasks.db", mock_db):
+            with patch("app.runtime.startup_tasks._time.sleep"):
                 task()
 
         app.logger.warning.assert_called()
@@ -414,7 +414,7 @@ class TestDeferredRbacSeed:
 
         with patch.dict(os.environ, {"AUTO_SEED_RBAC_ON_STARTUP": "true"}):
             os.environ.pop("RUNNING_MIGRATION", None)
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 mock_instance = MagicMock()
                 mock_thread.return_value = mock_instance
                 fn(app, "development", is_reloader=False)
@@ -426,7 +426,7 @@ class TestDeferredRbacSeed:
         app = _mock_app()
 
         with patch.dict(os.environ, {"AUTO_SEED_RBAC_ON_STARTUP": "false"}):
-            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+            with patch("app.runtime.startup_tasks.threading.Thread") as mock_thread:
                 fn(app, "production", is_reloader=False)
 
         mock_thread.assert_not_called()
@@ -440,7 +440,7 @@ class TestAuditAdminRouteGuards:
     """Tests for audit_admin_route_guards."""
 
     def _import(self):
-        from app.startup_tasks import audit_admin_route_guards
+        from app.runtime.startup_tasks import audit_admin_route_guards
         return audit_admin_route_guards
 
     def _make_app_with_rules(self, rules):
@@ -750,14 +750,14 @@ class TestRunStartupTasks:
     """Tests for run_startup_tasks."""
 
     def _import(self):
-        from app.startup_tasks import run_startup_tasks
+        from app.runtime.startup_tasks import run_startup_tasks
         return run_startup_tasks
 
     def test_calls_both_deferred_functions(self, app):
         fn = self._import()
 
-        with patch("app.startup_tasks.deferred_startup_cleanup") as mock_cleanup:
-            with patch("app.startup_tasks.deferred_rbac_seed") as mock_seed:
+        with patch("app.runtime.startup_tasks.deferred_startup_cleanup") as mock_cleanup:
+            with patch("app.runtime.startup_tasks.deferred_rbac_seed") as mock_seed:
                 fn(app, "testing", is_reloader=False)
 
         mock_cleanup.assert_called_once_with(app)
@@ -768,10 +768,10 @@ class TestRunStartupTasks:
         app = _mock_app()
 
         with patch(
-            "app.startup_tasks.deferred_startup_cleanup",
+            "app.runtime.startup_tasks.deferred_startup_cleanup",
             side_effect=Exception("cleanup failed"),
         ):
-            with patch("app.startup_tasks.deferred_rbac_seed") as mock_seed:
+            with patch("app.runtime.startup_tasks.deferred_rbac_seed") as mock_seed:
                 fn(app, "production", is_reloader=False)
 
         app.logger.warning.assert_called()
@@ -781,9 +781,9 @@ class TestRunStartupTasks:
         fn = self._import()
         app = _mock_app()
 
-        with patch("app.startup_tasks.deferred_startup_cleanup"):
+        with patch("app.runtime.startup_tasks.deferred_startup_cleanup"):
             with patch(
-                "app.startup_tasks.deferred_rbac_seed",
+                "app.runtime.startup_tasks.deferred_rbac_seed",
                 side_effect=Exception("seed failed"),
             ):
                 fn(app, "production", is_reloader=False)

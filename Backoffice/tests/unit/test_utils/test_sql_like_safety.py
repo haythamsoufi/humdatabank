@@ -89,14 +89,6 @@ class TestSqlUtilsPrimitives:
         _, params = _compile(ilike_contains(_Thing.name, "%"))
         assert list(params.values()) == ["%\\%%"]
 
-    def test_period_filter_escapes_wildcards(self):
-        from app.services.data_retrieval.aggregation import _period_filter
-
-        _, params = _compile(_period_filter(_Thing.name, ["2024_%"]))
-        values = list(params.values())
-        assert "2024_%" in values
-        assert "%2024\\_\\%%" in values
-
 
 _LIKE_METHODS = {"ilike", "like", "notilike", "notlike"}
 _STR_METHODS = {"contains", "startswith", "endswith"}

@@ -776,10 +776,10 @@ def build_lightweight_system_prompt(platform_context, page_context=None, languag
     is_focal = role_text == 'focal_point'
     is_admin_user = role_text in {'admin', 'system_manager', 'super_admin'}
     role_safe_links = (
-        "- [Template Management](/admin/templates)\n"
-        "- [User Management](/admin/users)\n"
-        "- [Assignment Management](/admin/assignments)\n"
-        "- [Country Management](/admin/countries)\n"
+        "- [Templates](/admin/templates)\n"
+        "- [Users](/admin/users)\n"
+        "- [Assignments](/admin/assignments)\n"
+        "- [Organizational Structure](/admin/organization)\n"
         "- [Indicator Bank](/admin/indicator_bank)\n"
         "- [Dashboard](/)"
         if is_admin_user
@@ -934,8 +934,8 @@ def build_system_prompt(platform_context, page_context=None, language='en'):
              "For permission/access changes, tell the user to contact their administrator."
     )
     page_name_link_examples = (
-        '- Write "Go to [Template Management](/admin/templates)" NOT "Go to Template Management"\n'
-        '- Write "Visit [User Management](/admin/users)" NOT "Visit User Management"\n'
+        '- Write "Go to [Templates](/admin/templates)" NOT "Go to Templates"\n'
+        '- Write "Visit [Users](/admin/users)" NOT "Visit Users"\n'
         '- Write "Check the [Dashboard](/)" NOT "Check the Dashboard"\n'
         '- Write "Create using [Indicator Bank](/admin/indicator_bank)" NOT "Create using Indicator Bank"'
         if is_admin_user
@@ -943,10 +943,10 @@ def build_system_prompt(platform_context, page_context=None, language='en'):
              '- Write "Open [Account Settings](/account_settings)" NOT "Open Account Settings"'
     )
     role_safe_links = (
-        "- [Template Management](/admin/templates) or [Manage Templates](/admin/templates)\n"
-        "  - [User Management](/admin/users) or [Manage Users](/admin/users)\n"
-        "  - [Assignment Management](/admin/assignments) or [Manage Assignments](/admin/assignments)\n"
-        "  - [Country Management](/admin/countries) or [Manage Countries](/admin/countries)\n"
+        "- [Templates](/admin/templates)\n"
+        "  - [Users](/admin/users)\n"
+        "  - [Assignments](/admin/assignments)\n"
+        "  - [Organizational Structure](/admin/organization)\n"
         "  - [Indicator Bank](/admin/indicator_bank)\n"
         "  - [Create New Template](/admin/templates/new)\n"
         "  - [Create New Assignment](/admin/assignments/new)\n"
@@ -1064,13 +1064,13 @@ RESPONSE GUIDELINES:
 - Answer what was asked, then stop
 
 **Example Good Responses:**
-- Question: "how do I create a template?" → "Go to [Template Management](/admin/templates), click Create New Template, add fields, and save."
-- Question: "how to create a template?" → "1. Visit [Template Management](/admin/templates)<br>2. Click Create New Template<br>3. Add fields and configure<br>4. Save"
-- Question: "where do I manage users?" → "You can manage users in [User Management](/admin/users)."
+- Question: "how do I create a template?" → "Go to [Templates](/admin/templates), click Create New Template, add fields, and save."
+- Question: "how to create a template?" → "1. Visit [Templates](/admin/templates)<br>2. Click Create New Template<br>3. Add fields and configure<br>4. Save"
+- Question: "where do I manage users?" → "You can manage users in [Users](/admin/users)."
 - Question: "what can I do here?" → "On your [Dashboard](/), you can: • View assignments • Track submissions • [Create Assignment](/admin/assignments/new)"
 - Question: "hi" → "Hello! I can help you with the platform. What would you like to know?"
 
-CRITICAL: When mentioning ANY page name (Template Management, User Management, Dashboard, etc.), ALWAYS wrap it in markdown links like [Page Name](/path) so users can click directly to that page!
+CRITICAL: When mentioning ANY page name (Templates, Users, Dashboard, etc.), ALWAYS wrap it in markdown links like [Page Name](/path) so users can click directly to that page!
 
 Remember: Less is more. Answer briefly and let users ask follow-ups if they want details."""
 
@@ -1439,9 +1439,9 @@ def format_country_assignment_response(country, assignments, user_role):
         response += f"📋 <strong>No assignments found for {country_name}</strong><br><br>"
         if user_role == 'admin':
             response += "💡 <strong>Admin Actions:</strong><br>"
-            response += "• Create new assignments in Form & Data Management → Manage Assignments<br>"
+            response += "• Create new assignments in Form & Data Management → Assignments<br>"
             response += "• Assign templates to this country<br>"
-            response += "• Check if the country is properly configured in Reference Data → Manage Countries"
+            response += "• Check if the country is properly configured in Reference Data → Organizational Structure"
         else:
             response += "💡 There are currently no assignments for this country. Contact your administrator if you need assignments created."
         return response
@@ -1497,8 +1497,8 @@ def format_country_assignment_response(country, assignments, user_role):
 
     if user_role == 'admin':
         response += f"<br>💡 <strong>Admin Actions:</strong><br>"
-        response += f"• Manage assignments in Form & Data Management → Manage Assignments<br>"
-        response += f"• View country details in Reference Data → Manage Countries<br>"
+        response += f"• Manage assignments in Form & Data Management → Assignments<br>"
+        response += f"• View country details in Reference Data → Organizational Structure<br>"
         response += f"• Check submission data in Analytics & Monitoring"
     else:
         response += f"<br>💡 You can view your assignments on your Dashboard or submit data through assigned forms."

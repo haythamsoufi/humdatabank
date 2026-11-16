@@ -1,4 +1,4 @@
-"""Production-safety behaviour of app/error_handlers.py: generic client messages, request IDs, sanitized events."""
+"""Production-safety behaviour of app/middleware/error_handlers.py: generic client messages, request IDs, sanitized events."""
 
 from __future__ import annotations
 

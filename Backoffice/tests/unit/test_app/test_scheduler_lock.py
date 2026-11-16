@@ -1,4 +1,4 @@
-"""Tests for the top-level scheduler_lock module (re-exported as app.scheduler_lock).
+"""Tests for the top-level scheduler_lock module (re-exported as app.runtime.scheduler_lock).
 
 Platform notes:
 - The flock implementation only runs on POSIX (Linux CI); those tests skip on
@@ -583,7 +583,7 @@ class TestHardExitIfLingeringThreads:
 
 class TestShimReExport:
     def test_app_scheduler_lock_exposes_same_objects(self):
-        import app.scheduler_lock as shim
+        import app.runtime.scheduler_lock as shim
         assert shim.try_acquire_scheduler_lock is try_acquire_scheduler_lock
         assert shim.SchedulerLockResult is SchedulerLockResult
         assert shim.shutdown_worker_scheduler is shutdown_worker_scheduler

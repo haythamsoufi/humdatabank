@@ -124,7 +124,7 @@ Peak burst (17:11–17:12) reported **DB pool 7/5** (overflow 2–3). Suggests c
 
 All 3 worker timeouts logged `[was in recycle — scheduler shutdown likely blocked]`. Pids 10337 and 10068 were `scheduler_owner=True/False` respectively.
 
-**Agent action:** Review recent changes to `scheduler_lock.py` and gunicorn `max_requests` recycle path — see git status on `Backoffice/app/scheduler_lock.py`, `Backoffice/config/gunicorn.conf.py`, `Backoffice/app/scheduler.py`.
+**Agent action:** Review recent changes to `scheduler_lock.py` and gunicorn `max_requests` recycle path — see git status on `Backoffice/app/runtime/scheduler_lock.py`, `Backoffice/config/gunicorn.conf.py`, `Backoffice/app/runtime/scheduler.py`.
 
 ---
 

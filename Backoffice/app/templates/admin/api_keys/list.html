@@ -7,16 +7,16 @@
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set can_manage_api = current_is_system_manager or has_permission('admin.api.manage') %}
 
-{% block title %}{{ _('API Key Management') }}{% endblock %}
+{% block title %}{{ _('API Keys') }}{% endblock %}
 
 {% block content %}
 {{ page_header(
-    title=_('API Key Management'),
+    title=_('API Keys'),
     icon='fas fa-key',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('API Management'), 'url': url_for('api_management.api_management')},
-        {'name': _('API Key Management')}
+        {'name': _('API'), 'url': url_for('api_management.api_management')},
+        {'name': _('API Keys')}
     ],
     actions=[
         {

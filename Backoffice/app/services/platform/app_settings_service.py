@@ -1016,7 +1016,7 @@ def organization_visual_asset_href(path: Optional[str], default: str = "logo.svg
     norm = _strip_visual_path_prefixes(raw)
     if not norm:
         norm = default
-    from app.static_version import asset_query_version, deploy_asset_version
+    from app.assets.static_version import asset_query_version, deploy_asset_version
     if norm.lower().startswith("branding/"):
         ver = deploy_asset_version(current_app)
         tail = norm[9:].split("/")[0].strip()

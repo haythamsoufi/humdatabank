@@ -148,7 +148,7 @@ This is your main dashboard page, your command center for the {org_name} system.
 - Use quick links for efficient navigation
 - Monitor KPIs for system performance""",
 
-        'user_management': """**User Management - Administrative System**
+        'user_management': """**Users - Administrative System**
 
 This page allows you to administer user accounts and permissions within the {org_name} system.
 
@@ -173,7 +173,7 @@ This page allows you to administer user accounts and permissions within the {org
 - Monitor suspicious logins
 - Keep user information up to date""",
 
-        'template_management': """**Template Management - Form Creation**
+        'template_management': """**Templates - Form Creation**
 
 Here you can create, modify, and manage form templates for data collection across the organization.
 
@@ -201,7 +201,7 @@ Here you can create, modify, and manage form templates for data collection acros
 3. Test the form
 4. Deploy to target users""",
 
-        'assignment_management': """**Assignment Management - Task Distribution**
+        'assignment_management': """**Assignments - Task Distribution**
 
 This page manages the distribution and tracking of data form assignments to specific users.
 
@@ -229,7 +229,7 @@ This page manages the distribution and tracking of data form assignments to spec
 - Regularly review progress
 - Provide timely feedback""",
 
-        'country_management': """**Country Management - Geographic Organization**
+        'country_management': """**Organizational Structure - Geographic Organization**
 
 Manages country information, regions, and geographic data for the {org_name} system.
 
@@ -292,7 +292,7 @@ The Indicator Bank is your central repository for managing and organizing all da
 - Regularly review for updates
 - Ensure definitions are clear and measurable""",
 
-        'document_management': """**Document Management - File Storage System**
+        'document_management': """**Documents - File Storage System**
 
 Central hub for uploading, organizing, and managing documents and files throughout the {org_name} system.
 
@@ -315,7 +315,7 @@ Central hub for uploading, organizing, and managing documents and files througho
 - Search functionality
 - Filters by type, date, and author""",
 
-        'analytics': """**Analytics Dashboard - Insights and Reporting**
+        'analytics': """**User Analytics - Insights and Reporting**
 
 Comprehensive dashboard for data analysis, reporting, and insights on {org_name} operations.
 
@@ -337,12 +337,12 @@ Comprehensive dashboard for data analysis, reporting, and insights on {org_name}
 - Scheduled reports
 - Real-time data alerts""",
 
-        'api_management': """**API Management - Data Access Control**
+        'api_management': """**API - Data Access Control**
 
 Manages API keys, usage, and access for external system integrations with the {org_name}.
 
 **Primary Functions:**
-- **API Key Management**: Create, rotate, and revoke API keys
+- **API Keys**: Create, rotate, and revoke API keys
 - **Usage Tracking**: Monitor API calls and usage quotas
 - **Access Control**: Configure permissions for different endpoints
 - **API Documentation**: Access to technical documentation

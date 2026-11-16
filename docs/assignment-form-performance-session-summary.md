@@ -30,9 +30,9 @@ High-level record of performance and static-asset work on the IFRC Humanitarian 
 
 ### Application code
 
-- **`static_url()` CDN support** — `Backoffice/app/template_context.py`: when `STATIC_CDN_URL` is set, assets use `{cdn}/{path}?v={ASSET_VERSION}` instead of Flask `/static/`.
+- **`static_url()` CDN support** — `Backoffice/app/templating/template_context.py`: when `STATIC_CDN_URL` is set, assets use `{cdn}/{path}?v={ASSET_VERSION}` instead of Flask `/static/`.
 - **CSP updates** — `Backoffice/app/middleware/security_headers.py`: allow blob CDN origin in `script-src`, `style-src`, `font-src`, `connect-src`.
-- **Cache headers** — `Backoffice/app/static_serving.py`: versioned assets get `Cache-Control: max-age=31536000, public, immutable`; fixed `Headers.remove` (was `.discard`, caused crashes).
+- **Cache headers** — `Backoffice/app/assets/static_serving.py`: versioned assets get `Cache-Control: max-age=31536000, public, immutable`; fixed `Headers.remove` (was `.discard`, caused crashes).
 
 ### Infrastructure
 
@@ -62,7 +62,7 @@ Top-level scripts used `static_url()` → `entry-form.js?v=…` on blob, but rel
 
 ### Solution
 
-1. **`Backoffice/app/static_import_map.py`** — Scans `js/forms/` for relative `import` / `import()` specifiers (`./` and `../`), builds a **scoped import map** mapping each to the same versioned URL as `static_url()`.
+1. **`Backoffice/app/assets/static_import_map.py`** — Scans `js/forms/` for relative `import` / `import()` specifiers (`./` and `../`), builds a **scoped import map** mapping each to the same versioned URL as `static_url()`.
 2. **`entry_form.html`** — Injects `<script type="importmap">` in `{% block head %}` **before** layout module scripts.
 3. **`layout.html`** — `window.getStaticUrl()` uses `STATIC_CDN_URL` when set (mirrors server-side `static_url()`).
 4. **`template_context.py`** — Jinja globals: `forms_module_import_map()`, `STATIC_CDN_URL`.
@@ -132,9 +132,9 @@ Entry form routes pass `config=Config` (the **class**), which shadowed the Jinja
 
 ```
 Backoffice/app/__init__.py
-Backoffice/app/template_context.py
-Backoffice/app/static_import_map.py
-Backoffice/app/static_serving.py
+Backoffice/app/templating/template_context.py
+Backoffice/app/assets/static_import_map.py
+Backoffice/app/assets/static_serving.py
 Backoffice/app/middleware/security_headers.py
 Backoffice/app/routes/forms/entry.py
 Backoffice/app/templates/core/layout.html

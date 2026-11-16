@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 
 def test_skips_when_assignment_tables_are_missing():
-    from app.seeding import _seed_dev_dashboard_samples
+    from app.runtime.seeding import _seed_dev_dashboard_samples
 
     app = MagicMock()
     country = MagicMock()
@@ -12,7 +12,7 @@ def test_skips_when_assignment_tables_are_missing():
     inspector = MagicMock()
     inspector.has_table.return_value = False
 
-    with patch("app.seeding.inspect", return_value=inspector):
+    with patch("app.runtime.seeding.inspect", return_value=inspector):
         _seed_dev_dashboard_samples(app, country, "ifrc.org")
 
     app.logger.info.assert_called()
@@ -20,7 +20,7 @@ def test_skips_when_assignment_tables_are_missing():
 
 
 def test_skips_when_table_check_is_not_a_real_database():
-    from app.seeding import _seed_dev_dashboard_samples
+    from app.runtime.seeding import _seed_dev_dashboard_samples
 
     app = MagicMock()
     country = MagicMock()
@@ -28,7 +28,7 @@ def test_skips_when_table_check_is_not_a_real_database():
     inspector = MagicMock()
     inspector.has_table.return_value = MagicMock()
 
-    with patch("app.seeding.inspect", return_value=inspector):
+    with patch("app.runtime.seeding.inspect", return_value=inspector):
         _seed_dev_dashboard_samples(app, country, "ifrc.org")
 
     app.logger.info.assert_called()

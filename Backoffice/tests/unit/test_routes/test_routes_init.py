@@ -47,7 +47,7 @@ class TestRegisterAllBlueprints:
            patch("app.routes.api.indicator_bank_compat.indicator_bank_compat_bp", MagicMock()), \
            patch("app.routes.api.mobile.mobile_bp", MagicMock()), \
            patch("app.routes.admin.register_admin_blueprints"), \
-           patch("app.startup_tasks.audit_admin_route_guards"):
+           patch("app.runtime.startup_tasks.audit_admin_route_guards"):
 
             result = register_all_blueprints(mock_app, mock_csrf, 0.0)
 
@@ -82,7 +82,7 @@ class TestRegisterAllBlueprints:
              patch("app.routes.api.indicator_bank_compat.indicator_bank_compat_bp", MagicMock()), \
              patch("app.routes.api.mobile.mobile_bp", MagicMock()), \
              patch("app.routes.admin.register_admin_blueprints"), \
-             patch("app.startup_tasks.audit_admin_route_guards"):
+             patch("app.runtime.startup_tasks.audit_admin_route_guards"):
 
             result = register_all_blueprints(mock_app, mock_csrf, 0.0)
 
@@ -115,7 +115,7 @@ class TestRegisterAllBlueprints:
              patch("app.routes.api.indicator_bank_compat.indicator_bank_compat_bp", MagicMock()), \
              patch("app.routes.api.mobile.mobile_bp", MagicMock()), \
              patch("app.routes.admin.register_admin_blueprints"), \
-             patch("app.startup_tasks.audit_admin_route_guards"):
+             patch("app.runtime.startup_tasks.audit_admin_route_guards"):
 
             result = register_all_blueprints(mock_app, mock_csrf, 0.0)
 
@@ -148,7 +148,7 @@ class TestRegisterAllBlueprints:
              patch("app.routes.api.mobile.mobile_bp", MagicMock()), \
              patch("app.routes.notifications_ws.register_notifications_ws", side_effect=Exception("notif ws error")) as register_notifications, \
              patch("app.routes.admin.register_admin_blueprints"), \
-             patch("app.startup_tasks.audit_admin_route_guards"):
+             patch("app.runtime.startup_tasks.audit_admin_route_guards"):
 
             result = register_all_blueprints(mock_app, mock_csrf, 0.0)
 
@@ -181,7 +181,7 @@ class TestRegisterAllBlueprints:
              patch("app.routes.api.mobile.mobile_bp", MagicMock()), \
              patch("app.routes.notifications_ws.register_notifications_ws", return_value=False), \
              patch("app.routes.admin.register_admin_blueprints"), \
-             patch("app.startup_tasks.audit_admin_route_guards"):
+             patch("app.runtime.startup_tasks.audit_admin_route_guards"):
 
             result = register_all_blueprints(mock_app, mock_csrf, 0.0)
 
@@ -224,7 +224,7 @@ class TestRegisterAllBlueprints:
              patch("app.routes.api.indicator_bank_compat.indicator_bank_compat_bp", MagicMock()), \
              patch("app.routes.api.mobile.mobile_bp", MagicMock()), \
              patch("app.routes.admin.register_admin_blueprints"), \
-             patch("app.startup_tasks.audit_admin_route_guards"), \
+             patch("app.runtime.startup_tasks.audit_admin_route_guards"), \
              patch("app.routes.time") as mock_time_mod:
             mock_time_mod.time.side_effect = mock_time
             result = register_all_blueprints(mock_app, mock_csrf, 0.0)

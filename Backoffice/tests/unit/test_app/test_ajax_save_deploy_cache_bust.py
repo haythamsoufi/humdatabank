@@ -49,7 +49,7 @@ def _load_import_map_module():
     if existing is None:
         pkg.__path__ = [str(BACKOFFICE / "app")]
         sys.modules["app"] = pkg
-    sys.modules["app.static_version"] = sv
+    sys.modules["app.assets.static_version"] = sv
     pkg.static_version = sv
     return _load_module("static_import_map_under_test", IMPORT_MAP_PY)
 

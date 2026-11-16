@@ -6,7 +6,7 @@ import io
 from html import escape
 from pathlib import Path
 
-from flask import Response, current_app, g, has_request_context, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Response, current_app, g, has_request_context, redirect, render_template, request, send_file, url_for
 from flask_babel import force_locale, gettext as _
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException, NotFound
@@ -57,6 +57,12 @@ from plugins.upr.dashboards.library import (
     open_library_dashboard,
     open_library_package,
 )
+from app.assets.plugin_static import (
+    apply_plugin_static_cache,
+    plugin_asset_version,
+    plugin_static_url,
+    send_plugin_static,
+)
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_required, permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
@@ -70,22 +76,13 @@ MAX_BULK_AES_IDS = 250
 MAX_BULK_DASHBOARDS = 20
 
 
-def _plugin_asset_version(filename: str) -> str:
-    path = _PLUGIN_DIR / "static" / filename
-    try:
-        return str(int(path.stat().st_mtime))
-    except OSError:
-        return "0"
+_STATIC_DIR = _PLUGIN_DIR / "static"
 
 
 @bp.app_template_global("upr_static_url")
 def upr_static_url(filename: str) -> str:
-    """Plugin static URL with an mtime query so CSS/JS edits bust the browser cache."""
-    return url_for(
-        "upr.static_file",
-        filename=filename,
-        v=_plugin_asset_version(filename),
-    )
+    """Plugin static URL; ``?v=`` follows the file's content (see ``app.assets.plugin_static``)."""
+    return plugin_static_url("upr.static_file", _STATIC_DIR, filename)
 
 
 @bp.app_template_global("upr_analysis_text")
@@ -106,21 +103,10 @@ def upr_analysis_ui() -> dict[str, str]:
 
 @bp.app_template_global("upr_asset_v")
 def upr_asset_v() -> str:
-    return _plugin_asset_version("css/upr.css")
+    """``?v=`` for ``/upr/fonts.css``: its stylesheet comes from ``upr.css`` plus typography and font files."""
+    from plugins.upr.dashboards.typography import export_style_token
 
-
-def _apply_plugin_static_cache(response: Response) -> Response:
-    debug = bool(current_app.config.get("DEBUG", False))
-    if debug:
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-    elif request.args.get("v"):
-        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    else:
-        response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
-    response._skip_cache_override = True
-    return response
+    return f"{plugin_asset_version(_STATIC_DIR, 'css/upr.css')}.{export_style_token()[:12]}"
 
 
 # CSS/JS/icons used by public FDRS iframes (International Overview embeds). Excel
@@ -462,8 +448,7 @@ def static_file(filename: str):
     """
     if not _is_public_upr_static(filename) and not current_user.is_authenticated:
         return current_app.login_manager.unauthorized()
-    response = send_from_directory(str(_PLUGIN_DIR / "static"), filename)
-    return _apply_plugin_static_cache(response)
+    return send_plugin_static(_STATIC_DIR, filename, private=not _is_public_upr_static(filename))
 
 
 @bp.route("/upr/fonts.css", methods=["GET"])
@@ -474,7 +459,7 @@ def fonts_css():
 
     response = Response(browser_stylesheet(), mimetype="text/css; charset=utf-8")
     response.set_etag(export_style_token())
-    return _apply_plugin_static_cache(response)
+    return apply_plugin_static_cache(response, private=True)
 
 
 @bp.route("/assignment/<int:aes_id>/visuals/progress", methods=["GET"])

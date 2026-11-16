@@ -1,11 +1,11 @@
-"""Tests for app/filters.py — all branches for 100% coverage."""
+"""Tests for app/templating/filters.py — all branches for 100% coverage."""
 
 import json
 import pytest
 from flask import Flask
 from markupsafe import Markup
 
-from app.filters import fromjson_filter, js_filter, register_jinja_filters
+from app.templating.filters import fromjson_filter, js_filter, register_jinja_filters
 
 
 # ---------------------------------------------------------------------------

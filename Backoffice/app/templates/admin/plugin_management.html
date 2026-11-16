@@ -4,17 +4,17 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "macros/modal_shell.html" import modal_shell %}
 
-{% block title %}{{ _('Plugin Management') }}{% endblock %}
+{% block title %}{{ _('Plugins') }}{% endblock %}
 
 {% block content %}
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set can_manage_plugins = current_is_system_manager or has_permission('admin.plugins.manage') %}
 {{ page_header(
-    title=_('Plugin Management'),
+    title=_('Plugins'),
     icon='fas fa-puzzle-piece',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Plugin Management')}
+        {'name': _('Plugins')}
     ],
     info_tooltip=_('Manage and configure plugins that extend the functionality of your') + ' ' + ORG_NAME + '. ' + _('Plugins can add new field types, custom workflows, integrations, and specialized features. Install, activate, deactivate, or remove plugins as needed. Always review plugin details and resource usage before installation.'),
     actions=[

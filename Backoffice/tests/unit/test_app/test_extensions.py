@@ -1,4 +1,4 @@
-"""Tests for app/extensions.py — 100% branch coverage."""
+"""Tests for app/extensions/__init__.py — 100% branch coverage."""
 
 import os
 import pytest

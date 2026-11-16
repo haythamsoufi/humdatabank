@@ -743,7 +743,7 @@ def manage_assignments():
 
     return render_template("admin/assignments/assignments.html",
                          assignments=assignments,
-                         title="Manage Assignments")
+                         title="Assignments")
 
 
 @bp.route("/assignments/api/review-recipients/search", methods=["GET"])

@@ -2,15 +2,15 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_status_label.html" import status_label, status_label_for_active, status_label_for_generic_status %}
 
-{% block title %}{{ _('AI System Dashboard') }}{% endblock %}
+{% block title %}{{ _('AI Dashboard') }}{% endblock %}
 
 {% block content %}
 {{ page_header(
-    title=_('AI System Dashboard'),
+    title=_('AI Dashboard'),
     icon='bubbles',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('AI System')}
+        {'name': _('AI Dashboard')}
     ]
 ) }}
 

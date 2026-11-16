@@ -10,8 +10,8 @@
     icon='fas fa-ban',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('API Management'), 'url': url_for('api_management.api_management')},
-        {'name': _('API Key Management'), 'url': url_for('api_key_management.list_api_keys')},
+        {'name': _('API'), 'url': url_for('api_management.api_management')},
+        {'name': _('API Keys'), 'url': url_for('api_key_management.list_api_keys')},
         {'name': api_key.client_name, 'url': url_for('api_key_management.view_api_key', key_id=api_key.id)},
         {'name': _('Revoke')}
     ],

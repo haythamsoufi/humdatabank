@@ -2,7 +2,8 @@
 Middleware Package
 
 Contains middleware functions for request processing, session management,
-activity tracking, transaction handling, security headers, and API usage tracking.
+activity tracking, transaction handling, security headers, API usage tracking,
+request hooks, and HTTP error handlers.
 """
 
 from .session_timeout import (

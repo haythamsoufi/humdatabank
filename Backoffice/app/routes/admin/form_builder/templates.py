@@ -248,7 +248,7 @@ def manage_templates():
     return render_template(
         "admin/templates/templates.html",
         templates=templates,
-        title="Manage Form Templates",
+        title="Templates",
         get_localized_template_name=get_localized_template_name,
         template_data_counts=template_data_counts,
         template_version_counts=template_version_counts,

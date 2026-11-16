@@ -1,7 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "components/ag_grid_includes.html" import ag_grid_container, ag_grid_js %}
 
-{% block title %}{{ _('Manage Resources') }}{% endblock %}
+{% block title %}{{ _('Resources') }}{% endblock %}
 
 {% block content %}
 
@@ -10,11 +10,11 @@
 
 {% from "components/_page_header.html" import page_header %}
 {{ page_header(
-    title=_('Manage Resources'),
+    title=_('Resources'),
     icon='fas fa-folder-open',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Resource Management')}
+        {'name': _('Resources')}
     ],
     actions=[
         {

@@ -76,7 +76,7 @@ from app import create_app
 app = create_app(os.getenv('FLASK_CONFIG'))
 
 # Logging configuration is now handled centrally in app/__init__.py
-# Custom Flask CLI commands are registered in app/cli.py via create_app.
+# Custom Flask CLI commands are registered in app/cli_commands/cli.py via create_app.
 
 
 if __name__ == '__main__':

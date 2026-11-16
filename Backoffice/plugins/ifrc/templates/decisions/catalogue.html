@@ -4,7 +4,7 @@
 {% block title %}{{ _('Decision Maker') }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('decisions.static_file', filename='css/decisions.css') }}">
+<link rel="stylesheet" href="{{ decisions_static_url('css/decisions.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -43,5 +43,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('decisions.static_file', filename='js/decisions.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+<script src="{{ decisions_static_url('js/decisions.js') }}" nonce="{{ csp_nonce() }}" defer></script>
 {% endblock %}

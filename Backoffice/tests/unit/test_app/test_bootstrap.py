@@ -1,4 +1,4 @@
-"""Tests for app/bootstrap.py — comprehensive coverage of all functions."""
+"""Tests for app/runtime/bootstrap.py — comprehensive coverage of all functions."""
 
 import os
 import pytest
@@ -27,7 +27,7 @@ def _make_flask_app(**config):
 
 class TestInitUploadStorage:
     def test_filesystem_provider_creates_upload_folder(self, tmp_path):
-        from app.bootstrap import init_upload_storage
+        from app.runtime.bootstrap import init_upload_storage
 
         upload_dir = str(tmp_path / "uploads")
         flask_app = _make_flask_app(
@@ -40,7 +40,7 @@ class TestInitUploadStorage:
         assert os.path.isdir(upload_dir)
 
     def test_azure_blob_creates_temp_subdir(self, tmp_path):
-        from app.bootstrap import init_upload_storage
+        from app.runtime.bootstrap import init_upload_storage
 
         upload_dir = str(tmp_path / "uploads")
         flask_app = _make_flask_app(
@@ -54,7 +54,7 @@ class TestInitUploadStorage:
 
     def test_empty_upload_folder_defaults_to_instance(self, tmp_path):
         """When UPLOAD_FOLDER is empty, falls back to instance_path/uploads."""
-        from app.bootstrap import init_upload_storage
+        from app.runtime.bootstrap import init_upload_storage
 
         flask_app = _make_flask_app(UPLOAD_FOLDER='', UPLOAD_STORAGE_PROVIDER='filesystem')
         flask_app.instance_path = str(tmp_path)
@@ -68,7 +68,7 @@ class TestInitUploadStorage:
 
     def test_no_upload_folder_key_defaults_to_instance(self, tmp_path):
         """Missing UPLOAD_FOLDER key should use instance_path/uploads."""
-        from app.bootstrap import init_upload_storage
+        from app.runtime.bootstrap import init_upload_storage
 
         flask_app = _make_flask_app(UPLOAD_STORAGE_PROVIDER='filesystem')
         flask_app.instance_path = str(tmp_path)
@@ -105,7 +105,7 @@ class TestLoadDynamicSettings:
 
     def test_loads_settings_from_database_success(self, app):
         """Happy path: settings read from DB and applied to app.config."""
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -132,7 +132,7 @@ class TestLoadDynamicSettings:
 
     def test_falls_back_to_defaults_on_exception(self, app):
         """If read_settings raises, defaults from config_class are used."""
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
 
@@ -145,7 +145,7 @@ class TestLoadDynamicSettings:
         assert app.config['SHOW_LANGUAGE_FLAGS'] is True
 
     def test_show_flags_parsed_from_string_true(self, app):
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -168,7 +168,7 @@ class TestLoadDynamicSettings:
         assert app.config['SHOW_LANGUAGE_FLAGS'] is True
 
     def test_show_flags_parsed_from_int(self, app):
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -191,7 +191,7 @@ class TestLoadDynamicSettings:
         assert app.config['SHOW_LANGUAGE_FLAGS'] is True
 
     def test_show_flags_unknown_type_defaults_true(self, app):
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -214,7 +214,7 @@ class TestLoadDynamicSettings:
         assert app.config['SHOW_LANGUAGE_FLAGS'] is True
 
     def test_empty_languages_falls_back_to_config(self, app):
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -239,7 +239,7 @@ class TestLoadDynamicSettings:
 
     def test_entity_types_filtered_by_allowed(self, app):
         """Entity types not in ALLOWED_ENTITY_TYPE_GROUPS are excluded."""
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -265,7 +265,7 @@ class TestLoadDynamicSettings:
 
     def test_rbac_not_seeded_warning(self, app):
         """When RBAC is enabled but permissions not seeded, a warning is logged."""
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -293,7 +293,7 @@ class TestLoadDynamicSettings:
 
     def test_rbac_check_exception_is_swallowed(self, app):
         """Exception during RBAC sanity check should be caught."""
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
 
         config_class = self._mock_config_class()
         all_settings = {
@@ -316,7 +316,7 @@ class TestLoadDynamicSettings:
 
     def test_settings_load_time_slow_path_logs(self, app):
         """Slow settings load (> 0.1s) should log a debug message."""
-        from app.bootstrap import load_dynamic_settings
+        from app.runtime.bootstrap import load_dynamic_settings
         import time
 
         config_class = self._mock_config_class()
@@ -336,7 +336,7 @@ class TestLoadDynamicSettings:
              patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', set()), \
              patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
              patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth, \
-             patch('app.bootstrap.time') as mock_time:
+             patch('app.runtime.bootstrap.time') as mock_time:
             mock_auth.rbac_enabled.return_value = False
             # Simulate slow load: first call for start, second for elapsed
             mock_time.time.side_effect = [0.0, 0.5, 0.5, 0.5, 1.0]
@@ -360,7 +360,7 @@ class TestConfigureAllModelMappers:
     """
 
     def test_imports_embedding_modules_and_configures_mappers(self, app):
-        from app.bootstrap import _configure_all_model_mappers
+        from app.runtime.bootstrap import _configure_all_model_mappers
         from sqlalchemy.orm import configure_mappers as real_configure_mappers
 
         with patch('sqlalchemy.orm.configure_mappers',
@@ -377,7 +377,7 @@ class TestConfigureAllModelMappers:
 
     def test_idempotent_when_called_twice(self, app):
         """A second call (e.g. from a re-imported module) must be a safe no-op."""
-        from app.bootstrap import _configure_all_model_mappers
+        from app.runtime.bootstrap import _configure_all_model_mappers
 
         with app.app_context():
             _configure_all_model_mappers(app)
@@ -385,7 +385,7 @@ class TestConfigureAllModelMappers:
 
     def test_logs_and_reraises_on_mapper_failure(self, app):
         """A genuine mapper misconfiguration must fail loudly at boot, not silently."""
-        from app.bootstrap import _configure_all_model_mappers
+        from app.runtime.bootstrap import _configure_all_model_mappers
 
         with patch('sqlalchemy.orm.configure_mappers',
                    side_effect=Exception("boom: broken relationship")):
@@ -399,7 +399,7 @@ class TestConfigureAllModelMappers:
         """init_flask_extensions must configure mappers immediately after db.init_app,
         before install_db_pool_logging / dynamic settings / any thread-starting code."""
         import inspect
-        from app import bootstrap
+        from app.runtime import bootstrap
 
         source = inspect.getsource(bootstrap.init_flask_extensions)
         db_init_pos = source.index('db.init_app(app)')
@@ -415,7 +415,7 @@ class TestConfigureAllModelMappers:
 
 class TestRegisterFaviconRoutes:
     def test_favicon_ico_served_when_exists(self, tmp_path):
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         favicon = tmp_path / "favicon.ico"
         favicon.write_bytes(b"\x00\x00\x01\x00")  # minimal ICO header
@@ -428,7 +428,7 @@ class TestRegisterFaviconRoutes:
         assert response.status_code == 200
 
     def test_svg_logo_served_when_favicon_missing(self, tmp_path):
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         logo = tmp_path / "IFRC_logo.svg"
         logo.write_bytes(b"<svg/>")
@@ -441,7 +441,7 @@ class TestRegisterFaviconRoutes:
         assert response.status_code == 200
 
     def test_404_when_neither_favicon_nor_logo(self, tmp_path):
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         flask_app = _make_flask_app()
         register_favicon_routes(flask_app, str(tmp_path))
@@ -452,7 +452,7 @@ class TestRegisterFaviconRoutes:
 
     def test_test_static_route_registered_in_debug(self, tmp_path):
         """In debug mode, /test-static/<filename> route should be registered."""
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         flask_app = _make_flask_app(DEBUG=True)
         flask_app.debug = True
@@ -464,7 +464,7 @@ class TestRegisterFaviconRoutes:
 
     def test_test_static_returns_file_in_debug(self, tmp_path):
         """In debug mode, /test-static/<filename> should serve existing files."""
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         test_file = tmp_path / "test.txt"
         test_file.write_text("hello")
@@ -479,7 +479,7 @@ class TestRegisterFaviconRoutes:
 
     def test_test_static_404_when_folder_missing(self):
         """If static folder doesn't exist, test-static returns 404."""
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         flask_app = _make_flask_app(DEBUG=True)
         flask_app.debug = True
@@ -491,7 +491,7 @@ class TestRegisterFaviconRoutes:
 
     def test_test_static_400_for_path_traversal(self, tmp_path):
         """Path traversal attempts should return 400."""
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         flask_app = _make_flask_app(DEBUG=True)
         flask_app.debug = True
@@ -505,7 +505,7 @@ class TestRegisterFaviconRoutes:
 
     def test_test_static_404_for_nonexistent_file(self, tmp_path):
         """Requesting a non-existent file should return 404."""
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         flask_app = _make_flask_app(DEBUG=True)
         flask_app.debug = True
@@ -517,7 +517,7 @@ class TestRegisterFaviconRoutes:
 
     def test_test_static_not_registered_in_production(self, tmp_path):
         """In non-debug mode, /test-static should NOT be registered."""
-        from app.bootstrap import register_favicon_routes
+        from app.runtime.bootstrap import register_favicon_routes
 
         flask_app = _make_flask_app(DEBUG=False)
         flask_app.debug = False

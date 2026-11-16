@@ -39,7 +39,7 @@ def manage_embed_content():
             items=items,
             categories=category_list,
             embed_visuals=embed_visuals,
-            title="Manage Embed Content",
+            title="Embed Content",
         )
     except Exception as e:
         db.session.rollback()
@@ -51,7 +51,7 @@ def manage_embed_content():
             items=[],
             categories=[],
             embed_visuals=[],
-            title="Manage Embed Content",
+            title="Embed Content",
             error="Failed to load embed content",
         )
 

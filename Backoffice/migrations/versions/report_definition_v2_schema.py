@@ -15,7 +15,7 @@ depends_on = None
 
 
 def _migrate_definition_v1_to_v2(definition: dict | None) -> dict:
-    """Inline migration helper (mirrors app.services.reports.schema.migrate_v1_to_v2)."""
+    """Inline v1-to-v2 helper. Kept in this revision so it does not import app code."""
     if not definition:
         definition = {}
     if int(definition.get("schema_version") or 0) >= 2:

@@ -82,7 +82,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
     icon='fas fa-' + ('edit' if resource else 'plus'),
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Resource Management'), 'url': url_for('content_management.manage_resources')},
+        {'name': _('Resources'), 'url': url_for('content_management.manage_resources')},
         {'name': _('Edit Resource') if resource else _('Upload New Resource')}
     ],
     actions=[

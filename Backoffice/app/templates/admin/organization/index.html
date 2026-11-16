@@ -7,7 +7,7 @@
 {% set can_manage_countries = current_is_system_manager or has_permission('admin.countries.edit') or has_permission('admin.organization.manage') %}
 {% set can_view_countries = can_manage_countries or (current_is_system_manager or has_permission('admin.countries.view')) %}
 
-{% block title %}{{ _('Organization Management') }}{% endblock %}
+{% block title %}{{ _('Organizational Structure') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -20,11 +20,11 @@
 
 <div class="pr-6">
 {{ page_header(
-    title=_('Organization Management'),
+    title=_('Organizational Structure'),
     icon='fas fa-sitemap',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Organization Management')}
+        {'name': _('Organizational Structure')}
     ]
 ) }}
 </div>

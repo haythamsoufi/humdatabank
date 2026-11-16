@@ -1,4 +1,4 @@
-"""Tests for app/template_context.py — comprehensive coverage of context processors and filters."""
+"""Tests for app/templating/template_context.py — comprehensive coverage of context processors and filters."""
 
 import pytest
 from datetime import datetime, timezone
@@ -8,7 +8,7 @@ from flask import Flask
 
 def _make_app_with_context(**config_updates):
     """Create a minimal app with template context registered."""
-    from app.static_serving import register_static_route
+    from app.assets.static_serving import register_static_route
     import tempfile
 
     tmp_dir = tempfile.mkdtemp()
@@ -38,7 +38,7 @@ class TestRegisterTemplateContext:
         assert 'zip' in app.jinja_env.filters
 
     def test_registers_fromjson_and_js_filters(self, app):
-        """Core filters from app.filters should be present."""
+        """Core filters from app.templating.filters should be present."""
         assert 'fromjson' in app.jinja_env.filters
         assert 'js' in app.jinja_env.filters
 
@@ -110,7 +110,7 @@ class TestInjectStagingEnvironmentBanner:
 
 class TestIsStagingEnvironment:
     def test_helper_reads_app_config(self, app):
-        from app.template_context import is_staging_environment
+        from app.templating.template_context import is_staging_environment
 
         app.config['FLASK_CONFIG'] = 'staging'
         assert is_staging_environment(app) is True

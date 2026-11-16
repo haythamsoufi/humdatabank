@@ -13,8 +13,6 @@ Justifications for the reviewed entries:
   ``format_activity_value`` / ``render_matrix_change`` return ``escape``-d output.
 - forms/entry_form/*: ``form_integration.render_custom_field_entry_form`` returns ``Markup``
   built from an autoescaped plugin template (or the escaped fallback).
-- admin/reports/export_pdf.html: ``payload.content`` is sanitised by
-  ``services/reports/sanitize_service`` on save (follow-up: re-sanitise at export).
 - Remaining multi-line/JS entries wrap ``_()``/``url_for`` values already passed through ``tojson``.
 """
 import re
@@ -24,7 +22,6 @@ ROOT = Path(__file__).resolve().parents[3]
 _SAFE = re.compile(r"\|\s*safe\b")
 
 _REVIEWED = {
-    "app/templates/admin/reports/export_pdf.html": 1,
     "app/templates/components/_page_header.html": 2,
     "app/templates/core/activity_items_partial.html": 10,
     "app/templates/core/dashboard/_admin_panel.html": 10,

@@ -3,7 +3,7 @@
 {% from "components/_svg_icons.html" import svg_icon %}
 {% from "components/_status_label.html" import status_label_for_active %}
 
-{% block title %}{{ _('Manage Embed Content') }}{% endblock %}
+{% block title %}{{ _('Embed Content') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -11,8 +11,8 @@
 
 {% block content %}
 {{ page_header(
-    title=_('Manage Embed Content'),
-    subtitle=_('Manage Power BI, Tableau Public, and other allowlisted embeds for the public website'),
+    title=_('Embed Content'),
+    subtitle=_('Power BI, Tableau Public, and other allowlisted embeds for the public website'),
     icon='fas fa-code',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},

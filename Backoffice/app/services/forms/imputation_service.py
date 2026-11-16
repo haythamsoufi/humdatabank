@@ -19,7 +19,7 @@ from app.models import (
     Country,
 )
 from app.models.assignments import AssignmentEntityStatus
-from app.cli import reset_form_data_sequence_helper
+from app.cli_commands.cli import reset_form_data_sequence_helper
 
 logger = logging.getLogger(__name__)
 

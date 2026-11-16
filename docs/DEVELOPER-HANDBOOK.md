@@ -172,6 +172,19 @@ python -m flask ai-chat ask "what emergency documents you have on syria" --quiet
 
 ### Backoffice Core Components
 
+#### Application package (`Backoffice/app/`)
+The package root is the factory (`__init__.py`) only. Import the module (`from app.runtime.scheduler import init_scheduler`). Package `__init__` files do not re-export names, except `extensions` and `i18n`, which are the modules.
+
+- `extensions/` — Flask extension singletons (`db`, `login`, `migrate`, `babel`, `csrf`, `mail`, `limiter`)
+- `i18n/` — request locale, language cookie, and session activity
+- `runtime/` — bootstrap, startup tasks, development seeding, the scheduler, the scheduler-lock shim, and logging configuration
+- `middleware/` — request pipeline, including `request_hooks` and `error_handlers`
+- `templating/` — Jinja filters and context processors
+- `assets/` — static route, cache-bust tokens, and ES module import maps
+- `cli_commands/cli.py` — Flask CLI registration; command implementations stay in the sibling modules
+
+The scheduler lock implementation stays at `Backoffice/scheduler_lock.py` so Gunicorn can import it without loading the Flask app. Application code imports that module through `app.runtime.scheduler_lock`.
+
 #### Models (`Backoffice/app/models/`)
 There is no single `models.py`. Domain modules are re-exported from `app/models/__init__.py`:
 
@@ -675,28 +688,13 @@ A plugin contributes a Data Explorer tab by returning a `DataExplorerTabConfig` 
 
 **Config override:** `PB_VISUALS_TOOL_DIR` in Flask config overrides the default `plugins/ifrc/pb_progress/visuals/` path for the P&B build pipeline.
 
-### Native Report Builder (core platform)
+### Report builder (removed)
 
-Admins compose metadata-driven reports from Indicator Bank, templates, and assignment data. Unlike the P&B plugin, reports are user-defined and stored in the `report_definition` table.
+The admin report builder (`/admin/reports`) has been removed. It stored user-defined layouts in `report_definition`, `report_definition_revision`, and `report_run`. Migration `drop_report_builder` drops those tables and the `admin.reports.view`, `admin.reports.edit`, `admin.reports.manage`, and `admin.data_explore.reports` permissions, plus the `admin_reports_viewer`, `admin_reports_editor`, and `admin_data_explorer_reports` roles.
 
-| Piece | Location |
-|-------|----------|
-| Models | [`Backoffice/app/models/reports.py`](Backoffice/app/models/reports.py) |
-| Definition schema (v1) | [`Backoffice/app/schemas/report_definition_v1.json`](Backoffice/app/schemas/report_definition_v1.json) |
-| CRUD + scoping | [`Backoffice/app/services/reports/definition_service.py`](Backoffice/app/services/reports/definition_service.py) |
-| Widget execution | [`Backoffice/app/services/reports/data_service.py`](Backoffice/app/services/reports/data_service.py) |
-| Shared aggregation | [`Backoffice/app/services/data_retrieval/aggregation.py`](Backoffice/app/services/data_retrieval/aggregation.py) |
-| Admin UI | `/admin/reports` — list, builder (`/edit`), viewer |
-| JS renderers | [`Backoffice/app/static/js/reports/`](Backoffice/app/static/js/reports/) |
-| Permissions | `admin.reports.view`, `admin.reports.edit`, `admin.reports.manage`; Data Explorer tab `admin.data_explore.reports` |
+**Public country one-pager (still present):** [`Backoffice/app/services/public/report_service.py`](Backoffice/app/services/public/report_service.py) is a separate, unauthenticated feature behind the Custom GPT `getCountryReport`/`getReportTemplate` Actions and the MCP connector's `databank_build_country_report`/`databank_get_report_template` tools. It has no `report_definition` row, no admin UI, and no widget model; it assembles a curated FDRS/UPR JSON spec plus an HTML/CSS design-template skeleton for an LLM to render (optionally as a PDF the LLM generates itself). Its style/layout assets live in `Backoffice/app/services/public/report_styles/<style>.html` (+ `<style>.tokens.json`), colocated with the one module that reads them — see [`humanitarian-databank-mcp/README.md`](../humanitarian-databank-mcp/README.md#report-design-templates) and [`Backoffice/docs/public/custom-gpt/README.md`](../Backoffice/docs/public/custom-gpt/README.md).
 
-**Adding a widget type:** extend the JSON schema, add a `data_source.kind` handler in `ReportDataService.execute_widget`, and register the type in the builder palette (`builder/main.js`) plus `widget-renderer.js`.
-
-**Relationship to `/api/v1/data`:** reports use the same underlying FormData/assignment joins via `aggregation.py` and `query_form_data` filters; the public data API remains the integration surface for external BI tools.
-
-**Relationship to IFRC P&B visuals:** P&B remains a specialized offline publish pipeline under `plugins/ifrc/pb_progress/`; it may later consume `aggregation.py` for system dataset generation, but is unchanged by the report builder v1.
-
-**Not to be confused with the public country one-pager report** (`Backoffice/app/services/public/report_service.py`) — a separate, unauthenticated feature behind the Custom GPT `getCountryReport`/`getReportTemplate` Actions and the MCP connector's `databank_build_country_report`/`databank_get_report_template` tools. It has no `report_definition` row, no admin UI, and no widget model; it assembles a curated FDRS/UPR JSON spec plus an HTML/CSS design-template skeleton for an LLM to render (optionally as a PDF the LLM generates itself). Its style/layout assets live in `Backoffice/app/services/public/report_styles/<style>.html` (+ `<style>.tokens.json`), colocated with the one module that reads them — see [`humanitarian-databank-mcp/README.md`](../humanitarian-databank-mcp/README.md#report-design-templates) and [`Backoffice/docs/public/custom-gpt/README.md`](../Backoffice/docs/public/custom-gpt/README.md).
+**IFRC P&B visuals** remain a specialized offline publish pipeline under `plugins/ifrc/pb_progress/`.
 
 ## RBAC & Permissions
 
@@ -720,7 +718,7 @@ Role-Based Access Control gates every `/admin` page, the mobile API's admin surf
 
 The catalog is **code, not data** — going forward, don't pre-populate `rbac_permission` / `rbac_role` via a data migration. [`Backoffice/app/services/organization/rbac_seed_service.py`](../Backoffice/app/services/organization/rbac_seed_service.py) is the intended sole writer:
 
-*(Historical exception, not a pattern to repeat: a handful of older migrations — `add_reports_permissions`, `add_validation_admin_permissions`, `migrate_data_explorer_permissions`, `rename_admin_notifications_rbac_to_communication` — do write `rbac_permission`/`rbac_role` rows directly, predating this policy. `add_validation_admin_permissions` also backfilled extra permissions onto `admin_data_explorer_compliance` — see the callout in `_baseline_roles()` and the pitfall below. `add_reports_permissions` once did the same for `admin_data_explorer_analysis`; that grant was later removed so Analysis does not open the report builder.)*
+*(Historical exception, not a pattern to repeat: a handful of older migrations — `add_reports_permissions`, `add_validation_admin_permissions`, `migrate_data_explorer_permissions`, `rename_admin_notifications_rbac_to_communication` — do write `rbac_permission`/`rbac_role` rows directly, predating this policy. `add_validation_admin_permissions` also backfilled extra permissions onto `admin_data_explorer_compliance` — see the callout in `_baseline_roles()` and the pitfall below. `add_reports_permissions` once did the same for `admin_data_explorer_analysis`; that grant was later removed, and `drop_report_builder` then deleted the report-builder permissions and roles.)*
 
 | Function | Returns |
 |----------|---------|
@@ -736,12 +734,12 @@ The catalog is **code, not data** — going forward, don't pre-populate `rbac_pe
 3. Run `tests/unit/test_services/test_rbac_catalog_completeness.py` locally — it fails loudly if a decorator or role references a code that isn't in the catalog. A typo here silently makes the guarded route unreachable for every non-System-Manager, since `seed_rbac_permissions_and_roles()` only ever creates rows for catalog codes and no role can hold a code that doesn't exist.
 4. Run `flask rbac seed` (or let the next deploy do it — see below). Only add a real DB migration if you also need to touch *existing* users'/roles' assignments — the seeder never assigns roles to users.
 
-**Pitfall — migration backfill onto an existing baseline role:** if a migration grants extra permissions directly to a role that's *also* defined in `_baseline_roles()` / a plugin's `get_seed_roles()` (e.g. to preserve access when splitting a permission in two), you **must** add those same codes to that role's `permission_codes` in code too. The reconciliation step in `seed_rbac_permissions_and_roles()` deletes any `rbac_role_permission` link for a catalog permission that isn't in the role's declared `permission_codes` — so a migration-only grant on a seeder-managed role survives only until the next `flask rbac seed` run (which, since `entrypoint.sh` runs it on every deploy, means the *next deploy*). `admin_data_explorer_compliance` still lists `admin.validation.{dashboard,questions,rules}` (backfilled by `add_validation_admin_permissions`) and that list is pinned by `TestBaselineRolesPreserveMigrationBackfilledPermissions`. `admin_data_explorer_analysis` no longer lists `admin.reports.{view,edit}`: the `add_reports_permissions` backfill was revoked on purpose, and the same test fails if those codes are added back. A role backfilled by a migration but **not** tracked in `_baseline_roles()`/a plugin (e.g. a custom role created via the admin UI) is safe from this — the reconciliation loop only ever touches roles it knows about.
+**Pitfall — migration backfill onto an existing baseline role:** if a migration grants extra permissions directly to a role that's *also* defined in `_baseline_roles()` / a plugin's `get_seed_roles()` (e.g. to preserve access when splitting a permission in two), you **must** add those same codes to that role's `permission_codes` in code too. The reconciliation step in `seed_rbac_permissions_and_roles()` deletes any `rbac_role_permission` link for a catalog permission that isn't in the role's declared `permission_codes` — so a migration-only grant on a seeder-managed role survives only until the next `flask rbac seed` run (which, since `entrypoint.sh` runs it on every deploy, means the *next deploy*). `admin_data_explorer_compliance` still lists `admin.validation.{dashboard,questions,rules}` (backfilled by `add_validation_admin_permissions`) and that list is pinned by `TestBaselineRolesPreserveMigrationBackfilledPermissions`. The retired report-builder codes (`admin.reports.*`, `admin.data_explore.reports`) must not be added back onto the split Data Explorer roles. A role backfilled by a migration but **not** tracked in `_baseline_roles()`/a plugin (e.g. a custom role created via the admin UI) is safe from this — the reconciliation loop only ever touches roles it knows about.
 
 **Seeding runs from three places, all funneling through `seed_rbac_permissions_and_roles()`:**
 - `flask rbac seed` CLI ([`app/cli_commands/rbac.py`](../Backoffice/app/cli_commands/rbac.py)) — operator/deploy-triggered, `RbacSeedLockMode.WAIT` (30s default via `--wait-timeout`).
 - `entrypoint.sh` — runs `flask rbac seed` unconditionally after every `flask db upgrade` (not just when the table is empty), so a plugin/catalog change ships on the very next deploy with no manual step. Skip via `RBAC_SEED_ON_STARTUP=false`.
-- Background auto-seed thread at app boot ([`app/startup_tasks.py`](../Backoffice/app/startup_tasks.py) `deferred_rbac_seed`) — best-effort safety net on every Gunicorn worker, `RbacSeedLockMode.TRY` (never blocks startup).
+- Background auto-seed thread at app boot ([`app/runtime/startup_tasks.py`](../Backoffice/app/runtime/startup_tasks.py) `deferred_rbac_seed`) — best-effort safety net on every Gunicorn worker, `RbacSeedLockMode.TRY` (never blocks startup).
 
 **`RbacSeedLockMode`** (PostgreSQL session advisory lock, key `915037121`) exists because two processes seeding at once can hit spurious unique-constraint races:
 - `TRY` — non-blocking; silently gives up if another process holds the lock (`skipped_due_to_lock`). Only for the boot-time background thread — losing the race to a sibling worker seeding the same catalog is harmless, and a boot-time thread must never block startup.
@@ -755,15 +753,15 @@ The catalog is **code, not data** — going forward, don't pre-populate `rbac_pe
 | `/admin` HTML + JSON routes | `admin_required`, `permission_required(code)`, `permission_required_any(*codes)`, `system_manager_required`, `admin_permission_required[_any]` (combo) — [`app/routes/admin/shared.py`](../Backoffice/app/routes/admin/shared.py) |
 | Mobile API (`/api/mobile/v1/admin/...`) | `mobile_auth_required(permission=code)` / `(permissions=(...))` — [`app/utils/mobile/mobile_auth.py`](../Backoffice/app/utils/mobile/mobile_auth.py) |
 | Inline checks (service code, either surface) | `AuthorizationService.has_rbac_permission(user, code, scope=...)`; route-local convenience wrapper `user_has_permission(code)` |
-| Templates (UI gating only — **routes remain authoritative**) | Jinja global `has_permission(code)` ([`app/template_context.py`](../Backoffice/app/template_context.py)) |
+| Templates (UI gating only — **routes remain authoritative**) | Jinja global `has_permission(code)` ([`app/templating/template_context.py`](../Backoffice/app/templating/template_context.py)) |
 | Intentionally-unguarded `/admin` route | `@rbac_guard_audit_exempt("reason")` — otherwise flagged by the startup audit below |
 
 Every route decorator above (and `mobile_auth_required`) stamps metadata attributes on the view function (`_rbac_permissions_required`, `_rbac_permissions_any_required`, `_ep_permission(s)`, ...). Those attributes play no role in the actual per-request authorization decision — they exist purely so the two automated checks below can audit the app's routes without re-executing every decorator.
 
 ### Automated guardrails
 
-- **Startup audit** — `audit_admin_route_guards()` in `app/startup_tasks.py` (findings collected by `collect_admin_route_guard_findings()`, rules in [`app/routes/admin/route_policy.py`](../Backoffice/app/routes/admin/route_policy.py)) walks `app.url_map` for every `/admin` rule plus `/plugins/static` and warns (or raises, if `RBAC_ADMIN_ROUTE_GUARD_MODE=error`/`strict`) about: `missing_guard` (no guard decorator and no `rbac_guard_audit_exempt`), `non_admin_permission` (guarded only by a non-`admin.*` code), `read_permission_on_mutating_route` (POST/PUT/PATCH/DELETE behind a `*.view` code; read-only POST lookups are listed in `READ_ONLY_POST_ALLOWLIST`), `get_side_effect_name` (GET-only view named `cleanup_*`/`delete_*`/`send_*`/`test_*`...), `csrf_exempt_mutation` (CSRF-exempt mutation not in `CSRF_EXEMPT_MUTATION_ALLOWLIST`), and the per-endpoint policy tables (`SYSTEM_MANAGER_ONLY_ENDPOINTS`, `POST_ONLY_ENDPOINTS`, `REQUIRED_PERMISSION_BY_ENDPOINT`). `tests/unit/test_routes/test_admin_rbac_scope_hardening.py::TestGuardAudit` fails if the live app has any finding, if a policy entry names an endpoint that no longer exists, and proves each finding kind fires on a synthetic route.
-- **Catalog completeness test** — [`tests/unit/test_services/test_rbac_catalog_completeness.py`](../Backoffice/tests/unit/test_services/test_rbac_catalog_completeness.py) walks every registered view function's RBAC metadata (web + mobile) plus every baseline/plugin role's `permission_codes`, and asserts each referenced code exists in `_permission_catalog()` + `_extension_permission_catalog()`. Also guards against duplicate permission/role codes across core + plugins, and pins the compliance-role validation backfill from the pitfall above so those codes can't be trimmed from `_baseline_roles()` by accident. The same test asserts `admin_data_explorer_analysis` does not include report-builder permissions. Catches a **typo'd/renamed** code — the class of bug where the guard exists but silently protects a permission that no non-System-Manager role can ever hold.
+- **Startup audit** — `audit_admin_route_guards()` in `app/runtime/startup_tasks.py` (findings collected by `collect_admin_route_guard_findings()`, rules in [`app/routes/admin/route_policy.py`](../Backoffice/app/routes/admin/route_policy.py)) walks `app.url_map` for every `/admin` rule plus `/plugins/static` and warns (or raises, if `RBAC_ADMIN_ROUTE_GUARD_MODE=error`/`strict`) about: `missing_guard` (no guard decorator and no `rbac_guard_audit_exempt`), `non_admin_permission` (guarded only by a non-`admin.*` code), `read_permission_on_mutating_route` (POST/PUT/PATCH/DELETE behind a `*.view` code; read-only POST lookups are listed in `READ_ONLY_POST_ALLOWLIST`), `get_side_effect_name` (GET-only view named `cleanup_*`/`delete_*`/`send_*`/`test_*`...), `csrf_exempt_mutation` (CSRF-exempt mutation not in `CSRF_EXEMPT_MUTATION_ALLOWLIST`), and the per-endpoint policy tables (`SYSTEM_MANAGER_ONLY_ENDPOINTS`, `POST_ONLY_ENDPOINTS`, `REQUIRED_PERMISSION_BY_ENDPOINT`). `tests/unit/test_routes/test_admin_rbac_scope_hardening.py::TestGuardAudit` fails if the live app has any finding, if a policy entry names an endpoint that no longer exists, and proves each finding kind fires on a synthetic route.
+- **Catalog completeness test** — [`tests/unit/test_services/test_rbac_catalog_completeness.py`](../Backoffice/tests/unit/test_services/test_rbac_catalog_completeness.py) walks every registered view function's RBAC metadata (web + mobile) plus every baseline/plugin role's `permission_codes`, and asserts each referenced code exists in `_permission_catalog()` + `_extension_permission_catalog()`. Also guards against duplicate permission/role codes across core + plugins, and pins the compliance-role validation backfill from the pitfall above so those codes can't be trimmed from `_baseline_roles()` by accident. The same test asserts the split Data Explorer roles do not include the retired report-builder permission codes. Catches a **typo'd/renamed** code — the class of bug where the guard exists but silently protects a permission that no non-System-Manager role can ever hold.
 - Neither check can verify *which* permission a route ought to have — only that a guard exists and that whatever it names is real. Code review still has to confirm `admin.foo.edit` is the *right* code for a given route (e.g. matching the equivalent HTML/JSON/mobile route for the same action).
 
 ### Privilege-escalation guard (RBAC role assignment)

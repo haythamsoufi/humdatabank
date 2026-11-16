@@ -63,7 +63,7 @@
     icon='fas fa-' + ('user-edit' if user else 'user-plus'),
     breadcrumbs=[
         {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'User Management', 'url': url_for('user_management.manage_users')},
+        {'name': _('Users'), 'url': url_for('user_management.manage_users')},
         {'name': user.email if user else "Add New User"}
     ],
     actions=header_actions.items,

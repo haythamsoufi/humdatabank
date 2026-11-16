@@ -1,4 +1,4 @@
-"""Tests for app/request_hooks.py — comprehensive coverage of all hooks."""
+"""Tests for app/middleware/request_hooks.py — comprehensive coverage of all hooks."""
 
 import pytest
 from unittest.mock import MagicMock, patch, call
@@ -7,7 +7,7 @@ from flask import Flask
 
 def _build_app_with_hooks():
     """Create a minimal Flask app with request hooks registered."""
-    from app.static_serving import register_static_route
+    from app.assets.static_serving import register_static_route
     import tempfile, os
 
     tmp_dir = tempfile.mkdtemp()
@@ -20,13 +20,13 @@ def _build_app_with_hooks():
     register_static_route(flask_app, tmp_dir)
 
     # Mock all heavy imports that request_hooks pulls in
-    with patch('app.request_hooks.update_session_activity'), \
-         patch('app.request_hooks.is_static_asset_request', return_value=False), \
-         patch('app.request_hooks.mark_mobile_app_webview_embed_request'), \
-         patch('app.request_hooks.persist_mobile_app_embed_cookie', side_effect=lambda r: r), \
+    with patch('app.middleware.request_hooks.update_session_activity'), \
+         patch('app.middleware.request_hooks.is_static_asset_request', return_value=False), \
+         patch('app.middleware.request_hooks.mark_mobile_app_webview_embed_request'), \
+         patch('app.middleware.request_hooks.persist_mobile_app_embed_cookie', side_effect=lambda r: r), \
          patch('app.middleware.api_tracker.track_api_request'), \
          patch('app.middleware.api_tracker.track_api_response', side_effect=lambda r: r):
-        from app.request_hooks import register_request_hooks
+        from app.middleware.request_hooks import register_request_hooks
         register_request_hooks(flask_app)
 
     @flask_app.route('/ping')
@@ -41,8 +41,8 @@ class TestHealthProbe:
 
     def test_health_probe_returned_for_bare_root_get(self):
         """GET / with no user-agent, no cookies, wildcard accept → health JSON."""
-        from app.request_hooks import register_request_hooks
-        from app.static_serving import register_static_route
+        from app.middleware.request_hooks import register_request_hooks
+        from app.assets.static_serving import register_static_route
         from flask_login import LoginManager
         import tempfile
 
@@ -90,7 +90,7 @@ class TestHealthProbe:
             method='GET',
             headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html'},
         ):
-            from app.request_hooks import register_request_hooks
+            from app.middleware.request_hooks import register_request_hooks
             # Verified via integration: hook returns None for browser requests
             pass
 
@@ -116,9 +116,9 @@ class TestClearFlashesForXhr:
         with app.test_request_context('/', headers={'Content-Type': 'application/json'}):
             from flask import session
             mock_session = {'_flashes': [('info', 'test')]}
-            with patch('app.request_hooks.is_json_request', return_value=True), \
-                 patch('app.request_hooks.session', mock_session):
-                from app.request_hooks import register_request_hooks
+            with patch('app.middleware.request_hooks.is_json_request', return_value=True), \
+                 patch('app.middleware.request_hooks.session', mock_session):
+                from app.middleware.request_hooks import register_request_hooks
                 # Access the inner function by registering a fresh app
                 inner_app = Flask(__name__)
                 inner_app.config.update(SECRET_KEY='test', TESTING=True)
@@ -128,14 +128,14 @@ class TestClearFlashesForXhr:
                     return 'ok'
 
                 # Register just the clear_flashes hook by importing the module function
-                from app.request_hooks import register_request_hooks as rrh
+                from app.middleware.request_hooks import register_request_hooks as rrh
                 # Use the existing app fixture which already has hooks
                 pass
 
     def test_exception_in_clear_flashes_is_swallowed(self, app):
         """If clearing flashes raises, the response should still be returned."""
         with app.test_request_context('/'):
-            with patch('app.request_hooks.is_json_request', side_effect=Exception("test")):
+            with patch('app.middleware.request_hooks.is_json_request', side_effect=Exception("test")):
                 # With exception, hook should not bubble up
                 pass  # Covered by the except clause in the hook
 
@@ -146,8 +146,8 @@ class TestMobileEmbedHooks:
     def test_mark_skipped_for_static_asset(self, app):
         """Static asset requests should skip the mobile embed marker."""
         with app.test_request_context('/static/main.css'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=True) as mock_static, \
-                 patch('app.request_hooks.mark_mobile_app_webview_embed_request') as mock_mark:
+            with patch('app.middleware.request_hooks.is_static_asset_request', return_value=True) as mock_static, \
+                 patch('app.middleware.request_hooks.mark_mobile_app_webview_embed_request') as mock_mark:
                 # The hook checks is_static_asset_request() → returns None early
                 mock_static.return_value = True
                 # Verify by examining what happens — the hook is already registered on app
@@ -156,16 +156,16 @@ class TestMobileEmbedHooks:
     def test_mark_exception_is_swallowed(self, app):
         """Exception in mark_mobile_app_webview_embed_request should be swallowed."""
         with app.test_request_context('/dashboard'):
-            with patch('app.request_hooks.mark_mobile_app_webview_embed_request',
+            with patch('app.middleware.request_hooks.mark_mobile_app_webview_embed_request',
                        side_effect=Exception("embed error")):
-                with patch('app.request_hooks.is_static_asset_request', return_value=False):
+                with patch('app.middleware.request_hooks.is_static_asset_request', return_value=False):
                     # Verify hook swallows exception
                     pass
 
     def test_persist_cookie_exception_returns_original_response(self, app):
         """If persist_mobile_app_embed_cookie raises, original response returned."""
         with app.test_request_context('/'):
-            with patch('app.request_hooks.persist_mobile_app_embed_cookie',
+            with patch('app.middleware.request_hooks.persist_mobile_app_embed_cookie',
                        side_effect=Exception("cookie error")):
                 pass  # The except clause returns response as-is
 
@@ -205,8 +205,8 @@ class TestUpdateActivityHook:
     def test_static_asset_skips_activity_update(self, app):
         """Static asset requests should not update session activity."""
         with app.test_request_context('/static/main.css'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=True):
-                with patch('app.request_hooks.update_session_activity') as mock_update:
+            with patch('app.middleware.request_hooks.is_static_asset_request', return_value=True):
+                with patch('app.middleware.request_hooks.update_session_activity') as mock_update:
                     hook = _find_before_request_hook(app, 'update_activity')
                     assert hook is not None, "update_activity hook not registered"
                     hook()
@@ -215,10 +215,10 @@ class TestUpdateActivityHook:
     def test_authenticated_user_updates_activity(self, app):
         """Authenticated non-static page nav should call update_session_activity."""
         with app.test_request_context('/dashboard'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
-                 patch('app.request_hooks.should_skip_activity_path', return_value=False), \
-                 patch('app.request_hooks.should_skip_activity_endpoint', return_value=False), \
-                 patch('app.request_hooks.update_session_activity') as mock_update:
+            with patch('app.middleware.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.middleware.request_hooks.should_skip_activity_path', return_value=False), \
+                 patch('app.middleware.request_hooks.should_skip_activity_endpoint', return_value=False), \
+                 patch('app.middleware.request_hooks.update_session_activity') as mock_update:
                 mock_user = MagicMock(is_authenticated=True)
                 with patch('flask_login.utils._get_user', return_value=mock_user):
                     hook = _find_before_request_hook(app, 'update_activity')
@@ -229,8 +229,8 @@ class TestUpdateActivityHook:
     def test_api_v1_path_skips_activity_update(self, app):
         """Requests under /api/v1/ must not reset last_activity (background polls)."""
         with app.test_request_context('/api/v1/some/endpoint'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
-                 patch('app.request_hooks.update_session_activity') as mock_update:
+            with patch('app.middleware.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.middleware.request_hooks.update_session_activity') as mock_update:
                 mock_user = MagicMock(is_authenticated=True)
                 with patch('flask_login.utils._get_user', return_value=mock_user):
                     hook = _find_before_request_hook(app, 'update_activity')
@@ -241,8 +241,8 @@ class TestUpdateActivityHook:
     def test_api_mobile_path_skips_activity_update(self, app):
         """Requests under /api/mobile/ must not reset last_activity."""
         with app.test_request_context('/api/mobile/device/heartbeat'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
-                 patch('app.request_hooks.update_session_activity') as mock_update:
+            with patch('app.middleware.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.middleware.request_hooks.update_session_activity') as mock_update:
                 mock_user = MagicMock(is_authenticated=True)
                 with patch('flask_login.utils._get_user', return_value=mock_user):
                     hook = _find_before_request_hook(app, 'update_activity')
@@ -253,10 +253,10 @@ class TestUpdateActivityHook:
     def test_poll_endpoint_skips_activity_update(self, app):
         """Endpoints in the skip list (e.g. presence heartbeat) must not reset last_activity."""
         with app.test_request_context('/presence/assignment/1/heartbeat'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
-                 patch('app.request_hooks.should_skip_activity_path', return_value=False), \
-                 patch('app.request_hooks.should_skip_activity_endpoint', return_value=True), \
-                 patch('app.request_hooks.update_session_activity') as mock_update:
+            with patch('app.middleware.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.middleware.request_hooks.should_skip_activity_path', return_value=False), \
+                 patch('app.middleware.request_hooks.should_skip_activity_endpoint', return_value=True), \
+                 patch('app.middleware.request_hooks.update_session_activity') as mock_update:
                 mock_user = MagicMock(is_authenticated=True)
                 with patch('flask_login.utils._get_user', return_value=mock_user):
                     hook = _find_before_request_hook(app, 'update_activity')
@@ -267,10 +267,10 @@ class TestUpdateActivityHook:
     def test_unauthenticated_user_does_not_update_activity(self, app):
         """Unauthenticated requests never call update_session_activity."""
         with app.test_request_context('/dashboard'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
-                 patch('app.request_hooks.should_skip_activity_path', return_value=False), \
-                 patch('app.request_hooks.should_skip_activity_endpoint', return_value=False), \
-                 patch('app.request_hooks.update_session_activity') as mock_update:
+            with patch('app.middleware.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.middleware.request_hooks.should_skip_activity_path', return_value=False), \
+                 patch('app.middleware.request_hooks.should_skip_activity_endpoint', return_value=False), \
+                 patch('app.middleware.request_hooks.update_session_activity') as mock_update:
                 mock_user = MagicMock(is_authenticated=False)
                 with patch('flask_login.utils._get_user', return_value=mock_user):
                     hook = _find_before_request_hook(app, 'update_activity')

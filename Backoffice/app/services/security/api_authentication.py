@@ -252,7 +252,7 @@ def _effective_permissions(db_api_key) -> KeyPermissions:
         _warned_legacy_key_ids.add(db_api_key.id)
         current_app.logger.warning(
             "[API auth] legacy full-access API key in use: api_keys.id=%s client=%r. "
-            "Narrow its permissions in Admin > API Management > API Keys.",
+            "Narrow its permissions in Admin > API > API Keys.",
             db_api_key.id,
             db_api_key.client_name,
         )

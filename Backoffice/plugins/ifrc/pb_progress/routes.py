@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from flask import render_template, request, send_from_directory, url_for
+from flask import render_template, request, url_for
 from werkzeug.exceptions import NotFound
+
+from app.assets.plugin_static import plugin_static_url, send_plugin_static
 
 from flask_login import current_user
 
@@ -30,6 +32,7 @@ from app.utils.api.api_responses import json_bad_request, json_ok
 
 logger = logging.getLogger(__name__)
 
+_STATIC_DIR = _PLUGIN_DIR / "static"
 _ADMIN_SUBTABS = frozenset({"build", "mapping", "translations"})
 
 
@@ -52,7 +55,12 @@ def settings_page():
 @permission_required("admin.data_explore.pb_progress")
 def static(filename: str):
     """Plugin JS/CSS — same permission as the P&B Progress explorer tab."""
-    return send_from_directory(str(_PLUGIN_DIR / "static"), filename)
+    return send_plugin_static(_STATIC_DIR, filename, private=True)
+
+
+@bp.app_template_global("pb_progress_static_url")
+def pb_progress_static_url(filename: str) -> str:
+    return plugin_static_url("pb_progress.static", _STATIC_DIR, filename)
 
 
 @bp.route("/pb-progress/manage", methods=["GET"])

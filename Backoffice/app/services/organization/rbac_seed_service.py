@@ -43,7 +43,7 @@ class RbacSeedLockMode(str, Enum):
     - TRY: non-blocking. If another process holds the lock, return immediately
       with `skipped_due_to_lock=1` and make no writes. Right for the
       best-effort background auto-seed thread started on every gunicorn worker
-      boot (`app/startup_tasks.py`) -- losing the race to a sibling worker
+      boot (`app/runtime/startup_tasks.py`) -- losing the race to a sibling worker
       seeding the exact same catalog is harmless, and a boot-time thread must
       never block app startup waiting on another process.
     - WAIT: retry non-blocking attempts for up to `wait_timeout_seconds`
@@ -179,11 +179,6 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
             "Legacy grant. Disaggregation, Service income, and Everyone Counts each have their own permission.",
         ),
         ("admin.data_explore.compliance", "Data Explorer: Compliance", "Access the Compliance tab in Data Explorer"),
-        ("admin.data_explore.reports", "Data Explorer: Reports", "Access published reports in Data Explorer"),
-        # Reports builder
-        ("admin.reports.view", "Reports: View", "View reports within assigned scope"),
-        ("admin.reports.edit", "Reports: Edit", "Create and edit own reports"),
-        ("admin.reports.manage", "Reports: Manage all", "View and edit all reports (system managers)"),
         # Validation admin
         ("admin.validation.dashboard", "Validation: Dashboard", "Access the Validation Dashboard (tracker, checks, dispatch)"),
         ("admin.validation.questions", "Validation: Questions", "Manage validation questions (list, edit, import/export)"),
@@ -440,24 +435,6 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
                 "admin.validation.questions",
                 "admin.validation.rules",
             ],
-        },
-        {
-            "code": "admin_data_explorer_reports",
-            "name": "Admin: Data Explorer (Reports)",
-            "description": "Access published reports in Data Explorer.",
-            "permission_codes": ["admin.data_explore.reports"],
-        },
-        {
-            "code": "admin_reports_viewer",
-            "name": "Admin: Reports (View)",
-            "description": "View published reports within scope.",
-            "permission_codes": ["admin.reports.view"],
-        },
-        {
-            "code": "admin_reports_editor",
-            "name": "Admin: Reports (Edit)",
-            "description": "Create and edit reports within scope.",
-            "permission_codes": ["admin.reports.view", "admin.reports.edit"],
         },
         {
             "code": "admin_validation_dashboard",

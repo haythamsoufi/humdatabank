@@ -6,9 +6,10 @@ import logging
 from functools import wraps
 from typing import Any, Callable
 
-from flask import g, jsonify, render_template, request, send_from_directory, url_for
+from flask import g, jsonify, render_template, request, url_for
 from flask_login import current_user
 
+from app.assets.plugin_static import plugin_static_url, send_plugin_static
 from app.utils.api.api_responses import (
     GENERIC_ERROR_MESSAGE,
     json_auth_required,
@@ -28,6 +29,7 @@ from plugins.ifrc.decisions.metrics import METRIC_REGISTRY
 
 logger = logging.getLogger(__name__)
 
+_STATIC_DIR = _PLUGIN_DIR / "static"
 _MAX_NOTE = 2000
 
 
@@ -237,7 +239,12 @@ def _page_guard():
 def static_file(filename: str):
     if not getattr(current_user, "is_authenticated", False):
         return json_auth_required()
-    return send_from_directory(str(_PLUGIN_DIR / "static"), filename)
+    return send_plugin_static(_STATIC_DIR, filename, private=True)
+
+
+@bp.app_template_global("decisions_static_url")
+def decisions_static_url(filename: str) -> str:
+    return plugin_static_url("decisions.static_file", _STATIC_DIR, filename)
 
 
 def _page(template: str, **context: Any):

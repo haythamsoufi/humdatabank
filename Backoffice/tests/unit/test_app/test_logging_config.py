@@ -1,11 +1,11 @@
-"""Tests for app/logging_config.py — full coverage of all branches."""
+"""Tests for app/runtime/logging_config.py — full coverage of all branches."""
 
 import logging
 import pytest
 from unittest.mock import MagicMock, patch
 from flask import Flask
 
-from app.logging_config import (
+from app.runtime.logging_config import (
     StaticFileFilter,
     SQLAlchemyRelationshipFilter,
     WeasyprintCssIgnoreFilter,

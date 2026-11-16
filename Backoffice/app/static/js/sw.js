@@ -97,7 +97,16 @@ function cacheKeyForUrl(u) {
 }
 
 function isCodeAsset(pathname) {
-  return /\.(js|css)$/i.test(pathname);
+  return /\.(m?js|css)$/i.test(pathname);
+}
+
+// Plugin static routes follow one shape: /<segment>/static/<path> (for example
+// /upr/static/js/x.js, /fdrs/static/css/y.css; see app/assets/plugin_static.py).
+// Matching the shape instead of plugin names means a new plugin is covered with no
+// change here. Only JS/CSS is handled: those must track the server's bytes. Other
+// plugin files (login-gated Excel templates, downloads) are left to the browser.
+function isPluginStaticCode(pathname) {
+  return /^\/(?:[^/]+\/)+static\/.+\.(?:m?js|css)$/i.test(pathname);
 }
 
 async function respondStaticAsset(request, url) {
@@ -384,6 +393,12 @@ self.addEventListener('fetch', (event) => {
 
   // Plugin static assets are served under /plugins/static/<plugin>/...
   if (url.pathname.startsWith('/plugins/') && url.pathname.includes('/static/')) {
+    event.respondWith(respondStaticAsset(request, url));
+    return;
+  }
+
+  // Plugins that serve their own files (/<name>/static/...) get the same JS/CSS handling.
+  if (isPluginStaticCode(url.pathname)) {
     event.respondWith(respondStaticAsset(request, url));
     return;
   }

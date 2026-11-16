@@ -101,7 +101,7 @@ Gunicorn recycles workers after `GUNICORN_MAX_REQUESTS` requests (default 1000).
 
 Symptoms: `QueuePool limit of size X overflow Y reached` in logs, then 504s on otherwise fast pages.
 
-Root cause: scheduler jobs (email retry, notification dispatch) run in **every** gunicorn worker simultaneously (fixed in `app/scheduler.py` — only one worker now runs the scheduler via `_is_scheduler_worker()`). Also common during post-deploy startup when deferred tasks and RBAC seed compete for connections.
+Root cause: scheduler jobs (email retry, notification dispatch) run in **every** gunicorn worker simultaneously (fixed in `app/runtime/scheduler.py` — only one worker now runs the scheduler via `_is_scheduler_worker()`). Also common during post-deploy startup when deferred tasks and RBAC seed compete for connections.
 
 - Check `SQLALCHEMY_POOL_SIZE` × workers does not exceed PostgreSQL `max_connections` tier limit (B1ms = 50, B2s = 100, GP-2vCore = 200).
 - Verify `DB_STATEMENT_TIMEOUT_MS=120000` is set (added to `ProductionConfig`) so runaway queries release their connections.

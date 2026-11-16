@@ -98,7 +98,7 @@ def _investigate(app, url: Optional[str], reported_at: float) -> None:
 
 def _analyse_and_log(app, *, url: Optional[str], reported_at: float) -> None:
     from app.services.monitoring.request_pressure import snapshot_inflight
-    from app.scheduler_lock import scheduler_lock_path, read_lock_owner, pid_alive
+    from app.runtime.scheduler_lock import scheduler_lock_path, read_lock_owner, pid_alive
 
     now = time.time()
     elapsed = now - reported_at

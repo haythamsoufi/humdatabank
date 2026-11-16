@@ -143,12 +143,6 @@ from .translation_quality import (
     TranslationDocumentPair,
 )
 
-from .reports import (
-    ReportDefinition,
-    ReportDefinitionRevision,
-    ReportRun,
-)
-
 from .rbac import (
     RbacPermission,
     RbacRole,
@@ -346,11 +340,6 @@ __all__ = [
     'TranslationGlossaryCandidate',
     'TranslationMemoryEntry',
     'TranslationDocumentPair',
-
-    # Report builder
-    'ReportDefinition',
-    'ReportDefinitionRevision',
-    'ReportRun',
 
     # AI Embeddings models
     'AIDocument',

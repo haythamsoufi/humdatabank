@@ -127,7 +127,7 @@ def register_dev_tools_commands(app):
             db.session.flush()
 
             try:
-                from app.seeding import _DEV_TEST_ADMIN_ALL_ROLE_CODES, _assign_roles_to_user
+                from app.runtime.seeding import _DEV_TEST_ADMIN_ALL_ROLE_CODES, _assign_roles_to_user
 
                 _assign_roles_to_user(int(admin.id), list(_DEV_TEST_ADMIN_ALL_ROLE_CODES))
             except Exception as e:
@@ -157,7 +157,7 @@ def register_dev_tools_commands(app):
 
         Refuses to run unless FLASK_CONFIG=development and the database host is local.
         """
-        from app.seeding import _database_url_for, create_default_data, dev_seeding_refusal_reason
+        from app.runtime.seeding import _database_url_for, create_default_data, dev_seeding_refusal_reason
 
         refusal = dev_seeding_refusal_reason(_database_url_for(current_app))
         if refusal:

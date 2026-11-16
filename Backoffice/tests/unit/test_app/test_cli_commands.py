@@ -19,7 +19,7 @@ class TestRbacCliCommandsModule:
 
     register_rbac_commands is the canonical source of the `flask rbac ...`
     group -- cli.py calls it once during normal app startup (see
-    register_commands in app/cli.py) rather than defining its own inline
+    register_commands in app/cli_commands/cli.py) rather than defining its own inline
     `rbac` group. This test file registers it on its own minimal Flask app
     (instead of the shared `app`/`runner` fixtures) to keep these unit tests
     independent of the main app's CLI wiring.

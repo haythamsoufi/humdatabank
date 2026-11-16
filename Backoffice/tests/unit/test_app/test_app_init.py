@@ -246,9 +246,9 @@ class TestCreateAppEdgeCases:
     def test_cli_registration_failure_is_swallowed(self, app):
         """CLI command registration exceptions should be caught and logged as warning."""
         # This tests the try/except block around register_cli_commands
-        with patch('app.cli.register_commands', side_effect=Exception("CLI error")):
+        with patch('app.cli_commands.cli.register_commands', side_effect=Exception("CLI error")):
             with patch.object(app.logger, 'warning') as mock_warn:
-                from app.cli import register_commands
+                from app.cli_commands.cli import register_commands
                 try:
                     register_commands(app)
                 except Exception as e:

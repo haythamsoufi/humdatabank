@@ -3,7 +3,7 @@
 Default data initialization script (local development only).
 
 Creates well-known test accounts, so it refuses to run unless ``FLASK_CONFIG=development`` is set
-explicitly and the database host is local (see ``app.seeding.dev_seeding_refusal_reason``).
+explicitly and the database host is local (see ``app.runtime.seeding.dev_seeding_refusal_reason``).
 
 Passwords come from ``TEST_ADMIN_PASSWORD``, ``TEST_FOCAL_PASSWORD`` and ``TEST_SYS_MANAGER_PASSWORD``.
 Any that are unset get a random password, printed once at the end of the run.
@@ -59,7 +59,7 @@ def main():
             )
             return 1
 
-        from app.seeding import dev_seeding_refusal_reason
+        from app.runtime.seeding import dev_seeding_refusal_reason
 
         refusal = dev_seeding_refusal_reason(os.environ.get('DATABASE_URL') or '')
         if refusal:
@@ -192,7 +192,7 @@ def main():
                         db.session.flush()
                         return int(role.id)
 
-                    from app.seeding import _DEV_TEST_ADMIN_ALL_ROLE_CODES, _assign_roles_to_user
+                    from app.runtime.seeding import _DEV_TEST_ADMIN_ALL_ROLE_CODES, _assign_roles_to_user
 
                     admin_role_codes = list(_DEV_TEST_ADMIN_ALL_ROLE_CODES)
                     focal_role_id = _ensure_role("assignment_editor_submitter", "Assignment Editor/Submitter")

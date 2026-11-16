@@ -68,7 +68,7 @@ class EntityService:
     # thread that was still mid-import of app/models/embeddings.py, causing
     # an intermittent "failed to locate a name ('AIEmbedding')" boot crash.
     # App startup now eagerly configures all mappers before any thread starts
-    # (see app.bootstrap._configure_all_model_mappers), which is the primary
+    # (see app.runtime.bootstrap._configure_all_model_mappers), which is the primary
     # fix; building this dict lazily is a defensive second layer so importing
     # this module alone never has side effects on the ORM registry.
     _HIERARCHY_LOAD_OPTIONS_CACHE = None

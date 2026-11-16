@@ -975,7 +975,7 @@ def manage_resources():
 
     return render_template(
         "admin/resources/manage_resources.html",
-        title="Manage Resources",
+        title="Resources",
         resource_rows=_resource_grid_rows(query.all()),
     )
 
@@ -1568,7 +1568,7 @@ def manage_documents():
         documents_json_url=url_for("content_management.manage_documents"),
         countries=countries,
         show_country_column=show_country_column,
-        title="Manage Documents",
+        title="Documents",
         document_entity_types=document_entity_types,
         standalone_entity_options_url=url_for("content_management.standalone_document_entity_options"),
         documents_modal_entity_choices=_document_modal_entity_choice_rows_for_admin(),

@@ -11,7 +11,7 @@ from config.config import config as config_map, resolve_flask_config_name
 
 from .extensions import babel, csrf, db, login, migrate
 from .i18n import get_locale  # noqa: F401 — re-export for callers that do `from app import get_locale`
-from .seeding import create_default_data  # noqa: F401 — re-export for run.py
+from .runtime.seeding import create_default_data  # noqa: F401 — re-export for run.py
 
 __all__ = ['create_app', 'create_default_data', 'db', 'get_locale', 'login', 'migrate', 'babel', 'csrf']
 
@@ -26,7 +26,7 @@ def create_app(config_name=None):
 
     app = Flask(__name__, static_folder=None, static_url_path=None)
 
-    from app.static_serving import register_static_route
+    from app.assets.static_serving import register_static_route
     register_static_route(app, static_folder_path)
 
     selected_config_name = config_name or resolve_flask_config_name()
@@ -113,7 +113,7 @@ def create_app(config_name=None):
     )
     debug_manager.configure_logging(app, verbose_debug)
 
-    from app.logging_config import configure_access_log_filters
+    from app.runtime.logging_config import configure_access_log_filters
     configure_access_log_filters(app)
 
     from app.services.monitoring.memory import memory_monitor
@@ -131,7 +131,7 @@ def create_app(config_name=None):
         init_security_headers(app)
         app.logger.debug("Security headers initialized")
 
-    from app.bootstrap import init_flask_extensions, init_upload_storage, register_favicon_routes
+    from app.runtime.bootstrap import init_flask_extensions, init_upload_storage, register_favicon_routes
     init_upload_storage(app)
     init_flask_extensions(app, config_class, startup_start)
 
@@ -140,11 +140,11 @@ def create_app(config_name=None):
     from app.middleware import register_site_lock_middleware, register_session_timeout_middleware
     register_site_lock_middleware(app)
 
-    from app.request_hooks import register_request_hooks
+    from app.middleware.request_hooks import register_request_hooks
     register_request_hooks(app)
     register_session_timeout_middleware(app)
 
-    from app.template_context import register_template_context
+    from app.templating.template_context import register_template_context
     register_template_context(app, config_class)
 
     from app.utils.common.dev_server_port import dev_process_serves_http
@@ -182,7 +182,7 @@ def create_app(config_name=None):
 
     # RBAC auto-seed reads plugin get_seed_roles(); it must start after plugins
     # are loaded or the first boot after a plugin role is added is a no-op.
-    from app.startup_tasks import run_startup_tasks
+    from app.runtime.startup_tasks import run_startup_tasks
     run_startup_tasks(app, selected_config_name, is_reloader)
 
     from app.routes import register_all_blueprints
@@ -197,14 +197,14 @@ def create_app(config_name=None):
         app.plugin_manager.register_blueprints()
         app.plugin_manager.register_activation_guard()
 
-    from app.error_handlers import register_error_handlers
+    from app.middleware.error_handlers import register_error_handlers
     register_error_handlers(app)
 
     csrf.exempt(api_bp)
     csrf.exempt(swagger_bp)
 
     try:
-        from .cli import register_commands as register_cli_commands
+        from .cli_commands.cli import register_commands as register_cli_commands
         register_cli_commands(app)
     except Exception as e:
         app.logger.warning("CLI commands not registered: %s", e)
@@ -215,7 +215,7 @@ def create_app(config_name=None):
     from app.middleware.activity_middleware import init_activity_tracking
     init_activity_tracking(app)
 
-    from app.scheduler import init_scheduler
+    from app.runtime.scheduler import init_scheduler
     init_scheduler(app, is_reloader)
 
     total_startup_time = time.time() - startup_start

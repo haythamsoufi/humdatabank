@@ -293,7 +293,7 @@ def _resolve_dev_act_as_preset(preset: str):
 
     # Test user missing — seed all test accounts, then retry once.
     try:
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
         current_app.logger.info(
             "Dev act-as: test user '%s' not found — running create_default_data to seed test accounts.",
             email,

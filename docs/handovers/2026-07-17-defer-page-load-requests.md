@@ -61,7 +61,7 @@ A plan was executed across phases. The working tree also contains **unrelated WI
 ## Files primarily owned by this work
 
 ```
-Backoffice/app/template_context.py
+Backoffice/app/templating/template_context.py
 Backoffice/app/templates/core/layout.html
 Backoffice/app/static/js/core/components.js
 Backoffice/app/static/js/core/csrf.js

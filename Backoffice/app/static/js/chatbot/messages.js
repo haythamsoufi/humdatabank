@@ -107,12 +107,12 @@ const ChatbotMessages = {
 
         template: {
             keywords: ['template', 'form template', 'create form', 'form builder'],
-            response: 'Templates are the foundation of your data collection! 📋<br><br><strong>Location:</strong> Form & Data Management → Manage Templates<br><br><strong>What you can do:</strong><br>• Create new templates with custom fields<br>• Add sections and organize your form structure<br>• Set up validation rules and conditional logic<br>• Use dynamic indicators from the Indicator Bank<br>• Configure repeating sections for complex data<br><br>Templates become the basis for assignments that users fill out.'
+            response: 'Templates are the foundation of your data collection! 📋<br><br><strong>Location:</strong> Form & Data Management → Templates<br><br><strong>What you can do:</strong><br>• Create new templates with custom fields<br>• Add sections and organize your form structure<br>• Set up validation rules and conditional logic<br>• Use dynamic indicators from the Indicator Bank<br>• Configure repeating sections for complex data<br><br>Templates become the basis for assignments that users fill out.'
         },
 
         assignment: {
             keywords: ['assignment', 'assign', 'task', 'assign form'],
-            response: 'Assignments connect your templates to specific users or countries! 🎯<br><br><strong>How it works:</strong><br>1. Choose a template<br>2. Select who should fill it out (users/countries)<br>3. Set deadlines and priorities<br>4. Track completion status<br><br><strong>Location:</strong> Form & Data Management → Manage Assignments<br><br>Users will see their assignments on their dashboard and can submit data through them.'
+            response: 'Assignments connect your templates to specific users or countries! 🎯<br><br><strong>How it works:</strong><br>1. Choose a template<br>2. Select who should fill it out (users/countries)<br>3. Set deadlines and priorities<br>4. Track completion status<br><br><strong>Location:</strong> Form & Data Management → Assignments<br><br>Users will see their assignments on their dashboard and can submit data through them.'
         },
 
         help: {
@@ -147,7 +147,7 @@ const ChatbotMessages = {
         },
 
         template_management: {
-            title: 'Template Management',
+            title: 'Templates',
             emoji: '🎯',
             description: `Create and edit form templates here:<br>
                 • Build custom forms with drag-and-drop<br>
@@ -157,7 +157,7 @@ const ChatbotMessages = {
         },
 
         assignment_management: {
-            title: 'Assignment Management',
+            title: 'Assignments',
             emoji: '🎯',
             description: `Assign templates to users or countries:<br>
                 • Select templates and target recipients<br>
@@ -167,7 +167,7 @@ const ChatbotMessages = {
         },
 
         user_management: {
-            title: 'User Management Center',
+            title: 'Users',
             emoji: '🎯',
             description: `Comprehensive user administration for platform access control:<br>
                 • <strong>Create Users:</strong> Add new Admin or Focal Point accounts<br>
@@ -182,7 +182,7 @@ const ChatbotMessages = {
         },
 
         country_management: {
-            title: 'Country Management',
+            title: 'Organizational Structure',
             emoji: '🎯',
             description: `Manage country data and assignments:<br>
                 • Add and edit country information<br>
@@ -202,7 +202,7 @@ const ChatbotMessages = {
         },
 
         analytics: {
-            title: 'Analytics Dashboard',
+            title: 'User Analytics',
             emoji: '🎯',
             description: `View platform insights and reports:<br>
                 • User activity and engagement<br>
@@ -222,7 +222,7 @@ const ChatbotMessages = {
         },
 
         document_management: {
-            title: 'Document Management',
+            title: 'Documents',
             emoji: '🎯',
             description: `Organize and share files:<br>
                 • Upload documents and organize in folders<br>

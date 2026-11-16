@@ -69,13 +69,13 @@ def login(client, user):
 
 class TestGuardAudit:
     def test_application_routes_have_no_findings(self, app):
-        from app.startup_tasks import collect_admin_route_guard_findings
+        from app.runtime.startup_tasks import collect_admin_route_guard_findings
 
         findings = collect_admin_route_guard_findings(app)
         assert findings == [], "\n".join(f"{f['kind']}: {f['endpoint']} {f['path']} {f['detail']}" for f in findings)
 
     def test_strict_audit_passes_on_the_real_app(self, app, monkeypatch):
-        from app.startup_tasks import audit_admin_route_guards
+        from app.runtime.startup_tasks import audit_admin_route_guards
 
         admin_rules = [r for r in app.url_map.iter_rules() if r.rule.startswith("/admin")]
         assert len(admin_rules) > 300
@@ -148,7 +148,7 @@ class TestGuardAudit:
         return mini
 
     def test_audit_flags_each_regression_class(self):
-        from app.startup_tasks import collect_admin_route_guard_findings
+        from app.runtime.startup_tasks import collect_admin_route_guard_findings
 
         kinds = {(f["kind"], f["endpoint"]) for f in collect_admin_route_guard_findings(self._mini_app())}
         assert ("missing_guard", "unguarded") in kinds
@@ -159,7 +159,7 @@ class TestGuardAudit:
 
     def test_audit_flags_policy_violations(self, monkeypatch):
         from app.routes.admin import route_policy as policy
-        from app.startup_tasks import collect_admin_route_guard_findings
+        from app.runtime.startup_tasks import collect_admin_route_guard_findings
 
         monkeypatch.setattr(policy, "SYSTEM_MANAGER_ONLY_ENDPOINTS", frozenset({"ok_route"}))
         monkeypatch.setattr(policy, "POST_ONLY_ENDPOINTS", frozenset({"non_admin_perm"}))
@@ -170,7 +170,7 @@ class TestGuardAudit:
         assert ("policy_required_permission", "ok_route") in kinds
 
     def test_strict_mode_raises(self, monkeypatch):
-        from app.startup_tasks import audit_admin_route_guards
+        from app.runtime.startup_tasks import audit_admin_route_guards
 
         monkeypatch.setenv("RBAC_ADMIN_ROUTE_GUARD_MODE", "error")
         with pytest.raises(RuntimeError):

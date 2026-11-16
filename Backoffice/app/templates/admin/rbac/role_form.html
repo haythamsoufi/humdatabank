@@ -10,7 +10,7 @@
     icon='fas fa-shield-alt',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('User Management'), 'url': url_for('user_management.manage_users')},
+        {'name': _('Users'), 'url': url_for('user_management.manage_users')},
         {'name': _('Roles'), 'url': url_for('rbac_management.manage_roles')},
         {'name': (role.name if role else _('New Role'))}
     ],

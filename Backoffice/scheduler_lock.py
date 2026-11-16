@@ -5,7 +5,7 @@ package) so the Gunicorn master process can import it from the hooks in
 ``config/gunicorn.conf.py`` without executing ``app/__init__`` (Flask,
 SQLAlchemy, config) — the master never serves requests and should stay
 light. Application code imports the same objects through the
-``app.scheduler_lock`` compatibility shim. Besides the lock itself it hosts
+``app.runtime.scheduler_lock`` compatibility shim. Besides the lock itself it hosts
 the worker-teardown helpers used by the hooks: bounded scheduler shutdown
 and the lingering-thread hard-exit escape hatch.
 
@@ -434,7 +434,7 @@ def sweep_stale_scheduler_locks(current_master_pid: Optional[int] = None) -> int
 
 
 # ---------------------------------------------------------------------------
-# Scheduler shutdown helpers (used by app/scheduler.py and gunicorn hooks)
+# Scheduler shutdown helpers (used by app/runtime/scheduler.py and gunicorn hooks)
 # ---------------------------------------------------------------------------
 
 def shutdown_scheduler_bounded(

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from html import escape
 
-from flask import Response, redirect, render_template, request, send_from_directory, url_for
+from flask import Response, redirect, render_template, request, url_for
 
+from app.assets.plugin_static import plugin_static_url, send_plugin_static
 from app.utils.api.api_responses import GENERIC_ERROR_MESSAGE, json_ok
 from app.utils.security.client_ip import get_client_ip
 from app.utils.common.error_handling import handle_json_view_exception
@@ -26,17 +27,12 @@ def _public() -> None:
     suppress_session_cookie_for_request()
 
 
-def _asset_version(filename: str) -> str:
-    path = _PLUGIN_DIR / "ppp" / "static" / filename
-    try:
-        return str(int(path.stat().st_mtime))
-    except OSError:
-        return "0"
+_STATIC_DIR = _PLUGIN_DIR / "ppp" / "static"
 
 
 @bp.app_template_global("ifrc_static_url")
 def ifrc_static_url(filename: str) -> str:
-    return url_for("ifrc.static_file", filename=filename, v=_asset_version(filename))
+    return plugin_static_url("ifrc.static_file", _STATIC_DIR, filename)
 
 
 def _powerbi_frame(page: str, title: str) -> Response:
@@ -55,9 +51,7 @@ def _powerbi_frame(page: str, title: str) -> Response:
 def static_file(filename: str):
     """Styles and scripts for the public embeds. No login cookie is required."""
     _public()
-    response = send_from_directory(str(_PLUGIN_DIR / "ppp" / "static"), filename)
-    response.headers["Cache-Control"] = "public, max-age=300"
-    return response
+    return send_plugin_static(_STATIC_DIR, filename)
 
 
 def _requested_view() -> str:

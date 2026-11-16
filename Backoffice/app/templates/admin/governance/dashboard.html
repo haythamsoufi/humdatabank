@@ -4,7 +4,7 @@
 {% from "components/ag_grid_includes.html" import ag_grid_container, ag_grid_js %}
 {% from "macros/part_of_filter_checkboxes.html" import part_of_filter_checkboxes %}
 
-{% block title %}{{ _('Data governance') }}{% endblock %}
+{% block title %}{{ _('Governance') }}{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -46,12 +46,12 @@ details.gov-decide > summary:hover { text-decoration:underline; }
 {% set o = report.ownership | default({}, true) %}
 
 {{ page_header(
-    title=_('Data governance'),
+    title=_('Governance'),
     subtitle=_('Control register for ownership, access, reporting discipline, the indicator glossary, and public links.'),
     icon='fas fa-balance-scale',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Data governance')}
+        {'name': _('Governance')}
     ]
 ) }}
 

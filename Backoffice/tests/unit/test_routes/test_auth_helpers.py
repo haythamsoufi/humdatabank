@@ -218,7 +218,7 @@ class TestDevActAsHelpers:
         monkeypatch.setenv('FLASK_CONFIG', 'development')
         # No test_sys@ user exists; seeding is stubbed to do nothing.
         with app.test_request_context('/'):
-            with patch('app.seeding.create_default_data', side_effect=RuntimeError('db unavail')):
+            with patch('app.runtime.seeding.create_default_data', side_effect=RuntimeError('db unavail')):
                 resolved = _resolve_dev_act_as_preset('sys_manager')
         # Must return None rather than a real user picked by RBAC role.
         assert resolved is None
@@ -235,7 +235,7 @@ class TestDevActAsHelpers:
             _db.session.commit()
 
         with app.test_request_context('/'):
-            with patch('app.seeding.create_default_data', side_effect=fake_seed):
+            with patch('app.runtime.seeding.create_default_data', side_effect=fake_seed):
                 resolved = _resolve_dev_act_as_preset('admin')
         assert resolved is not None
         assert resolved.email == 'test_admin@humdatabank.org'

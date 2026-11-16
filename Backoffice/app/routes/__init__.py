@@ -93,7 +93,7 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
             "Admin blueprints import/registration took %.3fs", admin_bp_time
         )
 
-    from app.startup_tasks import audit_admin_route_guards
+    from app.runtime.startup_tasks import audit_admin_route_guards
     audit_admin_route_guards(app)
 
     blueprint_time = time.time() - blueprint_start

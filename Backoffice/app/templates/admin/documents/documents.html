@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% block title %}{{ page_title if page_title is defined and page_title else _('Documents') }}{% endblock %}
 {% from "macros/empty_state.html" import empty_state %}
 {# Permission gates for UI (routes remain authoritative). Define at top-level so blocks can reuse safely. #}
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
@@ -37,7 +38,7 @@
 {% set _user_countries = (current_user.countries.all() if current_user.is_authenticated and hasattr(current_user, 'countries') and hasattr(current_user.countries, 'all') else (current_user.countries if current_user.is_authenticated and hasattr(current_user, 'countries') else [])) %}
 {% set current_user_country_ids = _user_countries | map(attribute='id') | list %}
 
-{% set _doc_page_title = (page_title if page_title is defined and page_title else _('Document Management')) %}
+{% set _doc_page_title = (page_title if page_title is defined and page_title else _('Documents')) %}
 {% set _doc_page_subtitle = (documents_page_subtitle if documents_page_subtitle is defined and documents_page_subtitle else none) %}
 {% set _doc_header_actions = [
     {

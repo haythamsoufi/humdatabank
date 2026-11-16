@@ -19,7 +19,7 @@
 {% set overview = user_overview_stats | default({}) %}
 
 {% from "components/_page_header.html" import page_header %}
-{% block title %}{{ _('Manage Users') }}{% endblock %}
+{% block title %}{{ _('Users') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -84,11 +84,11 @@
 {% endif %}
 
 {{ page_header(
-    title=_('Manage Users'),
+    title=_('Users'),
     icon='fas fa-users',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('User Management')}
+        {'name': _('Users')}
     ],
     actions=header_actions.items
 ) }}

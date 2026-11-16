@@ -1,7 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 
-{% block title %}{{ _('AI Reasoning Traces') }}{% endblock %}
+{% block title %}{{ _('Reasoning Traces') }}{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -10,7 +10,7 @@
 {% block content %}
 {% from "components/ag_grid_includes.html" import ag_grid_loading_overlay %}
 {{ page_header(
-    title=_('AI Reasoning Traces'),
+    title=_('Reasoning Traces'),
     icon='fas fa-project-diagram',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},

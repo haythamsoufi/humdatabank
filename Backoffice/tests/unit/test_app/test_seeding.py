@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/seeding.py — targets 100% coverage.
+Comprehensive tests for app/runtime/seeding.py — targets 100% coverage.
 
 All tests mock DB interactions and external services.
 
@@ -41,7 +41,7 @@ def _make_ctx(app):
 @pytest.fixture(autouse=True)
 def skip_dashboard_sample_seed():
     """Dashboard samples hit real form tables. Keep these unit tests on mocks."""
-    with patch("app.seeding._seed_dev_dashboard_samples") as mocked:
+    with patch("app.runtime.seeding._seed_dev_dashboard_samples") as mocked:
         yield mocked
 
 
@@ -51,7 +51,7 @@ def skip_dashboard_sample_seed():
 
 class TestCreateDefaultDataEnvironmentGuard:
     def test_refuses_production(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         with patch.dict(os.environ, {"FLASK_CONFIG": "production"}):
@@ -61,7 +61,7 @@ class TestCreateDefaultDataEnvironmentGuard:
         app.app_context.assert_not_called()
 
     def test_refuses_staging(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         with patch.dict(os.environ, {"FLASK_CONFIG": "staging"}):
@@ -71,15 +71,15 @@ class TestCreateDefaultDataEnvironmentGuard:
         app.app_context.assert_not_called()
 
     def test_allows_development_proceeds_to_app_context(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         _make_ctx(app)
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.return_value = False
-                with patch("app.seeding.db"):
+                with patch("app.runtime.seeding.db"):
                     with patch("app.models.User"), patch("app.models.Country"):
                         create_default_data(app)
 
@@ -92,15 +92,15 @@ class TestCreateDefaultDataEnvironmentGuard:
 
 class TestCreateDefaultDataMissingTables:
     def test_skips_when_both_tables_missing(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         _make_ctx(app)
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.return_value = False
-                with patch("app.seeding.db"):
+                with patch("app.runtime.seeding.db"):
                     with patch("app.models.User"), patch("app.models.Country"):
                         create_default_data(app)
 
@@ -108,7 +108,7 @@ class TestCreateDefaultDataMissingTables:
         app.logger.warning.assert_called()
 
     def test_skips_when_user_table_missing(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         _make_ctx(app)
@@ -117,9 +117,9 @@ class TestCreateDefaultDataMissingTables:
             return name == "country"  # user missing
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = has_table
-                with patch("app.seeding.db"):
+                with patch("app.runtime.seeding.db"):
                     with patch("app.models.User"), patch("app.models.Country"):
                         create_default_data(app)
 
@@ -151,7 +151,7 @@ class TestSystemSettingsInit:
         return app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db
 
     def test_creates_system_settings_when_table_exists_and_empty(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._build_app_and_mocks()
         mock_new_country = MagicMock()
@@ -161,9 +161,9 @@ class TestSystemSettingsInit:
         mock_sys_settings.query.count.return_value = 0
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.return_value = True
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -185,15 +185,15 @@ class TestSystemSettingsInit:
         et.assert_called_once()
 
     def test_skips_system_settings_when_table_missing(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._build_app_and_mocks()
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 # system_settings table missing
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -206,7 +206,7 @@ class TestSystemSettingsInit:
         app.logger.info.assert_called()
 
     def test_skips_system_settings_when_already_populated(self, skip_dashboard_sample_seed):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._build_app_and_mocks()
 
@@ -214,9 +214,9 @@ class TestSystemSettingsInit:
         mock_sys_settings.query.count.return_value = 5  # already has data
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.return_value = True
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -237,7 +237,7 @@ class TestSystemSettingsInit:
 
 class TestCountryCreation:
     def test_creates_testland_when_missing(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         _make_ctx(app)
@@ -257,9 +257,9 @@ class TestCountryCreation:
         mock_db = MagicMock()
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -272,7 +272,7 @@ class TestCountryCreation:
         assert "Created default country" in info_calls
 
     def test_skips_testland_when_already_exists(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         _make_ctx(app)
@@ -291,9 +291,9 @@ class TestCountryCreation:
         mock_db = MagicMock()
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -345,14 +345,14 @@ class TestAdminUserCreation:
         return app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db
 
     def test_admin_created_with_test_admin_password_env(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._base_setup()
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development", "TEST_ADMIN_PASSWORD": "secret123"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -366,16 +366,16 @@ class TestAdminUserCreation:
         assert "Created default admin user" in info_calls
 
     def test_admin_created_with_generated_password(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._base_setup()
 
         env = {"FLASK_CONFIG": "development"}
         with patch.dict(os.environ, env, clear=False):
             os.environ.pop("TEST_ADMIN_PASSWORD", None)
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -389,7 +389,7 @@ class TestAdminUserCreation:
 
     def test_rbac_role_assignment_exception_logged_as_debug(self):
         """Exception during RBAC assignment is logged at debug level, not raised."""
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._base_setup()
 
@@ -398,9 +398,9 @@ class TestAdminUserCreation:
         mock_rbac_role.query.filter_by.side_effect = Exception("rbac table missing")
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -412,14 +412,14 @@ class TestAdminUserCreation:
         app.logger.debug.assert_called()
 
     def test_admin_already_exists_logs_info(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._base_setup(admin_exists=True)
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -476,12 +476,12 @@ class TestFocalPointUserCreation:
         return app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db
 
     def _run(self, app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -551,16 +551,16 @@ class TestSystemManagerUserCreation:
         return app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db
 
     def _run(self, app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db, extra_env=None):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         env = {"FLASK_CONFIG": "development"}
         if extra_env:
             env.update(extra_env)
 
         with patch.dict(os.environ, env):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -594,12 +594,12 @@ class TestSystemManagerUserCreation:
 
 class TestEnsureDevTestSysManagerRole:
     def test_grants_missing_role_and_commits(self):
-        from app.seeding import _ensure_dev_test_sys_manager_role
+        from app.runtime.seeding import _ensure_dev_test_sys_manager_role
 
         app = _mock_app()
         user = MagicMock(id=40, email="test_sys@example.com")
-        with patch("app.seeding._assign_role_to_user", return_value=True) as assign:
-            with patch("app.seeding.db") as mock_db:
+        with patch("app.runtime.seeding._assign_role_to_user", return_value=True) as assign:
+            with patch("app.runtime.seeding.db") as mock_db:
                 _ensure_dev_test_sys_manager_role(user, app)
 
         assign.assert_called_once_with(
@@ -613,24 +613,24 @@ class TestEnsureDevTestSysManagerRole:
         assert "system_manager" in str(app.logger.info.call_args)
 
     def test_skips_commit_when_role_already_present(self):
-        from app.seeding import _ensure_dev_test_sys_manager_role
+        from app.runtime.seeding import _ensure_dev_test_sys_manager_role
 
         app = _mock_app()
         user = MagicMock(id=40, email="test_sys@example.com")
-        with patch("app.seeding._assign_role_to_user", return_value=False):
-            with patch("app.seeding.db") as mock_db:
+        with patch("app.runtime.seeding._assign_role_to_user", return_value=False):
+            with patch("app.runtime.seeding.db") as mock_db:
                 _ensure_dev_test_sys_manager_role(user, app)
 
         mock_db.session.commit.assert_not_called()
         app.logger.info.assert_not_called()
 
     def test_rolls_back_on_assignment_error(self):
-        from app.seeding import _ensure_dev_test_sys_manager_role
+        from app.runtime.seeding import _ensure_dev_test_sys_manager_role
 
         app = _mock_app()
         user = MagicMock(id=40, email="test_sys@example.com")
-        with patch("app.seeding._assign_role_to_user", side_effect=RuntimeError("db down")):
-            with patch("app.seeding.db") as mock_db:
+        with patch("app.runtime.seeding._assign_role_to_user", side_effect=RuntimeError("db down")):
+            with patch("app.runtime.seeding.db") as mock_db:
                 _ensure_dev_test_sys_manager_role(user, app)
 
         mock_db.session.rollback.assert_called_once()
@@ -639,7 +639,7 @@ class TestEnsureDevTestSysManagerRole:
 
 class TestClearDevTestSysManagerEntityPermissions:
     def test_deletes_leftover_grants_and_commits(self):
-        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+        from app.runtime.seeding import _clear_dev_test_sys_manager_entity_permissions
 
         app = _mock_app()
         user = MagicMock(id=40, email="test_sys@example.com")
@@ -647,7 +647,7 @@ class TestClearDevTestSysManagerEntityPermissions:
         mock_query.filter_by.return_value.delete.return_value = 2
         with patch("app.models.core.UserEntityPermission") as perm_cls:
             perm_cls.query = mock_query
-            with patch("app.seeding.db") as mock_db:
+            with patch("app.runtime.seeding.db") as mock_db:
                 _clear_dev_test_sys_manager_entity_permissions(user, app)
 
         mock_query.filter_by.assert_called_once_with(user_id=40)
@@ -656,7 +656,7 @@ class TestClearDevTestSysManagerEntityPermissions:
         assert "leftover entity permission" in str(app.logger.info.call_args)
 
     def test_skips_commit_when_no_grants(self):
-        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+        from app.runtime.seeding import _clear_dev_test_sys_manager_entity_permissions
 
         app = _mock_app()
         user = MagicMock(id=40, email="test_sys@example.com")
@@ -664,14 +664,14 @@ class TestClearDevTestSysManagerEntityPermissions:
         mock_query.filter_by.return_value.delete.return_value = 0
         with patch("app.models.core.UserEntityPermission") as perm_cls:
             perm_cls.query = mock_query
-            with patch("app.seeding.db") as mock_db:
+            with patch("app.runtime.seeding.db") as mock_db:
                 _clear_dev_test_sys_manager_entity_permissions(user, app)
 
         mock_db.session.commit.assert_not_called()
         app.logger.info.assert_not_called()
 
     def test_rolls_back_on_delete_error(self):
-        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+        from app.runtime.seeding import _clear_dev_test_sys_manager_entity_permissions
 
         app = _mock_app()
         user = MagicMock(id=40, email="test_sys@example.com")
@@ -679,17 +679,17 @@ class TestClearDevTestSysManagerEntityPermissions:
         mock_query.filter_by.return_value.delete.side_effect = RuntimeError("db down")
         with patch("app.models.core.UserEntityPermission") as perm_cls:
             perm_cls.query = mock_query
-            with patch("app.seeding.db") as mock_db:
+            with patch("app.runtime.seeding.db") as mock_db:
                 _clear_dev_test_sys_manager_entity_permissions(user, app)
 
         mock_db.session.rollback.assert_called_once()
         app.logger.debug.assert_called()
 
     def test_noop_when_user_missing(self):
-        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+        from app.runtime.seeding import _clear_dev_test_sys_manager_entity_permissions
 
         app = _mock_app()
-        with patch("app.seeding.db") as mock_db:
+        with patch("app.runtime.seeding.db") as mock_db:
             _clear_dev_test_sys_manager_entity_permissions(None, app)
 
         mock_db.session.commit.assert_not_called()
@@ -701,7 +701,7 @@ class TestClearDevTestSysManagerEntityPermissions:
 
 class TestNationalSocietyCreation:
     def test_ns_created_when_missing(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         _make_ctx(app)
@@ -720,9 +720,9 @@ class TestNationalSocietyCreation:
         mock_db = MagicMock()
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
@@ -741,7 +741,7 @@ class TestNationalSocietyCreation:
 
 class TestCreateDefaultDataExceptionHandling:
     def test_exception_triggers_rollback_and_reraise(self):
-        from app.seeding import create_default_data
+        from app.runtime.seeding import create_default_data
 
         app = _mock_app()
         _make_ctx(app)
@@ -753,10 +753,10 @@ class TestCreateDefaultDataExceptionHandling:
         mock_country_cls.query.filter_by.side_effect = Exception("unexpected db error")
 
         with patch.dict(os.environ, {"FLASK_CONFIG": "development"}):
-            with patch("app.seeding.inspect") as mock_inspect:
+            with patch("app.runtime.seeding.inspect") as mock_inspect:
                 # Only essential tables exist; system_settings does NOT so we skip that branch
                 mock_inspect.return_value.has_table.side_effect = lambda n: n in ("country", "user")
-                with patch("app.seeding.db", mock_db):
+                with patch("app.runtime.seeding.db", mock_db):
                     with patch("app.models.Country", mock_country_cls):
                         with patch("app.models.User"):
                             with pytest.raises(Exception, match="unexpected db error"):

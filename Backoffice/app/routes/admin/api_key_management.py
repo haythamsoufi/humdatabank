@@ -181,7 +181,7 @@ def list_api_keys():
             revoked_keys=revoked_keys,
             expired_keys=expired_keys,
             now=now.replace(tzinfo=None),
-            title="API Key Management"
+            title="API Keys"
         )
     except Exception as e:
         current_app.logger.error(f"Error listing API keys: {e}", exc_info=True)

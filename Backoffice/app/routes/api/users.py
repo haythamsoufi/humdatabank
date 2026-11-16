@@ -45,7 +45,7 @@ from app.routes.main.helpers import (
     DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES,
     dashboard_assignment_entity_filter,
 )
-from app.static_version import deploy_asset_version
+from app.assets.static_version import deploy_asset_version
 from app import db
 
 

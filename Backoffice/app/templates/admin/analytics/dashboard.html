@@ -2,7 +2,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_status_label.html" import status_label %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes %}
-{% block title %}{{ _('User Analytics Dashboard') }}{% endblock %}
+{% block title %}{{ _('User Analytics') }}{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -46,11 +46,11 @@
 ] %}
 
     {{ page_header(
-        title=_('Analytics Dashboard'),
+        title=_('User Analytics'),
         icon='fas fa-chart-line',
         breadcrumbs=[
             {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-            {'name': 'Analytics'}
+            {'name': _('User Analytics')}
         ]
     ) }}
 

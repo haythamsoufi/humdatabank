@@ -10,7 +10,7 @@
 {% set can_delete_assignment = current_is_system_manager or has_permission('admin.assignments.delete') %}
 
 {% from "components/_page_header.html" import page_header %}
-{% block title %}{{ _('Manage Assignments') }}{% endblock %}
+{% block title %}{{ _('Assignments') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -49,11 +49,11 @@
 {% endif %}
 
 {{ page_header(
-    title=_('Manage Assignments'),
+    title=_('Assignments'),
     icon='fas fa-tasks',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Assignment Management')}
+        {'name': _('Assignments')}
     ],
     info_tooltip=_('Create and manage data collection assignments that distribute form templates to specific periods and organizations. Assignments control when forms are available, who can access them, and how data is collected. Use this to organize your reporting cycles, enable public submissions, and track completion status across different time periods and regions.'),
     actions=header_actions.items

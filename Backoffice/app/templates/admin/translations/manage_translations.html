@@ -2,7 +2,7 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 
-{% block title %}{{ _('Manage Translations') }}{% endblock %}
+{% block title %}{{ _('Translations') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -164,11 +164,11 @@
 {% endset %}
 
     {{ page_header(
-        title=_('Translation Management'),
+        title=_('Translations'),
         icon='fas fa-language',
         breadcrumbs=[
             {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-            {'name': _('Translation Management')}
+            {'name': _('Translations')}
         ],
         info_tooltip=_('Manage translations for the') + ' ' + ORG_NAME + '. ' + _('You can add, edit, and delete translations for all supported languages. After making changes, remember to compile the translations to apply them.'),
         actions=[

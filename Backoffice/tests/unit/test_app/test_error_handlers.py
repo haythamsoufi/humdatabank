@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/error_handlers.py — targets 100% coverage.
+Comprehensive tests for app/middleware/error_handlers.py — targets 100% coverage.
 
 Strategy:
 - Add a session-scoped blueprint with trigger routes for each HTTP error code.
@@ -148,7 +148,7 @@ class TestCsrfErrorHandler:
     def test_html_response_flash_failure_is_suppressed(self, logged_in_client):
         """If flash() itself raises (e.g. no request context edge case), the
         redirect must still succeed rather than turning into a 500."""
-        with patch("app.error_handlers.flash", side_effect=RuntimeError("flash failed")):
+        with patch("app.middleware.error_handlers.flash", side_effect=RuntimeError("flash failed")):
             resp = logged_in_client.post(
                 "/test-error/csrf",
                 headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},

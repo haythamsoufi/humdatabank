@@ -221,7 +221,7 @@ def pre_fork(server, worker):
 def post_fork(server, worker):
     """Called just after a worker has been forked."""
     try:
-        from app.logging_config import _apply_access_log_filters
+        from app.runtime.logging_config import _apply_access_log_filters
         _apply_access_log_filters()
     except Exception:
         pass

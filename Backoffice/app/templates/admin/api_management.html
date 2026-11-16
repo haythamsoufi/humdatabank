@@ -2,7 +2,7 @@
 {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_loading %}
 {% from "components/_svg_icons.html" import svg_icon %}
 
-{% block title %}{{ _('API Management') }}{% endblock %}
+{% block title %}{{ _('API') }}{% endblock %}
 
 {% block content %}
 <!-- Tailwind CSS and Font Awesome -->
@@ -193,20 +193,20 @@
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {{ page_header(
-    title=_('API Management'),
+    title=_('API'),
     icon='fas fa-cogs',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('API Management')}
+        {'name': _('API')}
     ],
     actions=[
         {
             'type': 'link',
             'url': url_for('api_key_management.list_api_keys'),
-            'text': _('API Key Management'),
+            'text': _('API Keys'),
             'icon': 'fas fa-key',
             'classes': 'professional-action-btn professional-action-btn-blue',
-            'attributes': {'title': _('API Key Management')}
+            'attributes': {'title': _('API Keys')}
         }
     ] if (current_user_has_role('system_manager') or has_permission('admin.api.manage')) else None
 ) }}
@@ -242,7 +242,7 @@
                 <i class="fas fa-chart-line text-blue-500"></i>
             </div>
             <p class="text-2xl font-bold text-blue-600 tabular-nums">{{ "{:,}".format((total_requests|default(0))|int) }}</p>
-            <p class="text-xs text-gray-500 mt-1">{{ _('Logged /api traffic (APIUsage); per-key rows also in API Key Management') }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Logged /api traffic (APIUsage); per-key rows also in API Keys') }}</p>
         </div>
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
             <div class="flex items-center justify-between mb-2">
@@ -273,7 +273,7 @@
     {# Main sections: same tab pattern as admin/settings/manage_settings.html #}
     {# min-w-0: allow flex/grid ancestors to shrink so wide content (tabs, grid) gets a bounded width #}
     <div class="bg-white shadow-md border border-gray-200 mb-8 min-w-0 max-w-full">
-    {% call scroll_tab_bar(inner_id='api-mgmt-tabs', aria_label=_('API Management sections')) %}
+    {% call scroll_tab_bar(inner_id='api-mgmt-tabs', aria_label=_('API sections')) %}
         <button type="button" role="tab" data-tab="registry" aria-selected="true"
                 class="{{ admin_underline_tab_btn_classes(true) }}">
             <i class="fas fa-sitemap mr-1.5"></i>{{ _('Endpoint Registry') }}
@@ -629,7 +629,7 @@
                         <div class="bg-blue-50 p-4 rounded-lg">
                             <p class="text-sm text-gray-700 mb-2"><strong>{{ _('Two Authentication Methods:') }}</strong></p>
                             <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-                                <li><strong>{{ _('API Key:') }}</strong> {{ _('Access is limited to the permissions granted to the key (see API Key Management) and responses are always paginated. Send it as') }} <code class="bg-gray-200 px-1 rounded">Authorization: Bearer YOUR_API_KEY</code>. {{ _('Passing it in the URL (?api_key=) only works for keys that were explicitly allowed to and is discouraged.') }}</li>
+                                <li><strong>{{ _('API Key:') }}</strong> {{ _('Access is limited to the permissions granted to the key (see API Keys) and responses are always paginated. Send it as') }} <code class="bg-gray-200 px-1 rounded">Authorization: Bearer YOUR_API_KEY</code>. {{ _('Passing it in the URL (?api_key=) only works for keys that were explicitly allowed to and is discouraged.') }}</li>
                                 <li><strong>{{ _('User Auth:') }}</strong> {{ _('HTTP Basic Auth or Flask-Login session. Returns all accessible data (no pagination) with access control filtering.') }}</li>
                                 <li><strong>{{ _('FDRS public frontend:') }}</strong> {{ _('The data.ifrc.org paths (/api/data, /api/entities/ns, /csv/export, …) take a key with content:read. That site sends it as ?apiKey=, so the key must allow the query string. Authorization: Bearer and X-API-Key work for other callers. These routes are not paginated.') }}</li>
                             </ul>
@@ -729,7 +729,7 @@
               value is correctly honoured by Safari and prevents password-manager autofill.
             #}
             <input id="apiKeyInput" name="api_key" type="password" autocomplete="new-password"
-                   placeholder="{{ _('Paste an API key created in API Key Management')|forceescape }}"
+                   placeholder="{{ _('Paste an API key created in API Keys')|forceescape }}"
                    class="w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono text-sm bg-white">
             <p class="mt-2 text-xs text-blue-800">
                 {{ _('This key is kept only in your browser session (session storage) to help build URLs. It is not rendered by the server.') }}

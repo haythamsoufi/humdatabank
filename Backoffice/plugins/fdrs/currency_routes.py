@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import jsonify, send_from_directory, url_for
+from flask import jsonify
 from flask_login import current_user, login_required
+
+from app.assets.plugin_static import plugin_static_url, send_plugin_static
 
 from plugins.fdrs import _PLUGIN_DIR, bp
 from plugins.fdrs.services.fdrs_currency import (
@@ -19,24 +21,17 @@ from plugins.fdrs.services.fdrs_currency import (
 )
 
 
-def _asset_version(filename: str) -> str:
-    path = Path(_PLUGIN_DIR) / "static" / filename
-    try:
-        return str(int(path.stat().st_mtime))
-    except OSError:
-        return "0"
+_STATIC_DIR = Path(_PLUGIN_DIR) / "static"
 
 
 def fdrs_static_url(filename: str) -> str:
-    return url_for("fdrs.static_file", filename=filename, v=_asset_version(filename))
+    return plugin_static_url("fdrs.static_file", _STATIC_DIR, filename)
 
 
 @bp.route("/fdrs/static/<path:filename>", methods=["GET"])
 @login_required
 def static_file(filename: str):
-    response = send_from_directory(str(Path(_PLUGIN_DIR) / "static"), filename)
-    response.headers["Cache-Control"] = "no-cache"
-    return response
+    return send_plugin_static(_STATIC_DIR, filename, private=True)
 
 
 @bp.route("/fdrs/entry-currency", methods=["GET"])

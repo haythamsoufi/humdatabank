@@ -168,7 +168,7 @@ One redaction policy (`app/utils/security/logging_security.py`) is used by API u
 
 ## Seeding guard
 
-`init_data.py`, `app/seeding.py` and the `seed-test-data` CLI command are an allowlist, not a denylist: they run only when `FLASK_CONFIG` is exactly `development` (unset, unknown or typo'd values fail closed) **and** the database host is local (loopback, `host.docker.internal`, a unix socket, or a host listed in `SEED_ALLOWED_DB_HOSTS`). A restored production dump on a remote server cannot be seeded. The `create-admin` command asks for confirmation and validates password strength. There are no hardcoded default passwords any more: `test123` was removed and is no longer allow-listed in the secret scanner. Set the `TEST_*_PASSWORD` variables or let random ones be generated.
+`init_data.py`, `app/runtime/seeding.py` and the `seed-test-data` CLI command are an allowlist, not a denylist: they run only when `FLASK_CONFIG` is exactly `development` (unset, unknown or typo'd values fail closed) **and** the database host is local (loopback, `host.docker.internal`, a unix socket, or a host listed in `SEED_ALLOWED_DB_HOSTS`). A restored production dump on a remote server cannot be seeded. The `create-admin` command asks for confirmation and validates password strength. There are no hardcoded default passwords any more: `test123` was removed and is no longer allow-listed in the secret scanner. Set the `TEST_*_PASSWORD` variables or let random ones be generated.
 
 ## Container SSH
 

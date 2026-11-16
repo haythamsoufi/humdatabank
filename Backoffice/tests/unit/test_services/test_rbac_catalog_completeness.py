@@ -205,10 +205,10 @@ class TestBaselineRolesPreserveMigrationBackfilledPermissions:
     codes must stay listed or the next `flask rbac seed` revokes them.
 
     `add_reports_permissions` copied report-builder access onto
-    `admin_data_explorer_analysis`. That role is retired: Disaggregation,
-    Service income, and Everyone Counts each have their own role, and seed
-    must not recreate the shared Analysis checkbox (which would also risk
-    putting report-builder permissions back on a Data Explorer grant).
+    `admin_data_explorer_analysis`. That role is retired, and the report
+    builder itself was removed: Disaggregation, Service income, and Everyone
+    Counts each have their own role, and seed must not recreate the shared
+    Analysis checkbox or the retired report-builder permission codes.
     """
 
     def test_shared_analysis_role_is_not_reseeded(self, app):
@@ -229,10 +229,10 @@ class TestBaselineRolesPreserveMigrationBackfilledPermissions:
             assert role is not None, f"{role_code} is missing from plugin seed roles"
             codes = set(role.get("permission_codes") or [])
             assert codes == {permission}
-            leaked = {"admin.reports.view", "admin.reports.edit"} & codes
+            leaked = {"admin.reports.view", "admin.reports.edit", "admin.data_explore.reports"} & codes
             assert not leaked, (
-                f"{role_code} includes {sorted(leaked)}. Report builder access "
-                "belongs on admin_reports_viewer / admin_reports_editor only."
+                f"{role_code} includes {sorted(leaked)}. The report builder was "
+                "removed; do not grant its permission codes."
             )
 
     def test_compliance_role_keeps_backfilled_validation_permissions(self, app):

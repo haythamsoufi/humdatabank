@@ -1,0 +1,403 @@
+"""Background task scheduler initialization."""
+
+import atexit
+import os
+import threading
+import time as _time
+
+from app.runtime.scheduler_lock import (
+    SchedulerLockResult,
+    release_scheduler_lock,
+    shutdown_scheduler_bounded,
+    try_acquire_scheduler_lock,
+)
+
+
+def _graceful_shutdown(scheduler, app):
+    """Shut down APScheduler cleanly at interpreter exit (atexit).
+
+    Stopping the scheduler before its executor is torn down prevents the
+    'cannot schedule new futures after shutdown' RuntimeError seen when the
+    scheduler loop submits a job while the pool is closing.
+
+    Note on ordering (Python >= 3.9): concurrent.futures no longer uses the
+    atexit module — its executor threads are non-daemon and are joined by
+    ``threading._shutdown()`` *before* atexit callbacks run. So under
+    Gunicorn this handler is usually a no-op backstop: the worker_exit hook
+    (config/gunicorn.conf.py -> shutdown_worker_scheduler) has already shut
+    the scheduler down while the process was still fully alive. This path
+    matters for the plain dev server (`python run.py`).
+
+    The wait for running jobs is bounded (shutdown_scheduler_bounded): an
+    unbounded shutdown(wait=True) here blocked recycling workers past
+    GUNICORN_TIMEOUT, so the master SIGKILLed them mid-recycle (WORKER
+    TIMEOUT bursts observed in prod on 2026-07-16).
+    """
+    pid = os.getpid()
+    t0 = _time.monotonic()
+    try:
+        app.logger.info("[SCHED_SHUTDOWN] pid=%s graceful scheduler shutdown starting", pid)
+        if scheduler.running:
+            shutdown_scheduler_bounded(
+                scheduler,
+                log_fn=lambda msg: app.logger.warning(msg),
+            )
+        elapsed = _time.monotonic() - t0
+        level = 'warning' if elapsed > 5 else 'info'
+        getattr(app.logger, level)(
+            "[SCHED_SHUTDOWN] pid=%s graceful shutdown complete in %.2fs", pid, elapsed
+        )
+    except Exception as exc:
+        elapsed = _time.monotonic() - t0
+        app.logger.error(
+            "[SCHED_SHUTDOWN] pid=%s graceful shutdown error after %.2fs: %s", pid, elapsed, exc
+        )
+    finally:
+        try:
+            app.scheduler = None
+        except Exception:
+            pass
+        release_scheduler_lock(os.getppid(), os.getpid())
+
+
+def _log_scheduler_lock_outcome(app, result: SchedulerLockResult) -> None:
+    """Emit INFO/WARNING logs for scheduler lock acquisition outcomes."""
+    master_pid = os.getppid()
+    worker_pid = os.getpid()
+    if result is SchedulerLockResult.ACQUIRED:
+        app.logger.info(
+            'Scheduler lock acquired by worker pid=%s (master pid=%s)',
+            worker_pid,
+            master_pid,
+        )
+    elif result is SchedulerLockResult.RECLAIMED_STALE:
+        app.logger.info(
+            'Scheduler lock reclaimed by worker pid=%s (master pid=%s)',
+            worker_pid,
+            master_pid,
+        )
+    elif result is SchedulerLockResult.HELD_BY_LIVE_OWNER:
+        app.logger.info(
+            'Scheduler skipped: lock held by live worker (master pid=%s, this pid=%s)',
+            master_pid,
+            worker_pid,
+        )
+    elif result is SchedulerLockResult.FILESYSTEM_FALLBACK:
+        app.logger.warning(
+            'Scheduler lock unavailable; running scheduler without lock (pid=%s)',
+            worker_pid,
+        )
+
+
+def _evaluate_scheduler_worker(app) -> SchedulerLockResult | None:
+    """
+    Decide whether this process should init APScheduler.
+
+    Returns None when scheduler is disabled via environment settings.
+    """
+    if os.environ.get('SCHEDULER_DISABLE_ALL_WORKERS', '').strip().lower() in ('1', 'true', 'yes'):
+        app.logger.info('Scheduler disabled via SCHEDULER_DISABLE_ALL_WORKERS')
+        return None
+
+    only_pid_env = os.environ.get('SCHEDULER_WORKER_ONLY_PID', '').strip()
+    if only_pid_env:
+        try:
+            if os.getpid() == int(only_pid_env):
+                return SchedulerLockResult.ACQUIRED
+        except ValueError:
+            pass
+        app.logger.info(
+            'Scheduler skipped: SCHEDULER_WORKER_ONLY_PID=%s (this pid=%s)',
+            only_pid_env,
+            os.getpid(),
+        )
+        return None
+
+    result = try_acquire_scheduler_lock(os.getppid())
+    _log_scheduler_lock_outcome(app, result)
+    return result
+
+
+def _plugin_is_active(app, plugin_id: str) -> bool:
+    manager = getattr(app, "plugin_manager", None)
+    if manager is None:
+        return False
+    manager.sync_activation_state()
+    return manager.is_plugin_active(plugin_id)
+
+
+def _register_plugin_jobs(app, scheduler) -> None:
+    """Add the jobs plugins declare through ``BasePlugin.get_scheduled_jobs``.
+
+    Every loaded plugin's jobs are scheduled; ``_run_scheduled_job`` skips a run
+    while the plugin is inactive, so activation changes need no rescheduling.
+    """
+    manager = getattr(app, "plugin_manager", None)
+    if manager is None:
+        return
+    for plugin_id, plugin in sorted(manager.plugins.items()):
+        try:
+            jobs = plugin.get_scheduled_jobs() or []
+        except Exception as exc:
+            app.logger.warning("Plugin %s scheduled jobs unavailable: %s", plugin_id, exc)
+            continue
+        for job in jobs:
+            try:
+                scheduler.add_job(
+                    func=lambda job=job, plugin_id=plugin_id: _run_scheduled_job(
+                        app, job.job_id, job.func, plugin_id=plugin_id
+                    ),
+                    trigger=job.trigger,
+                    id=job.job_id,
+                    name=job.name,
+                    replace_existing=True,
+                    **job.trigger_args,
+                )
+            except Exception as exc:
+                app.logger.warning("Could not schedule %s for plugin %s: %s", job.job_id, plugin_id, exc)
+
+
+def _run_scheduled_job(app, label: str, fn, plugin_id: str | None = None) -> None:
+    """Execute fn inside an app context with standardised error handling and duration logging.
+
+    All scheduler jobs should be invoked through this helper so that:
+    - Each run gets a fresh app context (and therefore a fresh scoped DB session).
+      Flask-SQLAlchemy tears down the scoped session — returning the connection
+      to the pool — automatically when the app context exits, so DB connections
+      are never held longer than the job body.
+    - Unhandled exceptions are caught, logged with exc_info, and never propagate
+      into APScheduler's thread pool (where a bare raise would silence future runs).
+    - Jobs taking ≥2 s are surfaced as INFO; ≥30 s as WARNING for alerting.
+    - A job owned by a plugin (``plugin_id``) is skipped while that plugin is inactive.
+
+    Note: job bodies (fn) must manage their own transactions. They should NOT
+    be wrapped in atomic() externally — that would commit an already-committed
+    session and, for email jobs, hold the connection open during HTTP sends.
+
+    Job bodies must also bound every external call with an explicit timeout: a
+    hanging job blocks the bounded scheduler shutdown during worker recycle and
+    forces the hard-exit path. Audited 2026-07: all email sends go through
+    app/services/email/client.py (requests timeout=15), push notifications
+    through app/services/notification/push.py (timeout=10); the cleanup jobs
+    are DB/in-memory only.
+    """
+    t0 = _time.monotonic()
+    app.logger.debug("[SCHED_JOB] pid=%s '%s' starting", os.getpid(), label)
+    try:
+        with app.app_context():
+            if plugin_id and not _plugin_is_active(app, plugin_id):
+                app.logger.debug("[SCHED_JOB] '%s' skipped: plugin '%s' inactive", label, plugin_id)
+                return
+            fn()
+    except Exception as exc:
+        app.logger.error("Scheduled job '%s' failed: %s", label, exc, exc_info=True)
+    finally:
+        elapsed = _time.monotonic() - t0
+        if elapsed >= 30.0:
+            app.logger.warning(
+                "[SCHED_JOB] pid=%s '%s' took %.2fs — WARNING: long job may stall worker recycle",
+                os.getpid(), label, elapsed,
+            )
+        elif elapsed >= 2.0:
+            app.logger.info("[SCHED_JOB] pid=%s '%s' took %.2fs", os.getpid(), label, elapsed)
+        else:
+            app.logger.debug("[SCHED_JOB] pid=%s '%s' took %.2fs", os.getpid(), label, elapsed)
+
+
+def init_scheduler(app, is_reloader):
+    """Initialize the APScheduler background scheduler for periodic tasks."""
+    from app.utils.common.constants import SESSION_INACTIVITY_SECONDS
+
+    if app.config.get('TESTING', False) or os.environ.get('RUNNING_MIGRATION'):
+        return
+    if app.debug:
+        if not is_reloader:
+            # Parent watcher process — the reloader child will call init_scheduler.
+            return
+        if not app.config.get('SCHEDULER_ENABLED', True):
+            # Disabled in development by default (DevelopmentConfig.SCHEDULER_ENABLED=False).
+            # Set SCHEDULER_ENABLED=true in .env to opt in locally.
+            app.logger.debug('Scheduler disabled in development (SCHEDULER_ENABLED=false)')
+            return
+
+    lock_result = _evaluate_scheduler_worker(app)
+    if lock_result is None:
+        return
+    # Allow-list rather than deny-list so any future lock outcome defaults to
+    # "no scheduler in this worker" (duplicate schedulers send duplicate emails).
+    if lock_result not in (
+        SchedulerLockResult.ACQUIRED,
+        SchedulerLockResult.RECLAIMED_STALE,
+        SchedulerLockResult.FILESYSTEM_FALLBACK,
+    ):
+        return
+
+    if hasattr(app, 'scheduler') and app.scheduler is not None:
+        app.logger.debug("Scheduler already exists, skipping initialization")
+        return
+
+    if not hasattr(app, '_scheduler_lock'):
+        app._scheduler_lock = threading.Lock()
+
+    def scheduler_init_task():
+        try:
+            _time.sleep(0.1)
+            with app.app_context():
+                with app._scheduler_lock:
+                    if hasattr(app, 'scheduler') and app.scheduler is not None:
+                        app.logger.debug("Scheduler already initialized, skipping")
+                        return
+
+                    from apscheduler.schedulers.background import BackgroundScheduler
+                    try:
+                        misfire_grace_seconds = int(app.config.get('SCHEDULER_MISFIRE_GRACE_SECONDS', 30))
+                    except (TypeError, ValueError):
+                        misfire_grace_seconds = 30
+
+                    scheduler = BackgroundScheduler(job_defaults={
+                        'coalesce': True,
+                        'max_instances': 1,
+                        'misfire_grace_time': max(1, misfire_grace_seconds),
+                    })
+                    app.scheduler = scheduler
+
+                    # ── job bodies ────────────────────────────────────────────────────
+                    # Each function is a plain callable with no app-context boilerplate —
+                    # _run_scheduled_job provides the context, error handling, and timing.
+
+                    def _cleanup_notifications():
+                        from app.services.notification.core import cleanup_old_notifications
+                        cleanup_old_notifications()
+
+                    def _cleanup_sessions():
+                        from app.services.platform.user_analytics_service import cleanup_inactive_sessions
+                        cleanup_inactive_sessions()
+
+                    # Automatic email retries removed — admins retry from Communication Center.
+
+                    def _send_digest_emails():
+                        from app.services.notification.emails import send_notification_emails
+                        send_notification_emails()
+
+                    def _send_fds_access_request_digests():
+                        from app.services.email.fds_access_request_digest import (
+                            run_fds_access_request_digest_job,
+                        )
+                        run_fds_access_request_digest_job()
+
+                    def _purge_ai_trace_content():
+                        from app.services.ai.quality.trace_privacy import purge_expired_trace_content
+                        purge_expired_trace_content()
+
+                    def _process_scheduled_notifications():
+                        from app.services.notification.scheduling import process_scheduled_notifications
+                        processed = process_scheduled_notifications()
+                        if processed > 0:
+                            app.logger.info("Processed %d scheduled notification(s)", processed)
+
+                    def _cleanup_stale_websockets():
+                        # Purely in-memory — no DB connection needed.
+                        # Own try/except so APScheduler never loses the job on error.
+                        try:
+                            from app.utils.realtime.ws_manager import ws_manager
+                            cleaned = ws_manager.cleanup_stale_connections(
+                                max_idle_seconds=float(SESSION_INACTIVITY_SECONDS)
+                            )
+                            if cleaned > 0:
+                                app.logger.info("Cleaned up %d stale WebSocket connections", cleaned)
+                        except Exception as exc:
+                            app.logger.error("Scheduled WebSocket cleanup failed: %s", exc)
+
+                    # ── job registration ──────────────────────────────────────────────
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(app, 'cleanup_notifications', _cleanup_notifications),
+                        trigger="cron", hour=2, minute=0,
+                        id='cleanup_notifications', name='Cleanup old notifications',
+                        replace_existing=True
+                    )
+
+                    _register_plugin_jobs(app, scheduler)
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(app, 'purge_ai_trace_content', _purge_ai_trace_content),
+                        trigger="cron", hour=3, minute=30,
+                        id='purge_ai_trace_content', name='Purge expired AI trace content',
+                        replace_existing=True
+                    )
+
+                    # Every 15 minutes (not hourly): a row stays "Active" in the session
+                    # list until this runs, so hourly left idle sessions showing as live
+                    # for up to the inactivity timeout plus an hour.
+                    try:
+                        session_cleanup_interval = max(1, int(
+                            app.config.get('SESSION_CLEANUP_INTERVAL_MINUTES', 15)
+                        ))
+                    except (TypeError, ValueError):
+                        session_cleanup_interval = 15
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(app, 'cleanup_sessions', _cleanup_sessions),
+                        trigger="interval", minutes=session_cleanup_interval,
+                        id='cleanup_inactive_sessions', name='Cleanup inactive user sessions',
+                        replace_existing=True
+                    )
+
+                    try:
+                        digest_interval = max(1, int(
+                            app.config.get('SCHEDULER_DIGEST_EMAIL_INTERVAL_MINUTES', 5)
+                        ))
+                    except (TypeError, ValueError):
+                        digest_interval = 5
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(app, 'send_digest_emails', _send_digest_emails),
+                        trigger="interval", minutes=digest_interval,
+                        id='check_and_send_digest_emails', name='Send notification digest emails',
+                        replace_existing=True
+                    )
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(
+                            app, 'send_fds_access_request_digests', _send_fds_access_request_digests
+                        ),
+                        trigger="cron", minute=0,
+                        id='send_fds_access_request_digests',
+                        name='Send FDS access request digest emails',
+                        replace_existing=True
+                    )
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(
+                            app, 'process_scheduled_notifications', _process_scheduled_notifications
+                        ),
+                        trigger="interval", minutes=1,
+                        id='process_scheduled_notifications', name='Process scheduled notifications',
+                        replace_existing=True
+                    )
+
+                    # WebSocket cleanup is purely in-memory — registered directly so it
+                    # runs without opening a DB connection at all.
+                    scheduler.add_job(
+                        func=_cleanup_stale_websockets,
+                        trigger="interval", minutes=5,
+                        id='cleanup_stale_websockets', name='Cleanup stale WebSocket connections',
+                        replace_existing=True
+                    )
+
+                    if not scheduler.running:
+                        scheduler.start()
+                        atexit.register(_graceful_shutdown, scheduler, app)
+                        process_id = os.getpid()
+                        app.logger.info("Background scheduler started [PID: %d]", process_id)
+                    else:
+                        app.logger.info("Scheduler was already running [PID: %d]", os.getpid())
+
+        except Exception as e:
+            app.logger.warning("Could not start notification scheduler: %s", e)
+            if hasattr(app, 'scheduler'):
+                app.scheduler = None
+            release_scheduler_lock(os.getppid(), os.getpid())
+
+    scheduler_thread = threading.Thread(target=scheduler_init_task, daemon=True)
+    scheduler_thread.start()
+    app.logger.debug("Notification cleanup scheduler initialization deferred to background thread")

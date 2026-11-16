@@ -660,7 +660,7 @@ def knowledge_base():
             has_active_filters=False,
             stats_global=None,
             error="AI tables not found. Please run 'flask db upgrade' to create them.",
-            title="AI Knowledge Base"
+            title="Knowledge Base"
         )
 
     try:
@@ -761,7 +761,7 @@ def knowledge_base():
             search_query=filters.get('q', ''),
             has_active_filters=has_active_filters,
             stats_global=global_stats,
-            title="AI Knowledge Base",
+            title="Knowledge Base",
         )
 
     except Exception as e:
@@ -783,7 +783,7 @@ def knowledge_base():
             has_active_filters=False,
             stats_global=None,
             error="An error occurred.",
-            title="AI Knowledge Base",
+            title="Knowledge Base",
         )
 
 
@@ -2848,7 +2848,7 @@ def reasoning_traces():
             view_mode='message',
             llm_quality_judge_enabled=_is_llm_quality_judge_enabled(),
             error="AI tables not found. Please run 'flask db upgrade' to create them.",
-            title="AI Reasoning Traces"
+            title="Reasoning Traces"
         )
 
     try:
@@ -3021,7 +3021,7 @@ def reasoning_traces():
             days_filter=days_filter,
             view_mode=view_mode,
             llm_quality_judge_enabled=_is_llm_quality_judge_enabled(),
-            title="AI Reasoning Traces",
+            title="Reasoning Traces",
         )
 
     except Exception as e:
@@ -3040,7 +3040,7 @@ def reasoning_traces():
             view_mode='message',
             llm_quality_judge_enabled=_is_llm_quality_judge_enabled(),
             error="An error occurred.",
-            title="AI Reasoning Traces"
+            title="Reasoning Traces"
         )
 
 
@@ -3062,7 +3062,7 @@ def conversation_traces(conversation_id):
             view_mode='message',
             llm_quality_judge_enabled=_is_llm_quality_judge_enabled(),
             error="AI tables not found. Please run 'flask db upgrade' to create them.",
-            title="AI Reasoning Traces"
+            title="Reasoning Traces"
         )
     try:
         from app.models import AIReasoningTrace, AIToolUsage, User
@@ -3088,7 +3088,7 @@ def conversation_traces(conversation_id):
                 view_mode='message',
                 llm_quality_judge_enabled=_is_llm_quality_judge_enabled(),
                 error=f"No traces found for conversation {conversation_id}.",
-                title="AI Reasoning Traces"
+                title="Reasoning Traces"
             )
 
         # Tool usages keyed by trace_id for each trace
@@ -3209,7 +3209,7 @@ def trace_detail(trace_id):
             days_filter=0,
             llm_quality_judge_enabled=_is_llm_quality_judge_enabled(),
             error="AI tables not found. Please run 'flask db upgrade' to create them.",
-            title="AI Reasoning Traces"
+            title="Reasoning Traces"
         )
 
     try:
@@ -3228,7 +3228,7 @@ def trace_detail(trace_id):
                 days_filter=0,
                 llm_quality_judge_enabled=_is_llm_quality_judge_enabled(),
                 error=f"Trace #{trace_id} not found.",
-                title="AI Reasoning Traces"
+                title="Reasoning Traces"
             )
 
         # Get user info if available
@@ -3465,7 +3465,7 @@ def ai_dashboard():
             recent_docs=[],
             recent_traces=[],
             error="AI tables not found. Please run 'flask db upgrade' to create them.",
-            title="AI System Dashboard"
+            title="AI Dashboard"
         )
 
     try:
@@ -3561,7 +3561,7 @@ def ai_dashboard():
             stats=stats,
             recent_docs=recent_docs,
             recent_traces=recent_traces,
-            title="AI System Dashboard"
+            title="AI Dashboard"
         )
 
     except Exception as e:
@@ -3573,7 +3573,7 @@ def ai_dashboard():
             recent_docs=[],
             recent_traces=[],
             error="An error occurred.",
-            title="AI System Dashboard"
+            title="AI Dashboard"
         )
 
 

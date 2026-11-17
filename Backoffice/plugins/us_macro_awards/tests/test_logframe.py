@@ -155,7 +155,7 @@ def test_country_aliases():
         [
             CountryRef(1, "Türkiye", "TUR"),
             CountryRef(2, "Viet Nam", "VNM"),
-            CountryRef(3, "Congo, Democratic Republic of the", "COD"),
+            CountryRef(3, "Congo, the Democratic Republic of the", "COD"),
             CountryRef(4, "Micronesia, Federated States of", "FSM"),
             CountryRef(5, "Syrian Arab Republic", "SYR"),
         ]

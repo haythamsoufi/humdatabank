@@ -399,6 +399,7 @@ def _project_reference(country: CountryRef) -> str:
 
 
 def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
+    _sync_project_id_sequence()
     by_country: Dict[str, List[dict]] = {}
     for indicator in parsed.indicators:
         for country_name, target in indicator.targets.items():
@@ -459,12 +460,51 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
     return touched, unmatched
 
 
+def _sync_project_id_sequence() -> None:
+    """Point the sequence that ``project.id`` actually calls at MAX(id).
+
+    ``pg_get_serial_sequence`` still names ``nsd_project_id_seq`` after the
+    table rename, while the column default is ``project_id_seq``. Inserts
+    follow the default, so that is the sequence that has to move.
+    """
+    import re
+
+    from sqlalchemy import text
+
+    default = db.session.execute(
+        text(
+            """
+            SELECT column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'project'
+              AND column_name = 'id'
+            """
+        )
+    ).scalar()
+    match = re.search(r"nextval\('([A-Za-z_][A-Za-z0-9_]*)'", default or "")
+    if not match:
+        log.warning("US Macro Awards: project.id has no nextval default; left the sequence alone")
+        return
+    db.session.execute(
+        text(
+            "SELECT setval(to_regclass(:seq), COALESCE((SELECT MAX(id) FROM project), 1), true)"
+        ),
+        {"seq": match.group(1)},
+    )
+
+
 def _activate_plugin() -> str:
     try:
         from flask import current_app
 
         manager = getattr(current_app, "plugin_manager", None)
-        if manager is None or "us_macro_awards" not in getattr(manager, "plugins", {}):
+        if manager is None:
+            return "Template saved. Activate the US Macro Awards plugin to open its settings page."
+        if "us_macro_awards" not in getattr(manager, "plugins", {}):
+            # `flask` commands in debug boot a manager but do not load plugins.
+            manager.load_plugins()
+        if "us_macro_awards" not in manager.plugins:
             return "Template saved. Activate the US Macro Awards plugin to open its settings page."
         if manager.is_plugin_active("us_macro_awards"):
             return ""

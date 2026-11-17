@@ -95,6 +95,22 @@ class TestAPIKey:
             assert len(key_hash) == 64  # SHA256 = 64 hex chars
             assert key_prefix == full_key[:8]
 
+    def test_material_from_secret(self, db_session, app):
+        with app.app_context():
+            secret = "RestoredSecretValue_abcdefghijklmnopqrstuvwxyz012345"
+            full_key, key_id, key_hash, key_prefix = APIKey.material_from_secret(f"  {secret}  ")
+            assert full_key == secret
+            assert len(key_id) == 32
+            assert key_prefix == secret[:8]
+            assert key_hash == APIKey.hash_key(secret)
+            other_id = APIKey.material_from_secret(secret)[1]
+            assert other_id != key_id
+
+    def test_material_from_secret_empty_raises(self, db_session, app):
+        with app.app_context():
+            with pytest.raises(ValueError, match="empty"):
+                APIKey.material_from_secret("   ")
+
     def test_hash_key(self, db_session, app):
         """Test hash_key produces consistent hash."""
         with app.app_context():

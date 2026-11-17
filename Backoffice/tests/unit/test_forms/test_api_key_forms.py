@@ -42,6 +42,47 @@ class TestAPIKeyForm:
             assert form.validate() is False
             assert 'client_name' in form.errors
 
+    def test_existing_secret_optional(self, app):
+        with app.app_context():
+            from app.forms.system.api_key_forms import APIKeyForm
+            form = APIKeyForm(formdata=ImmutableMultiDict([
+                ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
+            ]))
+            assert form.validate() is True
+
+    def test_existing_secret_too_short(self, app):
+        with app.app_context():
+            from app.forms.system.api_key_forms import APIKeyForm
+            form = APIKeyForm(formdata=ImmutableMultiDict([
+                ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
+                ('existing_secret', 'short-secret-value'),
+            ]))
+            assert form.validate() is False
+            assert 'existing_secret' in form.errors
+
+    def test_existing_secret_invalid_chars(self, app):
+        with app.app_context():
+            from app.forms.system.api_key_forms import APIKeyForm
+            form = APIKeyForm(formdata=ImmutableMultiDict([
+                ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
+                ('existing_secret', 'bad secret with spaces!!!!!!!!!!!!!!'),
+            ]))
+            assert form.validate() is False
+            assert 'existing_secret' in form.errors
+
+    def test_existing_secret_valid(self, app):
+        with app.app_context():
+            from app.forms.system.api_key_forms import APIKeyForm
+            form = APIKeyForm(formdata=ImmutableMultiDict([
+                ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
+                ('existing_secret', 'RestoredSecretValue_abcdefghijklmnopqrstuvwxyz012345'),
+            ]))
+            assert form.validate() is True
+
     def test_optional_description(self, app):
         with app.app_context():
             from app.forms.system.api_key_forms import APIKeyForm

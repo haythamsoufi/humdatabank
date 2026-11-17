@@ -2,12 +2,13 @@
 API Key Management Forms
 """
 
+import re
 from typing import Any, Dict, Optional as Opt
 
 from flask_babel import lazy_gettext as _l
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, IntegerField, DateTimeField, BooleanField, SelectMultipleField
-from wtforms.validators import DataRequired, Optional, NumberRange, Length
+from wtforms.validators import DataRequired, Optional, NumberRange, Length, ValidationError
 from wtforms.widgets import CheckboxInput, ListWidget
 from app.services.security.api_key_permissions import (
     CAPABILITIES,
@@ -149,6 +150,21 @@ class APIKeyForm(APIKeyPermissionsForm):
         description='Optional description of what this API key is used for'
     )
 
+    existing_secret = StringField(
+        _l('Existing key (optional)'),
+        validators=[Optional(), Length(min=32, max=256)],
+        filters=[lambda x: x.strip() if isinstance(x, str) else x],
+        description=_l(
+            'Paste a known secret to restore a client after a database restore. '
+            'Leave blank to generate a new key. The secret is hashed; it is not stored in plaintext.'
+        ),
+        render_kw={
+            'autocomplete': 'off',
+            'spellcheck': 'false',
+            'autocapitalize': 'off',
+        },
+    )
+
     rate_limit_per_minute = IntegerField(
         'Rate Limit (per minute)',
         validators=[Optional(), NumberRange(min=1, max=10000)],
@@ -166,8 +182,15 @@ class APIKeyForm(APIKeyPermissionsForm):
     def validate_expires_at(self, field):
         """Ensure expiration date is in the future if provided"""
         if field.data and ensure_utc(field.data) <= ensure_utc(utcnow()):
-            from wtforms.validators import ValidationError
             raise ValidationError('Expiration date must be in the future')
+
+    def validate_existing_secret(self, field):
+        if not field.data:
+            return
+        if not re.fullmatch(r'[A-Za-z0-9_\-+/=.]+', field.data):
+            raise ValidationError(
+                'Existing key may only contain letters, numbers, and - _ + / = .'
+            )
 
 
 class APIKeyEditForm(APIKeyPermissionsForm):

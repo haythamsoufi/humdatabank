@@ -4,6 +4,7 @@ API Key Management Module - Admin UI for managing API keys
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import HTTPException
 from app import db
 from datetime import datetime, timedelta
@@ -189,6 +190,21 @@ def list_api_keys():
         return redirect(url_for('admin.admin_dashboard'))
 
 
+def _resolve_create_key_material(form: APIKeyForm) -> tuple[str, str, str, str] | None:
+    """Generate a new secret, or hash a pasted one. Sets a form error on hash collision."""
+    secret = (form.existing_secret.data or "").strip()
+    if not secret:
+        return APIKey.generate_key()
+    full_key, key_id, key_hash, key_prefix = APIKey.material_from_secret(secret)
+    already = db.session.query(APIKey.id).filter_by(key_hash=key_hash).first()
+    if already is not None:
+        form.existing_secret.errors.append(
+            "This secret is already stored as another API key."
+        )
+        return None
+    return full_key, key_id, key_hash, key_prefix
+
+
 @bp.route("/api-keys/create", methods=["GET", "POST"])
 @admin_permission_required('admin.api.manage')
 def create_api_key():
@@ -197,48 +213,57 @@ def create_api_key():
 
     if form.validate_on_submit():
         try:
-            full_key, key_id, key_hash, key_prefix = APIKey.generate_key()
-            permissions = form.build_permissions()
+            material = _resolve_create_key_material(form)
+            if material is not None:
+                full_key, key_id, key_hash, key_prefix = material
+                imported_existing = bool((form.existing_secret.data or "").strip())
+                permissions = form.build_permissions()
 
-            api_key = APIKey(
-                key_id=key_id,
-                key_hash=key_hash,
-                key_prefix=key_prefix,
-                client_name=form.client_name.data,
-                client_description=form.client_description.data or None,
-                rate_limit_per_minute=form.rate_limit_per_minute.data or 60,
-                expires_at=form.expires_at.data if form.expires_at.data else None,
-                permissions=permissions,
-                created_by_user_id=current_user.id,
-                is_active=True,
-                is_revoked=False
-            )
+                api_key = APIKey(
+                    key_id=key_id,
+                    key_hash=key_hash,
+                    key_prefix=key_prefix,
+                    client_name=form.client_name.data,
+                    client_description=form.client_description.data or None,
+                    rate_limit_per_minute=form.rate_limit_per_minute.data or 60,
+                    expires_at=form.expires_at.data if form.expires_at.data else None,
+                    permissions=permissions,
+                    created_by_user_id=current_user.id,
+                    is_active=True,
+                    is_revoked=False
+                )
 
-            db.session.add(api_key)
-            db.session.flush()
+                db.session.add(api_key)
+                db.session.flush()
 
-            log_admin_action(
-                action_type='api_key_create',
-                description=f'Created API key for client: {form.client_name.data}',
-                target_type='api_key',
-                target_id=api_key.id,
-                target_description=f'Client: {form.client_name.data}, Prefix: {key_prefix}...',
-                new_values={
-                    'client_name': form.client_name.data,
-                    'key_prefix': key_prefix,
-                    'rate_limit_per_minute': form.rate_limit_per_minute.data or 60,
-                    'expires_at': form.expires_at.data.isoformat() if form.expires_at.data else None,
-                    'permissions': _permissions_audit_summary(permissions),
-                },
-                risk_level='high',
-            )
+                log_admin_action(
+                    action_type='api_key_create',
+                    description=f'Created API key for client: {form.client_name.data}',
+                    target_type='api_key',
+                    target_id=api_key.id,
+                    target_description=f'Client: {form.client_name.data}, Prefix: {key_prefix}...',
+                    new_values={
+                        'client_name': form.client_name.data,
+                        'key_prefix': key_prefix,
+                        'imported_existing': imported_existing,
+                        'rate_limit_per_minute': form.rate_limit_per_minute.data or 60,
+                        'expires_at': form.expires_at.data.isoformat() if form.expires_at.data else None,
+                        'permissions': _permissions_audit_summary(permissions),
+                    },
+                    risk_level='high',
+                )
 
-            return render_template(
-                "admin/api_keys/create_success.html",
-                api_key=api_key,
-                access=describe_permissions(api_key.parsed_permissions),
-                full_key=full_key,
-                title="API Key Created"
+                return render_template(
+                    "admin/api_keys/create_success.html",
+                    api_key=api_key,
+                    access=describe_permissions(api_key.parsed_permissions),
+                    full_key=full_key,
+                    title="API Key Created"
+                )
+        except IntegrityError:
+            request_transaction_rollback()
+            form.existing_secret.errors.append(
+                "This secret is already stored as another API key."
             )
         except Exception as e:
             current_app.logger.error(f"Error creating API key: {e}", exc_info=True)

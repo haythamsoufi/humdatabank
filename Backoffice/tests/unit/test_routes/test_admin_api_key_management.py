@@ -145,6 +145,52 @@ class TestCreateApiKey:
         )
         assert resp.status_code == 200
 
+    def test_post_create_imports_existing_secret(self, logged_in_client, db_session, app):
+        secret = "RestoredSecretValue_abcdefghijklmnopqrstuvwxyz012345"
+        resp = logged_in_client.post(
+            "/admin/api-management/api-keys/create",
+            data={
+                "client_name": "Restored Frontend Client",
+                "rate_limit_per_minute": "1000",
+                "capabilities": ["content:read"],
+                "allow_query_api_key": "y",
+                "existing_secret": secret,
+            },
+        )
+        assert resp.status_code == 200
+        assert b"API Key Created" in resp.data
+        from app.models.api_key_management import APIKey
+        key = APIKey.query.filter_by(client_name="Restored Frontend Client").one()
+        assert key.verify_key(secret) is True
+        assert key.key_prefix == secret[:8]
+        assert key.parsed_permissions.allow_query_api_key is True
+
+    def test_post_create_duplicate_existing_secret_rejected(self, logged_in_client, db_session, app):
+        from app.models.api_key_management import APIKey
+
+        secret = "DuplicateSecretValue_abcdefghijklmnopqrstuvwxyz012345"
+        _full_key, key_id, key_hash, key_prefix = APIKey.material_from_secret(secret)
+        _create_key(
+            db_session,
+            client_name="Original Restored Client",
+            key_id=key_id,
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+        )
+        before = APIKey.query.count()
+        resp = logged_in_client.post(
+            "/admin/api-management/api-keys/create",
+            data={
+                "client_name": "Second Restored Client",
+                "capabilities": ["content:read"],
+                "existing_secret": secret,
+            },
+        )
+        assert resp.status_code == 200
+        assert b"already stored as another API key" in resp.data
+        assert APIKey.query.count() == before
+        assert APIKey.query.filter_by(client_name="Second Restored Client").first() is None
+
 
 # ---------------------------------------------------------------------------
 # view_api_key

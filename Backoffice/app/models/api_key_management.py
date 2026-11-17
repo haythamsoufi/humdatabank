@@ -115,10 +115,24 @@ class APIKey(db.Model):
         Returns:
             tuple: (full_key, key_id, key_hash, key_prefix)
         """
-        full_key = secrets.token_urlsafe(48)
+        return APIKey.material_from_secret(secrets.token_urlsafe(48))
+
+    @staticmethod
+    def material_from_secret(secret: str) -> tuple[str, str, str, str]:
+        """Hash a known plaintext secret so it can be stored like a generated key.
+
+        Used to restore a client after a database reset without changing the
+        compiled or configured secret. ``key_id`` is always newly generated.
+
+        Returns:
+            tuple: (full_key, key_id, key_hash, key_prefix)
+        """
+        full_key = (secret or "").strip()
+        if not full_key:
+            raise ValueError("Secret is empty")
         key_id = secrets.token_hex(16)
         key_prefix = full_key[:8]
-        key_hash = APIKey._fingerprint_api_token(full_key)
+        key_hash = APIKey.hash_key(full_key)
         return full_key, key_id, key_hash, key_prefix
 
     @staticmethod

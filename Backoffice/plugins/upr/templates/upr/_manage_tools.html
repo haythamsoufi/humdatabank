@@ -1,17 +1,17 @@
 {# Bulk export — Data Explorer UPR tab. #}
 {% from "macros/modal_shell.html" import modal_shell %}
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 <div id="upr-admin" class="space-y-5">
-    <div class="upr-vis-toolbar">
-        <nav id="upr-vis-mode-tabs" class="upr-vis-toolbar__tabs" role="tablist" aria-label="{{ _('UPR tools') }}">
+    {% call scroll_tab_bar(inner_id='upr-vis-mode-tabs', aria_label=_('UPR tools')) %}
             <button type="button"
                     role="tab"
                     id="upr-vis-tab-preview"
                     data-upr-mode="preview"
                     aria-selected="true"
                     aria-controls="upr-vis-pane-preview"
-                    class="upr-vis-mode-tab is-active">
-                <i class="fas fa-eye" aria-hidden="true"></i>{{ _('Preview') }}
+                    class="{{ admin_underline_tab_btn_classes(true) }}">
+                <i class="fas fa-eye mr-1.5" aria-hidden="true"></i>{{ _('Preview') }}
             </button>
             <button type="button"
                     role="tab"
@@ -19,11 +19,10 @@
                     data-upr-mode="generate"
                     aria-selected="false"
                     aria-controls="upr-vis-pane-generate"
-                    class="upr-vis-mode-tab">
-                <i class="fas fa-images" aria-hidden="true"></i>{{ _('Generate') }}
+                    class="{{ admin_underline_tab_btn_classes(false) }}">
+                <i class="fas fa-images mr-1.5" aria-hidden="true"></i>{{ _('Generate') }}
             </button>
-        </nav>
-    </div>
+    {% endcall %}
 
     <div class="space-y-3">
     <div class="upr-vis-filters">

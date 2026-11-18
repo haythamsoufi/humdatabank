@@ -1,11 +1,145 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_status_label.html" import status_label %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "plugins/nsd_report_forms/nsd_projects/_macros.html" import date, currency, no_decimal %}
 
 {% block title %}{{ p.reference }} — {{ _('Project') }}{% endblock %}
 
+{% block extra_css %}
+<style nonce="{{ csp_nonce() }}">
+  .project-inline-value {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    max-width: 100%;
+    margin: -0.125rem -0.25rem;
+    padding: 0.125rem 0.25rem;
+    border: 1px dashed transparent;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .project-inline-value.is-wide { display: flex; width: 100%; }
+  .project-inline-value.is-wide .project-inline-text { white-space: pre-wrap; }
+  .project-inline-value:hover,
+  .project-inline-value:focus-visible {
+    border-color: #93c5fd;
+    background: #f8fafc;
+    outline: none;
+  }
+  .project-inline-hint {
+    opacity: 0;
+    margin-top: 0.15rem;
+    color: #2563eb;
+    font-size: 0.7rem;
+    line-height: 1;
+  }
+  .project-inline-value:hover .project-inline-hint,
+  .project-inline-value:focus-visible .project-inline-hint,
+  .project-inline-value.is-dirty .project-inline-hint { opacity: 1; }
+  .project-inline-value.is-dirty,
+  .project-inline-value.is-editing {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #93c5fd;
+    border-radius: 0.25rem;
+    background: #fff;
+    overflow: hidden;
+    cursor: text;
+  }
+  .project-inline-value.is-dirty { border-color: #bfdbfe; background: #eff6ff; }
+  .project-inline-value.is-dirty .project-inline-hint,
+  .project-inline-value.is-editing .project-inline-hint { display: none; }
+  .project-inline-value.is-dirty .project-inline-text {
+    flex: 1;
+    min-width: 0;
+    padding: 0.3rem 0.5rem;
+  }
+  .project-inline-input {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    min-height: 1.85rem;
+    padding: 0.3rem 0.5rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #111827;
+    font: inherit;
+  }
+  .project-inline-input:focus { outline: none; }
+  .project-inline-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+  .project-inline-heading h2 { margin: 0; }
+  .project-inline-error { color: #b91c1c; font-size: 0.75rem; }
+  .project-inline-apply {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 1.85rem;
+    width: 1.85rem;
+    height: 1.85rem;
+    align-self: flex-start;
+    border: 0;
+    border-left: 1px solid #bfdbfe;
+    border-radius: 0;
+    background: #2563eb;
+    color: #fff;
+    cursor: pointer;
+  }
+  .project-inline-apply:hover { background: #1d4ed8; }
+  .project-inline-apply:disabled { opacity: 0.6; cursor: wait; }
+  .project-inline-email { margin-top: 0.25rem; color: #6b7280; font-size: 0.75rem; font-weight: 400; }
+  .project-inline-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(17, 24, 39, 0.45);
+  }
+  .project-inline-dialog[hidden] { display: none; }
+  .project-inline-dialog-card {
+    width: 100%;
+    max-width: 26rem;
+    padding: 1.25rem;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  }
+  .project-inline-dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+  .project-inline-dialog-actions button {
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .project-inline-discard { border: 1px solid #d1d5db; background: #fff; color: #111827; }
+  .project-inline-continue { border: 0; background: #2563eb; color: #fff; }
+</style>
+{% endblock %}
+
 {% block content %}
+{% macro project_field(field, kind, value, wide=false, options=None) %}
+{% if can_edit %}
+<div class="project-inline-value{% if wide %} is-wide{% endif %}" role="button" tabindex="0" data-field="{{ field }}" data-kind="{{ kind }}" data-value="{{ '' if value is none else value }}"{% if options is not none %} data-options-json="{{ options|tojson|forceescape }}"{% elif kind == 'select' %} data-options="Open,Active,Closed,Archived"{% endif %}>
+  <span class="project-inline-text">{{ caller() }}</span>
+  <i class="fas fa-pen project-inline-hint" aria-hidden="true"></i>
+</div>
+{% else %}
+{{ caller() }}
+{% endif %}
+{% endmacro %}
 {% set edit_url = url_for('project_management.project_edit', project_id=project.id) %}
 <div{% if open_edit_id == project.id %} data-open-project-edit="{{ project.id }}" data-project-edit-url-template="{{ edit_url }}"{% endif %}>
 {{ page_header(
@@ -19,71 +153,86 @@
         {'name': p.reference}
     ],
     actions=(
-        ([{
+        [{
             'type': 'link',
             'text': _('Country dashboard'),
             'url': url_for('main.dashboard', entity_select='country:%d' % p.country_id),
             'icon': 'fas fa-th-large',
             'classes': 'professional-action-btn',
-        }] if p.country_id else [])
-        + ([{
-            'type': 'button',
-            'text': _('Edit project'),
-            'icon': 'fas fa-pen',
-            'classes': 'professional-action-btn professional-action-btn-blue',
-            'attributes': {'type': 'button', 'data-project-edit': edit_url, 'title': _('Edit project')|forceescape}
-        }] if can_edit else [])
+        }] if p.country_id else []
     )
 ) }}
 
-<div class="space-y-6">
-  <div class="bg-white shadow-md border border-gray-200 rounded-sm">
-    <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
-      <h2 class="text-lg font-semibold text-gray-900">{{ _('Project information') }}</h2>
-    </div>
-    <div class="p-4 sm:p-6">
+<div class="bg-white shadow-md border border-gray-200">
+  {% call scroll_tab_bar(inner_id='project-tabs', aria_label=_('Project sections')) %}
+    <button type="button" role="tab" data-tab="project" aria-selected="true" class="{{ admin_underline_tab_btn_classes(true) }}">
+      <i class="fas fa-diagram-project mr-1.5"></i>{{ _('Project') }}
+    </button>
+    {% if p.logframe_targets %}
+    <button type="button" role="tab" data-tab="targets" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false) }}">
+      <i class="fas fa-bullseye mr-1.5"></i>{{ _('Logframe targets') }}
+    </button>
+    {% endif %}
+    <button type="button" role="tab" data-tab="reporting" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false) }}">
+      <i class="fas fa-calendar-alt mr-1.5"></i>{{ _('Reporting') }}
+    </button>
+    {% if p.outcomes %}
+    <button type="button" role="tab" data-tab="outcomes" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false) }}">
+      <i class="fas fa-chart-bar mr-1.5"></i>{{ _('Outcomes') }}
+    </button>
+    {% endif %}
+  {% endcall %}
+
+  <div class="p-6">
+<div id="panel-project" class="settings-panel" role="tabpanel"{% if can_edit %} data-inline-save="{{ url_for('project_management.project_inline_save', project_id=project.id) }}" data-apply-label="{{ _('Apply changes') }}"{% endif %}>
+      <div class="project-inline-heading">
+        <h2 class="text-lg font-semibold text-gray-900">{{ _('Project information') }}</h2>
+        {% if can_edit %}
+        <span id="projectInlineError" class="project-inline-error" role="alert"></span>
+        {% endif %}
+      </div>
       <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 text-sm">
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('National Society') }}</dt>
-          <dd class="mt-1 font-medium text-gray-900">{{ p.ns or '—' }}</dd>
+          <dd class="mt-1 font-medium text-gray-900">{% call project_field('national_society_id', 'select', project.national_society_id or '', options=ns_options) %}{{ project.national_society.name if project.national_society else (p.ns or '—') }}{% endcall %}</dd>
         </div>
         <div class="sm:col-span-2 lg:col-span-3">
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Title') }}</dt>
-          <dd class="mt-1 font-medium text-gray-900">{{ p.title or '—' }}</dd>
+          <dd class="mt-1 font-medium text-gray-900">{% call project_field('title', 'text', project.title or '') %}{{ p.title or '—' }}{% endcall %}</dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Reference') }}</dt>
-          <dd class="mt-1 font-medium text-gray-900">{{ p.reference }}</dd>
+          <dd class="mt-1 font-medium text-gray-900">{% call project_field('reference', 'text', project.reference or '') %}{{ p.reference }}{% endcall %}</dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Funding modality') }}</dt>
-          <dd class="mt-1 font-medium text-gray-900">{{ p.modality or '—' }}</dd>
+          <dd class="mt-1 font-medium text-gray-900">{% call project_field('funding_modality', 'text', project.funding_modality or '') %}{{ p.modality or '—' }}{% endcall %}</dd>
         </div>
         <div class="sm:col-span-2">
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Categories / thematics') }}</dt>
-          <dd class="mt-1">
+          <dd class="mt-1">{% call project_field('categories', 'text', project.categories or '') %}
             {% if p.categories_list and p.categories_list|length > 1 %}
-              <div class="flex flex-wrap gap-1">
+              <span class="inline-flex flex-wrap gap-1">
                 {% for cat in p.categories_list %}
                   <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">{{ cat }}</span>
                 {% endfor %}
-              </div>
+              </span>
             {% else %}
               <span class="font-medium text-gray-900">{{ p.categories or '—' }}</span>
             {% endif %}
-          </dd>
+          {% endcall %}</dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Start date') }}</dt>
-          <dd class="mt-1 font-medium text-gray-900">{{ date(p.start) }}</dd>
+          <dd class="mt-1 font-medium text-gray-900">{% call project_field('start_date', 'date', project.start_date.isoformat() if project.start_date else '') %}{{ date(p.start) }}{% endcall %}</dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('End date') }}</dt>
-          <dd class="mt-1 font-medium text-gray-900">{{ date(p.end) }}</dd>
+          <dd class="mt-1 font-medium text-gray-900">{% call project_field('end_date', 'date', project.end_date.isoformat() if project.end_date else '') %}{{ date(p.end) }}{% endcall %}</dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Amount granted (CHF)') }}</dt>
-          <dd class="mt-1 font-medium text-gray-900">{{ currency(p.granted) }}</dd>
+          <dd class="mt-1 font-medium text-gray-900">{% call project_field('amount_granted', 'number', project.amount_granted if project.amount_granted is not none else '') %}{{ currency(p.granted) }}{% endcall %}</dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Actual expenditure (CHF)') }}</dt>
@@ -92,21 +241,25 @@
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('NS focal person') }}</dt>
           <dd class="mt-1 font-medium text-gray-900">
-            {{ p.ns_focal or '—' }}
-            {% if p.ns_focal_email %}<div class="text-gray-500 font-normal text-xs mt-0.5">{{ p.ns_focal_email }}</div>{% endif %}
+            {% call project_field('focal_name', 'text', project.focal_name or '') %}{{ p.ns_focal or '—' }}{% endcall %}
+            {% if can_edit or p.ns_focal_email %}
+            {% call project_field('focal_email', 'email', project.focal_email or '') %}<span class="project-inline-email">{{ p.ns_focal_email or '—' }}</span>{% endcall %}
+            {% endif %}
           </dd>
         </div>
         <div class="sm:col-span-2 lg:col-span-3">
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('IFRC project manager') }}</dt>
           <dd class="mt-1 font-medium text-gray-900">
-            {{ p.pm or '—' }}
-            {% if p.pm_email %}<div class="text-gray-500 font-normal text-xs mt-0.5">{{ p.pm_email }}</div>{% endif %}
+            {% call project_field('manager_name', 'text', project.manager_name or '') %}{{ p.pm or '—' }}{% endcall %}
+            {% if can_edit or p.pm_email %}
+            {% call project_field('manager_email', 'email', project.manager_email or '') %}<span class="project-inline-email">{{ p.pm_email or '—' }}</span>{% endcall %}
+            {% endif %}
           </dd>
         </div>
-        {% if p.status %}
+        {% if p.status or can_edit %}
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ _('Status') }}</dt>
-          <dd class="mt-1">
+          <dd class="mt-1">{% call project_field('status', 'select', project.status or 'Open') %}
             {% if p.status == 'Active' %}
               {{ status_label(p.status, 'success') }}
             {% elif p.status == 'Open' %}
@@ -116,19 +269,58 @@
             {% elif p.status == 'Archived' %}
               {{ status_label(p.status, 'neutral') }}
             {% else %}
-              {{ status_label(p.status, 'neutral') }}
+              {{ status_label(p.status or 'Open', 'neutral') }}
             {% endif %}
-          </dd>
+          {% endcall %}</dd>
         </div>
         {% endif %}
       </dl>
+
+  {% if can_edit or p.overview %}
+  <div class="mt-8 pt-6 border-t border-gray-200">
+    <h2 class="text-lg font-semibold text-gray-900">{{ _('Planned overview') }}</h2>
+    <div class="mt-3 text-sm text-gray-800">{% call project_field('planned_overview', 'textarea', project.planned_overview or '', wide=true) %}{{ p.overview or '—' }}{% endcall %}</div>
+  </div>
+  {% endif %}
+</div>
+
+  {% if p.logframe_targets %}
+  <div id="panel-targets" class="settings-panel hidden" role="tabpanel">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Logframe targets') }}</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Code') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Indicator') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Unit') }}</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{{ _('Target') }}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for row in p.logframe_targets %}
+          <tr>
+            <td class="px-3 py-3 whitespace-nowrap font-medium text-gray-900">{{ row.code or '—' }}</td>
+            <td class="px-3 py-3 text-gray-800">{{ row.label or '—' }}</td>
+            <td class="px-3 py-3 whitespace-nowrap text-gray-700">{{ row.unit or '—' }}</td>
+            <td class="px-3 py-3 whitespace-nowrap text-gray-900">{{ row.target or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
+  {% endif %}
 
-  <div class="bg-white shadow-md border border-gray-200 rounded-sm">
-    <div class="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold text-gray-900">{{ _('Implementation monitoring') }}</h2>
-      {% if can_edit %}
+  <div id="panel-reporting" class="settings-panel hidden" role="tabpanel">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">{{ _('Implementation monitoring') }}</h2>
+        {% if project.portfolio == 'Global Awards' %}
+        <p class="text-xs text-gray-500 mt-1">{{ _('17–30 Sep 2026 was waived by DHR and is included in the first quarterly report and the final report. The deadline is the country-to-region date.') }}</p>
+        {% endif %}
+      </div>
+      {% if can_edit and project.portfolio != 'Global Awards' %}
       <form method="post" action="{{ url_for('project_management.project_add_cycle', project_id=project.id) }}" class="flex flex-wrap items-end gap-2">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
@@ -186,12 +378,19 @@
               {% else %}
                 <span class="text-gray-700">{{ date(report.due) }}</span>
               {% endif %}
+              {% if report.review_note %}
+              <div class="text-xs text-gray-500 mt-1">{{ report.review_note }}</div>
+              {% endif %}
             </td>
             <td class="px-3 py-3 whitespace-nowrap text-gray-700">{{ date(report.submitted) }}</td>
             <td class="px-3 py-3 whitespace-nowrap">
               <a href="/assignment/{{ report.aes_id }}" target="_blank" rel="noopener" class="inline-flex">
-                {% if is_final %}
+                {% if report.kind == 'final' %}
+                  <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold text-white bg-blue-800">{{ _('Final') }}</span>
+                {% elif is_final %}
                   <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold text-white bg-blue-800">{{ _('CBF final') }}</span>
+                {% elif report.kind == 'quarter' %}
+                  <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold text-gray-800 bg-blue-200">{{ _('Quarter') }}</span>
                 {% else %}
                   <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold text-gray-800 bg-blue-200">{{ _('CBF quarter') }}</span>
                 {% endif %}
@@ -258,12 +457,10 @@
   </div>
 
   {% if p.outcomes %}
-  <div class="bg-white shadow-md border border-gray-200 rounded-sm">
-    <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
-      <h2 class="text-lg font-semibold text-gray-900">{{ _('Outcomes & indicators') }}</h2>
-      <p class="text-xs text-gray-500 mt-1">{{ _('From the CBF final report (read-only).') }}</p>
-    </div>
-    <div class="p-4 sm:p-6 space-y-6">
+  <div id="panel-outcomes" class="settings-panel hidden" role="tabpanel">
+    <h2 class="text-lg font-semibold text-gray-900">{{ _('Outcomes & indicators') }}</h2>
+    <p class="text-xs text-gray-500 mt-1 mb-4">{{ _('From the CBF final report (read-only).') }}</p>
+    <div class="space-y-6">
       {% for outcome in p.outcomes %}
       <div class="border border-gray-200 rounded-sm p-4 bg-gray-50/50">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4 text-sm">
@@ -319,12 +516,52 @@
     </div>
   </div>
   {% endif %}
+  </div>
 </div>
 </div>
 
 {% include "admin/projects/_edit_modal.html" %}
+{% if can_edit %}
+<div id="projectInlineDialog" class="project-inline-dialog" hidden>
+  <div class="project-inline-dialog-card" role="alertdialog" aria-modal="true" aria-labelledby="projectInlineDialogTitle">
+    <h3 id="projectInlineDialogTitle" class="text-base font-semibold text-gray-900">{{ _('Discard unsaved changes?') }}</h3>
+    <p class="mt-2 text-sm text-gray-600">{{ _('You have edits that have not been applied.') }}</p>
+    <div class="project-inline-dialog-actions">
+      <button type="button" class="project-inline-discard" data-inline-discard>{{ _('Discard') }}</button>
+      <button type="button" class="project-inline-continue" data-inline-continue>{{ _('Continue editing') }}</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ static_url('js/admin/projects-modal.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% if can_edit %}
+<script src="{{ static_url('js/admin/projects-inline.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% endif %}
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  var A = window.AdminUnderlineTabs;
+  var tabs = document.querySelectorAll('#project-tabs .settings-tab');
+  if (!tabs.length || !A) return;
+
+  function activate(tabId) {
+    A.activateStripTab('#project-tabs', tabId, { panelSelector: '.settings-panel' });
+  }
+
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = this.getAttribute('data-tab');
+      activate(id);
+      history.replaceState(null, '', '#' + id);
+    });
+  });
+
+  var hash = (location.hash || '').replace('#', '');
+  if (hash && document.getElementById('panel-' + hash)) {
+    activate(hash);
+  }
+})();
+</script>
 {% endblock %}

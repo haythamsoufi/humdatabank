@@ -1,0 +1,314 @@
+/* Global Awards Data Explorer tab. Plain CSS so it needs no Tailwind rebuild. */
+:root {
+    --gai-navy: #011e41;
+    --gai-red: #f5333f;
+    --gai-amber: #f39200;
+    --gai-teal: #2a9d8f;
+    --gai-green: #6ba543;
+}
+
+#panel-global-awards {
+    color: #111827;
+}
+#panel-global-awards [hidden] {
+    display: none !important;
+}
+
+.gai-intro { margin-bottom: 1rem; }
+.gai-intro__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--gai-navy);
+    margin: 0 0 0.25rem;
+}
+.gai-intro__lead {
+    margin: 0;
+    max-width: 60rem;
+    font-size: 0.9rem;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+.gai-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem 1rem;
+    padding: 0.85rem 0 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 1.25rem;
+}
+.gai-toolbar__export {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+.gai-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.gai-field__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.gai-select {
+    min-width: 11rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    background: #fff;
+}
+.gai-select:focus {
+    outline: none;
+    border-color: var(--gai-navy);
+    box-shadow: 0 0 0 2px rgba(1, 30, 65, 0.18);
+}
+.gai-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+}
+.gai-btn:hover { border-color: #9ca3af; background: #f9fafb; }
+.gai-btn--primary {
+    border-color: var(--gai-navy);
+    background: var(--gai-navy);
+    color: #fff;
+}
+.gai-btn--primary:hover { background: #0b2f5c; border-color: #0b2f5c; }
+
+.gai-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 14rem;
+    color: #6b7280;
+    text-align: center;
+}
+.gai-state i { font-size: 1.75rem; color: #9ca3af; }
+.gai-state--error { color: #b91c1c; }
+.gai-state--error i { color: #ef4444; }
+.gai-empty-link { margin: 0; font-size: 0.875rem; }
+.gai-empty-link a { color: #1d4ed8; font-weight: 600; }
+
+.gai-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.gai-kpi {
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid var(--gai-navy);
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 0.85rem 1rem;
+}
+.gai-kpi__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.3rem;
+}
+.gai-kpi__value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--gai-navy);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.gai-kpi__meta {
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.gai-calendar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.gai-cycle {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.9rem;
+    background: #fff;
+}
+.gai-cycle__slot {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gai-navy);
+}
+.gai-cycle__meta {
+    margin: 0.2rem 0 0.55rem;
+    font-size: 0.72rem;
+    color: #6b7280;
+}
+.gai-cycle__bar {
+    display: flex;
+    height: 0.5rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+.gai-cycle__seg { height: 100%; }
+.gai-cycle__counts {
+    margin: 0.4rem 0 0;
+    font-size: 0.72rem;
+    color: #4b5563;
+}
+
+.gai-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 40rem), 1fr));
+    gap: 1rem;
+}
+.gai-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 1rem 1rem 0.5rem;
+    min-width: 0;
+}
+.gai-card--wide { grid-column: 1 / -1; }
+.gai-card__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gai-navy);
+    margin: 0;
+}
+.gai-card__hint {
+    margin: 0.2rem 0 0;
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+.gai-chart { min-height: 18rem; }
+
+.gai-table-wrap {
+    margin-top: 1.25rem;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+.gai-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+.gai-table th,
+.gai-table td {
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: top;
+}
+.gai-table th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    color: #374151;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+.gai-table tbody tr:hover { background: #f9fafb; }
+.gai-tone {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+}
+.gai-tone--green { background: var(--gai-green); }
+.gai-tone--amber { background: var(--gai-amber); }
+.gai-tone--red { background: var(--gai-red); }
+.gai-tone--grey { background: #9ca3af; }
+
+.gai-footnote {
+    margin: 0 0 1rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.gai-dialog {
+    width: min(36rem, calc(100vw - 2rem));
+    max-height: min(36rem, calc(100vh - 2rem));
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 40px rgba(1, 30, 65, 0.18);
+}
+.gai-dialog::backdrop { background: rgba(17, 24, 39, 0.45); }
+.gai-dialog__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.gai-dialog__title { margin: 0; font-size: 1rem; font-weight: 700; color: var(--gai-navy); }
+.gai-dialog__close {
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+}
+.gai-dialog__note {
+    margin: 0;
+    padding: 0.75rem 1rem 0;
+    font-size: 0.8rem;
+    color: #4b5563;
+}
+.gai-export__fields { border: 0; margin: 0; padding: 0.75rem 1rem; }
+.gai-export__list, #gai-export-list {
+    display: grid;
+    gap: 0.45rem;
+}
+.gai-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #111827;
+}
+.gai-export__extra { padding: 0 1rem 0.5rem; }
+.gai-export__empty { padding: 0.5rem 1rem; color: #6b7280; font-size: 0.875rem; }
+.gai-export__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+#panel-global-awards .apexcharts-svg title { display: none; }
+
+@media (max-width: 700px) {
+    .gai-toolbar__export { margin-left: 0; width: 100%; }
+    .gai-toolbar__export .gai-btn { flex: 1; justify-content: center; }
+}

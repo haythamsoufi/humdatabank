@@ -1,0 +1,75 @@
+# Plugin contract
+#
+# Every plugin (human- or AI-authored) must satisfy the contract in
+# Backoffice/plugins/README.md#plugin-contract-enforced: guarded settings page,
+# plugin.json manifest, README, tests, registration.
+#
+# Runs on EVERY pull request to main/develop and every push to main/develop, with no
+# `paths:` filter. That is deliberate: a path-filtered workflow never reports a status
+# when skipped, and a required check that never reports blocks the merge forever.
+# The job is stdlib-only and takes a few seconds.
+#
+# Required status check name: "Plugin contract" (see .github/ruleset-protect-main.json).
+#
+# The runtime half of the contract (settings URL resolves and renders) is
+# Backoffice/tests/unit/test_plugins/test_plugin_contract.py, run by Backoffice CI
+# whenever plugin code changes.
+
+name: Plugin contract
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plugin-contract:
+    name: Plugin contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Static plugin contract (settings page, manifest, README, tests, registration)
+        working-directory: Backoffice
+        run: python scripts/ci/check_plugin_contract.py --github
+
+      - name: Exemption list may only shrink
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::warning::No base SHA available (first push to branch?) - skipping exemption check"
+            exit 0
+          fi
+          if ! git cat-file -e "$BASE:Backoffice/scripts/ci/check_plugin_contract.py" 2>/dev/null; then
+            echo "Checker does not exist on the base commit (introduced by this change) - skipping"
+            exit 0
+          fi
+          # Adding an EXEMPT entry is how a plugin would dodge the contract. Entries may
+          # only be removed, so any added line fails the job.
+          ADDED="$(git diff "$BASE" HEAD -U0 -- Backoffice/scripts/ci/check_plugin_contract.py \
+            | grep -E '^\+\s+\("[a-z0-9_]+", "[a-z-]+"\):' || true)"
+          if [ -n "$ADDED" ]; then
+            echo "::error title=Plugin contract exemption added::Do not add exemptions; fix the plugin instead."
+            echo "$ADDED"
+            exit 1
+          fi

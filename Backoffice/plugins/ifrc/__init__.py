@@ -10,7 +10,7 @@ bp = Blueprint(
     "ifrc",
     __name__,
     url_prefix="",
-    template_folder=str(_PLUGIN_DIR / "ppp" / "templates"),
+    template_folder=str(_PLUGIN_DIR / "templates"),
 )
 
 from plugins.ifrc import routes  # noqa: E402, F401

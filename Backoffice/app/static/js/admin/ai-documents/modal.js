@@ -9,19 +9,15 @@ import { cfg, page } from './shared.js';
 
 function setActiveTab(allTabs, allPanels, activeTab, activeContent) {
     allTabs.forEach(function (tab) {
-        tab.classList.remove('active', 'border-blue-500', 'text-blue-600');
-        tab.classList.add('border-transparent', 'text-gray-600');
-        tab.setAttribute('aria-selected', 'false');
-        tab.setAttribute('tabindex', '-1');
+        const on = tab === activeTab;
+        if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(tab, on);
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        tab.setAttribute('tabindex', on ? '0' : '-1');
     });
     allPanels.forEach(function (content) {
         content.classList.add('hidden');
         content.setAttribute('aria-hidden', 'true');
     });
-    activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
-    activeTab.classList.remove('border-transparent', 'text-gray-600');
-    activeTab.setAttribute('aria-selected', 'true');
-    activeTab.setAttribute('tabindex', '0');
     activeContent.classList.remove('hidden');
     activeContent.setAttribute('aria-hidden', 'false');
     const track = activeTab.closest ? activeTab.closest('.scroll-tab-bar__track') : null;

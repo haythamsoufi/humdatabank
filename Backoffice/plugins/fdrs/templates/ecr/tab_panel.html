@@ -12,9 +12,6 @@
         .ecr-source { grid-template-columns: minmax(0, 1fr) minmax(10rem, 16rem) auto; }
     }
     .ecr-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-    .ecr-subtabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-    .ecr-subtab { border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.8125rem; font-weight: 600; padding: 0.45rem 0.8rem; border-radius: 999px; cursor: pointer; flex: none; }
-    .ecr-subtab[aria-selected="true"] { background: #111827; color: #fff; border-color: #111827; }
     .ecr-legend { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; margin-top: 0.75rem; }
     .ecr-legend span { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #374151; }
     .ecr-swatch { width: 0.75rem; height: 0.75rem; border-radius: 999px; display: inline-block; }
@@ -66,7 +63,6 @@
         .ecr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 639px) {
-        .ecr-subtabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 0.25rem; }
         .ecr-chart { max-width: none; }
         .ecr-chart svg { min-width: 0; width: 100%; }
         .ecr-chart svg text { font-size: 22px; }
@@ -186,7 +182,8 @@
             <div class="ecr-body">
                 <nav id="ecr-toc" class="ecr-toc" aria-label="{{ _('Contents')|forceescape }}"></nav>
                 <div class="ecr-reading">
-                    <div class="ecr-subtabs mb-3" id="ecr-subtabs" role="tablist" aria-label="{{ _('Everyone Counts chapters')|forceescape }}"></div>
+                    {% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+                    {% call scroll_tab_bar(inner_id='ecr-subtabs', wrapper_class='mb-3', aria_label=_('Everyone Counts chapters')) %}{% endcall %}
                     <p class="text-xs text-gray-500 mb-4" id="ecr-chapter-meta"></p>
                     <div id="ecr-chapter"></div>
 
@@ -503,8 +500,16 @@
         if (!chapterId || (chapterId !== 'sources' && !chapters.some(function (chapter) { return chapter.id === chapterId; }))) {
             chapterId = chapters[0].id;
         }
+        function chapterTabClass(selected) {
+            if (window.AdminUnderlineTabs && window.AdminUnderlineTabs.buttonClasses) {
+                return window.AdminUnderlineTabs.buttonClasses(selected, 'compact');
+            }
+            return 'settings-tab inline-flex items-center whitespace-nowrap text-sm font-medium border-b-2 py-2 px-3 '
+                + (selected ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500');
+        }
+
         chapters.forEach(function (chapter) {
-            var button = el('button', 'ecr-subtab', chapter.label);
+            var button = el('button', chapterTabClass(chapter.id === chapterId), chapter.label);
             button.type = 'button';
             button.setAttribute('role', 'tab');
             button.setAttribute('aria-selected', chapter.id === chapterId ? 'true' : 'false');
@@ -514,7 +519,7 @@
             });
             bar.appendChild(button);
         });
-        var sourcesTab = el('button', 'ecr-subtab', labels.sourcesTitle);
+        var sourcesTab = el('button', chapterTabClass(chapterId === 'sources'), labels.sourcesTitle);
         sourcesTab.type = 'button';
         sourcesTab.setAttribute('role', 'tab');
         sourcesTab.setAttribute('aria-selected', chapterId === 'sources' ? 'true' : 'false');

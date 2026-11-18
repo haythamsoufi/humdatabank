@@ -13,6 +13,8 @@ from app.utils.common.datetime_helpers import utcnow
 
 # Separator in period_name for project_cycle assignments: "<reference> · Y1Q2"
 CYCLE_PERIOD_SEP = " · "
+# Passed when a caller did not mention national_society_id. None clears the link.
+_UNSET: Any = object()
 
 
 def cycle_period_name(reference: str, slot: str) -> str:
@@ -60,6 +62,7 @@ def upsert_project(
     portfolio: Optional[str] = None,
     fund: Optional[str] = None,
     organization_name: Optional[str] = None,
+    national_society_id: Any = _UNSET,
     status: Optional[str] = None,
     funding_modality: Optional[str] = None,
     categories: Optional[str] = None,
@@ -116,6 +119,8 @@ def upsert_project(
         proj.fund = fund
     if organization_name is not None:
         proj.organization_name = organization_name
+    if national_society_id is not _UNSET:
+        proj.national_society_id = int(national_society_id) if national_society_id else None
     if status is not None:
         raw_status = (status or "").strip()
         proj.status = raw_status.capitalize() if raw_status else "Open"

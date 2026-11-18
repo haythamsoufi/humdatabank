@@ -64,6 +64,8 @@ class Capability:
     sensitivity: str = SENSITIVITY_STANDARD
     scopable: bool = False
     group: str = "reference"
+    # Shown instead of "Endpoints unlocked" for permissions that are not tied to a URL.
+    usage_note: str = ""
 
 
 CAPABILITIES: Tuple[Capability, ...] = (
@@ -99,9 +101,10 @@ CAPABILITIES: Tuple[Capability, ...] = (
         "Submitted documents",
         "Also list pending, rejected and non-public submitted documents (GET /submitted-documents), "
         "and include the documents attached to a submission. Public, approved documents only "
-        "need 'Public content'.",
+        "need 'Public content'. With a template / country limit, only documents inside that "
+        "limit are listed (documents without a country or assignment link are excluded).",
         SENSITIVITY_SENSITIVE,
-        scopable=False,
+        scopable=True,
         group="data",
     ),
     Capability(
@@ -151,6 +154,8 @@ CAPABILITIES: Tuple[Capability, ...] = (
         "requests. Grants no data access on its own.",
         SENSITIVITY_STANDARD,
         group="clients",
+        usage_note="Not a URL permission: the mobile app sends the key in the X-Mobile-Auth header "
+                   "on write requests that already carry a signed-in session.",
     ),
     Capability(
         MCP_USE,

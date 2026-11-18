@@ -7,22 +7,6 @@
 {% block head %}
     {{ super() }}
     <style>
-        .tab-button {
-            transition: all 0.2s ease-in-out;
-            cursor: pointer;
-        }
-        .tab-button.active {
-            border-bottom-color: #3b82f6 !important;
-            color: #2563eb !important;
-        }
-        .po-import-tab-btn {
-            transition: all 0.2s ease-in-out;
-            cursor: pointer;
-        }
-        .po-import-tab-btn.active {
-            border-bottom-color: #3b82f6 !important;
-            color: #2563eb !important;
-        }
         #translations-io-modal {
             align-items: flex-start;
         }
@@ -104,7 +88,7 @@
 
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% set build_apply_dropdown %}
 <div class="action-dropdown" id="build-apply-wrapper">
@@ -261,15 +245,13 @@
         </div>
 
         {# Tab Navigation #}
-        {% call scroll_tab_bar(wrapper_class='mb-4 flex-shrink-0', inner_class='space-x-8', aria_label=_('Import or export')) %}
-                <button type="button"
-                        id="tab-export"
-                        class="tab-button active whitespace-nowrap py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+        {% call scroll_tab_bar(inner_id='translations-io-tabs', wrapper_class='mb-4 flex-shrink-0', aria_label=_('Import or export')) %}
+                <button type="button" role="tab" id="tab-export" data-tab="export" aria-selected="true"
+                        class="{{ admin_underline_tab_btn_classes(true) }}">
                     <i class="fas fa-download mr-2"></i>{{ _('Export') }}
                 </button>
-                <button type="button"
-                        id="tab-import"
-                        class="tab-button whitespace-nowrap py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                <button type="button" role="tab" id="tab-import" data-tab="import" aria-selected="false"
+                        class="{{ admin_underline_tab_btn_classes(false) }}">
                     <i class="fas fa-upload mr-2"></i>{{ _('Import') }}
                 </button>
         {% endcall %}
@@ -384,20 +366,16 @@
                             <i class="fas fa-file-code text-blue-600 mr-2"></i>{{ _('PO Import') }}
                         </h4>
                         {# PO Import Tabs (Single / ZIP) #}
-                        <div class="border-b border-gray-200 mb-4">
-                            <nav class="-mb-px flex space-x-6" aria-label="{{ _('PO Import Tabs')|forceescape }}">
-                                <button type="button"
-                                        id="po-import-tab-single"
-                                        class="po-import-tab-btn active whitespace-nowrap py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                        {% call scroll_tab_bar(inner_id='po-import-tabs', wrapper_class='mb-4', aria_label=_('PO Import Tabs')) %}
+                                <button type="button" role="tab" id="po-import-tab-single" data-tab="single" aria-selected="true"
+                                        class="{{ admin_underline_tab_btn_classes(true, size='compact') }}">
                                     {{ _('Single PO') }}
                                 </button>
-                                <button type="button"
-                                        id="po-import-tab-zip"
-                                        class="po-import-tab-btn whitespace-nowrap py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                                <button type="button" role="tab" id="po-import-tab-zip" data-tab="zip" aria-selected="false"
+                                        class="{{ admin_underline_tab_btn_classes(false, size='compact') }}">
                                     {{ _('PO ZIP (all languages)') }}
                                 </button>
-                            </nav>
-                        </div>
+                        {% endcall %}
 
                         <div id="po-import-panel-single">
                             <p class="text-sm text-gray-600 mb-4">

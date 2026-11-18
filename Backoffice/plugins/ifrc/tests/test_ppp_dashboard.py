@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from datetime import date
 
+from flask import Flask
+
+from app.plugins.jinja_plugin_loader import PluginTemplateLoader
+from plugins.ifrc import _PLUGIN_DIR, bp
 from plugins.ifrc.ppp.catalogue import is_activity_field, is_pillar_reach, is_public_indicator
 from plugins.ifrc.ppp.dashboard import assemble_dashboard, choose_latest
 
@@ -118,3 +122,49 @@ def test_activity_and_reach_classification():
         "question",
         "yesno",
     )
+
+
+def _ppp_app():
+    app = Flask(__name__)
+    app.config.update(TESTING=True, DEBUG=True, SECRET_KEY="test", RATE_LIMIT_SKIP_DEBUG=True)
+    app.jinja_loader = PluginTemplateLoader(
+        lambda pid: (_PLUGIN_DIR / "templates") if pid == "ifrc" else None
+    )
+    app.register_blueprint(bp)
+    return app
+
+
+def test_dashboard_page_uses_the_plugin_template():
+    client = _ppp_app().test_client()
+    response = client.get("/ifrc/ppp")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/html"
+    assert "Pilot Programmatic Partnership" in html
+    assert 'data-view="overview"' in html
+    assert 'id="ppp-app"' in html
+    assert "/ifrc/ppp/data" in html
+    assert "ppp-dashboard.css" in html
+    assert "ppp-dashboard.js" in html
+
+
+def test_dashboard_detail_view_and_legacy_redirect():
+    client = _ppp_app().test_client()
+    detail = client.get("/ifrc/ppp?view=detail")
+    assert detail.status_code == 200
+    assert 'data-view="detail"' in detail.get_data(as_text=True)
+
+    redirect = client.get("/ifrc/ppp/detail")
+    assert redirect.status_code == 302
+    assert redirect.headers["Location"].endswith("/ifrc/ppp?view=detail")
+
+
+def test_powerbi_format_wraps_the_live_dashboard():
+    client = _ppp_app().test_client()
+    response = client.get("/ifrc/ppp?format=powerbi")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "<iframe" in html
+    assert "Pilot Programmatic Partnership" in html
+    assert "/ifrc/ppp" in html

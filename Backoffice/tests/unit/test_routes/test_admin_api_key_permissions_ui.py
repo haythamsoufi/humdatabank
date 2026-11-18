@@ -28,6 +28,12 @@ def _created(name):
     return APIKey.query.filter_by(client_name=name).first()
 
 
+def _future_date(days=30):
+    from datetime import datetime, timedelta
+
+    return (datetime.utcnow() + timedelta(days=days)).strftime("%Y-%m-%d")
+
+
 class TestCreateScreen:
     def test_page_explains_permissions_in_plain_language(self, logged_in_client):
         html = logged_in_client.get(CREATE_URL).get_data(as_text=True)
@@ -105,6 +111,45 @@ class TestCreateScreen:
         )
         assert "must be sent in a header" in response.get_data(as_text=True)
         assert _created("URL PII") is None
+
+    def test_personal_data_key_requires_an_expiry_date(self, logged_in_client, db_session):
+        data = _form(client_name="PII No Expiry", capabilities=[USERS_READ], confirm_sensitive="y")
+        response = logged_in_client.post(CREATE_URL, data=data)
+        assert "must have an expiry date" in response.get_data(as_text=True)
+        assert _created("PII No Expiry") is None
+
+        logged_in_client.post(CREATE_URL, data={**data, "client_name": "PII Expiry", "expires_at": _future_date()})
+        assert _created("PII Expiry") is not None
+
+    def test_non_personal_data_key_does_not_need_an_expiry(self, logged_in_client, db_session):
+        logged_in_client.post(CREATE_URL, data=_form(client_name="Ref No Expiry", capabilities=[REFERENCE_READ]))
+        assert _created("Ref No Expiry") is not None
+
+    def test_guessable_existing_secret_is_rejected(self, logged_in_client, db_session):
+        response = logged_in_client.post(
+            CREATE_URL,
+            data=_form(client_name="Weak Secret", capabilities=[REFERENCE_READ],
+                       existing_secret="a" * 40),
+        )
+        assert "too guessable" in response.get_data(as_text=True)
+        assert _created("Weak Secret") is None
+
+    def test_documents_read_accepts_a_data_scope(self, logged_in_client, db_session):
+        from app.services.security.api_key_permissions import DOCUMENTS_READ
+
+        template = create_test_template(db_session)
+        logged_in_client.post(
+            CREATE_URL,
+            data=_form(client_name="Scoped Docs", capabilities=[DOCUMENTS_READ], confirm_sensitive="y",
+                       restrict_data="y", scope_template_ids=[str(template.id)]),
+        )
+        stored = _created("Scoped Docs").permissions
+        assert stored["data_scope"] == {"template_ids": [template.id], "country_ids": []}
+
+    def test_mcp_and_mobile_permissions_explain_themselves(self, logged_in_client):
+        html = logged_in_client.get(CREATE_URL).get_data(as_text=True)
+        assert "/mcp" in html
+        assert "X-Mobile-Auth header" in html
 
     def test_query_string_key_can_be_enabled_for_non_personal_data(self, logged_in_client, db_session):
         logged_in_client.post(
@@ -184,8 +229,9 @@ class TestEditScreen:
             logged_in_client.post(
                 f"/admin/api-management/api-keys/{key.id}/edit",
                 data={"client_name": "Audited", "rate_limit_per_minute": "60",
-                      "capabilities": [REFERENCE_READ, USERS_READ], "confirm_sensitive": "y"},
-            )
+                      "capabilities": [REFERENCE_READ, USERS_READ], "confirm_sensitive": "y",
+                      "expires_at": _future_date()},
+        )
         kwargs = audit.call_args.kwargs
         assert kwargs["old_values"]["permissions"]["capabilities"] == [REFERENCE_READ]
         assert USERS_READ in kwargs["new_values"]["permissions"]["capabilities"]

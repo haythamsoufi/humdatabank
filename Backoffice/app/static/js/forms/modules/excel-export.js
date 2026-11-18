@@ -135,7 +135,7 @@ export class ExcelExportManager {
         if (!this.modal || !tabName) return;
         this.modal.querySelectorAll('[data-excel-io-tab]').forEach((btn) => {
             const active = btn.dataset.excelIoTab === tabName;
-            btn.classList.toggle('excel-io-tabs__btn--active', active);
+            if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, active);
             btn.setAttribute('aria-selected', active ? 'true' : 'false');
         });
         this.modal.querySelectorAll('[data-excel-io-panel]').forEach((panel) => {

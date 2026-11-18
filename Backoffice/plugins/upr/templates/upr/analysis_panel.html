@@ -42,16 +42,17 @@
         </div>
     </div>
 
-    <div class="upri-subtabs" role="tablist" aria-label="{{ L.intro_title }}">
-        <button type="button" class="upri-subtabs__btn{% if upri_subtab == 'data' %} is-active{% endif %}" id="upri-subtab-data" role="tab"
+    {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+    {% call scroll_tab_bar(inner_id='upri-subtabs', wrapper_class='mb-5', aria_label=L.intro_title) %}
+        <button type="button" class="{{ admin_underline_tab_btn_classes(upri_subtab == 'data') }}" id="upri-subtab-data" role="tab"
                 aria-selected="{{ 'true' if upri_subtab == 'data' else 'false' }}" aria-controls="upri-pane-data" data-upri-pane="data">{{ L.subtab_data }}</button>
-        <button type="button" class="upri-subtabs__btn{% if upri_subtab == 'flow' %} is-active{% endif %}" id="upri-subtab-flow" role="tab"
+        <button type="button" class="{{ admin_underline_tab_btn_classes(upri_subtab == 'flow') }}" id="upri-subtab-flow" role="tab"
                 aria-selected="{{ 'true' if upri_subtab == 'flow' else 'false' }}" aria-controls="upri-pane-flow" data-upri-pane="flow">{{ L.flow_title }}</button>
-        <button type="button" class="upri-subtabs__btn{% if upri_subtab == 'participation' %} is-active{% endif %}" id="upri-subtab-participation" role="tab"
+        <button type="button" class="{{ admin_underline_tab_btn_classes(upri_subtab == 'participation') }}" id="upri-subtab-participation" role="tab"
                 aria-selected="{{ 'true' if upri_subtab == 'participation' else 'false' }}" aria-controls="upri-pane-participation" data-upri-pane="participation">{{ L.subtab_participation }}</button>
-        <button type="button" class="upri-subtabs__btn{% if upri_subtab == 'global-plan' %} is-active{% endif %}" id="upri-subtab-global-plan" role="tab"
+        <button type="button" class="{{ admin_underline_tab_btn_classes(upri_subtab == 'global-plan') }}" id="upri-subtab-global-plan" role="tab"
                 aria-selected="{{ 'true' if upri_subtab == 'global-plan' else 'false' }}" aria-controls="upri-pane-global-plan" data-upri-pane="global-plan">{{ L.subtab_global_plan }}</button>
-    </div>
+    {% endcall %}
 
     <div id="upri-pane-data" class="upri-pane" role="tabpanel" aria-labelledby="upri-subtab-data"{% if upri_subtab != 'data' %} hidden{% endif %}>
     <div id="upri-loading" class="upri-state" hidden>

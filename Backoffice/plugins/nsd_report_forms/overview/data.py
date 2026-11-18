@@ -13,6 +13,7 @@ from collections import defaultdict
 from typing import Dict, Iterable, List, Optional
 
 from sqlalchemy import func, or_
+from sqlalchemy.orm import joinedload
 
 from app import db
 from app.models import (AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, FormTemplate,
@@ -134,7 +135,11 @@ def _project_dict_from_row(row: Project) -> dict:
         'project_id': row.id,
         'reference': row.reference,
         'title': row.title or '',
-        'ns': row.organization_name or '',
+        'ns': (
+            row.national_society.name
+            if row.national_society is not None
+            else (row.organization_name or '')
+        ),
         'status': row.status or 'Open',
         'modality': row.funding_modality or '',
         'categories': row.categories or '',
@@ -156,7 +161,7 @@ def _project_dict_from_row(row: Project) -> dict:
 
 def _profiles_from_registry(reference: Optional[str] = None, with_logframe: bool = False,
                             pm_email: Optional[str] = None) -> Dict[str, dict]:
-    q = Project.query
+    q = Project.query.options(joinedload(Project.national_society))
     if reference:
         q = q.filter(Project.reference == reference)
     if pm_email is not None:

@@ -69,7 +69,7 @@ def ppp_dashboard():
         page = url_for("ifrc.ppp_dashboard", _external=True, **({"view": view} if view != "overview" else {}))
         return _powerbi_frame(page, "Pilot Programmatic Partnership")
     return render_template(
-        "ppp_dashboard.html",
+        "plugins/ifrc/ppp/ppp_dashboard.html",
         view=view,
         page_title="Pilot Programmatic Partnership",
     )

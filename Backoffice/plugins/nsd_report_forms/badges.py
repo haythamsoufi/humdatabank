@@ -14,6 +14,29 @@ from plugins.nsd_report_forms.overview import data
 TONE = {"green": "success", "amber": "warning", "red": "danger", "grey": "neutral"}
 
 
+def project_report_answers(reports: List[Any]) -> Dict[int, dict]:
+    """Core hook ``get_project_report_answers``: overall/activities assessment and spending to date per report.
+
+    ``reports`` are dicts with ``aes_id`` and ``template_id``; only reports of the NSD quarterly and final templates
+    are answered. Used by Admin → Projects → Monitoring.
+    """
+    ctx = data.Ctx()
+    by_template = {ctx.tpl[k]: k for k in (data.QUARTER, data.FINAL) if ctx.tpl[k] is not None}
+    if not by_template:
+        return {}
+    wanted = {}
+    for r in reports:
+        kind = by_template.get(r.get("template_id"))
+        if kind:
+            wanted[r["aes_id"]] = {"kind": kind, "overall": None, "activities": None, "actual": None,
+                                   "author": None, "frame": None}
+    if not wanted:
+        return {}
+    data._attach_answers(ctx, wanted)
+    return {aes_id: {"overall": a["overall"], "activities": a["activities"], "actual": a["actual"]}
+            for aes_id, a in wanted.items()}
+
+
 def assignment_badges(assignment_entity_statuses: List[Any]):
     from app.plugins.base import AssignmentBadge
 

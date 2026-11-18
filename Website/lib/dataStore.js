@@ -713,15 +713,20 @@ export async function syncDataFromBackend() {
   console.log('🔄 Starting data sync from backend...');
   console.log(`📡 API: ${API_BASE_URL}`);
 
+  // Send the key in a header, never in the URL (URLs end up in logs and Referer headers).
+  const authFetch = (target) => fetch(target, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${API_KEY}` },
+  });
+
   // Ensure data directory exists
   await fs.mkdir(DATA_DIR, { recursive: true });
 
   try {
     // 1. Fetch comprehensive dataset with disaggregation data
-    const url = `${API_BASE_URL}/api/v1/data?api_key=${API_KEY}&related=all&per_page=100000&disagg=true`;
+    const url = `${API_BASE_URL}/api/v1/data?related=all&per_page=100000&disagg=true`;
     console.log(`📥 Fetching data from: ${url}`);
 
-    const response = await fetch(url);
+    const response = await authFetch(url);
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
@@ -735,8 +740,8 @@ export async function syncDataFromBackend() {
     // 2. Fetch indicators
     let indicators = [];
     try {
-      const indicatorsUrl = `${API_BASE_URL}/api/v1/indicator-bank?api_key=${API_KEY}`;
-      const indicatorsResponse = await fetch(indicatorsUrl);
+      const indicatorsUrl = `${API_BASE_URL}/api/v1/indicator-bank`;
+      const indicatorsResponse = await authFetch(indicatorsUrl);
       if (indicatorsResponse.ok) {
         const indicatorsData = await indicatorsResponse.json();
         indicators = indicatorsData.indicators || [];
@@ -749,8 +754,8 @@ export async function syncDataFromBackend() {
     // 3. Fetch templates
     let templates = [];
     try {
-      const templatesUrl = `${API_BASE_URL}/api/v1/templates?api_key=${API_KEY}&per_page=1000`;
-      const templatesResponse = await fetch(templatesUrl);
+      const templatesUrl = `${API_BASE_URL}/api/v1/templates?per_page=1000`;
+      const templatesResponse = await authFetch(templatesUrl);
       if (templatesResponse.ok) {
         const templatesData = await templatesResponse.json();
         templates = templatesData.templates || [];
@@ -763,8 +768,8 @@ export async function syncDataFromBackend() {
     // 4. Fetch common words
     let commonWords = [];
     try {
-      const commonWordsUrl = `${API_BASE_URL}/api/v1/common-words?api_key=${API_KEY}&language=en`;
-      const commonWordsResponse = await fetch(commonWordsUrl);
+      const commonWordsUrl = `${API_BASE_URL}/api/v1/common-words?language=en`;
+      const commonWordsResponse = await authFetch(commonWordsUrl);
       if (commonWordsResponse.ok) {
         const commonWordsData = await commonWordsResponse.json();
         commonWords = commonWordsData.common_words || [];
@@ -782,8 +787,8 @@ export async function syncDataFromBackend() {
       const perPage = 100; // Fetch in batches
 
       while (hasMore) {
-        const resourcesUrl = `${API_BASE_URL}/api/v1/resources?api_key=${API_KEY}&page=${page}&per_page=${perPage}`;
-        const resourcesResponse = await fetch(resourcesUrl);
+        const resourcesUrl = `${API_BASE_URL}/api/v1/resources?page=${page}&per_page=${perPage}`;
+        const resourcesResponse = await authFetch(resourcesUrl);
         if (resourcesResponse.ok) {
           const resourcesData = await resourcesResponse.json();
           const pageResources = resourcesData.resources || [];
@@ -803,8 +808,8 @@ export async function syncDataFromBackend() {
     // 6. Fetch embed content
     let embedContent = [];
     try {
-      const embedUrl = `${API_BASE_URL}/api/v1/embed-content?api_key=${API_KEY}`;
-      const embedResponse = await fetch(embedUrl);
+      const embedUrl = `${API_BASE_URL}/api/v1/embed-content`;
+      const embedResponse = await authFetch(embedUrl);
       if (embedResponse.ok) {
         const embedData = await embedResponse.json();
         embedContent = embedData.embeds || [];

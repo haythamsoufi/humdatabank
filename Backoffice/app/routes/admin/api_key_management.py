@@ -64,6 +64,7 @@ def _capability_catalog() -> list[dict]:
             'sensitivity': cap.sensitivity,
             'scopable': cap.scopable,
             'group': cap.group,
+            'usage_note': cap.usage_note,
             'endpoints': endpoints,
         })
     return catalog
@@ -426,8 +427,8 @@ def rotate_api_key(key_id):
         api_key.key_id = new_key_id
         api_key.key_hash = key_hash
         api_key.key_prefix = key_prefix
-        api_key.is_active = True
-        api_key.is_revoked = False
+        # Rotation replaces the secret only. A disabled key stays disabled (re-enabling is a
+        # separate decision); revoked keys were already refused above.
 
         db.session.flush()
 

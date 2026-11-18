@@ -60,19 +60,22 @@
                             </div>
 
                             {# Hybrid mode tab bar — shown by JS when row_mode=hybrid is active #}
-                            <div id="matrix-hybrid-tab-bar" class="hidden -mb-px mt-3 flex border-b border-gray-200">
-                                <button type="button" id="matrix-hybrid-tab-fixed"
-                                        class="matrix-hybrid-tab flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-orange-600 border-b-2 border-orange-500 bg-white focus:outline-none"
+                            {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+                            <div id="matrix-hybrid-tab-bar" class="hidden mt-3">
+                            {% call scroll_tab_bar(aria_label=_('Hybrid row configuration')) %}
+                                <button type="button" role="tab" id="matrix-hybrid-tab-fixed" aria-selected="true"
+                                        class="matrix-hybrid-tab {{ admin_underline_tab_btn_classes(true) }}"
                                         data-target="matrix-manual-rows-section">
-                                    <i class="fas fa-list w-3.5 h-3.5"></i>
+                                    <i class="fas fa-list w-3.5 h-3.5 mr-1.5"></i>
                                     {{ _('Fixed Rows') }}
                                 </button>
-                                <button type="button" id="matrix-hybrid-tab-list"
-                                        class="matrix-hybrid-tab flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-transparent focus:outline-none"
+                                <button type="button" role="tab" id="matrix-hybrid-tab-list" aria-selected="false"
+                                        class="matrix-hybrid-tab {{ admin_underline_tab_btn_classes(false) }}"
                                         data-target="matrix-list-library-section">
-                                    <i class="fas fa-database w-3.5 h-3.5"></i>
+                                    <i class="fas fa-database w-3.5 h-3.5 mr-1.5"></i>
                                     {{ _('List Config') }}
                                 </button>
+                            {% endcall %}
                             </div>
 
                             {# Manual Row Headers #}

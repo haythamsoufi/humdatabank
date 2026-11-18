@@ -485,6 +485,16 @@ class BasePlugin(ABC):
         """
         return {}
 
+    def get_project_report_answers(self, reports: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
+        """Implementation answers for the project reports on Admin → Projects → Monitoring.
+
+        ``reports`` are dicts with ``aes_id`` (``AssignmentEntityStatus.id``) and ``template_id``. Return
+        ``{aes_id: {"overall": str | None, "activities": str | None, "actual": float | None}}`` for the reports
+        this plugin understands: the overall and activities assessment wording ("On track", "Partially on track",
+        "Not on track") and the spending to date. Query in batches; called once per page load.
+        """
+        return {}
+
     def get_national_society_columns(self) -> List[NationalSocietyGridColumn]:
         """Columns this plugin adds to Admin → Organization → National Societies."""
         return []

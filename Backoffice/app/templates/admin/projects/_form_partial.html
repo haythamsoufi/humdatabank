@@ -35,8 +35,8 @@
         {{ form.status(class_='form-control w-full', id=form.status.id, disabled=not can_edit) }}
       </div>
       <div class="md:col-span-2">
-        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.organization_name.id }}">{{ form.organization_name.label.text }}</label>
-        {{ form.organization_name(class_='form-control w-full', id=form.organization_name.id, readonly=not can_edit, disabled=not can_edit) }}
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.national_society_id.id }}">{{ form.national_society_id.label.text }}</label>
+        {{ form.national_society_id(class_='form-control w-full', id=form.national_society_id.id, disabled=not can_edit) }}
       </div>
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2" for="{{ form.funding_modality.id }}">{{ form.funding_modality.label.text }}</label>

@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% block title %}{{ _('Decision Maker') }}{% endblock %}
 
@@ -23,12 +24,12 @@
      data-api-list="{{ url_for('decisions.api_list') }}"
      data-workspace-base="{{ url_for('decisions.page_catalogue') }}"
      dir="{{ 'rtl' if ui_lang == 'ar' else 'ltr' }}">
-  <div class="dec-tabs" role="tablist" aria-label="{{ _('Decision Maker sections') }}">
-    <button type="button" class="dec-tab dec-focus" role="tab" id="dec-tab-decisions" data-tab="decisions"
+  {% call scroll_tab_bar(inner_id='dec-tabs', wrapper_class='mb-3', aria_label=_('Decision Maker sections')) %}
+    <button type="button" class="dec-focus {{ admin_underline_tab_btn_classes(true) }}" role="tab" id="dec-tab-decisions" data-tab="decisions"
             aria-controls="dec-panel-decisions" aria-selected="true">{{ _('Decisions') }}</button>
-    <button type="button" class="dec-tab dec-focus" role="tab" id="dec-tab-guidance" data-tab="guidance"
+    <button type="button" class="dec-focus {{ admin_underline_tab_btn_classes(false) }}" role="tab" id="dec-tab-guidance" data-tab="guidance"
             aria-controls="dec-panel-guidance" aria-selected="false" tabindex="-1">{{ _('Guidance') }}</button>
-  </div>
+  {% endcall %}
 
   <div id="dec-panel-decisions" role="tabpanel" aria-labelledby="dec-tab-decisions" tabindex="0">
     <div id="dec-status" class="dec-muted" role="status" aria-live="polite"></div>

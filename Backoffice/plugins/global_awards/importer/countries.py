@@ -16,7 +16,7 @@ _ALIAS_GROUPS = (
     {"federated states of micronesia", "micronesia federated states of"},
     {"syrian arab republic", "syria"},
     {"kyrgyz republic", "kyrgyzstan"},
-    {"eswatini", "swaziland"},
+    {"eswatini", "swaziland", "eswatini the kingdom of"},
     {"cabo verde", "cape verde"},
     {"czech republic", "czechia"},
     {"united republic of tanzania", "tanzania"},

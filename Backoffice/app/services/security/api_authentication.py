@@ -203,10 +203,21 @@ def _plaintext_matches_env_mobile_api_key(provided_key: str) -> bool:
 
 
 def _consume_rate_limit(bucket: str, limit: int) -> bool:
-    """Record one request; return True if the bucket is already over ``limit``."""
+    """Record one request; return True if the bucket is already over ``limit``.
+
+    Counts in the shared store (Redis, or the ``auth_state_entry`` table with
+    ``RATE_LIMIT_SHARED_FALLBACK=db``) when one is configured, so the limit holds across
+    workers. Otherwise, or when the store is unreachable, it counts in process memory.
+    """
     from collections import deque
 
     now = time.time()
+    from app.utils.security.rate_limiting import _shared_limit_exceeded, _use_shared_store
+
+    if _use_shared_store():
+        exceeded = _shared_limit_exceeded(bucket, limit, now)
+        if exceeded is not None:
+            return exceeded
     if bucket not in _api_key_rate_limit_storage:
         _api_key_rate_limit_storage[bucket] = deque()
     storage = _api_key_rate_limit_storage[bucket]

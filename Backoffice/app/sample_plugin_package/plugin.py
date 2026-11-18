@@ -4,8 +4,9 @@ Starter template. Upload the ZIP from the admin plugin management page (needs
 PLUGIN_UPLOAD_ENABLED and the System Manager role), or extract it to
 Backoffice/plugins/sample_plugin/ and restart the application.
 """
+from typing import Any, Dict, List
+
 from app.plugins.base import BasePlugin
-from typing import List
 
 
 class SamplePlugin(BasePlugin):
@@ -41,3 +42,17 @@ class SamplePlugin(BasePlugin):
 
     def get_field_types(self) -> List:
         return []
+
+    def get_blueprint(self):
+        # Registered at application start; serves /admin/plugins/sample_plugin/settings.
+        from plugins.sample_plugin.routes import bp
+
+        return bp
+
+    def get_settings(self) -> Dict[str, Any]:
+        from plugins.sample_plugin.routes import settings_status
+
+        return settings_status()
+
+    def is_admin_feature(self) -> bool:
+        return True

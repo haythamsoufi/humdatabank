@@ -53,15 +53,12 @@
 .dec-chart text { font-size: 10px; fill: #4b5563; }
 .dec-bar-row { display: grid; grid-template-columns: 9rem 1fr 7rem; gap: 0.5rem; align-items: center; font-size: 0.8125rem; margin-block-end: 0.3rem; }
 .dec-bar { height: 0.7rem; background: #b91c1c; border-radius: 0.2rem; min-width: 1px; }
-.dec-tabs { display: flex; gap: 0.25rem; margin-block-end: 0.75rem; border-block-end: 1px solid #e5e7eb; }
-.dec-tab { padding: 0.4rem 0.8rem; border: 0; background: none; cursor: pointer; font-size: 0.875rem; border-block-end: 2px solid transparent; }
-.dec-tab[aria-selected="true"] { border-block-end-color: #b91c1c; font-weight: 600; }
 .dec-prompts { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .dec-prompt { text-align: start; }
 .dec-label-ai { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
 .dec-error { color: #991b1b; }
 .dec-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.dec-focus:focus-visible, .dec-btn:focus-visible, .dec-tab:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+.dec-focus:focus-visible, .dec-btn:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
 .dec-reasons { margin: 0.4rem 0; padding-inline-start: 1.1rem; list-style: disc; font-size: 0.875rem; }
 .dec-reasons li { margin-block-end: 0.2rem; }
 .dec-details { margin-block-start: 0.5rem; }

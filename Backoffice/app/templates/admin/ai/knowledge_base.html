@@ -5,7 +5,7 @@
 {% from "macros/modal_shell.html" import modal_shell %}
 {% from "components/_profile_icon.html" import profile_icon %}
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "components/ag_grid_includes.html" import ag_grid_container %}
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 
@@ -275,33 +275,33 @@
 {# z_index above .ag-column-visibility-* (100–10001); modal_shell defaults to 50 and inline style beats #uploadImportModal in CSS #}
 {% call modal_shell('uploadImportModal', _('Upload/Import Documents'), max_width='max-w-4xl', close_id='closeUploadModalBtn', content_class='flex flex-col flex-1 min-h-0 overflow-hidden', z_index=11000) %}
                 <div class="py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0 gap-4 min-w-0">
-                    {% call scroll_tab_bar(border_bottom=False, wrapper_class='min-w-0 flex-1', inner_class='space-x-4', aria_label=_('Import source')) %}
-                        <button type="button" id="uploadTab"
-                                class="tab-button inline-flex items-center px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-blue-600 transition-colors bg-transparent hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 active"
+                    {% call scroll_tab_bar(inner_id='knowledge-import-tabs', border_bottom=False, wrapper_class='min-w-0 flex-1', aria_label=_('Import source')) %}
+                        <button type="button" id="uploadTab" data-tab="upload"
+                                class="{{ admin_underline_tab_btn_classes(true) }}"
                                 role="tab"
                                 aria-selected="true"
                                 aria-controls="uploadContent"
                                 tabindex="0">
                             <i class="fas fa-cloud-upload-alt mr-2"></i>{{ _('Upload New') }}
                         </button>
-                        <button type="button" id="importTab"
-                                class="tab-button inline-flex items-center px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 transition-colors bg-transparent hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+                        <button type="button" id="importTab" data-tab="import"
+                                class="{{ admin_underline_tab_btn_classes(false) }}"
                                 role="tab"
                                 aria-selected="false"
                                 aria-controls="importContent"
                                 tabindex="-1">
                             <i class="fas fa-file-import mr-2"></i>{{ _('Import from System') }}
                         </button>
-                        <button type="button" id="ifrcApiTab"
-                                class="tab-button inline-flex items-center px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 transition-colors bg-transparent hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+                        <button type="button" id="ifrcApiTab" data-tab="ifrc"
+                                class="{{ admin_underline_tab_btn_classes(false) }}"
                                 role="tab"
                                 aria-selected="false"
                                 aria-controls="ifrcApiContent"
                                 tabindex="-1">
                             <i class="fas fa-globe mr-2"></i>{{ _('Import from external API') }}
                         </button>
-                        <button type="button" id="guidanceTab"
-                                class="tab-button inline-flex items-center px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 transition-colors bg-transparent hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+                        <button type="button" id="guidanceTab" data-tab="guidance"
+                                class="{{ admin_underline_tab_btn_classes(false) }}"
                                 role="tab"
                                 aria-selected="false"
                                 aria-controls="guidanceContent"

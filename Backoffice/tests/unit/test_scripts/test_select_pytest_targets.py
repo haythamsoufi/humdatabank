@@ -106,7 +106,12 @@ class TestPlanPytestRun:
             ["Backoffice/plugins/ifrc/pb_progress/routes.py"],
             BACKOFFICE_ROOT,
         )
-        assert plan.targets == ("tests/unit/test_plugins/test_plugin_metadata.py",)
+        assert plan.targets == (
+            "tests/unit/test_plugins/test_first_party_plugins.py",
+            "tests/unit/test_plugins/test_plugin_contract.py",
+            "tests/unit/test_plugins/test_plugin_metadata.py",
+            "tests/unit/test_plugins/test_plugin_route_access.py",
+        )
         assert plan.needs_render_libs is False
 
     def test_fdrs_routes_do_not_select_upr_or_fdrs_route_suites(self):
@@ -114,7 +119,8 @@ class TestPlanPytestRun:
             ["Backoffice/plugins/fdrs/routes.py"],
             BACKOFFICE_ROOT,
         )
-        assert plan.targets == ("tests/unit/test_plugins/test_plugin_metadata.py",)
+        assert "tests/unit/test_plugins/test_plugin_metadata.py" in plan.targets
+        assert "tests/unit/test_plugins/test_plugin_contract.py" in plan.targets
         assert "tests/unit/test_plugins/test_fdrs_routes.py" not in plan.targets
         assert "plugins/upr/tests/test_routes.py" not in plan.targets
         assert "tests/unit/test_plugins/test_fdrs_compliance_doc_matching.py" not in plan.targets
@@ -126,10 +132,26 @@ class TestPlanPytestRun:
         )
         assert plan == PytestPlan(
             "selected",
-            ("tests/unit/test_plugins/test_plugin_metadata.py",),
+            (
+                "tests/unit/test_plugins/test_first_party_plugins.py",
+                "tests/unit/test_plugins/test_plugin_contract.py",
+                "tests/unit/test_plugins/test_plugin_metadata.py",
+                "tests/unit/test_plugins/test_plugin_route_access.py",
+            ),
             "Mapped changed files to tests",
             False,
         )
+
+    def test_any_plugin_python_change_runs_the_plugin_contract_tests(self):
+        for changed in (
+            "Backoffice/plugins/brand_new/routes.py",
+            "Backoffice/plugins/upr/dashboards/raster.py",
+            "Backoffice/app/plugins/manager.py",
+            "Backoffice/app/sample_plugin_package/routes.py",
+            "Backoffice/scripts/ci/check_plugin_contract.py",
+        ):
+            plan = plan_pytest_run([changed], BACKOFFICE_ROOT)
+            assert "tests/unit/test_plugins/test_plugin_contract.py" in plan.targets, changed
 
     def test_unmapped_python_skips_rather_than_full_suite(self, tmp_path: Path):
         (tmp_path / "app").mkdir()

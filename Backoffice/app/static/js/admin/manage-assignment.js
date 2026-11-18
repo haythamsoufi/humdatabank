@@ -1604,15 +1604,9 @@
                 addEntitiesSubTabButtons.forEach(btn => {
                     const targetPanelId = btn.getAttribute('data-tabs-target');
                     const btnPanelId = targetPanelId ? targetPanelId.replace('#', '') : '';
-                    if (btnPanelId === panelId) {
-                        btn.classList.add('text-blue-600', 'border-blue-600');
-                        btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                        btn.setAttribute('aria-selected', 'true');
-                    } else {
-                        btn.classList.remove('text-blue-600', 'border-blue-600');
-                        btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                        btn.setAttribute('aria-selected', 'false');
-                    }
+                    const isActive = btnPanelId === panelId;
+                    if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, isActive);
+                    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
                 });
 
                 // Update panels
@@ -3283,15 +3277,9 @@
         function activateSecretariatSubtab(panelId) {
             secretariatSubtabButtons.forEach(btn => {
                 const target = btn.getAttribute('data-tabs-target');
-                if (target === '#' + panelId) {
-                    btn.classList.add('text-blue-600', 'border-blue-600');
-                    btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'true');
-                } else {
-                    btn.classList.remove('text-blue-600', 'border-blue-600');
-                    btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                    btn.setAttribute('aria-selected', 'false');
-                }
+                const isActive = target === '#' + panelId;
+                if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
             });
             secretariatSubtabPanels.forEach(panel => {
                 if (panel.id === panelId) {

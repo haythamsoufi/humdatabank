@@ -42,6 +42,8 @@ from flask_login import current_user
 from app.utils.http.request_validation import enforce_api_or_csrf_protection
 
 from app.extensions import limiter
+from app.services.security.api_key_permissions import MCP_USE
+from app.utils.auth.auth import api_capability
 from app.utils.http.outbound_url import (
     is_local_dev_environment,
     parse_network_allowlist,
@@ -284,6 +286,7 @@ def _safe_upstream_path(subpath: str) -> str:
 @bp.route("/mcp/", methods=["GET", "POST", "DELETE", "OPTIONS"])
 @bp.route("/mcp/<path:subpath>", methods=["GET", "POST", "DELETE", "OPTIONS"])
 @limiter.limit(_rate_limit, key_func=_rate_limit_key)
+@api_capability(MCP_USE)  # Declared for the permission catalog; authorize_mcp_request() enforces it.
 def mcp_proxy(subpath: str = "") -> Response:
     """Forward MCP streamable-http traffic to the configured upstream MCP host."""
     upstream_base = _upstream_base()

@@ -17,7 +17,9 @@ bp = Blueprint(
 settings_bp = Blueprint(
     "pb_progress_settings",
     __name__,
-    url_prefix="/admin/plugins/pb_progress",
+    # Plugin contract: the settings page lives at /admin/plugins/<plugin_id>/settings
+    # (the plugin id is "ifrc"; "pb_progress" was a legacy activation token).
+    url_prefix="/admin/plugins/ifrc",
     template_folder=str(_IFRC_TEMPLATES),
 )
 

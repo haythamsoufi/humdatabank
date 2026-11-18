@@ -294,6 +294,64 @@ class TestSubmitIndicatorSuggestion:
         assert resp.status_code == 500
 
 
+class TestSuggestionAbuseProtection:
+    """The suggestion endpoint is reachable with a public-site key and sends mail to the submitter."""
+
+    def _post(self, client, auth_headers, **overrides):
+        with patch("app.services.email.service.send_suggestion_confirmation_email") as confirm, \
+             patch("app.services.email.service.send_admin_notification_email"):
+            resp = client.post(
+                _api("/indicator-suggestions"),
+                json={**_SUGGESTION_PAYLOAD, **overrides},
+                headers=auth_headers,
+            )
+        return resp, confirm
+
+    @pytest.mark.parametrize("email", ["not-an-email", "a@b", "a b@example.org", "x@@example.org",
+                                       "victim@example.org\r\nBcc: other@example.org", "<x>@example.org"])
+    def test_invalid_email_is_rejected_and_nothing_is_sent(self, client, auth_headers, db_session, email):
+        resp, confirm = self._post(client, auth_headers, submitter_email=email)
+        assert resp.status_code == 400
+        confirm.assert_not_called()
+
+    @pytest.mark.parametrize("overrides", [
+        {"reason": "x" * 5001},
+        {"indicator_name": "x" * 256},
+        {"submitter_name": "x" * 256},
+        {"definition": "x" * 5001},
+        {"reason": {"nested": "object"}},
+        {"submitter_name": 123},
+        {"emergency": "yes"},
+        {"sector": {"primary": 5}},
+        {"sector": {"primary": "x" * 256}},
+        {"sub_sector": ["list"]},
+    ])
+    def test_oversized_or_mistyped_fields_are_rejected(self, client, auth_headers, db_session, overrides):
+        resp, _ = self._post(client, auth_headers, **overrides)
+        assert resp.status_code == 400
+
+    def test_same_email_is_throttled(self, client, auth_headers, db_session, app):
+        app.config["API_SUGGESTIONS_PER_EMAIL_HOUR"] = 2
+        try:
+            assert self._post(client, auth_headers)[0].status_code == 201
+            assert self._post(client, auth_headers, submitter_email="ALICE@example.com")[0].status_code == 201
+            resp, confirm = self._post(client, auth_headers)
+            assert resp.status_code == 429
+            confirm.assert_not_called()
+            assert self._post(client, auth_headers, submitter_email="bob@example.com")[0].status_code == 201
+        finally:
+            app.config.pop("API_SUGGESTIONS_PER_EMAIL_HOUR", None)
+
+    def test_total_volume_is_throttled(self, client, auth_headers, db_session, app):
+        app.config["API_SUGGESTIONS_PER_HOUR"] = 2
+        try:
+            assert self._post(client, auth_headers, submitter_email="a1@example.com")[0].status_code == 201
+            assert self._post(client, auth_headers, submitter_email="a2@example.com")[0].status_code == 201
+            assert self._post(client, auth_headers, submitter_email="a3@example.com")[0].status_code == 429
+        finally:
+            app.config.pop("API_SUGGESTIONS_PER_HOUR", None)
+
+
 # ---------------------------------------------------------------------------
 # GET /api/v1/indicator-suggestions
 # ---------------------------------------------------------------------------
@@ -396,7 +454,26 @@ class TestGetIndicatorSuggestion:
 # ---------------------------------------------------------------------------
 
 class TestUpdateIndicatorSuggestionStatus:
-    """Tests for PUT /api/v1/indicator-suggestions/<id>/status."""
+    """Tests for PUT /api/v1/indicator-suggestions/<id>/status.
+
+    Authorization is the key's ``indicators:manage`` permission; a key has no user, so no
+    session or admin object is involved.
+    """
+
+    @staticmethod
+    def _suggestion(db_session, app, name):
+        with app.app_context():
+            s = IndicatorSuggestion(
+                submitter_name=name,
+                submitter_email=f"{name.lower()}@example.com",
+                suggestion_type="new_indicator",
+                indicator_name=f"{name} indicator",
+                reason="test",
+                status="pending",
+            )
+            db_session.add(s)
+            db_session.commit()
+            return s.id
 
     def test_no_auth_returns_401(self, client, db_session):
         resp = client.put(
@@ -405,93 +482,60 @@ class TestUpdateIndicatorSuggestionStatus:
         )
         assert resp.status_code == 401
 
-    def test_non_admin_returns_403(self, client, auth_headers, db_session):
-        """Non-admin API key caller returns 403."""
-        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=False):
-            resp = client.put(
-                _api("/indicator-suggestions/1/status"),
-                json={"status": "approved"},
-                headers=auth_headers,
-            )
+    def test_key_without_manage_permission_returns_403(self, client, db_session):
+        from app.services.security.api_key_permissions import REFERENCE_READ, build_permissions_document
+        from tests.factories import create_test_api_key
+
+        _key, full_key = create_test_api_key(db_session, permissions=build_permissions_document([REFERENCE_READ]))
+        resp = client.put(
+            _api("/indicator-suggestions/1/status"),
+            json={"status": "approved"},
+            headers={"Authorization": f"Bearer {full_key}"},
+        )
         assert resp.status_code == 403
+        assert resp.get_json()["required_permission"] == "indicators:manage"
 
     def test_missing_status_returns_400(self, client, auth_headers, db_session, app):
-        with app.app_context():
-            s = IndicatorSuggestion(
-                submitter_name="Eve",
-                submitter_email="eve@example.com",
-                suggestion_type="new_indicator",
-                indicator_name="Status Update",
-                reason="test",
-            )
-            db_session.add(s)
-            db_session.commit()
-            s_id = s.id
+        s_id = self._suggestion(db_session, app, "Eve")
+        resp = client.put(_api(f"/indicator-suggestions/{s_id}/status"), json={}, headers=auth_headers)
+        assert resp.status_code == 400
 
-        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
-             patch("app.routes.api.indicators.current_user") as mock_cu:
-            mock_cu.is_authenticated = True
-            resp = client.put(
-                _api(f"/indicator-suggestions/{s_id}/status"),
-                json={},  # missing status
-                headers=auth_headers,
-            )
+    def test_invalid_status_is_rejected_not_reset_to_pending(self, client, auth_headers, db_session, app):
+        s_id = self._suggestion(db_session, app, "Ivy")
+        resp = client.put(
+            _api(f"/indicator-suggestions/{s_id}/status"), json={"status": "banana"}, headers=auth_headers
+        )
+        assert resp.status_code == 400
+        assert "approved" in resp.get_json()["allowed"]
+        resp = client.put(
+            _api(f"/indicator-suggestions/{s_id}/status"), json={"status": ["approved"]}, headers=auth_headers
+        )
         assert resp.status_code == 400
 
     def test_not_found_returns_404(self, client, auth_headers, db_session):
-        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
-             patch("app.routes.api.indicators.current_user") as mock_cu:
-            mock_cu.is_authenticated = True
-            resp = client.put(
-                _api("/indicator-suggestions/999999/status"),
-                json={"status": "approved"},
-                headers=auth_headers,
-            )
+        resp = client.put(
+            _api("/indicator-suggestions/999999/status"),
+            json={"status": "approved"},
+            headers=auth_headers,
+        )
         assert resp.status_code == 404
 
-    def test_valid_status_update(self, client, auth_headers, db_session, app):
-        with app.app_context():
-            s = IndicatorSuggestion(
-                submitter_name="Frank",
-                submitter_email="frank@example.com",
-                suggestion_type="new_indicator",
-                indicator_name="Update Me",
-                reason="test",
-                status="pending",
-            )
-            db_session.add(s)
-            db_session.commit()
-            s_id = s.id
-
-        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
-             patch("app.routes.api.indicators.current_user") as mock_cu:
-            mock_cu.is_authenticated = True
-            resp = client.put(
-                _api(f"/indicator-suggestions/{s_id}/status"),
-                json={"status": "approved", "admin_notes": "Looks good"},
-                headers=auth_headers,
-            )
+    def test_valid_status_update_works_for_a_key(self, client, auth_headers, db_session, app):
+        s_id = self._suggestion(db_session, app, "Frank")
+        resp = client.put(
+            _api(f"/indicator-suggestions/{s_id}/status"),
+            json={"status": "Approved", "admin_notes": "Looks good"},
+            headers=auth_headers,
+        )
         assert resp.status_code == 200
-        data = resp.get_json()
-        assert "status" in data
+        assert resp.get_json()["status"] == "approved"
+        stored = db.session.get(IndicatorSuggestion, s_id)
+        assert stored.admin_notes == "Looks good"
+        assert stored.reviewed_at is not None
 
     def test_exception_returns_500(self, client, auth_headers, db_session, app):
-        with app.app_context():
-            s = IndicatorSuggestion(
-                submitter_name="Greg",
-                submitter_email="greg@example.com",
-                suggestion_type="new_indicator",
-                indicator_name="Fail Update",
-                reason="test",
-            )
-            db_session.add(s)
-            db_session.commit()
-            s_id = s.id
-
-        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
-             patch("app.routes.api.indicators.current_user") as mock_cu, \
-             patch("app.routes.api.indicators.db") as mock_db:
-            mock_cu.is_authenticated = True
+        s_id = self._suggestion(db_session, app, "Greg")
+        with patch("app.routes.api.indicators.db") as mock_db:
             mock_db.session.flush.side_effect = Exception("DB error")
             resp = client.put(
                 _api(f"/indicator-suggestions/{s_id}/status"),

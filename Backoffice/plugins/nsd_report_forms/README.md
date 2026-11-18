@@ -17,6 +17,13 @@ on top of **core project reporting** (`app.models.projects.Project`, `entity_typ
 Legacy `/admin/nsd-import/` redirects to `?tab=import`.  
 Legacy `/admin/nsd-projects/` and `/nsd-funds/pm-overview` redirect to **Admin → Projects** (`/admin/projects/`). PM pages are that list filtered to the manager email.
 
+**Monitoring tab:** Admin → Projects → **Monitoring** (`/admin/projects/#monitoring`) is the portfolio dashboard for
+reporting and progress: KPI tiles, report pipeline, deadlines by month, regional view, implementation assessment,
+spending pace and follow-up worklists (overdue, due soon, needs attention, ending soon, manager workload, data gaps) with
+CSV export. It is core (`app/services/projects/monitoring.py`) and works from report statuses and due dates alone; this
+plugin supplies the overall/activities assessment and spending to date of the quarterly and final reports through the
+`BasePlugin.get_project_report_answers` hook (`badges.project_report_answers`).
+
 **Core project reporting (manual):**
 
 1. **Admin → Projects** — create a project (reference, country, dates, contacts, …).

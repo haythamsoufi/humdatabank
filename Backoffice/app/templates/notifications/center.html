@@ -2,7 +2,7 @@
 {% extends "core/layout.html" %}
 {% from "components/_svg_icons.html" import svg_icon %}
 {% from "components/_page_header.html" import page_header %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes %}
 
 {% block title %}{{ _('Notifications') }}{% endblock %}
 
@@ -65,18 +65,18 @@
 
     <!-- Tabs -->
     <div class="notification-tabs-bar bg-white rounded-lg shadow-md p-4 mb-4">
-        {% call scroll_tab_bar(wrapper_class='', inner_class='gap-2', aria_label=_('Notification list')) %}
-            <button class="tab-button active" data-tab="all">
+        {% call scroll_tab_bar(inner_id='notification-tabs', aria_label=_('Notification list')) %}
+            <button type="button" role="tab" class="{{ admin_underline_tab_btn_classes(true) }}" data-tab="all" aria-selected="true">
                 {{ _('All') }}
-                <span class="tab-count" id="count-all">0</span>
+                <span class="{{ admin_underline_tab_badge_classes(true) }}" id="count-all">0</span>
             </button>
-            <button class="tab-button" data-tab="unread">
+            <button type="button" role="tab" class="{{ admin_underline_tab_btn_classes(false) }}" data-tab="unread" aria-selected="false">
                 {{ _('Unread') }}
-                <span class="tab-count" id="count-unread">0</span>
+                <span class="{{ admin_underline_tab_badge_classes(false) }}" id="count-unread">0</span>
             </button>
-            <button class="tab-button" data-tab="archived">
+            <button type="button" role="tab" class="{{ admin_underline_tab_btn_classes(false) }}" data-tab="archived" aria-selected="false">
                 {{ _('Archived') }}
-                <span class="tab-count" id="count-archived">0</span>
+                <span class="{{ admin_underline_tab_badge_classes(false) }}" id="count-archived">0</span>
             </button>
         {% endcall %}
     </div>

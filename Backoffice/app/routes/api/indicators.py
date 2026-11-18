@@ -9,13 +9,13 @@ Part of the /api/v1 blueprint.
 """
 
 from flask import request, current_app
-from flask_login import current_user
 from werkzeug.exceptions import NotFound
 import uuid
 from sqlalchemy import desc
 from app.models.enums import IndicatorSuggestionStatusValue
+import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
@@ -30,7 +30,7 @@ from app.models import (
     SubSector,
 )
 from app.utils.auth.auth import require_api_key
-from app.services.security.api_authentication import redact_request_params
+from app.services.security.api_authentication import get_api_principal, redact_request_params
 from app.services.security.api_key_permissions import (
     INDICATORS_MANAGE,
     INDICATORS_SUGGEST,
@@ -43,7 +43,6 @@ from app import db
 from app.utils.api.api_helpers import json_response, api_error, get_json_safe
 from app.utils.api.api_responses import require_json_data, require_json_keys
 from app.utils.forms.form_localization import get_localized_indicator_type, get_localized_indicator_unit
-from app.services.organization.authorization_service import AuthorizationService
 from app.services.indicators.bank_service import (
     IndicatorBankFilters,
     build_sector_subsector_names as _build_sector_subsector_names,
@@ -143,6 +142,80 @@ def get_indicator_bank_details(indicator_id):
         return api_error("Could not fetch indicator details", 500)
 
 
+_EMAIL_RE = re.compile(r"^[^@\s<>\"',;:()\[\]\\]+@[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?)+$")
+
+# (field, max length). Columns are String(255)/String(50); free-text columns are capped so a
+# public key cannot store or mail unbounded content.
+_SUGGESTION_TEXT_LIMITS = (
+    ('submitter_name', 255),
+    ('submitter_email', 254),
+    ('suggestion_type', 50),
+    ('indicator_name', 255),
+    ('definition', 5000),
+    ('type', 50),
+    ('unit', 50),
+    ('related_programs', 2000),
+    ('reason', 5000),
+    ('additional_notes', 5000),
+)
+_SUGGESTION_LEVEL_MAX = 255
+_DEFAULT_SUGGESTIONS_PER_EMAIL_HOUR = 5
+_DEFAULT_SUGGESTIONS_PER_HOUR = 200
+
+
+def _validate_suggestion_payload(data):
+    """Return an error message when the payload is malformed or oversized, else ``None``."""
+    for field, limit in _SUGGESTION_TEXT_LIMITS:
+        value = data.get(field)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            return f'Field must be text: {field}'
+        if len(value) > limit:
+            return f'Field is too long (max {limit} characters): {field}'
+
+    email = data['submitter_email'].strip()
+    if not _EMAIL_RE.fullmatch(email):
+        return 'submitter_email is not a valid email address'
+
+    if 'emergency' in data and data['emergency'] is not None and not isinstance(data['emergency'], bool):
+        return 'Field must be true or false: emergency'
+
+    for field in ('sector', 'sub_sector'):
+        value = data.get(field)
+        if not value:
+            continue
+        if isinstance(value, dict):
+            for level in ('primary', 'secondary', 'tertiary'):
+                level_value = value.get(level)
+                if level_value is None:
+                    continue
+                if not isinstance(level_value, str) or len(level_value) > _SUGGESTION_LEVEL_MAX:
+                    return f'Invalid {field}.{level}'
+        elif not isinstance(value, str) or len(value) > _SUGGESTION_LEVEL_MAX:
+            return f'Invalid {field}'
+    return None
+
+
+def _suggestion_throttle_error(email):
+    """Return a message when too many suggestions arrived recently (also bounds outbound mail)."""
+    since = utcnow() - timedelta(hours=1)
+    per_email = int(current_app.config.get('API_SUGGESTIONS_PER_EMAIL_HOUR') or _DEFAULT_SUGGESTIONS_PER_EMAIL_HOUR)
+    total = int(current_app.config.get('API_SUGGESTIONS_PER_HOUR') or _DEFAULT_SUGGESTIONS_PER_HOUR)
+
+    recent_for_email = IndicatorSuggestion.query.filter(
+        db.func.lower(IndicatorSuggestion.submitter_email) == email.lower(),
+        IndicatorSuggestion.submitted_at >= since,
+    ).count()
+    if recent_for_email >= per_email:
+        return 'Too many suggestions from this email address. Please try again later.'
+
+    recent_total = IndicatorSuggestion.query.filter(IndicatorSuggestion.submitted_at >= since).count()
+    if recent_total >= total:
+        return 'Too many suggestions received. Please try again later.'
+    return None
+
+
 @api_bp.route('/indicator-suggestions', methods=['POST'])
 @require_api_key(capability=INDICATORS_SUGGEST)
 @api_rate_limit()
@@ -157,6 +230,16 @@ def submit_indicator_suggestion():
         for field in required_fields:
             if not data.get(field):
                 return api_error(f'Missing required field: {field}', 400)
+
+        # This endpoint is reachable with a key that may be embedded in a public site, and it
+        # sends mail to the submitted address: validate shape and size, then throttle.
+        validation_error = _validate_suggestion_payload(data)
+        if validation_error:
+            return api_error(validation_error, 400)
+        data['submitter_email'] = data['submitter_email'].strip()
+        throttled = _suggestion_throttle_error(data['submitter_email'])
+        if throttled:
+            return api_error(throttled, 429, extra={"retry_after": 3600})
 
         # Validate sector and subsector data
         if data.get('sector'):
@@ -370,28 +453,48 @@ def get_indicator_suggestion(suggestion_id):
 @require_api_key(capability=INDICATORS_MANAGE)
 @api_rate_limit()
 def update_indicator_suggestion_status(suggestion_id):
-    """Update the status of an indicator suggestion (admin only)."""
-    try:
-        if not (current_user.is_authenticated and AuthorizationService.is_admin(current_user)):
-            return api_error('Admin access required', 403)
+    """Update the status of an indicator suggestion.
 
+    Authorization is the key's ``indicators:manage`` permission (enforced before this view
+    runs); a key has no user, so there is no per-user admin check.
+    """
+    try:
         data = get_json_safe()
 
         if not data or 'status' not in data:
             return api_error('Status is required', 400)
 
+        raw_status = data['status']
+        if not isinstance(raw_status, str) or (
+            raw_status.strip().lower() not in IndicatorSuggestionStatusValue.values()
+            and raw_status.strip().lower() != 'pending review'
+        ):
+            return api_error(
+                'Invalid status',
+                400,
+                extra={'allowed': list(IndicatorSuggestionStatusValue.values())},
+            )
+        admin_notes = data.get('admin_notes')
+        if admin_notes is not None and (not isinstance(admin_notes, str) or len(admin_notes) > 5000):
+            return api_error('admin_notes must be text of at most 5000 characters', 400)
+
         suggestion = IndicatorSuggestion.query.get_or_404(suggestion_id)
+        old_status = suggestion.status
 
         # Update status
-        suggestion.status = IndicatorSuggestionStatusValue.normalize(data['status'])
+        suggestion.status = IndicatorSuggestionStatusValue.normalize(raw_status)
         suggestion.reviewed_at = utcnow()
-        suggestion.admin_notes = data.get('admin_notes', suggestion.admin_notes)
-
-        # If status is being updated, record who reviewed it
-        # Note: This would need to be enhanced to get the current user from the API key
-        # For now, we'll leave reviewed_by_user_id as None
+        if admin_notes is not None:
+            suggestion.admin_notes = admin_notes
+        # reviewed_by_user_id stays unset: a key is not a user. The key is recorded in the log.
 
         db.session.flush()
+        principal = get_api_principal()
+        current_app.logger.info(
+            "Indicator suggestion %s status %s -> %s via API key id=%s (%s)",
+            suggestion_id, old_status, suggestion.status,
+            getattr(principal, 'api_key_id', None), getattr(principal, 'client_name', None),
+        )
 
         return json_response({
             'message': 'Suggestion status updated successfully',

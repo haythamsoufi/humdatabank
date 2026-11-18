@@ -1305,10 +1305,12 @@ class AdminNotifications {
         if (type === 'app') {
             appGroup?.classList.remove('hidden');
             customGroup?.classList.add('hidden');
-            appBtn?.classList.add('active', 'border-blue-600', 'text-blue-600');
-            appBtn?.classList.remove('border-transparent', 'text-gray-500');
-            customBtn?.classList.remove('active', 'border-blue-600', 'text-blue-600');
-            customBtn?.classList.add('border-transparent', 'text-gray-500');
+            if (window.AdminUnderlineTabs) {
+                window.AdminUnderlineTabs.setStripButtonActive(appBtn, true);
+                window.AdminUnderlineTabs.setStripButtonActive(customBtn, false);
+            }
+            appBtn?.setAttribute('aria-selected', 'true');
+            customBtn?.setAttribute('aria-selected', 'false');
 
             // Clear custom URL input
             const customUrlInput = document.getElementById('admin-notification-redirect-url');
@@ -1316,10 +1318,12 @@ class AdminNotifications {
         } else {
             appGroup?.classList.add('hidden');
             customGroup?.classList.remove('hidden');
-            customBtn?.classList.add('active', 'border-blue-600', 'text-blue-600');
-            customBtn?.classList.remove('border-transparent', 'text-gray-500');
-            appBtn?.classList.remove('active', 'border-blue-600', 'text-blue-600');
-            appBtn?.classList.add('border-transparent', 'text-gray-500');
+            if (window.AdminUnderlineTabs) {
+                window.AdminUnderlineTabs.setStripButtonActive(customBtn, true);
+                window.AdminUnderlineTabs.setStripButtonActive(appBtn, false);
+            }
+            customBtn?.setAttribute('aria-selected', 'true');
+            appBtn?.setAttribute('aria-selected', 'false');
 
             // Clear app screen select
             const appScreenSelect = document.getElementById('admin-notification-redirect-screen');

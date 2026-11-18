@@ -28,7 +28,8 @@
         "do_not_enforce_on_create": true,
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          { "context": "Analyze (CodeQL)" }
+          { "context": "Analyze (CodeQL)" },
+          { "context": "Plugin contract" }
         ]
       }
     }

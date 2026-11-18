@@ -5,10 +5,21 @@ from __future__ import annotations
 import openpyxl
 import pytest
 
-from plugins.us_macro_awards.constants import DEFAULT_WORKBOOK
-from plugins.us_macro_awards.importer.countries import CountryIndex, CountryRef
-from plugins.us_macro_awards.importer.match import BankIndex, BankRow, question_type_for
-from plugins.us_macro_awards.importer.workbook import load_logframe, parse_workbook
+import datetime as dt
+import json
+
+from plugins.global_awards.constants import DEFAULT_WORKBOOK
+from plugins.global_awards.importer.countries import CountryIndex, CountryRef
+from plugins.global_awards.importer.match import BankIndex, BankRow, question_type_for
+from plugins.global_awards.importer.schedule import (
+    AWARD_END,
+    AWARD_START,
+    official_cycles,
+    quarterly_cycles,
+    relevance_for_countries,
+)
+from plugins.global_awards.importer.societies import pick_national_society
+from plugins.global_awards.importer.workbook import load_logframe, parse_workbook
 
 pytestmark = pytest.mark.unit
 
@@ -95,6 +106,17 @@ def test_annex_logframe_keeps_bank_ids_and_country_targets():
     assert "Total" not in parsed.countries
     assert "Bangladesh" in parsed.countries
     assert "Syria" in parsed.countries
+    assert "Panama" in parsed.countries
+    assert len(parsed.countries) == 38
+    assert parsed.timeframe_note == "12 months"
+    assert parsed.award is not None
+    assert parsed.award.start == dt.date(2026, 9, 1)
+    assert parsed.award.end == dt.date(2027, 9, 30)
+    assert "Panama" not in by_code["1"].targets
+    cycles = quarterly_cycles(parsed.award.start, parsed.award.end)
+    assert [cycle.slot for cycle in cycles] == ["Y1Q1", "Y1Q2", "Y1Q3", "Y1Q4", "Y2Q1"]
+    assert cycles[0].start == dt.date(2026, 9, 1) and cycles[0].end == dt.date(2026, 11, 30)
+    assert cycles[-1].start == dt.date(2027, 9, 1) and cycles[-1].end == dt.date(2027, 9, 30)
     assert len({item.key for item in parsed.indicators}) == len(parsed.indicators)
     assert all(item.section_key for item in parsed.indicators)
     assert not any(item.label.casefold().startswith("notes to self") for item in parsed.indicators)
@@ -150,6 +172,31 @@ def test_bank_id_wins_and_wording_must_be_unambiguous():
     assert "99999" in gone.note
 
 
+def test_official_reporting_calendar():
+    cycles = official_cycles()
+    assert [cycle.slot for cycle in cycles] == ["Y1Q1", "Y1Q2", "Y1Q3", "Final"]
+    assert cycles[0].start == dt.date(2026, 9, 17) and cycles[0].end == dt.date(2026, 12, 20)
+    assert cycles[0].country_due == dt.date(2027, 1, 8)
+    assert cycles[0].dhr_due == dt.date(2027, 1, 30)
+    assert cycles[2].start == dt.date(2027, 3, 21) and cycles[2].end == dt.date(2027, 6, 20)
+    final = cycles[-1]
+    assert final.kind == "final"
+    assert final.start == AWARD_START == dt.date(2026, 9, 17)
+    assert final.end == AWARD_END == dt.date(2027, 9, 16)
+    assert final.country_due == dt.date(2027, 10, 15)
+    assert final.dhr_due == dt.date(2028, 1, 14)
+
+
+def test_relevance_lists_only_the_countries_with_a_target():
+    rule = json.loads(relevance_for_countries(["SYR", "bgd", "SYR", ""]))
+    assert rule["logic"] == "OR"
+    assert [item["value"] for item in rule["conditions"]] == ["SYR", "BGD"]
+    hidden = json.loads(relevance_for_countries([]))
+    assert hidden["conditions"] == [
+        {"item_id": "country_iso", "condition_type": "equal_to", "value": ""}
+    ]
+
+
 def test_country_aliases():
     index = CountryIndex(
         [
@@ -158,6 +205,7 @@ def test_country_aliases():
             CountryRef(3, "Congo, the Democratic Republic of the", "COD"),
             CountryRef(4, "Micronesia, Federated States of", "FSM"),
             CountryRef(5, "Syrian Arab Republic", "SYR"),
+            CountryRef(6, "Eswatini, the Kingdom of", "SWZ"),
         ]
     )
     assert index.match("Türkiye").iso3 == "TUR"
@@ -166,7 +214,21 @@ def test_country_aliases():
     assert index.match("Democratic Republic of the Congo").iso3 == "COD"
     assert index.match("Federated States of Micronesia").iso3 == "FSM"
     assert index.match("Syria").iso3 == "SYR"
+    assert index.match("Eswatini").iso3 == "SWZ"
     assert index.match("Not a country") is None
+
+
+def test_one_active_national_society_is_chosen():
+    class Society:
+        def __init__(self, name, active=True):
+            self.name = name
+            self.is_active = active
+
+    only = Society("Bangladesh Red Crescent Society")
+    assert pick_national_society([only]) is only
+    assert pick_national_society([Society("Old", active=False), only]).name == only.name
+    assert pick_national_society([only, Society("Second society")]) is None
+    assert pick_national_society([]) is None
 
 
 def test_workbook_without_the_mastersheet_is_rejected():
@@ -190,7 +252,7 @@ def test_load_logframe_reads_bytes_only_through_the_safe_opener(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "plugins.us_macro_awards.importer.workbook.open_workbook",
+        "plugins.global_awards.importer.workbook.open_workbook",
         fake_open,
     )
     parsed = load_logframe(b"not-a-real-xlsx")

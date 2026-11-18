@@ -225,6 +225,24 @@ def _plugin_targets(rel: str, root: Path, test_files: list[Path]) -> set[str]:
     return targets
 
 
+# Runtime half of the plugin contract. Any Python change to a plugin, the plugin loader or the
+# starter package runs these, so a plugin without a resolvable settings page cannot merge.
+PLUGIN_CONTRACT_TESTS = (
+    "tests/unit/test_plugins/test_plugin_contract.py",
+    "tests/unit/test_plugins/test_plugin_route_access.py",
+    "tests/unit/test_plugins/test_first_party_plugins.py",
+)
+PLUGIN_CONTRACT_PREFIXES = ("plugins/", "app/plugins/", "app/sample_plugin_package/")
+
+
+def _plugin_contract_targets(rel: str, root: Path) -> set[str]:
+    if not rel.endswith(".py") or is_pytest_file(rel):
+        return set()
+    if not (rel.startswith(PLUGIN_CONTRACT_PREFIXES) or rel == "scripts/ci/check_plugin_contract.py"):
+        return set()
+    return {t for t in PLUGIN_CONTRACT_TESTS if (root / t).is_file()}
+
+
 def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
     if not rel:
         return set()
@@ -245,6 +263,7 @@ def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
             if path.name in names
         }
     hits.update(_plugin_targets(rel, root, test_files))
+    hits.update(_plugin_contract_targets(rel, root))
     if rel.startswith("scripts/") and not rel.startswith("scripts/ci/"):
         layout = root / "tests" / "unit" / "test_scripts" / "test_scripts_layout.py"
         if layout.is_file():

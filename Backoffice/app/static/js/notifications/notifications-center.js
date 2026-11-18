@@ -36,8 +36,8 @@ class NotificationCenter {
 
     attachEventListeners() {
         // Tab switching
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', (e) => this.handleTabSwitch(e.target.dataset.tab));
+        document.querySelectorAll('#notification-tabs .settings-tab').forEach(button => {
+            button.addEventListener('click', (e) => this.handleTabSwitch(e.currentTarget.dataset.tab));
         });
 
         // Filter controls
@@ -167,8 +167,10 @@ class NotificationCenter {
         this.currentPage = 1;
 
         // Update tab UI
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tab);
+        document.querySelectorAll('#notification-tabs .settings-tab').forEach(btn => {
+            const on = btn.dataset.tab === tab;
+            if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setOrgMainTabButton(btn, on);
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
 
         // Update filters based on tab

@@ -510,7 +510,7 @@
             var on = id === name;
             if (pane) pane.hidden = !on;
             if (button) {
-                button.classList.toggle('is-active', on);
+                if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(button, on);
                 button.setAttribute('aria-selected', on ? 'true' : 'false');
             }
         });

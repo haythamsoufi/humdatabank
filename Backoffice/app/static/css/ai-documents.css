@@ -9,10 +9,6 @@
     border-color: #3b82f6;
     background-color: #eff6ff;
 }
-.tab-button.active {
-    color: #2563eb;
-    border-bottom-color: #2563eb;
-}
 .tab-content {
     display: block;
 }
@@ -633,13 +629,13 @@
         padding: 1rem;
     }
 
-    #uploadImportModal .tab-button {
+    #uploadImportModal .settings-tab {
         padding-left: 0.75rem;
         padding-right: 0.75rem;
         font-size: 0.8125rem;
     }
 
-    #uploadImportModal .tab-button i {
+    #uploadImportModal .settings-tab i {
         margin-right: 0.25rem;
     }
 

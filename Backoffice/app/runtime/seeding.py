@@ -35,6 +35,7 @@ _DEV_TEST_ADMIN_ROLE_CODES = (
     "admin_data_explorer_compliance",
     "admin_data_explorer_pb_progress",
     "admin_data_explorer_upr_visuals",
+    "admin_data_explorer_global_awards",
     "admin_validation_dashboard",
     "admin_validation_questions",
     "admin_validation_rules",

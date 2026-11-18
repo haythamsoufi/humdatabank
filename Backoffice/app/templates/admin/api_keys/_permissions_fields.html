@@ -88,6 +88,8 @@
                                 {% endfor %}
                             </ul>
                         </details>
+                        {% elif cap.usage_note %}
+                        <p class="mt-2 ml-7 text-xs text-gray-600">{{ _(cap.usage_note) }}</p>
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -101,7 +103,7 @@
                 {{ form.restrict_data(class="mt-1 h-4 w-4 rounded border-gray-300", id="restrictData") }}
                 <span>{{ form.restrict_data.label.text }}</span>
             </label>
-            <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('Applies to Form data, Submissions and Form templates. Leave both lists empty on one side to allow everything on that side. Users, reference data and content are not affected.') }}</p>
+            <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('Applies to Form data, Submissions, Form templates and Submitted documents. Leave one list empty to allow everything on that side. Template structure is not tied to a country, so a country-only limit does not hide form templates. Users, reference data and public content are not affected.') }}</p>
             {% for error in form.restrict_data.errors %}
                 <p class="mt-1 ml-6 text-sm text-red-600">{{ error }}</p>
             {% endfor %}
@@ -123,7 +125,7 @@
 
     <div id="apiKeySensitiveWarning" class="hidden bg-red-50 border border-red-200 rounded-md p-4 text-sm text-red-800" role="alert">
         <p class="font-semibold"><i class="fas fa-user-shield mr-1"></i>{{ _('This key will be able to read sensitive or personal data') }}</p>
-        <p id="apiKeyPiiWarning" class="mt-1 hidden">{{ _('Personal data includes names and email addresses of users, quiz participants, public submitters and indicator-suggestion authors. Prefer the narrowest set of permissions, set an expiry date, and never embed this key in a website or mobile app.') }}</p>
+        <p id="apiKeyPiiWarning" class="mt-1 hidden">{{ _('Personal data includes names and email addresses of users, quiz participants, public submitters and indicator-suggestion authors. Prefer the narrowest set of permissions, set an expiry date (required for personal data), and never embed this key in a website or mobile app.') }}</p>
         <label class="mt-3 flex items-start gap-2 font-medium">
             {{ form.confirm_sensitive(class="mt-1 h-4 w-4 rounded border-gray-300", id="confirmSensitive") }}
             <span>{{ form.confirm_sensitive.label.text }}</span>

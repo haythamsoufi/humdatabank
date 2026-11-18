@@ -1,17 +1,17 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 
-{% block title %}US Macro Awards{% endblock %}
+{% block title %}Global Awards{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-6">
     {{ page_header(
-        title="US Macro Awards",
+        title="Global Awards",
         icon='fas fa-clipboard-list',
         breadcrumbs=[
             {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
             {'name': 'Plugins', 'url': url_for('admin.plugin_management')},
-            {'name': 'US Macro Awards'}
+            {'name': 'Global Awards'}
         ]
     ) }}
 
@@ -51,6 +51,13 @@
                    class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
                     <i class="fas fa-edit mr-2"></i>
                     Open the form template
+                </a>
+                {% endif %}
+                {% if explore_url %}
+                <a href="{{ explore_url }}"
+                   class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
+                    <i class="fas fa-chart-pie mr-2"></i>
+                    Explore Data — visuals and reports
                 </a>
                 {% endif %}
                 <a href="{{ projects_url }}"
@@ -108,7 +115,11 @@
                 Preview: {{ report.sections }} sections,
                 {{ report.linked }} linked to the bank,
                 {{ report.questions }} questions,
-                {{ report.projects_upserted }} country projects.
+                {{ report.projects_upserted }} country projects
+                {% if report.cycles_per_project %},
+                {{ report.cycles_per_project }} quarterly cycles
+                ({{ report.award_start }} to {{ report.award_end }})
+                {% endif %}.
             </p>
             {% if report.unmatched_countries %}
             <p class="text-gray-700 mb-3">No country match: {{ report.unmatched_countries | join(', ') }}</p>

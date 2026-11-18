@@ -39,18 +39,20 @@
     <div class="bg-white shadow-md border border-gray-200">
         <div class="px-3 sm:px-4 py-3 border-b border-gray-200">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <nav id="pb-progress-version-tabs" class="flex flex-wrap gap-1 -mb-px border-b border-gray-200 flex-1 min-w-0" role="tablist" aria-label="{{ _('P&B report versions') }}">
+                <div class="flex-1 min-w-0">
+                {% call scroll_tab_bar(inner_id='pb-progress-version-tabs', border_bottom=False, aria_label=_('P&B report versions')) %}
                     {% for version_id in pb_report_version_order %}
                     {% set version = pb_report_versions[version_id] %}
                     <button type="button"
                             role="tab"
                             data-pb-version="{{ version_id }}"
                             aria-selected="{{ 'true' if version_id == pb_default_version else 'false' }}"
-                            class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {{ 'border-blue-600 text-blue-700' if version_id == pb_default_version else 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300' }}">
+                            class="{{ admin_underline_tab_btn_classes(version_id == pb_default_version) }}">
                         {{ _(version.label) }}
                     </button>
                     {% endfor %}
-                </nav>
+                {% endcall %}
+                </div>
                 <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden shrink-0" role="group" aria-label="{{ _('Data source') }}">
                     <button type="button" id="pb-progress-source-excel" data-source="excel" class="px-3 py-1.5 text-sm font-medium {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'excel' else 'bg-white text-gray-700' }}">{{ _('Excel upload') }}</button>
                     <button type="button" id="pb-progress-source-system" data-source="system" class="px-3 py-1.5 text-sm font-medium border-l border-gray-300 {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'system' else 'bg-white text-gray-700' }}">{{ _('System (DB)') }}</button>

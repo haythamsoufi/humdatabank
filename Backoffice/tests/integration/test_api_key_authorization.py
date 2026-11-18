@@ -148,6 +148,64 @@ def test_documents_capability_gates_unpublished_documents(client, db_session, wo
     assert _get(client, "/api/v1/submitted-documents", public_only).status_code == 200
 
 
+def _document(db_session, world, *, country, name, is_public=False, status=None, aes=None):
+    from app.models.documents import SubmittedDocument
+    from app.models.enums import DocumentStatus
+
+    doc = SubmittedDocument(
+        filename=name, document_type="Annual Report", language="en", is_public=is_public,
+        status=status or DocumentStatus.PENDING, country_id=country, assignment_entity_status_id=aes,
+        uploaded_by_user_id=world["user"],
+    )
+    db_session.add(doc)
+    db_session.commit()
+    return doc
+
+
+def _listed_documents(client, key, query="status=pending"):
+    response = _get(client, f"/api/v1/submitted-documents?{query}", key)
+    assert response.status_code == 200, response.get_json()
+    return {d["filename"] for d in response.get_json()["documents"]}
+
+
+def test_documents_read_respects_the_keys_data_scope(client, db_session, world):
+    _document(db_session, world, country=world["c1"], name="c1-t1.pdf", aes=world["aes1"])
+    _document(db_session, world, country=world["c2"], name="c2-t2.pdf", aes=world["aes2"])
+    _document(db_session, world, country=world["c1"], name="c1-no-link.pdf")
+    _document(db_session, world, country=None, name="orphan.pdf")
+
+    unrestricted = _key(db_session, _caps(CONTENT_READ, DOCUMENTS_READ))
+    assert _listed_documents(client, unrestricted) == {
+        "c1-t1.pdf", "c2-t2.pdf", "c1-no-link.pdf", "orphan.pdf",
+    }
+
+    by_country = _key(db_session, _caps(
+        CONTENT_READ, DOCUMENTS_READ, restrict_data=True, country_ids=[world["c1"]]))
+    assert _listed_documents(client, by_country) == {"c1-t1.pdf", "c1-no-link.pdf"}
+
+    by_template = _key(db_session, _caps(
+        CONTENT_READ, DOCUMENTS_READ, restrict_data=True, template_ids=[world["t2"]]))
+    assert _listed_documents(client, by_template) == {"c2-t2.pdf"}
+
+    both = _key(db_session, _caps(
+        CONTENT_READ, DOCUMENTS_READ, restrict_data=True,
+        template_ids=[world["t1"]], country_ids=[world["c2"]]))
+    assert _listed_documents(client, both) == set()
+
+    deny_all = _key(db_session, _caps(CONTENT_READ, DOCUMENTS_READ, restrict_data=True))
+    assert _listed_documents(client, deny_all) == set()
+
+
+def test_documents_scope_does_not_hide_published_documents(client, db_session, world):
+    from app.models.enums import DocumentStatus
+
+    _document(db_session, world, country=world["c2"], name="public-c2.pdf",
+              is_public=True, status=DocumentStatus.APPROVED)
+    scoped = _key(db_session, _caps(
+        CONTENT_READ, DOCUMENTS_READ, restrict_data=True, country_ids=[world["c1"]]))
+    assert _listed_documents(client, scoped, "") == {"public-c2.pdf"}
+
+
 def test_capability_is_not_transitive(client, db_session, world):
     """users:read must not unlock form data, submissions, templates or documents."""
     key = _key(db_session, _caps(USERS_READ))

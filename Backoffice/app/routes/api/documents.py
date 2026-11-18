@@ -8,16 +8,59 @@ import os
 
 from flask import request, current_app, abort, url_for
 
+from app import db
 from app.routes.api import api_bp
 from app.models.documents import SubmittedDocument
 from app.models.enums import DocumentStatus
 from app.services.documents import public_access
-from app.services.security.api_authentication import api_key_has_capability
+from app.services.security.api_authentication import api_key_has_capability, get_api_key_data_scope
 from app.services.security.api_key_permissions import CONTENT_READ, DOCUMENTS_READ
 from app.utils.auth.auth import require_api_key
 from app.utils.security.rate_limiting import api_rate_limit
 from app.utils.api.api_helpers import json_response, api_error
 from app.services.platform import storage_service as storage
+
+
+def _unpublished_document_scope_clause(scope):
+    """SQL condition for the non-public documents a data-scoped key may see.
+
+    ``scope`` is the key's ``{"template_ids", "country_ids"}``. Both lists apply together
+    (a document must match every non-empty list). A document that cannot be tied to a
+    template (no assignment link) never matches a template restriction, and one with no
+    country never matches a country restriction (fail closed). An empty scope matches nothing.
+    """
+    from sqlalchemy import exists, false, select, or_
+    from app.models import AssignedForm
+    from app.models.assignments import AssignmentEntityStatus
+    from app.models.documents import submitted_document_countries
+
+    template_ids = scope.get('template_ids') or []
+    country_ids = scope.get('country_ids') or []
+    if not template_ids and not country_ids:
+        return false()
+
+    conditions = []
+    if country_ids:
+        in_m2m = exists(
+            select(1).where(
+                submitted_document_countries.c.submitted_document_id == SubmittedDocument.id,
+                submitted_document_countries.c.country_id.in_(country_ids),
+            )
+        )
+        conditions.append(or_(SubmittedDocument.country_id.in_(country_ids), in_m2m))
+    if template_ids:
+        conditions.append(
+            exists(
+                select(1)
+                .select_from(AssignmentEntityStatus)
+                .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+                .where(
+                    AssignmentEntityStatus.id == SubmittedDocument.assignment_entity_status_id,
+                    AssignedForm.template_id.in_(template_ids),
+                )
+            )
+        )
+    return db.and_(*conditions)
 
 
 @api_bp.route('/submitted-documents', methods=['GET'])
@@ -70,6 +113,16 @@ def get_submitted_documents():
         query = SubmittedDocument.query
         if not may_see_unpublished:
             query = query.filter(SubmittedDocument.is_public.is_(True))
+        else:
+            key_scope = get_api_key_data_scope()
+            if key_scope is not None:
+                # Published documents are public content; anything else must be inside the
+                # key's template / country scope.
+                published = db.and_(
+                    SubmittedDocument.is_public.is_(True),
+                    SubmittedDocument.status == DocumentStatus.APPROVED,
+                )
+                query = query.filter(db.or_(published, _unpublished_document_scope_clause(key_scope)))
 
         # Apply filters
         if country_id:

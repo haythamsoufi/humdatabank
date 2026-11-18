@@ -111,10 +111,7 @@
         els.versionTabs.querySelectorAll('[data-pb-version]').forEach(function(btn) {
             const selected = btn.getAttribute('data-pb-version') === activeVersion;
             btn.setAttribute('aria-selected', selected ? 'true' : 'false');
-            btn.classList.toggle('border-blue-600', selected);
-            btn.classList.toggle('text-blue-700', selected);
-            btn.classList.toggle('border-transparent', !selected);
-            btn.classList.toggle('text-gray-600', !selected);
+            if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, selected);
         });
         updateViewerToolbarTitle();
     }

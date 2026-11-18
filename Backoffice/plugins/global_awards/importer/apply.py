@@ -1,7 +1,8 @@
-"""Create the US Macro Awards template and one project per country in the logframe."""
+"""Create the Global Awards template and one project per country in the logframe."""
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -13,27 +14,36 @@ from app.models import (
     FormTemplate,
     FormTemplateVersion,
     IndicatorBank,
+    NationalSociety,
     Project,
 )
 from app.models.enums import FormTemplateVersionStatusValue
 from app.services.indicators.bank_service import indicator_bank_supports_disaggregation
 from app.utils.common.datetime_helpers import utcnow
 
-from plugins.us_macro_awards.constants import (
+from plugins.global_awards.constants import (
     FUND,
+    PLUGIN_ID,
     PORTFOLIO,
     PROJECT_REFERENCE_PREFIX,
     TEMPLATE_NAME,
 )
-from plugins.us_macro_awards.importer.countries import CountryIndex, CountryRef
-from plugins.us_macro_awards.importer.match import (
+from plugins.global_awards.importer.countries import CountryIndex, CountryRef
+from plugins.global_awards.importer.societies import pick_national_society
+from plugins.global_awards.importer.match import (
     BankIndex,
     BankRow,
     IndicatorMatch,
     disaggregation_for_question,
     question_type_for,
 )
-from plugins.us_macro_awards.importer.workbook import LogframeIndicator, ParsedLogframe, load_logframe
+from plugins.global_awards.importer.schedule import (
+    AWARD_END,
+    AWARD_START,
+    official_cycles,
+    relevance_for_countries,
+)
+from plugins.global_awards.importer.workbook import LogframeIndicator, ParsedLogframe, load_logframe
 
 log = logging.getLogger(__name__)
 
@@ -84,10 +94,18 @@ def _apply(parsed: ParsedLogframe) -> Dict[str, Any]:
     countries = _country_index()
     template, version = _ensure_template()
     sections = _upsert_sections(template, version, parsed)
-    linked, questions = _upsert_items(template, version, parsed, sections, bank)
+    linked, questions = _upsert_items(template, version, parsed, sections, bank, countries)
     _archive_removed(version, parsed)
     projects, unmatched = _upsert_projects(parsed, countries)
+    cycles = official_cycles()
+    cycle_count = _ensure_cycles(projects, template, cycles)
+    removed = _retire_replaced_cycles(projects, template, {cycle.slot for cycle in cycles})
     db.session.flush()
+    warnings = []
+    if unmatched:
+        warnings.append("No country row for: " + ", ".join(unmatched))
+    if removed:
+        warnings.append(f"Removed {removed} reporting cycles that are not on the DHR calendar.")
     return {
         "template_id": template.id,
         "template_name": TEMPLATE_NAME,
@@ -95,12 +113,16 @@ def _apply(parsed: ParsedLogframe) -> Dict[str, Any]:
         "linked": len(linked),
         "questions": len(questions),
         "projects_upserted": len(projects),
+        "cycles_per_project": len(cycles),
+        "cycle_assignments": cycle_count,
+        "award_start": AWARD_START.isoformat(),
+        "award_end": AWARD_END.isoformat(),
+        "cycles_removed": removed,
+        "timeframe_note": parsed.timeframe_note,
         "unmatched_countries": unmatched,
         "links": linked,
         "created_questions": questions,
-        "warnings": list(unmatched and [
-            "No country row for: " + ", ".join(unmatched)
-        ] or []),
+        "warnings": warnings,
     }
 
 
@@ -154,7 +176,7 @@ def _ensure_template() -> tuple[FormTemplate, FormTemplateVersion]:
             status=FormTemplateVersionStatusValue.published,
             name=TEMPLATE_NAME,
             description=(
-                "US Macro Awards (IFRC MARC) logframe. Lines that match the indicator "
+                "Global Awards (IFRC MARC) logframe. Lines that match the indicator "
                 "bank are indicators; the other lines are questions."
             ),
             created_by=owner_id,
@@ -167,7 +189,7 @@ def _ensure_template() -> tuple[FormTemplate, FormTemplateVersion]:
         db.session.add(version)
         db.session.flush()
         template.published_version_id = version.id
-        log.info("US Macro Awards: created template id=%s", template.id)
+        log.info("Global Awards: created template id=%s", template.id)
         return template, version
 
     template = version.template
@@ -254,10 +276,14 @@ def _definition(indicator: LogframeIndicator) -> str:
         parts.append(f"Frequency: {indicator.frequency}")
     if indicator.scope:
         parts.append(f"Scope: {indicator.scope}")
+    if indicator.targets:
+        parts.append("Applies to: " + ", ".join(indicator.targets))
+    else:
+        parts.append("Applies to: no country target in the logframe yet.")
     return "\n\n".join(parts)
 
 
-def _marc_block(indicator: LogframeIndicator, match) -> dict:
+def _marc_block(indicator: LogframeIndicator, match, iso3: List[str]) -> dict:
     return {
         "key": indicator.key,
         "code": indicator.display_code,
@@ -268,10 +294,22 @@ def _marc_block(indicator: LogframeIndicator, match) -> dict:
         "match": match.method if match.linked else "question",
         "bank_id": match.bank_id,
         "bank_name": match.bank_name,
+        "countries": list(indicator.targets),
+        "country_iso3": iso3,
     }
 
 
-def _upsert_items(template, version, parsed, sections, bank: BankIndex):
+def _iso3_for(indicator: LogframeIndicator, countries: CountryIndex) -> List[str]:
+    codes: List[str] = []
+    for name in indicator.targets:
+        country = countries.match(name)
+        code = (country.iso3 if country else "").upper()
+        if code and code not in codes:
+            codes.append(code)
+    return codes
+
+
+def _upsert_items(template, version, parsed, sections, bank: BankIndex, countries: CountryIndex):
     existing = {
         _marc(item.config).get("key"): item
         for item in FormItem.query.filter_by(version_id=version.id).all()
@@ -320,8 +358,9 @@ def _upsert_items(template, version, parsed, sections, bank: BankIndex):
         config = dict(_BASE_CONFIG)
         if item is not None and isinstance(item.config, dict):
             config = dict(item.config)
+        iso3 = _iso3_for(indicator, countries)
         config["allowed_disaggregation_options"] = disaggregation
-        config["marc"] = _marc_block(indicator, match)
+        config["marc"] = _marc_block(indicator, match, iso3)
         label = _item_label(indicator)
         if item is None:
             item = FormItem(
@@ -341,6 +380,7 @@ def _upsert_items(template, version, parsed, sections, bank: BankIndex):
             item.definition = _definition(indicator)
             item.archived = False
             item.config = config
+        item.relevance_condition = relevance_for_countries(iso3)
 
         if bank_row is not None:
             item.item_type = "indicator"
@@ -374,7 +414,20 @@ def _upsert_items(template, version, parsed, sections, bank: BankIndex):
                 "question_type": question_type,
                 "note": match.note,
             })
+    _apply_section_relevance(sections, parsed, countries)
     return linked, questions
+
+
+def _apply_section_relevance(sections, parsed: ParsedLogframe, countries: CountryIndex) -> None:
+    """Hide a section unless the country has at least one of its indicators."""
+    codes_by_section: Dict[str, List[str]] = {}
+    for indicator in parsed.indicators:
+        bucket = codes_by_section.setdefault(indicator.section_key, [])
+        for code in _iso3_for(indicator, countries):
+            if code not in bucket:
+                bucket.append(code)
+    for key, section in sections.items():
+        section.relevance_condition = relevance_for_countries(codes_by_section.get(key, []))
 
 
 def _archive_removed(version, parsed: ParsedLogframe) -> None:
@@ -411,19 +464,26 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
                 "target": target,
             })
 
-    touched = []
+    touched: List[Project] = []
     unmatched = []
-    for country_name, lines in by_country.items():
+    for country_name in parsed.countries:
+        lines = by_country.get(country_name, [])
         country = countries.match(country_name)
         if country is None:
             unmatched.append(country_name)
             continue
         reference = _project_reference(country)
         title = f"{TEMPLATE_NAME} — {country.name}"
+        society = pick_national_society(
+            NationalSociety.query.filter_by(country_id=country.id).all()
+        )
+        if society is None:
+            unmatched.append(f"{country_name} (no single National Society)")
         plan = {
             "source": "marc_logframe",
             "portfolio": PORTFOLIO,
             "country": country.name,
+            "national_society_id": society.id if society is not None else None,
             "indicators": lines,
         }
         project = Project.query.filter_by(reference=reference).first()
@@ -434,7 +494,8 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
                 fund=FUND,
                 title=title[:500],
                 country_id=country.id,
-                organization_name=country.name,
+                national_society_id=society.id if society is not None else None,
+                organization_name=society.name if society is not None else None,
                 status="Open",
                 categories=PORTFOLIO,
                 planned_overview=parsed.goal or None,
@@ -449,15 +510,67 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
             project.fund = project.fund or FUND
             project.title = title[:500]
             project.country_id = country.id
-            if not project.organization_name:
-                project.organization_name = country.name
+            project.national_society_id = society.id if society is not None else None
+            project.organization_name = society.name if society is not None else None
             project.categories = project.categories or PORTFOLIO
             project.planned_overview = parsed.goal or project.planned_overview
             project.plan_data = plan
             if not project.status:
                 project.status = "Open"
-        touched.append(reference)
+        project.start_date = AWARD_START
+        project.end_date = AWARD_END
+        touched.append(project)
+    db.session.flush()
     return touched, unmatched
+
+
+def _ensure_cycles(projects: List[Project], template: FormTemplate, cycles) -> int:
+    if not projects or not cycles:
+        return 0
+    from app.services.projects.service import ensure_project_cycle_assignment
+
+    created = 0
+    for project in projects:
+        for cycle in cycles:
+            ensure_project_cycle_assignment(
+                project,
+                template.id,
+                cycle.slot,
+                period_start=cycle.start,
+                period_end=cycle.end,
+                due_date=dt.datetime.combine(cycle.country_due, dt.time.min),
+            )
+            created += 1
+    return created
+
+
+def _retire_replaced_cycles(projects: List[Project], template: FormTemplate, keep_slots: set[str]) -> int:
+    """Drop cycles from the earlier month-grid import when they have no answers."""
+    from app.models import AssignmentEntityStatus, FormData
+    from app.models.assignments import AssignedForm
+    from app.models.enums import AssignmentScope
+    from app.services.projects.service import parse_cycle_slot
+
+    removed = 0
+    for project in projects:
+        assignments = AssignedForm.query.filter_by(
+            project_id=project.id,
+            template_id=template.id,
+            scope=AssignmentScope.project_cycle.value,
+        ).all()
+        for assignment in assignments:
+            slot = parse_cycle_slot(assignment.period_name)
+            if slot in keep_slots:
+                continue
+            aes_ids = [
+                row.id
+                for row in AssignmentEntityStatus.query.filter_by(assigned_form_id=assignment.id).all()
+            ]
+            if aes_ids and FormData.query.filter(FormData.assignment_entity_status_id.in_(aes_ids)).count():
+                continue
+            db.session.delete(assignment)
+            removed += 1
+    return removed
 
 
 def _sync_project_id_sequence() -> None:
@@ -484,7 +597,7 @@ def _sync_project_id_sequence() -> None:
     ).scalar()
     match = re.search(r"nextval\('([A-Za-z_][A-Za-z0-9_]*)'", default or "")
     if not match:
-        log.warning("US Macro Awards: project.id has no nextval default; left the sequence alone")
+        log.warning("Global Awards: project.id has no nextval default; left the sequence alone")
         return
     db.session.execute(
         text(
@@ -500,17 +613,17 @@ def _activate_plugin() -> str:
 
         manager = getattr(current_app, "plugin_manager", None)
         if manager is None:
-            return "Template saved. Activate the US Macro Awards plugin to open its settings page."
-        if "us_macro_awards" not in getattr(manager, "plugins", {}):
+            return "Template saved. Activate the Global Awards plugin to open its settings page."
+        if PLUGIN_ID not in getattr(manager, "plugins", {}):
             # `flask` commands in debug boot a manager but do not load plugins.
             manager.load_plugins()
-        if "us_macro_awards" not in manager.plugins:
-            return "Template saved. Activate the US Macro Awards plugin to open its settings page."
-        if manager.is_plugin_active("us_macro_awards"):
+        if PLUGIN_ID not in manager.plugins:
+            return "Template saved. Activate the Global Awards plugin to open its settings page."
+        if manager.is_plugin_active(PLUGIN_ID):
             return ""
-        if not manager.activate_plugin("us_macro_awards"):
+        if not manager.activate_plugin(PLUGIN_ID):
             return "Template saved. The plugin could not be activated automatically."
     except Exception:
-        log.exception("US Macro Awards: plugin activation failed")
+        log.exception("Global Awards: plugin activation failed")
         return "Template saved. The plugin could not be activated automatically."
     return ""

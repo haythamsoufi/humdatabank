@@ -1774,6 +1774,21 @@ class PluginManager:
                 merged.setdefault(int(aes_id), []).extend(badges)
         return merged
 
+    def get_project_report_answers(self, reports) -> Dict[int, dict]:
+        """Answers plugins supply for project reports (see BasePlugin hook), keyed by AES id. A failing plugin adds none."""
+        merged: Dict[int, dict] = {}
+        if not reports:
+            return merged
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                result = plugin.get_project_report_answers(reports) or {}
+            except Exception as exc:
+                self.logger.warning("get_project_report_answers failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for aes_id, answers in result.items():
+                merged.setdefault(int(aes_id), {}).update(answers)
+        return merged
+
     def get_all_seed_roles(self) -> List[Dict[str, Any]]:
         roles: List[Dict[str, Any]] = []
         for plugin_id, plugin in self.plugins.items():

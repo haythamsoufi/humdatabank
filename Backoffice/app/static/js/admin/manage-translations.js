@@ -37,24 +37,18 @@
             const tabContentExport = document.getElementById('tab-content-export');
             const tabContentImport = document.getElementById('tab-content-import');
 
+            function setIoTabButton(btn, active) {
+                if (!btn) return;
+                if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, active);
+                btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            }
+
             function switchTab(tabName) {
-                if (tabName === 'export') {
-                    // Activate Export tab
-                    tabExport.classList.add('active', 'border-blue-500', 'text-blue-600');
-                    tabExport.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    tabImport.classList.remove('active', 'border-blue-500', 'text-blue-600');
-                    tabImport.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    tabContentExport.classList.remove('hidden');
-                    tabContentImport.classList.add('hidden');
-                } else if (tabName === 'import') {
-                    // Activate Import tab
-                    tabImport.classList.add('active', 'border-blue-500', 'text-blue-600');
-                    tabImport.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    tabExport.classList.remove('active', 'border-blue-500', 'text-blue-600');
-                    tabExport.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    tabContentImport.classList.remove('hidden');
-                    tabContentExport.classList.add('hidden');
-                }
+                const exportOn = tabName === 'export';
+                setIoTabButton(tabExport, exportOn);
+                setIoTabButton(tabImport, !exportOn);
+                if (tabContentExport) tabContentExport.classList.toggle('hidden', !exportOn);
+                if (tabContentImport) tabContentImport.classList.toggle('hidden', exportOn);
             }
 
             if (tabExport) tabExport.addEventListener('click', () => switchTab('export'));
@@ -135,23 +129,8 @@
             function switchPoImportTab(which) {
                 if (!poTabSingle || !poTabZip || !poPanelSingle || !poPanelZip) return;
                 const isSingle = which === 'single';
-
-                poTabSingle.classList.toggle('active', isSingle);
-                poTabZip.classList.toggle('active', !isSingle);
-
-                // Keep Tailwind classes in sync
-                if (isSingle) {
-                    poTabSingle.classList.add('border-blue-500', 'text-blue-600');
-                    poTabSingle.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    poTabZip.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    poTabZip.classList.remove('border-blue-500', 'text-blue-600');
-                } else {
-                    poTabZip.classList.add('border-blue-500', 'text-blue-600');
-                    poTabZip.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    poTabSingle.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                    poTabSingle.classList.remove('border-blue-500', 'text-blue-600');
-                }
-
+                setIoTabButton(poTabSingle, isSingle);
+                setIoTabButton(poTabZip, !isSingle);
                 poPanelSingle.classList.toggle('hidden', !isSingle);
                 poPanelZip.classList.toggle('hidden', isSingle);
             }

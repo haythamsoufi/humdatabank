@@ -9,13 +9,14 @@ export default async function handler(req, res) {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backoffice-databank.fly.dev';
     const API_KEY = process.env.NEXT_PUBLIC_API_KEY || '';
 
-    const testUrl = `${API_BASE_URL}/api/v1/countrymap?api_key=${API_KEY}&per_page=1`;
+    const testUrl = `${API_BASE_URL}/api/v1/countrymap?per_page=1`;
 
     const response = await fetch(testUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        ...(API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}),
       },
       signal: AbortSignal.timeout(10000), // 10 second timeout
     });

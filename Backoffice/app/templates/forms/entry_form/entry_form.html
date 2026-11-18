@@ -80,7 +80,7 @@
      data-i18n-translating="{{ _('Translating…')|forceescape }}"
      data-i18n-preview-note="{{ _('Preview only. This does not change the saved text.')|forceescape }}"
      data-i18n-unavailable="{{ _('Translation is unavailable right now.')|forceescape }}"
-     data-i18n-preview-title="{{ _('Preview in %(language)s')|forceescape }}"
+     data-i18n-preview-title="{{ _('Preview in %(language)s', language='%(language)s')|forceescape }}"
      data-i18n-truncated="{{ _('Preview shows the beginning of this text.')|forceescape }}"
      {% endif %}
      {% if is_public_submission and submission is defined and submission and submission.id %}

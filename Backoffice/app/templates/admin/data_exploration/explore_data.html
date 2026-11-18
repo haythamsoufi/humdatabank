@@ -2790,15 +2790,14 @@
         window.currentDisaggSubtab = 'overview';
 
         // Disaggregation sub-tabs
-        document.querySelectorAll('.disagg-subtab').forEach(function(btn) {
+        document.querySelectorAll('#disagg-subtabs .disagg-subtab').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 const subtab = this.getAttribute('data-subtab');
-                document.querySelectorAll('.disagg-subtab').forEach(function(b) {
-                    b.classList.remove('active', 'border-blue-600', 'text-blue-600');
-                    b.classList.add('border-transparent', 'text-gray-600');
+                document.querySelectorAll('#disagg-subtabs .disagg-subtab').forEach(function(b) {
+                    const on = b === btn;
+                    if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(b, on);
+                    b.setAttribute('aria-selected', on ? 'true' : 'false');
                 });
-                this.classList.add('active', 'border-blue-600', 'text-blue-600');
-                this.classList.remove('border-transparent', 'text-gray-600');
                 document.querySelectorAll('.disagg-content').forEach(function(panel) {
                     panel.classList.add('hidden');
                 });

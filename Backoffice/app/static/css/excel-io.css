@@ -844,37 +844,6 @@
     display: none !important;
 }
 
-.excel-io-tabs__bar {
-    display: flex;
-    gap: 2rem;
-    border-bottom: 1px solid #e5e7eb;
-    margin-bottom: 1rem;
-}
-
-.excel-io-tabs__btn {
-    white-space: nowrap;
-    padding: 1rem 0.25rem;
-    border-bottom: 2px solid transparent;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #6b7280;
-    background: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    cursor: pointer;
-}
-
-.excel-io-tabs__btn:hover {
-    color: #374151;
-    border-bottom-color: #d1d5db;
-}
-
-.excel-io-tabs__btn--active {
-    color: #2563eb;
-    border-bottom-color: #2563eb;
-}
-
 .excel-io-card {
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;

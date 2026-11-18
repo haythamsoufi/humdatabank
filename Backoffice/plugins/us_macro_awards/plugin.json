@@ -1,9 +1,0 @@
-{
-  "plugin_id": "us_macro_awards",
-  "name": "us_macro_awards",
-  "display_name": "US Macro Awards",
-  "version": "0.1.0",
-  "description": "US Macro Awards (IFRC MARC) logframe: form template linked to the indicator bank, with a project per country.",
-  "author": "Haytham Alsoufi",
-  "license": "MIT"
-}

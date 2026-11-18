@@ -3,6 +3,7 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% block title %}{% if resource %}{{ _('Edit Resource') }}{% else %}{{ _('Upload New Resource') }}{% endif %}{% endblock %}
 
 {% block extra_css %}
@@ -140,8 +141,8 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
 <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
 
     {# Tab bar #}
-    <div class="border-b border-gray-200 px-6">
-        <nav class="-mb-px flex flex-wrap gap-0" aria-label="Language tabs">
+    <div class="px-6">
+        {% call scroll_tab_bar(inner_id='resource-lang-tabs', aria_label=_('Language tabs')) %}
 
             {# English tab — compute badge state #}
             {% set en_tr = resource.get_translation('en') if resource else none %}
@@ -154,8 +155,8 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                 {% set en_badge = 'empty' %}
             {% endif %}
 
-            <button type="button" id="btn-en"
-                    class="tab-btn border-b-2 border-blue-500 py-3 px-4 text-sm font-semibold text-blue-600 cursor-pointer whitespace-nowrap">
+            <button type="button" role="tab" id="btn-en" data-tab="en" aria-selected="true"
+                    class="resource-lang-tab {{ admin_underline_tab_btn_classes(true) }}">
                 <i class="fas fa-globe-americas mr-1 opacity-70"></i>English
                 {% if en_badge != 'empty' %}
                 <span class="tab-badge tab-badge-{{ en_badge }}" title="English content status">
@@ -175,8 +176,8 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                     {% else %}
                         {% set lbadge = 'empty' %}
                     {% endif %}
-                    <button type="button" id="btn-{{ lang_code }}"
-                            class="tab-btn border-b-2 border-transparent py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 cursor-pointer whitespace-nowrap">
+                    <button type="button" role="tab" id="btn-{{ lang_code }}" data-tab="{{ lang_code }}" aria-selected="false"
+                            class="resource-lang-tab {{ admin_underline_tab_btn_classes(false) }}">
                         {{ (LANGUAGE_DISPLAY_NAMES.get(lang_code) or ALL_LANGUAGES_DISPLAY_NAMES.get(lang_code) or lang_code.upper()) }}
                         {% if lbadge != 'empty' %}
                         <span class="tab-badge tab-badge-{{ lbadge }}" title="{{ lang_code.upper() }} content status">
@@ -187,7 +188,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                     </button>
                 {% endif %}
             {% endfor %}
-        </nav>
+        {% endcall %}
     </div>
 
     {# Tab contents #}
@@ -610,10 +611,6 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
 (function () {
     'use strict';
 
-    // ── Tab switching ──────────────────────────────────────────────────────
-    const INACTIVE = 'tab-btn border-b-2 border-transparent py-3 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 cursor-pointer whitespace-nowrap';
-    const ACTIVE   = 'tab-btn border-b-2 border-blue-500 py-3 px-4 text-sm font-semibold text-blue-600 cursor-pointer whitespace-nowrap';
-
     const footerAutoTranslateBtn  = document.getElementById('footer-auto-translate-btn');
     const footerAutoTranslateLang = document.getElementById('footer-auto-translate-lang');
 
@@ -733,7 +730,10 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
             t.classList.remove('active-tab');
             t.style.display = 'none';
         });
-        document.querySelectorAll('.tab-btn').forEach(b => { b.className = INACTIVE; });
+        document.querySelectorAll('#resource-lang-tabs .resource-lang-tab').forEach(function (b) {
+            if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(b, false);
+            b.setAttribute('aria-selected', 'false');
+        });
 
         const tab = document.getElementById('tab-' + lang);
         const btn = document.getElementById('btn-' + lang);
@@ -741,7 +741,8 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
 
         tab.classList.add('active-tab');
         tab.style.display = 'block';
-        btn.className = ACTIVE;
+        if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, true);
+        btn.setAttribute('aria-selected', 'true');
 
         // Show/hide footer auto-translate for non-English tabs
         if (footerAutoTranslateBtn) {
@@ -907,7 +908,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
         }
 
         // Wire tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        document.querySelectorAll('#resource-lang-tabs .resource-lang-tab').forEach(btn => {
             btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 showTab(this.id.replace('btn-', ''));

@@ -6,6 +6,55 @@ The Humanitarian Databank supports a plugin system that allows developers to ext
 
 > **Security notice:** Plugins execute in the host process with full application privileges (database, file system, network, secrets). There is no OS-level sandbox. Only install plugins from trusted sources.
 
+## Plugin contract (enforced)
+
+Plugins are written by different people, teams and AI agents. Everything below is checked automatically; a pull request or push to `main`/`develop` that breaks it fails CI and cannot merge.
+
+**Start from the starter** (`Backoffice/app/sample_plugin_package/`, also `GET /admin/api/plugins/starter/download`). It already satisfies the contract. Do not start from an empty folder.
+
+| # | Rule | Check id | Reference |
+|---|---|---|---|
+| 1 | Folder name = `plugin_id` = `plugin.json` `plugin_id` (`^[a-z][a-z0-9_]{0,63}$`). | `naming` | |
+| 2 | `plugin.json` has `plugin_id`, `name`, `display_name`, `version` (semver), `description`, `author`, `license`; `plugin_id` and `version` equal `plugin.py`. Bump both together. | `manifest` | `global_awards/plugin.json` |
+| 3 | **Settings page.** `GET /admin/plugins/<plugin_id>/settings` exists, even when the plugin has nothing to configure (show status, version, the info card). Plugin Management only shows the settings button when this URL resolves. | `settings-route` | `global_awards/routes.py` |
+| 4 | The settings route is guarded: `plugin_admin_route_wrapper(...)` or `@admin_permission_required_any(PLUGIN_MANAGE_PERMISSION, <your permission>)`. Never expose it with `login_required` alone. | `settings-guard` | |
+| 5 | `templates/settings.html` extends `core/layout.html`, uses the `page_header` macro with Admin > Plugins breadcrumbs, and includes `plugins/_plugin_info_card.html` (pass `plugin_info=settings_plugin_info(PLUGIN_ID)`). Render it as `plugins/<plugin_id>/settings.html`. | `settings-template` | |
+| 6 | `get_blueprint()` returns the blueprint that holds those routes. `get_settings()` returns a plain dict (it feeds the Plugin Management API). Secrets go through `secret_paths` (see below). | runtime test | |
+| 7 | Every other route has an auth decorator (`plugin_route_wrapper`, `plugin_admin_route_wrapper`, `login_required`, `permission_required`, ...). Public routes need an entry in `INTENTIONALLY_UNGUARDED` with a reason. | `test_plugin_route_access.py` | |
+| 8 | New permissions and roles come from `get_seed_permissions()` / `get_seed_roles()`. Do not edit core RBAC files. | `test_rbac_catalog_completeness.py` | |
+| 9 | `README.md` (200+ characters): what the plugin does, permissions, settings, config, how to test. | `readme` | `nsd_report_forms/README.md` |
+| 10 | Tests in `plugins/<id>/tests/test_*.py` (or `tests/unit/test_plugins/test_<id>*.py`): at least the plugin class loads, the settings page renders for an admin, and it is denied to anonymous users. | `tests` | `global_awards/tests/` |
+| 11 | The id is listed in `BUNDLED_PLUGIN_IDS` in `plugins/metadata.py` (any plugin folder committed to the repo ships with the image). Add it to `FIRST_PARTY_PLUGIN_IDS` only when it is first-party. | `bundled` | `test_first_party_plugins.py` |
+| 12 | Core code never imports `plugins.*`. Add an extension point on `BasePlugin` instead. | `test_core_plugin_boundary.py` | |
+
+Also required by repository-wide CI, not by this contract: no inline `<script>` / `onclick` in templates, no `|safe` on request or DB values, `SafeDom` for DOM writes, Tailwind rebuilt (`npm run build:css`) after adding utility classes, Alembic migrations for schema changes (plugin models under `plugins/` still need a migration in `Backoffice/migrations/`).
+
+### Run the checks locally
+
+From `Backoffice/`:
+
+```powershell
+python scripts/ci/check_plugin_contract.py                       # static rules, a few seconds, no database
+python scripts/ci/check_plugin_contract.py --plugin my_plugin    # one plugin
+python -m pytest tests/unit/test_plugins/test_plugin_contract.py tests/unit/test_plugins/test_plugin_route_access.py tests/unit/test_plugins/test_first_party_plugins.py --no-cov
+```
+
+### What runs in GitHub
+
+| Workflow | Trigger | Gate |
+|---|---|---|
+| `Plugin contract` (`.github/workflows/plugin-contract.yml`) | every PR to `main`/`develop`, every push to `main`/`develop` | Static contract above; the exemption list may only shrink. Required status check on `main`. |
+| `Backoffice CI` (`.github/workflows/backoffice-ci.yml`) | PR / push touching `Backoffice/**` | Code guards, Bandit, then pytest on the changed files. Plugin changes always include `test_plugin_contract.py`, `test_plugin_route_access.py` and `test_first_party_plugins.py`. |
+| `CodeQL` | PR / push | Required status check on `main`. |
+
+### Exemptions
+
+`EXEMPT` in `scripts/ci/check_plugin_contract.py` lists the older bundled plugins that predate a rule (each with a reason). It can only shrink: a stale entry fails CI, and the `Plugin contract` workflow rejects any added entry. New plugins comply; they do not get exemptions.
+
+### Instructions for AI agents
+
+`.cursor/rules/plugin-development.mdc` attaches these rules whenever a file under `Backoffice/plugins/` or `Backoffice/app/plugins/` is touched. An agent creating or changing a plugin must: copy the starter, add the settings page first, run the commands above, and open the settings URL in the browser (log in with the dev "Act as Admin" preset) before reporting the work as done. Activate the plugin in Admin > Plugins and restart the dev server: blueprints register at application start, so a new plugin's routes return 404 until restart.
+
 ## Plugin Directory Structure
 
 All plugins must be placed in the `Backoffice/plugins/` directory and follow this structure:
@@ -31,7 +80,7 @@ Backoffice/plugins/
 - Must define custom field types that inherit from `BaseFieldType`
 - Must implement all required methods and properties
 
-### 2. `routes.py` (optional)
+### 2. `routes.py` (required: holds the settings page, see the contract above)
 - The manager only calls `BasePlugin.get_blueprint()` (and `get_additional_blueprints()`). `routes.py` is a convention: bundled plugins expose `create_blueprint()` there and return it from `get_blueprint()`.
 - Every route needs an auth decorator (`plugin_route_wrapper`, `plugin_admin_route_wrapper`, `login_required`, `permission_required`, ...). `tests/unit/test_plugins/test_plugin_route_access.py` fails for routes without one unless they are listed there on purpose.
 

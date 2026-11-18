@@ -1094,7 +1094,7 @@ class TestReloadScanAndInfoRoutes:
         assert resp.status_code == 200
         archive = zipfile.ZipFile(io.BytesIO(resp.data))
         names = set(archive.namelist())
-        assert {"plugin.py", "plugin.json", "__init__.py"} <= names
+        assert {"plugin.py", "plugin.json", "__init__.py", "routes.py", "templates/settings.html"} <= names
         manifest = json.loads(archive.read("plugin.json"))
         assert manifest["plugin_id"] == "sample_plugin"
         assert 'return "sample_plugin"' in archive.read("plugin.py").decode()

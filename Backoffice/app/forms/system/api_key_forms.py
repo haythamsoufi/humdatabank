@@ -22,6 +22,9 @@ from app.services.security.api_key_permissions import (
 from app.utils.common.datetime_helpers import ensure_utc, utcnow
 
 
+MIN_EXISTING_SECRET_DISTINCT_CHARS = 12
+
+
 class APIKeyPermissionsForm(FlaskForm):
     """Permission fields shared by the create and edit screens (one source of truth)."""
 
@@ -89,7 +92,7 @@ class APIKeyPermissionsForm(FlaskForm):
                 ok = False
             elif not (selected & SCOPABLE_CAPABILITY_CODES):
                 self.restrict_data.errors = list(self.restrict_data.errors) + [
-                    str(_l('The restriction only applies to Form data, Submissions and Form templates. Select one of them or untick the restriction.'))
+                    str(_l('The restriction only applies to Form data, Submissions, Form templates and Submitted documents. Select one of them or untick the restriction.'))
                 ]
                 ok = False
         if selected & SENSITIVE_CAPABILITY_CODES and not self.confirm_sensitive.data:
@@ -100,6 +103,12 @@ class APIKeyPermissionsForm(FlaskForm):
         if self.allow_query_api_key.data and selected & PII_CAPABILITY_CODES:
             self.allow_query_api_key.errors = list(self.allow_query_api_key.errors) + [
                 str(_l('Keys with personal-data permissions must be sent in a header, not in the URL.'))
+            ]
+            ok = False
+        expires_field = getattr(self, 'expires_at', None)
+        if selected & PII_CAPABILITY_CODES and expires_field is not None and not expires_field.data:
+            expires_field.errors = list(expires_field.errors) + [
+                str(_l('Keys with personal-data permissions must have an expiry date. Pick one and rotate the key before it passes.'))
             ]
             ok = False
         return ok
@@ -190,6 +199,13 @@ class APIKeyForm(APIKeyPermissionsForm):
         if not re.fullmatch(r'[A-Za-z0-9_\-+/=.]+', field.data):
             raise ValidationError(
                 'Existing key may only contain letters, numbers, and - _ + / = .'
+            )
+        # Keys are stored as an unsalted SHA-256 fingerprint, which is only safe for
+        # high-entropy secrets. Refuse obviously guessable ones (repeats, short alphabets).
+        if len(set(field.data)) < MIN_EXISTING_SECRET_DISTINCT_CHARS:
+            raise ValidationError(
+                'Existing key looks too guessable (too few different characters). '
+                'Use a long random secret, or leave this blank to generate one.'
             )
 
 

@@ -7,7 +7,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from plugins.us_macro_awards.constants import DEFAULT_WORKBOOK, SHEET_NAME
+from plugins.global_awards.constants import DEFAULT_WORKBOOK, SHEET_NAME
+from plugins.global_awards.importer.schedule import AwardWindow, parse_award_window
 
 _HEADING_LIMIT = 120
 _SKIP_PREFIXES = ("notes to self",)
@@ -79,6 +80,8 @@ class ParsedLogframe:
     countries: List[str]
     sections: List[LogframeSection]
     indicators: List[LogframeIndicator]
+    award: Optional[AwardWindow] = None
+    timeframe_note: str = ""
 
 
 def clean_text(value: Any) -> str:
@@ -336,6 +339,8 @@ def parse_workbook(workbook) -> ParsedLogframe:
         countries=[name for name, _index in columns["countries"]],
         sections=list(sections.values()),
         indicators=indicators,
+        award=parse_award_window(workbook),
+        timeframe_note=_timeframe_note(rows[:header_index]),
     )
 
 
@@ -360,6 +365,16 @@ def open_workbook(source):
 
 def default_workbook_path():
     return DEFAULT_WORKBOOK
+
+
+def _timeframe_note(rows: List[tuple]) -> str:
+    """The mastersheet label such as ``12 months``, when the file states one."""
+    for row in rows:
+        cells = [clean_text(cell) for cell in row]
+        for index, cell in enumerate(cells):
+            if cell.casefold().rstrip(":") == "timeframe" and index + 1 < len(cells):
+                return cells[index + 1]
+    return ""
 
 
 def _find_header(rows: List[tuple]) -> int:

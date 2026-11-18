@@ -895,11 +895,10 @@
             <div class="p-4 rounded-lg bg-gray-50 {% if show_main_tabs %}hidden{% endif %}" id="add-entities-panel" role="tabpanel" aria-labelledby="add-entities-tab">
                 {# Sub-tab navigation for Add Entities - only show if multiple sub-tabs are available #}
                 {% if show_add_entities_subtabs %}
-                {% call scroll_tab_bar(inner_tag='ul', inner_id='add-entities-subtabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-4', aria_label=_('Add entities by')) %}
+                {% call scroll_tab_bar(inner_id='add-entities-subtabs', wrapper_class='mb-4', aria_label=_('Add entities by')) %}
                         {% if has_countries %}
                         {% set is_countries_subtab_active = default_add_entities_subtab == 'countries' %}
-                        <li class="me-2" role="presentation">
-                            <button class="inline-block p-3 border-b-2 rounded-t-lg {% if is_countries_subtab_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                            <button class="{{ admin_underline_tab_btn_classes(is_countries_subtab_active) }}"
                                     id="add-entities-countries-tab"
                                     data-tabs-target="#add-entities-countries-panel"
                                     type="button"
@@ -908,12 +907,10 @@
                                     aria-selected="{{ 'true' if is_countries_subtab_active else 'false' }}">
                                 <i class="fas fa-flag mr-2"></i>Countries
                             </button>
-                        </li>
                         {% endif %}
                         {% if has_projects %}
                         {% set is_projects_subtab_active = default_add_entities_subtab == 'projects' %}
-                        <li class="me-2" role="presentation">
-                            <button class="inline-block p-3 border-b-2 rounded-t-lg {% if is_projects_subtab_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                            <button class="{{ admin_underline_tab_btn_classes(is_projects_subtab_active) }}"
                                     id="add-entities-projects-tab"
                                     data-tabs-target="#add-entities-projects-panel"
                                     type="button"
@@ -922,12 +919,10 @@
                                     aria-selected="{{ 'true' if is_projects_subtab_active else 'false' }}">
                                 <i class="fas fa-folder-open mr-2"></i>{{ _('Projects') }}
                             </button>
-                        </li>
                         {% endif %}
                         {% if has_secretariat %}
                         {% set is_secretariat_subtab_active = default_add_entities_subtab == 'secretariat' %}
-                        <li class="me-2" role="presentation">
-                            <button class="inline-block p-3 border-b-2 rounded-t-lg {% if is_secretariat_subtab_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
+                            <button class="{{ admin_underline_tab_btn_classes(is_secretariat_subtab_active) }}"
                                     id="add-entities-secretariat-tab"
                                     data-tabs-target="#add-entities-secretariat-panel"
                                     type="button"
@@ -936,7 +931,6 @@
                                     aria-selected="{{ 'true' if is_secretariat_subtab_active else 'false' }}">
                                 <i class="fas fa-building mr-2"></i>Secretariat
                             </button>
-                        </li>
                         {% endif %}
                 {% endcall %}
                 {% endif %}
@@ -1086,9 +1080,8 @@
                         </div>
 
                         {# Sub-tab navigation for Secretariat #}
-                        {% call scroll_tab_bar(inner_tag='ul', inner_id='secretariat-subtabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-4', aria_label=_('Secretariat structure')) %}
-                                <li class="me-2" role="presentation">
-                                    <button class="inline-block p-3 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
+                        {% call scroll_tab_bar(inner_id='secretariat-subtabs', wrapper_class='mb-4', aria_label=_('Secretariat structure')) %}
+                                    <button class="{{ admin_underline_tab_btn_classes(true) }}"
                                             id="secretariat-divisions-tab"
                                             data-tabs-target="#secretariat-divisions-panel"
                                             type="button"
@@ -1097,9 +1090,7 @@
                                             aria-selected="true">
                                         <i class="fas fa-building mr-2"></i>{{ _('Divisions & Departments') }}
                                     </button>
-                                </li>
-                                <li class="me-2" role="presentation">
-                                    <button class="inline-block p-3 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300"
+                                    <button class="{{ admin_underline_tab_btn_classes(false) }}"
                                             id="secretariat-regions-tab"
                                             data-tabs-target="#secretariat-regions-panel"
                                             type="button"
@@ -1108,7 +1099,6 @@
                                             aria-selected="false">
                                         <i class="fas fa-globe-europe mr-2"></i>{{ _('Regions') }}
                                     </button>
-                                </li>
                         {% endcall %}
 
                         {# Sub-tab panels for Secretariat #}

@@ -12,8 +12,8 @@ PLUGIN_LICENSE = "MIT"
 
 # Plugins whose author metadata is stamped by FirstPartyPluginMetadata.
 FIRST_PARTY_PLUGIN_IDS = (
+    "global_awards",
     "interactive_map",
-    "us_macro_awards",
 )
 
 # Plugins that ship in the application image. Core code imports their modules
@@ -24,11 +24,11 @@ FIRST_PARTY_PLUGIN_IDS = (
 BUNDLED_PLUGIN_IDS = (
     "emergency_operations",
     "fdrs",
+    "global_awards",
     "ifrc",
     "interactive_map",
     "nsd_report_forms",
     "upr",
-    "us_macro_awards",
 )
 
 

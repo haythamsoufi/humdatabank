@@ -163,13 +163,14 @@
   // -------------------------------------------------------------------------
 
   function initTabs() {
-    var tabs = Array.prototype.slice.call(document.querySelectorAll('.dec-tab[data-tab]'));
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('#dec-tabs [data-tab]'));
     if (!tabs.length) return;
 
     function select(name, focus) {
       tabs.forEach(function (tab) {
         var active = tab.dataset.tab === name;
         tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(tab, active);
         tab.tabIndex = active ? 0 : -1;
         var panel = document.getElementById(tab.getAttribute('aria-controls'));
         if (panel) panel.hidden = !active;

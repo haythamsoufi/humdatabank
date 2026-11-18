@@ -134,7 +134,9 @@ class TestVocabulary:
             assert not set(preset.capabilities) & PII_CAPABILITY_CODES, preset.code
 
     def test_only_data_bearing_capabilities_are_scopable(self):
-        assert SCOPABLE_CAPABILITY_CODES == {"data:read", "submissions:read", "templates:read"}
+        assert SCOPABLE_CAPABILITY_CODES == {
+            "data:read", "submissions:read", "templates:read", "documents:read",
+        }
 
     def test_full_access_document_grants_everything(self):
         assert parse_key_permissions(full_access_document()).capabilities == ALL_CAPABILITY_CODES
@@ -227,6 +229,7 @@ class TestRouteCapabilityGuard:
             "/api/v1/nskeydata",
             "/api/v1/upr", "/api/v1/upr/data", "/api/v1/upr/master", "/api/v1/upr/overall",
             "/api/v1/upr/submissions",
+            "/api/v1/nsd-funds/deadlines", "/api/v1/nsd-funds/projects", "/api/v1/nsd-funds/kpis",
         }
 
     def test_personal_data_routes_require_a_pii_capability(self, app):

@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% block title %}{{ _('Projects') }}{% endblock %}
 
@@ -29,13 +30,26 @@
 ) }}
 
 <div class="bg-white shadow-md border border-gray-200">
-  <div class="p-4 sm:p-6 relative">
+  {% call scroll_tab_bar(inner_id='projects-tabs', aria_label=_('Project views')) %}
+    <button type="button" role="tab" data-tab="registry" aria-selected="true" class="{{ admin_underline_tab_btn_classes(true) }}">
+      <i class="fas fa-table-list mr-1.5"></i>{{ _('Registry') }}
+    </button>
+    <button type="button" role="tab" data-tab="monitoring" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false) }}">
+      <i class="fas fa-chart-line mr-1.5"></i>{{ _('Monitoring') }}
+    </button>
+  {% endcall %}
+
+  <div id="panel-registry" class="settings-panel p-4 sm:p-6 relative" role="tabpanel">
     {% set search_box %}
     <input type="search" id="projectsGridSearch" class="form-control w-full max-w-xs" autocomplete="off"
            placeholder="{{ _('Search projects...')|forceescape }}" aria-label="{{ _('Search')|forceescape }}">
     {% endset %}
     {{ ag_grid_header_toolbar(placeholder_id='projectsGrid-colvis', meta=search_box) }}
     {{ ag_grid_body_wrap('projectsGrid', loading_text=_('Loading projects...'), placeholder_id='projectsGrid-colvis', empty_message=_('No projects yet.')) }}
+  </div>
+
+  <div id="panel-monitoring" class="settings-panel hidden p-4 sm:p-6" role="tabpanel">
+    {% include "admin/projects/_monitoring_panel.html" %}
   </div>
 </div>
 </div>
@@ -176,4 +190,35 @@
 })();
 </script>
 <script src="{{ static_url('js/admin/projects-modal.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
+<script src="{{ static_url('js/admin/projects-monitoring.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  var A = window.AdminUnderlineTabs;
+  var tabs = document.querySelectorAll('#projects-tabs .settings-tab');
+  if (!tabs.length || !A) return;
+
+  function activate(tabId) {
+    A.activateStripTab('#projects-tabs', tabId, { panelSelector: '.settings-panel' });
+    if (tabId === 'monitoring' && window.ProjectMonitoring) {
+      window.ProjectMonitoring.onTabActivated();
+    } else if (tabId === 'registry' && window.gridApi && window.gridApi.sizeColumnsToFit) {
+      setTimeout(function () { try { window.gridApi.sizeColumnsToFit(); } catch (e) { /* ignore */ } }, 50);
+    }
+  }
+
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = this.getAttribute('data-tab');
+      activate(id);
+      history.replaceState(null, '', id === 'registry' ? location.pathname + location.search : '#' + id);
+    });
+  });
+
+  var hash = (location.hash || '').replace('#', '');
+  if (hash && document.getElementById('panel-' + hash)) {
+    activate(hash);
+  }
+})();
+</script>
 {% endblock %}

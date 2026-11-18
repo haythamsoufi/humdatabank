@@ -28,7 +28,12 @@ class Project(db.Model):
     fund = db.Column(db.String(40), nullable=True)
     title = db.Column(db.String(500), nullable=True)
     country_id = db.Column(db.Integer, db.ForeignKey("country.id", ondelete="RESTRICT"), nullable=False)
-    # Display name of the implementing NS when useful (not a FK — NS matching varies by fund)
+    # Implementing National Society. organization_name mirrors its official name when set.
+    national_society_id = db.Column(
+        db.Integer,
+        db.ForeignKey("national_societies.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     organization_name = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(40), nullable=False, default="Open")
     funding_modality = db.Column(db.String(120), nullable=True)
@@ -48,9 +53,11 @@ class Project(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
     country = db.relationship("Country", foreign_keys=[country_id])
+    national_society = db.relationship("NationalSociety", foreign_keys=[national_society_id])
 
     __table_args__ = (
         db.Index("ix_project_country", "country_id"),
+        db.Index("ix_project_national_society", "national_society_id"),
         db.Index("ix_project_status", "status"),
         db.Index("ix_project_portfolio", "portfolio"),
         db.Index("ix_project_fund", "fund"),
@@ -61,6 +68,8 @@ class Project(db.Model):
     # --- compatibility aliases used by the NSD plugin (same semantics) ---
     @property
     def national_society_name(self):
+        if self.national_society is not None:
+            return self.national_society.name
         return self.organization_name
 
     @national_society_name.setter

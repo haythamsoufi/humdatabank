@@ -3038,7 +3038,7 @@ export const MatrixItem = {
                     sec?.classList.remove('mb-4');
                 });
                 // Activate the Fixed Rows tab by default (unless list tab already active)
-                const activeTab = hybridTabBar.querySelector('.matrix-hybrid-tab.border-orange-500');
+                const activeTab = hybridTabBar.querySelector('.matrix-hybrid-tab[aria-selected="true"]');
                 this._activateHybridTab(modalElement, activeTab?.dataset.target || 'matrix-manual-rows-section');
             }
             this.updateConfig(modalElement);
@@ -3079,12 +3079,8 @@ export const MatrixItem = {
         // Tab active styling
         hybridTabBar.querySelectorAll('.matrix-hybrid-tab').forEach(tab => {
             const isActive = tab.dataset.target === targetId;
-            tab.classList.toggle('text-orange-600', isActive);
-            tab.classList.toggle('border-orange-500', isActive);
-            tab.classList.toggle('bg-white', isActive);
-            tab.classList.toggle('text-gray-500', !isActive);
-            tab.classList.toggle('border-transparent', !isActive);
-            tab.classList.toggle('bg-transparent', !isActive);
+            if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(tab, isActive);
+            tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
     },
 

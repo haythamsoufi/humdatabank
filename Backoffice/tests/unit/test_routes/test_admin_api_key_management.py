@@ -304,6 +304,23 @@ class TestRotateApiKey:
         resp = logged_in_client.post(f"/admin/api-management/api-keys/{key_id}/rotate")
         assert resp.status_code == 200  # renders rotate_success template
 
+    def test_rotate_keeps_a_disabled_key_disabled(self, logged_in_client, db_session, app):
+        from app.models.api_key_management import APIKey
+
+        with app.app_context():
+            key, old_secret = _create_key(db_session, client_name="Disabled Rotate Key")
+            key.disable("paused")
+            db_session.commit()
+            key_id = key.id
+            old_hash = key.key_hash
+        resp = logged_in_client.post(f"/admin/api-management/api-keys/{key_id}/rotate")
+        assert resp.status_code == 200
+        refreshed = db_session.get(APIKey, key_id)
+        db_session.refresh(refreshed)
+        assert refreshed.key_hash != old_hash
+        assert refreshed.is_active is False
+        assert refreshed.status == "disabled"
+
     def test_rotate_revoked_key_redirects(self, logged_in_client, db_session, app):
         with app.app_context():
             key, _ = _create_key(db_session, client_name="Revoked Rotate Key")

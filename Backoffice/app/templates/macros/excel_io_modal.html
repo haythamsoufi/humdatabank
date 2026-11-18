@@ -4,6 +4,7 @@
 #}
 {% from "macros/modal_shell.html" import modal_shell %}
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% macro excel_io_modal(
     modal_id,
@@ -125,10 +126,10 @@
 
     {% elif layout == 'tabs' %}
     <div class="excel-io-tabs">
-        <div class="excel-io-tabs__bar" role="tablist" aria-label="{{ _('Import or export')|forceescape }}">
+        {% call scroll_tab_bar(inner_id=modal_id ~ '-io-tabs', aria_label=_('Import or export'), wrapper_class='mb-4') %}
             {% if show_export %}
             <button type="button"
-                    class="excel-io-tabs__btn {% if default_tab == 'export' %}excel-io-tabs__btn--active{% endif %}"
+                    class="{{ admin_underline_tab_btn_classes(default_tab == 'export') }}"
                     data-excel-io-tab="export"
                     role="tab"
                     aria-selected="{{ 'true' if default_tab == 'export' else 'false' }}">
@@ -137,14 +138,14 @@
             {% endif %}
             {% if show_import %}
             <button type="button"
-                    class="excel-io-tabs__btn {% if default_tab == 'import' %}excel-io-tabs__btn--active{% endif %}"
+                    class="{{ admin_underline_tab_btn_classes(default_tab == 'import') }}"
                     data-excel-io-tab="import"
                     role="tab"
                     aria-selected="{{ 'true' if default_tab == 'import' else 'false' }}">
                 <i class="fas fa-upload mr-2"></i>{{ _import_tab_label }}
             </button>
             {% endif %}
-        </div>
+        {% endcall %}
         {% if show_export %}
         <div class="excel-io-tab-panel" data-excel-io-panel="export" role="tabpanel" {% if default_tab != 'export' %}hidden{% endif %}>
             {% if tab_export %}{{ tab_export|safe }}

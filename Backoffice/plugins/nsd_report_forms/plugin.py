@@ -238,6 +238,11 @@ class NsdReportFormsPlugin(BasePlugin):
 
         return assignment_badges(assignment_entity_statuses)
 
+    def get_project_report_answers(self, reports):
+        from plugins.nsd_report_forms.badges import project_report_answers
+
+        return project_report_answers(reports)
+
     def get_seed_permissions(self) -> List[SeedPermission]:
         return [
             SeedPermission(

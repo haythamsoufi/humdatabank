@@ -701,8 +701,10 @@
 
   function setMode(mode) {
     const preview = mode === "preview";
-    els.tabGenerate.classList.toggle("is-active", !preview);
-    els.tabPreview.classList.toggle("is-active", preview);
+    if (window.AdminUnderlineTabs) {
+      window.AdminUnderlineTabs.setStripButtonActive(els.tabGenerate, !preview);
+      window.AdminUnderlineTabs.setStripButtonActive(els.tabPreview, preview);
+    }
     els.tabGenerate.setAttribute("aria-selected", preview ? "false" : "true");
     els.tabPreview.setAttribute("aria-selected", preview ? "true" : "false");
     els.paneGenerate.hidden = preview;

@@ -84,7 +84,30 @@ def _sync_audience(af, slot: str) -> None:
         )
 
 
-def ensure_project_aes(project: Project, slot: str, *, due=None, active=None, template_id=None):
+def _window_date(value):
+    """Schedule cells are ISO strings. Empty means the cycle has no window yet."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, dt.datetime):
+        return value.date()
+    if isinstance(value, dt.date):
+        return value
+    try:
+        return dt.date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def ensure_project_aes(
+    project: Project,
+    slot: str,
+    *,
+    due=None,
+    active=None,
+    template_id=None,
+    period_start=None,
+    period_end=None,
+):
     """AES for this project on its own cycle assignment for ``slot`` (Y1Q2 / Final)."""
     if template_id is None:
         key = FINAL_TEMPLATE_KEY if slot == FINAL_SLOT else QUARTER_TEMPLATE_KEY
@@ -96,6 +119,8 @@ def ensure_project_aes(project: Project, slot: str, *, due=None, active=None, te
         project,
         int(template_id),
         slot,
+        period_start=_window_date(period_start),
+        period_end=_window_date(period_end),
         due_date=due,
         is_active=want_active,
     )
@@ -125,7 +150,16 @@ def apply_schedule(project: Project, schedule_rows: List[dict]):
                     due = dt.datetime.combine(dt.date.fromisoformat(str(raw_due)[:10]), dt.time.min)
                 except ValueError:
                     due = None
-        created.append(ensure_project_aes(project, slot_name, due=due, template_id=tpl_id))
+        created.append(
+            ensure_project_aes(
+                project,
+                slot_name,
+                due=due,
+                template_id=tpl_id,
+                period_start=row.get("period_start"),
+                period_end=row.get("period_end"),
+            )
+        )
     return created
 
 

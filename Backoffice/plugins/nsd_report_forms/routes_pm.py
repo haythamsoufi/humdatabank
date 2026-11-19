@@ -51,7 +51,7 @@ def _viewing():
 @permission_required(NSD_PM_PERMISSION)
 def pm_overview():
     email, _previewing = _viewing()
-    return redirect(url_for("project_management.project_list", manager=email))
+    return redirect(url_for("assignment_management.manage_assignments", type="project", manager=email))
 
 
 @pm_bp.route("/projects/<path:reference>", methods=["GET"])
@@ -61,7 +61,7 @@ def project_detail(reference):
     project = Project.query.filter_by(reference=reference.strip()).first()
     if project is None or data.norm_email(project.manager_email) != email:
         abort(404)
-    return redirect(url_for("project_management.project_detail", project_id=project.id))
+    return redirect(url_for("project_assignments.project_page", project_id=project.id))
 
 
 @pm_bp.route("/links", methods=["GET"])

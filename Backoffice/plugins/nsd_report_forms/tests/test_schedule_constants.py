@@ -8,7 +8,7 @@ from plugins.nsd_report_forms.constants import (
     parse_quarter_slot,
     quarter_slot,
 )
-from plugins.nsd_report_forms.schedule import slot_for_schedule_row
+from plugins.nsd_report_forms.schedule import _window_date, slot_for_schedule_row
 
 
 def test_entity_type_constant():
@@ -27,6 +27,16 @@ def test_parse_quarter_slot():
     assert parse_quarter_slot("Y1Q2") == (1, 2)
     assert parse_quarter_slot("Final") is None
     assert quarter_slot(2, 3) == "Y2Q3"
+
+
+def test_schedule_window_dates_are_parsed():
+    import datetime as dt
+
+    assert _window_date("2027-04-01") == dt.date(2027, 4, 1)
+    assert _window_date(dt.date(2027, 4, 30)) == dt.date(2027, 4, 30)
+    assert _window_date("") is None
+    assert _window_date(None) is None
+    assert _window_date("not-a-date") is None
 
 
 def test_slot_for_schedule_row():

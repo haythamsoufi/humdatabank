@@ -243,6 +243,65 @@ class NsdReportFormsPlugin(BasePlugin):
 
         return project_report_answers(reports)
 
+    def get_project_admin_summary(self, project):
+        if (getattr(project, "portfolio", None) or "").strip() != "NSD":
+            return None
+        from plugins.nsd_report_forms.overview import data as nsd_overview
+
+        summary = nsd_overview.project_detail(getattr(project, "reference", None))
+        return summary if isinstance(summary, dict) else None
+
+    def get_project_report_types(self, project):
+        if (getattr(project, "portfolio", None) or "").strip() != "NSD":
+            return []
+        from plugins.nsd_report_forms.constants import FINAL_SLOT, FINAL_TEMPLATE_KEY, QUARTER_TEMPLATE_KEY, all_quarter_slots
+        from plugins.nsd_report_forms.schedule import _template_id
+
+        quarter_id = _template_id(QUARTER_TEMPLATE_KEY)
+        final_id = _template_id(FINAL_TEMPLATE_KEY)
+        types = [
+            {
+                "slot": slot,
+                "label": slot,
+                "template_id": quarter_id,
+                "kind": "quarter",
+                "period_start": None,
+                "period_end": None,
+                "due_date": None,
+                "note": "",
+            }
+            for slot in all_quarter_slots()
+        ]
+        types.append(
+            {
+                "slot": FINAL_SLOT,
+                "label": "Final",
+                "template_id": final_id,
+                "kind": "final",
+                "period_start": None,
+                "period_end": None,
+                "due_date": None,
+                "note": "",
+            }
+        )
+        return types
+
+    def project_report_audience(self, project, slot: str):
+        """Final reports include focal points; every NSD cycle includes project managers."""
+        if (getattr(project, "portfolio", None) or "").strip() != "NSD":
+            return []
+        from plugins.nsd_report_forms.constants import FINAL_SLOT, parse_quarter_slot
+        from plugins.nsd_report_forms.importer.restrictions import ensure_nsd_access_groups
+
+        label = (slot or "").strip()
+        if label != FINAL_SLOT and not parse_quarter_slot(label):
+            return []
+        groups = ensure_nsd_access_groups()
+        role_ids = [int(groups["pm"].id)]
+        if label == FINAL_SLOT:
+            role_ids.insert(0, int(groups["focal"].id))
+        return role_ids
+
     def get_seed_permissions(self) -> List[SeedPermission]:
         return [
             SeedPermission(

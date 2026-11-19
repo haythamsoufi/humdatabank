@@ -261,7 +261,16 @@ class Run:
         fd.submitted_at = when or utcnow()
         self.stats['values'] += 1
 
-    def get_assignment(self, key: str, suffix: str, due: Optional[dt.datetime], proj: SimpleNamespace):
+    def get_assignment(
+        self,
+        key: str,
+        suffix: str,
+        due: Optional[dt.datetime],
+        proj: SimpleNamespace,
+        *,
+        period_start=None,
+        period_end=None,
+    ):
         """AES on a per-project cycle assignment (period = ``<ref> · Y1Q2`` / Final).
 
         Profile key is no longer written as an assignment; project identity lives in core ``project``.
@@ -280,7 +289,13 @@ class Run:
                 assigned_form_id=existed_af.id, entity_type=ENTITY_TYPE, entity_id=proj.project.id
             ).first()
         aes = nsd_schedule.ensure_project_aes(
-            proj.project, slot, due=due, active=proj.active, template_id=tpl_id
+            proj.project,
+            slot,
+            due=due,
+            active=proj.active,
+            template_id=tpl_id,
+            period_start=period_start,
+            period_end=period_end,
         )
         if not proj.active:
             aes.reopened_after_close = False
@@ -465,7 +480,14 @@ class Run:
             return
         due = dt.datetime.fromisoformat(s['deadline']) if s.get('deadline') else None
         suffix = layout.FINAL_PERIOD if rtype == 'CBF final report' else period
-        aes = self.get_assignment(key, suffix, due, proj)
+        aes = self.get_assignment(
+            key,
+            suffix,
+            due,
+            proj,
+            period_start=s.get('period_start'),
+            period_end=s.get('period_end'),
+        )
         self.stats['schedule_rows'] += 1
         self.prefill(aes, key, proj.p)
         if rtype == 'CBF quarter':

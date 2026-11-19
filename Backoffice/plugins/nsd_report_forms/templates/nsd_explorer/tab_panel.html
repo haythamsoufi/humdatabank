@@ -46,7 +46,7 @@
        {% if show_nsd_subtabs %}aria-labelledby="tab-nsd-all-projects"{% endif %}>
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p class="text-sm text-gray-600">{{ _('All NSD portfolio projects in the core registry.') }}</p>
-      <a href="{{ url_for('project_management.project_list', portfolio='NSD') }}"
+      <a href="{{ url_for('assignment_management.manage_assignments', type='project', portfolio='NSD') }}"
          class="text-sm font-medium text-blue-700 hover:underline whitespace-nowrap">
         {{ _('Open in Admin → Projects') }} <i class="fas fa-external-link-alt text-xs ml-0.5" aria-hidden="true"></i>
       </a>

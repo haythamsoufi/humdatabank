@@ -1,4 +1,4 @@
-"""Legacy NSD overview URLs. The registry UI is Admin → Projects."""
+"""Legacy NSD overview URLs. The registry UI is Admin → Assignments, filtered to projects."""
 
 from pathlib import Path
 
@@ -29,7 +29,8 @@ def project_list():
             params[key] = args.get(key)
     if "status" not in args:
         params["status"] = "Open"
-    return redirect(url_for("project_management.project_list", **params))
+    params["type"] = "project"
+    return redirect(url_for("assignment_management.manage_assignments", **params))
 
 
 @projects_bp.route("/<path:reference>", methods=["GET"])
@@ -38,4 +39,4 @@ def project_detail(reference):
     project = Project.query.filter_by(reference=reference.strip()).first()
     if project is None:
         abort(404)
-    return redirect(url_for("project_management.project_detail", project_id=project.id))
+    return redirect(url_for("project_assignments.project_page", project_id=project.id))

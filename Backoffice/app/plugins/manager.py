@@ -1665,10 +1665,10 @@ class PluginManager:
         return [item for item in cached if section is None or item.section == section]
 
     def get_documentation_sources(self) -> List[PluginDocsSource]:
-        """Collect plugin documentation sources for the in-app docs UI."""
+        """Documentation pages for plugins that are currently active."""
         sources: List[PluginDocsSource] = []
         seen: Set[str] = set()
-        for plugin_id, plugin in self.plugins.items():
+        for plugin_id, plugin in self._integrating_plugins().items():
             try:
                 source = plugin.get_documentation_source()
             except Exception as exc:
@@ -1788,6 +1788,49 @@ class PluginManager:
             for aes_id, answers in result.items():
                 merged.setdefault(int(aes_id), {}).update(answers)
         return merged
+
+    def project_report_types(self, project) -> list:
+        """Report slots active plugins offer for this project. The first plugin to claim a slot wins."""
+        merged = []
+        seen = set()
+        if project is None:
+            return merged
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                items = plugin.get_project_report_types(project) or []
+            except Exception as exc:
+                self.logger.warning("get_project_report_types failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for item in items:
+                slot = str((item or {}).get("slot") or "").strip()
+                if not slot or slot in seen:
+                    continue
+                seen.add(slot)
+                merged.append(item)
+        return merged
+
+    def project_report_audience_ids(self, project, slot: str) -> list:
+        """Access Group ids plugins require for this project report, in plugin order, without duplicates."""
+        found = []
+        seen = set()
+        if project is None:
+            return found
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                role_ids = plugin.project_report_audience(project, slot) or []
+            except Exception as exc:
+                self.logger.warning("project_report_audience failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for role_id in role_ids:
+                try:
+                    role_id = int(role_id)
+                except (TypeError, ValueError):
+                    continue
+                if role_id in seen:
+                    continue
+                seen.add(role_id)
+                found.append(role_id)
+        return found
 
     def get_all_seed_roles(self) -> List[Dict[str, Any]]:
         roles: List[Dict[str, Any]] = []

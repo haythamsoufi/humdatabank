@@ -11,8 +11,26 @@
         if (!el) return [];
         try { return JSON.parse(el.textContent || '[]'); } catch (e) { return []; }
     })();
+    (function () {
+        var el = document.getElementById('project-assignment-rows');
+        if (!el) return;
+        try {
+            var extra = JSON.parse(el.textContent || '[]');
+            if (extra && extra.length) assignmentsData = assignmentsData.concat(extra);
+        } catch (e) { /* leave the campaign rows */ }
+    })();
 
     var columnDefs = [
+        {
+            field: 'row_type',
+            headerName: cfg.t.type_8f3a1c20 || 'Type',
+            width: 130, minWidth: 110, maxWidth: 160,
+            filter: 'agTextColumnFilter', sortable: true,
+            cellRenderer: function (params) {
+                var project = params.value === 'project';
+                return project ? (cfg.t.project_type_b2 || 'Project') : (cfg.t.campaign_type_a1 || 'Campaign');
+            }
+        },
         {
             field: 'id',
             headerName: cfg.t.id_e369853d,
@@ -129,6 +147,30 @@
             }
         },
         {
+            field: 'country',
+            headerName: cfg.t.country_c3 || 'Country',
+            hide: true,
+            width: 160, minWidth: 120,
+            filter: 'agTextColumnFilter'
+        },
+        {
+            field: 'portfolio',
+            headerName: cfg.t.category_d4 || 'Category',
+            hide: true,
+            width: 140, minWidth: 100,
+            filter: 'agTextColumnFilter'
+        },
+        {
+            field: 'manager_name',
+            headerName: cfg.t.manager_e5 || 'Manager',
+            hide: true,
+            width: 180, minWidth: 120,
+            filter: 'agTextColumnFilter'
+        },
+        { field: 'fund', headerName: 'Fund', hide: true, filter: 'agTextColumnFilter' },
+        { field: 'manager_email', headerName: 'Manager email', hide: true, filter: 'agTextColumnFilter' },
+        { field: 'project_status', headerName: 'Project status', hide: true, filter: 'agTextColumnFilter' },
+        {
             field: 'actions',
             headerName: cfg.t.actions_9f36b7c9,
             width: 120, minWidth: 100, maxWidth: 150,
@@ -204,6 +246,27 @@
             onReady: function (api, helper) {
                 AgGridHelper.pinActionsColumn(api, null, helper && helper.columnVisibilityManager);
                 var urlParams = new URLSearchParams(window.location.search);
+                if (api) {
+                    var model = {};
+                    if (urlParams.get('type') === 'project') {
+                        model.row_type = { filterType: 'text', type: 'equals', filter: 'project' };
+                    }
+                    ['country', 'portfolio', 'fund', 'manager_email', 'project_status'].forEach(function (key) {
+                        var value = urlParams.get(key);
+                        if (value) model[key] = { filterType: 'text', type: 'equals', filter: value };
+                    });
+                    var manager = urlParams.get('manager');
+                    if (manager) {
+                        model.manager_email = { filterType: 'text', type: 'equals', filter: manager };
+                    }
+                    if (!model.project_status && urlParams.get('status')) {
+                        model.project_status = { filterType: 'text', type: 'equals', filter: urlParams.get('status') };
+                    }
+                    if (Object.keys(model).length) {
+                        api.setFilterModel(model);
+                        api.onFilterChanged();
+                    }
+                }
                 if (urlParams.get('no_data_owner') === '1' && api) {
                     var ownerCol = api.getColumn('data_owner_name');
                     if (ownerCol) {

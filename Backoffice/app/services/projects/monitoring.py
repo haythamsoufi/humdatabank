@@ -1,4 +1,4 @@
-"""Portfolio monitoring for project-based reporting (Admin → Projects → Monitoring tab).
+"""Portfolio monitoring for project-based reporting (programme portfolio → Monitoring tab).
 
 Two layers:
 

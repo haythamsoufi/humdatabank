@@ -59,6 +59,7 @@ READONLY_NOTICE_APPROVED = "approved"
 READONLY_NOTICE_SUBMITTED = "submitted"
 READONLY_NOTICE_VIEW_ONLY = "view_only"
 READONLY_NOTICE_ROUND_CLOSED = "round_closed"
+READONLY_NOTICE_UPCOMING = "upcoming"
 READONLY_NOTICE_GENERIC = "generic"
 
 
@@ -95,9 +96,10 @@ def assignment_readonly_notice_reason(
     Priority:
       1. Public submission
       2. Workflow lock (sent for review / approved / submitted)
-      3. Missing assignment.enter (viewer / documents-only)
-      4. Collection round closed for this entity
-      5. Generic fallback
+      3. Project cycle whose reporting window has not opened
+      4. Missing assignment.enter (viewer / documents-only)
+      5. Collection round closed for this entity
+      6. Generic fallback
 
     Viewers must not see the closed-round notice: that copy tells data-entry
     users that only an admin can reopen the form, which is misleading when the
@@ -113,6 +115,11 @@ def assignment_readonly_notice_reason(
         return READONLY_NOTICE_APPROVED
     if status == "submitted":
         return READONLY_NOTICE_SUBMITTED
+
+    from app.services.projects.service import assignment_is_upcoming_cycle
+
+    if assignment_is_upcoming_cycle(assignment_entity_status):
+        return READONLY_NOTICE_UPCOMING
 
     can_enter = False
     if user and getattr(user, "is_authenticated", False) and assignment_entity_status is not None:
@@ -208,13 +215,27 @@ def check_assignment_edit_access(f):
 
             # Check edit permissions
             if not can_edit_assignment(aes, current_user):
-                from app.utils.api.api_serialization import _country_for_aes
-                aes_country = _country_for_aes(aes)
-                entity_display = aes_country.name if aes_country else f"entity {aes.entity_id}"
-                flash(
-                    f"This assignment for {entity_display} is in '{aes.status}' status and cannot be edited by you at this time.",
-                    "warning"
-                )
+                from app.services.projects.service import assignment_is_upcoming_cycle
+
+                if assignment_is_upcoming_cycle(aes):
+                    from flask_babel import _
+
+                    opens = getattr(getattr(aes, "assigned_form", None), "period_start", None)
+                    flash(
+                        _(
+                            "This reporting cycle is upcoming. Data entry opens on %(date)s.",
+                            date=opens.isoformat() if hasattr(opens, "isoformat") else "",
+                        ),
+                        "warning",
+                    )
+                else:
+                    from app.utils.api.api_serialization import _country_for_aes
+                    aes_country = _country_for_aes(aes)
+                    entity_display = aes_country.name if aes_country else f"entity {aes.entity_id}"
+                    flash(
+                        f"This assignment for {entity_display} is in '{aes.status}' status and cannot be edited by you at this time.",
+                        "warning"
+                    )
                 return redirect(url_for("assignments.view_assignment", aes_id=aes.id))
 
             return f(aes_id, *args, **kwargs)

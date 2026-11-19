@@ -10,7 +10,7 @@
     {% set history_events = status_history.events if status_history and status_history.events is defined else none %}
     {% set history_has_more = status_history.has_more if status_history and status_history.has_more is defined else false %}
 
-    {% if status_key == 'cancelled' %}
+    {% if status_key == 'cancelled' or status_key == 'upcoming' %}
         <span class="inline-block align-middle shrink-0" title="{{ assignment_status_step_description(status_key) }}">
             {{ status_label(status_text, status_variant) }}
         </span>

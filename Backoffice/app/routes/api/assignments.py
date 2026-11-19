@@ -19,6 +19,7 @@ from app.utils.database.sql_utils import safe_ilike_pattern
 from app.models import AssignedForm, Country, FormData, FormItem
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue
+from app.services.projects.service import assignment_display_status
 from app.services.organization.authorization_service import AuthorizationService
 from app.utils.auth.auth import api_capability, require_api_key
 from app.services.security.api_key_permissions import SUBMISSIONS_READ
@@ -196,7 +197,7 @@ def get_assigned_forms():
                     'assignment_entity_status_id': status.id,
                     'country_id': country_id,
                     'iso3': country.iso3 if country else None,
-                    'status': status.status,
+                    'status': assignment_display_status(status),
                     'status_timestamp': status.status_timestamp.isoformat() if status.status_timestamp else None,
                     'due_date': status.due_date.isoformat() if status.due_date else None
                 })

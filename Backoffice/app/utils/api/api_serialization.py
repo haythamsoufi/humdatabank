@@ -2323,7 +2323,9 @@ def format_dim_submission_assigned(aes, last_modified_at=None):
     """Dimension row for assigned submissions (AssignmentEntityStatus)."""
     if not aes:
         return None
-    status_val = aes.status.value if hasattr(aes.status, 'value') else aes.status
+    from app.services.projects.service import assignment_display_status
+
+    status_val = assignment_display_status(aes)
     modified = (
         last_modified_at
         if isinstance(last_modified_at, datetime)

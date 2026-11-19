@@ -1147,6 +1147,13 @@ class AuthorizationService:
         if AuthorizationService.is_admin(user):
             return True
 
+        from app.services.projects.service import assignment_is_upcoming_cycle
+
+        # Future project cycles stay pending in the database. Focal points wait
+        # until the reporting window opens; admins can still prepare the form.
+        if assignment_is_upcoming_cycle(assignment_entity_status):
+            return False
+
         # RBAC gate: require assignment.enter
         try:
             scope = {

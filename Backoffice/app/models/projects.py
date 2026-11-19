@@ -11,6 +11,7 @@ from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.extensions import db
+from app.models.assignments import SUBMISSION_REVIEW_RECIPIENT_FDS
 from app.models.enums import EntityType
 from app.utils.common.datetime_helpers import utcnow
 
@@ -149,3 +150,62 @@ class Project(db.Model):
 
     def __repr__(self) -> str:
         return f"<Project {self.reference} country={self.country_id}>"
+
+
+class ProjectAssignment(db.Model):
+    """Shared assignment settings for every report of one project.
+
+    The entry form still reads flags from each ``project_cycle`` ``AssignedForm``.
+    Saving this row copies the shared options onto those reports. Period dates,
+    the due date, and open/closed stay on the individual report.
+    """
+
+    __tablename__ = "project_assignment"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("project.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    custom_name = db.Column(db.String(200), nullable=True)
+    custom_name_translations = db.Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    data_owner_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    requires_delegation_review = db.Column(db.Boolean, default=False, nullable=False)
+    enable_page_submission = db.Column(db.Boolean, default=False, nullable=False)
+    enable_offline_download = db.Column(db.Boolean, default=False, nullable=False)
+    enable_export_excel = db.Column(db.Boolean, default=False, nullable=False)
+    enable_import_excel = db.Column(db.Boolean, default=False, nullable=False)
+    enable_export_pdf = db.Column(db.Boolean, default=False, nullable=False)
+    email_attach_pdf = db.Column(db.Boolean, default=False, nullable=False)
+    email_attach_excel = db.Column(db.Boolean, default=False, nullable=False)
+    submission_review_recipient_mode = db.Column(
+        db.String(20),
+        nullable=False,
+        default=SUBMISSION_REVIEW_RECIPIENT_FDS,
+        server_default=SUBMISSION_REVIEW_RECIPIENT_FDS,
+    )
+    # Access Group ids chosen by an admin. Plugin audiences are added per report on apply.
+    allowed_role_ids = db.Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    review_recipient_user_ids = db.Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    project = db.relationship(
+        "Project",
+        backref=db.backref(
+            "assignment_settings",
+            uselist=False,
+            cascade="all, delete-orphan",
+        ),
+    )
+    data_owner_user = db.relationship("User", foreign_keys=[data_owner_id])
+
+    def role_id_list(self) -> list:
+        raw = self.allowed_role_ids if isinstance(self.allowed_role_ids, list) else []
+        return [int(v) for v in raw if v is not None]
+
+    def reviewer_id_list(self) -> list:
+        raw = self.review_recipient_user_ids if isinstance(self.review_recipient_user_ids, list) else []
+        return [int(v) for v in raw if v is not None]

@@ -3,10 +3,13 @@
 {% from "components/_status_label.html" import status_label_for_active %}
 {% from "macros/translation_modal.html" import translation_modal %}
 
+{% set assignment_mode = assignment_mode if assignment_mode is defined else 'campaign' %}
 {% set can_edit_assignment_details = can_edit_assignment_details if can_edit_assignment_details is defined else (not assignment) %}
 {% set can_manage_assignment_entities = can_manage_assignment_entities if can_manage_assignment_entities is defined else (not assignment) %}
 {% set can_update_assignment_entity_status = can_update_assignment_entity_status if can_update_assignment_entity_status is defined else false %}
-{% if assignment %}
+{% if assignment_mode == 'project' and project is defined %}
+{% set assignment_page_title = project.reference %}
+{% elif assignment %}
 {% set assignment_page_title = _('Edit Assignment: %(name)s', name=assignment.display_name) %}
 {% else %}
 {% set assignment_page_title = _('Create New Assignment') %}
@@ -20,6 +23,9 @@
 {% endblock %}
 
 {% block content %}
+{% if assignment_mode == 'project' %}
+{% include "admin/assignments/_project_mode.html" %}
+{% else %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "macros/year_picker.html" import year_picker %}
@@ -51,7 +57,8 @@
 
 {% set resolved_entity_types = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
 {% set has_countries = 'countries' in resolved_entity_types %}
-{% set has_projects = 'projects' in resolved_entity_types %}
+{# Projects are their own rows on the Assignments list, not entities added to a campaign. #}
+{% set has_projects = false %}
 {% set has_ns_structure = 'ns_structure' in resolved_entity_types %}
 {% set has_secretariat = 'secretariat' in resolved_entity_types %}
 {% set entity_tabs = namespace(order=[]) %}
@@ -373,113 +380,8 @@
             {% endfor %}
         </div>
 
-        {# Submission review notification #}
-        {% if form.submission_review_recipient_mode is defined %}
-        <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <fieldset>
-                <legend class="block text-gray-700 text-sm font-semibold mb-3">
-                    {{ _('Submission review notification') }}
-                    <span class="ml-1 text-gray-400" title="{{ _('Who receives the review request when a focal point submits this assignment.')|forceescape }}">
-                        <i class="fas fa-info-circle text-xs"></i>
-                    </span>
-                </legend>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label class="flex items-start gap-2 cursor-pointer">
-                        <input type="radio"
-                               name="{{ form.submission_review_recipient_mode.name }}"
-                               value="fds_member"
-                               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                               {% if (form.submission_review_recipient_mode.data or 'fds_member') == 'fds_member' %}checked{% endif %}>
-                        <span>
-                            <span class="text-sm text-gray-800 font-medium">{{ _('Designated FDS member') }}</span>
-                            <span class="block text-xs text-gray-500">{{ _('Notify the FDS member assigned to the submitting country (default).') }}</span>
-                        </span>
-                    </label>
-                    <label class="flex items-start gap-2 cursor-pointer">
-                        <input type="radio"
-                               name="{{ form.submission_review_recipient_mode.name }}"
-                               value="specific_admin"
-                               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                               {% if form.submission_review_recipient_mode.data == 'specific_admin' %}checked{% endif %}>
-                        <span>
-                            <span class="text-sm text-gray-800 font-medium">{{ _('Specific IFRC admin(s)') }}</span>
-                            <span class="block text-xs text-gray-500">{{ _('Choose one or more admins responsible for reviewing submissions for this assignment.') }}</span>
-                        </span>
-                    </label>
-                </div>
-                <div id="submission-review-user-picker"
-                     class="mt-4 {% if form.submission_review_recipient_mode.data != 'specific_admin' %}hidden{% endif %}">
-                    <label for="submission-review-user-search" class="block text-sm font-medium text-gray-700 mb-1">
-                        {{ _('Reviewers') }}
-                    </label>
-                    <div class="relative max-w-xl">
-                        <input type="text"
-                               id="submission-review-user-search"
-                               class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                               placeholder="{{ _('Search by name or email...')|forceescape }}"
-                               autocomplete="off">
-                        <div id="submission-review-user-results"
-                             class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
-                    </div>
-                    <div id="submission-review-selected-users" class="mt-3 min-h-[2rem] flex flex-wrap gap-2"></div>
-                    <input type="hidden"
-                           name="{{ form.submission_review_recipient_user_ids.name }}"
-                           id="submission_review_recipient_user_ids"
-                           value="{{ form.submission_review_recipient_user_ids.data or '' }}">
-                    {% for error in form.submission_review_recipient_user_ids.errors %}
-                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                    {% endfor %}
-                </div>
-            </fieldset>
-        </div>
-        {% endif %}
-
-        {# Access control: restrict the assignment to members of selected Access Groups #}
-        {% if assignment_access_roles is defined and (can_manage_assignment_access or selected_allowed_role_ids) %}
-        <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200" id="assignment-access-control">
-            <fieldset {% if not can_manage_assignment_access %}disabled{% endif %}>
-                <legend class="block text-gray-700 text-sm font-semibold mb-1">
-                    {{ _('Who can access this assignment') }}
-                </legend>
-                <p class="text-xs text-gray-500 mb-3">
-                    {% if selected_allowed_role_ids %}
-                        {{ _('Restricted to these access groups. A user must belong to at least one of them, including users with no personal assignment limit. Entity permissions still apply.') }}
-                    {% else %}
-                        {{ _('No group limit. Anyone with access to the assigned entities can open this assignment, unless that person has a personal shortlist that leaves it out.') }}
-                    {% endif %}
-                    {{ _('System Managers always have access. Permission roles are not an audience.') }}
-                </p>
-                <input type="hidden" name="allowed_roles_submitted" value="1">
-                {% if assignment_access_roles %}
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
-                    {% for role in assignment_access_roles %}
-                    <label class="flex items-start gap-2 cursor-pointer rounded border border-gray-200 bg-white px-3 py-2">
-                        <input type="checkbox"
-                               name="allowed_role_ids"
-                               value="{{ role.id }}"
-                               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                               {% if role.id in selected_allowed_role_ids %}checked{% endif %}>
-                        <span class="min-w-0">
-                            <span class="block text-sm text-gray-800 font-medium truncate">{{ role.name }}</span>
-                            <span class="block text-xs text-gray-500 truncate">{{ role.code }}</span>
-                        </span>
-                    </label>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-sm text-gray-500 italic">
-                    {{ _('No access groups exist yet. Create a group such as Finance or HR to restrict this assignment to it.') }}
-                </p>
-                {% endif %}
-                {% if current_user_has_role('system_manager') %}
-                <p class="mt-2 text-xs text-gray-500">
-                    {{ _('Need a new group such as Finance or HR?') }}
-                    <a href="{{ url_for('rbac_management.manage_groups') }}" class="text-blue-600 hover:underline">{{ _('Create an access group') }}</a>
-                </p>
-                {% endif %}
-            </fieldset>
-        </div>
-        {% endif %}
+        {% include "admin/assignments/_assignment_review_notification.html" %}
+        {% include "admin/assignments/_assignment_access_control.html" %}
 
         {# Hidden fields for country selections (for new assignments) - populated from Entity Assignments tab #}
         {% if not assignment %}
@@ -685,102 +587,7 @@
 
         {% if assignment %}
         <div class="mt-6 border-t border-gray-200 pt-6 space-y-4">
-            {% if form.requires_delegation_review is defined %}
-            <div class="flex items-start gap-3">
-                <div class="pt-0.5">
-                    {{ form.requires_delegation_review(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.requires_delegation_review.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.enable_page_submission is defined %}
-            <div class="flex items-start gap-3">
-                <div class="pt-0.5">
-                    {{ form.enable_page_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-page-mode-toggle", **{'data-scoped-mode': 'page', 'data-initial-page-mode': '1' if assignment.enable_page_submission else '0'}) }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_page_submission.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points submit each page independently instead of the whole form at once. Save still writes the whole form. Applies to paginated templates.') }}</p>
-                    <p class="mt-1 text-xs text-amber-800">{{ _('Changing this asks for confirmation. Turning it off unlocks pages that were submitted while the assignment is still in progress, and keeps submitted/approved assignment statuses. Turning it on gives each page a status that matches the entity (existing submitted pages stay locked).') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.enable_export_excel is defined %}
-            <div class="flex items-start gap-3" id="assignment-export-excel-row">
-                <div class="pt-0.5">
-                    {{ form.enable_export_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_excel") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_export_excel.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel export button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.enable_import_excel is defined %}
-            <div class="flex items-start gap-3" id="assignment-import-excel-row">
-                <div class="pt-0.5">
-                    {{ form.enable_import_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_import_excel") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_import_excel.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel import button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.enable_export_pdf is defined %}
-            <div class="flex items-start gap-3" id="assignment-export-pdf-row">
-                <div class="pt-0.5">
-                    {{ form.enable_export_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_pdf") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_export_pdf.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Export PDF button on the entry form.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.email_attach_pdf is defined %}
-            <div class="flex items-start gap-3" id="assignment-email-attach-pdf-row">
-                <div class="pt-0.5">
-                    {{ form.email_attach_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_pdf") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.email_attach_pdf.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach the same PDF as the entry-form export to the emails sent when an entity submits or is approved.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.email_attach_excel is defined %}
-            <div class="flex items-start gap-3" id="assignment-email-attach-excel-row">
-                <div class="pt-0.5">
-                    {{ form.email_attach_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_excel") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.email_attach_excel.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach a filled Excel snapshot to those emails. A custom workbook is used when a plugin already has one set up for this assignment; otherwise the generic item-row workbook is used. Independent of the Export Excel button.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.enable_offline_download is defined %}
-            <div class="flex items-start gap-3" id="assignment-offline-download-row">
-                <div class="pt-0.5">
-                    {{ form.enable_offline_download(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_offline_download") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_offline_download.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save this form in the mobile app and open it without a connection. Leave this off for assignments that should only be completed online.') }}</p>
-                </div>
-            </div>
-            {% endif %}
+            {% include "admin/assignments/_assignment_option_flags.html" %}
         </div>
         {% endif %}
 
@@ -908,18 +715,6 @@
                                 <i class="fas fa-flag mr-2"></i>Countries
                             </button>
                         {% endif %}
-                        {% if has_projects %}
-                        {% set is_projects_subtab_active = default_add_entities_subtab == 'projects' %}
-                            <button class="{{ admin_underline_tab_btn_classes(is_projects_subtab_active) }}"
-                                    id="add-entities-projects-tab"
-                                    data-tabs-target="#add-entities-projects-panel"
-                                    type="button"
-                                    role="tab"
-                                    aria-controls="add-entities-projects-panel"
-                                    aria-selected="{{ 'true' if is_projects_subtab_active else 'false' }}">
-                                <i class="fas fa-folder-open mr-2"></i>{{ _('Projects') }}
-                            </button>
-                        {% endif %}
                         {% if has_secretariat %}
                         {% set is_secretariat_subtab_active = default_add_entities_subtab == 'secretariat' %}
                             <button class="{{ admin_underline_tab_btn_classes(is_secretariat_subtab_active) }}"
@@ -1008,63 +803,6 @@
 
 
                 </form>
-                    </div>
-                    {% endif %}
-
-                    {# Projects Sub-tab #}
-                    {% if has_projects %}
-                    {% set is_projects_subtab_active = default_add_entities_subtab == 'projects' %}
-                    <div class="{% if show_add_entities_subtabs and not is_projects_subtab_active %}hidden{% endif %}" id="add-entities-projects-panel" role="tabpanel" aria-labelledby="add-entities-projects-tab">
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Assign Projects') }}</label>
-                            <p class="text-sm text-gray-600 mb-3">
-                                {{ _('Select projects to add to this assignment. Create projects under Admin → Projects first.') }}
-                                <a href="{{ url_for('project_management.project_list') }}" class="text-blue-600 hover:underline">{{ _('Manage projects') }}</a>
-                            </p>
-                        </div>
-                        {% if assignment %}
-                        <form id="add-projects-form" action="{{ url_for('assignment_management.add_projects_to_assignment', assignment_id=assignment.id) }}" method="POST">
-                            {{ form.csrf_token }}
-                            <div class="p-4 border border-gray-200 rounded-md bg-white max-h-96 overflow-y-auto">
-                                {% set assigned_project_ids = assignment_project_ids if assignment_project_ids is defined else [] %}
-                                {% set projects_for_assign = projects_for_assign if projects_for_assign is defined else [] %}
-                                {% if projects_for_assign %}
-                                <div class="flex items-center mb-3 pb-3 border-b border-gray-200">
-                                    <input type="checkbox" id="select-all-projects-entity" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                           onclick="document.querySelectorAll('.project-checkbox-entity:not(:disabled)').forEach(function(cb){ cb.checked = this.checked; }.bind(this))">
-                                    <label for="select-all-projects-entity" class="ml-2 text-sm font-bold text-gray-800">{{ _('Select all') }}</label>
-                                </div>
-                                {% for p in projects_for_assign %}
-                                {% set already = p.id in assigned_project_ids %}
-                                <div class="flex items-center mb-2">
-                                    <input type="checkbox" name="project_ids" id="project-entity-{{ p.id }}" value="{{ p.id }}"
-                                           class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 project-checkbox-entity"
-                                           {% if already %}checked disabled{% endif %}>
-                                    <label for="project-entity-{{ p.id }}" class="ml-2 text-sm {% if already %}text-gray-500{% else %}text-gray-900{% endif %}">
-                                        <span class="font-medium">{{ p.reference }}</span>
-                                        {% if p.title %} — {{ p.title }}{% endif %}
-                                        <span class="text-gray-500">({{ p.country_name }})</span>
-                                        {% if already %}<span class="ml-1 text-xs text-blue-600">({{ _('assigned') }})</span>{% endif %}
-                                    </label>
-                                </div>
-                                {% endfor %}
-                                {% else %}
-                                <p class="text-sm text-gray-600">{{ _('No projects yet.') }}
-                                    <a href="{{ url_for('project_management.project_new') }}" class="text-blue-600 hover:underline">{{ _('Create a project') }}</a>
-                                </p>
-                                {% endif %}
-                            </div>
-                            {% if projects_for_assign %}
-                            <div class="mt-4">
-                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">
-                                    {{ _('Add selected projects') }}
-                                </button>
-                            </div>
-                            {% endif %}
-                        </form>
-                        {% else %}
-                        <p class="text-sm text-gray-600">{{ _('Save the assignment first, then add projects.') }}</p>
-                        {% endif %}
                     </div>
                     {% endif %}
 
@@ -1336,9 +1074,62 @@
 {% endif %}
 
 
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+{% if assignment_mode == 'project' %}
+<script src="{{ static_url('js/form_builder/modules/utils.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+window.manageAssignmentConfig = {
+    assignmentId: null,
+    permissions: {
+        canEditDetails: {{ (can_edit if can_edit is defined else false)|tojson }},
+        canManageEntities: false,
+        canUpdateEntityStatus: false
+    },
+    urls: {
+        adminBase: {{ url_for('admin.admin_dashboard')|tojson }},
+        reviewRecipientSearch: {{ url_for('assignment_management.api_search_submission_review_recipients')|tojson }}
+    },
+    t: {
+        clearReviewer: {{ _('Remove')|tojson }},
+        searchMinChars: {{ _('Type at least 2 characters to search.')|tojson }},
+        noUsersFound: {{ _('No users found.')|tojson }}
+    },
+    submissionReviewRecipient: {
+        mode: {{ (form.submission_review_recipient_mode.data if form is defined and form.submission_review_recipient_mode is defined else 'fds_member')|tojson }},
+        users: {% if submission_review_recipient_users is defined and submission_review_recipient_users %}[
+            {% for reviewer in submission_review_recipient_users %}
+            {
+                id: {{ reviewer.id|tojson }},
+                name: {{ (reviewer.name or reviewer.email)|tojson }},
+                email: {{ reviewer.email|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]{% else %}[]{% endif %}
+    }
+};
+</script>
+<script src="{{ static_url('js/admin/manage-assignment.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ static_url('js/admin/projects-inline.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var root = document.querySelector('[data-project-initial-tab]');
+    var initial = root ? root.getAttribute('data-project-initial-tab') : 'overview';
+    var tabs = document.querySelectorAll('#project-assignment-tabs .settings-tab');
+    function activate(tabId) {
+        if (window.AdminUnderlineTabs) {
+            window.AdminUnderlineTabs.activateStripTab('#project-assignment-tabs', tabId, { panelSelector: '.settings-panel' });
+        }
+    }
+    tabs.forEach(function (btn) {
+        btn.addEventListener('click', function () { activate(this.getAttribute('data-tab')); });
+    });
+    if (initial && initial !== 'overview') activate(initial);
+})();
+</script>
+{% else %}
 <!-- AG Grid JS -->
 {% from "components/ag_grid_includes.html" import ag_grid_js %}
 {{ ag_grid_js() }}
@@ -1830,4 +1621,5 @@ document.querySelectorAll('.js-page-mode-toggle').forEach((input) => {
 }
 </style>
 <script src="{{ static_url('js/components/hierarchical-entity-selector.js') }}"></script>
+{% endif %}
 {% endblock %}

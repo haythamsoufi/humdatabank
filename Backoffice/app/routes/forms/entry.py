@@ -756,8 +756,20 @@ def handle_assignment_form(aes_id):
         is_ajax = is_json_request()
 
         if not can_edit:
-             entity_name = EntityService.get_entity_display_name(assignment_entity_status.entity_type, assignment_entity_status.entity_id)
-             flash(_("This assignment for %(entity)s is in '%(status)s' status and cannot be edited by you at this time.", entity=entity_name, status=assignment_entity_status.status), "warning")
+             from app.services.projects.service import assignment_is_upcoming_cycle
+
+             if assignment_is_upcoming_cycle(assignment_entity_status):
+                 opens = assignment.period_start
+                 flash(
+                     _(
+                         "This reporting cycle is upcoming. Data entry opens on %(date)s.",
+                         date=opens.isoformat() if opens else "",
+                     ),
+                     "warning",
+                 )
+             else:
+                 entity_name = EntityService.get_entity_display_name(assignment_entity_status.entity_type, assignment_entity_status.entity_id)
+                 flash(_("This assignment for %(entity)s is in '%(status)s' status and cannot be edited by you at this time.", entity=entity_name, status=assignment_entity_status.status), "warning")
              return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
 
         if csrf_form.validate_on_submit():

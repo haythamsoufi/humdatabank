@@ -322,7 +322,8 @@ def apply_assignment_access(query, user, assigned_form_id_column):
 def campaign_only(query):
     """Exclude per-project report cycles from campaign assignment lists and counts.
 
-    Project-cycle rows are managed from Admin → Projects, not Manage Assignments.
+    Project-cycle rows are not campaign assignments. The Assignments list adds one
+    project row per project instead of listing each report.
     """
     from app.models.enums import AssignmentScope
 

@@ -1,0 +1,98 @@
+{# Export, email, page, and offline options. Shared by an existing campaign and by project settings. #}
+{% set page_mode_on = settings.enable_page_submission if settings is defined and settings else (assignment.enable_page_submission if assignment else false) %}
+{% if form.requires_delegation_review is defined %}
+<div class="flex items-start gap-3">
+    <div class="pt-0.5">
+        {{ form.requires_delegation_review(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.requires_delegation_review.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if form.enable_page_submission is defined %}
+<div class="flex items-start gap-3">
+    <div class="pt-0.5">
+        {{ form.enable_page_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-page-mode-toggle", **{'data-scoped-mode': 'page', 'data-initial-page-mode': '1' if page_mode_on else '0'}) }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.enable_page_submission.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points submit each page independently instead of the whole form at once. Save still writes the whole form. Applies to paginated templates.') }}</p>
+        <p class="mt-1 text-xs text-amber-800">{{ _('Changing this asks for confirmation. Turning it off unlocks pages that were submitted while the assignment is still in progress, and keeps submitted/approved assignment statuses. Turning it on gives each page a status that matches the entity (existing submitted pages stay locked).') }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if form.enable_export_excel is defined %}
+<div class="flex items-start gap-3" id="assignment-export-excel-row">
+    <div class="pt-0.5">
+        {{ form.enable_export_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_excel") }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.enable_export_excel.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel export button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if form.enable_import_excel is defined %}
+<div class="flex items-start gap-3" id="assignment-import-excel-row">
+    <div class="pt-0.5">
+        {{ form.enable_import_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_import_excel") }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.enable_import_excel.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel import button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if form.enable_export_pdf is defined %}
+<div class="flex items-start gap-3" id="assignment-export-pdf-row">
+    <div class="pt-0.5">
+        {{ form.enable_export_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_pdf") }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.enable_export_pdf.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Export PDF button on the entry form.') }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if form.email_attach_pdf is defined %}
+<div class="flex items-start gap-3" id="assignment-email-attach-pdf-row">
+    <div class="pt-0.5">
+        {{ form.email_attach_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_pdf") }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.email_attach_pdf.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach the same PDF as the entry-form export to the emails sent when an entity submits or is approved.') }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if form.email_attach_excel is defined %}
+<div class="flex items-start gap-3" id="assignment-email-attach-excel-row">
+    <div class="pt-0.5">
+        {{ form.email_attach_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_excel") }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.email_attach_excel.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach a filled Excel snapshot to those emails. A custom workbook is used when a plugin already has one set up for this assignment; otherwise the generic item-row workbook is used. Independent of the Export Excel button.') }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if form.enable_offline_download is defined %}
+<div class="flex items-start gap-3" id="assignment-offline-download-row">
+    <div class="pt-0.5">
+        {{ form.enable_offline_download(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_offline_download") }}
+    </div>
+    <div class="min-w-0 flex-1">
+        {{ form.enable_offline_download.label(class="text-sm font-medium text-gray-800") }}
+        <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save this form in the mobile app and open it without a connection. Leave this off for assignments that should only be completed online.') }}</p>
+    </div>
+</div>
+{% endif %}

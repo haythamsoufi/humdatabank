@@ -53,8 +53,10 @@ REQUIRED_PERMISSION_BY_ENDPOINT = {
 }
 
 # Routes that are deliberately guarded by a non-``admin.*`` permission (document/assignment
-# permissions evaluated with their own scope rules). Everything else must use ``admin.*`` codes.
-NON_ADMIN_PERMISSION_ALLOWLIST_PREFIXES = ("assignment.", "documents.", "document.")
+# permissions evaluated with their own scope rules, and the NSD project-manager overview,
+# which opens that person's projects on the Assignments list). Everything else must use
+# ``admin.*`` codes.
+NON_ADMIN_PERMISSION_ALLOWLIST_PREFIXES = ("assignment.", "documents.", "document.", "nsd_funds.")
 
 # Prefixes outside ``/admin`` that the audit inspects because they serve privileged content.
 EXTRA_AUDITED_PATH_PREFIXES = ("/plugins/static",)

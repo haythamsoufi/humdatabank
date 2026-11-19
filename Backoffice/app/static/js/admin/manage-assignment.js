@@ -294,11 +294,12 @@
             togglePeriodFields();
         }
 
-        // Event listeners
+        // Event listeners. Project settings have no fixed period, so this block is absent there.
+        if (periodTypeSelect && hiddenPeriodNameField) {
         periodTypeSelect.addEventListener('change', togglePeriodFields);
         yearFields.forEach(bindYearFieldListeners);
-        startMonthSelect.addEventListener('change', generatePeriodName);
-        endMonthSelect.addEventListener('change', generatePeriodName);
+        if (startMonthSelect) startMonthSelect.addEventListener('change', generatePeriodName);
+        if (endMonthSelect) endMonthSelect.addEventListener('change', generatePeriodName);
 
         // Remove required attribute from hidden period_name field to prevent browser validation
         // (we handle validation with JavaScript instead)
@@ -319,6 +320,7 @@
             if (endMonthSelect) endMonthSelect.value = '12';
             togglePeriodFields();
             generatePeriodName();
+        }
         }
 
         // --- Modal Handling ---
@@ -744,7 +746,7 @@
                 maxWidth: 500,
                 filter: 'agTextColumnFilter',
                 sortable: true,
-                cellRenderer: AgGridRenderers.link('assignment_url')
+                cellRenderer: window.AgGridRenderers ? window.AgGridRenderers.link('assignment_url') : undefined
             },
             {
                 field: 'fds_member_name',
@@ -754,7 +756,7 @@
                 maxWidth: 300,
                 filter: 'agTextColumnFilter',
                 sortable: true,
-                cellStyle: AgGridRenderers.userHoverCellStyle,
+                cellStyle: window.AgGridRenderers ? window.AgGridRenderers.userHoverCellStyle : undefined,
                 valueGetter: function(params) {
                     return params.data && params.data.fds_member_name ? params.data.fds_member_name : '';
                 },
@@ -803,7 +805,7 @@
                 maxWidth: 300,
                 filter: 'agTextColumnFilter',
                 sortable: true,
-                cellStyle: AgGridRenderers.userHoverCellStyle,
+                cellStyle: window.AgGridRenderers ? window.AgGridRenderers.userHoverCellStyle : undefined,
                 valueGetter: function(params) {
                     return params.data && params.data.status_changed_by_name ? params.data.status_changed_by_name : '';
                 },
@@ -862,7 +864,7 @@
                 minWidth: 120,
                 maxWidth: 200,
                 filter: 'agDateColumnFilter',
-                filterParams: AgGridRenderers.dateFilterParams,
+                filterParams: window.AgGridRenderers ? window.AgGridRenderers.dateFilterParams : undefined,
                 sortable: true,
                 cellRenderer: function(params) {
                     if (!params.value) return '<span class="text-gray-400 italic">Not set</span>';
@@ -4235,7 +4237,7 @@
     const exportExcelCheckbox = document.getElementById('enable_export_excel');
     const importExcelCheckbox = document.getElementById('enable_import_excel');
     const exportPdfCheckbox = document.getElementById('enable_export_pdf');
-    if (!templateSelect) return;
+    if (!templateSelect || !(cfg.urls && cfg.urls.templateOwnedByBase)) return;
 
     let exportExcelUserTouched = exportExcelCheckbox ? exportExcelCheckbox.checked : false;
     let importExcelUserTouched = importExcelCheckbox ? importExcelCheckbox.checked : false;
@@ -4295,15 +4297,12 @@
         }
     }
 
-    // On template change (new assignment form)
-    templateSelect.addEventListener('change', function () {
-        prefillDataOwnerFromTemplate(this.value);
-    });
-
-    // Auto-trigger on page load for new assignments with a pre-selected template: keeps
-    // Excel/PDF defaults in sync regardless of whether a data-owner field is present.
-    if (!cfg.assignmentId) {
-        if (templateSelect.value) {
+    // On template change (new assignment form). Absent on the project settings page.
+    if (templateSelect) {
+        templateSelect.addEventListener('change', function () {
+            prefillDataOwnerFromTemplate(this.value);
+        });
+        if (!cfg.assignmentId && templateSelect.value) {
             prefillDataOwnerFromTemplate(templateSelect.value);
         }
     }

@@ -20,6 +20,72 @@ from app.models.assignments import (
 )
 
 
+class AssignmentSharedSettingsMixin:
+    """Options stored on a campaign assignment and on a project's shared settings."""
+
+    custom_name = StringField("Custom Name (optional)", validators=[Optional()])
+    data_owner_id = SelectField(
+        "Data Owner",
+        coerce=lambda x: int(x) if x and str(x).isdigit() else None,
+        validators=[Optional()],
+    )
+    requires_delegation_review = BooleanField(
+        "Require delegation review before final submission",
+        default=False,
+    )
+    enable_page_submission = BooleanField(
+        "Allow save and submit per page",
+        default=False,
+    )
+    enable_offline_download = BooleanField(
+        "Allow offline download in the mobile app",
+        default=False,
+    )
+    enable_export_excel = BooleanField("Enable Export Excel button", default=False)
+    enable_import_excel = BooleanField("Enable Import Excel button", default=False)
+    enable_export_pdf = BooleanField("Enable Export PDF button", default=False)
+    email_attach_pdf = BooleanField(
+        "Attach a PDF summary to submit and approve emails",
+        default=False,
+    )
+    email_attach_excel = BooleanField(
+        "Attach a filled Excel snapshot to submit and approve emails",
+        default=False,
+    )
+    submission_review_recipient_mode = SelectField(
+        "Submission review notification",
+        choices=[
+            (SUBMISSION_REVIEW_RECIPIENT_FDS, "Designated FDS member for the submitting country"),
+            (SUBMISSION_REVIEW_RECIPIENT_SPECIFIC, "Specific IFRC admin(s)"),
+        ],
+        default=SUBMISSION_REVIEW_RECIPIENT_FDS,
+    )
+    submission_review_recipient_user_ids = HiddenField(validators=[Optional()])
+
+    def bind_data_owner_choices(self):
+        active_users = User.query.filter_by(active=True).order_by(User.name).all()
+        self.data_owner_id.choices = [("", "— Select data owner —")] + [
+            (user.id, f"{user.name} ({user.email})") for user in active_users
+        ]
+
+
+class ProjectAssignmentSettingsForm(AssignmentSharedSettingsMixin, FlaskForm):
+    """Shared settings for every report of one project."""
+
+    submit = SubmitField("Save settings")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bind_data_owner_choices()
+
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators):
+            return False
+        from app.routes.admin.assignment_management import _validate_submission_review_recipient_form
+
+        return _validate_submission_review_recipient_form(self)
+
+
 class AssignedFormForm(BaseForm):
     """Form for creating a new Assigned Form (Assignment)."""
 

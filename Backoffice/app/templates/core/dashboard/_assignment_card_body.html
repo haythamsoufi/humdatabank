@@ -48,11 +48,12 @@
                                         {# Primary status line with inline attribution (flex keeps badge + date on one row when possible) #}
                                         <div class="text-sm text-gray-600 mb-1 flex flex-wrap items-center gap-x-1 gap-y-0.5">
                                             <span class="whitespace-nowrap">{{ _('Status') }}:</span>
+                                            {% set _card_status = assignment_display_status(item.item_object) %}
                                             {{ assignment_status_pipeline_badge(
-                                                item.status,
+                                                _card_status,
                                                 item.item_object.is_round_closed_for_entity(),
                                                 _ui_language,
-                                                item.item_object
+                                                item.item_object if _card_status != 'upcoming' else none
                                             ) }}
                                             {# Inline: "by: <user> at: <time>" for the current status actor #}
                                             {% if item.status == 'approved' and item.approved_by_user is defined and item.approved_by_user %}

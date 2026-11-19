@@ -1,0 +1,107 @@
+{# Reports of one project. Dates and open/closed are per report; other settings are on the project. #}
+<div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+        <h2 class="text-lg font-semibold text-gray-900">{{ _('Reports') }}</h2>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Each report is what focal points open. Period dates, the due date, and open or closed are set here.') }}</p>
+    </div>
+    {% if can_edit and (available_report_types or manual_templates) %}
+    <form method="post" action="{{ url_for('project_assignments.project_add_report', project_id=project.id) }}" class="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if available_report_types %}
+        <div>
+            <label for="report-slot" class="block text-xs font-semibold text-gray-500 uppercase">{{ _('Add report') }}</label>
+            <select id="report-slot" name="slot" class="mt-1 border border-gray-300 rounded-sm text-sm px-2 py-1.5">
+                {% for item in available_report_types %}
+                <option value="{{ item.slot }}" {% if not item.template_id %}disabled{% endif %}>{{ item.label or item.slot }}{% if not item.template_id %} — {{ _('template not published') }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% else %}
+        <div>
+            <label for="report-slot" class="block text-xs font-semibold text-gray-500 uppercase">{{ _('Slot') }}</label>
+            <input id="report-slot" name="slot" class="mt-1 border border-gray-300 rounded-sm text-sm px-2 py-1.5" placeholder="Y1Q1" required>
+        </div>
+        <div>
+            <label for="report-template" class="block text-xs font-semibold text-gray-500 uppercase">{{ _('Template') }}</label>
+            <select id="report-template" name="template_id" class="mt-1 border border-gray-300 rounded-sm text-sm px-2 py-1.5" required>
+                {% for template in manual_templates %}
+                <option value="{{ template.id }}">{{ template.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div>
+            <label for="report-due" class="block text-xs font-semibold text-gray-500 uppercase">{{ _('Due date') }}</label>
+            <input id="report-due" type="date" name="due_date" class="mt-1 border border-gray-300 rounded-sm text-sm px-2 py-1.5">
+        </div>
+        <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-sm text-sm font-medium">{{ _('Add') }}</button>
+    </form>
+    {% elif can_edit %}
+    <p class="text-sm text-gray-500">{{ _('Every report offered for this project is already on the list.') }}</p>
+    {% endif %}
+</div>
+
+{% if reports %}
+<div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+        <thead>
+            <tr class="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
+                <th class="py-2 pr-3">{{ _('Report') }}</th>
+                <th class="py-2 pr-3">{{ _('Template') }}</th>
+                <th class="py-2 pr-3">{{ _('Period') }}</th>
+                <th class="py-2 pr-3">{{ _('Due') }}</th>
+                <th class="py-2 pr-3">{{ _('Status') }}</th>
+                <th class="py-2 pr-3">{{ _('Completion') }}</th>
+                {% if can_edit %}<th class="py-2 pr-3">{{ _('Actions') }}</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr class="border-b border-gray-100 align-top">
+                <td class="py-3 pr-3 font-medium text-gray-900">
+                    {% if report.aes_id %}
+                    <a href="{{ url_for('assignments.view_assignment', aes_id=report.aes_id) }}" class="text-blue-700 hover:underline">{{ report.slot }}</a>
+                    {% else %}{{ report.slot }}{% endif %}
+                    {% if report.closed %}<span class="ml-1 text-xs text-amber-700">{{ _('Closed') }}</span>{% endif %}
+                    {% if report.note %}<div class="text-xs text-gray-500 mt-1">{{ report.note }}</div>{% endif %}
+                </td>
+                <td class="py-3 pr-3 text-gray-700">{{ report.template_name or '—' }}</td>
+                <td class="py-3 pr-3 text-gray-700">
+                    {% if can_edit %}
+                    <form method="post" action="{{ url_for('project_assignments.project_report_dates', project_id=project.id, assignment_id=report.assignment_id) }}" class="flex flex-wrap gap-1 items-center">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="date" name="period_start" value="{{ report.start.isoformat() if report.start else '' }}" class="border border-gray-300 rounded-sm text-xs px-1 py-1" aria-label="{{ _('Period start') }}">
+                        <input type="date" name="period_end" value="{{ report.end.isoformat() if report.end else '' }}" class="border border-gray-300 rounded-sm text-xs px-1 py-1" aria-label="{{ _('Period end') }}">
+                        <input type="date" name="due_date" value="{{ report.due.strftime('%Y-%m-%d') if report.due else '' }}" class="border border-gray-300 rounded-sm text-xs px-1 py-1" aria-label="{{ _('Due date') }}">
+                        <button type="submit" class="text-xs font-semibold text-blue-700 hover:underline">{{ _('Save') }}</button>
+                    </form>
+                    {% else %}
+                    {{ report.start.isoformat() if report.start else '—' }} – {{ report.end.isoformat() if report.end else '—' }}
+                    {% endif %}
+                </td>
+                <td class="py-3 pr-3 text-gray-700">{{ report.due.strftime('%Y-%m-%d') if report.due else '—' }}</td>
+                <td class="py-3 pr-3 text-gray-700">{{ report.status or '—' }}</td>
+                <td class="py-3 pr-3 text-gray-700">{% if report.completion is not none %}{{ report.completion }}%{% else %}—{% endif %}</td>
+                {% if can_edit %}
+                <td class="py-3 pr-3 whitespace-nowrap">
+                    {% if report.closed %}
+                    <form method="post" action="{{ url_for('project_assignments.project_report_reopen', project_id=project.id, assignment_id=report.assignment_id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="text-xs font-semibold text-blue-700 hover:underline">{{ _('Reopen') }}</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{{ url_for('project_assignments.project_report_close', project_id=project.id, assignment_id=report.assignment_id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="text-xs font-semibold text-amber-700 hover:underline">{{ _('Close') }}</button>
+                    </form>
+                    {% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-sm text-gray-500">{{ _('No reports yet for this project.') }}</p>
+{% endif %}

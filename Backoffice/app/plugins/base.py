@@ -495,6 +495,30 @@ class BasePlugin(ABC):
         """
         return {}
 
+    def get_project_report_types(self, project: Any) -> List[Dict[str, Any]]:
+        """Report slots this plugin can add for ``project``.
+
+        Return an empty list when the project is not this plugin's. Each item is
+        ``{"slot", "label", "template_id", "kind", "period_start", "period_end", "due_date", "note"}``.
+        ``template_id`` may be None when the form is not published yet.
+        """
+        return []
+
+    def get_project_admin_summary(self, project: Any) -> Optional[Dict[str, Any]]:
+        """Extra fields for the project assignment page (expenditure, outcomes, overview).
+
+        Return None when the project is not this plugin's. Core merges the first summary it gets.
+        """
+        return None
+
+    def project_report_audience(self, project: Any, slot: str) -> List[int]:
+        """Access Group role ids this plugin requires on the report for ``slot``.
+
+        Added on top of the groups an admin picked for the project. Return an empty
+        list when the project or slot is not this plugin's.
+        """
+        return []
+
     def get_national_society_columns(self) -> List[NationalSocietyGridColumn]:
         """Columns this plugin adds to Admin → Organization → National Societies."""
         return []

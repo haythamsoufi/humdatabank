@@ -1,0 +1,186 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+{% block title %}{{ portfolio_label }}{% endblock %}
+
+{% block content %}
+{% set settings_tab_first = form.errors %}
+{% set header_actions = namespace(items=[]) %}
+{% if can_edit %}
+{% set __ = header_actions.items.append({
+    'type': 'submit',
+    'text': _('Save settings'),
+    'classes': 'professional-action-btn professional-action-btn-blue' ~ ('' if settings_tab_first else ' hidden'),
+    'attributes': {'form': 'portfolioSettingsForm', 'id': 'portfolioSaveSettingsBtn'}
+}) %}
+{% endif %}
+
+{{ page_header(
+    title=portfolio_label,
+    subtitle=_('%(n)s country projects', n=country_rows|length),
+    icon='fas fa-diagram-project',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Assignments'), 'url': url_for('assignment_management.manage_assignments', type='project')},
+        {'name': portfolio_label}
+    ],
+    actions=header_actions.items,
+    pin_actions_on_scroll=can_edit,
+    pin_actions_active=settings_tab_first,
+    info_tooltip=_('One record for this programme. Country projects are listed here. Saving settings applies them to every country project and its reports.')
+) }}
+
+<div class="bg-white shadow-md border border-gray-200 mb-8">
+    {% call scroll_tab_bar(inner_id='portfolio-tabs', aria_label=_('Programme sections')) %}
+        <button type="button" role="tab" data-tab="countries" aria-selected="true" class="{{ admin_underline_tab_btn_classes(true) }}">
+            <i class="fas fa-flag mr-1.5"></i>{{ _('Country projects') }}
+        </button>
+        <button type="button" role="tab" data-tab="monitoring" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-chart-line mr-1.5"></i>{{ _('Monitoring') }}
+        </button>
+        <button type="button" role="tab" data-tab="settings" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-sliders mr-1.5"></i>{{ _('Settings') }}
+        </button>
+    {% endcall %}
+
+    <div class="p-6">
+        <div id="panel-countries" class="settings-panel" role="tabpanel">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
+                            <th class="py-2 pr-3">{{ _('Country') }}</th>
+                            <th class="py-2 pr-3">{{ _('Reference') }}</th>
+                            <th class="py-2 pr-3">{{ _('Title') }}</th>
+                            <th class="py-2 pr-3">{{ _('Status') }}</th>
+                            <th class="py-2 pr-3">{{ _('Reports') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in country_rows %}
+                        <tr class="border-b border-gray-100">
+                            <td class="py-3 pr-3 text-gray-800">{{ row.country or '—' }}</td>
+                            <td class="py-3 pr-3 font-medium">
+                                <a href="{{ row.url }}" class="text-blue-700 hover:underline">{{ row.project.reference }}</a>
+                            </td>
+                            <td class="py-3 pr-3 text-gray-700">{{ row.project.title or '—' }}</td>
+                            <td class="py-3 pr-3 text-gray-700">{{ row.project.status }}</td>
+                            <td class="py-3 pr-3 text-gray-700">{{ row.open_reports }} / {{ row.reports }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="py-4 text-gray-600">{{ _('No country projects in this programme.') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="panel-monitoring" class="settings-panel hidden" role="tabpanel">
+            {% include "admin/projects/_monitoring_panel.html" %}
+        </div>
+
+        <div id="panel-settings" class="settings-panel hidden" role="tabpanel">
+            <form id="portfolioSettingsForm" method="POST" action="{{ url_for('project_assignments.portfolio_page', portfolio_key=portfolio_key) }}">
+                {{ form.csrf_token }}
+                <fieldset {% if not can_edit %}disabled class="opacity-75"{% endif %}>
+                    <p class="text-sm text-gray-600 mb-4">
+                        {{ _('These options apply to every country project in %(name)s, and to each of its reports.', name=portfolio_label) }}
+                    </p>
+                    {% if form.data_owner_id is defined %}
+                    <div class="max-w-xl mb-4">
+                        <label for="{{ form.data_owner_id.id }}" class="block text-gray-700 text-sm font-semibold mb-2">{{ form.data_owner_id.label.text }}</label>
+                        {{ form.data_owner_id(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                    </div>
+                    {% endif %}
+                    {% include "admin/assignments/_assignment_review_notification.html" %}
+                    {% include "admin/assignments/_assignment_access_control.html" %}
+                    <div class="mt-6 border-t border-gray-200 pt-6 space-y-4">
+                        {% include "admin/assignments/_assignment_option_flags.html" %}
+                    </div>
+                </fieldset>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/form_builder/modules/utils.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+window.manageAssignmentConfig = {
+    assignmentId: null,
+    permissions: {
+        canEditDetails: {{ (can_edit if can_edit is defined else false)|tojson }},
+        canManageEntities: false,
+        canUpdateEntityStatus: false
+    },
+    urls: {
+        adminBase: {{ url_for('admin.admin_dashboard')|tojson }},
+        reviewRecipientSearch: {{ url_for('assignment_management.api_search_submission_review_recipients')|tojson }}
+    },
+    t: {
+        clearReviewer: {{ _('Remove')|tojson }},
+        searchMinChars: {{ _('Type at least 2 characters to search.')|tojson }},
+        noUsersFound: {{ _('No users found.')|tojson }}
+    },
+    submissionReviewRecipient: {
+        mode: {{ (form.submission_review_recipient_mode.data if form is defined and form.submission_review_recipient_mode is defined else 'fds_member')|tojson }},
+        users: {% if submission_review_recipient_users is defined and submission_review_recipient_users %}[
+            {% for reviewer in submission_review_recipient_users %}
+            {
+                id: {{ reviewer.id|tojson }},
+                name: {{ (reviewer.name or reviewer.email)|tojson }},
+                email: {{ reviewer.email|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]{% else %}[]{% endif %}
+    }
+};
+</script>
+<script src="{{ static_url('js/admin/manage-assignment.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
+<script src="{{ static_url('js/admin/projects-monitoring.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var tabs = document.querySelectorAll('#portfolio-tabs .settings-tab');
+    var saveBtn = document.getElementById('portfolioSaveSettingsBtn');
+    var header = document.querySelector('.executive-page-header');
+
+    function syncChrome(tabId) {
+        var onSettings = tabId === 'settings';
+        if (saveBtn) saveBtn.classList.toggle('hidden', !onSettings);
+        if (header && window.PageHeaderPin) {
+            window.PageHeaderPin.setEnabled(header, onSettings);
+        }
+    }
+
+    function activate(tabId) {
+        if (window.AdminUnderlineTabs) {
+            window.AdminUnderlineTabs.activateStripTab('#portfolio-tabs', tabId, { panelSelector: '.settings-panel' });
+        }
+        syncChrome(tabId);
+        if (tabId === 'monitoring' && window.ProjectMonitoring) {
+            window.ProjectMonitoring.onTabActivated();
+        }
+    }
+    tabs.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = this.getAttribute('data-tab');
+            activate(id);
+            var base = location.pathname + location.search;
+            history.replaceState(null, '', id === 'countries' ? base : base + '#' + id);
+        });
+    });
+    {% if form.errors %}
+    activate('settings');
+    {% else %}
+    var hash = (location.hash || '').replace('#', '');
+    if (hash === 'monitoring' || hash === 'settings') activate(hash);
+    else syncChrome('countries');
+    {% endif %}
+})();
+</script>
+{% endblock %}

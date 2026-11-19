@@ -24,6 +24,7 @@ from app.models.forms import FormTemplate
 from app.models.assignments import AssignmentEntityStatus, PublicSubmission
 from app.models.core import UserEntityPermission
 from app.models.enums import EntityType
+from app.services.projects.service import assignment_display_status
 from app.models.documents import SubmittedDocument
 from app.services.assignments.access_service import apply_assignment_access
 from app.services.assignments.completion_service import AssignmentCompletionService
@@ -825,7 +826,7 @@ def _build_entity_assignments(selected_entity_type, selected_entity_id, only_tem
             'badges': [{'label': b.label, 'value': b.value, 'tone': b.tone} for b in badges_by_aes.get(aes.id, [])],
             'id': aes.id,
             'name': f"{period_name} - {localized_template_name if localized_template_name else 'Template Missing'}",
-            'status': aes.status,
+            'status': assignment_display_status(aes),
             'due_date': aes.due_date.isoformat() if aes.due_date else None,
             'status_timestamp': aes.status_timestamp.isoformat()
             if aes.status_timestamp

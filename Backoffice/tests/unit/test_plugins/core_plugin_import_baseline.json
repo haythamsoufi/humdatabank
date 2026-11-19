@@ -13,9 +13,6 @@
     "fdrs": 5,
     "upr": 1
   },
-  "app/routes/admin/project_management.py": {
-    "nsd_report_forms": 4
-  },
   "app/routes/admin/validation_dashboard.py": {
     "upr": 5
   },

@@ -1004,6 +1004,26 @@ class TestFormatDimSubmissionAssigned:
         assert result['submitted_at'] == '2024-01-10T00:00:00'
         assert result['last_modified_at'] == '2024-01-12T00:00:00'
 
+    def test_upcoming_project_cycle_reports_upcoming(self):
+        from datetime import date
+        from types import SimpleNamespace
+
+        aes = MagicMock()
+        aes.id = 9
+        aes.status = 'pending'
+        aes.entity_type = 'project'
+        aes.entity_id = 4
+        aes.submitted_at = None
+        aes.due_date = None
+        aes.assigned_form_id = 11
+        aes.assigned_form = SimpleNamespace(
+            is_project_cycle=True,
+            period_start=date(2099, 4, 1),
+            period_end=date(2099, 4, 30),
+        )
+        result = format_dim_submission_assigned(aes)
+        assert result['status'] == 'upcoming'
+
     def test_with_string_status(self):
         aes = MagicMock()
         aes.id = 2

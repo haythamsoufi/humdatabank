@@ -1,4 +1,4 @@
-{# Monitoring tab body (Admin → Projects). Data is loaded by js/admin/projects-monitoring.js from monitoring_data. #}
+{# Monitoring tab body (programme portfolio page). Data is loaded by js/admin/projects-monitoring.js. #}
 {% set _sel = 'form-control w-full text-sm' %}
 
 <div id="pmRoot">
@@ -12,32 +12,36 @@
         <option value="all">{{ _('All projects') }}</option>
       </select>
     </div>
+    {% if locked_portfolio %}
+    <input type="hidden" id="pmFilter-portfolio" value="{{ locked_portfolio }}">
+    {% else %}
     <div>
       <label for="pmFilter-portfolio" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ _('Category') }}</label>
       <select id="pmFilter-portfolio" class="{{ _sel }}">
         <option value="">{{ _('All') }}</option>
-        {% for v in all_portfolios %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        {% for v in all_portfolios|default([]) %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
       </select>
     </div>
+    {% endif %}
     <div>
       <label for="pmFilter-fund" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ _('Fund') }}</label>
       <select id="pmFilter-fund" class="{{ _sel }}">
         <option value="">{{ _('All') }}</option>
-        {% for v in all_funds %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        {% for v in all_funds|default([]) %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
       </select>
     </div>
     <div>
       <label for="pmFilter-region" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ _('Region') }}</label>
       <select id="pmFilter-region" class="{{ _sel }}">
         <option value="">{{ _('All') }}</option>
-        {% for v in all_regions %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        {% for v in all_regions|default([]) %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
       </select>
     </div>
     <div>
       <label for="pmFilter-country" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ _('Country') }}</label>
       <select id="pmFilter-country" class="{{ _sel }}">
         <option value="">{{ _('All') }}</option>
-        {% for v in all_countries %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+        {% for v in all_countries|default([]) %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
       </select>
     </div>
     {% if not scoped_to_self %}
@@ -45,7 +49,7 @@
       <label for="pmFilter-manager" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ _('Project manager') }}</label>
       <select id="pmFilter-manager" class="{{ _sel }}">
         <option value="">{{ _('All') }}</option>
-        {% for m in all_managers %}<option value="{{ m.email }}"{% if manager_filter and manager_filter|lower == m.email|lower %} selected{% endif %}>{{ m.label }}</option>{% endfor %}
+        {% for m in all_managers|default([]) %}<option value="{{ m.email }}"{% if manager_filter and manager_filter|lower == m.email|lower %} selected{% endif %}>{{ m.label }}</option>{% endfor %}
       </select>
     </div>
     {% endif %}
@@ -53,7 +57,7 @@
       <button type="button" id="pmRefresh" class="professional-action-btn" title="{{ _('Reload the monitoring data') }}">
         <i class="fas fa-rotate mr-1"></i>{{ _('Refresh') }}
       </button>
-      <a id="pmExport" class="professional-action-btn" href="{{ url_for('project_management.monitoring_export') }}"
+      <a id="pmExport" class="professional-action-btn" href="{{ url_for('project_assignments.monitoring_export') }}"
          title="{{ _('Download every report with its due date, state and contacts as CSV') }}">
         <i class="fas fa-file-csv mr-1"></i>{{ _('Export CSV') }}
       </a>
@@ -263,9 +267,9 @@
 } %}
 <script nonce="{{ csp_nonce() }}">
 window.ProjectMonitoringConfig = {
-  dataUrl: {{ url_for('project_management.monitoring_data')|tojson|safe }},
-  exportUrl: {{ url_for('project_management.monitoring_export')|tojson|safe }},
-  detailUrlTemplate: {{ url_for('project_management.project_detail', project_id=999999)|replace('999999', '__ID__')|tojson|safe }},
+  dataUrl: {{ url_for('project_assignments.monitoring_data')|tojson|safe }},
+  exportUrl: {{ url_for('project_assignments.monitoring_export')|tojson|safe }},
+  detailUrlTemplate: {{ url_for('project_assignments.project_page', project_id=999999)|replace('999999', '__ID__')|tojson|safe }},
   limits: {},
   i18n: {{ _mon_i18n|tojson|safe }}
 };

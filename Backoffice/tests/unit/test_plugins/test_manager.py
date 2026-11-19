@@ -1580,7 +1580,25 @@ class TestGetDocumentationSources:
         plugin_c = MagicMock()
         plugin_c.get_documentation_source.return_value = None
         pm.plugins = {"upr": plugin_a, "dup": plugin_dup, "broken": plugin_b, "empty": plugin_c}
+        pm.active_plugins = {"upr", "dup", "broken", "empty"}
 
         sources = pm.get_documentation_sources()
         assert len(sources) == 1
         assert sources[0].category == "upr"
+
+    def test_skips_inactive_plugins(self, tmp_path):
+        from app.plugins.base import PluginDocsSource
+
+        pm, _ = _make_manager(tmp_path)
+        plugin = MagicMock()
+        plugin.get_documentation_source.return_value = PluginDocsSource(
+            category="dref-monitoring",
+            root_dir=tmp_path / "dref-docs",
+            display_name="DREF monitoring",
+            include_in_help=True,
+        )
+        pm.plugins = {"dref_monitoring": plugin}
+        pm.active_plugins = set()
+
+        assert pm.get_documentation_sources() == []
+        plugin.get_documentation_source.assert_not_called()

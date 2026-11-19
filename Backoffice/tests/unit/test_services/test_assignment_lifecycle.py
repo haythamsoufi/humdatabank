@@ -45,6 +45,53 @@ class TestClosedAssignmentAuthorization:
         aes.reopened_after_close = reopened_after_close
         return aes
 
+    def test_focal_point_cannot_edit_upcoming_project_cycle(self, app):
+        from datetime import date
+        from unittest.mock import MagicMock, patch
+        from app.services.organization.authorization_service import AuthorizationService
+
+        user = MagicMock()
+        user.is_authenticated = True
+        form = MagicMock()
+        form.is_project_cycle = True
+        form.period_start = date(2099, 4, 1)
+        form.period_end = date(2099, 4, 30)
+        aes = MagicMock()
+        aes.assigned_form = form
+        aes.status = "pending"
+        aes.entity_type = "project"
+        aes.entity_id = 1
+        aes.assigned_form_id = 1
+
+        with app.app_context():
+            with patch.object(AuthorizationService, "can_access_assignment", return_value=True), \
+                 patch.object(AuthorizationService, "_assignment_is_effectively_closed", return_value=False), \
+                 patch.object(AuthorizationService, "is_system_manager", return_value=False), \
+                 patch.object(AuthorizationService, "is_admin", return_value=False):
+                assert AuthorizationService.can_edit_assignment(aes, user) is False
+
+    def test_admin_can_still_edit_upcoming_project_cycle(self, app):
+        from datetime import date
+        from unittest.mock import MagicMock, patch
+        from app.services.organization.authorization_service import AuthorizationService
+
+        user = MagicMock()
+        user.is_authenticated = True
+        form = MagicMock()
+        form.is_project_cycle = True
+        form.period_start = date(2099, 4, 1)
+        form.period_end = date(2099, 4, 30)
+        aes = MagicMock()
+        aes.assigned_form = form
+        aes.status = "pending"
+
+        with app.app_context():
+            with patch.object(AuthorizationService, "can_access_assignment", return_value=True), \
+                 patch.object(AuthorizationService, "_assignment_is_effectively_closed", return_value=False), \
+                 patch.object(AuthorizationService, "is_system_manager", return_value=False), \
+                 patch.object(AuthorizationService, "is_admin", return_value=True):
+                assert AuthorizationService.can_edit_assignment(aes, user) is True
+
     def test_focal_point_cannot_edit_closed_assignment(self, app):
         from unittest.mock import MagicMock, patch
         from app.services.organization.authorization_service import AuthorizationService

@@ -201,7 +201,11 @@ class AssignedForm(db.Model):
     )
     activated_by_user = relationship('User', foreign_keys=[activated_by_user_id])
     deactivated_by_user = relationship('User', foreign_keys=[deactivated_by_user_id])
-    project = relationship('Project', foreign_keys=[project_id], backref='cycle_assignments')
+    project = relationship(
+        'Project',
+        foreign_keys=[project_id],
+        backref=backref('cycle_assignments', passive_deletes='all'),
+    )
     # Access Groups (RbacRole.kind == 'group') allowed to see and work on this
     # assignment. Empty means no audience limit. Permission roles stored here
     # are ignored by the access check and dropped the next time this is saved.

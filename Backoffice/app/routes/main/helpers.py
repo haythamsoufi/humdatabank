@@ -1822,6 +1822,7 @@ def localize_status(status):
     # Map canonical snake_case values to translation keys
     status_map = {
         'pending': _('Pending'),
+        'upcoming': _('Upcoming'),
         'in_progress': _('In Progress'),
         'submitted': _('Submitted'),
         'approved': _('Approved'),
@@ -1834,6 +1835,15 @@ def localize_status(status):
     }
 
     return status_map.get(status_lower, status)
+
+
+@bp.app_template_global()
+def assignment_display_status(assignment_entity_status):
+    """Jinja helper: Upcoming for a project cycle whose window has not opened."""
+    from app.services.projects.service import assignment_display_status as _display
+
+    return _display(assignment_entity_status)
+
 
 @bp.app_template_global()
 def get_localized_national_society_name(country):

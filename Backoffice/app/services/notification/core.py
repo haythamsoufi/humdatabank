@@ -231,6 +231,13 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         'notification.validation_questions.message': _notification_msgid(
             '%(count)s data validation question(s) for %(entity)s require your response.'
         ),
+
+        'notification.dref_monitoring.reminder.title': _notification_msgid(
+            'DREF monitoring reminder: %(appeal)s'
+        ),
+        'notification.dref_monitoring.reminder.message': _notification_msgid(
+            '%(detail)s'
+        ),
     }
 
     # Try to get translation source from map

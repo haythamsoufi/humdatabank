@@ -11,8 +11,7 @@
     icon='fas fa-' + ('diagram-project' if project else 'plus'),
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Assignments'), 'url': url_for('assignment_management.manage_assignments')},
-        {'name': _('Projects'), 'url': url_for('project_management.project_list')},
+        {'name': _('Assignments'), 'url': url_for('assignment_management.manage_assignments', type='project')},
         {'name': (project.reference if project else _('New project'))}
     ],
     subtitle=_('Reporting unit for project-based assignments. Country cycles use countries instead of projects.')

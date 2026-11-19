@@ -806,6 +806,16 @@ By default every user reaches all assignments within their entities. Two optiona
 - **Migration:** `add_assignment_access_control` (all existing users stay `all`, all assignments stay open). Run `flask rbac seed` (every deploy does) to create the permission.
 - **Known limits (not covered by this policy):** notification fan-out to focal points of a restricted assignment, API-key access and the Data Explorer remain template/country scoped.
 
+### Project assignments
+
+A project is one row on **Admin → Assignments** (Type = Project). Its reports stay separate `AssignedForm` rows with `scope=project_cycle`; the entry form, emails, mobile API and dashboards keep reading those rows. Shared options (PDF and Excel export, email attachments, page submission, offline download, delegation review, data owner, review recipients, access groups) are edited once on `ProjectAssignment` and copied onto every report by `app/services/projects/assignment_settings.py`. Period dates, the due date, and open or closed stay on the report.
+
+New reports inherit the project settings. When the project has no settings row yet, a new report takes PDF/Excel defaults from the published template version. Re-importing a project does not overwrite reports that already exist. `/admin/projects/` redirects to the Assignments list. Campaign assignments no longer gain project entities; ones that already have them stay visible and read-only.
+
+Plugins offer report slots and extra audiences through `BasePlugin.get_project_report_types`, `get_project_admin_summary` and `project_report_audience`. NSD uses that for quarterly and final templates, and for “Final = focal points + project managers, quarters = project managers”. Admin-chosen groups are added on top. Core does not import plugins for this.
+
+A project manager with only `nsd_funds.pm_overview` sees their own projects on the Assignments list and can open them read-only.
+
 ### Troubleshooting
 
 - **A newly-added plugin role/permission is missing from the DB after deploy** — check `entrypoint.sh` actually ran `flask rbac seed` (not skipped via `RBAC_SEED_ON_STARTUP=false`), and that the plugin loaded successfully (`PluginManager.load_plugins()` logs per-plugin failures; one broken plugin doesn't fail the whole boot, but it does mean that plugin's permissions/roles never reach the seeder).

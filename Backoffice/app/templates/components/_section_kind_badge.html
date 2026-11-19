@@ -1,0 +1,19 @@
+{# Logframe level chip from FormSection.config.marc.kind. Empty when unset. #}
+{% from "components/_status_label.html" import status_label %}
+
+{% macro section_kind_badge(section) %}
+    {% set _cfg = section.config if section.config is mapping else {} %}
+    {% set _marc = _cfg.get('marc') if _cfg.get('marc') is mapping else {} %}
+    {% set _kind = _marc.get('kind') or '' %}
+    {% if _kind == 'objective' %}
+        {{ status_label(_('Objective'), 'info') }}
+    {% elif _kind == 'outcome' %}
+        {{ status_label(_('Outcome'), 'success') }}
+    {% elif _kind == 'goal' %}
+        {{ status_label(_('Goal'), 'neutral') }}
+    {% elif _kind == 'cross_cutting' %}
+        {{ status_label(_('Cross-cutting'), 'warning') }}
+    {% elif _kind == 'topic' %}
+        {{ status_label(_('Sector'), 'neutral') }}
+    {% endif %}
+{% endmacro %}

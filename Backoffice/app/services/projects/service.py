@@ -60,6 +60,59 @@ def cycle_selected_by_default(phase: str) -> bool:
     return phase in ("active", "passed")
 
 
+def assignment_status_value(assignment_entity_status) -> str:
+    """Workflow status string for an assignment entity status row."""
+    if assignment_entity_status is None:
+        return ""
+    status = getattr(assignment_entity_status, "status", None)
+    if status is None:
+        return ""
+    if hasattr(status, "value"):
+        return str(status.value)
+    return str(status)
+
+
+def assignment_is_upcoming_cycle(assignment_entity_status) -> bool:
+    """True when a project report window has not opened and work has not started.
+
+    Plugins create every cycle up front with workflow status ``pending``. Until
+    ``period_start``, that row is upcoming: focal points cannot enter data, and
+    the form shows Upcoming rather than Pending. A cycle with no start date is
+    already open.
+    """
+    if assignment_entity_status is None:
+        return False
+    if assignment_status_value(assignment_entity_status) != AssignmentEntityStatusValue.pending.value:
+        return False
+    form = getattr(assignment_entity_status, "assigned_form", None)
+    if form is None:
+        return False
+    try:
+        is_cycle = form.is_project_cycle is True
+    except Exception:
+        return False
+    if not is_cycle:
+        return False
+    try:
+        return (
+            cycle_phase(getattr(form, "period_start", None), getattr(form, "period_end", None))
+            == "upcoming"
+        )
+    except Exception:
+        return False
+
+
+def assignment_display_status(assignment_entity_status) -> str:
+    """Status shown on the dashboard and entry form.
+
+    The stored workflow value stays ``pending`` so the cycle becomes editable
+    on its start date without a status migration.
+    """
+    if assignment_is_upcoming_cycle(assignment_entity_status):
+        return "upcoming"
+    return assignment_status_value(assignment_entity_status)
+
+
 def parse_cycle_slot(period_name: str) -> Optional[str]:
     """Return the slot label (Y1Q2 / Final) from a cycle or legacy shared period_name."""
     import re
@@ -292,7 +345,9 @@ def ensure_project_cycle_assignment(
 
     aes = ensure_project_on_assignment(af, project, due_date=due_date)
     if created:
-        af  # noqa: B018 — clarity for callers checking identity
+        from app.services.projects.assignment_settings import inherit_on_new_report
+
+        inherit_on_new_report(project, af)
     return af, aes
 
 

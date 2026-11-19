@@ -22,6 +22,7 @@ from app.models import (
     SubmittedDocument, NSBranch, NSSubBranch, NSLocalUnit, SecretariatDivision, SecretariatDepartment
 )
 from app.models.enums import AssignmentEntityStatusValue, EntityType
+from app.services.projects.service import assignment_display_status
 from app.forms.assignments import (
     AssignedFormForm, AssignmentEntityStatusForm
 )
@@ -77,6 +78,7 @@ from app.services.assignments.access_service import (
     set_assignment_allowed_roles,
     user_can_access_assigned_form,
 )
+from app.forms.assignments.assignment_forms import AssignmentSharedSettingsMixin
 from app.utils.database.sql_utils import safe_ilike_pattern
 
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
@@ -123,6 +125,21 @@ def _has_assignment_perm(code):
 
 def _can_edit_assignment_details():
     return _has_assignment_perm(ASSIGNMENT_DETAILS_PERMISSION)
+
+
+def _refuse_project_cycle_direct_edit(assignment):
+    """Project reports are edited from the project assignment, not one report at a time."""
+    if not getattr(assignment, "is_project_cycle", False):
+        return None
+    message = _(
+        "This report belongs to a project. Change export, review, and access on the project assignment."
+    )
+    if is_json_request():
+        return json_bad_request(message)
+    flash(message, "info")
+    if assignment.project_id:
+        return redirect(url_for("project_assignments.project_page", project_id=assignment.project_id))
+    abort(404)
 
 
 def _can_manage_assignment_entities():
@@ -613,55 +630,11 @@ def _queue_assignment_notification_job(aes_ids, notify_admins, source):
 
 
 # Define the form for editing overall assignment details
-class EditAssignmentDetailsForm(FlaskForm):
+class EditAssignmentDetailsForm(AssignmentSharedSettingsMixin, FlaskForm):
     template_id = SelectField("Form Template", coerce=int, validators=[DataRequired()])
     period_name = StringField("Period Name", validators=[DataRequired()])
-    custom_name = StringField("Custom Name (optional)", validators=[Optional()])
     due_date = DateField("Due Date", validators=[Optional()])
     expiry_date = DateField("Expiry Date (assignment will be treated as Closed after this date)", format='%Y-%m-%d', validators=[Optional()])
-    data_owner_id = SelectField(
-        "Data Owner",
-        coerce=lambda x: int(x) if x and str(x).isdigit() else None,
-        validators=[Optional()],
-    )
-    requires_delegation_review = BooleanField(
-        "Require delegation review before final submission",
-        default=False,
-    )
-    enable_page_submission = BooleanField(
-        "Allow save and submit per page",
-        default=False,
-    )
-    enable_offline_download = BooleanField(
-        "Allow offline download in the mobile app",
-        default=False,
-    )
-    enable_export_excel = BooleanField(
-        "Enable Export Excel button",
-        default=False,
-    )
-    enable_import_excel = BooleanField(
-        "Enable Import Excel button",
-        default=False,
-    )
-    enable_export_pdf = BooleanField(
-        "Enable Export PDF button",
-        default=False,
-    )
-    email_attach_pdf = BooleanField(
-        "Attach a PDF summary to submit and approve emails",
-        default=False,
-    )
-    email_attach_excel = BooleanField(
-        "Attach a filled Excel snapshot to submit and approve emails",
-        default=False,
-    )
-    submission_review_recipient_mode = SelectField(
-        "Submission review notification",
-        choices=_submission_review_recipient_mode_choices(),
-        default=SUBMISSION_REVIEW_RECIPIENT_FDS,
-    )
-    submission_review_recipient_user_ids = HiddenField(validators=[Optional()])
     submit = SubmitField("Update Assignment")
 
     def validate(self, extra_validators=None):
@@ -684,7 +657,7 @@ class EditAssignmentDetailsForm(FlaskForm):
 
 # === Assignment Management Routes ===
 @bp.route("/assignments", methods=["GET"])
-@permission_required('admin.assignments.view')
+@permission_required_any('admin.assignments.view', 'nsd_funds.pm_overview')
 def manage_assignments():
     assignments = campaign_only(
         apply_assignment_access(
@@ -741,8 +714,13 @@ def manage_assignments():
             })
         return json_ok(assignments=assignments_data, count=len(assignments_data))
 
+    from app.routes.admin.project_assignments import project_grid_rows
+    from app.services.projects.access import can_manage_projects
+
     return render_template("admin/assignments/assignments.html",
                          assignments=assignments,
+                         project_rows=project_grid_rows(current_user),
+                         can_manage_projects=can_manage_projects(current_user),
                          title="Assignments")
 
 
@@ -1420,6 +1398,9 @@ def assignment_notification_email_preview():
 )
 def edit_assignment(assignment_id):
     assignment = AssignedForm.query.get_or_404(assignment_id)
+    refused = _refuse_project_cycle_direct_edit(assignment)
+    if refused is not None:
+        return refused
     form = EditAssignmentDetailsForm(obj=assignment)
     if not form.is_submitted():
         form.submission_review_recipient_user_ids.data = (
@@ -1668,54 +1649,12 @@ def edit_assignment(assignment_id):
 @bp.route("/assignments/edit/<int:assignment_id>/add_projects", methods=["POST"])
 @permission_required('admin.assignments.entities.manage')
 def add_projects_to_assignment(assignment_id):
-    from app.models.projects import Project
-    from app.services.projects.service import ensure_project_on_assignment
-
-    assignment = AssignedForm.query.get_or_404(assignment_id)
-    selected_ids = request.form.getlist("project_ids")
-    if not selected_ids:
-        flash(_("No projects selected."), "warning")
-        return redirect(url_for("assignment_management.edit_assignment", assignment_id=assignment_id))
-
-    try:
-        added = 0
-        created_aes_list = []
-        existing = {
-            aes.entity_id
-            for aes in AssignmentEntityStatus.query.filter(
-                AssignmentEntityStatus.assigned_form_id == assignment_id,
-                AssignmentEntityStatus.entity_type == EntityType.project.value,
-            ).all()
-        }
-        for raw_id in selected_ids:
-            try:
-                pid = int(raw_id)
-            except (TypeError, ValueError):
-                continue
-            if pid in existing:
-                continue
-            project = Project.query.get(pid)
-            if not project:
-                continue
-            aes = ensure_project_on_assignment(assignment, project)
-            created_aes_list.append(aes)
-            existing.add(pid)
-            added += 1
-        db.session.flush()
-        if created_aes_list:
-            aes_ids_for_notify = [aes.id for aes in created_aes_list]
-            if not _queue_assignment_notification_job(aes_ids_for_notify, False, "add_projects"):
-                flash(
-                    _("Projects were added, but notifications could not be queued."),
-                    "warning",
-                )
-        flash(_("Added %(n)s project(s) to assignment.", n=added), "success")
-    except Exception as e:
-        request_transaction_rollback()
-        flash(_("Error adding projects."), "danger")
-        current_app.logger.error(
-            "Error adding projects to assignment %s: %s", assignment_id, e, exc_info=True
-        )
+    """Retired: projects are reported through their own project assignment."""
+    AssignedForm.query.get_or_404(assignment_id)
+    flash(
+        _("Projects are no longer added to a campaign. Open the project from the Assignments list to manage its reports."),
+        "info",
+    )
     return redirect(url_for("assignment_management.edit_assignment", assignment_id=assignment_id))
 
 
@@ -1851,7 +1790,7 @@ def get_assignment_entities(assignment_id):
                 'entity_type': aes.entity_type,
                 'entity_id': aes.entity_id,
                 'entity_name': hierarchy_names.get((aes.entity_type, aes.entity_id), entity.name),
-                'status': aes.status,
+                'status': assignment_display_status(aes),
                 'due_date': aes.due_date.strftime('%Y-%m-%d') if aes.due_date else None,
                 'is_public_available': aes.is_public_available,
                 'fds_member_user_id': fds_info.get('fds_member_user_id'),
@@ -1876,6 +1815,10 @@ def add_entity_to_assignment(assignment_id):
 
     if not entity_type or not entity_id:
         return json_error('entity_type and entity_id are required', 400)
+    if entity_type == EntityType.project.value and not assignment.is_project_cycle:
+        return json_bad_request(
+            str(_("Projects are reported through their project assignment, not added to a campaign."))
+        )
 
     # Validate entity exists
     entity = EntityService.get_entity(entity_type, entity_id)
@@ -1928,6 +1871,11 @@ def add_entity_to_assignment(assignment_id):
 def remove_entity_from_assignment(assignment_id, status_id):
     """Remove an entity from an assignment."""
     aes = AssignmentEntityStatus.query.filter_by(id=status_id, assigned_form_id=assignment_id).first_or_404()
+    assignment = AssignedForm.query.get_or_404(assignment_id)
+    if aes.entity_type == EntityType.project.value and not assignment.is_project_cycle:
+        return json_bad_request(
+            str(_("This project is already on the campaign and is kept for its existing data. New project reporting is set up on the project assignment."))
+        )
 
     _delete_assignment_entity_status_with_children(aes)
     db.session.flush()
@@ -2086,6 +2034,9 @@ def edit_assignment_entity_status(aes_id):
 @permission_required('admin.assignments.delete')
 def delete_assignment(assignment_id):
     assignment = AssignedForm.query.get_or_404(assignment_id)
+    refused = _refuse_project_cycle_direct_edit(assignment)
+    if refused is not None:
+        return refused
 
     try:
         # Delete related entity statuses and their children first
@@ -2107,6 +2058,9 @@ def delete_assignment(assignment_id):
 def toggle_assignment_active(assignment_id):
     """Toggle assignment active state (deactivate / activate)."""
     assignment = AssignedForm.query.get_or_404(assignment_id)
+    refused = _refuse_project_cycle_direct_edit(assignment)
+    if refused is not None:
+        return refused
     try:
         assignment.is_active = not assignment.is_active
         if assignment.is_active:
@@ -2128,6 +2082,9 @@ def toggle_assignment_active(assignment_id):
 def close_assignment(assignment_id):
     """Close an assignment (e.g. after one year). Admins can reopen it later."""
     assignment = AssignedForm.query.get_or_404(assignment_id)
+    refused = _refuse_project_cycle_direct_edit(assignment)
+    if refused is not None:
+        return refused
     try:
         assignment.is_closed = True
         AssignmentEntityStatus.query.filter_by(assigned_form_id=assignment_id).update(
@@ -2148,6 +2105,9 @@ def close_assignment(assignment_id):
 def reopen_closed_assignment(assignment_id):
     """Reopen a closed assignment (admin only). Clears explicit close and expiry so it stays open."""
     assignment = AssignedForm.query.get_or_404(assignment_id)
+    refused = _refuse_project_cycle_direct_edit(assignment)
+    if refused is not None:
+        return refused
     try:
         assignment.is_closed = False
         assignment.expiry_date = None  # Clear expiry so assignment stays open until a new expiry is set
@@ -2169,6 +2129,9 @@ def reopen_closed_assignment(assignment_id):
 def generate_public_url(assignment_id):
     """Generate a public URL for an existing assignment."""
     assignment = AssignedForm.query.get_or_404(assignment_id)
+    refused = _refuse_project_cycle_direct_edit(assignment)
+    if refused is not None:
+        return refused
 
     try:
         if not assignment.has_public_url():
@@ -2191,6 +2154,9 @@ def generate_public_url(assignment_id):
 def toggle_public_access(assignment_id):
     """Toggle public access for an assignment's public URL."""
     assignment = AssignedForm.query.get_or_404(assignment_id)
+    refused = _refuse_project_cycle_direct_edit(assignment)
+    if refused is not None:
+        return refused
 
     try:
         if assignment.has_public_url():

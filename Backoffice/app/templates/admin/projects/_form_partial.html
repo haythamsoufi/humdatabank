@@ -103,7 +103,7 @@
         {% else %}
         {{ form_actions(
           form.submit.label.text if form.submit and form.submit.label else _('Save'),
-          cancel_url=url_for('project_management.project_list')
+          cancel_url=url_for('assignment_management.manage_assignments', type='project')
         ) }}
         {% endif %}
         {% if modal|default(false) %}

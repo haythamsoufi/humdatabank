@@ -57,7 +57,7 @@
         }
 
         function setCompact(want) {
-            var next = !!want;
+            var next = !!want && header.classList.contains('executive-page-header--pin-actions');
             if (next === compact) {
                 return;
             }
@@ -90,6 +90,16 @@
             setCompact(!e.isIntersecting);
         }, { root: ioRoot, rootMargin: marginTop, threshold: 0 });
 
+        function syncNow() {
+            if (!header.classList.contains('executive-page-header--pin-actions')) {
+                setCompact(false);
+                return;
+            }
+            io.unobserve(sentinel);
+            io.observe(sentinel);
+        }
+
+        header._pageHeaderPinSync = syncNow;
         io.observe(sentinel);
 
         window.requestAnimationFrame(function () {
@@ -109,6 +119,13 @@
 
         function update() {
             ticking = false;
+            if (!header.classList.contains('executive-page-header--pin-actions')) {
+                if (compact) {
+                    compact = false;
+                    header.classList.remove('is-header-pinned-compact');
+                }
+                return;
+            }
             var now = nowMs();
             var scrollTop = getScrollTop(scrollParent);
             var nearScrollTop = scrollTop <= SCROLL_TOP_SLACK;
@@ -165,6 +182,10 @@
         }
         window.addEventListener('resize', onScrollOrResize, { passive: true });
 
+        header._pageHeaderPinSync = function () {
+            ticking = false;
+            update();
+        };
         update();
     }
 
@@ -185,6 +206,25 @@
             bindWithScrollGeometry(header, scrollParent);
         }
     }
+
+    function setEnabled(header, enabled) {
+        if (!header) {
+            return;
+        }
+        var on = !!enabled;
+        header.classList.toggle('executive-page-header--pin-actions', on);
+        if (!on) {
+            header.classList.remove('is-header-pinned-compact');
+        }
+        if (on) {
+            bindHeader(header);
+        }
+        if (typeof header._pageHeaderPinSync === 'function') {
+            header._pageHeaderPinSync();
+        }
+    }
+
+    window.PageHeaderPin = { setEnabled: setEnabled };
 
     function init() {
         document.querySelectorAll('.executive-page-header--pin-actions').forEach(bindHeader);

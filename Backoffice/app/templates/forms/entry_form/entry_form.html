@@ -6,6 +6,7 @@
 {% from "components/_form_helpers.html" import format_number_value %}
 {% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
 {% from "components/_status_label.html" import status_label, status_label_for_assignment, status_label_for_data_flag %}
+{% from "components/_section_kind_badge.html" import section_kind_badge %}
 {% set page_import_map = true %}
 {% set scoped_locked_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled'] %}
 {% set scoped_reopenable_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled', 'requires_revision'] %}
@@ -174,8 +175,8 @@
                                 <span class="font-medium mr-1">{{ _('Due Date:') }}</span>{{ assignment_status.due_date|datetime_local('date') if assignment_status.due_date else _('N/A') }}
                                 <span class="mx-2">•</span>
                                 <span class="font-medium mr-1">{{ _('Status:') }}</span>
-                                {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
-                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_is_round_closed_for_entity(assignment_status), translation_key if translation_key is defined else 'en', assignment_status, status_history=assignment_status_history if assignment_status_history is defined else none) }}
+                                {% set aes_status = assignment_display_status(assignment_status) %}
+                                {{ assignment_status_pipeline_badge(aes_status, assignment_is_round_closed_for_entity(assignment_status), translation_key if translation_key is defined else 'en', assignment_status if aes_status != 'upcoming' else none, status_history=assignment_status_history if assignment_status_history is defined and aes_status != 'upcoming' else none) }}
                                 {% if enable_page_submission and pages_total_count %}
                                 <span class="mx-2">•</span>
                                 <span id="pages-submitted-chip" class="inline-flex items-center gap-1 text-sm text-gray-700" data-submitted="{{ pages_submitted_count }}" data-total="{{ pages_total_count }}">
@@ -360,6 +361,13 @@
                             {{ _('You have view-only access to this assignment. You can review the data but cannot enter or change values.') }}
                         {% elif _readonly_reason == 'round_closed' %}
                             {{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}
+                        {% elif _readonly_reason == 'upcoming' %}
+                            {% set _cycle_opens = assignment_status.assigned_form.period_start if assignment_status and assignment_status.assigned_form else none %}
+                            {% if _cycle_opens %}
+                            {{ _('This reporting cycle is upcoming. Data entry opens on %(date)s.', date=_cycle_opens|format_date_localized('medium')) }}
+                            {% else %}
+                            {{ _('This reporting cycle is upcoming. Data entry is disabled until it opens.') }}
+                            {% endif %}
                         {% else %}
                             {{ _('This form is read-only. You can review the data but cannot make changes.') }}
                         {% endif %}
@@ -741,7 +749,29 @@
                 </div>
                 {% elif not is_preview_mode and not is_public_submission %}
                 <div id="sidebar-action-buttons" class="pt-6 border-t border-gray-200 bg-white">
-                    <p class="text-gray-700 font-semibold text-center">{{ _('This form has been %(status)s. Data entry is disabled.', status=localize_status(assignment_status.status)) }}</p>
+                    {% set _sidebar_readonly_reason = assignment_readonly_notice_reason(
+                        assignment_status if assignment_status is defined else none,
+                        current_user,
+                        is_public_submission=false,
+                    ) %}
+                    {% if _sidebar_readonly_reason == 'upcoming' %}
+                        {% set _cycle_opens = assignment_status.assigned_form.period_start if assignment_status and assignment_status.assigned_form else none %}
+                        <p class="text-gray-700 font-semibold text-center">
+                            {% if _cycle_opens %}
+                            {{ _('This reporting cycle is upcoming. Data entry opens on %(date)s.', date=_cycle_opens|format_date_localized('medium')) }}
+                            {% else %}
+                            {{ _('This reporting cycle is upcoming. Data entry is disabled until it opens.') }}
+                            {% endif %}
+                        </p>
+                    {% elif _sidebar_readonly_reason == 'submitted' %}
+                        <p class="text-gray-700 font-semibold text-center">{{ _('This form has been submitted. Data entry is disabled.') }}</p>
+                    {% elif _sidebar_readonly_reason == 'approved' %}
+                        <p class="text-gray-700 font-semibold text-center">{{ _('This form has been approved. Data entry is disabled.') }}</p>
+                    {% elif _sidebar_readonly_reason == 'sent_for_review' %}
+                        <p class="text-gray-700 font-semibold text-center">{{ _('This form has been sent for review. Data entry is disabled.') }}</p>
+                    {% else %}
+                        <p class="text-gray-700 font-semibold text-center">{{ _('Data entry is disabled.') }}</p>
+                    {% endif %}
                 </div>
                 {% endif %}
 
@@ -983,6 +1013,7 @@
                                         {% if template_structure.display_order_visible %}<span class="text-xl font-semibold text-gray-700 mr-1">{{ section.display_order }}.</span>{% endif %}
                                         {% set section_display_name = section._display_name_resolved if hasattr(section, '_display_name_resolved') and section._display_name_resolved else section.display_name %}
                                         {{ section_display_name }}
+                                        {{ section_kind_badge(section) }}
                                         <button type="button" class="collapse-toggle btn btn-icon btn-sm ml-auto" aria-expanded="true" aria-controls="collapsible-content-{{ section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                             <i class="fas fa-chevron-up"></i>
                                         </button>
@@ -2014,11 +2045,12 @@
                                                 {% set sub_page_name_main = page_names_main.get(sub_page_key_main, page_name_main) %}
                                                 <div id="section-container-{{ sub_section.id }}" class="{% if not sub_section.hide_section_header %}{% if not loop.first or section.fields_ordered %}pt-4 sm:pt-6 border-t border-gray-300 {% endif %}mt-4 sm:mt-6{% else %}mt-2 sm:mt-3{% endif %} scroll-mt-20{% if sub_section.hide_section_header %} section-container--no-header{% endif %}" data-section-type="{{ sub_section.section_type }}" data-page-number="{{ sub_page_number_main }}" data-page-name="{{ sub_page_name_main }}"{% if sub_section.section_type == 'dynamic_indicators' and sub_section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ sub_section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and sub_section.section_type == 'dynamic_indicators' %} data-exclude-from-section-nav="true"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.max_entries %} data-max-entries="{{ sub_section.max_entries }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.entry_label_item_id %} data-entry-label-item-id="{{ sub_section.entry_label_item_id }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.show_entries_in_navigation %} data-show-entries-in-navigation="true"{% endif %}{% if sub_section.hide_section_header %} data-hide-section-header="true"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ sub_section.id }}"{% if sub_section.relevance_condition %} data-relevance-condition='{{ sub_section.relevance_condition|tojson }}' data-item-id="{{ sub_section.id }}"{% endif %}>
                                                     {% if not sub_section.hide_section_header %}
-                                                    <h4 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
+                                                    <h4 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center gap-2">
                                                         <i class="fas fa-indent w-4 h-4 mr-3 text-gray-500"></i>
                                                         {% if template_structure.display_order_visible %}<span class="text-gray-700 mr-1">{{ sub_section.display_order }}.</span>{% endif %}
                                                         {% set sub_section_display_name = sub_section._display_name_resolved if hasattr(sub_section, '_display_name_resolved') and sub_section._display_name_resolved else sub_section.display_name %}
                                                         <span class="text-gray-600 font-medium">↳ {{ sub_section_display_name }}</span>
+                                                        {{ section_kind_badge(sub_section) }}
                                                         <button type="button" class="collapse-toggle btn btn-icon btn-sm ml-auto" aria-expanded="true" aria-controls="collapsible-content-sub-{{ sub_section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                                             <i class="fas fa-chevron-up"></i>
                                                         </button>

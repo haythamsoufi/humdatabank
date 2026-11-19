@@ -1,4 +1,5 @@
 """Unit tests for form_authorization decorators and helpers."""
+import datetime as dt
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,6 +22,7 @@ from app.utils.forms.form_authorization import (
     READONLY_NOTICE_SUBMITTED,
     READONLY_NOTICE_VIEW_ONLY,
     READONLY_NOTICE_ROUND_CLOSED,
+    READONLY_NOTICE_UPCOMING,
     READONLY_NOTICE_GENERIC,
 )
 
@@ -130,6 +132,17 @@ class TestAssignmentReadonlyNoticeReason:
             return_value=False,
         ):
             assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_SENT_FOR_REVIEW
+
+    def test_upcoming_project_cycle_notice_beats_view_only(self):
+        aes = _readonly_aes(status="pending", round_closed=False)
+        aes.assigned_form.is_project_cycle = True
+        aes.assigned_form.period_start = dt.date(2099, 4, 1)
+        aes.assigned_form.period_end = dt.date(2099, 4, 30)
+        with patch(
+            "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
+            return_value=False,
+        ):
+            assert assignment_readonly_notice_reason(aes, _readonly_user()) == READONLY_NOTICE_UPCOMING
 
     def test_viewer_on_open_assignment_is_view_only_not_round_closed(self):
         """Jinja used to treat the unbound method as truthy, so viewers always saw 'round closed'."""

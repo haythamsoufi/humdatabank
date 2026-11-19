@@ -20,6 +20,7 @@ from app.utils.mobile.mobile_responses import (
 )
 from app.extensions import resolve_translations_directory
 from app.routes.api.mobile import mobile_bp
+from app.services.projects.service import assignment_display_status
 
 import time as _time
 
@@ -231,7 +232,7 @@ def get_assignment(assignment_id):
             'display_name': EntityService.get_entity_display_name(
                 aes.entity_type, aes.entity_id
             ),
-            'status': aes.status,
+            'status': assignment_display_status(aes),
             'due_date': aes.due_date.isoformat() if aes.due_date else None,
             'is_public_available': bool(aes.is_public_available),
             'submitted_at': aes.submitted_at.isoformat() if aes.submitted_at else None,

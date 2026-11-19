@@ -16,6 +16,7 @@ from app.routes.api import api_bp
 # Import models
 from app.models import FormData, PublicSubmission, AssignedForm
 from app.models.assignments import AssignmentEntityStatus
+from app.services.projects.service import assignment_display_status
 from app.utils.auth.auth import api_capability
 from app.services.security.api_key_permissions import DOCUMENTS_READ, SUBMISSIONS_READ
 from app.utils.security.rate_limiting import api_rate_limit
@@ -279,7 +280,7 @@ def get_submissions():
                     'template_name': assigned_form.template.name if assigned_form and assigned_form.template else None,
                     'period_name': assigned_form.period_name if assigned_form else None,
                     'country_info': format_country_info(country),
-                    'status': status_entry.status,
+                    'status': assignment_display_status(status_entry),
                     'due_date': status_entry.due_date.isoformat() if status_entry.due_date is not None else None,
                     'submitted_at': submitted_dt.isoformat() if submitted_dt else None,
                     'created_at': assigned_form.assigned_at.isoformat() if assigned_form and assigned_form.assigned_at is not None else None,
@@ -407,7 +408,7 @@ def get_submission_details(submission_id):
             'template_name': assigned_form.template.name if assigned_form and assigned_form.template else None,
             'period_name': assigned_form.period_name if assigned_form else None,
             'country_info': format_country_info(country),
-            'status': submission.status,
+            'status': assignment_display_status(submission) if submission_type == 'assigned' else submission.status,
             'due_date': submission.due_date.isoformat() if submission.due_date is not None else None,
             'submitted_at': (
                 latest_entry.submitted_at.isoformat()

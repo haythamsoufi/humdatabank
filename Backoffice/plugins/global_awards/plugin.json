@@ -2,7 +2,7 @@
   "plugin_id": "global_awards",
   "name": "global_awards",
   "display_name": "Global Awards",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Global Awards (IFRC MARC) logframe: form template linked to the indicator bank, with a project per country, plus Data Explorer visuals, a presentation, and an A4 report.",
   "author": "Haytham Alsoufi",
   "license": "MIT"

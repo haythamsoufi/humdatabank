@@ -5,9 +5,22 @@ import { conditionTypesMap } from '../../../lib/condition-operators.js';
 
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
-// Built-in metadata tokens (available globally from form_builder.html)
+// Built-in metadata tokens (available globally from form_builder.html).
+// country_iso is a relevance-condition token (assignment country), not a label
+// variable, so it is added here rather than in that label list. The stored value
+// stays an ISO code; the builder only shows the country name.
 function getBuiltInMetadataOptions() {
     const metadata = Array.isArray(window.builtInMetadataVariables) ? window.builtInMetadataVariables : [];
+    const conditionTokens = [
+        { key: 'country_iso', label: _t('Country') }
+    ];
+    const seen = new Set(
+        metadata.map(m => String(m?.key || '').trim()).filter(Boolean)
+    );
+    const combined = metadata.slice();
+    conditionTokens.forEach(token => {
+        if (!seen.has(token.key)) combined.push(token);
+    });
     // Map metadata keys to a simple type so the rule builder can choose condition operators.
     const typeByKey = {
         entity_id: 'Number',
@@ -15,9 +28,12 @@ function getBuiltInMetadataOptions() {
         entity_name_hierarchy: 'text',
         entity_type: 'text',
         template_name: 'text',
-        assignment_period: 'text'
+        assignment_period: 'text',
+        assignment_year: 'text',
+        country_iso: 'text',
+        country_iso2: 'text'
     };
-    return metadata
+    return combined
         .map(m => {
             const key = String(m?.key || '').trim();
             if (!key) return null;
@@ -73,6 +89,627 @@ function findTemplateItemByAnyId(allItems, idLike) {
     return null;
 }
 
+const MEMBERSHIP_TYPES = new Set(['in', 'not_in']);
+const EQUAL_TYPES = new Set(['equals', 'equal_to']);
+const COUNTRY_METADATA_KEYS = new Set(['country_iso', 'country_iso2']);
+
+let countryCatalog = null;
+let countryCatalogPromise = null;
+
+function membershipList(value) {
+    const raw = Array.isArray(value) ? value : String(value ?? '').split(',');
+    const seen = [];
+    raw.forEach((item) => {
+        const text = String(item ?? '').trim();
+        if (text && !seen.includes(text)) seen.push(text);
+    });
+    return seen;
+}
+
+function formatMembership(value) {
+    return `{${membershipList(value).join(', ')}}`;
+}
+
+function countryDisplayName(code, isoKey) {
+    const normalized = String(code || '').trim().toUpperCase();
+    if (!normalized || !Array.isArray(countryCatalog)) return '';
+    const field = isoKey === 'country_iso2' ? 'iso2' : 'iso3';
+    const row = countryCatalog.find((country) => (
+        String(country?.[field] || '').trim().toUpperCase() === normalized
+    ));
+    return String(row?.localized_name || row?.name || '').trim();
+}
+
+function formatCountryMembership(value, isoKey) {
+    const codes = membershipList(value);
+    const names = codes.map((code) => countryDisplayName(code, isoKey)).filter(Boolean);
+    if (names.length === codes.length && names.length) return `{${names.join(', ')}}`;
+    if (codes.length === 1) return _t('1 country');
+    return `${codes.length} ${_t('countries')}`;
+}
+
+function countryConditionPhrase(condition) {
+    const isoKey = condition.item_id;
+    if (MEMBERSHIP_TYPES.has(condition.condition_type)) {
+        const list = formatCountryMembership(condition.value, isoKey);
+        return condition.condition_type === 'not_in' ? `is not in ${list}` : `is in ${list}`;
+    }
+    const name = countryDisplayName(condition.value, isoKey);
+    const shown = name ? `"${name}"` : _t('a country');
+    if (condition.condition_type === 'not_equals' || condition.condition_type === 'not_equal_to') {
+        return `does not equal ${shown}`;
+    }
+    if (EQUAL_TYPES.has(condition.condition_type)) return `equals ${shown}`;
+    return `${condition.condition_type} ${shown}`;
+}
+
+/**
+ * An OR of "country ISO equals X" lines is one membership test.
+ * Collapse those for display and for the rule editor; leave every other rule as stored.
+ */
+function collapseCountryEquals(rule) {
+    if (!rule || !Array.isArray(rule.conditions) || (rule.logic || 'AND') !== 'OR') {
+        return rule;
+    }
+    const groups = new Map();
+    rule.conditions.forEach((condition, index) => {
+        if (!condition || !EQUAL_TYPES.has(condition.condition_type)) return;
+        if (condition.value_field_id !== null && condition.value_field_id !== undefined) return;
+        const key = String(condition.item_id || '');
+        if (!COUNTRY_METADATA_KEYS.has(key)) return;
+        const text = String(condition.value ?? '').trim();
+        if (!text) return;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(index);
+    });
+
+    const skip = new Set();
+    const replacements = new Map();
+    groups.forEach((indexes) => {
+        if (indexes.length < 2) return;
+        const values = [];
+        indexes.forEach((index) => {
+            const text = String(rule.conditions[index].value).trim();
+            if (!values.includes(text)) values.push(text);
+            skip.add(index);
+        });
+        const first = indexes[0];
+        skip.delete(first);
+        replacements.set(first, {
+            item_id: rule.conditions[first].item_id,
+            condition_type: 'in',
+            value: values
+        });
+    });
+    if (replacements.size === 0) return rule;
+
+    const conditions = [];
+    rule.conditions.forEach((condition, index) => {
+        if (skip.has(index)) return;
+        conditions.push(replacements.get(index) || condition);
+    });
+    return { ...rule, conditions };
+}
+
+function conditionPhrase(condition, allItems) {
+    if (COUNTRY_METADATA_KEYS.has(String(condition.item_id || ''))) {
+        return countryConditionPhrase(condition);
+    }
+    let valueDisplay = '';
+    if (MEMBERSHIP_TYPES.has(condition.condition_type)) {
+        valueDisplay = formatMembership(condition.value);
+    } else if (condition.value_field_id !== null && condition.value_field_id !== undefined) {
+        const refItem = findTemplateItemByAnyId(allItems, condition.value_field_id);
+        valueDisplay = refItem ? `field "${refItem.label}"` : `field ID ${condition.value_field_id}`;
+    } else if (condition.value !== null && condition.value !== undefined) {
+        valueDisplay = `"${condition.value}"`;
+    }
+
+    switch (condition.condition_type) {
+        case 'is_empty':
+            return 'is empty';
+        case 'is_not_empty':
+            return 'is not empty';
+        case 'equals':
+        case 'equal_to':
+            return `equals ${valueDisplay}`;
+        case 'not_equals':
+        case 'not_equal_to':
+            return `does not equal ${valueDisplay}`;
+        case 'greater_than':
+            return `is greater than ${valueDisplay}`;
+        case 'greater_than_or_equal_to':
+            return `is greater than or equal to ${valueDisplay}`;
+        case 'less_than':
+            return `is less than ${valueDisplay}`;
+        case 'less_than_or_equal_to':
+            return `is less than or equal to ${valueDisplay}`;
+        case 'contains':
+            return `contains ${valueDisplay}`;
+        case 'not_contains':
+            return `does not contain ${valueDisplay}`;
+        case 'in':
+            return `is in ${valueDisplay}`;
+        case 'not_in':
+            return `is not in ${valueDisplay}`;
+        default:
+            return `${condition.condition_type} ${valueDisplay}`;
+    }
+}
+
+function loadCountryCatalog() {
+    if (countryCatalog) return Promise.resolve(countryCatalog);
+    if (!countryCatalogPromise) {
+        countryCatalogPromise = fetch('/api/v1/countrymap', {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+        })
+            .then((response) => (response.ok ? response.json() : []))
+            .then((payload) => {
+                const rows = Array.isArray(payload) ? payload : (payload && payload.countries) || [];
+                countryCatalog = rows;
+                return rows;
+            })
+            .catch(() => {
+                countryCatalogPromise = null;
+                return [];
+            });
+    }
+    return countryCatalogPromise;
+}
+
+function destroyCountrySelect(container) {
+    if (!container || !container.querySelectorAll) return;
+    container.querySelectorAll('.rule-country-picker').forEach((picker) => {
+        if (typeof picker._cleanup === 'function') picker._cleanup();
+    });
+}
+
+function ensureCountryPickerStyles() {
+    if (document.getElementById('rule-country-picker-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'rule-country-picker-styles';
+    style.textContent = `
+        .rule-country-controls { display: flex; align-items: center; gap: 0.25rem; }
+        .rule-country-toggle, .rule-country-expand {
+            height: 2.25rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            background: #fff;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+        }
+        .rule-country-toggle {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0 0.5rem;
+            text-align: left;
+            color: #111827;
+        }
+        .rule-country-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rule-country-expand {
+            flex: none;
+            width: 2.25rem;
+            color: #4b5563;
+        }
+        .rule-country-expand.is-open { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .rule-country-expand:disabled { opacity: 0.4; cursor: default; }
+        .rule-country-panel {
+            position: fixed;
+            z-index: 80;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            padding: 0.5rem;
+        }
+        .rule-country-search {
+            display: block;
+            width: 100%;
+            margin-bottom: 0.5rem;
+            padding: 0.35rem 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        .rule-country-options { max-height: 220px; overflow: auto; }
+        .rule-country-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.15rem;
+            font-size: 0.875rem;
+            color: #111827;
+        }
+        .rule-country-sheet {
+            flex: 1 0 100%;
+            width: 100%;
+            margin: 0.5rem 0 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .rule-country-sheet[hidden],
+        .rule-country-suggest[hidden] { display: none !important; }
+        .rule-country-suggest {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+        .rule-country-suggest button {
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            background: #fff;
+            padding: 0.15rem 0.45rem;
+            font-size: 0.75rem;
+            line-height: 1.25rem;
+            color: #111827;
+        }
+        .rule-country-suggest button:hover,
+        .rule-country-suggest button.is-active { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .rule-country-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+        .rule-country-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.1rem 0.35rem;
+            border-radius: 0.25rem;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 0.75rem;
+            line-height: 1.25rem;
+            white-space: nowrap;
+        }
+        .rule-country-chip button {
+            border: 0;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function readStaticRuleValue(valueInput) {
+    if (!valueInput) return undefined;
+    if (valueInput.multiple) {
+        const selected = Array.from(valueInput.selectedOptions)
+            .map((option) => option.value.trim())
+            .filter(Boolean);
+        return selected.length ? selected : undefined;
+    }
+    if (valueInput.dataset.valueList === 'true') {
+        const selected = membershipList(valueInput.value);
+        return selected.length ? selected : undefined;
+    }
+    return valueInput.value ? valueInput.value : undefined;
+}
+
+function countryRows(catalog, isoKey) {
+    const codeField = isoKey === 'country_iso2' ? 'iso2' : 'iso3';
+    const seen = new Set();
+    return (catalog || [])
+        .filter((country) => country && String(country[codeField] || '').trim())
+        .map((country) => {
+            const code = String(country[codeField]).trim().toUpperCase();
+            const name = String(country.localized_name || country.name || '').trim();
+            if (!name) return null;
+            return { code, label: name };
+        })
+        .filter((country) => {
+            if (!country || !country.code || seen.has(country.code)) return false;
+            seen.add(country.code);
+            return true;
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function buildCountryPicker(isoKey, existingValue) {
+    ensureCountryPickerStyles();
+    const picker = document.createElement('div');
+    picker.className = 'rule-country-picker';
+
+    const select = document.createElement('select');
+    select.multiple = true;
+    select.hidden = true;
+    select.className = 'rule-value-input rule-value-countries';
+    select.setAttribute('aria-hidden', 'true');
+
+    const controls = document.createElement('div');
+    controls.className = 'rule-country-controls';
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'rule-country-toggle';
+    const summary = document.createElement('span');
+    const caret = document.createElement('i');
+    caret.className = 'fas fa-chevron-down';
+    caret.setAttribute('aria-hidden', 'true');
+    toggle.append(summary, caret);
+
+    const expand = document.createElement('button');
+    expand.type = 'button';
+    expand.className = 'rule-country-expand';
+    expand.title = _t('Show selected countries');
+    const expandIcon = document.createElement('i');
+    expandIcon.className = 'fas fa-list';
+    expandIcon.setAttribute('aria-hidden', 'true');
+    expand.appendChild(expandIcon);
+
+    const panel = document.createElement('div');
+    panel.className = 'rule-country-panel';
+    panel.hidden = true;
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'rule-country-search';
+    search.placeholder = _t('Search countries');
+    search.setAttribute('aria-label', _t('Search countries'));
+    const list = document.createElement('div');
+    list.className = 'rule-country-options';
+    panel.append(search, list);
+
+    const sheet = document.createElement('div');
+    sheet.className = 'rule-country-sheet';
+    sheet.hidden = true;
+    const addBox = document.createElement('input');
+    addBox.type = 'search';
+    addBox.className = 'rule-country-search';
+    addBox.placeholder = _t('Type to search and add a country');
+    addBox.setAttribute('aria-label', _t('Type to search and add a country'));
+    const suggest = document.createElement('div');
+    suggest.className = 'rule-country-suggest';
+    suggest.hidden = true;
+    const chips = document.createElement('div');
+    chips.className = 'rule-country-chips';
+    sheet.append(addBox, suggest, chips);
+
+    controls.append(toggle, expand);
+    picker.append(select, controls, panel);
+    picker._sheet = sheet;
+
+    const initial = membershipList(existingValue).map((code) => code.toUpperCase());
+    let countries = initial.map((code) => ({ code, label: countryDisplayName(code, isoKey) }));
+    const chosen = new Set(initial);
+    let expanded = false;
+    let disposed = false;
+
+    function syncSelect() {
+        select.replaceChildren();
+        countries.forEach((country) => {
+            const option = document.createElement('option');
+            option.value = country.code;
+            option.textContent = country.label;
+            option.selected = chosen.has(country.code);
+            select.appendChild(option);
+        });
+    }
+
+    function renderSummary() {
+        const count = chosen.size;
+        if (count === 0) summary.textContent = _t('Select countries');
+        else if (count === 1) {
+            const only = countries.find((country) => chosen.has(country.code));
+            summary.textContent = only && only.label ? only.label : _t('1 country');
+        } else summary.textContent = `${count} ${_t('countries')}`;
+        toggle.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+        expand.title = expanded ? _t('Hide selected countries') : _t('Show selected countries');
+        expand.classList.toggle('is-open', expanded);
+    }
+
+    function renderChips() {
+        chips.replaceChildren();
+        countries.filter((country) => chosen.has(country.code) && country.label).forEach((country) => {
+            const chip = document.createElement('span');
+            chip.className = 'rule-country-chip';
+            chip.appendChild(document.createTextNode(country.label));
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', _t('Remove'));
+            remove.addEventListener('click', () => setChecked(country.code, false));
+            chip.appendChild(remove);
+            chips.appendChild(chip);
+        });
+    }
+
+    function renderSuggestions() {
+        const query = addBox.value.trim().toLowerCase();
+        suggest.replaceChildren();
+        if (!query) {
+            suggest.hidden = true;
+            return;
+        }
+        const matches = countries.filter((country) => (
+            country.label
+            && !chosen.has(country.code)
+            && country.label.toLowerCase().includes(query)
+        )).slice(0, 12);
+        if (!matches.length) {
+            suggest.hidden = true;
+            return;
+        }
+        suggest.hidden = false;
+        matches.forEach((country, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = country.label;
+            if (index === 0) button.classList.add('is-active');
+            button.addEventListener('mousedown', (event) => event.preventDefault());
+            button.addEventListener('click', () => addCountry(country.code));
+            suggest.appendChild(button);
+        });
+    }
+
+    function addCountry(code) {
+        setChecked(code, true);
+        addBox.value = '';
+        suggest.hidden = true;
+        addBox.focus();
+    }
+
+    function showSheet(open) {
+        expanded = open;
+        sheet.hidden = !open;
+        if (!open) {
+            addBox.value = '';
+            suggest.hidden = true;
+        }
+        renderSummary();
+        renderChips();
+        if (open) addBox.focus();
+    }
+
+    function renderOptions() {
+        const query = search.value.trim().toLowerCase();
+        list.replaceChildren();
+        countries.forEach((country) => {
+            if (!country.label) return;
+            if (query && !country.label.toLowerCase().includes(query)) return;
+            const label = document.createElement('label');
+            label.className = 'rule-country-option';
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.value = country.code;
+            box.checked = chosen.has(country.code);
+            box.addEventListener('change', () => setChecked(country.code, box.checked));
+            label.append(box, document.createTextNode(country.label));
+            list.appendChild(label);
+        });
+    }
+
+    function setChecked(code, on) {
+        if (on) chosen.add(code);
+        else chosen.delete(code);
+        syncSelect();
+        renderSummary();
+        renderChips();
+        renderSuggestions();
+        const box = list.querySelector(`input[value="${code}"]`);
+        if (box) box.checked = on;
+    }
+
+    function positionPanel() {
+        const rect = toggle.getBoundingClientRect();
+        const width = Math.max(rect.width, 280);
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+        panel.style.width = `${width}px`;
+        panel.style.left = `${left}px`;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        if (spaceBelow < 240 && rect.top > spaceBelow) {
+            panel.style.top = 'auto';
+            panel.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+        } else {
+            panel.style.bottom = 'auto';
+            panel.style.top = `${rect.bottom + 4}px`;
+        }
+    }
+
+    function closePanel() {
+        panel.hidden = true;
+        renderSummary();
+    }
+
+    function openPanel() {
+        panel.hidden = false;
+        positionPanel();
+        renderSummary();
+        search.focus();
+    }
+
+    function onDocumentClick(event) {
+        if (panel.hidden || picker.contains(event.target)) return;
+        closePanel();
+    }
+
+    function onKeyDown(event) {
+        if (event.key === 'Escape' && !panel.hidden) closePanel();
+    }
+
+    const dialog = () => picker.closest('[role="dialog"]');
+    function onDialogScroll(event) {
+        if (panel.hidden || panel.contains(event.target)) return;
+        positionPanel();
+    }
+
+    function onResize() {
+        if (!panel.hidden) positionPanel();
+    }
+
+    toggle.addEventListener('click', () => {
+        if (panel.hidden) openPanel();
+        else closePanel();
+    });
+    expand.addEventListener('click', () => {
+        showSheet(!expanded);
+    });
+    search.addEventListener('input', renderOptions);
+    addBox.addEventListener('input', renderSuggestions);
+    addBox.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const first = suggest.querySelector('button');
+            if (first) first.click();
+        } else if (event.key === 'Escape') {
+            suggest.hidden = true;
+        }
+    });
+    document.addEventListener('click', onDocumentClick);
+    document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('resize', onResize);
+
+    function bindDialogScroll() {
+        if (disposed || picker._scrollBound) return;
+        const host = dialog();
+        if (!host) return;
+        host.addEventListener('scroll', onDialogScroll);
+        picker._scrollBound = true;
+    }
+
+    picker._cleanup = () => {
+        disposed = true;
+        document.removeEventListener('click', onDocumentClick);
+        document.removeEventListener('keydown', onKeyDown);
+        window.removeEventListener('resize', onResize);
+        const host = dialog();
+        if (host) host.removeEventListener('scroll', onDialogScroll);
+        if (sheet.parentNode) sheet.remove();
+    };
+
+    function applyCatalog(catalog) {
+        if (disposed || !catalog) return;
+        const rows = countryRows(catalog, isoKey);
+        const known = new Set(rows.map((country) => country.code));
+        chosen.forEach((code) => {
+            if (!known.has(code)) rows.push({ code, label: countryDisplayName(code, isoKey) || _t('Country') });
+        });
+        rows.sort((a, b) => a.label.localeCompare(b.label));
+        countries = rows;
+        syncSelect();
+        renderOptions();
+        renderSummary();
+        renderChips();
+        renderSuggestions();
+        bindDialogScroll();
+    }
+
+    syncSelect();
+    renderOptions();
+    renderSummary();
+    // The caller inserts the picker after this returns. A catalog that is already
+    // loaded must still be applied; bailing out while the node is detached left
+    // the dropdown with only the countries already selected.
+    if (countryCatalog) applyCatalog(countryCatalog);
+    else loadCountryCatalog().then(applyCatalog);
+    queueMicrotask(bindDialogScroll);
+    return picker;
+}
+
 export const RuleBuilder = {
     // Initialize rule displays in the template list
     initializeRuleDisplays() {
@@ -85,7 +722,7 @@ export const RuleBuilder = {
                 try {
                     const humanText = this.parseRuleToText(ruleJson, ruleType);
                     element.textContent = humanText;
-                    element.title = ruleJson;
+                    element.title = humanText;
                 } catch (error) {
                     element.textContent = 'Error parsing rule';
                 }
@@ -93,12 +730,23 @@ export const RuleBuilder = {
                 element.textContent = 'No rule defined';
             }
         });
+        if (!countryCatalog) {
+            loadCountryCatalog().then((rows) => {
+                if (rows && rows.length) this.initializeRuleDisplays();
+            });
+        }
     },
+
+_setCountryCatalog(rows) {
+    countryCatalog = Array.isArray(rows) ? rows : null;
+    countryCatalogPromise = null;
+},
 
     // Parse rule JSON to human-readable text
     parseRuleToText(ruleJson, ruleType) {
         try {
-            const rule = typeof ruleJson === 'string' ? JSON.parse(ruleJson) : ruleJson;
+            const parsed = typeof ruleJson === 'string' ? JSON.parse(ruleJson) : ruleJson;
+            const rule = collapseCountryEquals(parsed);
 
             if (!rule || !rule.conditions || rule.conditions.length === 0) {
                 return 'No conditions defined';
@@ -112,56 +760,15 @@ export const RuleBuilder = {
                 let item = null;
                 let measureName = '';
 
-                // Built-in metadata condition
+                // Built-in metadata condition. Country rules keep an ISO code in
+                // storage and show the country name here.
+                if (condition.item_id && COUNTRY_METADATA_KEYS.has(String(condition.item_id))) {
+                    return `${_t('Country')} ${conditionPhrase(condition, allItems)}`;
+                }
                 if (condition.item_id && typeof condition.item_id === 'string') {
                     const meta = metadataOptions.find(m => m.key === condition.item_id);
                     if (meta) {
-                        let conditionText = '';
-                        let valueDisplay = '';
-                        if (condition.value_field_id !== null && condition.value_field_id !== undefined) {
-                            valueDisplay = `field ID ${condition.value_field_id}`;
-                        } else if (condition.value !== null && condition.value !== undefined) {
-                            valueDisplay = `"${condition.value}"`;
-                        }
-
-                        switch (condition.condition_type) {
-                            case 'is_empty':
-                                conditionText = 'is empty';
-                                break;
-                            case 'is_not_empty':
-                                conditionText = 'is not empty';
-                                break;
-                            case 'equals':
-                            case 'equal_to':
-                                conditionText = `equals ${valueDisplay}`;
-                                break;
-                            case 'not_equals':
-                            case 'not_equal_to':
-                                conditionText = `does not equal ${valueDisplay}`;
-                                break;
-                            case 'greater_than':
-                                conditionText = `is greater than ${valueDisplay}`;
-                                break;
-                            case 'greater_than_or_equal_to':
-                                conditionText = `is greater than or equal to ${valueDisplay}`;
-                                break;
-                            case 'less_than':
-                                conditionText = `is less than ${valueDisplay}`;
-                                break;
-                            case 'less_than_or_equal_to':
-                                conditionText = `is less than or equal to ${valueDisplay}`;
-                                break;
-                            case 'contains':
-                                conditionText = `contains ${valueDisplay}`;
-                                break;
-                            case 'not_contains':
-                                conditionText = `does not contain ${valueDisplay}`;
-                                break;
-                            default:
-                                conditionText = `${condition.condition_type} ${valueDisplay}`;
-                        }
-
-                        return `Metadata: ${meta.label} ${conditionText}`;
+                        return `${meta.label} ${conditionPhrase(condition, allItems)}`;
                     }
                 }
 
@@ -197,59 +804,7 @@ export const RuleBuilder = {
                     }
                 }
 
-                let conditionText = '';
-                // Check if using field reference or static value
-                let valueDisplay = '';
-                if (condition.value_field_id !== null && condition.value_field_id !== undefined) {
-                    // Find the referenced field
-                    const refItem = findTemplateItemByAnyId(allItems, condition.value_field_id);
-                    if (refItem) {
-                        valueDisplay = `field "${refItem.label}"`;
-                    } else {
-                        valueDisplay = `field ID ${condition.value_field_id}`;
-                    }
-                } else if (condition.value !== null && condition.value !== undefined) {
-                    valueDisplay = `"${condition.value}"`;
-                }
-
-                switch (condition.condition_type) {
-                    case 'is_empty':
-                        conditionText = 'is empty';
-                        break;
-                    case 'is_not_empty':
-                        conditionText = 'is not empty';
-                        break;
-                    case 'equals':
-                    case 'equal_to':
-                        conditionText = `equals ${valueDisplay}`;
-                        break;
-                    case 'not_equals':
-                    case 'not_equal_to':
-                        conditionText = `does not equal ${valueDisplay}`;
-                        break;
-                    case 'greater_than':
-                        conditionText = `is greater than ${valueDisplay}`;
-                        break;
-                    case 'greater_than_or_equal_to':
-                        conditionText = `is greater than or equal to ${valueDisplay}`;
-                        break;
-                    case 'less_than':
-                        conditionText = `is less than ${valueDisplay}`;
-                        break;
-                    case 'less_than_or_equal_to':
-                        conditionText = `is less than or equal to ${valueDisplay}`;
-                        break;
-                    case 'contains':
-                        conditionText = `contains ${valueDisplay}`;
-                        break;
-                    case 'not_contains':
-                        conditionText = `does not contain ${valueDisplay}`;
-                        break;
-                    default:
-                        conditionText = `${condition.condition_type} ${valueDisplay}`;
-                }
-
-                return `${itemLabel} ${conditionText}`;
+                return `${itemLabel} ${conditionPhrase(condition, allItems)}`;
             });
 
             const logic = rule.logic || 'AND';
@@ -348,6 +903,7 @@ export const RuleBuilder = {
 
                 // Only proceed if we have a valid rule object
                 if (rule && typeof rule === 'object' && rule !== null) {
+                    rule = collapseCountryEquals(rule);
                     if (rule.logic) {
                         logicSelect.value = rule.logic;
                     }
@@ -419,6 +975,7 @@ export const RuleBuilder = {
 
         // Add event listeners
         removeBtn.addEventListener('click', () => {
+            destroyCountrySelect(conditionDiv);
             conditionDiv.remove();
         });
 
@@ -763,6 +1320,15 @@ export const RuleBuilder = {
         const itemType = selectedOption?.dataset.itemType;
         const itemModel = selectedOption?.dataset.itemModel;
 
+        destroyCountrySelect(containerElement);
+        if (conditionLine) {
+            conditionLine.style.flexWrap = '';
+            conditionLine.style.alignItems = '';
+        }
+        containerElement.style.flex = '';
+        containerElement.style.width = '';
+        containerElement.style.minWidth = '';
+
         // Special no-value conditions
         const noValueConditions = ['is_empty', 'is_not_empty', 'is_yes', 'is_no'];
         if (noValueConditions.includes(selectedConditionType)) {
@@ -774,6 +1340,31 @@ export const RuleBuilder = {
             return;
         }
 
+        if (MEMBERSHIP_TYPES.has(selectedConditionType)) {
+            containerElement.replaceChildren();
+            if (COUNTRY_METADATA_KEYS.has(selectedItemId)) {
+                if (conditionLine) conditionLine.style.alignItems = 'flex-start';
+                const picker = buildCountryPicker(selectedItemId, existingValue);
+                containerElement.appendChild(picker);
+                if (conditionLine && picker._sheet) {
+                    conditionLine.insertAdjacentElement('afterend', picker._sheet);
+                }
+                return;
+            }
+            const listInput = document.createElement('input');
+            listInput.type = 'text';
+            listInput.placeholder = _t('Separate values with commas');
+            listInput.className = 'form-input block w-full text-sm border-gray-300 rounded-md rule-value-input';
+            listInput.dataset.valueList = 'true';
+            const existingList = membershipList(existingValue);
+            if (existingList.length) listInput.value = existingList.join(', ');
+            containerElement.appendChild(listInput);
+            return;
+        }
+
+        containerElement.style.flex = '';
+        containerElement.style.width = '';
+        containerElement.style.minWidth = '';
         // Clear container first
         containerElement.replaceChildren();
 
@@ -1004,9 +1595,11 @@ export const RuleBuilder = {
                         fieldId = parseInt(fieldMatch[2], 10);
                     }
                     condition.value_field_id = fieldId;
-                } else if (valueInput && valueInput.value) {
-                    // Static value
-                    condition.value = valueInput.value;
+                } else {
+                    const staticValue = readStaticRuleValue(valueInput);
+                    if (staticValue !== undefined) {
+                        condition.value = staticValue;
+                    }
                 }
 
                 conditions.push(condition);

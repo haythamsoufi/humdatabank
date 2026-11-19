@@ -125,10 +125,7 @@ def relevance_for_countries(iso3_codes: Sequence[str]) -> str:
         conditions = [{"item_id": "country_iso", "condition_type": "equal_to", "value": ""}]
         logic = "AND"
     else:
-        conditions = [
-            {"item_id": "country_iso", "condition_type": "equal_to", "value": code}
-            for code in codes
-        ]
+        conditions = [{"item_id": "country_iso", "condition_type": "in", "value": codes}]
         logic = "OR"
     return json.dumps({"logic": logic, "conditions": conditions})
 

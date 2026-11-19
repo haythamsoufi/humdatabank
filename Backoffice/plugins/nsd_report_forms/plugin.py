@@ -130,7 +130,7 @@ class NsdReportFormsPlugin(BasePlugin):
 
     @property
     def version(self) -> str:
-        return "0.18.0"
+        return "0.18.1"
 
     @property
     def description(self) -> str:

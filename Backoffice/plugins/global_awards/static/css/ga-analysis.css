@@ -296,8 +296,13 @@
     font-size: 0.875rem;
     color: #111827;
 }
+.gai-export__hint { margin: 0 0 0.5rem; font-size: 0.75rem; color: #6b7280; }
+.gai-export__phase { font-size: 0.75rem; color: #6b7280; }
+#gai-export-cycles { display: grid; gap: 0.45rem; }
 .gai-export__extra { padding: 0 1rem 0.5rem; }
 .gai-export__empty { padding: 0.5rem 1rem; color: #6b7280; font-size: 0.875rem; }
+.gai-export__hint { display: block; margin-top: 0.15rem; font-size: 0.75rem; line-height: 1.4; color: #6b7280; }
+.gai-export__status { margin: 0; padding: 0.5rem 1rem; font-size: 0.85rem; color: #b91c1c; }
 .gai-export__actions {
     display: flex;
     justify-content: flex-end;

@@ -606,6 +606,11 @@ def operation_overlays() -> Dict[str, dict]:
                 _q("country_iso3", _STR, "Alias of `iso3`."),
                 _q("year", _INT, "4-digit calendar year."),
                 _q("section", _STR, "Section name. See GET /upr for the list."),
+                _q(
+                    "area",
+                    _STR,
+                    "SP/EF area. A code (SP4) or a name (migration, Migration and displacement).",
+                ),
             ],
             "description_extra": "FDRS wins where both FDRS and Unified Reporting have a value. The body is `{data, meta}`.",
             "responses": {

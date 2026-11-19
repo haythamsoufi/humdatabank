@@ -274,6 +274,65 @@ body.gai-locked { overflow: hidden; }
 .gai-page .gai-table { font-size: 0.7rem; }
 .gai-page .gai-table th { position: static; }
 
+/* Optional AI summary: one block per section, as a slide or inside an A4 page. */
+.gai-ai { display: flex; flex-direction: column; gap: 0.7rem; }
+.gai-ai__badge {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.gai-ai__headline {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--gai-navy, #011e41);
+}
+.gai-ai__summary { margin: 0; font-size: 0.88rem; line-height: 1.55; color: #374151; }
+.gai-ai__cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.7rem; }
+.gai-ai__col {
+    padding: 0.6rem 0.8rem;
+    border-left: 3px solid var(--gai-navy, #011e41);
+    border-radius: 0.25rem;
+    background: #f9fafb;
+}
+.gai-ai__col--attention { border-left-color: var(--gai-amber, #f39200); }
+.gai-ai__col--steps { border-left-color: var(--gai-teal, #2a9d8f); }
+.gai-ai__label {
+    margin: 0 0 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #4b5563;
+}
+.gai-ai__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0;
+    padding-left: 1.05rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #1f2937;
+}
+.gai-slide--ai { justify-content: center; }
+.gai-slide--ai .gai-ai { gap: 1rem; }
+.gai-slide--ai .gai-ai__headline { font-size: 1.9rem; }
+.gai-slide--ai .gai-ai__summary { font-size: 1.1rem; }
+.gai-slide--ai .gai-ai__cols {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: none;
+    align-items: start;
+    gap: 1rem;
+}
+.gai-slide--ai .gai-ai__label { font-size: 0.78rem; }
+.gai-slide--ai .gai-ai__list { font-size: 0.95rem; }
+
 @media (max-width: 720px) {
     .gai-report__bar { flex-direction: column; align-items: stretch; }
     .gai-report__actions { width: 100%; }

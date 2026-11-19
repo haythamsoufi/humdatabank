@@ -31,6 +31,35 @@ def cycle_period_name(reference: str, slot: str) -> str:
     return name
 
 
+def _as_date(value) -> Optional[dt.date]:
+    if isinstance(value, dt.datetime):
+        return value.date()
+    if isinstance(value, dt.date):
+        return value
+    return None
+
+
+def cycle_phase(start, end, today: Optional[dt.date] = None) -> str:
+    """Where a reporting window sits relative to ``today``.
+
+    ``upcoming`` has not started, ``active`` is open (or has no dates), and
+    ``passed`` has already ended. The end date itself is still active.
+    """
+    day = today or dt.date.today()
+    window_start = _as_date(start)
+    window_end = _as_date(end)
+    if window_start is not None and day < window_start:
+        return "upcoming"
+    if window_end is not None and day > window_end:
+        return "passed"
+    return "active"
+
+
+def cycle_selected_by_default(phase: str) -> bool:
+    """Presentations include cycles that are open or already finished."""
+    return phase in ("active", "passed")
+
+
 def parse_cycle_slot(period_name: str) -> Optional[str]:
     """Return the slot label (Y1Q2 / Final) from a cycle or legacy shared period_name."""
     import re

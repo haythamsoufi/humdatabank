@@ -52,6 +52,12 @@
       {% if meta.filename %}
       <div><dt class="text-gray-500">{{ _('File') }}</dt><dd class="text-gray-900 break-all">{{ meta.filename }}</dd></div>
       {% endif %}
+      {% if meta.source_label %}
+      <div><dt class="text-gray-500">{{ _('Source') }}</dt><dd class="text-gray-900">{{ meta.source_label }}</dd></div>
+      {% endif %}
+      {% if meta.summary %}
+      <div class="col-span-2"><dt class="text-gray-500">{{ _('Summary') }}</dt><dd class="text-gray-900">{{ meta.summary }}</dd></div>
+      {% endif %}
       {% if meta.rounds %}
       <div class="col-span-2"><dt class="text-gray-500">{{ _('Rounds') }}</dt><dd class="text-gray-900">{{ meta.rounds|join(', ') }}</dd></div>
       {% endif %}
@@ -59,6 +65,16 @@
       <div><dt class="text-gray-500">{{ _('Dry run') }}</dt><dd class="text-amber-800 font-medium">{{ _('Yes') }}</dd></div>
       {% endif %}
     </dl>
+    {% if meta.counts %}
+    <div class="mt-4 pt-4 border-t border-gray-100">
+      <h3 class="text-sm font-medium text-gray-900 mb-2">{{ _('Import counts') }}</h3>
+      <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        {% for row in meta.counts %}
+        <div><dt class="text-gray-500">{{ row.label }}</dt><dd class="text-gray-900">{{ row.value }}</dd></div>
+        {% endfor %}
+      </dl>
+    </div>
+    {% endif %}
     {% if stats.documents_ran %}
     <div class="mt-4 pt-4 border-t border-gray-100">
       <h3 class="text-sm font-medium text-gray-900 mb-2">{{ _('Documents') }}</h3>

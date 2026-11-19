@@ -1,11 +1,24 @@
-{# Master import UI (embedded in plugin settings). Expects sheets, required_sheets, template_names. #}
+{# Master import UI (embedded in plugin settings). Expects sheets, required_sheets, template_names, disk_files, last_import, import_runs. #}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+{% from "macros/import_source_files.html" import disk_files as disk_file_table, import_activity as import_activity_panel %}
 <div id="nsd-import"
-     class="space-y-6 max-w-5xl"
+     class="space-y-6"
      data-upload-url="{{ url_for('nsd_import.upload') }}"
+     data-check-url="{{ url_for('nsd_import.check_stored', file_id='__FILE__') }}"
      data-run-url="{{ url_for('nsd_import.run_import') }}"
      data-status-url-prefix="{{ url_for('nsd_import.status', job_id='__JOB__') }}"
-     data-cancel-url-prefix="{{ url_for('nsd_import.cancel', job_id='__JOB__') }}"
-     data-sample-url="{{ url_for('nsd_import.download_blank') }}">
+     data-cancel-url-prefix="{{ url_for('nsd_import.cancel', job_id='__JOB__') }}">
+
+  {% call(file) disk_file_table(
+      disk_files,
+      empty_message='No workbook has been uploaded yet. A file you drop below is kept on disk with its name, size, and upload time.'
+  ) %}
+    {% if file.file_id %}
+    <button type="button" class="btn btn-secondary btn-sm" data-disk-check="{{ file.file_id }}">
+      Check this file
+    </button>
+    {% endif %}
+  {% endcall %}
 
   <div class="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
     <h3 class="text-base font-semibold text-gray-900">1. Choose the master workbook</h3>
@@ -18,7 +31,7 @@
       {% endfor %}.
       <a href="{{ url_for('nsd_import.download_blank') }}"
          class="text-red-700 hover:text-red-800 underline font-medium">Download an empty workbook</a>
-      with the right columns.
+      with the right columns. Dropped files stay on disk and show in the list above after you reload.
     </p>
     <p class="text-sm text-gray-600">
       The importer writes into these templates (created and published automatically if missing):
@@ -26,12 +39,17 @@
         <span class="font-medium text-gray-800">{{ n }}</span>{% if not loop.last %}, {% endif %}
       {% endfor %}.
     </p>
-    <div class="flex flex-wrap items-center gap-3">
-      <input type="file" id="nsdi-file" accept=".xlsx"
-             class="block w-full max-w-md text-sm text-gray-700">
-      <button type="button" class="btn btn-primary" id="nsdi-upload">Check workbook</button>
-      <span class="text-sm text-gray-500" id="nsdi-uploading" aria-live="polite"></span>
-    </div>
+    {% call excel_import_dropzone(
+        'nsd-import-dropzone',
+        input_id='nsd-import-file',
+        input_name='file',
+        required=false,
+        accept='.xlsx',
+        title='Drop the master workbook here or click to browse',
+        hint='Supported format: .xlsx — up to 40 MB',
+        max_size_bytes=40 * 1024 * 1024
+    ) %}{% endcall %}
+    <p class="text-sm text-gray-500" id="nsdi-uploading" aria-live="polite"></p>
   </div>
 
   <div class="rounded-lg border border-gray-200 bg-white p-5 space-y-4 hidden" id="nsdi-preview">
@@ -62,6 +80,8 @@
     <div class="text-sm text-gray-500" id="nsdi-progress" aria-live="polite"></div>
     <div id="nsdi-result" class="space-y-3 text-sm"></div>
   </div>
+
+  {{ import_activity_panel(last_import, import_runs) }}
 </div>
 
 <script nonce="{{ csp_nonce() }}">
@@ -73,6 +93,7 @@
   var csrfEl = document.querySelector('meta[name="csrf-token"]');
   var csrf = csrfEl ? csrfEl.getAttribute('content') : '';
   var fileId = null, jobId = null, timer = null;
+  var DZ = 'excel-io-dropzone';
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -111,60 +132,97 @@
       '<div class="text-xs text-gray-500">' + esc(label) + '</div></div>';
   }
 
-  $('nsdi-upload').addEventListener('click', function () {
-    var f = $('nsdi-file').files[0];
-    if (!f) { $('nsdi-uploading').textContent = 'Choose a file first.'; return; }
-    var fd = new FormData(); fd.append('file', f);
+  function showAnalysis(j) {
+    $('nsdi-uploading').textContent = '';
+    if (!j.success && !j.errors) {
+      $('nsdi-uploading').textContent = j.message || j.error || 'Upload failed.';
+      show('nsdi-preview', false);
+      show('nsdi-run-card', false);
+      return false;
+    }
+    fileId = j.file_id;
+    var html = '';
+    if (j.filename) {
+      html += '<p class="text-sm text-gray-700">Workbook: <b>' + esc(j.filename) + '</b></p>';
+    }
+    if (j.errors && j.errors.length) {
+      html += alertBox('err', '<b>This workbook cannot be imported:</b>' + list(j.errors.slice(0, 40)));
+    }
+    if (j.warnings && j.warnings.length) {
+      html += alertBox('warn', '<b>Warnings (' + j.warnings.length + '):</b>' + list(j.warnings.slice(0, 40)));
+    }
+    $('nsdi-messages').innerHTML = html;
+    var a = j.analysis, out = '';
+    if (a) {
+      if (a.problems.length) out += alertBox('err', list(a.problems));
+      out += '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
+        stat(a.projects.new, 'projects to create') +
+        stat(a.projects.existing, 'projects to update') +
+        stat(a.logframe_projects, 'projects with a logframe (' + a.logframe_rows + ' rows)') +
+        stat(Object.keys(a.schedule).map(function (k) { return a.schedule[k] + ' ' + k; }).join(', ') || 0, 'scheduled reports') +
+        stat(a.quarterly, 'quarterly reports with data') +
+        stat(a.final, 'final reports with data') + '</div>';
+      out += '<p>National Societies matched: <b>' + a.ns.matched + '</b> of ' + a.projects.total +
+        (a.ns.unmatched_count
+          ? ' · <b>' + a.ns.unmatched_count + '</b> names not found (these projects are skipped): ' +
+            esc(a.ns.unmatched_names.slice(0, 8).join('; ')) + (a.ns.unmatched_count > 8 ? ' …' : '')
+          : '') + '</p>';
+      out += '<p>Access by email: <b>' + a.access.matched + '</b> of ' + a.access.emails +
+        ' addresses already have accounts' +
+        (a.access.will_create || a.access.unknown
+          ? ' · <b>' + (a.access.will_create || a.access.unknown) +
+            '</b> will be created and added to Access Groups' +
+            (a.access.focal_group && a.access.pm_group
+              ? ' (<code>' + esc(a.access.focal_group) + '</code> → Final only; <code>' +
+                esc(a.access.pm_group) + '</code> → all reports)'
+              : '') +
+            (a.access.will_create_sample || a.access.unknown_sample
+              ? ', e.g. ' + esc((a.access.will_create_sample || a.access.unknown_sample).slice(0, 4).join(', '))
+              : '')
+          : '') + '.</p>';
+    }
+    $('nsdi-analysis').innerHTML = out;
+    show('nsdi-preview', true);
+    show('nsdi-run-card', !(j.errors && j.errors.length) && !(a && a.problems.length));
+    $('nsdi-result').innerHTML = '';
+    return !(j.errors && j.errors.length);
+  }
+
+  function checkFile(file, renderValidationStatus) {
+    var fd = new FormData();
+    fd.append('file', file);
     $('nsdi-uploading').textContent = 'Reading workbook…';
-    show('nsdi-preview', false); show('nsdi-run-card', false); $('nsdi-result').innerHTML = '';
-    post(root.dataset.uploadUrl, fd, true).then(function (j) {
-      $('nsdi-uploading').textContent = '';
-      if (!j.success && !j.errors) {
-        $('nsdi-uploading').textContent = j.message || j.error || 'Upload failed.';
-        return;
+    show('nsdi-preview', false);
+    show('nsdi-run-card', false);
+    $('nsdi-result').innerHTML = '';
+    return post(root.dataset.uploadUrl, fd, true).then(function (j) {
+      var ok = showAnalysis(j);
+      if (renderValidationStatus) {
+        if (!j.success && !j.errors) {
+          renderValidationStatus({ valid: false, message: j.message || j.error || 'Upload failed.' });
+        } else if (j.errors && j.errors.length) {
+          renderValidationStatus({ valid: false, message: 'This workbook cannot be imported.', errors: j.errors.slice(0, 8) });
+        } else {
+          renderValidationStatus({ valid: true, preview: { name: j.filename || file.name } });
+        }
       }
-      fileId = j.file_id;
-      var html = '';
-      if (j.errors && j.errors.length) {
-        html += alertBox('err', '<b>This workbook cannot be imported:</b>' + list(j.errors.slice(0, 40)));
-      }
-      if (j.warnings && j.warnings.length) {
-        html += alertBox('warn', '<b>Warnings (' + j.warnings.length + '):</b>' + list(j.warnings.slice(0, 40)));
-      }
-      $('nsdi-messages').innerHTML = html;
-      var a = j.analysis, out = '';
-      if (a) {
-        if (a.problems.length) out += alertBox('err', list(a.problems));
-        out += '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
-          stat(a.projects.new, 'projects to create') +
-          stat(a.projects.existing, 'projects to update') +
-          stat(a.logframe_projects, 'projects with a logframe (' + a.logframe_rows + ' rows)') +
-          stat(Object.keys(a.schedule).map(function (k) { return a.schedule[k] + ' ' + k; }).join(', ') || 0, 'scheduled reports') +
-          stat(a.quarterly, 'quarterly reports with data') +
-          stat(a.final, 'final reports with data') + '</div>';
-        out += '<p>National Societies matched: <b>' + a.ns.matched + '</b> of ' + a.projects.total +
-          (a.ns.unmatched_count
-            ? ' · <b>' + a.ns.unmatched_count + '</b> names not found (these projects are skipped): ' +
-              esc(a.ns.unmatched_names.slice(0, 8).join('; ')) + (a.ns.unmatched_count > 8 ? ' …' : '')
-            : '') + '</p>';
-        out += '<p>Access by email: <b>' + a.access.matched + '</b> of ' + a.access.emails +
-          ' addresses already have accounts' +
-          (a.access.will_create || a.access.unknown
-            ? ' · <b>' + (a.access.will_create || a.access.unknown) +
-              '</b> will be created and added to Access Groups' +
-              (a.access.focal_group && a.access.pm_group
-                ? ' (<code>' + esc(a.access.focal_group) + '</code> → Final only; <code>' +
-                  esc(a.access.pm_group) + '</code> → all reports)'
-                : '') +
-              (a.access.will_create_sample || a.access.unknown_sample
-                ? ', e.g. ' + esc((a.access.will_create_sample || a.access.unknown_sample).slice(0, 4).join(', '))
-                : '')
-            : '') + '.</p>';
-      }
-      $('nsdi-analysis').innerHTML = out;
-      show('nsdi-preview', true);
-      show('nsdi-run-card', !(j.errors && j.errors.length) && !(a && a.problems.length));
-    }).catch(function () { $('nsdi-uploading').textContent = 'Upload failed.'; });
+      return ok;
+    }).catch(function () {
+      $('nsdi-uploading').textContent = 'Upload failed.';
+      if (renderValidationStatus) renderValidationStatus({ valid: false, message: 'Upload failed.' });
+    });
+  }
+
+  root.addEventListener('click', function (event) {
+    var btn = event.target.closest('[data-disk-check]');
+    if (!btn || !root.contains(btn)) return;
+    var id = btn.getAttribute('data-disk-check');
+    if (!id) return;
+    $('nsdi-uploading').textContent = 'Reading workbook on disk…';
+    show('nsdi-preview', false);
+    show('nsdi-run-card', false);
+    post(root.dataset.checkUrl.replace('__FILE__', encodeURIComponent(id)), {}).then(showAnalysis)
+      .catch(function () { $('nsdi-uploading').textContent = 'Could not read that file.'; });
   });
 
   function poll() {
@@ -190,6 +248,9 @@
               esc(k.replace(/_/g, ' ')) + '</td><td class="px-3 py-1.5 font-medium text-gray-900">' +
               esc(s[k]) + '</td></tr>';
           }).join('') + '</tbody></table></div>';
+      }
+      if (res.change_log_url) {
+        html += '<p><a class="text-blue-700 hover:underline" href="' + esc(res.change_log_url) + '">View change log</a></p>';
       }
       if (res.messages && res.messages.length) {
         html += alertBox('warn', list(res.messages.slice(0, 40)));
@@ -217,5 +278,29 @@
   $('nsdi-cancel').addEventListener('click', function () {
     if (jobId) post(jobUrl(root.dataset.cancelUrlPrefix, jobId), {});
   });
+
+  import({{ static_url('js/components/excel-import-dropzone.js')|tojson }})
+    .then(function (mod) {
+      mod.initExcelImportDropzone('#nsd-import-dropzone', {
+        acceptExtensions: ['.xlsx'],
+        maxSizeBytes: 40 * 1024 * 1024,
+        invalidFileTypeLabel: 'Please upload an Excel workbook (.xlsx).',
+        maxSizeLabel: 'File is too large (max 40 MB).',
+        buildValidPreviewHtml: function (preview) {
+          var name = preview && preview.name ? esc(preview.name) : 'Workbook';
+          return '<div class="' + DZ + '__preview"><p class="' + DZ + '__preview-line ' + DZ + '__preview-line--success">' +
+            '<i class="fas fa-check-circle" aria-hidden="true"></i><span>' + name + ' checked. Review the preview below.</span></p></div>';
+        },
+        onFileSelected: function (file, ctx) {
+          var statusEl = ctx.dropzone.querySelector('.' + DZ + '__status');
+          if (statusEl) {
+            statusEl.className = DZ + '__status ' + DZ + '__status--pending';
+            statusEl.innerHTML = '<div class="' + DZ + '__preview"><p class="' + DZ + '__preview-line ' + DZ + '__preview-line--pending">' +
+              '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i><span>Reading workbook…</span></p></div>';
+          }
+          checkFile(file, ctx.renderValidationStatus);
+        }
+      });
+    });
 })();
 </script>

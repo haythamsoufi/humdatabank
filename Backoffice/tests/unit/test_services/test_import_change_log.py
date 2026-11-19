@@ -12,9 +12,12 @@ from app.services.imports.import_change_log import (
     is_noop_import_change,
     is_valid_import_log_id,
     iter_import_log_changes,
+    latest_import_run,
+    list_import_runs,
     matrix_ns_ids,
     persist_import_change_log,
     present_matrix_change,
+    publish_import_log,
     staged_payload_changes,
 )
 
@@ -336,3 +339,42 @@ class TestSetImportAuditDetails:
         assert captured["import_kind"] == "fdrs_data_sync"
         assert captured["change_log_url"].endswith(f"/admin/import-logs/{log_id}")
         assert captured["dry_run"] is True
+
+
+class TestImportRunHistory:
+    def test_publish_remembers_the_newest_run_and_prefers_a_real_import(self, tmp_path):
+        preview_id = "a" * 32
+        import_id = "b" * 32
+        publish_import_log(
+            kind="global_awards_logframe",
+            log_id=preview_id,
+            filename="preview.xlsx",
+            source="disk",
+            dry_run=True,
+            success=True,
+            summary="Preview only",
+            counts=[{"label": "Sections", "value": 3}],
+            changes=[{"op": "link", "label": "Volunteers", "new_value": "bank #1"}],
+            log_dir=str(tmp_path),
+            audit=False,
+        )
+        publish_import_log(
+            kind="global_awards_logframe",
+            log_id=import_id,
+            filename="Annex.xlsx",
+            source="upload",
+            dry_run=False,
+            success=True,
+            summary="Imported",
+            counts=[{"label": "Sections", "value": 4}],
+            log_dir=str(tmp_path),
+            audit=False,
+        )
+        runs = list_import_runs("global_awards_logframe", log_dir=str(tmp_path))
+        assert [row["log_id"] for row in runs] == [import_id, preview_id]
+        assert runs[0]["source_label"] == "Uploaded file"
+        assert runs[0]["counts"] == [{"label": "Sections", "value": 4}]
+        assert latest_import_run(runs)["log_id"] == import_id
+        summary = json.loads((tmp_path / f"{import_id}.json").read_text(encoding="utf-8"))
+        assert summary["meta"]["source_label"] == "Uploaded file"
+        assert summary["meta"]["counts"][0]["label"] == "Sections"

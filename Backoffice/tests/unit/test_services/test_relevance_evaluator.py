@@ -106,6 +106,24 @@ def test_is_empty_and_is_not_empty():
     ) is True
 
 
+def test_metadata_in_and_not_in():
+    raw = json.dumps({
+        'logic': 'OR',
+        'conditions': [{
+            'item_id': 'country_iso',
+            'condition_type': 'in',
+            'value': ['BGD', 'SYR'],
+        }],
+    })
+    assert evaluate_relevance_condition(raw, {'country_iso': 'BGD'}) is True
+    assert evaluate_relevance_condition(raw, {'country_iso': 'FRA'}) is False
+    assert evaluate_relevance_condition(raw, {'country_iso': ''}) is False
+
+    excluded = _condition('country_iso', 'not_in', 'BGD, SYR')
+    assert evaluate_relevance_condition(excluded, {'country_iso': 'FRA'}) is True
+    assert evaluate_relevance_condition(excluded, {'country_iso': 'SYR'}) is False
+
+
 def test_numeric_comparison_operators():
     raw = _condition('assignment_year', 'greater_than_or_equal_to', '2026')
     assert evaluate_relevance_condition(raw, {'assignment_year': '2027'}) is True

@@ -21,7 +21,7 @@ from app.models import (
     Project,
 )
 from app.models.enums import AssignmentScope, EntityType
-from app.services.projects.service import parse_cycle_slot
+from app.services.projects.service import cycle_phase, cycle_selected_by_default, parse_cycle_slot
 from app.utils.common.datetime_helpers import utcnow
 
 from plugins.global_awards.constants import PORTFOLIO, TEMPLATE_NAME
@@ -119,11 +119,57 @@ def _empty(reason: str, message: str) -> dict:
     }
 
 
+def resolve_cycle_slots(
+    cycle: Optional[str] = None,
+    cycles: Optional[Sequence[str]] = None,
+) -> Optional[set]:
+    """Slots to keep. ``None`` means every cycle; an empty set means none.
+
+    ``cycles`` is an explicit selection (the presentation). ``cycle`` is the
+    single tab filter, and only applies when ``cycles`` was not provided.
+    """
+    if cycles is not None:
+        return {slot.strip() for slot in cycles if (slot or "").strip()}
+    token = (cycle or "").strip()
+    return {token} if token else None
+
+
+def cycle_catalog(today: Optional[dt.date] = None) -> List[dict]:
+    """Official cycles with the core phase flag the presentation uses.
+
+    ``present`` is true for cycles that are active or have already passed.
+    """
+    day = today or utcnow().date()
+    rows = []
+    for cycle in official_cycles():
+        phase = cycle_phase(cycle.start, cycle.end, day)
+        rows.append(
+            {
+                "slot": cycle.slot,
+                "kind": cycle.kind,
+                "due": cycle.country_due.isoformat(),
+                "start": cycle.start.isoformat(),
+                "end": cycle.end.isoformat(),
+                "phase": phase,
+                "present": cycle_selected_by_default(phase),
+            }
+        )
+    return rows
+
+
+def listed_cycle_slots(wanted: Optional[set]) -> List[str]:
+    slots = [cycle.slot for cycle in official_cycles()]
+    if wanted is None:
+        return slots
+    return [slot for slot in slots if slot in wanted]
+
+
 def build_analysis(
     *,
     region: Optional[str] = None,
     country_id: Optional[int] = None,
     cycle: Optional[str] = None,
+    cycles: Optional[Sequence[str]] = None,
 ) -> dict:
     """Portfolio snapshot, reporting coverage, and target vs actual for Global Awards."""
     version = (
@@ -148,7 +194,7 @@ def build_analysis(
         payload["meta"]["template_id"] = version.template_id
         payload["ready"] = True
         payload["kpis"] = _kpis(projects=[], items=items, reports=[], answers={})
-        payload["filters"] = _filters(projects, official_cycles())
+        payload["filters"] = _filters(projects)
         payload["charts"] = _structure_charts(items, sections, [])
         payload["tables"]["indicators"] = _indicator_table(items, sections, {}, {}, None)
         return payload
@@ -161,15 +207,16 @@ def build_analysis(
     filtered_projects = _apply_filters(projects, region=region, country_id=country_id)
     filtered_ids = {row["id"] for row in filtered_projects}
     filtered_reports = [row for row in reports if row["project_id"] in filtered_ids]
-    if cycle:
-        filtered_reports = [row for row in filtered_reports if row["slot"] == cycle]
+    wanted = resolve_cycle_slots(cycle, cycles)
+    if wanted is not None:
+        filtered_reports = [row for row in filtered_reports if row["slot"] in wanted]
 
     selected_iso3 = {row["iso3"] for row in filtered_projects if row["iso3"]}
     country_targets = _targets_by_country(filtered_projects)
     latest_by_item = _latest_numeric(filtered_reports, answers, items)
 
     charts = _structure_charts(items, sections, filtered_projects)
-    charts.extend(_reporting_charts(filtered_reports, official_cycles(), cycle=cycle))
+    charts.extend(_reporting_charts(filtered_reports, official_cycles(), slots=wanted))
     charts.extend(_progress_charts(items, sections, selected_iso3, country_targets, latest_by_item))
 
     return {
@@ -188,9 +235,10 @@ def build_analysis(
             "region": region or "",
             "country_id": country_id,
             "cycle": cycle or "",
+            "cycles": listed_cycle_slots(wanted),
         },
         "kpis": _kpis(filtered_projects, items, filtered_reports, answers),
-        "filters": _filters(projects, official_cycles()),
+        "filters": _filters(projects),
         "charts": charts,
         "tables": {
             "countries": _country_table(filtered_projects, filtered_reports, items, answers),
@@ -198,7 +246,7 @@ def build_analysis(
         },
         "countries": _country_summaries(filtered_projects, filtered_reports, items, answers),
         "indicators": _indicator_summaries(items, sections, selected_iso3, country_targets, latest_by_item),
-        "cycles": _cycle_summaries(filtered_reports),
+        "cycles": _cycle_summaries(filtered_reports, slots=wanted),
         "sections": _section_summaries(items, sections, selected_iso3, latest_by_item),
     }
 
@@ -398,7 +446,7 @@ def _apply_filters(
     return rows
 
 
-def _filters(projects: List[dict], cycles) -> dict:
+def _filters(projects: List[dict]) -> dict:
     regions = sorted({row["region"] for row in projects if row["region"]})
     countries = [
         {"id": row["country_id"], "name": row["country"], "iso3": row["iso3"], "region": row["region"]}
@@ -407,7 +455,7 @@ def _filters(projects: List[dict], cycles) -> dict:
     return {
         "regions": regions,
         "countries": countries,
-        "cycles": [{"slot": cycle.slot, "kind": cycle.kind, "due": cycle.country_due.isoformat()} for cycle in cycles],
+        "cycles": cycle_catalog(),
     }
 
 
@@ -550,10 +598,9 @@ def _structure_charts(items: List[dict], sections: List[dict], projects: List[di
     return charts
 
 
-def _reporting_charts(reports: List[dict], cycles, *, cycle: Optional[str]) -> List[dict]:
-    slots = [row.slot for row in cycles]
-    if cycle and cycle in slots:
-        slots = [cycle]
+def _reporting_charts(reports: List[dict], cycles, *, slots: Optional[set]) -> List[dict]:
+    wanted = slots
+    slots = [row.slot for row in cycles if wanted is None or row.slot in wanted]
     buckets = ("pending", "progress", "submitted", "approved")
     labels = {
         "pending": _("Not started"),
@@ -740,10 +787,14 @@ def _indicator_summaries(
     return summaries
 
 
-def _cycle_summaries(reports: List[dict]) -> List[dict]:
+def _cycle_summaries(reports: List[dict], *, slots: Optional[set] = None) -> List[dict]:
     by_slot: Dict[str, dict] = {}
+    today = utcnow().date()
     for cycle in official_cycles():
+        if slots is not None and cycle.slot not in slots:
+            continue
         by_slot[cycle.slot] = {
+            "phase": cycle_phase(cycle.start, cycle.end, today),
             "slot": cycle.slot,
             "kind": cycle.kind,
             "start": cycle.start.isoformat(),

@@ -886,6 +886,259 @@ def count_import_log_changes(
     return n
 
 
+_HISTORY_LIMIT = 12
+_KIND_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
+_SOURCE_LABELS = {
+    "disk": "Workbook on disk",
+    "upload": "Uploaded file",
+    "stored": "File on disk",
+}
+
+
+def _check_import_kind(kind: str) -> str:
+    text = str(kind or "").strip()
+    if not _KIND_RE.fullmatch(text):
+        raise ValueError("Invalid import kind")
+    return text
+
+
+def _history_rel(kind: str) -> str:
+    return f"history/{_check_import_kind(kind)}.json"
+
+
+def _history_local_path(kind: str, log_dir: Optional[str]) -> str:
+    folder = os.path.join(import_logs_dir(log_dir), "history")
+    os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, f"{_check_import_kind(kind)}.json")
+
+
+def _clean_counts(counts: Optional[Iterable[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    cleaned: List[Dict[str, Any]] = []
+    for row in counts or []:
+        if not isinstance(row, dict):
+            continue
+        label = str(row.get("label") or "").strip()
+        if not label:
+            continue
+        value = row.get("value")
+        if value is None or value == "":
+            continue
+        if isinstance(value, bool):
+            shown: Any = "Yes" if value else "No"
+        elif isinstance(value, (int, float)):
+            shown = value
+        else:
+            shown = str(value)[:120]
+        cleaned.append({"label": label[:80], "value": shown})
+        if len(cleaned) >= 24:
+            break
+    return cleaned
+
+
+def _read_history(path: str) -> List[Dict[str, Any]]:
+    if not os.path.isfile(path):
+        return []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        logger.exception("Failed to read import history %s", path)
+        return []
+    runs = payload.get("runs") if isinstance(payload, dict) else None
+    if not isinstance(runs, list):
+        return []
+    return [row for row in runs if isinstance(row, dict)]
+
+
+def _write_history(path: str, runs: List[Dict[str, Any]]) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as handle:
+        json.dump({"runs": runs}, handle, indent=2, default=str, ensure_ascii=True)
+    os.replace(tmp, path)
+
+
+def _persist_history(kind: str, path: str, *, log_dir: Optional[str]) -> None:
+    if not _use_durable_storage(log_dir) or not os.path.isfile(path):
+        return
+    from app.services.platform import storage_service
+
+    try:
+        with open(path, "rb") as handle:
+            storage_service.upload(STORAGE_CATEGORY, _history_rel(kind), handle.read())
+    except Exception:
+        logger.exception("Failed to persist import history %s", kind)
+
+
+def _hydrate_history(kind: str, path: str, *, log_dir: Optional[str]) -> None:
+    if os.path.isfile(path) or not _use_durable_storage(log_dir):
+        return
+    from app.services.platform import storage_service
+
+    rel = _history_rel(kind)
+    try:
+        if not storage_service.exists(STORAGE_CATEGORY, rel):
+            return
+        data = storage_service.download(STORAGE_CATEGORY, rel)
+    except Exception:
+        logger.exception("Failed to hydrate import history %s", kind)
+        return
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as handle:
+        handle.write(data)
+    os.replace(tmp, path)
+
+
+def _present_import_run(row: Dict[str, Any]) -> Dict[str, Any]:
+    item = dict(row)
+    finished = str(item.get("finished_at") or "")
+    if len(finished) >= 16 and finished[10] == "T":
+        item["finished_label"] = finished[:10] + " " + finished[11:16] + " UTC"
+    else:
+        item["finished_label"] = finished or "—"
+    source = str(item.get("source") or "")
+    item["source_label"] = _SOURCE_LABELS.get(source, source.replace("_", " ") or "Import")
+    log_id = str(item.get("log_id") or "")
+    if is_valid_import_log_id(log_id) and not item.get("change_log_url"):
+        item["change_log_url"] = change_log_url_for(log_id)
+    return item
+
+
+def remember_import_run(
+    *,
+    kind: str,
+    log_id: str,
+    filename: Optional[str] = None,
+    source: Optional[str] = None,
+    dry_run: bool = False,
+    success: bool = True,
+    summary: str = "",
+    counts: Optional[Iterable[Dict[str, Any]]] = None,
+    log_dir: Optional[str] = None,
+) -> None:
+    """Keep the newest import runs for a plugin settings page."""
+    if not is_valid_import_log_id(log_id):
+        raise ValueError("Invalid import log id")
+    kind = _check_import_kind(kind)
+    entry = {
+        "log_id": log_id,
+        "filename": (filename or "")[:180],
+        "source": (source or "")[:40],
+        "dry_run": bool(dry_run),
+        "success": bool(success),
+        "finished_at": utc_iso(),
+        "summary": (summary or "")[:240],
+        "counts": _clean_counts(counts),
+        "change_log_url": change_log_url_for(log_id),
+    }
+    path = _history_local_path(kind, log_dir)
+    runs = [entry] + [row for row in _read_history(path) if str(row.get("log_id") or "") != log_id]
+    _write_history(path, runs[:_HISTORY_LIMIT])
+    _persist_history(kind, path, log_dir=log_dir)
+
+
+def list_import_runs(kind: str, *, limit: int = 12, log_dir: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Newest import runs for ``kind``, hydrated from durable storage when needed."""
+    kind = _check_import_kind(kind)
+    path = _history_local_path(kind, log_dir)
+    _hydrate_history(kind, path, log_dir=log_dir)
+    runs = [_present_import_run(row) for row in _read_history(path)]
+    cap = max(1, min(int(limit or _HISTORY_LIMIT), _HISTORY_LIMIT))
+    return runs[:cap]
+
+
+def latest_import_run(runs: Optional[Iterable[Dict[str, Any]]]) -> Optional[Dict[str, Any]]:
+    """Prefer the newest completed import over a dry-run preview."""
+    rows = [row for row in (runs or []) if isinstance(row, dict)]
+    for row in rows:
+        if row.get("success") and not row.get("dry_run"):
+            return row
+    return rows[0] if rows else None
+
+
+def publish_import_log(
+    *,
+    kind: str,
+    filename: Optional[str] = None,
+    source: Optional[str] = None,
+    dry_run: bool = False,
+    success: bool = True,
+    summary: str = "",
+    counts: Optional[Iterable[Dict[str, Any]]] = None,
+    changes: Optional[Iterable[Dict[str, Any]]] = None,
+    stats: Optional[Dict[str, Any]] = None,
+    log_id: Optional[str] = None,
+    user_id: Optional[int] = None,
+    audit: bool = True,
+    log_dir: Optional[str] = None,
+) -> str:
+    """Write a change log and remember the run for the plugin import tab.
+
+    ``audit=True`` attaches the log to this request's activity row. Async jobs
+    should pass ``audit=False`` and call ``attach_import_change_log_to_activity``
+    from the worker after ``set_import_audit_details`` in the request.
+    """
+    kind = _check_import_kind(kind)
+    log_id = log_id or uuid.uuid4().hex
+    if not is_valid_import_log_id(log_id):
+        raise ValueError("Invalid import log id")
+    cleaned_counts = _clean_counts(counts)
+    source_label = _SOURCE_LABELS.get(str(source or ""), str(source or ""))
+    meta = {
+        "filename": filename,
+        "source": source,
+        "source_label": source_label,
+        "dry_run": bool(dry_run),
+        "summary": (summary or "")[:240],
+        "counts": cleaned_counts,
+    }
+    merged = dict(stats or {})
+    merged.setdefault("success", bool(success))
+    merged.setdefault("dry_run", bool(dry_run))
+    limited = list(changes or [])[:400]
+    persist_import_change_log(
+        log_id=log_id,
+        kind=kind,
+        meta=meta,
+        changes=limited,
+        stats=merged,
+        log_dir=log_dir,
+    )
+    remember_import_run(
+        kind=kind,
+        log_id=log_id,
+        filename=filename,
+        source=source,
+        dry_run=dry_run,
+        success=success,
+        summary=summary,
+        counts=cleaned_counts,
+        log_dir=log_dir,
+    )
+    if audit:
+        from flask import has_request_context
+
+        if has_request_context():
+            set_import_audit_details(
+                log_id=log_id,
+                import_kind=kind,
+                filename=filename,
+                dry_run=dry_run,
+                extra={
+                    "source": source_label or None,
+                    "summary": (summary or "")[:240] or None,
+                },
+            )
+    if user_id:
+        attach_import_change_log_to_activity(
+            log_id=log_id,
+            user_id=user_id,
+            extra={"summary": (summary or "")[:240] or None, "dry_run": bool(dry_run)},
+        )
+    return log_id
+
+
 def count_import_log_noops(log_id: str, *, log_dir: Optional[str] = None) -> int:
     path = changes_path(log_id, log_dir=log_dir)
     if not os.path.isfile(path):

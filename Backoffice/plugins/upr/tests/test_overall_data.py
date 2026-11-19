@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from plugins.upr.extracts.overall_data import (
     OVERALL_COLUMNS,
     SOURCE_FDRS,
@@ -10,8 +12,10 @@ from plugins.upr.extracts.overall_data import (
     _COLLAPSE_KEY_FIELDS,
     _finish,
     _planning_data_source,
+    apply_overall_filters,
     fdrs_role,
     merge_facts,
+    resolve_area,
 )
 from plugins.upr.extracts.upr_data import (
     ItemView,
@@ -403,3 +407,41 @@ def test_blank_entity_defaults_to_hns_or_pns():
     kept = {"Entity": "IFRC Secretariat", "Source": "Country Data"}
     fill_entity(kept)
     assert kept["Entity"] == "IFRC Secretariat"
+
+
+def test_resolve_area_accepts_code_and_migration_names():
+    assert resolve_area("SP4") == "SP4"
+    assert resolve_area("sp4") == "SP4"
+    assert resolve_area("SP 4") == "SP4"
+    assert resolve_area("migration") == "SP4"
+    assert resolve_area("Migration and displacement") == "SP4"
+    assert resolve_area("Migration & displacement") == "SP4"
+    assert resolve_area("Resilience - Migration and displacement") == "SP4"
+
+
+def test_resolve_area_cross_cutting_uses_the_stored_label():
+    assert resolve_area("CC1") == "Cross-cutting"
+    assert resolve_area("cross-cutting") == "Cross-cutting"
+
+
+def test_resolve_area_rejects_unknown_and_ambiguous_names():
+    with pytest.raises(ValueError, match="one SP/EF"):
+        resolve_area("not-an-area")
+    with pytest.raises(ValueError, match="more than one"):
+        resolve_area("and")
+
+
+def test_area_filter_keeps_the_matching_sp_ef_rows():
+    rows = [
+        {"Section": "Core indicators", "SP/EF": "SP4", "Indicator": "Migrants"},
+        {"Section": "Core indicators", "SP/EF": "SP3", "Indicator": "Health"},
+        {"Section": "Funding", "SP/EF": None, "Indicator": "Funding (CHF)"},
+        {"Section": "Funding", "SP/EF": "SP4", "Indicator": "Funding SP4"},
+    ]
+    kept = [row["Indicator"] for row in apply_overall_filters(rows, area="migration")]
+    assert kept == ["Migrants", "Funding SP4"]
+    both = [
+        row["Indicator"]
+        for row in apply_overall_filters(rows, section="Funding", area="SP4")
+    ]
+    assert both == ["Funding SP4"]

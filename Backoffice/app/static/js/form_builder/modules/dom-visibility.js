@@ -11,6 +11,16 @@
 export function isActuallyHidden(el) {
     if (!el) return true;
     try {
+        // Select2 hides the original <select> with a clipped stand-in. The visible
+        // widget is the next sibling; treat the control as hidden only when that
+        // widget (or an ancestor section) is hidden.
+        if (el.classList && el.classList.contains('select2-hidden-accessible')) {
+            if (el.closest && el.closest('.hidden, [hidden]')) return true;
+            const widget = el.nextElementSibling;
+            if (widget && widget.classList && widget.classList.contains('select2-container')) {
+                return isActuallyHidden(widget);
+            }
+        }
         if (el.closest && el.closest('.hidden')) return true;
         const inlineDisplay = el.style && el.style.display;
         const inlineVisibility = el.style && el.style.visibility;

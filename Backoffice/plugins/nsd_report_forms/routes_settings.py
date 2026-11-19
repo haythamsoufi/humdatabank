@@ -68,6 +68,9 @@ def nsd_settings_status() -> dict:
 def settings_page():
     from plugins.nsd_report_forms.importer import layout
 
+    from plugins.nsd_report_forms.routes import import_history, list_disk_files
+
+    import_runs, last_import = import_history()
     return render_template(
         "plugins/nsd_report_forms/settings.html",
         settings=nsd_settings_status(),
@@ -75,4 +78,7 @@ def settings_page():
         sheets=layout.SHEETS,
         required_sheets=layout.REQUIRED_SHEETS,
         template_names=layout.TEMPLATE_NAMES,
+        disk_files=list_disk_files(),
+        last_import=last_import,
+        import_runs=import_runs,
     )

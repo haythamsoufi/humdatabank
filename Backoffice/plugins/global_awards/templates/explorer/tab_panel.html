@@ -97,6 +97,11 @@
                 </button>
             </div>
             <p class="gai-dialog__note">{{ _('Choose what to include. The presentation and the report use the same charts as this tab.') }}</p>
+            <fieldset class="gai-export__fields" id="gai-export-cycles-fields" hidden>
+                <legend class="gai-field__label">{{ _('Cycles to present') }}</legend>
+                <p class="gai-export__hint">{{ _('Active and past cycles are selected by default.') }}</p>
+                <div id="gai-export-cycles"></div>
+            </fieldset>
             <fieldset class="gai-export__fields" id="gai-export-fields">
                 <legend class="gai-field__label">{{ _('Include') }}</legend>
                 <div id="gai-export-list"></div>
@@ -105,7 +110,15 @@
                 <input type="checkbox" id="gai-export-tables">
                 <span>{{ _('Add the data tables to the report') }}</span>
             </label>
+            <label class="gai-check gai-export__extra" id="gai-export-ai-row" hidden>
+                <input type="checkbox" id="gai-export-ai">
+                <span>
+                    {{ _('Add AI summaries') }}
+                    <small class="gai-export__hint">{{ _('Sends the figures for the chosen sections to the AI service and adds a short summary, findings and next steps. Review the text before sharing.') }}</small>
+                </span>
+            </label>
             <p class="gai-export__empty" id="gai-export-empty" hidden></p>
+            <p class="gai-export__status" id="gai-export-status" role="status" aria-live="polite" hidden></p>
             <div class="gai-export__actions">
                 <button type="button" class="gai-btn" data-gai-close>{{ _('Cancel') }}</button>
                 <button type="submit" class="gai-btn gai-btn--primary" id="gai-export-go"></button>
@@ -117,6 +130,7 @@
 <script nonce="{{ csp_nonce() }}">
 window.GaAnalysisConfig = {
     dataUrl: {{ url_for('global_awards.analysis_data')|tojson }},
+    aiUrl: {{ url_for('global_awards.ai_summary')|tojson }},
     logoUrl: {{ url_for('static', filename='IFRC_logo_square.svg')|tojson }},
     pdf: {
         html2canvas: {{ url_for('static', filename='libs/html2canvas.min.js')|tojson }},
@@ -135,11 +149,22 @@ window.GaAnalysisConfig = {
         export_next: {{ _('Next slide')|tojson }},
         export_fullscreen: {{ _('Full screen')|tojson }},
         export_nothing: {{ _('Nothing to include yet. Load the tab first.')|tojson }},
+        ai_working: {{ _('Writing AI summaries…')|tojson }},
+        ai_failed: {{ _('Could not create the AI summaries. Try again, or untick the option to continue without them.')|tojson }},
+        ai_badge: {{ _('AI-generated summary. Review before sharing.')|tojson }},
+        ai_findings: {{ _('Key findings')|tojson }},
+        ai_attention: {{ _('Needs attention')|tojson }},
+        ai_next_steps: {{ _('Next steps')|tojson }},
         export_cover_lead: {{ _('MARC logframe progress against country targets and the DHR reporting calendar.')|tojson }},
         generated: {{ _('Generated')|tojson }},
         all_regions: {{ _('All regions')|tojson }},
         all_countries: {{ _('All countries')|tojson }},
         all_cycles: {{ _('All cycles')|tojson }},
+        cycle_phase_active: {{ _('active')|tojson }},
+        cycle_phase_passed: {{ _('passed')|tojson }},
+        cycle_phase_upcoming: {{ _('upcoming')|tojson }},
+        export_no_cycles: {{ _('Select at least one cycle.')|tojson }},
+        export_failed: {{ _('Could not load the selected cycles. Try again.')|tojson }},
         overview: {{ _('Overview')|tojson }},
         logframe: {{ _('Logframe')|tojson }},
         countries: {{ _('Countries')|tojson }},

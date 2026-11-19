@@ -80,6 +80,10 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "upr_excel_import.preview",
         "upr_excel_import.upload",
         "upr_excel_import.cancel_job",
+        # NSD master import checkpoints. The run itself stays in the audit trail.
+        "nsd_import.upload",
+        "nsd_import.check_stored",
+        "nsd_import.cancel",
         # Pre-import file check; the following import POST is the accountability event.
         "excel.validate_upr_country_reporting_import",
         "excel.validate_unified_country_plan_import",

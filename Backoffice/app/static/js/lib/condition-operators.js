@@ -22,6 +22,8 @@ export const conditionTypesMap = {
     'text': [
         {value: 'equal_to', label: 'Equal to'},
         {value: 'not_equal_to', label: 'Not equal to'},
+        {value: 'in', label: 'Is in'},
+        {value: 'not_in', label: 'Is not in'},
         {value: 'contains', label: 'Contains'},
         {value: 'not_contains', label: 'Does not contain'},
         {value: 'starts_with', label: 'Starts with'},
@@ -86,6 +88,16 @@ function comparableConditionValue(value) {
     return String(value).trim();
 }
 
+function membershipValues(value) {
+    const raw = Array.isArray(value) ? value : String(value ?? '').split(',');
+    const seen = [];
+    raw.forEach((item) => {
+        const text = comparableConditionValue(item);
+        if (text && !seen.includes(text)) seen.push(text);
+    });
+    return seen;
+}
+
 function parseComparableNumber(value) {
     if (value === null || value === undefined) return NaN;
     if (typeof value === 'number') return value;
@@ -132,6 +144,10 @@ export function compareCondition(conditionType, actualValue, expectedValue) {
         case 'not_equals':
         case 'not_equal_to':
             return comparableConditionValue(actualValue) !== comparableConditionValue(expectedValue);
+        case 'in':
+            return membershipValues(expectedValue).includes(comparableConditionValue(actualValue));
+        case 'not_in':
+            return !membershipValues(expectedValue).includes(comparableConditionValue(actualValue));
         case 'is_yes':
             return actualValue !== null && actualValue !== undefined && String(actualValue).toLowerCase().trim() === 'yes';
         case 'is_no':

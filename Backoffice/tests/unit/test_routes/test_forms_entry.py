@@ -964,7 +964,7 @@ class TestPreviewTemplateImpl:
 
         # db for session queries
         mock_db = MagicMock()
-        mock_db.session.query.return_value.filter.return_value.distinct.return_value.order_by.return_value.all.return_value = []
+        mock_db.session.query.return_value.filter.return_value.distinct.return_value.all.return_value = []
         mocks["db"] = stack.enter_context(
             patch("app.routes.forms.entry.db", mock_db))
 

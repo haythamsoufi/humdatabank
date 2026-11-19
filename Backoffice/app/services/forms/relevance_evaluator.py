@@ -57,6 +57,22 @@ def _is_empty(value: Any) -> bool:
     return False
 
 
+def _membership_values(expected: Any) -> list[str]:
+    """Normalize an ``in`` / ``not_in`` value (list or comma-separated text)."""
+    if isinstance(expected, (list, tuple, set)):
+        raw = expected
+    elif isinstance(expected, str):
+        raw = expected.split(',')
+    else:
+        return []
+    values: list[str] = []
+    for item in raw:
+        text = str(item).strip()
+        if text and text not in values:
+            values.append(text)
+    return values
+
+
 def _as_float(value: Any) -> Optional[float]:
     if value is None:
         return None
@@ -132,6 +148,10 @@ def _evaluate_single_condition(condition: dict, metadata: dict) -> Optional[bool
         return str(actual or '').strip() == str(expected or '').strip()
     if condition_type in ('not_equals', 'not_equal_to'):
         return str(actual or '').strip() != str(expected or '').strip()
+    if condition_type == 'in':
+        return str(actual or '').strip() in _membership_values(expected)
+    if condition_type == 'not_in':
+        return str(actual or '').strip() not in _membership_values(expected)
     if condition_type == 'is_yes':
         return actual is not None and str(actual).strip().lower() == 'yes'
     if condition_type == 'is_no':

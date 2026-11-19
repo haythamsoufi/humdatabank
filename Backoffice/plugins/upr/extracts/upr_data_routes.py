@@ -28,7 +28,7 @@ from app.utils.security.rate_limiting import api_rate_limit
 from plugins.upr import bp
 from plugins.upr.extracts.api_cache import get_or_build_upr_payload
 from plugins.upr.extracts.ns_key_data import NS_KEY_COLUMNS, load_ns_key_rows
-from plugins.upr.extracts.overall_data import OVERALL_COLUMNS, build_overall_data
+from plugins.upr.extracts.overall_data import OVERALL_AREA_CODES, OVERALL_COLUMNS, build_overall_data, resolve_area
 from plugins.upr.extracts.upr_data import (
     FACT_COLUMNS,
     MASTER_COLUMNS,
@@ -125,7 +125,8 @@ API_ENDPOINTS = [
             "(annual report first, then mid-year). Data source is FDRS or Unified Reporting. "
             "Unified Reporting, Unified Plan, and PNS data (templates 33, 24, 23, 22) include every "
             "workflow status, as in /api/v1/upr/data. FDRS (template 21) is approved-only. "
-            "Filters: iso3, year, section. Returns the complete filtered extract; this endpoint is not paginated."
+            "Filters: iso3, year, section, area (SP/EF code or name, for example SP4 or migration). "
+            "Returns the complete filtered extract; this endpoint is not paginated."
         ),
         "consumers": "Power BI, Backoffice session",
         "paginated": False,
@@ -147,6 +148,15 @@ API_ENDPOINTS = [
                 "type": "text",
                 "placeholder": "NS Data",
                 "description": "Limit facts to one Section value. Omit to return every section.",
+            },
+            {
+                "name": "area",
+                "type": "text",
+                "placeholder": "SP4",
+                "description": (
+                    "Limit facts to one SP/EF area. A code (SP4) or a name "
+                    "(migration, Migration and displacement). Omit to return every area."
+                ),
             },
         ],
     },
@@ -378,6 +388,9 @@ def _parameter_doc(param: dict) -> dict:
     elif name == "section":
         doc["values"] = list(_SECTION_VALUES)
         doc["example"] = param.get("placeholder")
+    elif name == "area":
+        doc["values"] = list(OVERALL_AREA_CODES)
+        doc["example"] = param.get("placeholder")
     elif name == "iso2":
         doc["example"] = "KE"
     elif name == "iso3":
@@ -503,29 +516,30 @@ def get_upr_overall():
             return api_error("year must be a 4-digit calendar year", 400)
         year = int(year_raw) if year_raw else None
         section = (request.args.get("section") or "").strip().lower() or None
+        area_raw = (request.args.get("area") or "").strip() or None
+        area = resolve_area(area_raw) if area_raw else None
 
         payload, cache_hit = get_or_build_upr_payload(
             "overall",
-            {"iso3": iso3, "year": year, "section": section},
-            lambda: build_overall_data(iso3=iso3, year=year, section=section),
+            {"iso3": iso3, "year": year, "section": section, "area": area},
+            lambda: build_overall_data(iso3=iso3, year=year, section=section, area=area),
         )
         rows = payload["data"]
-        return _extract_response(
-            {
-                "data": rows,
-                "meta": {
-                    "total": len(rows),
-                    "columns": list(OVERALL_COLUMNS),
-                    "priority": (
-                        "Per country, year and indicator: FDRS, then Unified Reporting "
-                        "annual report, then Unified Reporting mid-year. "
-                        "FDRS approved only; Unified Reporting any status."
-                    ),
-                    "data_sources": ["FDRS", "Unified Reporting"],
-                },
-            },
-            cache_hit=cache_hit,
-        )
+        meta = {
+            "total": len(rows),
+            "columns": list(OVERALL_COLUMNS),
+            "priority": (
+                "Per country, year and indicator: FDRS, then Unified Reporting "
+                "annual report, then Unified Reporting mid-year. "
+                "FDRS approved only; Unified Reporting any status."
+            ),
+            "data_sources": ["FDRS", "Unified Reporting"],
+        }
+        if area:
+            meta["area"] = area
+        return _extract_response({"data": rows, "meta": meta}, cache_hit=cache_hit)
+    except ValueError as error:
+        return api_error(str(error), 400)
     except Exception as error:
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 

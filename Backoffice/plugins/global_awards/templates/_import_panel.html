@@ -1,0 +1,144 @@
+{# Logframe import tab. Expects disk_files, last_import, import_runs, report, settings. #}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+{% from "macros/import_source_files.html" import disk_files as disk_file_table, import_activity as import_activity_panel %}
+
+<div class="space-y-6">
+  <p class="text-sm text-gray-600">
+    Re-importing updates the published template in place. Lines that match the indicator bank
+    stay indicators; the others are questions. Portfolio
+    <strong>{{ settings.portfolio }}</strong>, fund <strong>{{ settings.fund }}</strong>.
+  </p>
+
+  {% call(file) disk_file_table(disk_files) %}
+    {% if file.found and file.kind == 'repo' %}
+    <button type="submit" form="ga-import-form" name="action" value="disk"
+            class="bg-red-600 hover:bg-red-700 text-white font-medium py-1.5 px-3 rounded-lg text-sm">
+      Import this file
+    </button>
+    {% endif %}
+  {% endcall %}
+
+  <form id="ga-import-form" method="post" enctype="multipart/form-data"
+        action="{{ url_for('global_awards.settings_page', tab='import') }}"
+        class="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
+    <h3 class="text-base font-semibold text-gray-900">Upload a replacement workbook</h3>
+    <p class="text-sm text-gray-600">
+      Drop an Excel file, or import the workbook already on disk. A preview does not save.
+    </p>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="flex items-center text-sm text-gray-700">
+      <input type="checkbox" name="dry_run" value="1" class="mr-2"
+             {% if report and report.dry_run %}checked{% endif %}>
+      Preview only (do not save)
+    </label>
+    {% call excel_import_dropzone(
+        'ga-import-dropzone',
+        input_id='ga-import-file',
+        input_name='file',
+        required=false,
+        accept='.xlsx,.xls',
+        title='Drop a replacement workbook here or click to browse',
+        hint='Supported formats: .xlsx, .xls'
+    ) %}{% endcall %}
+    <div class="flex flex-wrap gap-3">
+      <button type="submit" name="action" value="disk"
+              class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
+              {% if not settings.workbook_found %}disabled{% endif %}>
+        Import workbook on disk
+      </button>
+      <button type="submit" name="action" value="upload" id="ga-import-upload"
+              class="bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
+        Upload and import
+      </button>
+    </div>
+  </form>
+
+  {% if report %}
+  <div class="rounded-lg border border-gray-200 bg-white p-5 text-sm">
+    <p class="font-medium text-gray-900 mb-2">
+      {% if report.dry_run %}Preview{% else %}Imported{% endif %}:
+      {{ report.sections }} sections,
+      {{ report.linked }} linked to the bank,
+      {{ report.questions }} questions,
+      {{ report.projects_upserted }} country projects
+      {% if report.cycles_per_project %},
+      {{ report.cycles_per_project }} quarterly cycles
+      ({{ report.award_start }} to {{ report.award_end }})
+      {% endif %}.
+    </p>
+    {% if report.unmatched_countries %}
+    <p class="text-gray-700 mb-3">No country match: {{ report.unmatched_countries | join(', ') }}</p>
+    {% endif %}
+    {% if report.links %}
+    <h4 class="font-semibold text-gray-700 mb-2">Linked to the indicator bank</h4>
+    <div class="overflow-x-auto mb-4">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-600">
+            <th class="py-1 pr-3">Code</th>
+            <th class="py-1 pr-3">Bank</th>
+            <th class="py-1 pr-3">How</th>
+            <th class="py-1">Indicator</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in report.links %}
+          <tr class="border-t border-gray-200">
+            <td class="py-1 pr-3">{{ row.code }}</td>
+            <td class="py-1 pr-3">#{{ row.bank_id }}</td>
+            <td class="py-1 pr-3">{{ row.method }}</td>
+            <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    {% if report.created_questions %}
+    <h4 class="font-semibold text-gray-700 mb-2">Questions (no bank match)</h4>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-600">
+            <th class="py-1 pr-3">Code</th>
+            <th class="py-1 pr-3">Type</th>
+            <th class="py-1 pr-3">Section</th>
+            <th class="py-1">Question</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in report.created_questions %}
+          <tr class="border-t border-gray-200">
+            <td class="py-1 pr-3">{{ row.code or '—' }}</td>
+            <td class="py-1 pr-3">{{ row.question_type }}</td>
+            <td class="py-1 pr-3">{{ row.section }}</td>
+            <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {{ import_activity_panel(last_import, import_runs) }}
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  var uploadBtn = document.getElementById('ga-import-upload');
+  import({{ static_url('js/components/excel-import-dropzone.js')|tojson }})
+    .then(function (mod) {
+      mod.initExcelImportDropzone('#ga-import-dropzone', {
+        submitBtn: uploadBtn,
+        acceptExtensions: ['.xlsx', '.xls'],
+        onReset: function () {
+          if (uploadBtn) uploadBtn.disabled = true;
+        }
+      });
+      var input = document.getElementById('ga-import-file');
+      if (uploadBtn && !(input && input.files && input.files.length)) uploadBtn.disabled = true;
+    });
+})();
+</script>

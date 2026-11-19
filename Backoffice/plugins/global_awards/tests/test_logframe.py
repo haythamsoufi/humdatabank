@@ -190,7 +190,9 @@ def test_official_reporting_calendar():
 def test_relevance_lists_only_the_countries_with_a_target():
     rule = json.loads(relevance_for_countries(["SYR", "bgd", "SYR", ""]))
     assert rule["logic"] == "OR"
-    assert [item["value"] for item in rule["conditions"]] == ["SYR", "BGD"]
+    assert rule["conditions"] == [
+        {"item_id": "country_iso", "condition_type": "in", "value": ["SYR", "BGD"]}
+    ]
     hidden = json.loads(relevance_for_countries([]))
     assert hidden["conditions"] == [
         {"item_id": "country_iso", "condition_type": "equal_to", "value": ""}

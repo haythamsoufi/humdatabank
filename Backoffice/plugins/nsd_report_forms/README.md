@@ -32,6 +32,7 @@ plugin supplies the overall/activities assessment and spending to date of the qu
 
 **CBF master import** (automates projects + scheduled cycles):  
 Settings → Master import. Needs **Admin: NSD funds** (or System Manager).  
+The tab uses the standard Excel dropzone. Uploaded workbooks stay on disk (name, size, upload time), and each run records a last-import line plus a change log.  
 Missing published templates (`NSD Quarterly report - CBF`, `NSD Final report - CBF`) are auto-created on first import/check.  
 Inactive National Societies are matched (not skipped). Missing contact emails create users and add them to Access Groups **NSD Focal Points** (`ns_focal_email`, Final reports only) and **NSD PMs** (`ifrc_pm_email`, all report slots), with country access and Assignment Editor/Submitter.
 

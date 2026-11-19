@@ -36,6 +36,28 @@ def test_cycle_sort_key_orders_quarters_then_final():
     assert [slot for slot in sorted(slots, key=cycle_sort_key)] == ["Y1Q1", "Y1Q2", "Y1Q3", "Final"]
 
 
+def test_resolve_cycle_slots_prefers_the_explicit_selection():
+    from plugins.global_awards.analysis.data import resolve_cycle_slots
+
+    assert resolve_cycle_slots() is None
+    assert resolve_cycle_slots("Y1Q2") == {"Y1Q2"}
+    assert resolve_cycle_slots("Y1Q2", ["Y1Q1", " Final "]) == {"Y1Q1", "Final"}
+    assert resolve_cycle_slots(None, []) == set()
+
+
+def test_cycle_catalog_flags_active_and_passed_for_the_presentation():
+    from plugins.global_awards.analysis.data import cycle_catalog
+
+    rows = {row["slot"]: row for row in cycle_catalog(dt.date(2027, 1, 10))}
+    assert rows["Y1Q1"]["phase"] == "passed" and rows["Y1Q1"]["present"] is True
+    assert rows["Y1Q2"]["phase"] == "active" and rows["Y1Q2"]["present"] is True
+    assert rows["Y1Q3"]["phase"] == "upcoming" and rows["Y1Q3"]["present"] is False
+    assert rows["Final"]["phase"] == "active" and rows["Final"]["present"] is True
+
+    before = {row["slot"]: row for row in cycle_catalog(dt.date(2026, 8, 1))}
+    assert not any(row["present"] for row in before.values())
+
+
 def test_marc_block_reads_config():
     assert marc_block({"marc": {"key": "goal:people", "code": "1"}})["code"] == "1"
     assert marc_block(None) == {}

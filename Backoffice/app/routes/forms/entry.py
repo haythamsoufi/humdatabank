@@ -1346,6 +1346,45 @@ def handle_assignment_form(aes_id):
     return response
 
 
+def _preview_period_sort_key(period_name: str):
+    """Group project cycles by reference, then by slot (Y1Q1 … Y1Q3, Final).
+
+    A reverse name sort puts Y1Q3 ahead of Y1Q1 because "3" > "1".
+    """
+    from app.services.projects.monitoring import slot_sort_key
+    from app.services.projects.service import parse_cycle_slot
+
+    raw = (period_name or "").strip()
+    slot = parse_cycle_slot(raw)
+    if slot and raw != slot:
+        prefix = raw[: raw.rfind(slot)].strip(" ·-").casefold()
+    else:
+        prefix = "" if slot else raw.casefold()
+    return (prefix, slot_sort_key(slot or raw), raw.casefold())
+
+
+def _preview_period_name_options(template_id, entity_type=None, entity_id=None):
+    """Period names for the template-preview assignment dropdown.
+
+    With no entity selected, every period on the template is listed. With a
+    view-as entity, only periods assigned to that entity are listed. A country
+    also includes project-cycle assignments for projects in that country.
+    """
+    query = db.session.query(AssignedForm.period_name).filter(
+        AssignedForm.template_id == template_id
+    )
+    if entity_type and entity_id:
+        from app.routes.main.helpers import dashboard_assignment_entity_filter
+
+        query = query.join(
+            AssignmentEntityStatus,
+            AssignmentEntityStatus.assigned_form_id == AssignedForm.id,
+        ).filter(dashboard_assignment_entity_filter(entity_type, int(entity_id)))
+    rows = query.distinct().all()
+    names = [row[0] for row in rows if row and row[0]]
+    return sorted(names, key=_preview_period_sort_key)
+
+
 def _preview_template_impl(template_id):
     """Preview a form template using existing form processing logic."""
     from app.services.organization.authorization_service import AuthorizationService
@@ -1480,14 +1519,11 @@ def _preview_template_impl(template_id):
 
     preview_period_name_options = []
     try:
-        period_rows = (
-            db.session.query(AssignedForm.period_name)
-            .filter(AssignedForm.template_id == template.id)
-            .distinct()
-            .order_by(AssignedForm.period_name.desc())
-            .all()
+        preview_period_name_options = _preview_period_name_options(
+            template.id,
+            selected_entity_type,
+            selected_entity_id,
         )
-        preview_period_name_options = [r[0] for r in period_rows if r and r[0]]
     except Exception as e:
         current_app.logger.debug("preview_period_name_options failed: %s", e)
         preview_period_name_options = []

@@ -19,12 +19,19 @@ sources, comments) comes from Unified Reporting unchanged.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID
-from plugins.upr.dashboards.catalog import REPORT_ITEM_FALLBACKS, REPORT_TEMPLATE_ID
+from plugins.upr.dashboards.catalog import (
+    AREA_LABELS,
+    PLAN_DETAIL_SP_LABELS,
+    REPORT_ITEM_FALLBACKS,
+    REPORT_TEMPLATE_ID,
+    SECTION_AREA_HINTS,
+)
 from plugins.upr.dashboards.formatters import to_number
-from plugins.upr.dashboards.matrix import _funding_entity
+from plugins.upr.dashboards.matrix import _area_code, _funding_entity
 from plugins.upr.extracts.upr_data import (
     FACT_COLLAPSE_KEY_FIELDS,
     _KPI_BANK_ID_SET,
@@ -49,6 +56,7 @@ from plugins.upr.extracts.upr_data import (
     facts_for_item,
     fill_entity,
     fill_section_b,
+    spef_label,
 )
 
 SOURCE_FDRS = "FDRS"
@@ -127,6 +135,78 @@ _UR_SOURCE_ENTITY = {
 _UR_FUNDING_COLUMN = "_ns_fun"
 # Entities that are a single FDRS income-source row (not rolled into HNS other sources).
 _FDRS_DIRECT_SOURCE_ENTITIES = frozenset({"IFRC Secretariat", "Other National Society"})
+
+OVERALL_AREA_CODES = ("SP1", "SP2", "SP3", "SP4", "SP5", "EO", "CC1", "EFs", "EF1", "EF2", "EF3", "EF4")
+
+
+def _normalize_area_text(value: str) -> str:
+    text = value.replace("&", " and ")
+    return re.sub(r"[\s,]+", " ", text).strip().casefold()
+
+
+def resolve_area(raw: str) -> str:
+    """SP/EF cell value for an ``area`` query.
+
+    Accepts a code (``SP4``) or a name (``migration``, ``Migration and displacement``).
+    ``CC1`` resolves to ``Cross-cutting``, which is what the column stores.
+    Raises ``ValueError`` when the text is not one area.
+    """
+    text = (raw or "").strip()
+    if not text:
+        raise ValueError(
+            "area must name one SP/EF (SP1–SP5, EO, CC1, EFs, EF1–EF4), for example SP4 or migration"
+        )
+    code = _area_code(text) or _area_code(re.sub(r"[\s_-]+", "", text))
+    if code:
+        return spef_label(code) or code
+    normalized = _normalize_area_text(text)
+    exact = [
+        area_code
+        for area_code, label in (*AREA_LABELS.items(), *PLAN_DETAIL_SP_LABELS.items())
+        if _normalize_area_text(label) == normalized
+    ]
+    exact = list(dict.fromkeys(exact))
+    if len(exact) == 1:
+        return spef_label(exact[0]) or exact[0]
+    folded = text.casefold().replace("&", " and ")
+    hinted = list(dict.fromkeys(area_code for needle, area_code in SECTION_AREA_HINTS if needle in folded))
+    if len(hinted) == 1:
+        return spef_label(hinted[0]) or hinted[0]
+    if len(hinted) > 1:
+        raise ValueError(
+            f"area matches more than one SP/EF ({', '.join(hinted)}). Use a code such as SP4"
+        )
+    if len(normalized) >= 3:
+        hits = [
+            area_code
+            for area_code, label in AREA_LABELS.items()
+            if normalized in _normalize_area_text(label)
+        ]
+        if len(hits) == 1:
+            return spef_label(hits[0]) or hits[0]
+        if len(hits) > 1:
+            raise ValueError(
+                f"area matches more than one SP/EF ({', '.join(hits)}). Use a code such as SP4"
+            )
+    known = ", ".join(OVERALL_AREA_CODES)
+    raise ValueError(f"area must name one SP/EF ({known}), for example SP4 or migration")
+
+
+def apply_overall_filters(
+    rows: list[dict[str, Any]],
+    *,
+    section: str | None = None,
+    area: str | None = None,
+) -> list[dict[str, Any]]:
+    """Keep rows for one Section bucket and one SP/EF area."""
+    if section:
+        wanted = section.strip().lower()
+        rows = [row for row in rows if str(row.get("Section") or "").strip().lower() == wanted]
+    if area:
+        wanted_area = resolve_area(area)
+        rows = [row for row in rows if row.get("SP/EF") == wanted_area]
+    return rows
+
 
 TOKEN_FUNDING_TOTAL = ("funding_total",)
 # All Funding Source rows for a country and year share this token so FDRS and Unified
@@ -434,8 +514,15 @@ def build_overall_data(
     iso3: str | None = None,
     year: int | None = None,
     section: str | None = None,
+    area: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Merged FDRS and Unified Reporting facts."""
+    """Merged FDRS and Unified Reporting facts.
+
+    ``area`` is an SP/EF code or name (``SP4``, ``migration``). It is resolved
+    before the extract is built so an unknown area fails without a query.
+    """
+    if area:
+        area = resolve_area(area)
     fdrs_places = _places(FDRS_TEMPLATE_ID, iso3=iso3, year=year, approved_only=True)
     report_places = _places(REPORT_TEMPLATE_ID, iso3=iso3, year=year)
     places = fdrs_places + report_places
@@ -547,9 +634,7 @@ def build_overall_data(
         blank_value_fields=("Value", "ValueNum", "FDRS Value", "UPR Value"),
     )
 
-    if section:
-        wanted = section.strip().lower()
-        rows = [row for row in rows if str(row.get("Section") or "").strip().lower() == wanted]
+    rows = apply_overall_filters(rows, section=section, area=area)
     rows.sort(
         key=lambda row: (
             str(row.get("ISO3") or ""),

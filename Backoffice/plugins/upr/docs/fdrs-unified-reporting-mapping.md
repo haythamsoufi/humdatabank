@@ -35,7 +35,9 @@ Column order:
 
 So when both reported, both are visible, and `Value` equals the FDRS one.
 
-Query parameters: `iso3` (alias `country_iso3`), `year`, `section`.
+Query parameters: `iso3` (alias `country_iso3`), `year`, `section`, `area`.
+
+`area` keeps rows whose `SP/EF` is that strategic priority or enabling function. A code (`SP4`) or a name (`migration`, `Migration and displacement`, `Migration & displacement`) both work. `CC1` and `cross-cutting` match the stored label `Cross-cutting`. Rows with a blank `SP/EF` (for example a National Society funding total) are left out. `iso3` and `year` still combine with it. When `area` is set, `meta.area` is the resolved value (`SP4`, or `Cross-cutting` for CC1).
 
 ## Summary
 

@@ -425,4 +425,16 @@ describe('evaluateConditions', () => {
       expect(evaluateConditions(payload([cond('[SOME_VAR]', 'equals', 'other')]))).toBe(false);
     });
   });
+
+  describe('country membership', () => {
+    it('country ISO is in the listed codes', async () => {
+      window.metadataContext = { country_iso: 'BGD' };
+      const { evaluateConditions } = await loadConditions();
+      const rule = payload([cond('country_iso', 'in', ['BGD', 'SYR'])]);
+      expect(evaluateConditions(rule)).toBe(true);
+      window.metadataContext = { country_iso: 'FRA' };
+      expect(evaluateConditions(rule)).toBe(false);
+      expect(evaluateConditions(payload([cond('country_iso', 'not_in', 'BGD, SYR')]))).toBe(true);
+    });
+  });
 });

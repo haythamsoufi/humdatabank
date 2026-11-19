@@ -1,0 +1,80 @@
+{% if show_ui_style_preview|default(false) %}
+{# Add a tool: a [data-dev-tool] tab and a matching [data-dev-tool-panel]. #}
+<aside id="dev-tools"
+       class="dev-tools is-collapsed"
+       aria-label="{{ _('Dev tools')|forceescape }}">
+    <div class="dev-tools__bar" data-dev-tools-drag>
+        <button type="button"
+                class="dev-tools__toggle"
+                data-dev-tools-toggle
+                draggable="false"
+                aria-expanded="false"
+                aria-controls="dev-tools-body">
+            <span class="dev-tools__grip" aria-hidden="true"></span>
+            <span class="dev-tools__label">{{ _('Dev tools') }}</span>
+            <span class="dev-tools__chevron" aria-hidden="true"></span>
+        </button>
+    </div>
+    <div id="dev-tools-body" class="dev-tools__body" data-dev-tools-body hidden>
+        <div class="dev-tools__tools" role="tablist" aria-label="{{ _('Dev tools')|forceescape }}">
+            <button type="button"
+                    class="dev-tools__tool is-active"
+                    role="tab"
+                    id="dev-tools-tab-style"
+                    data-dev-tool="style"
+                    aria-selected="true"
+                    aria-controls="dev-tools-panel-style">{{ _('Style preview') }}</button>
+        </div>
+        <div id="dev-tools-panel-style"
+             class="dev-tools__panel"
+             role="tabpanel"
+             data-dev-tool-panel="style"
+             aria-labelledby="dev-tools-tab-style">
+            <div id="ui-style-preview" class="dev-tools__options" role="group" aria-label="{{ _('UI styles')|forceescape }}">
+                <button type="button" class="dev-tools__btn" data-ui-style-option="ifrc" aria-pressed="false">IFRC</button>
+                <button type="button" class="dev-tools__btn" data-ui-style-option="go" aria-pressed="false">GO</button>
+                <button type="button" class="dev-tools__btn" data-ui-style-option="erp" aria-pressed="false">ERP</button>
+                <button type="button" class="dev-tools__btn" data-ui-style-option="legacy" aria-pressed="false">Legacy</button>
+            </div>
+            <p class="dev-tools__hint">{{ _('Dev only · saved in this browser') }}</p>
+        </div>
+    </div>
+</aside>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var el = document.getElementById('dev-tools');
+    if (!el) return;
+    try {
+        var raw = window.localStorage.getItem('devToolsPane');
+        if (raw == null) raw = window.localStorage.getItem('uiStylePreviewPane');
+        var data = JSON.parse(raw || 'null');
+        if (!data || typeof data !== 'object') return;
+        if (data.open === true) {
+            el.classList.remove('is-collapsed');
+            var body = document.getElementById('dev-tools-body');
+            if (body) body.removeAttribute('hidden');
+            var toggle = el.querySelector('[data-dev-tools-toggle]');
+            if (toggle) toggle.setAttribute('aria-expanded', 'true');
+        }
+        var x = Number(data.x);
+        var y = Number(data.y);
+        if (isFinite(x) && isFinite(y)) {
+            el.classList.add('is-positioned');
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+        }
+        if (typeof data.tool === 'string' && data.tool) {
+            el.querySelectorAll('[data-dev-tool]').forEach(function (tab) {
+                var on = tab.getAttribute('data-dev-tool') === data.tool;
+                tab.classList.toggle('is-active', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            el.querySelectorAll('[data-dev-tool-panel]').forEach(function (panel) {
+                if (panel.getAttribute('data-dev-tool-panel') === data.tool) panel.removeAttribute('hidden');
+                else panel.setAttribute('hidden', '');
+            });
+        }
+    } catch (e) { /* ignore */ }
+})();
+</script>
+{% endif %}

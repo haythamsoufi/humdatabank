@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="{{ static_url('css/dashboard-styles.css') }}">
 <link rel="stylesheet" href="{{ static_url('css/ui-style-ifrc.css') }}">
 <link rel="stylesheet" href="{{ static_url('css/ui-style-erp.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/ui-style-go.css') }}">
 <link rel="stylesheet" href="{{ static_url('css/enhanced-search-dropdown.css') }}">
 <style nonce="{{ csp_nonce() }}">
     /* Critical: keep country/entity header controls aligned before external CSS finishes loading */
@@ -60,24 +61,8 @@
      class="ui-style-root sharp-ui {% if not user_countries %}dashboard-no-access dashboard-no-access-bleed{% else %}py-2{% endif %}"
      data-ui-style="legacy"
      data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}">
-<script nonce="{{ csp_nonce() }}">
-(function () {
-    var root = document.getElementById('dashboard-root');
-    if (!root) return;
-    var preview = root.getAttribute('data-style-preview') === '1';
-    var allowed = ['ifrc', 'erp', 'legacy'];
-    /* Shipped default stays legacy until a style is chosen for production. */
-    var style = 'legacy';
-    if (preview) {
-        try {
-            var stored = window.localStorage.getItem('uiStylePreview');
-            if (stored == null) stored = window.localStorage.getItem('dashboardStylePreview');
-            if (allowed.indexOf(stored) !== -1) style = stored;
-        } catch (e) { /* ignore */ }
-    }
-    root.setAttribute('data-ui-style', style);
-})();
-</script>
+{% set ui_style_root_id = 'dashboard-root' %}
+{% include "components/_ui_style_boot.html" %}
 
     {% if _dash_header_controls %}
     {% call page_header(title=title, icon='fas fa-th-list') %}
@@ -1252,19 +1237,7 @@
 
 {% include 'components/_profile_completion_modal.html' %}
 
-{% if show_ui_style_preview|default(false) %}
-<aside id="ui-style-preview"
-       class="dashboard-style-preview"
-       aria-label="{{ _('UI style preview')|forceescape }}">
-    <p class="dashboard-style-preview__label">{{ _('Style preview') }}</p>
-    <div class="dashboard-style-preview__options" role="group" aria-label="{{ _('UI styles')|forceescape }}">
-        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="ifrc" aria-pressed="false">IFRC</button>
-        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="erp" aria-pressed="false">ERP</button>
-        <button type="button" class="dashboard-style-preview__btn" data-ui-style-option="legacy" aria-pressed="false">Legacy</button>
-    </div>
-    <p class="dashboard-style-preview__hint">{{ _('Dev only · saved in this browser') }}</p>
-</aside>
-{% endif %}
+{% include "components/_ui_style_preview.html" %}
 
 </div>{# /#dashboard-root #}
 

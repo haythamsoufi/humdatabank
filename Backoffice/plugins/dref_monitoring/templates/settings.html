@@ -4,12 +4,18 @@
 
 {% block title %}{{ dref_tr('DREF monitoring') }}{% endblock %}
 
+{% block extra_css %}
+{% include "components/_ui_style_stylesheets.html" %}
+{% endblock %}
+
 {% set initial_tab = request.args.get('tab', 'overview') %}
 {% if initial_tab not in ('overview', 'settings', 'sync') %}
   {% set initial_tab = 'overview' %}
 {% endif %}
 
 {% block content %}
+{% set ui_style_root_id = 'dref-style-root' %}
+{% include "components/_ui_style_root_start.html" %}
 <div class="container mx-auto px-4 py-6">
     {{ page_header(
         title=dref_tr('DREF monitoring'),
@@ -207,4 +213,5 @@
     </div>
 </div>
 <script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/settings_tabs.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+{% include "components/_ui_style_root_end.html" %}
 {% endblock %}

@@ -1,0 +1,466 @@
+/**
+ * IFRC GO UI preview (go.ifrc.org, GO UI 7.x tokens).
+ * Applied when .ui-style-root[data-ui-style="go"].
+ * Poppins, primary red #F5333F, navy #011E41, gray canvas, pill actions.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+.ui-style-root[data-ui-style="go"] {
+  --dash-accent: #F5333F;
+  --dash-accent-soft: #FDD6D9;
+  --dash-navy: #011E41;
+  --dash-border: #E0E0E0;
+  --dash-page-bg: #f5f5f5;
+  --dash-card-bg: #ffffff;
+  --dash-card-shadow: 0 1px 4px rgb(0 0 0 / 0.14);
+  --dash-section-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  --dash-radius: 0.75rem;
+  --dash-dq-accent: #011E41;
+  --dash-dq-accent-soft: #E0E3E7;
+  --dash-dq-ring: #F5333F;
+  --dash-dq-focus: rgba(245, 51, 63, 0.16);
+  --dash-focus: #F5333F;
+  --dash-focus-ring: rgba(245, 51, 63, 0.18);
+  --dash-cta: #F5333F;
+  --dash-cta-hover: #DE2934;
+  --dash-header-icon-display: none;
+  --dash-header-pattern-display: none;
+  --dash-section-icon-display: none;
+  --dash-card-hover-lift: 0;
+  --dash-card-hover-shadow: 0 2px 8px rgb(0 0 0 / 0.16);
+  --dash-card-padding: 1rem 1.125rem;
+  --dash-section-padding: 1.25rem;
+  --dash-overdue-animation: none;
+  --dash-overdue-glow: none;
+  --go-text: rgb(0 0 0 / 0.8);
+  --go-text-light: rgb(0 0 0 / 0.5);
+  --go-green: #7FB845;
+  --go-orange: #FF8000;
+  --go-blue: #3FA2F7;
+  background: var(--dash-page-bg);
+  color: var(--go-text);
+  font-family: Poppins, Montserrat, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+main.admin-scroll-main:has(.ui-style-root[data-ui-style="go"]) {
+  background: #f5f5f5;
+}
+
+/* ——— Header: white bar, red rule, navy title ——— */
+.ui-style-root[data-ui-style="go"] .executive-page-header {
+  background: #ffffff;
+  border: 0;
+  border-bottom: 2px solid var(--dash-accent);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-card-shadow);
+  margin-bottom: 1rem !important;
+}
+
+.ui-style-root[data-ui-style="go"] .executive-page-header .main-title {
+  color: var(--dash-navy);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ui-style-root[data-ui-style="go"] .page-subtitle,
+.ui-style-root[data-ui-style="go"] .executive-page-header .text-gray-500,
+.ui-style-root[data-ui-style="go"] .executive-page-header .text-gray-600 {
+  color: var(--go-text-light) !important;
+}
+
+/* ——— Buttons: GO pills ——— */
+.ui-style-root[data-ui-style="go"] .btn,
+.ui-style-root[data-ui-style="go"] .professional-action-btn {
+  border-radius: 999px !important;
+  box-shadow: none;
+  transform: none !important;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn {
+  background: #ffffff;
+  color: var(--dash-accent);
+  border: 1px solid var(--dash-accent);
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn:hover {
+  background: var(--dash-accent);
+  color: #ffffff;
+  border-color: var(--dash-accent);
+  box-shadow: none;
+  transform: none;
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn-green,
+.ui-style-root[data-ui-style="go"] .btn-success {
+  background: var(--go-green);
+  color: #ffffff;
+  border-color: var(--go-green);
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn-green:hover,
+.ui-style-root[data-ui-style="go"] .btn-success:hover {
+  background: #6aa336;
+  color: #ffffff;
+  border-color: #6aa336;
+  box-shadow: none;
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn-red,
+.ui-style-root[data-ui-style="go"] .btn-primary,
+.ui-style-root[data-ui-style="go"] .btn-danger,
+.ui-style-root[data-ui-style="go"] .professional-action-btn-blue,
+.ui-style-root[data-ui-style="go"] .professional-action-btn-purple,
+.ui-style-root[data-ui-style="go"] .btn-purple {
+  background: var(--dash-accent);
+  color: #ffffff;
+  border-color: var(--dash-accent);
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn-red:hover,
+.ui-style-root[data-ui-style="go"] .btn-primary:hover,
+.ui-style-root[data-ui-style="go"] .btn-danger:hover,
+.ui-style-root[data-ui-style="go"] .professional-action-btn-blue:hover,
+.ui-style-root[data-ui-style="go"] .professional-action-btn-purple:hover,
+.ui-style-root[data-ui-style="go"] .btn-purple:hover {
+  background: var(--dash-cta-hover);
+  color: #ffffff;
+  border-color: var(--dash-cta-hover);
+  box-shadow: none;
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn-orange {
+  background: var(--go-orange);
+  color: #ffffff;
+  border-color: var(--go-orange);
+}
+
+.ui-style-root[data-ui-style="go"] .professional-action-btn-orange:hover {
+  background: #e06d00;
+  color: #ffffff;
+  border-color: #e06d00;
+  box-shadow: none;
+}
+
+.ui-style-root[data-ui-style="go"] .btn-secondary,
+.ui-style-root[data-ui-style="go"] .btn-ghost,
+.ui-style-root[data-ui-style="go"] .collapse-toggle.btn {
+  background: #ffffff;
+  color: var(--dash-navy);
+  border: 1px solid var(--dash-border);
+  border-radius: 999px !important;
+}
+
+.ui-style-root[data-ui-style="go"] .btn-secondary:hover,
+.ui-style-root[data-ui-style="go"] .collapse-toggle.btn:hover {
+  background: #F2F2F2;
+  color: var(--dash-navy);
+  box-shadow: none;
+}
+
+.ui-style-root[data-ui-style="go"] a.bg-emerald-600,
+.ui-style-root[data-ui-style="go"] button.bg-emerald-600,
+.ui-style-root[data-ui-style="go"] a.bg-blue-600,
+.ui-style-root[data-ui-style="go"] button.bg-blue-600 {
+  background-color: var(--dash-accent) !important;
+  border-color: var(--dash-accent) !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  font-weight: 600;
+}
+
+.ui-style-root[data-ui-style="go"] a.bg-emerald-600:hover,
+.ui-style-root[data-ui-style="go"] button.bg-emerald-600:hover,
+.ui-style-root[data-ui-style="go"] a.bg-blue-600:hover,
+.ui-style-root[data-ui-style="go"] button.bg-blue-600:hover {
+  background-color: var(--dash-cta-hover) !important;
+}
+
+.ui-style-root[data-ui-style="go"] button.bg-white.border,
+.ui-style-root[data-ui-style="go"] a.bg-white.border {
+  border-radius: 999px !important;
+  border-color: var(--dash-accent) !important;
+  color: var(--dash-accent) !important;
+  background: #ffffff !important;
+}
+
+/* ——— Status: rounded semantic chips ——— */
+.ui-style-root[data-ui-style="go"] .status-label,
+.ui-style-root[data-ui-style="go"] .sharp-ui .status-label,
+.ui-style-root[data-ui-style="go"] .assignment-status-pipeline-trigger .status-label,
+.ui-style-root[data-ui-style="go"] .entity-status-chip.status-label {
+  border-radius: 999px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0.15rem 0.65rem;
+}
+
+.ui-style-root[data-ui-style="go"] .status-label--neutral {
+  color: #323232;
+  background: #F2F2F2;
+}
+
+.ui-style-root[data-ui-style="go"] .status-label--success {
+  color: #3d6b1c;
+  background: #eef6e4;
+}
+
+.ui-style-root[data-ui-style="go"] .status-label--danger {
+  color: #DE2934;
+  background: #FDD6D9;
+}
+
+.ui-style-root[data-ui-style="go"] .status-label--warning {
+  color: #9a4d00;
+  background: #fff1e0;
+}
+
+.ui-style-root[data-ui-style="go"] .status-label--pending {
+  color: #525252;
+  background: #F2F2F2;
+}
+
+.ui-style-root[data-ui-style="go"] .status-label--active,
+.ui-style-root[data-ui-style="go"] .status-label--info,
+.ui-style-root[data-ui-style="go"] .status-label--review {
+  color: #011E41;
+  background: #E0E3E7;
+}
+
+/* ——— Dashboard cards and sections ——— */
+.ui-style-root[data-ui-style="go"] .dashboard-assignments-grid {
+  gap: 0.875rem;
+}
+
+.ui-style-root[data-ui-style="go"] .dashboard-assignment-card {
+  background: #ffffff;
+  border: 0 !important;
+  border-radius: var(--dash-radius) !important;
+  box-shadow: var(--dash-card-shadow) !important;
+}
+
+.ui-style-root[data-ui-style="go"] .dashboard-assignment-card.border-red-500,
+.ui-style-root[data-ui-style="go"] .dashboard-assignment-card.dashboard-assignment-card--overdue {
+  box-shadow: inset 0 3px 0 var(--dash-accent), var(--dash-card-shadow) !important;
+  background: #fffafa !important;
+}
+
+.ui-style-root[data-ui-style="go"] .dashboard-assignment-card:hover,
+.ui-style-root[data-ui-style="go"] .dashboard-assignment-card:focus-within {
+  transform: none;
+  box-shadow: var(--dash-card-hover-shadow) !important;
+}
+
+.ui-style-root[data-ui-style="go"] #current-assignments-section,
+.ui-style-root[data-ui-style="go"] #past-assignments-section,
+.ui-style-root[data-ui-style="go"] .lg\:w-2\/3 > .bg-white.shadow-md,
+.ui-style-root[data-ui-style="go"] .lg\:w-1\/3 > .bg-white.shadow-md,
+.ui-style-root[data-ui-style="go"] #data-quality-dashboard > .rounded-xl,
+.ui-style-root[data-ui-style="go"] .data-quality-pillar-card {
+  background: #ffffff;
+  border: 0;
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-section-shadow);
+}
+
+.ui-style-root[data-ui-style="go"] #current-assignments-section > h2,
+.ui-style-root[data-ui-style="go"] #approved-assignments-header h2,
+.ui-style-root[data-ui-style="go"] .lg\:w-2\/3 > .bg-white.shadow-md > h2,
+.ui-style-root[data-ui-style="go"] .lg\:w-1\/3 > .bg-white.shadow-md > h2 {
+  color: var(--dash-navy);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ui-style-root[data-ui-style="go"] a:not(.btn):not(.professional-action-btn):not(.settings-tab) {
+  color: var(--dash-navy);
+}
+
+.ui-style-root[data-ui-style="go"] a.text-blue-700 {
+  color: var(--dash-accent) !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ui-style-root[data-ui-style="go"] a.text-blue-700:hover {
+  color: var(--dash-cta-hover) !important;
+  text-decoration: underline;
+}
+
+.ui-style-root[data-ui-style="go"] .dashboard-no-access-submit {
+  background: var(--dash-accent);
+  border-radius: 999px;
+}
+
+.ui-style-root[data-ui-style="go"] .dashboard-no-access-submit:hover {
+  background: var(--dash-cta-hover);
+}
+
+/* ——— Entry form ——— */
+.entry-form-root.ui-style-root[data-ui-style="go"] .entry-form-sections-pane {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.ui-style-root[data-ui-style="go"] #sections-container > [id^="section-container-"],
+.ui-style-root[data-ui-style="go"] [id^="section-container-"].bg-gray-50.rounded-lg,
+.ui-style-root[data-ui-style="go"] [id^="section-container-"].bg-gray-50 {
+  background: #ffffff !important;
+  border: 0 !important;
+  border-radius: var(--dash-radius) !important;
+  box-shadow: var(--dash-card-shadow) !important;
+  padding: 0 !important;
+  margin-bottom: 1rem !important;
+  overflow: hidden;
+}
+
+.ui-style-root[data-ui-style="go"] [data-collapsible-content] > [id^="section-container-"] {
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid var(--dash-border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+.ui-style-root[data-ui-style="go"] [id^="section-container-"].bg-gray-50 > h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 !important;
+  padding: 0.75rem 1rem !important;
+  background: #ffffff;
+  border-bottom: 1px solid var(--dash-border) !important;
+  border-inline-start: 3px solid var(--dash-accent);
+  font-weight: 600;
+}
+
+.ui-style-root[data-ui-style="go"] [id^="section-container-"].bg-gray-50 > h3,
+.ui-style-root[data-ui-style="go"] [id^="section-container-"].bg-gray-50 > h3 .text-gray-700,
+.ui-style-root[data-ui-style="go"] [id^="section-container-"].bg-gray-50 > h3 span {
+  color: var(--dash-navy) !important;
+}
+
+.ui-style-root[data-ui-style="go"] [id^="section-container-"].bg-gray-50 > [data-collapsible-content] {
+  padding: 0.875rem !important;
+  background: #f5f5f5;
+}
+
+.ui-style-root[data-ui-style="go"] .form-item-block.border,
+.ui-style-root[data-ui-style="go"] .form-group.form-item-block {
+  background: #ffffff !important;
+  border: 1px solid var(--dash-border) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+}
+
+.ui-style-root[data-ui-style="go"] .form-item-block.border:focus-within,
+.ui-style-root[data-ui-style="go"] .form-group.form-item-block:focus-within {
+  border-color: var(--dash-accent) !important;
+}
+
+.ui-style-root[data-ui-style="go"] .form-item-block input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+.ui-style-root[data-ui-style="go"] .form-item-block select,
+.ui-style-root[data-ui-style="go"] .form-item-block textarea,
+.ui-style-root[data-ui-style="go"] .dref-report-field input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+.ui-style-root[data-ui-style="go"] .dref-report-field select,
+.ui-style-root[data-ui-style="go"] .dref-report-field textarea,
+.ui-style-root[data-ui-style="go"] .form-input {
+  border-radius: 0.25rem;
+  border-color: #C6C6C6;
+  font-family: inherit;
+}
+
+.ui-style-root[data-ui-style="go"] .form-item-block input:focus,
+.ui-style-root[data-ui-style="go"] .form-item-block select:focus,
+.ui-style-root[data-ui-style="go"] .form-item-block textarea:focus,
+.ui-style-root[data-ui-style="go"] .dref-report-field input:focus,
+.ui-style-root[data-ui-style="go"] .dref-report-field select:focus,
+.ui-style-root[data-ui-style="go"] .dref-report-field textarea:focus,
+.ui-style-root[data-ui-style="go"] .form-input:focus {
+  border-color: var(--dash-accent);
+  outline: 2px solid var(--dash-focus-ring);
+  outline-offset: 1px;
+}
+
+.ui-style-root[data-ui-style="go"] .dref-report-field fieldset,
+.ui-style-root[data-ui-style="go"] .dref-report-field [data-activity-id] {
+  border-color: var(--dash-border);
+  border-radius: 0.5rem;
+  background: #ffffff;
+}
+
+/* ——— DREF monitoring surfaces ——— */
+.ui-style-root[data-ui-style="go"] .bg-white.rounded-lg {
+  border-radius: var(--dash-radius) !important;
+  border-color: transparent !important;
+  box-shadow: var(--dash-card-shadow);
+}
+
+.ui-style-root[data-ui-style="go"] .settings-tab.border-blue-500,
+.ui-style-root[data-ui-style="go"] .settings-tab.text-blue-600,
+.ui-style-root[data-ui-style="go"] .settings-tab.active {
+  border-color: var(--dash-accent) !important;
+  color: var(--dash-accent) !important;
+  font-weight: 600;
+}
+
+.ui-style-root[data-ui-style="go"] .settings-tab:hover {
+  color: var(--dash-navy);
+}
+
+.ui-style-root[data-ui-style="go"] table thead {
+  background: #ffffff;
+  color: var(--go-text-light);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ui-style-root[data-ui-style="go"] table thead th {
+  font-weight: 600;
+}
+
+.ui-style-root[data-ui-style="go"] table tbody tr:hover {
+  background: #FAFAFA;
+}
+
+.ui-style-root[data-ui-style="go"] tr[data-closed="1"] {
+  background: #F2F2F2;
+  color: var(--go-text-light);
+}
+
+.ui-style-root[data-ui-style="go"] .bg-gray-50.rounded,
+.ui-style-root[data-ui-style="go"] .bg-gray-50.rounded-lg {
+  background: #ffffff;
+  border: 1px solid var(--dash-border);
+  border-radius: 0.75rem;
+}
+
+.ui-style-root[data-ui-style="go"] dl dt.text-xs,
+.ui-style-root[data-ui-style="go"] .bg-gray-50.rounded dt {
+  color: var(--dash-accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ui-style-root[data-ui-style="go"] .dref-timeline-event.is-done .dref-timeline-mark {
+  background: var(--dash-navy);
+}
+
+.ui-style-root[data-ui-style="go"] .dref-timeline-event.is-current .dref-timeline-mark {
+  background: var(--dash-accent);
+}
+
+.ui-style-root[data-ui-style="go"] .dref-plan-table th {
+  color: var(--go-text-light);
+  font-weight: 600;
+}

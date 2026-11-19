@@ -246,6 +246,60 @@ def test_saving_a_cycle_stores_the_report_and_submit_moves_its_status(seeded, ap
     assert report.status == "draft"
 
 
+def test_a_percentage_split_is_stored_as_counts(seeded):
+    _country, user = seeded
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    assert validate_plan(operation, _manager(user.id), date(2026, 1, 10)) is None
+    period = DrefPeriod.query.filter_by(operation_id=operation.id).order_by(DrefPeriod.sequence).first()
+    activity = activities_for(groups_for(latest_plan(operation.id).id)[0].id)[0]
+    saved = apply_cycle_payload(
+        operation,
+        period,
+        {
+            "activities": {
+                str(activity.id): {
+                    "status": "ongoing",
+                    "reached": 10,
+                    "pct_women": 40,
+                    "pct_men": 30,
+                    "pct_girls": 20,
+                    "pct_boys": 10,
+                    "expenditure": "5",
+                }
+            }
+        },
+        user.id,
+    )
+    assert saved is None
+    update = DrefActivityUpdate.query.filter_by(activity_id=activity.id).one()
+    assert update.people_individuals == 10
+    assert update.disaggregation["women"] == 4
+    assert update.disaggregation["men"] == 3
+    assert update.disaggregation["girls"] == 2
+    assert update.disaggregation["boys"] == 1
+    assert update.disaggregation_na is False
+
+    refused = apply_cycle_payload(
+        operation,
+        period,
+        {
+            "activities": {
+                str(activity.id): {
+                    "reached": 10,
+                    "pct_women": 50,
+                    "pct_men": 10,
+                    "pct_girls": 10,
+                    "pct_boys": 10,
+                }
+            }
+        },
+        user.id,
+    )
+    assert refused == "The percentage split must add up to 100."
+    assert db.session.get(DrefActivityUpdate, update.id).disaggregation["women"] == 4
+
+
 def test_backfill_replaces_a_missing_project_and_does_not_duplicate_cycles(seeded):
     _country, user = seeded
     apply_rows([_row()])

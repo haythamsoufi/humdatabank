@@ -14,6 +14,8 @@ from app.routes.admin.shared import admin_permission_required_any, permission_re
 from plugins.dref_monitoring.access import current_actor, operations_for
 from plugins.dref_monitoring.config_store import ai_enabled, get_config, save_posted_settings
 from plugins.dref_monitoring.constants import (
+    ACTIVITY_TYPES,
+    CARRIED_OUT_BY,
     ENTER_PERMISSION,
     MANAGE_PERMISSION,
     PLUGIN_ID,
@@ -44,14 +46,12 @@ from plugins.dref_monitoring.services.excel_import import import_activities
 from plugins.dref_monitoring.services.go_parse import is_imminent
 from plugins.dref_monitoring.services.go_sync import sync_from_go
 from plugins.dref_monitoring.services.plans import (
-    activities_for,
     decide_change,
     edit_activity,
     generate_plan,
-    groups_for,
-    indicators_for_activity,
     latest_baseline,
     latest_plan,
+    plan_sections,
     remove_member,
     sectors_not_on_plan,
     save_plan_activities,
@@ -65,8 +65,10 @@ from plugins.dref_monitoring.services.reporting import (
     add_procurement,
     add_risk,
     matrix_for_request,
+    monitoring_snapshot,
     periods_for,
     report_for_period,
+    reporting_period_badge,
     set_funds,
 )
 
@@ -223,32 +225,39 @@ def operation_page(operation_id: int):
     operation = _operation(operation_id)
     actor = _actor()
     plan = latest_plan(operation.id)
-    sections = []
-    if plan is not None:
-        for group in groups_for(plan.id):
-            activities = []
-            for activity in activities_for(group.id):
-                activities.append({"activity": activity, "indicators": indicators_for_activity(activity.id)})
-            sections.append({"group": group, "activities": activities})
+    sections = plan_sections(plan.id) if plan is not None else []
     periods = []
     for period in periods_for(operation.id):
         href = assignment_url(operation.id, period)
+        report = report_for_period(period.id)
         periods.append(
             {
                 "period": period,
-                "report": report_for_period(period.id),
+                "report": report,
+                "display_status": reporting_period_badge(period, report),
                 "assignment_href": href if href.startswith("/assignment/") else None,
             }
         )
     members = DrefMember.query.filter_by(operation_id=operation.id).order_by(DrefMember.id).all()
     member_users = {}
-    if members:
+    system_users = []
+    can_review = actor.allows(operation, "review")
+    if members or can_review:
+        from sqlalchemy import func
+
         from app.models.core import User
 
-        member_users = {
-            user.id: user
-            for user in User.query.filter(User.id.in_([member.user_id for member in members])).all()
-        }
+        if members:
+            member_users = {
+                user.id: user
+                for user in User.query.filter(User.id.in_([member.user_id for member in members])).all()
+            }
+        if can_review:
+            system_users = (
+                User.query.filter(User.active.is_(True))
+                .order_by(func.lower(func.coalesce(User.name, User.email)))
+                .all()
+            )
     return render_template(
         f"plugins/{PLUGIN_ID}/operation.html",
         operation=operation,
@@ -259,6 +268,9 @@ def operation_page(operation_id: int):
         plan=plan,
         baseline=latest_baseline(operation.id),
         sections=sections,
+        snapshot=monitoring_snapshot(operation),
+        activity_types=ACTIVITY_TYPES,
+        carried_out_by=CARRIED_OUT_BY,
         available_sectors=sectors_not_on_plan(plan.id) if plan is not None else [],
         plan_imminent=is_imminent(operation.appeal_type, operation.pillar),
         changes=DrefChangeRequest.query.filter_by(operation_id=operation.id).order_by(DrefChangeRequest.id.desc()).limit(30).all(),
@@ -267,6 +279,7 @@ def operation_page(operation_id: int):
         delays=DrefDelay.query.filter_by(operation_id=operation.id).order_by(DrefDelay.id.desc()).limit(20).all(),
         members=members,
         member_users=member_users,
+        system_users=system_users,
         feedback=DrefFeedback.query.filter_by(operation_id=operation.id).order_by(DrefFeedback.id.desc()).limit(20).all(),
         risks=DrefRisk.query.filter_by(operation_id=operation.id).all(),
         funds=DrefFundsEvent.query.filter_by(operation_id=operation.id).order_by(DrefFundsEvent.id.desc()).limit(5).all(),

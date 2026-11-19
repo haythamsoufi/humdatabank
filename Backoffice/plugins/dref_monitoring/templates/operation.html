@@ -14,6 +14,29 @@
   {%- if value is not none and value != '' -%}{{ value|format_number }}{%- else -%}-{%- endif -%}
 {%- endmacro %}
 
+{% macro activity_status_options(selected) %}
+<option value="planned" {% if selected == 'planned' %}selected{% endif %}>{{ dref_tr('Planned') }}</option>
+<option value="ongoing" {% if selected == 'ongoing' %}selected{% endif %}>{{ dref_tr('Ongoing') }}</option>
+<option value="completed" {% if selected == 'completed' %}selected{% endif %}>{{ dref_tr('Completed') }}</option>
+<option value="blocked" {% if selected == 'blocked' %}selected{% endif %}>{{ dref_tr('Blocked') }}</option>
+<option value="delayed" {% if selected == 'delayed' %}selected{% endif %}>{{ dref_tr('Delayed') }}</option>
+{% endmacro %}
+
+{% macro choice_label(options, selected) %}
+{%- set ns = namespace(label=selected or '-') -%}
+{%- for code, label in options -%}
+{%- if code == selected -%}{%- set ns.label = label -%}{%- endif -%}
+{%- endfor -%}
+{{ dref_tr(ns.label) if ns.label != '-' else '-' }}
+{% endmacro %}
+
+{% macro choice_options(options, selected) %}
+<option value="">{{ dref_tr('Select') }}</option>
+{% for code, label in options %}
+<option value="{{ code }}" {% if selected == code %}selected{% endif %}>{{ dref_tr(label) }}</option>
+{% endfor %}
+{% endmacro %}
+
 {% macro fact(label, value, wide=False) %}
 <div{% if wide %} class="sm:col-span-2"{% endif %}>
   <dt class="text-xs font-medium text-gray-500">{{ label }}</dt>
@@ -24,10 +47,13 @@
 {% block title %}{{ operation.appeal_code }}{% endblock %}
 
 {% block extra_css %}
+{% include "components/_ui_style_stylesheets.html" %}
 <link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/plan_inline.css') }}">
 {% endblock %}
 
 {% block content %}
+{% set ui_style_root_id = 'dref-style-root' %}
+{% include "components/_ui_style_root_start.html" %}
 {% set active_tab = active_tab|default('overview') %}
 {% set allocation = operation.total_approved if operation.total_approved is not none else operation.amount_approved %}
 {% set input_class = "form-input mt-1 w-full px-3 py-2 text-sm text-gray-900 bg-white" %}
@@ -52,7 +78,7 @@
         <input type="hidden" name="tab" value="plan">
         <button type="submit" class="professional-action-btn professional-action-btn-green">
             <i class="fas fa-check" aria-hidden="true"></i>
-            <span>{{ dref_tr('Validate plan') }}</span>
+            <span>{{ dref_tr('Confirm the monitoring plan') }}</span>
         </button>
     </form>
     {% endset %}
@@ -116,6 +142,56 @@
 
     <div class="p-6">
         <div id="panel-overview" class="settings-panel space-y-6{% if active_tab != 'overview' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-overview">
+            {% if snapshot %}
+            <section class="space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold text-gray-800">{{ dref_tr('Reporting timeline') }}</h2>
+                    {% if snapshot.update_href %}
+                    <a class="btn btn-primary btn-sm" href="{{ snapshot.update_href }}">{{ dref_tr('Report updates') }}</a>
+                    {% endif %}
+                </div>
+                {% if snapshot.events %}
+                <ol class="dref-timeline" style="grid-template-columns: repeat({{ snapshot.events|length }}, minmax(0, 1fr));">
+                    {% for event in snapshot.events %}
+                    <li class="dref-timeline-event is-{{ event.state }}">
+                        <div class="dref-timeline-mark"></div>
+                        <p class="text-sm font-medium text-gray-900">{{ dref_tr(event.label) }}</p>
+                        <p class="mt-0.5 text-xs text-gray-500">{% if event.date %}{{ event.date }}{% elif event.state == 'done' %}{{ dref_tr('Done') }}{% else %}{{ dref_tr('Not yet') }}{% endif %}</p>
+                    </li>
+                    {% endfor %}
+                </ol>
+                {% if snapshot.period_count %}
+                <p class="text-sm text-gray-600">{{ snapshot.filed_count }} / {{ snapshot.period_count }} {{ dref_tr('updates filed') }}{% if snapshot.next_overdue %} · {{ dref_tr('Overdue') }}{% endif %}</p>
+                {% endif %}
+                {% endif %}
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ dref_tr('Activities by sector') }}</h3>
+                        <div class="mt-3 flex items-center gap-4">
+                            <div class="dref-donut" style="background: {{ snapshot.sector_chart }}"></div>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                {% for part in snapshot.by_sector %}
+                                <li>{{ part.label }} · {{ part.count }}</li>
+                                {% else %}
+                                <li class="text-gray-500">{{ dref_tr('No activities on this plan yet') }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ dref_tr('Activities by status') }}</h3>
+                        <div class="mt-3 flex items-center gap-4">
+                            <div class="dref-donut" style="background: {{ snapshot.status_chart }}"></div>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                {% for part in snapshot.by_status %}
+                                <li>{{ dref_enum(part.key) }} · {{ part.count }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
                     <p class="text-xs font-medium text-gray-500">{{ dref_tr('Approved allocation') }}</p>
@@ -275,7 +351,14 @@
                         </thead>
                         <tbody>
                             {% for section in sections %}
+                            {% set seen = namespace(ids=[]) %}
                             {% for row in section.activities %}
+                            {% set linked = namespace(indicator=none) %}
+                            {% for block in section.blocks %}
+                                {% if block.indicator and (row.indicator_id == block.indicator.id or block.indicator.activity_id == row.id) %}
+                                    {% set linked.indicator = block.indicator %}
+                                {% endif %}
+                            {% endfor %}
                             <tr class="border-t border-gray-200">
                                 {% if loop.first %}
                                 <td class="dref-plan-wrap px-4 py-3 align-top" {% if section.activities|length > 1 %}rowspan="{{ section.activities|length }}"{% endif %}>
@@ -283,61 +366,102 @@
                                 </td>
                                 {% endif %}
                                 <td class="dref-plan-wrap px-4 py-3">
-                                    <span class="dref-plan-read font-medium text-gray-900">{{ row.activity.title }}</span>
+                                    <span class="dref-plan-read font-medium text-gray-900">{{ row.title }}</span>
+                                    {% if row.activity_type or row.carried_out_by %}
+                                    <p class="dref-plan-read mt-1 text-xs text-gray-500">{{ choice_label(activity_types, row.activity_type) }} · {{ choice_label(carried_out_by, row.carried_out_by) }}</p>
+                                    {% endif %}
                                     {% if actor_can_enter %}
-                                    <input type="hidden" class="dref-plan-field" name="activity_id" value="{{ row.activity.id }}" disabled>
-                                    <textarea class="{{ field_class }} dref-plan-area" name="title-{{ row.activity.id }}" rows="2" aria-label="{{ dref_tr('Activity') }}" disabled>{{ row.activity.title or '' }}</textarea>
+                                    <input type="hidden" class="dref-plan-field" name="activity_id" value="{{ row.id }}" disabled>
+                                    {% if linked.indicator %}
+                                    <input type="hidden" class="dref-plan-field" name="indicator_id-{{ row.id }}" value="{{ linked.indicator.id }}" disabled>
+                                    {% endif %}
+                                    <textarea class="{{ field_class }} dref-plan-area" name="title-{{ row.id }}" rows="2" aria-label="{{ dref_tr('Activity') }}" disabled>{{ row.title }}</textarea>
+                                    <label class="dref-plan-write mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
+                                        <input type="checkbox" class="dref-plan-field" name="remove_activity" value="{{ row.id }}" disabled>
+                                        {{ dref_tr('Remove') }}
+                                    </label>
                                     {% endif %}
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--status px-4 py-3">
-                                    <span class="dref-plan-read">{{ dref_status(row.activity.status) }}</span>
+                                    <span class="dref-plan-read">{{ dref_status(row.status) }}</span>
                                     {% if actor_can_enter %}
-                                    <select class="{{ field_class }}" name="status-{{ row.activity.id }}" aria-label="{{ dref_tr('Status') }}" disabled>
-                                        <option value="planned" {% if row.activity.status == 'planned' %}selected{% endif %}>{{ dref_tr('Planned') }}</option>
-                                        <option value="ongoing" {% if row.activity.status == 'ongoing' %}selected{% endif %}>{{ dref_tr('Ongoing') }}</option>
-                                        <option value="completed" {% if row.activity.status == 'completed' %}selected{% endif %}>{{ dref_tr('Completed') }}</option>
-                                    </select>
+                                    <select class="{{ field_class }}" name="status-{{ row.id }}" aria-label="{{ dref_tr('Status') }}" disabled>{{ activity_status_options(row.status) }}</select>
                                     {% endif %}
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--budget px-4 py-3">
-                                    <span class="dref-plan-read">{{ money(row.activity.budget_chf) }}</span>
+                                    <span class="dref-plan-read">{{ money(row.budget_chf) }}</span>
                                     {% if actor_can_enter %}
-                                    <input class="{{ field_class }}" name="budget_chf-{{ row.activity.id }}" value="{{ row.activity.budget_chf|format_number }}" inputmode="decimal" aria-label="{{ dref_tr('Budget') }}" disabled>
+                                    <input class="{{ field_class }}" name="budget_chf-{{ row.id }}" value="{{ row.budget_chf|format_number if row.budget_chf is not none else '' }}" inputmode="decimal" aria-label="{{ dref_tr('Budget') }}" disabled>
                                     {% endif %}
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--date px-4 py-3">
-                                    <span class="dref-plan-read">{{ row.activity.start_date or '-' }}</span>
+                                    <span class="dref-plan-read">{{ row.start_date or '-' }}</span>
                                     {% if actor_can_enter %}
-                                    <input class="{{ field_class }}" type="date" name="start_date-{{ row.activity.id }}" value="{{ row.activity.start_date.isoformat() if row.activity.start_date else '' }}" aria-label="{{ dref_tr('Start') }}" disabled>
+                                    <input class="{{ field_class }}" type="date" name="start_date-{{ row.id }}" value="{{ row.start_date.isoformat() if row.start_date else '' }}" aria-label="{{ dref_tr('Start') }}" disabled>
                                     {% endif %}
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--date px-4 py-3">
-                                    <span class="dref-plan-read">{{ row.activity.end_date or '-' }}</span>
+                                    <span class="dref-plan-read">{{ row.end_date or '-' }}</span>
                                     {% if actor_can_enter %}
-                                    <input class="{{ field_class }}" type="date" name="end_date-{{ row.activity.id }}" value="{{ row.activity.end_date.isoformat() if row.activity.end_date else '' }}" aria-label="{{ dref_tr('End') }}" disabled>
+                                    <input class="{{ field_class }}" type="date" name="end_date-{{ row.id }}" value="{{ row.end_date.isoformat() if row.end_date else '' }}" aria-label="{{ dref_tr('End') }}" disabled>
                                     {% endif %}
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--target px-4 py-3">
-                                    {% for indicator in row.indicators %}
-                                    <div class="{% if not loop.first %}mt-2 {% endif %}text-xs font-medium text-gray-500">
-                                        {{ indicator.title }}{% if indicator.unit %} · {{ indicator.unit }}{% endif %}
-                                        <span class="dref-plan-read block mt-1 text-sm font-normal text-gray-900">{{ count(indicator.target) }}</span>
-                                        {% if actor_can_enter %}
-                                        <input type="hidden" class="dref-plan-field" name="indicator_id-{{ row.activity.id }}" value="{{ indicator.id }}" disabled>
-                                        <input class="{{ field_class }} mt-1" name="target-{{ indicator.id }}" value="{{ indicator.target|format_number }}" inputmode="decimal" aria-label="{{ indicator.title }}" disabled>
-                                        {% endif %}
-                                    </div>
+                                    {% if linked.indicator %}
+                                    <p class="text-xs text-gray-500">{{ linked.indicator.title }}{% if linked.indicator.unit %} · {{ linked.indicator.unit }}{% endif %}</p>
+                                    <span class="dref-plan-read mt-1 block text-sm text-gray-900">{{ count(linked.indicator.target) }}</span>
+                                    {% if actor_can_enter and linked.indicator.id not in seen.ids %}
+                                    <input class="{{ field_class }} mt-1" name="target-{{ linked.indicator.id }}" value="{{ linked.indicator.target|format_number if linked.indicator.target is not none else '' }}" inputmode="decimal" aria-label="{{ dref_tr('Target') }}" disabled>
+                                    {% set _ = seen.ids.append(linked.indicator.id) %}
+                                    {% endif %}
                                     {% else %}
                                     <span class="text-gray-500">-</span>
-                                    {% endfor %}
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% else %}
                             <tr class="border-t border-gray-200">
-                                <td class="px-4 py-3 font-medium text-gray-900">{{ section.group.label }}</td>
-                                <td class="px-4 py-3 text-gray-500" colspan="6">-</td>
+                                <td class="dref-plan-wrap px-4 py-3 align-top">
+                                    <p class="font-medium text-gray-900">{{ section.group.label }}</p>
+                                    {% if actor_can_enter %}
+                                    <input type="hidden" class="dref-plan-field" name="group_id" value="{{ section.group.id }}" disabled>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 text-gray-500" colspan="6">{{ dref_tr('No activities on this plan yet') }}</td>
                             </tr>
                             {% endfor %}
+                            {% if actor_can_enter %}
+                            {% for block in section.blocks if block.indicator %}
+                            <tr class="dref-plan-extra border-t border-gray-200" data-dref-add-row>
+                                <td class="dref-plan-wrap px-4 py-3 align-top">
+                                    <label class="flex items-start gap-2 font-medium text-gray-900">
+                                        <input type="checkbox" class="mt-1" name="add_activity" value="{{ block.indicator.id }}" data-dref-add disabled>
+                                        <span>{{ dref_tr('Add activity') }}<span class="block text-xs font-normal text-gray-500">{{ block.indicator.title }}</span></span>
+                                    </label>
+                                </td>
+                                <td class="dref-plan-wrap px-4 py-3">
+                                    <textarea class="{{ field_class }} dref-plan-add-field dref-plan-area" name="add_activity_title-{{ block.indicator.id }}" rows="2" aria-label="{{ dref_tr('Activity') }}" data-add-field disabled></textarea>
+                                </td>
+                                <td class="dref-plan-col dref-plan-col--status px-4 py-3">
+                                    <select class="{{ field_class }} dref-plan-add-field" name="add_activity_status-{{ block.indicator.id }}" aria-label="{{ dref_tr('Status') }}" data-add-field disabled>{{ activity_status_options('planned') }}</select>
+                                </td>
+                                <td class="dref-plan-col dref-plan-col--budget px-4 py-3">
+                                    <input class="{{ field_class }} dref-plan-add-field" name="add_activity_budget-{{ block.indicator.id }}" inputmode="decimal" aria-label="{{ dref_tr('Budget') }}" data-add-field disabled>
+                                </td>
+                                <td class="dref-plan-col dref-plan-col--date px-4 py-3">
+                                    <input class="{{ field_class }} dref-plan-add-field" type="date" name="add_activity_start-{{ block.indicator.id }}" value="{{ operation.start_date.isoformat() if operation.start_date else '' }}" aria-label="{{ dref_tr('Start') }}" data-add-field disabled>
+                                </td>
+                                <td class="dref-plan-col dref-plan-col--date px-4 py-3">
+                                    <input class="{{ field_class }} dref-plan-add-field" type="date" name="add_activity_end-{{ block.indicator.id }}" value="{{ operation.end_date.isoformat() if operation.end_date else '' }}" aria-label="{{ dref_tr('End') }}" data-add-field disabled>
+                                </td>
+                                <td class="dref-plan-col dref-plan-col--target px-4 py-3">
+                                    <input class="{{ field_class }} dref-plan-add-field" name="add_activity_target-{{ block.indicator.id }}" inputmode="decimal" aria-label="{{ dref_tr('Target') }}" data-add-field disabled>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                            {% else %}
+                            <tr><td class="px-4 py-6 text-gray-500" colspan="7">{{ dref_tr('No activities on this plan yet') }}</td></tr>
                             {% endfor %}
                             {% if actor_can_enter and available_sectors %}
                             <tr class="dref-plan-extra border-t border-gray-200 bg-gray-50">
@@ -348,27 +472,17 @@
                                 <td class="dref-plan-wrap px-4 py-3 align-top">
                                     <label class="flex items-start gap-2 font-medium text-gray-900">
                                         <input type="checkbox" class="mt-1" name="add_sector" value="{{ key }}" data-dref-add disabled>
-                                        <span>
-                                            {{ label }}
-                                            <span class="block text-xs font-normal text-gray-500">{{ dref_tr('Not on this plan') }}</span>
-                                            {% if plan_imminent %}
-                                            <span class="block text-xs font-normal text-gray-500">{{ dref_tr('Adds early actions and early response for this sector.') }}</span>
-                                            {% endif %}
-                                        </span>
+                                        <span>{{ label }}<span class="block text-xs font-normal text-gray-500">{{ dref_tr('Not on this plan') }}</span></span>
                                     </label>
                                 </td>
                                 <td class="dref-plan-wrap px-4 py-3">
                                     <textarea class="{{ field_class }} dref-plan-add-field dref-plan-area" name="add_title-{{ key }}" rows="2" aria-label="{{ dref_tr('Activity') }}" data-add-field disabled>{% if plan_imminent %}Early response: {{ label }}{% else %}Deliver {{ label }}{% endif %}</textarea>
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--status px-4 py-3">
-                                    <select class="{{ field_class }} dref-plan-add-field" name="add_status-{{ key }}" aria-label="{{ dref_tr('Status') }}" data-add-field disabled>
-                                        <option value="planned" selected>{{ dref_tr('Planned') }}</option>
-                                        <option value="ongoing">{{ dref_tr('Ongoing') }}</option>
-                                        <option value="completed">{{ dref_tr('Completed') }}</option>
-                                    </select>
+                                    <select class="{{ field_class }} dref-plan-add-field" name="add_status-{{ key }}" aria-label="{{ dref_tr('Status') }}" data-add-field disabled>{{ activity_status_options('planned') }}</select>
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--budget px-4 py-3">
-                                    <input class="{{ field_class }} dref-plan-add-field" name="add_budget-{{ key }}" value="" inputmode="decimal" aria-label="{{ dref_tr('Budget') }}" data-add-field disabled>
+                                    <input class="{{ field_class }} dref-plan-add-field" name="add_budget-{{ key }}" inputmode="decimal" aria-label="{{ dref_tr('Budget') }}" data-add-field disabled>
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--date px-4 py-3">
                                     <input class="{{ field_class }} dref-plan-add-field" type="date" name="add_start-{{ key }}" value="{{ operation.start_date.isoformat() if operation.start_date else '' }}" aria-label="{{ dref_tr('Start') }}" data-add-field disabled>
@@ -377,8 +491,8 @@
                                     <input class="{{ field_class }} dref-plan-add-field" type="date" name="add_end-{{ key }}" value="{{ operation.end_date.isoformat() if operation.end_date else '' }}" aria-label="{{ dref_tr('End') }}" data-add-field disabled>
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--target px-4 py-3">
-                                    <p class="text-xs font-medium text-gray-500">{{ dref_tr('People reached') }} · people</p>
-                                    <input class="{{ field_class }} dref-plan-add-field mt-1" name="add_target-{{ key }}" value="" inputmode="decimal" aria-label="{{ dref_tr('Target') }}" data-add-field disabled>
+                                    <p class="text-xs font-medium text-gray-500">{{ dref_tr('People targeted') }}</p>
+                                    <input class="{{ field_class }} dref-plan-add-field mt-1" name="add_target-{{ key }}" inputmode="decimal" aria-label="{{ dref_tr('People targeted') }}" data-add-field disabled>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -392,16 +506,13 @@
                 <label class="block text-sm font-medium text-gray-700" for="dref-plan-justification">{{ dref_tr('Justification') }}
                     <textarea id="dref-plan-justification" class="dref-plan-field form-input mt-1 w-full px-3 py-2 text-sm text-gray-900 bg-white" name="justification" rows="2" required disabled></textarea>
                 </label>
-                <p class="text-sm text-gray-500">{{ dref_tr('One reason for every change in this save. Edits inside the approved operation apply immediately. Changes outside the approved budget, targets, or dates wait for sign-off.') }}</p>
+                <p class="text-sm text-gray-500">{{ dref_tr('One reason for every change in this save. Edits inside the approved operation apply immediately. Changes outside the approved budget, targets, or dates wait for sign-off. Adding or removing a sector, an indicator, or an activity on a confirmed plan opens a new draft.') }}</p>
                 <div class="flex flex-wrap gap-2">
                     <button class="btn btn-primary" type="submit"><i class="fas fa-save" aria-hidden="true"></i>{{ dref_tr('Save') }}</button>
                     <button class="btn btn-secondary" type="button" data-dref-plan-cancel>{{ dref_tr('Cancel') }}</button>
                 </div>
             </div>
             </form>
-            {% endif %}
-            {% if not sections %}
-            <p class="dref-plan-empty text-sm text-gray-500 text-center py-8 border border-gray-200 rounded-lg">{{ dref_tr('No activities on this plan yet') }}</p>
             {% endif %}
             {% else %}
             <p class="text-sm text-gray-500 text-center py-8 border border-gray-200 rounded-lg">{{ dref_tr('No monitoring plan yet') }}</p>
@@ -434,12 +545,10 @@
                                 <td class="px-4 py-3 text-gray-700">{{ row.period.start_date }} – {{ row.period.end_date }}</td>
                                 <td class="px-4 py-3 text-gray-700">{{ row.period.due_date }}</td>
                                 <td class="px-4 py-3">
-                                    {% if row.report %}
-                                        {{ dref_status(row.report.status) }}
-                                    {% elif row.period.status == 'open' %}
+                                    {% if row.display_status == 'open' %}
                                         {{ dref_status('monitoring', dref_tr('Open period')) }}
                                     {% else %}
-                                        {{ dref_status(row.period.status) }}
+                                        {{ dref_status(row.display_status) }}
                                     {% endif %}
                                 </td>
                                 <td class="px-4 py-3 text-right">
@@ -490,10 +599,15 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <section class="border border-gray-200 rounded-lg">
-                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
                         <h2 class="text-sm font-semibold text-gray-800">
                             <i class="fas fa-truck text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Procurement') }}
                         </h2>
+                        {% if actor_can_enter %}
+                        <button type="button" class="btn btn-icon btn-sm btn-success" data-dref-reveal="dref-procurement-form" aria-expanded="false" aria-controls="dref-procurement-form" title="{{ dref_tr('Add') }}" aria-label="{{ dref_tr('Add') }}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                        </button>
+                        {% endif %}
                     </div>
                     <ul class="divide-y divide-gray-200">
                         {% for item in procurement %}
@@ -506,7 +620,7 @@
                         {% endfor %}
                     </ul>
                     {% if actor_can_enter %}
-                    <form method="post" action="{{ url_for('dref_monitoring.procurement_route', operation_id=operation.id) }}" class="p-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <form id="dref-procurement-form" method="post" action="{{ url_for('dref_monitoring.procurement_route', operation_id=operation.id) }}" class="hidden p-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Item') }}
                             <input class="{{ input_class }}" name="item">
@@ -528,10 +642,15 @@
                 </section>
 
                 <section class="border border-gray-200 rounded-lg">
-                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
                         <h2 class="text-sm font-semibold text-gray-800">
                             <i class="fas fa-clock text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Delays') }}
                         </h2>
+                        {% if actor_can_enter %}
+                        <button type="button" class="btn btn-icon btn-sm btn-success" data-dref-reveal="dref-delay-form" aria-expanded="false" aria-controls="dref-delay-form" title="{{ dref_tr('Add') }}" aria-label="{{ dref_tr('Add') }}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                        </button>
+                        {% endif %}
                     </div>
                     <ul class="divide-y divide-gray-200">
                         {% for delay in delays %}
@@ -546,7 +665,7 @@
                         {% endfor %}
                     </ul>
                     {% if actor_can_enter %}
-                    <form method="post" action="{{ url_for('dref_monitoring.delay_route', operation_id=operation.id) }}" class="p-4 border-t border-gray-200 space-y-3">
+                    <form id="dref-delay-form" method="post" action="{{ url_for('dref_monitoring.delay_route', operation_id=operation.id) }}" class="hidden p-4 border-t border-gray-200 space-y-3">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Reason') }}
                             <textarea class="{{ input_class }}" name="reason" rows="2"></textarea>
@@ -642,10 +761,15 @@
 
         <div id="panel-team" class="settings-panel space-y-6{% if active_tab != 'team' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-team">
             <section class="border border-gray-200 rounded-lg overflow-hidden">
-                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-gray-800">
                         <i class="fas fa-users text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Members') }}
                     </h2>
+                    {% if actor_can_review %}
+                    <button type="button" class="btn btn-icon btn-sm btn-success" data-dref-reveal="dref-member-form" aria-expanded="false" aria-controls="dref-member-form" title="{{ dref_tr('Add') }}" aria-label="{{ dref_tr('Add') }}">
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                    </button>
+                    {% endif %}
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
@@ -685,10 +809,15 @@
                     </table>
                 </div>
                 {% if actor_can_review %}
-                <form method="post" action="{{ url_for('dref_monitoring.member_route', operation_id=operation.id) }}" class="p-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <form id="dref-member-form" method="post" action="{{ url_for('dref_monitoring.member_route', operation_id=operation.id) }}" class="hidden p-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <label class="block text-sm font-medium text-gray-700">{{ dref_tr('User id') }}
-                        <input class="{{ input_class }}" name="user_id" inputmode="numeric">
+                    <label class="block text-sm font-medium text-gray-700">{{ dref_tr('User') }}
+                        <select name="user_id" class="{{ input_class }}" required data-dref-user-select data-placeholder="{{ dref_tr('Select') }}" data-search="{{ dref_tr('Search by name or email') }}" data-empty="{{ dref_tr('No matching users') }}">
+                            <option value=""></option>
+                            {% for user in system_users %}
+                            <option value="{{ user.id }}" data-name="{{ user.name or user.email }}" data-email="{{ user.email }}">{{ user.name or user.email }}{% if user.name and user.name != user.email %} ({{ user.email }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
                     </label>
                     <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Role') }}
                         <select name="tier" class="{{ input_class }}">
@@ -705,10 +834,15 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <section class="border border-gray-200 rounded-lg">
-                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
                         <h2 class="text-sm font-semibold text-gray-800">
                             <i class="fas fa-comments text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Community feedback') }}
                         </h2>
+                        {% if actor_can_enter %}
+                        <button type="button" class="btn btn-icon btn-sm btn-success" data-dref-reveal="dref-feedback-form" aria-expanded="false" aria-controls="dref-feedback-form" title="{{ dref_tr('Add') }}" aria-label="{{ dref_tr('Add') }}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                        </button>
+                        {% endif %}
                     </div>
                     <ul class="divide-y divide-gray-200">
                         {% for row in feedback %}
@@ -721,7 +855,7 @@
                         {% endfor %}
                     </ul>
                     {% if actor_can_enter %}
-                    <form method="post" action="{{ url_for('dref_monitoring.feedback_route', operation_id=operation.id) }}" class="p-4 border-t border-gray-200 space-y-3">
+                    <form id="dref-feedback-form" method="post" action="{{ url_for('dref_monitoring.feedback_route', operation_id=operation.id) }}" class="hidden p-4 border-t border-gray-200 space-y-3">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Channel') }}
                             <input class="{{ input_class }}" name="channel">
@@ -735,10 +869,15 @@
                 </section>
 
                 <section class="border border-gray-200 rounded-lg">
-                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
                         <h2 class="text-sm font-semibold text-gray-800">
                             <i class="fas fa-exclamation-triangle text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Risks') }}
                         </h2>
+                        {% if actor_can_enter %}
+                        <button type="button" class="btn btn-icon btn-sm btn-success" data-dref-reveal="dref-risk-form" aria-expanded="false" aria-controls="dref-risk-form" title="{{ dref_tr('Add') }}" aria-label="{{ dref_tr('Add') }}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                        </button>
+                        {% endif %}
                     </div>
                     <ul class="divide-y divide-gray-200">
                         {% for row in risks %}
@@ -766,7 +905,7 @@
                         {% endfor %}
                     </ul>
                     {% if actor_can_enter %}
-                    <form method="post" action="{{ url_for('dref_monitoring.risk_route', operation_id=operation.id) }}" class="p-4 border-t border-gray-200 space-y-3">
+                    <form id="dref-risk-form" method="post" action="{{ url_for('dref_monitoring.risk_route', operation_id=operation.id) }}" class="hidden p-4 border-t border-gray-200 space-y-3">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Title') }}
                             <input class="{{ input_class }}" name="title">
@@ -845,7 +984,7 @@
             {%- endfor %}.
         </p>
         {% endif %}
-        <p>{{ dref_tr('Each sector GO switched on, or that has a budget or a people figure, becomes one group with a single activity, such as Deliver Health, and a People reached target when GO sent one. An imminent or anticipatory DREF uses Early actions and Early response instead. GO does not send an activity list, so lines finer than a sector come from the Excel import. If a later approved stage changes the total, the end date, or a sector budget or target, a validated plan is copied into a new draft.') }}</p>
+        <p>{{ dref_tr('Each sector GO switched on keeps its budget and people targeted, with one indicator and a starting activity. More activities can be added under that indicator. An imminent or anticipatory DREF uses Early actions and Early response instead. Adding or removing a sector, an indicator, or an activity after confirmation opens a new draft.') }}</p>
         {% if plan and plan.source == 'excel' %}
         <p>{{ dref_tr('The groups below came from an Excel import. The ceilings still follow the latest approved GO stage.') }}</p>
         {% elif plan and plan.source == 'rebased' %}
@@ -858,4 +997,5 @@
 {% endcall %}
 <script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/operation_tabs.js') }}" nonce="{{ csp_nonce() }}" defer></script>
 <script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/plan_inline.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+{% include "components/_ui_style_root_end.html" %}
 {% endblock %}

@@ -13,7 +13,7 @@ pytestmark = pytest.mark.db
 def test_plugin_class_loads():
     plugin = DrefMonitoringPlugin()
     assert plugin.plugin_id == "dref_monitoring"
-    assert plugin.version == "0.2.0"
+    assert plugin.version == "0.3.0"
     assert plugin.get_blueprint().name == "dref_monitoring"
     assert plugin.get_seed_permissions()
     assert plugin.get_scheduled_jobs()

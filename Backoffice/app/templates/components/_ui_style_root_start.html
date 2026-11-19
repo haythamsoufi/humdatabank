@@ -1,0 +1,5 @@
+<div id="{{ ui_style_root_id }}"
+     class="ui-style-root{{ (' ' ~ ui_style_root_class) if ui_style_root_class|default('') else '' }}"
+     data-ui-style="legacy"
+     data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}">
+{% include "components/_ui_style_boot.html" %}

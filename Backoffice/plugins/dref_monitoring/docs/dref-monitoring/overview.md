@@ -96,20 +96,22 @@ The country link is a match on ISO3 against the Databank country list. If there 
 
 ## The monitoring plan
 
-The generated plan is sector-level.
+The generated plan is organised as sector, then indicator, then activities.
 
-For a response DREF, each included sector becomes a group with one activity, “Deliver {sector}”, and an indicator:
+For a response DREF, each included sector keeps the approved budget and people targeted. Under that sits one indicator:
 
 - **People reached**, when GO sent a people-targeted figure
 - **Activities completed**, when it did not
 
+The sector starts with one activity, “Deliver {sector}”. Further activities can be added under the same indicator. Each activity has a type, who carries it out, its own target, a budget, dates, and a status (planned, ongoing, completed, blocked, or delayed).
+
 For an imminent or anticipatory operation, each sector becomes two groups: Early actions (a process indicator) and Early response (the sector budget, people targeted, and a people-reached indicator). If GO sent no sectors, the plan is a single Operation group, or Early actions plus Early response for an imminent operation.
 
-The National Society can edit titles, budgets, dates, and indicator targets, and can replace the activity list with an Excel file.
+The National Society can edit the sector figures, the indicator, and the activities, and can replace the activity list with an Excel file. Adding or removing a sector, an indicator, or an activity after the plan is confirmed opens a new draft. Number changes inside the approved budget, targets, and dates still apply on the confirmed plan.
 
 ### Validating the plan
 
-A user with the validation role opens the operation and clicks **Validate plan**. That sets the plan to validated, moves the workflow to `monitoring` (or `closure` if GO already says the operation is closed), and builds the reporting periods. Each period becomes a project cycle on the published template **DREF operational monitoring**. The cycle label is the appeal code and the period, for example `MDRMM024 · 2026-08`. Validating again does not open a second cycle for a period that already has one.
+A user with the validation role opens the operation and clicks **Confirm the monitoring plan**. That sets the plan to validated, moves the workflow to `monitoring` (or `closure` if GO already says the operation is closed), and builds the reporting periods. Each period becomes a project cycle on the published template **DREF operational monitoring**. The cycle label is the appeal code and the period, for example `MDRMM024 · 2026-08`. Validating again does not open a second cycle for a period that already has one.
 
 Settings include a plan-validation window, 14 days by default. The plugin stamps that date on the draft. It does not send a separate reminder for an unvalidated plan. The reminder job starts once periods exist, which is after validation.
 
@@ -157,14 +159,14 @@ Each period has one report: draft, submitted, validated, then reviewed.
 
 The country does not file that report from **Analytics & Monitoring → DREF monitoring**. A focal point for the country opens the project card on the country dashboard and saves the current cycle. The cycle shows one field, the operational report for that period. Saving writes the DREF tables. The focal point does not need a DREF monitoring role to open the cycle.
 
-On a draft report the data-entry user records, per activity:
+On a draft report the data-entry user records, per activity, the cumulative position to date:
 
-- status: planned, ongoing, or completed
+- status: planned, ongoing, completed, blocked, or delayed
 - percent complete
-- people reached as households and as individuals
-- disaggregation: women, men, girls, boys
+- people reached as one total
+- the split of that total as percentages of women, men, girls, and boys, or a mark that disaggregation cannot be provided
 - expenditure in CHF
-- the actual for each indicator
+- the actual for an indicator that is not people reached
 - a narrative note for the period
 
 Saving a draft on the cycle copies status and percent onto the activity and sums the expenditure lines onto the report.

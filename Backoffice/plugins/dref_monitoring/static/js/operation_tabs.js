@@ -29,6 +29,106 @@
         });
     }
 
+    function userResult(state) {
+        if (!state.id || !state.element) {
+            return state.text;
+        }
+        var name = state.element.getAttribute('data-name') || state.text;
+        var email = state.element.getAttribute('data-email') || '';
+        var wrap = document.createElement('span');
+        wrap.className = 'block leading-tight';
+        var nameEl = document.createElement('span');
+        nameEl.className = 'block text-sm font-medium';
+        nameEl.textContent = name;
+        wrap.appendChild(nameEl);
+        if (email && email !== name) {
+            var emailEl = document.createElement('span');
+            emailEl.className = 'block text-xs opacity-70';
+            emailEl.textContent = email;
+            wrap.appendChild(emailEl);
+        }
+        return wrap;
+    }
+
+    function enhanceUserSelect(select) {
+        var $ = window.jQuery;
+        if (!$ || !$.fn || !$.fn.select2 || !select) {
+            return null;
+        }
+        var $select = $(select);
+        if ($select.data('select2')) {
+            return $select;
+        }
+        $select.select2({
+            width: '100%',
+            placeholder: select.getAttribute('data-placeholder') || '',
+            allowClear: false,
+            dropdownParent: $(document.body),
+            minimumResultsForSearch: 0,
+            dropdownCssClass: 'dref-user-dropdown',
+            containerCssClass: 'mt-1',
+            language: {
+                noResults: function () {
+                    return select.getAttribute('data-empty') || '';
+                }
+            },
+            templateResult: userResult,
+            templateSelection: function (state) {
+                if (!state.id || !state.element) {
+                    return state.text;
+                }
+                return state.element.getAttribute('data-name') || state.text;
+            }
+        });
+        $select.on('select2:open', function () {
+            var field = document.querySelector('.select2-container--open .select2-search__field');
+            if (!field) {
+                return;
+            }
+            field.setAttribute('placeholder', select.getAttribute('data-search') || '');
+            field.focus();
+        });
+        return $select;
+    }
+
+    document.querySelectorAll('[data-dref-reveal]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var panel = document.getElementById(btn.getAttribute('data-dref-reveal') || '');
+            if (!panel) {
+                return;
+            }
+            var open = !panel.classList.toggle('hidden');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            var icon = btn.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-plus', !open);
+                icon.classList.toggle('fa-times', open);
+            }
+            var userSelect = panel.querySelector('[data-dref-user-select]');
+            if (!open && userSelect && window.jQuery) {
+                var existing = window.jQuery(userSelect);
+                if (existing.data('select2')) {
+                    existing.select2('close');
+                }
+                return;
+            }
+            if (!open) {
+                return;
+            }
+            if (userSelect) {
+                var $select = enhanceUserSelect(userSelect);
+                if ($select) {
+                    $select.select2('open');
+                    return;
+                }
+            }
+            var field = panel.querySelector('input:not([type="hidden"]), textarea, select');
+            if (field) {
+                field.focus();
+            }
+        });
+    });
+
     var A = window.AdminUnderlineTabs;
     var tabs = document.querySelectorAll('#dref-operation-tabs .settings-tab');
     if (!tabs.length || !A) {

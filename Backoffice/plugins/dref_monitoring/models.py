@@ -134,9 +134,26 @@ class DrefActivity(db.Model):
     status = db.Column(db.String(16), nullable=False, default="planned")
     percent = db.Column(db.Integer, nullable=True)
     budget_chf = db.Column(db.Numeric(14, 2), nullable=True)
+    target = db.Column(db.Numeric(14, 2), nullable=True)
+    activity_type = db.Column(db.String(64), nullable=False, default="")
+    carried_out_by = db.Column(db.String(64), nullable=False, default="")
+    indicator_id = db.Column(
+        db.Integer,
+        db.ForeignKey(
+            "dref_mon_indicator.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_dref_mon_activity_indicator",
+        ),
+        nullable=True,
+    )
     start_date = db.Column(db.Date, nullable=True)
     end_date = db.Column(db.Date, nullable=True)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        db.Index("ix_dref_mon_activity_indicator", "indicator_id"),
+    )
 
 
 class DrefIndicator(db.Model):
@@ -214,6 +231,7 @@ class DrefActivityUpdate(db.Model):
     people_households = db.Column(db.Integer, nullable=True)
     people_individuals = db.Column(db.Integer, nullable=True)
     disaggregation = db.Column(_JSON, nullable=True)
+    disaggregation_na = db.Column(db.Boolean, nullable=False, default=False)
     expenditure = db.Column(db.Numeric(14, 2), nullable=True)
     note = db.Column(db.Text, nullable=False, default="")
 

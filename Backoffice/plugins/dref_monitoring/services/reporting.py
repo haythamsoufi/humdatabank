@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from app.extensions import db
 from plugins.dref_monitoring.constants import (
+    ACTIVITY_BLOCKED,
     ACTIVITY_COMPLETED,
+    ACTIVITY_DELAYED,
     ACTIVITY_ONGOING,
     ACTIVITY_PLANNED,
     PROCUREMENT_MILESTONES,
@@ -27,7 +31,56 @@ from plugins.dref_monitoring.models import (
 )
 from plugins.dref_monitoring.services.parsing import as_bool, as_date, as_int, as_money
 from plugins.dref_monitoring.services.periods import build_periods
-from plugins.dref_monitoring.services.plans import activities_for, groups_for, indicators_for_activity, latest_plan
+from plugins.dref_monitoring.services.plans import (
+    activities_for,
+    activity_status,
+    groups_for,
+    indicators_for_activity,
+    latest_plan,
+    plan_sections,
+)
+
+SHARE_PARTS = ("women", "men", "girls", "boys")
+
+
+def shares_to_counts(total, shares: dict) -> dict:
+    """Turn a percentage split into headcounts of the reached total."""
+    counts = {}
+    for part in SHARE_PARTS:
+        percent = shares.get(part)
+        if total is None or percent is None:
+            counts[part] = None
+        else:
+            counts[part] = int(round(int(total) * int(percent) / 100))
+    return counts
+
+
+def counts_to_shares(total, counts: dict | None) -> dict:
+    counts = counts or {}
+    shares = {}
+    for part in SHARE_PARTS:
+        count = counts.get(part)
+        if not total or count is None:
+            shares[part] = None
+        else:
+            shares[part] = int(round(100 * int(count) / int(total)))
+    return shares
+
+
+def _chart_background(parts: list[dict]) -> str:
+    colors = ("#111827", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db")
+    total = sum(part["count"] for part in parts)
+    if not total:
+        return "#e5e7eb"
+    start = 0.0
+    stops = []
+    for index, part in enumerate(parts):
+        if not part["count"]:
+            continue
+        end = start + part["count"] / total * 100
+        stops.append(f"{colors[index % len(colors)]} {start:.1f}% {end:.1f}%")
+        start = end
+    return f"conic-gradient({', '.join(stops)})"
 
 
 def ensure_periods(operation) -> None:
@@ -68,6 +121,25 @@ def periods_for(operation_id: int) -> list[DrefPeriod]:
 
 def report_for_period(period_id: int) -> DrefReport | None:
     return DrefReport.query.filter_by(period_id=period_id).first()
+
+
+def reporting_period_badge(period, report, today: date | None = None) -> str:
+    """Status shown on the operation reporting tab.
+
+    A period that has not started, and has not been filed, is upcoming.
+    The stored period status stays open, so the row becomes an open period
+    on its start date without a status change.
+    """
+    today = today or date.today()
+    filed = report is not None and report.status != REPORT_DRAFT
+    start = getattr(period, "start_date", None)
+    if not filed and getattr(period, "status", None) == "open" and start is not None and start > today:
+        return "upcoming"
+    if report is not None:
+        return report.status
+    if getattr(period, "status", None) == "open":
+        return "open"
+    return getattr(period, "status", None) or ""
 
 
 def get_or_create_report(operation, period: DrefPeriod) -> DrefReport:
@@ -117,26 +189,57 @@ def write_report_fields(operation, period, form) -> str | None:
         if expenditure is not None and expenditure < 0:
             return "Expenditure cannot be negative."
 
+    for _group, activity, _indicators in _plan_activities(operation):
+        if not _touches_activity(form, activity.id):
+            continue
+        if as_bool(form.get(f"activity_{activity.id}_disaggregation_na")):
+            continue
+        if not any(f"activity_{activity.id}_pct_{part}" in keys for part in SHARE_PARTS):
+            continue
+        percents = [as_int(form.get(f"activity_{activity.id}_pct_{part}")) for part in SHARE_PARTS]
+        if not any(value is not None for value in percents):
+            continue
+        if any(value is None for value in percents) or sum(value or 0 for value in percents) != 100:
+            return "The percentage split must add up to 100."
+        reached = as_int(form.get(f"activity_{activity.id}_reached"))
+        if reached is None:
+            reached = as_int(form.get(f"activity_{activity.id}_individuals"))
+        if reached is None:
+            return "Enter the reached total before the percentage split."
+
     total = 0
     saw_expenditure = False
     for _group, activity, indicators in _plan_activities(operation):
         if not _touches_activity(form, activity.id):
             continue
-        status = str(form.get(f"activity_{activity.id}_status") or ACTIVITY_PLANNED)
-        if status not in {ACTIVITY_PLANNED, ACTIVITY_ONGOING, ACTIVITY_COMPLETED}:
-            status = ACTIVITY_PLANNED
+        status = activity_status(form.get(f"activity_{activity.id}_status")) or ACTIVITY_PLANNED
         percent = as_int(form.get(f"activity_{activity.id}_percent"))
         if percent is not None:
             percent = max(0, min(percent, 100))
         households = as_int(form.get(f"activity_{activity.id}_households"))
         individuals = as_int(form.get(f"activity_{activity.id}_individuals"))
+        if f"activity_{activity.id}_reached" in keys:
+            individuals = as_int(form.get(f"activity_{activity.id}_reached"))
         expenditure = as_money(form.get(f"activity_{activity.id}_expenditure"))
-        disaggregation = {
-            "women": as_int(form.get(f"activity_{activity.id}_women")),
-            "men": as_int(form.get(f"activity_{activity.id}_men")),
-            "girls": as_int(form.get(f"activity_{activity.id}_girls")),
-            "boys": as_int(form.get(f"activity_{activity.id}_boys")),
+        skipped = as_bool(form.get(f"activity_{activity.id}_disaggregation_na"))
+        percents = {
+            part: as_int(form.get(f"activity_{activity.id}_pct_{part}"))
+            for part in SHARE_PARTS
         }
+        percent_posted = any(f"activity_{activity.id}_pct_{part}" in keys for part in SHARE_PARTS)
+        if skipped:
+            disaggregation = {part: None for part in SHARE_PARTS}
+        elif percent_posted and any(value is not None for value in percents.values()):
+            if any(value is None for value in percents.values()) or sum(value or 0 for value in percents.values()) != 100:
+                return "The percentage split must add up to 100."
+            if individuals is None:
+                return "Enter the reached total before the percentage split."
+            disaggregation = shares_to_counts(individuals, percents)
+        else:
+            disaggregation = {
+                part: as_int(form.get(f"activity_{activity.id}_{part}"))
+                for part in SHARE_PARTS
+            }
         update = DrefActivityUpdate.query.filter_by(report_id=report.id, activity_id=activity.id).first()
         if update is None:
             update = DrefActivityUpdate(report_id=report.id, activity_id=activity.id)
@@ -146,6 +249,7 @@ def write_report_fields(operation, period, form) -> str | None:
         update.people_households = households
         update.people_individuals = individuals
         update.disaggregation = disaggregation
+        update.disaggregation_na = skipped
         update.expenditure = expenditure
         update.note = str(form.get(f"activity_{activity.id}_note") or "")[:2000]
         activity.status = status
@@ -187,10 +291,16 @@ def form_from_cycle_payload(data: dict) -> dict:
                 "percent",
                 "households",
                 "individuals",
+                "reached",
                 "women",
                 "men",
                 "girls",
                 "boys",
+                "pct_women",
+                "pct_men",
+                "pct_girls",
+                "pct_boys",
+                "disaggregation_na",
                 "expenditure",
                 "note",
             ):
@@ -210,6 +320,20 @@ def apply_cycle_payload(operation, period, data: dict, user_id=None) -> str | No
     return write_report_fields(operation, period, form_from_cycle_payload(data))
 
 
+def _activity_row(activity, saved, actuals):
+    update = saved.get(activity.id)
+    counts = (update.disaggregation if update is not None else None) or {}
+    total = None if update is None else update.people_individuals
+    return {
+        "activity": activity,
+        "indicators": indicators_for_activity(activity.id),
+        "update": update,
+        "actuals": actuals,
+        "shares": counts_to_shares(total, counts),
+        "disaggregation_na": bool(update and update.disaggregation_na),
+    }
+
+
 def report_sections(operation, report) -> list:
     plan = latest_plan(operation.id)
     if plan is None or report is None:
@@ -217,18 +341,16 @@ def report_sections(operation, report) -> list:
     saved = updates_for(report.id)
     actuals = values_for(report.id)
     sections = []
-    for group in groups_for(plan.id):
-        activities = []
-        for activity in activities_for(group.id):
-            activities.append(
+    for section in plan_sections(plan.id):
+        blocks = []
+        for block in section["blocks"]:
+            blocks.append(
                 {
-                    "activity": activity,
-                    "indicators": indicators_for_activity(activity.id),
-                    "update": saved.get(activity.id),
-                    "actuals": actuals,
+                    "indicator": block["indicator"],
+                    "activities": [_activity_row(activity, saved, actuals) for activity in block["activities"]],
                 }
             )
-        sections.append({"group": group, "activities": activities})
+        sections.append({"group": section["group"], "blocks": blocks, "activities": [_activity_row(activity, saved, actuals) for activity in section["activities"]]})
     return sections
 
 
@@ -269,6 +391,75 @@ def matrix_for_request():
         "period": period,
         "report": report,
         "sections": report_sections(operation, report),
+    }
+
+
+def monitoring_snapshot(operation) -> dict:
+    """Four timeline marks, plus activity counts by sector and status."""
+    from plugins.dref_monitoring.services.assignment_sync import assignment_url
+
+    plan = latest_plan(operation.id)
+    confirmed = plan.validated_at.date() if plan is not None and plan.validated_at else None
+    events = [
+        {
+            "date": operation.date_of_approval,
+            "label": "Approved",
+            "state": "done" if operation.date_of_approval else "upcoming",
+        },
+        {
+            "date": confirmed,
+            "label": "Plan confirmed",
+            "state": "done" if confirmed else "upcoming",
+        },
+    ]
+    update_href = None
+    filed_count = 0
+    period_count = 0
+    next_update = None
+    next_overdue = False
+    for period in periods_for(operation.id):
+        period_count += 1
+        report = report_for_period(period.id)
+        filed = report is not None and report.status != REPORT_DRAFT
+        if filed:
+            filed_count += 1
+        elif next_update is None:
+            next_overdue = period.status == "overdue" or (period.due_date is not None and period.due_date < date.today())
+            next_update = {"date": period.due_date, "label": "Next update", "state": "current"}
+        href = assignment_url(operation.id, period)
+        if update_href is None and not filed and href.startswith("/assignment/"):
+            update_href = href
+    if next_update is not None:
+        events.append(next_update)
+    elif period_count:
+        events.append({"date": None, "label": "Updates filed", "state": "done"})
+    if operation.end_date:
+        events.append(
+            {
+                "date": operation.end_date,
+                "label": "Operation ends",
+                "state": "done" if operation.operation_status == "closed" else "upcoming",
+            }
+        )
+    known = (ACTIVITY_PLANNED, ACTIVITY_ONGOING, ACTIVITY_COMPLETED, ACTIVITY_BLOCKED, ACTIVITY_DELAYED)
+    status_counts = {key: 0 for key in known}
+    by_sector = []
+    if plan is not None:
+        for section in plan_sections(plan.id):
+            for activity in section["activities"]:
+                status_counts[activity.status] = status_counts.get(activity.status, 0) + 1
+            by_sector.append({"label": section["group"].label, "count": len(section["activities"])})
+    by_status = [{"key": key, "count": status_counts[key]} for key in known]
+    return {
+        "events": events,
+        "by_status": by_status,
+        "by_sector": by_sector,
+        "status_chart": _chart_background(by_status),
+        "sector_chart": _chart_background(by_sector),
+        "update_href": update_href,
+        "period_count": period_count,
+        "filed_count": filed_count,
+        "next_overdue": next_overdue,
     }
 
 

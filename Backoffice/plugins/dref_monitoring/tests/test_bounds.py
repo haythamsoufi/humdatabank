@@ -109,3 +109,21 @@ def test_draft_template_does_not_print_missing_numbers_as_none():
     )
     assert "None" not in body
     assert "not reported" in body
+
+
+def test_future_open_period_shows_upcoming():
+    from types import SimpleNamespace
+
+    from plugins.dref_monitoring.services.reporting import reporting_period_badge
+
+    today = date(2026, 11, 19)
+    future = SimpleNamespace(status="open", start_date=date(2027, 4, 1))
+    current = SimpleNamespace(status="open", start_date=date(2026, 11, 1))
+    draft = SimpleNamespace(status="draft")
+    filed = SimpleNamespace(status="submitted")
+    assert reporting_period_badge(future, None, today) == "upcoming"
+    assert reporting_period_badge(future, draft, today) == "upcoming"
+    assert reporting_period_badge(future, filed, today) == "submitted"
+    assert reporting_period_badge(current, None, today) == "open"
+    assert reporting_period_badge(current, draft, today) == "draft"
+    assert reporting_period_badge(SimpleNamespace(status="overdue", start_date=date(2026, 8, 1)), None, today) == "overdue"

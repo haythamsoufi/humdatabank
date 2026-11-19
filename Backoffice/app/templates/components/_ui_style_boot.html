@@ -1,0 +1,18 @@
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var root = document.getElementById({{ ui_style_root_id|tojson }});
+    if (!root) return;
+    var preview = root.getAttribute('data-style-preview') === '1';
+    var allowed = ['ifrc', 'go', 'erp', 'legacy'];
+    /* Shipped default stays legacy until a style is chosen for production. */
+    var style = 'legacy';
+    if (preview) {
+        try {
+            var stored = window.localStorage.getItem('uiStylePreview');
+            if (stored == null) stored = window.localStorage.getItem('dashboardStylePreview');
+            if (allowed.indexOf(stored) !== -1) style = stored;
+        } catch (e) { /* ignore */ }
+    }
+    root.setAttribute('data-ui-style', style);
+})();
+</script>

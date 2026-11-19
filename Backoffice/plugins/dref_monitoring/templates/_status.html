@@ -17,6 +17,7 @@
   {%- elif key == 'plan_draft' -%}{{ dref_tr('Plan draft') }}
   {%- elif key == 'draft' -%}{{ dref_tr('Draft') }}
   {%- elif key == 'pending' -%}{{ dref_tr('Pending') }}
+  {%- elif key == 'upcoming' -%}{{ dref_tr('Upcoming') }}
   {%- elif key == 'approved' -%}{{ dref_tr('Approved') }}
   {%- elif key == 'rejected' -%}{{ dref_tr('Rejected') }}
   {%- elif key == 'active' -%}{{ dref_tr('Active') }}
@@ -28,6 +29,8 @@
   {%- elif key == 'planned' -%}{{ dref_tr('Planned') }}
   {%- elif key == 'ongoing' -%}{{ dref_tr('Ongoing') }}
   {%- elif key == 'completed' -%}{{ dref_tr('Completed') }}
+  {%- elif key == 'blocked' -%}{{ dref_tr('Blocked') }}
+  {%- elif key == 'delayed' -%}{{ dref_tr('Delayed') }}
   {%- elif key == 'low' -%}{{ dref_tr('Low') }}
   {%- elif key == 'medium' -%}{{ dref_tr('Medium') }}
   {%- elif key == 'high' -%}{{ dref_tr('High') }}
@@ -49,11 +52,11 @@
     {{ status_label(text, variant) }}
   {%- elif key in ['approved', 'validated', 'active', 'completed', 'received', 'distributed', 'mitigated', 'reviewed'] -%}
     {{ status_label(text, 'success') }}
-  {%- elif key in ['rejected', 'failed', 'high'] -%}
+  {%- elif key in ['rejected', 'failed', 'high', 'blocked'] -%}
     {{ status_label(text, 'danger') }}
   {%- elif key in ['pending', 'draft', 'planned', 'not_started', 'stub', 'plan_draft', 'requested', 'open'] -%}
     {{ status_label(text, 'pending') }}
-  {%- elif key in ['ordered', 'ongoing', 'medium', 'submitted'] -%}
+  {%- elif key in ['ordered', 'ongoing', 'medium', 'submitted', 'delayed'] -%}
     {{ status_label(text, 'warning') }}
   {%- elif key in ['monitoring', 'in_progress'] -%}
     {{ status_label(text, 'active') }}

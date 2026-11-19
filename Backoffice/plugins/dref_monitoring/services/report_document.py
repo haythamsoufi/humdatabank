@@ -172,7 +172,7 @@ def source_for(operation, draft) -> dict:
         DrefReport,
         DrefRisk,
     )
-    from plugins.dref_monitoring.services.plans import activities_for, groups_for, latest_plan
+    from plugins.dref_monitoring.services.plans import activities_for, groups_for, indicators_for_activity, latest_plan
 
     report = (
         DrefReport.query.filter_by(operation_id=operation.id).order_by(DrefReport.id.desc()).first()
@@ -198,7 +198,7 @@ def source_for(operation, draft) -> dict:
                     spent += Decimal(spent_line)
                 disaggregation = (update.disaggregation if update is not None else None) or {}
                 indicators = []
-                for indicator in DrefIndicator.query.filter_by(activity_id=activity.id).order_by(DrefIndicator.id):
+                for indicator in indicators_for_activity(activity.id):
                     actual = values.get(indicator.id)
                     indicators.append(
                         {
@@ -224,7 +224,12 @@ def source_for(operation, draft) -> dict:
                         "indicators": indicators,
                     }
                 )
-            loose = DrefIndicator.query.filter_by(group_id=group.id, activity_id=None).order_by(DrefIndicator.id).all()
+            linked = {row.indicator_id for row in activities_for(group.id) if row.indicator_id}
+            loose = [
+                indicator
+                for indicator in DrefIndicator.query.filter_by(group_id=group.id, activity_id=None).order_by(DrefIndicator.id)
+                if indicator.id not in linked
+            ]
             if loose:
                 loose_rows = []
                 for indicator in loose:

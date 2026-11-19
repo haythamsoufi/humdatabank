@@ -39,7 +39,7 @@ Reporting cadence stays as it is today. Imminent DREF and operations of about 60
 
 ## The form on the cycle
 
-Publish one form template, **DREF operational monitoring**, with a single plugin field. The field renders the report that already exists for that period: activity status, percent complete, households and individuals (including women, men, girls, and boys), expenditure, and indicator actuals.
+Publish one form template, **DREF operational monitoring**, with a single plugin field. The field renders the report that already exists for that period: activity status, percent complete, the cumulative people reached, the percentage split of women, men, girls, and boys, expenditure, and indicator actuals.
 
 Saving still writes the `dref_mon_*` tables. Bounds checks, change requests, date history, and Draft 0 keep reading those tables. The template does not duplicate the matrix as generic form items, because the activities differ for every operation.
 

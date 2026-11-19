@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 PLUGIN_ID = "dref_monitoring"
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 DISPLAY_NAME = "DREF Monitoring"
 
 TEMPLATE_NAME = "DREF operational monitoring"
@@ -50,6 +50,26 @@ REPORT_REVIEWED = "reviewed"
 ACTIVITY_PLANNED = "planned"
 ACTIVITY_ONGOING = "ongoing"
 ACTIVITY_COMPLETED = "completed"
+ACTIVITY_BLOCKED = "blocked"
+ACTIVITY_DELAYED = "delayed"
+
+ACTIVITY_TYPES: tuple[tuple[str, str], ...] = (
+    ("preparedness_design", "Preparedness & Design"),
+    ("assessment", "Assessment"),
+    ("procurement", "Procurement"),
+    ("distribution", "Distribution"),
+    ("training", "Training"),
+    ("community_engagement", "Community engagement"),
+    ("cash_voucher", "Cash and voucher"),
+    ("other", "Other"),
+)
+
+CARRIED_OUT_BY: tuple[tuple[str, str], ...] = (
+    ("national_society", "National Society"),
+    ("ifrc", "IFRC"),
+    ("pns", "Participating National Society"),
+    ("other", "Other"),
+)
 
 CHANGE_PENDING = "pending"
 CHANGE_APPROVED = "approved"

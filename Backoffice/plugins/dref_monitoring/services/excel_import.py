@@ -17,7 +17,7 @@ from app.extensions import db
 from plugins.dref_monitoring.constants import PLAN_DRAFT
 from plugins.dref_monitoring.models import DrefActivity, DrefGroup, DrefIndicator
 from plugins.dref_monitoring.services.parsing import as_date, as_money
-from plugins.dref_monitoring.services.plans import _new_plan, groups_for, latest_plan
+from plugins.dref_monitoring.services.plans import _new_plan, groups_for, indicators_for_group, latest_plan
 
 _HEADERS = {
     "group": "group",
@@ -117,17 +117,21 @@ def import_activities(operation, raw: bytes, actor, today) -> dict:
             if kind not in {"process", "outcome"}:
                 kind = "process"
             unit = str(row.get("beneficiary_unit") or "none").strip().lower()
-            db.session.add(
-                DrefIndicator(
-                    activity_id=activity.id,
+            title = str(row.get("indicator"))[:255]
+            indicator = next((item for item in indicators_for_group(group.id) if item.title == title), None)
+            if indicator is None:
+                indicator = DrefIndicator(
                     group_id=group.id,
-                    title=str(row.get("indicator"))[:255],
+                    title=title,
                     kind=kind,
                     target=as_money(row.get("target")),
                     unit=str(row.get("unit") or "")[:32],
                     beneficiary_unit=unit if unit in {"households", "individuals", "none"} else "none",
                 )
-            )
+                db.session.add(indicator)
+                db.session.flush()
+            activity.indicator_id = indicator.id
+            activity.target = as_money(row.get("target"))
     operation.workflow_status = "plan_draft"
     db.session.commit()
     return {"ok": True, "plan_id": plan.id, "rows": len(rows)}

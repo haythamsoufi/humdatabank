@@ -167,6 +167,68 @@ def test_plan_table_saves_every_row_together(seeded):
     assert db.session.get(type(activity), activity.id).title == "Clinics"
 
 
+def test_generated_plan_puts_the_indicator_on_the_sector(seeded):
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    group = groups_for(latest_plan(operation.id).id)[0]
+    activity = activities_for(group.id)[0]
+    from plugins.dref_monitoring.services.plans import indicators_for_activity
+
+    indicator = indicators_for_activity(activity.id)[0]
+    assert indicator.group_id == group.id
+    assert activity.indicator_id == indicator.id
+    assert group.people_targeted == 80
+    assert group.budget_chf == Decimal("8000")
+
+
+def test_adding_an_activity_to_a_confirmed_plan_opens_a_draft(seeded):
+    _country, user = seeded
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    actor = _manager(user.id)
+    assert validate_plan(operation, actor, date(2026, 1, 10)) is None
+    group = groups_for(latest_plan(operation.id).id)[0]
+    activity = activities_for(group.id)[0]
+    from plugins.dref_monitoring.services.plans import indicators_for_activity
+
+    indicator = indicators_for_activity(activity.id)[0]
+    saved = save_plan_activities(
+        operation,
+        _Posted(
+            {
+                "activity_id": [str(activity.id)],
+                f"title-{activity.id}": activity.title,
+                f"status-{activity.id}": activity.status,
+                f"budget_chf-{activity.id}": "8000",
+                f"start_date-{activity.id}": "2026-01-01",
+                f"end_date-{activity.id}": "2026-06-30",
+                f"indicator_id-{activity.id}": [str(indicator.id)],
+                f"target-{indicator.id}": "80",
+                "justification": "Distribution is a second activity under the same indicator.",
+                "add_activity": [str(indicator.id)],
+                f"add_activity_title-{indicator.id}": "Distribute kits",
+                f"add_activity_status-{indicator.id}": "planned",
+                f"add_activity_type-{indicator.id}": "distribution",
+                f"add_activity_by-{indicator.id}": "national_society",
+            }
+        ),
+        actor,
+    )
+    assert saved["ok"] is True and not saved["errors"]
+    operation = db.session.get(DrefOperation, operation.id)
+    plan = latest_plan(operation.id)
+    assert plan.version == 2
+    assert plan.status == "draft"
+    assert plan.source == "structure"
+    assert operation.workflow_status == "plan_draft"
+    titles = {row.title for row in activities_for(groups_for(plan.id)[0].id)}
+    assert titles == {activity.title, "Distribute kits"}
+    added = next(row for row in activities_for(groups_for(plan.id)[0].id) if row.title == "Distribute kits")
+    assert added.activity_type == "distribution"
+    assert added.carried_out_by == "national_society"
+    assert added.indicator_id is not None
+
+
 def test_plan_edit_adds_a_sector_that_was_not_on_the_plan(seeded):
     _country, user = seeded
     apply_rows([_row()])

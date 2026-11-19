@@ -33,7 +33,8 @@ export class DrefOperationalReportField {
                 if (el.hasAttribute("data-indicator-id")) {
                     return;
                 }
-                row[el.getAttribute("data-part")] = el.value;
+                const part = el.getAttribute("data-part");
+                row[part] = el.type === "checkbox" ? (el.checked ? "1" : "") : el.value;
             });
             activities[id] = row;
         });

@@ -1,0 +1,148 @@
+/* On-page facsimile of the Word and PDF draft. Scoped so it does not restyle the admin chrome. */
+
+.dref-report-frame {
+    background: #e7e8ea;
+    border: 1px solid #d5d6d8;
+    border-radius: 0.5rem;
+    padding: 1.5rem 1rem 2rem;
+}
+
+.dref-report {
+    max-width: 210mm;
+    margin: 0 auto;
+    background: #fff;
+    color: #000;
+    padding: 18mm 16mm 16mm;
+    box-shadow: 0 1px 4px rgba(1, 30, 65, 0.12);
+    font-family: "Open Sans", "Montserrat", "Inter", "Segoe UI", sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.35;
+}
+
+.dref-report__runhead {
+    margin: 0 0 12pt;
+    padding-bottom: 4pt;
+    border-bottom: 2px solid #ef3340;
+    color: #011e41;
+    font-size: 8pt;
+}
+
+.dref-report__title {
+    margin: 0 0 2pt;
+    color: #ef3340;
+    font-family: "Montserrat", "Inter", "Segoe UI", sans-serif;
+    font-size: 22pt;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.dref-report__subtitle {
+    margin: 0 0 10pt;
+    color: #011e41;
+    font-family: "Montserrat", "Inter", "Segoe UI", sans-serif;
+    font-size: 14pt;
+    font-weight: 700;
+}
+
+.dref-report__h1,
+.dref-report__h2,
+.dref-report__h3 {
+    page-break-after: avoid;
+}
+
+.dref-report__h1 {
+    margin: 16pt 0 4pt;
+    color: #011e41;
+    font-family: "Montserrat", "Inter", "Segoe UI", sans-serif;
+    font-size: 16pt;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.dref-report__h2 {
+    margin: 12pt 0 4pt;
+    color: #1b365d;
+    font-family: "Montserrat", "Inter", "Segoe UI", sans-serif;
+    font-size: 13pt;
+    font-weight: 700;
+}
+
+.dref-report__h3 {
+    margin: 8pt 0 3pt;
+    color: #000;
+    font-size: 11pt;
+    font-weight: 700;
+}
+
+.dref-report p {
+    margin: 0 0 8pt;
+}
+
+.dref-report__note {
+    margin: 2pt 0 8pt;
+    color: #58595b;
+    font-size: 9pt;
+    font-style: italic;
+}
+
+.dref-report__blank {
+    min-height: 1.2em;
+}
+
+.dref-report ul {
+    margin: 0 0 8pt 1.1em;
+    padding: 0;
+}
+
+.dref-report li {
+    margin: 0 0 2pt;
+}
+
+.dref-report table {
+    width: 100%;
+    margin: 0 0 8pt;
+    border-collapse: collapse;
+    font-size: 9pt;
+}
+
+.dref-report th {
+    padding: 4pt 6pt;
+    background: #011e41;
+    color: #fff;
+    font-weight: 700;
+    text-align: left;
+}
+
+.dref-report td {
+    padding: 3pt 6pt;
+    border-bottom: 1px solid #d5d6d8;
+    vertical-align: top;
+}
+
+.dref-report tbody tr:nth-child(even) td {
+    background: #f7f8fa;
+}
+
+.dref-report__kv th,
+.dref-report__kv td {
+    background: transparent;
+    color: #000;
+    font-weight: 400;
+}
+
+.dref-report__kv td:first-child {
+    width: 42%;
+    background: #f4f5f7;
+    color: #58595b;
+    font-weight: 700;
+}
+
+@media (max-width: 720px) {
+    .dref-report-frame {
+        padding: 0.75rem 0.5rem 1rem;
+    }
+
+    .dref-report {
+        padding: 1.25rem 1rem;
+    }
+}

@@ -1,0 +1,40 @@
+{% from "plugins/dref_monitoring/_status.html" import dref_status %}
+<div id="panel-dref-monitoring"
+     class="explore-panel{% if explore_first_tab != 'dref-monitoring' %} hidden{% endif %}"
+     role="tabpanel"
+     aria-labelledby="tab-dref-monitoring">
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900">{{ dref_tr('DREF monitoring') }}</h3>
+        <p class="mt-1 text-sm text-gray-600">{{ dref_tr('Indicative until delegation finance validates it in ERP.') }}</p>
+        <dl class="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <div class="bg-gray-50 rounded p-3"><dt class="text-gray-600">{{ dref_tr('Active operations') }}</dt><dd class="text-xl font-semibold text-gray-900">{{ dref_overview.active }}</dd></div>
+            <div class="bg-gray-50 rounded p-3"><dt class="text-gray-600">{{ dref_tr('Plans awaiting validation') }}</dt><dd class="text-xl font-semibold text-gray-900">{{ dref_overview.plan_draft }}</dd></div>
+            <div class="bg-gray-50 rounded p-3"><dt class="text-gray-600">{{ dref_tr('Overdue reports') }}</dt><dd class="text-xl font-semibold text-gray-900">{{ dref_overview.overdue }}</dd></div>
+            <div class="bg-gray-50 rounded p-3"><dt class="text-gray-600">{{ dref_tr('Pending changes') }}</dt><dd class="text-xl font-semibold text-gray-900">{{ dref_overview.pending_changes }}</dd></div>
+            <div class="bg-gray-50 rounded p-3"><dt class="text-gray-600">{{ dref_tr('Approved allocation') }}</dt><dd class="text-xl font-semibold text-gray-900">{{ '%.0f'|format(dref_overview.approved_chf) }}</dd></div>
+            <div class="bg-gray-50 rounded p-3"><dt class="text-gray-600">{{ dref_tr('Reported expenditure') }}</dt><dd class="text-xl font-semibold text-gray-900">{{ '%.0f'|format(dref_overview.reported_chf) }}</dd></div>
+        </dl>
+        <div class="mt-4 overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-gray-600">
+                    <tr>
+                        <th class="py-2">{{ dref_tr('Appeal') }}</th>
+                        <th class="py-2">{{ dref_tr('Country') }}</th>
+                        <th class="py-2">{{ dref_tr('Workflow') }}</th>
+                        <th class="py-2">{{ dref_tr('Reported expenditure') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in dref_overview.operations %}
+                    <tr class="border-t border-gray-200">
+                        <td class="py-2"><a class="text-blue-700 underline" href="{{ url_for('dref_monitoring.operation_page', operation_id=row.id) }}">{{ row.appeal_code }}</a></td>
+                        <td class="py-2">{{ row.country }}</td>
+                        <td class="py-2">{{ dref_status(row.workflow) }}{% if row.overdue %} · {{ dref_tr('Overdue reports') }}{% endif %}</td>
+                        <td class="py-2">{{ '%.0f'|format(row.reported_chf) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

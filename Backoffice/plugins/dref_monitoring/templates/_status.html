@@ -1,0 +1,65 @@
+{% from "components/_status_label.html" import status_label %}
+
+{% macro dref_enum(value) -%}
+  {%- set key = (value or '')|string|lower -%}
+  {%- if not key -%}-
+  {%- elif key == 'ns' -%}{{ dref_tr('National Society leadership') }}
+  {%- elif key == 'delegation' -%}{{ dref_tr('IFRC delegation') }}
+  {%- elif key == 'biweekly' -%}{{ dref_tr('Biweekly') }}
+  {%- elif key == 'monthly' -%}{{ dref_tr('Monthly') }}
+  {%- elif key == 'operational_update' -%}{{ dref_tr('Operational update') }}
+  {%- elif key == 'final_report' -%}{{ dref_tr('Final report') }}
+  {%- elif key in ['not_started', 'stub'] -%}{{ dref_tr('Not started') }}
+  {%- elif key == 'requested' -%}{{ dref_tr('Requested') }}
+  {%- elif key == 'ordered' -%}{{ dref_tr('Ordered') }}
+  {%- elif key == 'received' -%}{{ dref_tr('Received') }}
+  {%- elif key == 'distributed' -%}{{ dref_tr('Distributed') }}
+  {%- elif key == 'plan_draft' -%}{{ dref_tr('Plan draft') }}
+  {%- elif key == 'draft' -%}{{ dref_tr('Draft') }}
+  {%- elif key == 'pending' -%}{{ dref_tr('Pending') }}
+  {%- elif key == 'approved' -%}{{ dref_tr('Approved') }}
+  {%- elif key == 'rejected' -%}{{ dref_tr('Rejected') }}
+  {%- elif key == 'active' -%}{{ dref_tr('Active') }}
+  {%- elif key == 'validated' -%}{{ dref_tr('Validated') }}
+  {%- elif key == 'submitted' -%}{{ dref_tr('Submitted') }}
+  {%- elif key == 'reviewed' -%}{{ dref_tr('Reviewed') }}
+  {%- elif key == 'monitoring' -%}{{ dref_tr('Monitoring') }}
+  {%- elif key == 'closure' -%}{{ dref_tr('Closure') }}
+  {%- elif key == 'planned' -%}{{ dref_tr('Planned') }}
+  {%- elif key == 'ongoing' -%}{{ dref_tr('Ongoing') }}
+  {%- elif key == 'completed' -%}{{ dref_tr('Completed') }}
+  {%- elif key == 'low' -%}{{ dref_tr('Low') }}
+  {%- elif key == 'medium' -%}{{ dref_tr('Medium') }}
+  {%- elif key == 'high' -%}{{ dref_tr('High') }}
+  {%- elif key == 'mitigated' -%}{{ dref_tr('Mitigated') }}
+  {%- elif key == 'closed' -%}{{ dref_tr('Closed') }}
+  {%- elif key == 'unspecified' -%}{{ dref_tr('Not set') }}
+  {%- elif key == 'enter' -%}{{ dref_tr('Data entry') }}
+  {%- elif key == 'validate' -%}{{ dref_tr('Validation') }}
+  {%- elif key == 'review' -%}{{ dref_tr('Technical review') }}
+  {%- elif key == 'portfolio' -%}{{ dref_tr('Portfolio') }}
+  {%- else -%}{{ key|replace('_', ' ') }}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro dref_status(value, label=None, variant=None) -%}
+  {%- set key = (value or '')|string|lower -%}
+  {%- set text = label if label is not none else dref_enum(key) -%}
+  {%- if variant -%}
+    {{ status_label(text, variant) }}
+  {%- elif key in ['approved', 'validated', 'active', 'completed', 'received', 'distributed', 'mitigated', 'reviewed'] -%}
+    {{ status_label(text, 'success') }}
+  {%- elif key in ['rejected', 'failed', 'high'] -%}
+    {{ status_label(text, 'danger') }}
+  {%- elif key in ['pending', 'draft', 'planned', 'not_started', 'stub', 'plan_draft', 'requested', 'open'] -%}
+    {{ status_label(text, 'pending') }}
+  {%- elif key in ['ordered', 'ongoing', 'medium', 'submitted'] -%}
+    {{ status_label(text, 'warning') }}
+  {%- elif key in ['monitoring', 'in_progress'] -%}
+    {{ status_label(text, 'active') }}
+  {%- elif key in ['low', 'enter', 'validate', 'review', 'portfolio', 'closure', 'monthly', 'biweekly'] -%}
+    {{ status_label(text, 'info') }}
+  {%- else -%}
+    {{ status_label(text, 'neutral') }}
+  {%- endif -%}
+{%- endmacro %}

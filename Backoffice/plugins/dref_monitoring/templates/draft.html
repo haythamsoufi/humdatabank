@@ -1,0 +1,105 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "plugins/dref_monitoring/_status.html" import dref_enum %}
+
+{% block title %}{{ dref_tr('Draft 0') }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/draft_preview.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 space-y-4">
+    {{ page_header(
+        title=dref_tr('Draft 0'),
+        icon='fas fa-clipboard-list',
+        breadcrumbs=[
+            {'name': dref_tr('DREF monitoring'), 'url': url_for('dref_monitoring.operations_page')},
+            {'name': operation.appeal_code, 'url': url_for('dref_monitoring.operation_page', operation_id=operation.id, tab='drafts')},
+            {'name': dref_tr('Draft 0')}
+        ],
+        actions=[
+            {
+                'type': 'link',
+                'url': url_for('dref_monitoring.draft_docx_route', operation_id=operation.id, draft_id=draft.id),
+                'text': dref_tr('Export Word'),
+                'icon': 'fas fa-file-word',
+                'classes': 'professional-action-btn',
+            },
+            {
+                'type': 'link',
+                'url': url_for('dref_monitoring.draft_pdf_route', operation_id=operation.id, draft_id=draft.id),
+                'text': dref_tr('Export PDF'),
+                'icon': 'fas fa-file-pdf',
+                'classes': 'professional-action-btn professional-action-btn-green',
+            },
+        ]
+    ) }}
+    <p class="text-sm text-gray-600">
+        {{ dref_enum(draft.report_kind) }}
+        · {{ dref_tr('AI draft reports') }}: {{ dref_tr('Enabled') if draft.ai_used else dref_tr('Disabled') }}
+        · {{ draft.model or '-' }}
+    </p>
+    <p class="text-sm text-gray-600">{{ dref_tr('The preview matches the Word file and the PDF.') }}</p>
+    <div class="dref-report-frame">
+        <article class="dref-report" aria-label="{{ dref_tr('Draft 0') }}">
+            <p class="dref-report__runhead">{{ header }}</p>
+            {% for block in blocks %}
+                {% if block.kind == 'title' %}
+                    <p class="dref-report__title">{{ block.text }}</p>
+                {% elif block.kind == 'subtitle' %}
+                    <p class="dref-report__subtitle">{{ block.text }}</p>
+                {% elif block.kind == 'heading' %}
+                    {% if block.level == 1 %}
+                        <h2 class="dref-report__h1">{{ block.text }}</h2>
+                    {% elif block.level == 3 %}
+                        <h4 class="dref-report__h3">{{ block.text }}</h4>
+                    {% else %}
+                        <h3 class="dref-report__h2">{{ block.text }}</h3>
+                    {% endif %}
+                {% elif block.kind == 'note' %}
+                    <p class="dref-report__note">{{ block.text }}</p>
+                {% elif block.kind == 'kv' %}
+                    <table class="dref-report__kv">
+                        <tbody>
+                            {% for row in block.rows %}
+                            <tr>
+                                <td>{{ row[0] }}</td>
+                                <td>{{ row[1] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% elif block.kind == 'table' %}
+                    <table>
+                        {% if block.headers %}
+                        <thead>
+                            <tr>
+                                {% for cell in block.headers %}<th>{{ cell }}</th>{% endfor %}
+                            </tr>
+                        </thead>
+                        {% endif %}
+                        <tbody>
+                            {% for row in block.rows %}
+                            <tr>
+                                {% for cell in row %}<td>{{ cell }}</td>{% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% elif block.kind == 'bullets' %}
+                    <ul>
+                        {% for row in block.rows %}
+                        <li>{{ row[0] }}</li>
+                        {% endfor %}
+                    </ul>
+                {% elif block.text %}
+                    <p>{{ block.text }}</p>
+                {% else %}
+                    <p class="dref-report__blank">&nbsp;</p>
+                {% endif %}
+            {% endfor %}
+        </article>
+    </div>
+</div>
+{% endblock %}

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
-from werkzeug.utils import secure_filename
 
 from app.assets.plugin_static import plugin_static_url, send_plugin_static
 from app.plugins.plugin_utils import PLUGIN_MANAGE_PERMISSION, settings_plugin_info
@@ -21,7 +19,6 @@ from app.utils.forms.advanced_validation import validate_upload_extension_and_mi
 
 from plugins.global_awards.constants import (
     ADMIN_PERMISSION,
-    DEFAULT_WORKBOOK,
     EXPLORE_PERMISSION,
     FUND,
     PLUGIN_ID,
@@ -30,10 +27,13 @@ from plugins.global_awards.constants import (
     TEMPLATE_NAME,
 )
 from plugins.global_awards.importer.apply import import_logframe
+from plugins.global_awards.importer.files import list_disk_files, resolve_ref, store_upload
 
 log = logging.getLogger(__name__)
 
 IMPORT_KIND = "global_awards_logframe"
+# ``publish_import_log`` keeps at most this many rows per run.
+CHANGE_LOG_LIMIT = 400
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
 _STATIC_DIR = _PLUGIN_DIR / "static"
@@ -138,8 +138,6 @@ def settings_status() -> dict:
         "indicator_count": 0,
         "question_count": 0,
         "project_count": 0,
-        "workbook_found": DEFAULT_WORKBOOK.is_file(),
-        "workbook_name": DEFAULT_WORKBOOK.name,
         "sheet_name": SHEET_NAME,
     }
     try:
@@ -187,11 +185,11 @@ def settings_page():
         settings=status,
         plugin_info=settings_plugin_info(PLUGIN_ID),
         report=report,
-        disk_files=[_disk_workbook()],
+        disk_files=list_disk_files(),
         last_import=latest_import_run(import_runs),
         import_runs=import_runs,
         template_url=template_url,
-        projects_url=url_for("project_management.project_list"),
+        projects_url=url_for("assignment_management.manage_assignments", type="project"),
         explore_url=url_for("data_exploration.explore_data", tab="global-awards"),
     )
 
@@ -204,63 +202,43 @@ def _import_history() -> list:
         return []
 
 
-def _disk_workbook() -> dict:
-    path = DEFAULT_WORKBOOK
-    found = path.is_file()
-    size_label = "—"
-    modified_label = "—"
-    if found:
-        stat = path.stat()
-        size_label = _format_bytes(stat.st_size)
-        modified_label = datetime.fromtimestamp(stat.st_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return {
-        "name": path.name,
-        "found": found,
-        "size_label": size_label,
-        "modified_label": modified_label,
-        "note": f"Sheet {SHEET_NAME}. This is the workbook stored with the repository.",
-        "kind": "repo",
-    }
-
-
-def _format_bytes(size: int) -> str:
-    value = float(size)
-    for unit in ("B", "KB", "MB", "GB"):
-        if value < 1024 or unit == "GB":
-            if unit == "B":
-                return f"{int(value)} B"
-            return f"{value:.1f} {unit}"
-        value /= 1024
-    return f"{size} B"
+def _display_filename(raw: str) -> str:
+    """The uploaded file's own name (no folders), kept readable rather than slugged."""
+    name = (raw or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+    return name[:180] or "workbook.xlsx"
 
 
 def _run_import():
     dry_run = request.form.get("dry_run") == "1"
-    action = (request.form.get("action") or "").strip()
+    file_ref = (request.form.get("file_ref") or "").strip()
     upload = request.files.get("file")
     has_upload = upload is not None and bool(upload.filename)
-    if action == "repo":
-        action = "disk"
-    if action not in ("disk", "upload"):
-        action = "upload" if has_upload else "disk"
     try:
-        if action == "upload":
-            if not has_upload:
-                flash("Choose an Excel file to upload.", "warning")
+        if file_ref:
+            resolved = resolve_ref(file_ref)
+            if resolved is None:
+                flash("That workbook is no longer on disk. Upload it again.", "danger")
                 return None
-            valid, error_msg, _ext = validate_upload_extension_and_mime(upload, EXCEL_EXTENSIONS)
-            if not valid:
-                flash(error_msg or "Invalid file type.", "danger")
-                return None
-            filename = secure_filename(upload.filename) or "workbook.xlsx"
-            report = import_logframe(upload.read(), dry_run=dry_run)
-            _publish(report, filename=filename, source="upload")
+            path, name = resolved
+            report = import_logframe(path.read_bytes(), dry_run=dry_run)
+            _publish(report, filename=name, source="disk")
             return report
-        if not DEFAULT_WORKBOOK.is_file():
-            flash(f"Workbook not found: {DEFAULT_WORKBOOK.name}", "danger")
+        if not has_upload:
+            flash("Choose an Excel file to upload, or import one of the files on disk.", "warning")
             return None
-        report = import_logframe(DEFAULT_WORKBOOK, dry_run=dry_run)
-        _publish(report, filename=DEFAULT_WORKBOOK.name, source="disk")
+        valid, error_msg, _ext = validate_upload_extension_and_mime(upload, EXCEL_EXTENSIONS)
+        if not valid:
+            flash(error_msg or "Invalid file type.", "danger")
+            return None
+        filename = _display_filename(upload.filename)
+        data = upload.read()
+        report = import_logframe(data, dry_run=dry_run)
+        # Keep the file so it is listed under "Files on disk" and can be imported again.
+        try:
+            store_upload(data, filename)
+        except OSError:
+            log.exception("Global Awards upload could not be kept on disk")
+        _publish(report, filename=filename, source="upload")
         return report
     except ClientInputError as exc:
         flash(exc.public_message or "The workbook could not be read.", "danger")
@@ -274,28 +252,32 @@ def _publish(report: dict, *, filename: str, source: str) -> None:
     summary = _summary(report)
     if report.get("dry_run"):
         summary = "Preview: " + summary
+    tally = report.get("change_tally") or {}
+
+    def changed(entity: str) -> int:
+        row = tally.get(entity) or {}
+        return int(row.get("new", 0)) + int(row.get("changed", 0))
+
+    def unchanged(entity: str) -> int:
+        return int((tally.get(entity) or {}).get("unchanged", 0))
+
     counts = [
         {"label": "Sections", "value": report.get("sections")},
         {"label": "Linked to the bank", "value": report.get("linked")},
         {"label": "Questions", "value": report.get("questions")},
         {"label": "Country projects", "value": report.get("projects_upserted")},
         {"label": "Quarterly cycles", "value": report.get("cycles_per_project")},
+        {"label": "Indicators changed", "value": changed("items")},
+        {"label": "Indicators unchanged", "value": unchanged("items")},
+        {"label": "Targets changed", "value": changed("targets")},
+        {"label": "Targets unchanged", "value": unchanged("targets")},
     ]
-    changes = []
-    for row in report.get("links") or []:
-        changes.append({
-            "op": "link",
-            "kpi": row.get("code"),
-            "label": row.get("label"),
-            "new_value": f"bank #{row.get('bank_id')} via {row.get('method')}",
-        })
-    for row in report.get("created_questions") or []:
-        changes.append({
-            "op": "question",
-            "kpi": row.get("code"),
-            "label": row.get("label"),
-            "new_value": f"{row.get('question_type') or 'question'} · {row.get('section') or ''}".strip(" ·"),
-        })
+    changes = list(report.get("changes") or [])
+    warnings = list(report.get("warnings") or [])
+    if len(changes) > CHANGE_LOG_LIMIT:
+        warnings.append(
+            f"{len(changes)} changes were made; the log shows the first {CHANGE_LOG_LIMIT}."
+        )
     for name in report.get("unmatched_countries") or []:
         changes.append({"op": "skip", "label": name, "new_value": "No country match"})
     try:
@@ -313,7 +295,7 @@ def _publish(report: dict, *, filename: str, source: str) -> None:
                 "errors": 0,
                 "success": True,
                 "dry_run": bool(report.get("dry_run")),
-                "warnings": report.get("warnings") or [],
+                "warnings": warnings,
             },
         )
     except Exception:
@@ -321,7 +303,7 @@ def _publish(report: dict, *, filename: str, source: str) -> None:
 
 
 def _summary(report: dict) -> str:
-    return (
+    text = (
         f"{report['template_name']}: {report['sections']} sections, "
         f"{report['linked']} indicators linked to the bank, "
         f"{report['questions']} questions, "
@@ -333,3 +315,7 @@ def _summary(report: dict) -> str:
             else "."
         )
     )
+    if "changes" in report:
+        made = len(report.get("changes") or [])
+        text += f" {made} changes." if made else " No changes since the last import."
+    return text

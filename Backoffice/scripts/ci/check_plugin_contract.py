@@ -68,7 +68,6 @@ EXEMPT: dict[tuple[str, str], str] = {
     ("emergency_operations", "readme"): "predates the contract",
     ("fdrs", "manifest"): "predates the contract; plugin.json would change loader behaviour",
     ("fdrs", "readme"): "predates the contract",
-    ("global_awards", "readme"): "predates the contract",
     ("ifrc", "manifest"): "predates the contract; plugin.json would change loader behaviour",
     ("ifrc", "readme"): "predates the contract",
     ("interactive_map", "manifest"): "predates the contract; plugin.json would change loader behaviour",

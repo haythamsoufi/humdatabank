@@ -89,14 +89,126 @@ def import_logframe(source, *, dry_run: bool = False, activate: bool = True) -> 
     return report
 
 
+_LONG_VALUE = 200
+_EXCERPT = 120
+
+
+def _shown_change(field: str, old: str, new: str) -> tuple[str, str]:
+    """Before/after text for the change log that always shows what differs.
+
+    The log keeps about 240 characters per value, so a long value that changed near
+    its end would otherwise look unchanged. Country lists are summarised by what was
+    added and removed; other long text is cut around the first difference.
+    """
+    if field == "Applies to":
+        before = [code for code in old.split(", ") if code and code != "no country"]
+        after = [code for code in new.split(", ") if code and code != "no country"]
+        added = [code for code in after if code not in before]
+        removed = [code for code in before if code not in after]
+        detail = "; ".join(
+            part
+            for part in (
+                f"added {', '.join(added)}" if added else "",
+                f"removed {', '.join(removed)}" if removed else "",
+            )
+            if part
+        )
+        return f"{len(before)} countries", f"{len(after)} countries" + (f" ({detail})" if detail else "")
+    if len(old) <= _LONG_VALUE and len(new) <= _LONG_VALUE:
+        return old, new
+    common = 0
+    for left, right in zip(old, new):
+        if left != right:
+            break
+        common += 1
+    start = max(0, common - 30)
+    lead = "…" if start else ""
+    return (
+        lead + old[start:start + _EXCERPT] + ("…" if len(old) > start + _EXCERPT else ""),
+        lead + new[start:start + _EXCERPT] + ("…" if len(new) > start + _EXCERPT else ""),
+    )
+
+
+class _Changes:
+    """What this import changed, as before/after rows for the change log.
+
+    Rows are only recorded when the stored value differs, so importing the same
+    workbook twice records nothing the second time.
+    """
+
+    def __init__(self) -> None:
+        self.rows: List[dict] = []
+        self.tally: Dict[str, Dict[str, int]] = {
+            entity: {"new": 0, "changed": 0, "unchanged": 0}
+            for entity in ("sections", "items", "projects", "targets")
+        }
+
+    def add(
+        self,
+        op: str,
+        *,
+        label: str,
+        old: Any = None,
+        new: Any = None,
+        kpi: Optional[str] = None,
+        iso3: Optional[str] = None,
+    ) -> None:
+        self.rows.append({
+            "op": op,
+            "kpi": kpi or None,
+            "iso3": iso3 or None,
+            "label": (label or "")[:200],
+            "old_value": old,
+            "new_value": new,
+        })
+
+    def diff(
+        self,
+        entity: str,
+        before: Optional[Dict[str, str]],
+        after: Dict[str, str],
+        *,
+        label: str,
+        kpi: Optional[str] = None,
+        iso3: Optional[str] = None,
+        insert_value: str = "",
+    ) -> None:
+        """Record a new entity, or one row per field that differs from ``before``."""
+        if before is None:
+            self.tally[entity]["new"] += 1
+            self.add("insert", label=label, kpi=kpi, iso3=iso3, new=insert_value or None)
+            return
+        changed = [field for field in after if (before.get(field) or "") != (after.get(field) or "")]
+        if not changed:
+            self.tally[entity]["unchanged"] += 1
+            return
+        self.tally[entity]["changed"] += 1
+        for field in changed:
+            old, new = _shown_change(field, before.get(field) or "", after.get(field) or "")
+            self.add(
+                "update",
+                label=f"{label} · {field}",
+                kpi=kpi,
+                iso3=iso3,
+                old=old or None,
+                new=new or None,
+            )
+
+
 def _apply(parsed: ParsedLogframe) -> Dict[str, Any]:
     bank = _bank_index()
     countries = _country_index()
     template, version = _ensure_template()
-    sections = _upsert_sections(template, version, parsed)
-    linked, questions = _upsert_items(template, version, parsed, sections, bank, countries)
-    _archive_removed(version, parsed)
-    projects, unmatched = _upsert_projects(parsed, countries)
+    changes = _Changes()
+    section_names_before = {
+        row.id: row.name for row in FormSection.query.filter_by(version_id=version.id).all()
+    }
+    sections = _upsert_sections(template, version, parsed, changes)
+    linked, questions = _upsert_items(
+        template, version, parsed, sections, bank, countries, changes, section_names_before
+    )
+    _archive_removed(version, parsed, changes)
+    projects, unmatched = _upsert_projects(parsed, countries, changes)
     cycles = official_cycles()
     cycle_count = _ensure_cycles(projects, template, cycles)
     removed = _retire_replaced_cycles(projects, template, {cycle.slot for cycle in cycles})
@@ -123,6 +235,8 @@ def _apply(parsed: ParsedLogframe) -> Dict[str, Any]:
         "links": linked,
         "created_questions": questions,
         "warnings": warnings,
+        "changes": changes.rows,
+        "change_tally": changes.tally,
     }
 
 
@@ -212,7 +326,17 @@ def _marc(config: Optional[dict]) -> dict:
     return block if isinstance(block, dict) else {}
 
 
-def _upsert_sections(template, version, parsed: ParsedLogframe) -> Dict[str, FormSection]:
+def _section_state(section: FormSection) -> Dict[str, str]:
+    marc = _marc(section.config)
+    return {
+        "Name": section.name or "",
+        "Statement": str(marc.get("statement") or ""),
+        "Parent": str(marc.get("parent") or ""),
+        "Status": "archived" if section.archived else "active",
+    }
+
+
+def _upsert_sections(template, version, parsed: ParsedLogframe, changes: _Changes) -> Dict[str, FormSection]:
     existing = {
         _marc(section.config).get("key"): section
         for section in FormSection.query.filter_by(version_id=version.id).all()
@@ -221,10 +345,13 @@ def _upsert_sections(template, version, parsed: ParsedLogframe) -> Dict[str, For
     by_key: Dict[str, FormSection] = {}
     for section_row in parsed.sections:
         section = existing.get(section_row.key)
+        before = _section_state(section) if section is not None else None
         config = {
             "marc": {
                 "key": section_row.key,
                 "statement": section_row.statement,
+                "parent": section_row.parent_key or None,
+                "kind": section_row.kind or None,
             }
         }
         if section is None:
@@ -245,16 +372,32 @@ def _upsert_sections(template, version, parsed: ParsedLogframe) -> Dict[str, For
             kept = dict(section.config or {})
             kept["marc"] = config["marc"]
             section.config = kept
+        changes.diff(
+            "sections",
+            before,
+            _section_state(section),
+            label=section_row.name,
+            insert_value="subsection" if section_row.parent_key else "section",
+        )
         by_key[section_row.key] = section
     db.session.flush()
+    for section_row in parsed.sections:
+        section = by_key[section_row.key]
+        parent = by_key.get(section_row.parent_key) if section_row.parent_key else None
+        section.parent_section_id = parent.id if parent is not None else None
     return by_key
 
 
 def _item_label(indicator: LogframeIndicator) -> str:
-    code = indicator.display_code
-    if code and not indicator.label.casefold().startswith(code.casefold()):
-        return f"{code}. {indicator.label}"
-    return indicator.label
+    """Question/indicator title as written, without the logframe code prefix."""
+    label = indicator.label or ""
+    code = (indicator.display_code or "").strip()
+    if not code:
+        return label
+    if label.casefold().startswith(code.casefold()):
+        rest = label[len(code) :].lstrip(" .:-")
+        return rest or label
+    return label
 
 
 def _definition(indicator: LogframeIndicator) -> str:
@@ -268,6 +411,8 @@ def _definition(indicator: LogframeIndicator) -> str:
         meta.append(f"Unit: {indicator.unit}")
     if meta:
         parts.append(" · ".join(meta))
+    if indicator.topic:
+        parts.append(f"Group: {indicator.topic}")
     if indicator.definition:
         parts.append(indicator.definition)
     if indicator.disaggregation:
@@ -291,6 +436,7 @@ def _marc_block(indicator: LogframeIndicator, match, iso3: List[str]) -> dict:
         "source": indicator.source,
         "unit": indicator.unit,
         "section": indicator.section_key,
+        "topic": indicator.topic or None,
         "match": match.method if match.linked else "question",
         "bank_id": match.bank_id,
         "bank_name": match.bank_name,
@@ -309,7 +455,32 @@ def _iso3_for(indicator: LogframeIndicator, countries: CountryIndex) -> List[str
     return codes
 
 
-def _upsert_items(template, version, parsed, sections, bank: BankIndex, countries: CountryIndex):
+def _item_state(item: FormItem, section_names: Dict[int, str]) -> Dict[str, str]:
+    marc = _marc(item.config)
+    if item.item_type == "indicator" and item.indicator_bank_id:
+        kind = f"indicator · bank #{item.indicator_bank_id}"
+    else:
+        kind = f"question · {item.type or 'text'}"
+    return {
+        "Wording": item.label or "",
+        "Type": kind,
+        "Section": section_names.get(item.section_id, ""),
+        "Applies to": ", ".join(marc.get("country_iso3") or []) or "no country",
+        "Definition": item.definition or "",
+        "Status": "archived" if item.archived else "active",
+    }
+
+
+def _upsert_items(
+    template,
+    version,
+    parsed,
+    sections,
+    bank: BankIndex,
+    countries: CountryIndex,
+    changes: _Changes,
+    section_names_before: Dict[int, str],
+):
     existing = {
         _marc(item.config).get("key"): item
         for item in FormItem.query.filter_by(version_id=version.id).all()
@@ -341,6 +512,7 @@ def _upsert_items(template, version, parsed, sections, bank: BankIndex, countrie
 
     linked: List[dict] = []
     questions: List[dict] = []
+    section_names_after = {section.id: section.name for section in sections.values()}
     for order, indicator, match in decisions:
         section = sections[indicator.section_key]
         bank_row = bank_rows.get(match.bank_id) if match.linked else None
@@ -355,6 +527,7 @@ def _upsert_items(template, version, parsed, sections, bank: BankIndex, countrie
             disaggregation = disaggregation_for_question(question_type, indicator.unit)
 
         item = existing.get(indicator.key)
+        before = _item_state(item, section_names_before) if item is not None else None
         config = dict(_BASE_CONFIG)
         if item is not None and isinstance(item.config, dict):
             config = dict(item.config)
@@ -414,33 +587,68 @@ def _upsert_items(template, version, parsed, sections, bank: BankIndex, countrie
                 "question_type": question_type,
                 "note": match.note,
             })
+        after = _item_state(item, section_names_after)
+        changes.diff(
+            "items",
+            before,
+            after,
+            label=_item_label(indicator),
+            kpi=indicator.display_code,
+            insert_value=f"{after['Type']} · {after['Section']}",
+        )
     _apply_section_relevance(sections, parsed, countries)
     return linked, questions
 
 
 def _apply_section_relevance(sections, parsed: ParsedLogframe, countries: CountryIndex) -> None:
-    """Hide a section unless the country has at least one of its indicators."""
+    """Hide a section unless the country has at least one of its indicators.
+
+    Objective sections inherit the countries of their outcome subsections so a
+    parent is not hidden when only the children apply.
+    """
     codes_by_section: Dict[str, List[str]] = {}
     for indicator in parsed.indicators:
         bucket = codes_by_section.setdefault(indicator.section_key, [])
         for code in _iso3_for(indicator, countries):
             if code not in bucket:
                 bucket.append(code)
+    for section_row in parsed.sections:
+        if not section_row.parent_key:
+            continue
+        parent_bucket = codes_by_section.setdefault(section_row.parent_key, [])
+        for code in codes_by_section.get(section_row.key, []):
+            if code not in parent_bucket:
+                parent_bucket.append(code)
     for key, section in sections.items():
         section.relevance_condition = relevance_for_countries(codes_by_section.get(key, []))
 
 
-def _archive_removed(version, parsed: ParsedLogframe) -> None:
+def _archive_removed(version, parsed: ParsedLogframe, changes: _Changes) -> None:
     item_keys = {indicator.key for indicator in parsed.indicators}
     section_keys = {section.key for section in parsed.sections}
     for item in FormItem.query.filter_by(version_id=version.id, archived=False).all():
         key = _marc(item.config).get("key")
         if key and key not in item_keys:
             item.archived = True
+            changes.tally["items"]["changed"] += 1
+            changes.add(
+                "archive",
+                label=item.label,
+                kpi=str(_marc(item.config).get("code") or "") or None,
+                old="active",
+                new="archived (no longer in the workbook)",
+            )
     for section in FormSection.query.filter_by(version_id=version.id, archived=False).all():
         key = _marc(section.config).get("key")
         if key and key not in section_keys:
             section.archived = True
+            changes.tally["sections"]["changed"] += 1
+            changes.add(
+                "archive",
+                label=section.name,
+                old="active",
+                new="archived (no longer in the workbook)",
+            )
 
 
 def _project_reference(country: CountryRef) -> str:
@@ -451,7 +659,68 @@ def _project_reference(country: CountryRef) -> str:
     return f"{PROJECT_REFERENCE_PREFIX}{token}"
 
 
-def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
+def _day(value) -> str:
+    if isinstance(value, dt.datetime):
+        value = value.date()
+    return value.isoformat() if isinstance(value, dt.date) else ""
+
+
+def _project_state(project: Project) -> Dict[str, str]:
+    return {
+        "Title": project.title or "",
+        "National Society": project.organization_name or "",
+        "Start date": _day(project.start_date),
+        "End date": _day(project.end_date),
+    }
+
+
+def _plan_targets(plan: Any) -> Dict[str, dict]:
+    """Logframe lines of a project plan by indicator key."""
+    lines = plan.get("indicators") if isinstance(plan, dict) else None
+    return {
+        str(line["key"]): line
+        for line in lines or []
+        if isinstance(line, dict) and line.get("key")
+    }
+
+
+def _record_target_changes(
+    changes: _Changes,
+    country: CountryRef,
+    old_plan: Any,
+    new_lines: List[dict],
+) -> None:
+    """One row per indicator whose target for this country was added, changed or dropped."""
+    old = _plan_targets(old_plan)
+    new = {str(line["key"]): line for line in new_lines}
+    for key in [*new, *(key for key in old if key not in new)]:
+        before = old.get(key)
+        after = new.get(key)
+        old_target = str(before.get("target") or "") if before else ""
+        new_target = str(after.get("target") or "") if after else ""
+        if old_target == new_target:
+            changes.tally["targets"]["unchanged"] += 1
+            continue
+        line = after or before or {}
+        label = str(line.get("label") or key)
+        if not before:
+            op, bucket = "insert", "new"
+        elif not after:
+            op, bucket = "remove", "changed"
+        else:
+            op, bucket = "update", "changed"
+        changes.tally["targets"][bucket] += 1
+        changes.add(
+            op,
+            label=label,
+            kpi=str(line.get("code") or "") or None,
+            iso3=(country.iso3 or "").upper() or None,
+            old=old_target or None,
+            new=new_target or None,
+        )
+
+
+def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex, changes: _Changes):
     _sync_project_id_sequence()
     by_country: Dict[str, List[dict]] = {}
     for indicator in parsed.indicators:
@@ -487,6 +756,8 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
             "indicators": lines,
         }
         project = Project.query.filter_by(reference=reference).first()
+        before = None
+        old_plan = None
         if project is None:
             project = Project(
                 reference=reference,
@@ -506,6 +777,8 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
             if (project.portfolio or "") not in ("", PORTFOLIO):
                 unmatched.append(f"{country_name} (reference {reference} belongs to {project.portfolio})")
                 continue
+            before = _project_state(project)
+            old_plan = project.plan_data
             project.portfolio = PORTFOLIO
             project.fund = project.fund or FUND
             project.title = title[:500]
@@ -519,6 +792,16 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex):
                 project.status = "Open"
         project.start_date = AWARD_START
         project.end_date = AWARD_END
+        changes.diff(
+            "projects",
+            before,
+            _project_state(project),
+            label=title,
+            iso3=(country.iso3 or "").upper() or None,
+            insert_value=f"project {reference} · {len(lines)} indicator targets",
+        )
+        if before is not None:
+            _record_target_changes(changes, country, old_plan, lines)
         touched.append(project)
     db.session.flush()
     return touched, unmatched

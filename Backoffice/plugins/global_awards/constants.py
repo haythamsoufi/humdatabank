@@ -25,4 +25,3 @@ SHEET_NAME = "Logframe_Mastersheet"
 PLUGIN_DIR = Path(__file__).resolve().parent
 # Backoffice/plugins/global_awards -> repository root
 REPO_ROOT = PLUGIN_DIR.parents[2]
-DEFAULT_WORKBOOK = REPO_ROOT / "Annex_IFRC MARC_Logframe (work in progress).xlsx"

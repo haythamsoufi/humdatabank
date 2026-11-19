@@ -14,14 +14,18 @@ def register_cli(app):
     def global_awards_import(path, dry_run):
         """Import the MARC logframe into the Global Awards template and projects.
 
-        PATH defaults to the annex workbook at the repository root.
+        PATH defaults to the newest logframe workbook at the repository root.
         """
-        from plugins.global_awards.constants import DEFAULT_WORKBOOK
         from plugins.global_awards.importer.apply import import_logframe
+        from plugins.global_awards.importer.files import repo_workbooks
 
-        source = path or DEFAULT_WORKBOOK
-        if path is None and not DEFAULT_WORKBOOK.is_file():
-            raise click.ClickException(f"Workbook not found: {DEFAULT_WORKBOOK}")
+        source = path
+        if source is None:
+            found = repo_workbooks()
+            if not found:
+                raise click.ClickException("No logframe workbook at the repository root. Pass a PATH.")
+            source = found[0]
+            click.echo(f"Using {source.name}")
         report = import_logframe(source, dry_run=dry_run)
         click.echo(
             f"dry_run={report['dry_run']} template_id={report['template_id']} "

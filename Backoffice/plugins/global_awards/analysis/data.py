@@ -293,6 +293,8 @@ def _load_sections(version_id: int) -> List[dict]:
                 "key": marc.get("key") or f"section-{section.id}",
                 "name": section.name or "",
                 "statement": marc.get("statement") or "",
+                "parent": marc.get("parent") or "",
+                "kind": marc.get("kind") or "",
             }
         )
     return sections
@@ -838,6 +840,8 @@ def _section_summaries(
                 "key": section["key"],
                 "name": section["name"],
                 "statement": section["statement"],
+                "parent": section.get("parent") or "",
+                "kind": section.get("kind") or "",
                 "indicators": stats["indicators"],
                 "with_data": stats["with_data"],
             }

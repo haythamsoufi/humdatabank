@@ -9,9 +9,9 @@
     <strong>{{ settings.portfolio }}</strong>, fund <strong>{{ settings.fund }}</strong>.
   </p>
 
-  {% call(file) disk_file_table(disk_files) %}
-    {% if file.found and file.kind == 'repo' %}
-    <button type="submit" form="ga-import-form" name="action" value="disk"
+  {% call(file) disk_file_table(disk_files, empty_message='No workbook is on disk yet. Upload one below.') %}
+    {% if file.found and file.ref %}
+    <button type="submit" form="ga-import-form" name="file_ref" value="{{ file.ref }}"
             class="bg-red-600 hover:bg-red-700 text-white font-medium py-1.5 px-3 rounded-lg text-sm">
       Import this file
     </button>
@@ -23,7 +23,8 @@
         class="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
     <h3 class="text-base font-semibold text-gray-900">Upload a replacement workbook</h3>
     <p class="text-sm text-gray-600">
-      Drop an Excel file, or import the workbook already on disk. A preview does not save.
+      Drop an Excel file to import it. The file is kept under Files on disk so it can be imported
+      again. Tick Preview to see the changes without saving, for this form and for the files above.
     </p>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label class="flex items-center text-sm text-gray-700">
@@ -41,13 +42,8 @@
         hint='Supported formats: .xlsx, .xls'
     ) %}{% endcall %}
     <div class="flex flex-wrap gap-3">
-      <button type="submit" name="action" value="disk"
-              class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg"
-              {% if not settings.workbook_found %}disabled{% endif %}>
-        Import workbook on disk
-      </button>
-      <button type="submit" name="action" value="upload" id="ga-import-upload"
-              class="bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
+      <button type="submit" id="ga-import-upload"
+              class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
         Upload and import
       </button>
     </div>

@@ -8,8 +8,8 @@ import pytest
 import datetime as dt
 import json
 
-from plugins.global_awards.constants import DEFAULT_WORKBOOK
 from plugins.global_awards.importer.countries import CountryIndex, CountryRef
+from plugins.global_awards.importer.files import repo_workbooks
 from plugins.global_awards.importer.match import BankIndex, BankRow, question_type_for
 from plugins.global_awards.importer.schedule import (
     AWARD_END,
@@ -66,6 +66,12 @@ def test_parse_places_indicators_under_the_current_heading():
             ["", "Preparedness, Readiness and Anticipatory Action", "", "", "", "", "", "", "", "", "", ""],
             ["1.1.1", "Number of National Societies with updated plans", "", "Custom", "NA", "Plans.", 1, None, 1, "National Societies", "", ""],
             ["", "Number of National Societies able to deliver cash assistance.", "", "IFRC indicator bank", "606", "Cash capability.", None, 1, 1, "National Societies", "", ""],
+            ["", "Objective 2 (Pillar 2) Support to Ongoing Complex Emergencies\nImproved access to assistance.", "", "", "", "", "", "", "", "", "", ""],
+            ["O2-01", "People reached in ongoing emergencies", "", "Custom", "Custom", "People.", 5, None, 5, "People", "", ""],
+            ["", "Outcome 2.1: Essential services.", "", "", "", "", "", "", "", "", "", ""],
+            ["", "Cross cutting sector indictors", "", "", "", "", "", "", "", "", "", ""],
+            ["", "Health and MHPSS", "", "", "", "", "", "", "", "", "", ""],
+            ["CC-HLT-01", "People trained in MHPSS", "", "Custom", "Custom", "People.", 2, None, 2, "People", "", ""],
             ["", "Notes to self", "", "", "", "", "", "", "", "", "", ""],
             ["", "This note must not become an indicator", "", "", "", "", "", "", "", "", "", ""],
         ]
@@ -75,51 +81,147 @@ def test_parse_places_indicators_under_the_current_heading():
     assert parsed.countries == ["Bangladesh", "Syria"]
     assert [section.key for section in parsed.sections] == [
         "goal",
-        "outcome-1-1:preparedness-readiness-and-anticipatory-action",
+        "objective-1",
+        "outcome-1-1",
+        "objective-2",
+        "outcome-2-1",
+        "cross-cutting",
+        "cross-cutting-health-and-mhpss",
     ]
+    by_section = {section.key: section for section in parsed.sections}
+    assert by_section["goal"].parent_key == ""
+    assert by_section["objective-1"].parent_key == ""
+    assert by_section["outcome-1-1"].parent_key == "objective-1"
+    assert by_section["outcome-1-1"].kind == "outcome"
+    assert by_section["objective-1"].name == "1. Rapid response"
+    assert by_section["objective-2"].name == "2. Support to Ongoing Complex Emergencies"
+    assert by_section["objective-2"].parent_key == ""
+    assert by_section["cross-cutting"].parent_key == ""
+    assert by_section["cross-cutting"].kind == "cross_cutting"
+    assert by_section["cross-cutting"].name == "Cross-cutting"
+    assert by_section["cross-cutting-health-and-mhpss"].parent_key == "cross-cutting"
+    assert by_section["cross-cutting-health-and-mhpss"].kind == "topic"
+    assert by_section["cross-cutting-health-and-mhpss"].name == "Health and MHPSS"
     by_code = {item.display_code: item for item in parsed.indicators}
     assert by_code["1"].section_key == "goal"
     assert by_code["1"].targets["Bangladesh"] == "100000"
     assert "Syria" not in by_code["1"].targets
-    assert by_code["1.1.1"].section_name.startswith("Outcome 1.1 ·")
+    assert by_code["1.1.1"].section_key == "outcome-1-1"
+    assert by_code["1.1.1"].section_name.startswith("1.1.")
+    assert by_code["1.1.1"].topic == "Preparedness, Readiness and Anticipatory Action"
+    assert by_code["O2-01"].section_key == "objective-2"
+    assert by_code["CC-HLT-01"].section_key == "cross-cutting-health-and-mhpss"
+    assert by_code["CC-HLT-01"].topic == "Health and MHPSS"
     assert by_code["606"].cited_bank_id == 606
+    assert by_code["606"].section_key == "outcome-1-1"
     assert by_code["606"].targets == {"Syria": "1"}
     assert all("note" not in item.label.casefold() for item in parsed.indicators)
 
 
 def test_annex_logframe_keeps_bank_ids_and_country_targets():
-    if not DEFAULT_WORKBOOK.is_file():
-        pytest.skip("MARC annex workbook is not in the repository root")
-    parsed = load_logframe(DEFAULT_WORKBOOK)
+    workbooks = repo_workbooks()
+    if not workbooks:
+        pytest.skip("Global Award annex workbook is not in the repository root")
+    parsed = load_logframe(workbooks[0])
     codes = {item.display_code for item in parsed.indicators}
-    references = {item.reference for item in parsed.indicators}
     bank_ids = {item.cited_bank_id for item in parsed.indicators if item.cited_bank_id}
     by_code = {item.display_code: item for item in parsed.indicators}
 
-    assert "1" in codes
-    assert "1.1.1" in codes
-    assert "PROP-01" in codes
-    assert "S01" in codes
-    assert any(ref.startswith("H01") for ref in references)
+    # The identifier column is called "Indicator ID" in the annex; every line keeps it.
+    assert {"G-01", "O1-OC1.1-01", "CC-HLT-01", "CC-FOOD-03"} <= codes
+    assert all(item.code for item in parsed.indicators)
+    assert all(item.key == f"id:{item.code.casefold().replace('.', '-')}" for item in parsed.indicators)
     assert bank_ids == {606, 1124, 627, 624, 969}
-    assert by_code["1"].targets["Bangladesh"] == "100000"
     assert "Total" not in parsed.countries
-    assert "Bangladesh" in parsed.countries
-    assert "Syria" in parsed.countries
-    assert "Panama" in parsed.countries
+    assert "Submission note" not in parsed.countries
+    assert {"Panama", "Bangladesh", "Syria"} <= set(parsed.countries)
     assert len(parsed.countries) == 38
-    assert parsed.timeframe_note == "12 months"
-    assert parsed.award is not None
-    assert parsed.award.start == dt.date(2026, 9, 1)
-    assert parsed.award.end == dt.date(2027, 9, 30)
-    assert "Panama" not in by_code["1"].targets
-    cycles = quarterly_cycles(parsed.award.start, parsed.award.end)
-    assert [cycle.slot for cycle in cycles] == ["Y1Q1", "Y1Q2", "Y1Q3", "Y1Q4", "Y2Q1"]
-    assert cycles[0].start == dt.date(2026, 9, 1) and cycles[0].end == dt.date(2026, 11, 30)
-    assert cycles[-1].start == dt.date(2027, 9, 1) and cycles[-1].end == dt.date(2027, 9, 30)
+    assert parsed.timeframe_note == "17 Sep 2026 to 16 Sep 2027"
+    assert by_code["G-01"].targets["Bangladesh"] == "300000"
+    assert by_code["G-01"].targets["Panama"] == "25000"
+    # "Not applicable" in a country column is no target, so the line is not offered there.
+    assert "Panama" not in by_code["O1-OC1.1-01"].targets
+    assert not any(
+        target.casefold() == "not applicable"
+        for item in parsed.indicators
+        for target in item.targets.values()
+    )
     assert len({item.key for item in parsed.indicators}) == len(parsed.indicators)
     assert all(item.section_key for item in parsed.indicators)
     assert not any(item.label.casefold().startswith("notes to self") for item in parsed.indicators)
+    assert [section.key for section in parsed.sections] == [
+        "goal",
+        "objective-1",
+        "outcome-1-1",
+        "outcome-1-2",
+        "objective-2",
+        "outcome-2-1",
+        "outcome-2-2",
+        "objective-3",
+        "outcome-3-1",
+        "outcome-3-2",
+        "cross-cutting",
+        "cross-cutting-health-and-mhpss",
+        "cross-cutting-wash",
+        "cross-cutting-shelter-settlements-and-nfis",
+        "cross-cutting-cash-and-voucher-assistance",
+        "cross-cutting-food-assistance",
+    ]
+    by_section = {section.key: section for section in parsed.sections}
+    assert by_section["objective-1"].name == "1. Rapid Response and Preparedness for Natural Disasters"
+    assert by_section["objective-2"].name == "2. Support to Ongoing Complex Emergencies"
+    assert by_section["objective-3"].name == "3. Response within Complex Emergencies"
+    assert by_section["cross-cutting"].name == "Cross-cutting"
+    assert by_section["cross-cutting-wash"].name == "WASH"
+    parents = {section.key: section.parent_key for section in parsed.sections}
+    assert parents["goal"] == parents["objective-1"] == parents["cross-cutting"] == ""
+    assert parents["outcome-1-1"] == parents["outcome-1-2"] == "objective-1"
+    assert parents["outcome-2-1"] == "objective-2"
+    assert parents["outcome-3-2"] == "objective-3"
+    assert parents["cross-cutting-health-and-mhpss"] == parents["cross-cutting-wash"] == "cross-cutting"
+    assert parents["cross-cutting-food-assistance"] == "cross-cutting"
+    assert by_code["O2-01"].section_key == "objective-2"
+    assert by_code["O1-OC1.1-01"].section_key == "outcome-1-1"
+    assert by_code["O3-OC3.2-01"].section_key == "outcome-3-2"
+    assert by_code["CC-HLT-01"].section_key == "cross-cutting-health-and-mhpss"
+    assert by_code["CC-WASH-01"].section_key == "cross-cutting-wash"
+    assert by_code["CC-FOOD-03"].section_key == "cross-cutting-food-assistance"
+    assert all(":" not in section.key for section in parsed.sections)
+
+
+def test_indicator_id_column_is_the_code_and_not_applicable_is_no_target():
+    header = [
+        "Indicator ID",
+        "Indicator",
+        "Indicator source",
+        "Indicator reference",
+        "Definition",
+        "Bangladesh",
+        "Syria",
+        "Total",
+        "Unit of measurement",
+        "Submission note",
+    ]
+    workbook = _sheet(
+        [
+            ["Mastersheet", None, "Timeframe: 17 Sep 2026 to 16 Sep 2027"],
+            [],
+            header,
+            ["", "Goal: Life-saving assistance."],
+            ["G-01", "People reached", "Custom", "Custom", "Unique people.", 10, "Not applicable", 10, "People", None],
+            ["", "Outcome 1.1: Preparedness.", None, None, None, None, None, None, None, None],
+            ["O1-01", "Plans", "Custom", "Custom", "Plans.", "n/a", 2, 2, "Plans", None],
+        ]
+    )
+    parsed = parse_workbook(workbook)
+
+    assert parsed.timeframe_note == "17 Sep 2026 to 16 Sep 2027"
+    assert parsed.countries == ["Bangladesh", "Syria"]
+    first, second = parsed.indicators
+    assert (first.display_code, first.key) == ("G-01", "id:g-01")
+    assert first.targets == {"Bangladesh": "10"}
+    assert (second.display_code, second.key) == ("O1-01", "id:o1-01")
+    assert second.targets == {"Syria": "2"}
 
 
 def test_question_type_follows_the_unit():
@@ -170,6 +272,13 @@ def test_bank_id_wins_and_wording_must_be_unambiguous():
     )
     assert not gone.linked
     assert "99999" in gone.note
+
+
+def test_quarterly_cycles_stop_on_the_end_date():
+    cycles = quarterly_cycles(dt.date(2026, 9, 1), dt.date(2027, 9, 30))
+    assert [cycle.slot for cycle in cycles] == ["Y1Q1", "Y1Q2", "Y1Q3", "Y1Q4", "Y2Q1"]
+    assert cycles[0].start == dt.date(2026, 9, 1) and cycles[0].end == dt.date(2026, 11, 30)
+    assert cycles[-1].start == dt.date(2027, 9, 1) and cycles[-1].end == dt.date(2027, 9, 30)
 
 
 def test_official_reporting_calendar():

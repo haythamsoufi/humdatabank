@@ -1,5 +1,6 @@
 {# Existing Sections and their Items (Indicators, Document Fields, or Questions) #}
 {% from "components/_status_label.html" import status_label %}
+{% from "components/_section_kind_badge.html" import section_kind_badge %}
 {% macro fb_actions_toggle() %}
 <button type="button" class="fb-actions-toggle fb-icon-btn fb-icon-btn--neutral" aria-haspopup="true" aria-expanded="false" title="{{ _('Actions')|forceescape }}" aria-label="{{ _('Actions')|forceescape }}">
     <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
@@ -118,9 +119,15 @@
                         'Discussion': ('fa-comments fb-section-type-icon--discussion', _('Discussion'), 'info')
                     }.get(_section_type_value, ('fa-layer-group fb-section-type-icon--standard', _('Standard'), 'neutral')) %}
                     <i class="fas {{ _section_type_meta[0] }} fb-section-type-icon w-5 h-5 mr-2 flex-shrink-0" title="{{ _section_type_meta[1]|forceescape }}" aria-hidden="true"></i>
+                    {% set _marc_kind = ((item_s_f.section.config or {}).get('marc') or {}).get('kind') if item_s_f.section.config is mapping else none %}
+                    {% if not _marc_kind %}
                     {# Avoid decimal-style display; show integer section position #}
                     <span class="text-lg font-semibold text-gray-800 mr-1">{{ item_s_f.section.display_order.split('.')[0] }}.</span>
+                    {% endif %}
                         <h3 class="text-lg font-semibold text-gray-800 {{ 'text-gray-500' if is_section_archived else '' }}">{{ item_s_f.section.name }}</h3>
+                    {% if _marc_kind %}
+                    <span class="ml-2 flex-shrink-0">{{ section_kind_badge(item_s_f.section) }}</span>
+                    {% endif %}
                     </div>
                     {% if is_section_archived %}
                         <span class="ml-3">{{ status_label(_('Archived'), 'neutral') }}</span>
@@ -304,7 +311,11 @@
                                     {% if is_subsection_archived %}
                                         <span class="mr-2">{{ status_label(_('Archived'), 'neutral') }}</span>
                                     {% endif %}
+                                    {% set _sub_kind = ((item_instance.config or {}).get('marc') or {}).get('kind') if item_instance.config is mapping else none %}
                                     <span class="font-semibold text-teal-700 {{ 'text-gray-500' if is_subsection_archived else '' }}">{{ item_instance.name }}</span>
+                                    {% if _sub_kind %}
+                                    <span class="ml-2">{{ section_kind_badge(item_instance) }}</span>
+                                    {% endif %}
                                 </span>
                             </div>
                         </td>

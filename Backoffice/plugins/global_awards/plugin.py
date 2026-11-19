@@ -28,7 +28,7 @@ class GlobalAwardsPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     @property
     def version(self) -> str:
-        return "0.3.0"
+        return "0.8.1"
 
     @property
     def description(self) -> str:
@@ -63,6 +63,43 @@ class GlobalAwardsPlugin(FirstPartyPluginMetadata, BasePlugin):
                 manage_requires_system_manager=False,
             ),
         ]
+
+    def get_project_report_types(self, project):
+        from plugins.global_awards.constants import PORTFOLIO, TEMPLATE_NAME
+        from plugins.global_awards.importer.schedule import official_cycles
+
+        if (getattr(project, "portfolio", None) or "").strip() != PORTFOLIO:
+            return []
+        from app.models import FormTemplate, FormTemplateVersion
+
+        row = (
+            FormTemplate.query.join(
+                FormTemplateVersion, FormTemplateVersion.id == FormTemplate.published_version_id
+            )
+            .filter(FormTemplateVersion.name == TEMPLATE_NAME)
+            .with_entities(FormTemplate.id)
+            .first()
+        )
+        template_id = int(row[0]) if row else None
+        types = []
+        for cycle in official_cycles():
+            types.append(
+                {
+                    "slot": cycle.slot,
+                    "label": cycle.slot,
+                    "template_id": template_id,
+                    "kind": cycle.kind,
+                    "period_start": cycle.start,
+                    "period_end": cycle.end,
+                    "due_date": cycle.country_due,
+                    "note": (
+                        f"Region {cycle.region_due.strftime('%d/%m/%Y')}"
+                        f" · Geneva {cycle.geneva_due.strftime('%d/%m/%Y')}"
+                        f" · DHR {cycle.dhr_due.strftime('%d/%m/%Y')}"
+                    ),
+                }
+            )
+        return types
 
     def get_seed_permissions(self) -> List[SeedPermission]:
         return [

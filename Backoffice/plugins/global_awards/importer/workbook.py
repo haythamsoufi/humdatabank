@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from plugins.global_awards.constants import DEFAULT_WORKBOOK, SHEET_NAME
+from plugins.global_awards.constants import SHEET_NAME
 from plugins.global_awards.importer.schedule import AwardWindow, parse_award_window
 
 _HEADING_LIMIT = 120
@@ -29,8 +29,14 @@ _META_HEADERS = {
     "decision / missing inputs",
     "evidence / rationale",
     "results level / placement",
+    "submission note",
 }
 _NOT_A_CODE = {"", "custom", "na", "n/a"}
+# The mastersheet states "Not applicable" in a country column when a line does not apply
+# there. That is the absence of a target, not a target.
+_NO_TARGET = {"not applicable", "n/a", "na", "n.a.", "none", "-", "–", "—"}
+# Header names the identifier column has gone by across revisions of the annex.
+_CODE_HEADERS = ("code", "indicator id", "indicator code", "id")
 
 
 @dataclass
@@ -53,6 +59,7 @@ class LogframeIndicator:
     frequency: str
     scope: str
     results_level: str
+    topic: str = ""
     targets: Dict[str, str] = field(default_factory=dict)
 
     @property
@@ -72,6 +79,8 @@ class LogframeSection:
     name: str
     statement: str
     order: float
+    parent_key: str = ""
+    kind: str = ""
 
 
 @dataclass
@@ -145,27 +154,60 @@ def _display_code(code: str, reference: str) -> str:
     return head
 
 
-def _objective_parts(text: str) -> tuple[str, str, str]:
-    match = re.match(r"objective\s+(\d+)\b(.*)", text, flags=re.IGNORECASE)
+def _split_heading_lines(text: Any) -> tuple[str, str, str]:
+    """First line, remainder, and the full cleaned statement.
+
+    Annex objective cells put the title on the first line and the statement on
+    the next. ``clean_text`` would join those into one sentence and hide the title.
+    """
+    raw = str(text or "").replace("\u000d", "\n").replace("_x000D_", "\n").replace("\xa0", " ")
+    lines = [clean_text(part) for part in re.split(r"[\n\r]+", raw)]
+    lines = [line for line in lines if line]
+    first = lines[0] if lines else ""
+    after = " ".join(lines[1:])
+    return first, after, " ".join(lines)
+
+
+def _title_after_label(rest: str) -> str:
+    return rest.split(":")[0].strip(" .")
+
+
+def _objective_parts(text: Any) -> tuple[str, str, str]:
+    first, after, statement = _split_heading_lines(text)
+    match = re.match(r"objective\s+(\d+)\b(.*)", first, flags=re.IGNORECASE)
     if not match:
-        return f"objective:{slug(text)}", clip(text), text
+        return f"objective:{slug(first or statement)}", clip(first or statement), statement
     number = match.group(1)
     rest = re.sub(r"^\s*\([^)]*\)\s*", "", match.group(2) or "")
-    title = rest.split(":")[0].strip(" .")
-    short = f"Objective {number}"
-    name = clip(f"{short}. {title}" if title else short)
-    return f"objective-{number}", name, text
+    title = _title_after_label(rest) or _title_after_label(after)
+    name = clip(f"{number}. {title}" if title else f"{number}.")
+    return f"objective-{number}", name, statement
 
 
-def _outcome_parts(text: str) -> tuple[str, str, str]:
-    match = re.match(r"outcome\s+([\d.]+)\s*[:.]?\s*(.*)", text, flags=re.IGNORECASE)
+def _outcome_parts(text: Any) -> tuple[str, str, str]:
+    first, after, statement = _split_heading_lines(text)
+    match = re.match(r"outcome\s+([\d.]+)\s*[:.]?\s*(.*)", first, flags=re.IGNORECASE)
     if not match:
-        return f"outcome:{slug(text)}", clip(text), text
+        return f"outcome:{slug(first or statement)}", clip(first or statement), statement
     code = match.group(1).strip(".")
-    title = (match.group(2) or "").strip(" .")
-    short = f"Outcome {code}"
-    name = clip(f"{short}. {title}" if title else short)
-    return "outcome-" + code.replace(".", "-"), name, text
+    title = (match.group(2) or "").strip(" .") or after
+    name = clip(f"{code}. {title}" if title else f"{code}.")
+    return "outcome-" + code.replace(".", "-"), name, statement
+
+
+def _cross_cutting_parts(text: Any) -> tuple[str, str, str]:
+    _first, _after, statement = _split_heading_lines(text)
+    return "cross-cutting", "Cross-cutting", statement
+
+
+def _topic_parts(text: str, parent_key: str) -> tuple[str, str, str]:
+    label = clean_text(text)
+    return f"{parent_key}-{slug(label)}", clip(label), label
+
+
+def _is_cross_cutting(text: str) -> bool:
+    lowered = (text or "").casefold()
+    return lowered.startswith("cross cutting") or lowered.startswith("cross-cutting")
 
 
 def _heading_kind(text: str, source: str, unit: str, definition: str, code: str) -> Optional[str]:
@@ -178,6 +220,8 @@ def _heading_kind(text: str, source: str, unit: str, definition: str, code: str)
         return "objective"
     if lowered.startswith("outcome"):
         return "outcome"
+    if _is_cross_cutting(text):
+        return "cross_cutting"
     if not source and not unit and not definition and not code and len(text) <= _HEADING_LIMIT:
         return "topic"
     return None
@@ -188,66 +232,131 @@ def _is_indicator(source: str, unit: str, definition: str, code: str) -> bool:
 
 
 class _Outline:
-    """Tracks the goal / objective / outcome / topic the next indicator belongs to."""
+    """Tracks the goal / objective / outcome the next indicator belongs to."""
 
     def __init__(self) -> None:
         self.goal = ""
-        self.parent_key = "goal"
-        self.parent_name = "Goal"
-        self.parent_short = "Goal"
-        self.parent_statement = ""
-        self.topic_key = ""
-        self.topic_name = ""
+        self.objective_key = ""
+        self.objective_name = ""
+        self.objective_statement = ""
+        self.outcome_key = ""
+        self.outcome_name = ""
+        self.outcome_statement = ""
+        self.cross_cutting_key = ""
+        self.cross_cutting_name = ""
+        self.cross_cutting_statement = ""
+        self.sector_key = ""
+        self.sector_name = ""
+        self.sector_statement = ""
+        self.topic = ""
+
+    def _clear_sector(self) -> None:
+        self.sector_key = ""
+        self.sector_name = ""
+        self.sector_statement = ""
+
+    def _clear_children(self) -> None:
+        self.outcome_key = ""
+        self.outcome_name = ""
+        self.outcome_statement = ""
+        self.cross_cutting_key = ""
+        self.cross_cutting_name = ""
+        self.cross_cutting_statement = ""
+        self._clear_sector()
+        self.topic = ""
 
     def goal_heading(self, text: str) -> None:
-        self.goal = text
-        self.parent_key = "goal"
-        self.parent_name = "Goal"
-        self.parent_short = "Goal"
-        self.parent_statement = text
-        self.topic_key = ""
-        self.topic_name = ""
+        self.goal = _split_heading_lines(text)[2]
+        self.objective_key = ""
+        self.objective_name = ""
+        self.objective_statement = ""
+        self._clear_children()
 
     def objective_heading(self, text: str) -> None:
         key, name, statement = _objective_parts(text)
-        self.parent_key = key
-        self.parent_name = name
-        number = re.fullmatch(r"objective-(\d+)", key)
-        self.parent_short = f"Objective {number.group(1)}" if number else "Objective"
-        self.parent_statement = statement
-        self.topic_key = ""
-        self.topic_name = ""
+        self.objective_key = key
+        self.objective_name = name
+        self.objective_statement = statement
+        self._clear_children()
 
     def outcome_heading(self, text: str) -> None:
         key, name, statement = _outcome_parts(text)
-        self.parent_key = key
-        self.parent_name = name
-        if key.startswith("outcome-"):
-            self.parent_short = "Outcome " + key[len("outcome-"):].replace("-", ".")
-        else:
-            self.parent_short = "Outcome"
-        self.parent_statement = statement
-        self.topic_key = ""
-        self.topic_name = ""
+        self.outcome_key = key
+        self.outcome_name = name
+        self.outcome_statement = statement
+        self.cross_cutting_key = ""
+        self.cross_cutting_name = ""
+        self.cross_cutting_statement = ""
+        self._clear_sector()
+        self.topic = ""
+
+    def cross_cutting_heading(self, text: str) -> None:
+        key, name, statement = _cross_cutting_parts(text)
+        self.cross_cutting_key = key
+        self.cross_cutting_name = name
+        self.cross_cutting_statement = statement
+        self._clear_sector()
+        self.topic = ""
 
     def topic_heading(self, text: str) -> None:
-        self.topic_key = f"{self.parent_key}:{slug(text)}"
-        self.topic_name = clip(f"{self.parent_short} · {text}")
+        self.topic = text
+        if self.cross_cutting_key:
+            key, name, statement = _topic_parts(text, self.cross_cutting_key)
+            self.sector_key = key
+            self.sector_name = name
+            self.sector_statement = statement
+            return
+        self._clear_sector()
 
     @property
     def section_key(self) -> str:
-        return self.topic_key or self.parent_key
+        return self.sector_key or self.cross_cutting_key or self.outcome_key or self.objective_key or "goal"
 
     @property
     def section_name(self) -> str:
-        return self.topic_name or self.parent_name
+        if self.sector_key:
+            return self.sector_name
+        if self.cross_cutting_key:
+            return self.cross_cutting_name
+        if self.outcome_key:
+            return self.outcome_name
+        if self.objective_key:
+            return self.objective_name
+        return "Goal"
 
     @property
     def section_statement(self) -> str:
-        if self.topic_name and self.parent_statement:
-            topic = self.topic_name.split("·", 1)[-1].strip()
-            return f"{self.parent_statement}\n\n{topic}"
-        return self.parent_statement
+        if self.sector_key:
+            return self.sector_statement
+        if self.cross_cutting_key:
+            return self.cross_cutting_statement
+        if self.outcome_key:
+            return self.outcome_statement
+        if self.objective_key:
+            return self.objective_statement
+        return self.goal
+
+    @property
+    def section_parent_key(self) -> str:
+        if self.sector_key:
+            return self.cross_cutting_key
+        if self.cross_cutting_key:
+            return ""
+        if self.outcome_key:
+            return self.objective_key
+        return ""
+
+    @property
+    def section_kind(self) -> str:
+        if self.sector_key:
+            return "topic"
+        if self.cross_cutting_key:
+            return "cross_cutting"
+        if self.outcome_key:
+            return "outcome"
+        if self.objective_key:
+            return "objective"
+        return "goal"
 
 
 def parse_workbook(workbook) -> ParsedLogframe:
@@ -266,7 +375,8 @@ def parse_workbook(workbook) -> ParsedLogframe:
 
     for offset, raw in enumerate(rows[header_index + 1 :], start=header_index + 2):
         padded = list(raw) + [None] * max(0, len(header) - len(raw))
-        label = clean_text(_at(padded, columns["indicator"]))
+        raw_label = _at(padded, columns["indicator"])
+        label = clean_text(raw_label)
         if not label:
             continue
         if label.casefold().startswith("notes to self"):
@@ -278,45 +388,52 @@ def parse_workbook(workbook) -> ParsedLogframe:
         kind = _heading_kind(label, source, unit, definition, code)
         if kind == "skip":
             break
+        heading_text = raw_label if raw_label is not None else label
         if kind == "goal":
-            outline.goal_heading(label)
+            outline.goal_heading(heading_text)
+            _put_section(sections, outline)
             continue
         if kind == "objective":
-            outline.objective_heading(label)
+            outline.objective_heading(heading_text)
+            _put_section(sections, outline)
             continue
         if kind == "outcome":
-            outline.outcome_heading(label)
+            outline.outcome_heading(heading_text)
+            _put_section(sections, outline)
+            continue
+        if kind == "cross_cutting":
+            outline.cross_cutting_heading(heading_text)
+            _put_section(sections, outline)
             continue
         if kind == "topic":
             outline.topic_heading(label)
+            if outline.sector_key:
+                _put_section(sections, outline)
             continue
         if not _is_indicator(source, unit, definition, code):
             continue
 
         reference = clean_text(_at(padded, columns.get("reference")))
         display = _display_code(code, reference)
-        base_key = f"{outline.section_key}:{display or slug(label)}"
+        # An identifier from the sheet's ID column survives a line moving to another
+        # heading; without one the key falls back to heading plus reference or wording.
+        base_key = f"id:{slug(code)}" if code else f"{outline.section_key}:{display or slug(label)}"
         seen_keys[base_key] = seen_keys.get(base_key, 0) + 1
         key = base_key if seen_keys[base_key] == 1 else f"{base_key}-{seen_keys[base_key]}"
-        if outline.section_key not in sections:
-            sections[outline.section_key] = LogframeSection(
-                key=outline.section_key,
-                name=outline.section_name or "General",
-                statement=outline.section_statement,
-                order=float(len(sections) + 1),
-            )
+        _put_section(sections, outline)
         targets = {}
         for name, index in columns["countries"]:
             target = format_cell(_at(padded, index))
-            if target:
+            if target and target.casefold() not in _NO_TARGET:
                 targets[name] = target
+        section = sections[outline.section_key]
         indicators.append(
             LogframeIndicator(
                 row=offset,
                 key=key,
-                section_key=outline.section_key,
-                section_name=sections[outline.section_key].name,
-                section_statement=sections[outline.section_key].statement,
+                section_key=section.key,
+                section_name=section.name,
+                section_statement=section.statement,
                 display_code=display,
                 code=code,
                 reference=reference,
@@ -328,6 +445,7 @@ def parse_workbook(workbook) -> ParsedLogframe:
                 frequency=clean_text(_at(padded, columns.get("frequency"))),
                 scope=clean_text(_at(padded, columns.get("scope"))),
                 results_level=clean_text(_at(padded, columns.get("results"))),
+                topic=outline.topic,
                 targets=targets,
             )
         )
@@ -363,10 +481,6 @@ def open_workbook(source):
     return openpyxl.load_workbook(source, read_only=True, data_only=True)
 
 
-def default_workbook_path():
-    return DEFAULT_WORKBOOK
-
-
 def _timeframe_note(rows: List[tuple]) -> str:
     """The mastersheet label such as ``12 months``, when the file states one."""
     for row in rows:
@@ -374,6 +488,10 @@ def _timeframe_note(rows: List[tuple]) -> str:
         for index, cell in enumerate(cells):
             if cell.casefold().rstrip(":") == "timeframe" and index + 1 < len(cells):
                 return cells[index + 1]
+            # "Timeframe: 17 Sep 2026 to 16 Sep 2027" in one cell.
+            inline = re.match(r"timeframe\s*:\s*(.+)", cell, flags=re.IGNORECASE)
+            if inline:
+                return inline.group(1).strip()
     return ""
 
 
@@ -408,7 +526,7 @@ def _columns(header: tuple) -> dict:
         countries.append((name, position))
     return {
         "indicator": index["indicator"],
-        "code": index.get("code"),
+        "code": next((index[name] for name in _CODE_HEADERS if name in index), None),
         "source": index.get("indicator source"),
         "reference": index.get("indicator reference"),
         "definition": index.get("definition"),
@@ -419,6 +537,21 @@ def _columns(header: tuple) -> dict:
         "results": index.get("results level / placement"),
         "countries": countries,
     }
+
+
+def _put_section(sections: Dict[str, LogframeSection], outline: _Outline) -> None:
+    """Record a heading as soon as it appears, even if no indicator sits under it yet."""
+    key = outline.section_key
+    if key in sections:
+        return
+    sections[key] = LogframeSection(
+        key=key,
+        name=outline.section_name or "General",
+        statement=outline.section_statement,
+        order=float(len(sections) + 1),
+        parent_key=outline.section_parent_key,
+        kind=outline.section_kind,
+    )
 
 
 def _at(row: list, index: Optional[int]) -> Any:

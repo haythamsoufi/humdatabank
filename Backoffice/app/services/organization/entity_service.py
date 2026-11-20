@@ -3,6 +3,10 @@ Entity Service - Centralized service for multi-level organizational entity opera
 
 This service provides a unified interface for working with different entity types
 (countries, NS branches/sub-branches/local units, secretariat divisions/departments).
+
+``Project`` is included so a project-cycle report (``entity_type='project'``) can
+be named and resolved. It is an assignment subject, not an organizational entity
+group, and must not appear in entity pickers.
 """
 from collections import defaultdict
 
@@ -29,6 +33,7 @@ class EntityService:
         EntityType.department.value: SecretariatDepartment,
         EntityType.regional_office.value: SecretariatRegionalOffice,
         EntityType.cluster_office.value: SecretariatClusterOffice,
+        # Assignment subject for project-cycle reports, not an org entity group.
         EntityType.project.value: Project,
     }
 

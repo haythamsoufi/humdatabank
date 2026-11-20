@@ -1,11 +1,10 @@
 from flask import render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_required, current_user
-from app.models.enums import EntityType
 from app.services.organization.entity_service import EntityService
 from app.utils.common.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from flask_babel import _
 from config import Config
-from app.utils.organization.entity_groups import get_enabled_entity_groups
+from app.utils.organization.entity_groups import get_enabled_entity_groups, organizational_entity_types
 from app.utils.http.request_utils import is_top_level_navigation
 from contextlib import suppress
 
@@ -145,7 +144,7 @@ def documents_submit():
 
     document_entity_types = [
         {"value": et.value, "label": EntityService.get_entity_type_label(et.value)}
-        for et in EntityType
+        for et in organizational_entity_types()
     ]
 
     documents_modal_entity_choices = _document_modal_entity_choice_rows(user_entities) if show_entity_select else None

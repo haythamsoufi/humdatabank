@@ -57,23 +57,21 @@
 
 {% set resolved_entity_types = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
 {% set has_countries = 'countries' in resolved_entity_types %}
-{# Projects are their own rows on the Assignments list, not entities added to a campaign. #}
-{% set has_projects = false %}
 {% set has_ns_structure = 'ns_structure' in resolved_entity_types %}
 {% set has_secretariat = 'secretariat' in resolved_entity_types %}
 {% set entity_tabs = namespace(order=[]) %}
 {% if assignment and assignment_entities %}
 {% set __ = entity_tabs.order.append('manage') %}{% endif %}
-{% if (not assignment or can_manage_assignment_entities) and (has_countries or has_projects or has_secretariat) %}
+{% if (not assignment or can_manage_assignment_entities) and (has_countries or has_secretariat) %}
 {% set __ = entity_tabs.order.append('add_entities') %}{% endif %}
 {% if (not assignment or can_manage_assignment_entities) and has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
 {% set show_status_overview = true if (assignment and assignment_overview) else false %}
 {# Validation errors live on Assignment details; land there so they stay visible. #}
 {% set details_tab_active = (not show_status_overview) or form.errors %}
 {% set show_main_tabs = show_status_overview or (entity_tabs.order|length > 0) %}
-{% set default_add_entities_subtab = 'countries' if has_countries else ('projects' if has_projects else 'secretariat') %}
+{% set default_add_entities_subtab = 'countries' if has_countries else 'secretariat' %}
 {# Determine if we should show sub-tabs within Add Entities: hide if only one sub-tab is available #}
-{% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_projects else 0) + (1 if has_secretariat else 0) %}
+{% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_secretariat else 0) %}
 {% set show_add_entities_subtabs = sub_tabs_count > 1 %}
 
 {# Assignment details form and entity management in one card with main tabs

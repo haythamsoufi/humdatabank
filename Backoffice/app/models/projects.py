@@ -1,8 +1,9 @@
 """Core project registry for project-based periodic reporting.
 
-Assignments can target ``entity_type='project'`` (see ``EntityType.project``).
-Plugins (e.g. NSD funds) upsert rows and attach schedule-driven submissions;
-admins can also manage projects and add them to assignments in the UI.
+A project is an assignment type (``AssignmentScope.project_cycle``), not an
+organizational entity. Each report is an ``AssignmentEntityStatus`` row with
+``entity_type='project'`` pointing at this table. Plugins (e.g. NSD funds)
+upsert rows and attach schedule-driven submissions.
 """
 
 from __future__ import annotations

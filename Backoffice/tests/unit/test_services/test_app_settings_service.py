@@ -424,9 +424,11 @@ class TestEnabledEntityTypes:
     def test_invalid_group_excluded(self, app, db_session):
         with app.app_context():
             _clear_settings(db_session, app)
-            svc.set_enabled_entity_types(["countries", "invalid_group"])
+            svc.set_enabled_entity_types(["countries", "invalid_group", "projects"])
             result = svc.get_enabled_entity_types()
         assert "invalid_group" not in result
+        assert "projects" not in result
+        assert "countries" in result
 
     def test_empty_defaults_to_countries(self, app, db_session):
         with app.app_context():

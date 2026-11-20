@@ -2114,12 +2114,12 @@ def api_admin_get_countries():
 @permission_required('admin.communication.manage')
 @json_error_handler('Admin entity types list')
 def api_admin_get_entity_types():
-    """Get list of entity types for bulk selection (admin only)"""
-    from app.models.enums import EntityType
+    """Get list of organizational entity types for bulk selection (admin only)."""
     from app.services.organization.entity_service import EntityService
+    from app.utils.organization.entity_groups import organizational_entity_types
 
     entity_types = []
-    for entity_type in EntityType:
+    for entity_type in organizational_entity_types():
         entity_types.append({
             'value': entity_type.value,
             'label': EntityService.get_entity_type_label(entity_type.value)

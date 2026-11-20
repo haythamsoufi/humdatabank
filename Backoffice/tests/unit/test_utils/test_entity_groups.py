@@ -4,12 +4,15 @@ Unit tests for app/utils/organization/entity_groups.py – 100% coverage target.
 import pytest
 from unittest.mock import patch
 
+from app.models.enums import EntityType
 from app.utils.organization.entity_groups import (
     ENTITY_GROUP_TYPE_MAP,
     _get_default_groups,
     get_enabled_entity_groups,
     get_allowed_entity_type_codes,
     is_entity_group_enabled,
+    is_organizational_entity_type,
+    organizational_entity_types,
 )
 
 
@@ -32,6 +35,18 @@ class TestEntityGroupTypeMap:
 
     def test_secretariat_list_nonempty(self):
         assert len(ENTITY_GROUP_TYPE_MAP['secretariat']) > 0
+
+    def test_projects_are_not_an_entity_group(self):
+        assert 'projects' not in ENTITY_GROUP_TYPE_MAP
+        allowed = get_allowed_entity_type_codes(enabled_groups=list(ENTITY_GROUP_TYPE_MAP))
+        assert EntityType.project.value not in allowed
+
+    def test_organizational_entity_types_exclude_project(self):
+        values = {et.value for et in organizational_entity_types()}
+        assert EntityType.project.value not in values
+        assert EntityType.country.value in values
+        assert is_organizational_entity_type('country') is True
+        assert is_organizational_entity_type('project') is False
 
 
 @pytest.mark.unit

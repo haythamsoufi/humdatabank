@@ -32,6 +32,7 @@ from app.models import (
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import DocumentStatus, EntityType
 from app.services.organization.entity_service import EntityService
+from app.utils.organization.entity_groups import is_organizational_entity_type, organizational_entity_types
 from app.forms.content import ResourceForm
 from app.forms.shared import DeleteForm
 from app.routes.admin.shared import permission_required, permission_required_any, rbac_guard_audit_exempt
@@ -100,6 +101,8 @@ def _document_modal_entity_choice_rows_for_admin():
     sees_all = _viewer_sees_all_documents(current_user)
     pairs = []
     for et_slug, model_class in EntityService.ENTITY_MODEL_MAP.items():
+        if not is_organizational_entity_type(et_slug):
+            continue
         try:
             for obj in model_class.query.all():
                 eid = getattr(obj, "id", None)
@@ -126,6 +129,8 @@ def _parse_standalone_link_from_form(form) -> tuple[str, int] | None:
     try:
         et_slug = storage.normalize_standalone_entity_type_slug(raw_type)
     except ValueError:
+        return None
+    if not is_organizational_entity_type(et_slug):
         return None
     entity_id = form.get("linked_entity_id", type=int)
     country_id = form.get("country_id", type=int)
@@ -1558,7 +1563,7 @@ def manage_documents():
 
     document_entity_types = [
         {"value": et.value, "label": EntityService.get_entity_type_label(et.value)}
-        for et in EntityType
+        for et in organizational_entity_types()
     ]
 
     return render_template(
@@ -1583,6 +1588,8 @@ def standalone_document_entity_options():
     try:
         et = storage.normalize_standalone_entity_type_slug(entity_type_raw)
     except ValueError:
+        return json_bad_request("Invalid entity type")
+    if not is_organizational_entity_type(et):
         return json_bad_request("Invalid entity type")
 
     entities = EntityService.get_all_entities_by_type(et, filter_active=True)

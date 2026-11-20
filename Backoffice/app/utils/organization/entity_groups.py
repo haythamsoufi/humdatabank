@@ -11,13 +11,11 @@ except Exception as e:  # pragma: no cover - allow usage outside app context
 from config import Config
 from app.models.enums import EntityType
 
-# Mapping of high-level entity groups to their concrete entity type identifiers
+# Organizational entity groups. A project is an assignment type
+# (AssignmentScope.project_cycle), not an entity you enable or assign users to.
 ENTITY_GROUP_TYPE_MAP = {
     'countries': [
         EntityType.country.value,
-    ],
-    'projects': [
-        EntityType.project.value,
     ],
     'ns_structure': [
         EntityType.ns_branch.value,
@@ -69,6 +67,20 @@ def get_allowed_entity_type_codes(enabled_groups: Iterable[str] = None) -> Set[s
     for group in groups:
         allowed.update(ENTITY_GROUP_TYPE_MAP.get(group, []))
     return allowed
+
+
+def organizational_entity_types() -> List[EntityType]:
+    """Entity types that represent an organization.
+
+    ``EntityType.project`` stays on a project-cycle report so the row can point
+    at a ``Project``. It is not offered in entity-type settings or entity pickers.
+    """
+    return [et for et in EntityType if et is not EntityType.project]
+
+
+def is_organizational_entity_type(entity_type: str) -> bool:
+    """True for an organizational entity type code (not a project assignment)."""
+    return str(entity_type or "").strip().lower() in {et.value for et in organizational_entity_types()}
 
 
 def is_entity_group_enabled(group_key: str, enabled_groups: Iterable[str] = None) -> bool:

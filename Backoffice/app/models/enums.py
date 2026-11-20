@@ -473,7 +473,13 @@ class AssignmentScope(str, enum.Enum):
 
 
 class EntityType(str, enum.Enum):
-    """Types of organizational entities that can be assigned users and templates."""
+    """Organizational units that can hold users and campaign assignments.
+
+    ``project`` is not an organizational entity. A project is an assignment type
+    (``AssignmentScope.project_cycle``). The report row stores
+    ``entity_type='project'`` so it can point at a ``Project``. Do not offer it
+    in entity-type settings or entity pickers.
+    """
     country = 'country'
     national_society = 'national_society'
     ns_branch = 'ns_branch'
@@ -483,7 +489,6 @@ class EntityType(str, enum.Enum):
     department = 'department'
     regional_office = 'regional_office'
     cluster_office = 'cluster_office'
-    # Project-based periodic reporting (core); plugins may specialise workflows
     project = 'project'
 
 

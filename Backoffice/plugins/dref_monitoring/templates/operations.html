@@ -50,12 +50,6 @@
                     <th class="px-3 py-2">{{ dref_tr('Hazard') }}</th>
                     <th class="px-3 py-2">{{ dref_tr('Workflow') }}</th>
                     <th class="px-3 py-2">{{ dref_tr('Status') }}</th>
-                    <th class="px-3 py-2">
-                        {{ dref_tr('Funds received') }}
-                        <button type="button" class="text-gray-500" title="{{ dref_tr('Funds received is recorded on the operation. GO does not send it. A dash means nobody has recorded it yet.') }}" aria-label="{{ dref_tr('Funds received is recorded on the operation. GO does not send it. A dash means nobody has recorded it yet.') }}">
-                            <i class="fas fa-info-circle" aria-hidden="true"></i>
-                        </button>
-                    </th>
                     <th class="px-3 py-2"></th>
                 </tr>
             </thead>
@@ -68,11 +62,10 @@
                     <td class="px-3 py-2">{{ operation.hazard }}</td>
                     <td class="px-3 py-2">{{ dref_status(operation.workflow_status) }}</td>
                     <td class="px-3 py-2">{{ dref_status(operation.operation_status, variant='danger' if (operation.operation_status or '')|string|lower == 'closed' else '') }}</td>
-                    <td class="px-3 py-2">{{ dref_tr('Funds received') if operation.funds_received else '-' }}</td>
                     <td class="px-3 py-2"><a class="text-blue-700 underline" href="{{ url_for('dref_monitoring.operation_page', operation_id=operation.id) }}">{{ dref_tr('Open') }}</a></td>
                 </tr>
                 {% else %}
-                <tr><td class="px-3 py-6 text-gray-600" colspan="7">{{ dref_tr('No open operations' if not include_closed else 'No operations yet') }}</td></tr>
+                <tr><td class="px-3 py-6 text-gray-600" colspan="6">{{ dref_tr('No open operations' if not include_closed else 'No operations yet') }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

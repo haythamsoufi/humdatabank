@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
 from plugins.dref_monitoring.constants import SECTORS
@@ -103,6 +105,24 @@ def application_signature(application) -> tuple:
             (item.get("key"), str(item.get("budget")), item.get("people_targeted"), indicators, activities)
         )
     return tuple(items)
+
+
+def narrative_signature(application) -> str:
+    """Digest of the written application. It is not part of ``stage_signature``.
+
+    New wording must be saved, but it must not open a new plan version.
+    """
+    if not isinstance(application, dict):
+        return ""
+    material = {
+        "version": application.get("narrative_version"),
+        "narrative": application.get("narrative"),
+        "context": application.get("context"),
+    }
+    if not material["narrative"] and not material["context"]:
+        return ""
+    raw = json.dumps(material, sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def stage_signature(parsed: dict[str, Any]) -> tuple:

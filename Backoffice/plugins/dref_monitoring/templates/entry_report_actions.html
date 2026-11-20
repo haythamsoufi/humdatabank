@@ -1,0 +1,64 @@
+{% from "macros/modal_shell.html" import modal_shell %}
+{% set dref_report_labels = {
+    'operational_update': {'button': dref_tr('Operational update'), 'title': dref_tr('Generate operational update'), 'icon': 'fas fa-file-alt', 'classes': 'professional-action-btn'},
+    'final_report': {'button': dref_tr('Final report'), 'title': dref_tr('Generate final report'), 'icon': 'fas fa-flag-checkered', 'classes': 'professional-action-btn professional-action-btn-green'}
+} %}
+{% for kind in kinds %}
+{% set info = dref_report_labels[kind] %}
+<button type="button" class="{{ info.classes }}" data-dref-report-open="dref-report-modal-{{ kind }}" aria-haspopup="dialog">
+    <i class="{{ info.icon }}" aria-hidden="true"></i>
+    <span>{{ info.button }}</span>
+</button>
+{% call modal_shell('dref-report-modal-' ~ kind, info.title, max_width='max-w-lg', data_attrs={'dref-report-modal': kind}) %}
+<form method="post" action="{{ url_for('dref_monitoring.draft_generate_route', operation_id=operation.id) }}" class="space-y-4" data-dref-report-form data-dref-draft-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <input type="hidden" name="return_to" value="/assignment/{{ aes_id }}">
+    <p class="text-sm text-gray-600">{{ dref_tr('The report is built from the figures saved on this form. Save your changes first.') }}</p>
+    <fieldset class="space-y-2">
+        <legend class="text-sm font-medium text-gray-700 mb-1">{{ dref_tr('Narrative') }}</legend>
+        <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 {% if not ai_ready %}opacity-60 cursor-not-allowed{% endif %}">
+            <input type="radio" name="narrative" value="ai" class="mt-1" {% if ai_ready %}checked{% else %}disabled{% endif %}>
+            <span class="block">
+                <span class="block text-sm font-medium text-gray-900">{{ dref_tr('AI-generated narrative') }}</span>
+                <span class="block text-xs text-gray-600">
+                    {% if ai_ready %}
+                    {{ dref_tr('The model drafts the GO chapters from the approved request, the monitoring history, recent GO field reports and the Databank documents you can access. It does not receive community feedback. It runs in the background and you can edit the text before validating.') }}
+                    {% else %}
+                    {{ dref_tr('AI drafting is not enabled.') }}
+                    {% endif %}
+                </span>
+            </span>
+        </label>
+        <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+            <input type="radio" name="narrative" value="manual" class="mt-1" {% if not ai_ready %}checked{% endif %}>
+            <span class="block">
+                <span class="block text-sm font-medium text-gray-900">{{ dref_tr('Write the narrative myself') }}</span>
+                <span class="block text-xs text-gray-600">{{ dref_tr('The chapters start empty. You write them on the next page.') }}</span>
+            </span>
+        </label>
+        <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+            <input type="radio" name="narrative" value="none" class="mt-1">
+            <span class="block">
+                <span class="block text-sm font-medium text-gray-900">{{ dref_tr('Data only') }}</span>
+                <span class="block text-xs text-gray-600">{{ dref_tr('Tables and figures from the monitoring data, with no narrative chapters.') }}</span>
+            </span>
+        </label>
+    </fieldset>
+    <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Language') }}
+        <select name="language" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            {% for code, label in [('en', 'English'), ('fr', 'French'), ('es', 'Spanish'), ('ar', 'Arabic')] %}
+            <option value="{{ code }}" {% if dref_language() == code %}selected{% endif %}>{{ dref_tr(label) }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-secondary close-modal">{{ dref_tr('Cancel') }}</button>
+        <button type="submit" class="btn btn-primary" data-dref-report-submit data-loading-text="{{ dref_tr('Generating…') }}">
+            <i class="fas fa-file-alt" aria-hidden="true"></i> {{ dref_tr('Generate draft') }}
+        </button>
+    </div>
+</form>
+{% include "plugins/dref_monitoring/_draft_job_panel.html" %}
+{% endcall %}
+{% endfor %}

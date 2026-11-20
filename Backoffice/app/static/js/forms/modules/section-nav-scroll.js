@@ -1,5 +1,5 @@
 import { debugLog } from './debug.js';
-import { getScrollableContainer, scrollElementToStart } from '../../core/scroll-container.js';
+import { getScrollableContainer, getStickySectionNavInset, scrollElementToStart } from '../../core/scroll-container.js';
 import { buildFormPageStorageKey, getStableFormStorageBaseUrl } from './form-page-state.js';
 
 const MODULE_NAME = 'section-nav-scroll';
@@ -148,8 +148,10 @@ function createSectionNavScrollSpy(links, { isPaginated = false } = {}) {
 
   function getActivationLine(container) {
     const scrollMarginTop = getScrollMarginTop();
-    if (container === window) return scrollMarginTop;
-    return container.getBoundingClientRect().top + scrollMarginTop;
+    const stickyInset = getStickySectionNavInset();
+    const inset = stickyInset > 0 ? stickyInset + 8 : scrollMarginTop;
+    if (container === window) return inset;
+    return container.getBoundingClientRect().top + inset;
   }
 
   function isNearBottom(container) {
@@ -187,8 +189,21 @@ function createSectionNavScrollSpy(links, { isPaginated = false } = {}) {
   function ensureNavLinkVisible(link) {
     const navScroller = document.querySelector('#sidebar-nav-scroll') || document.querySelector('#section-navigation-sidebar .overflow-y-auto');
     if (!navScroller || !link) return;
-    const linkRect = link.getBoundingClientRect();
+    const stepper = document.querySelector('.entry-form-root[data-section-nav="stepper"]');
+    let target = link;
+    if (stepper) {
+      const item = link.closest('.sidebar-section-item');
+      const topLink = item && item.querySelector(':scope > a.section-link');
+      if (topLink) target = topLink;
+    }
+    const linkRect = target.getBoundingClientRect();
     const scrollerRect = navScroller.getBoundingClientRect();
+    if (stepper) {
+      if (linkRect.left < scrollerRect.left || linkRect.right > scrollerRect.right) {
+        target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
+      return;
+    }
     if (linkRect.top < scrollerRect.top || linkRect.bottom > scrollerRect.bottom) {
       link.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }

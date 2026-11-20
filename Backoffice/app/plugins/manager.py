@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from flask import Flask
+from markupsafe import Markup
 from .base import (
     BasePlugin,
     BaseFieldType,
@@ -1480,6 +1481,22 @@ class PluginManager:
                 return error
         return None
 
+    def entry_form_header_html(self, assignment_entity_status) -> Markup:
+        """Header buttons active plugins add to an assignment form. A failing plugin is skipped."""
+        parts: list = []
+        for plugin_id, plugin in self._integrating_plugins().items():
+            contribute = getattr(plugin, "get_entry_form_header_html", None)
+            if not callable(contribute):
+                continue
+            try:
+                html = contribute(assignment_entity_status)
+            except Exception as exc:
+                self.logger.warning("get_entry_form_header_html failed for plugin %s: %s", plugin_id, exc)
+                continue
+            if isinstance(html, str) and html.strip():
+                parts.append(html)
+        return Markup("".join(parts))
+
     def entry_form_assets(self, template_id=None) -> list:
         """Stylesheets and scripts active plugins contribute to an assignment form."""
         try:
@@ -1543,6 +1560,12 @@ class PluginManager:
         @self.app.template_global('plugin_entry_form_assets')
         def plugin_entry_form_assets(template_id=None):
             return self.entry_form_assets(template_id)
+
+        @self.app.template_global('plugin_entry_form_header')
+        def plugin_entry_form_header(assignment_entity_status=None):
+            if assignment_entity_status is None:
+                return Markup("")
+            return self.entry_form_header_html(assignment_entity_status)
 
         @self.app.template_global('plugin_nav_items')
         def plugin_nav_items(section: str):

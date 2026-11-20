@@ -136,7 +136,7 @@ def test_selected_sectors_use_emergency_indicators_and_scripted_questions(seeded
     )
     from plugins.dref_monitoring.constants import SECTORS
 
-    assert [section.name for section in sections] == [label for _key, label in SECTORS] + ["Report"]
+    assert [section.name for section in sections] == [label for _key, label in SECTORS] + ["Note"]
     health_section = next(section for section in sections if section.config["dref_sector_key"] == "health")
     assert health_section.config["entry_render"] == "dref-sector"
     assert health_section.config["entry_key"] == "health"
@@ -168,17 +168,21 @@ def test_selected_sectors_use_emergency_indicators_and_scripted_questions(seeded
 
     report = next(section for section in sections if section.config["dref_sector_key"] == "__report__")
     report_labels = [item.label for item in _items(report.id)]
+    assert report.name == "Note"
     assert report_labels == ["Note"]
     assert report.config["entry_render"] == "dref-report"
+    assert report.config["hide_section_header"] is True
+    assert report.hide_section_header is True
 
     from plugins.dref_monitoring.plugin import DrefMonitoringPlugin
 
     assets = DrefMonitoringPlugin().get_entry_form_assets(cycle.template_id)
-    assert [asset["kind"] for asset in assets] == ["stylesheet", "script"]
+    assert [asset["kind"] for asset in assets] == ["stylesheet", "script", "script"]
     import re
 
     assert re.search(r"css/sector_section\.css\?v=\d+$", assets[0]["url"])
     assert re.search(r"js/sector_section\.js\?v=\d+$", assets[1]["url"])
+    assert re.search(r"js/report_actions\.js\?v=\d+$", assets[2]["url"])
 
     before = FormItem.query.filter_by(version_id=version.id).count()
     ensure_operation_template(operation)
@@ -190,7 +194,7 @@ def test_selected_sectors_use_emergency_indicators_and_scripted_questions(seeded
         .order_by(FormSection.order)
         .all()
     ]
-    assert names == [label for _key, label in SECTORS] + ["Report"]
+    assert names == [label for _key, label in SECTORS] + ["Note"]
 
 
 def test_a_script_alias_places_indicators_when_the_sector_name_differs(seeded, monkeypatch):
@@ -449,3 +453,67 @@ def test_a_cycle_stores_the_indicator_figure_as_a_plan_target(seeded, monkeypatc
 
     assert save_posted_targets(aes, {f"indicator_{other_item.id}_total_value": "3"}) is None
     assert linked.target is None
+
+
+def test_the_assignment_form_omits_indicators_that_are_not_on_the_plan(seeded):
+    from app.models.assignments import AssignmentEntityStatus
+    from plugins.dref_monitoring.models import DrefIndicator
+    from plugins.dref_monitoring.services.entry_activities import limit_entry_fields
+    from plugins.dref_monitoring.services.plans import groups_for, latest_plan
+
+    _country, user = seeded
+    health = Sector(name="Health", display_order=1, is_active=True)
+    db.session.add(health)
+    db.session.flush()
+    reached = IndicatorBank(
+        name="DREF entry people reached with health services",
+        type="number",
+        unit="People",
+        emergency=True,
+        archived=False,
+        sector={"primary": health.id},
+    )
+    other = IndicatorBank(
+        name="DREF entry people reached with restoring family links",
+        type="number",
+        unit="People",
+        emergency=True,
+        archived=False,
+        sector={"primary": health.id},
+    )
+    db.session.add_all([reached, other])
+    db.session.commit()
+    apply_rows([_row(id="Dref-entry-limit", appeal_code="MDRENTRY1")])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRENTRY1").one()
+    assert validate_plan(operation, _manager(user.id), date(2026, 1, 10)) is None
+    group = next(row for row in groups_for(latest_plan(operation.id).id) if row.key == "health")
+    db.session.add(
+        DrefIndicator(
+            group_id=group.id,
+            title=reached.name,
+            indicator_bank_id=reached.id,
+            unmatched=False,
+            target=5,
+        )
+    )
+    db.session.commit()
+
+    cycle = (
+        AssignedForm.query.filter_by(project_id=operation.project_id, scope="project_cycle")
+        .order_by(AssignedForm.id)
+        .first()
+    )
+    aes = AssignmentEntityStatus.query.filter_by(assigned_form_id=cycle.id).one()
+    version = FormTemplateVersion.query.filter_by(template_id=cycle.template_id).one()
+    health_section = FormSection.query.filter_by(version_id=version.id, name="Health", archived=False).one()
+    shelter_section = FormSection.query.filter_by(
+        version_id=version.id, name="Shelter and basic household items", archived=False
+    ).one()
+    health_section.fields_ordered = _items(health_section.id)
+    shelter_section.fields_ordered = _items(shelter_section.id)
+
+    limit_entry_fields(aes)
+
+    kept = [item.indicator_bank_id for item in health_section.fields_ordered if item.item_type == "indicator"]
+    assert kept == [reached.id]
+    assert shelter_section.fields_ordered == []

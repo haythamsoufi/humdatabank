@@ -2103,6 +2103,43 @@ def dashboard_assignment_entity_filter(entity_type: str, entity_id: int):
     )
 
 
+def dashboard_cycle_label(period_name: str, portfolio: str = "", reference: str = "") -> str:
+    """Cycle text on a project card.
+
+    DREF period names are ``<appeal code> · <slot>``. The code is already in
+    the card title, so the cycle line keeps the slot only.
+    """
+    raw = (period_name or "").strip()
+    if (portfolio or "").strip() != "DREF" or not raw:
+        return raw
+    from app.services.projects.service import CYCLE_PERIOD_SEP
+
+    prefix = f"{(reference or '').strip()}{CYCLE_PERIOD_SEP}"
+    if (reference or "").strip() and raw.startswith(prefix):
+        return raw[len(prefix):].strip() or raw
+    return raw
+
+
+def dashboard_project_card_heading(portfolio, fund, reference, title) -> tuple[str, str]:
+    """Title and subtitle for one project assignment card.
+
+    A DREF card title is the fund, the appeal code, and the disaster name.
+    Other portfolios keep the project name as the title and the reference
+    as the subtitle.
+    """
+    ref = (reference or "").strip()
+    name = (title or "").strip()
+    if (portfolio or "").strip() == "DREF":
+        label = (fund or "").strip() or "DREF"
+        heading = f"{label} {ref}".strip()
+        if name and name != ref:
+            heading = f"{heading} — {name}"
+        return heading, ""
+    if name:
+        return name, ref
+    return ref, ""
+
+
 def group_dashboard_project_assignments(items, current_date):
     """Collapse project entity AES rows into one dashboard card with cycle dropdown."""
     from collections import defaultdict
@@ -2124,11 +2161,30 @@ def group_dashboard_project_assignments(items, current_date):
         cycle_items.sort(key=_dashboard_cycle_sort_key)
         proj = projects.get(pid)
         active = _pick_project_dashboard_cycle_index(cycle_items, current_date)
+        reference = proj.reference if proj else f"#{pid}"
+        title = (proj.title or "") if proj else ""
+        portfolio = (proj.portfolio or "") if proj else ""
+        card_title, card_subtitle = dashboard_project_card_heading(
+            portfolio,
+            proj.fund if proj else "",
+            reference,
+            title,
+        )
+        for cycle in cycle_items:
+            aes = cycle.get("item_object")
+            form = getattr(aes, "assigned_form", None) if aes is not None else None
+            cycle["cycle_label"] = dashboard_cycle_label(
+                form.period_name if form is not None else "",
+                portfolio,
+                reference,
+            )
         groups[pid] = {
             "type": "project_group",
             "project_id": pid,
-            "project_reference": proj.reference if proj else f"#{pid}",
-            "project_title": (proj.title or "") if proj else "",
+            "project_reference": reference,
+            "project_title": title,
+            "project_card_title": card_title,
+            "project_card_subtitle": card_subtitle,
             "project_status": (proj.status or "") if proj else "",
             "project_closed": bool(proj and not proj.is_open),
             "cycles": cycle_items,

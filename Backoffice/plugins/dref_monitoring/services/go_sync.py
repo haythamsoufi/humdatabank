@@ -23,7 +23,13 @@ from plugins.dref_monitoring.constants import (
     WORKFLOW_PLAN_DRAFT,
 )
 from plugins.dref_monitoring.models import DrefBaseline, DrefOperation, DrefSyncLog
-from plugins.dref_monitoring.services.go_parse import is_dref_appeal, parse_stage, stage_signature
+from plugins.dref_monitoring.services.go_application import NARRATIVE_VERSION
+from plugins.dref_monitoring.services.go_parse import (
+    is_dref_appeal,
+    narrative_signature,
+    parse_stage,
+    stage_signature,
+)
 from plugins.dref_monitoring.services.periods import default_frequency
 from plugins.dref_monitoring.services.plans import latest_plan, sync_plan
 
@@ -263,6 +269,7 @@ def _stage_fingerprint(parsed: dict) -> tuple:
         parsed.get("people_targeted"),
         parsed.get("people_assisted"),
         stage_signature(parsed),
+        narrative_signature(parsed.get("application")),
     )
 
 
@@ -688,7 +695,12 @@ def stamp_stored_applications(rows: list[dict]) -> int:
         DrefBaseline.application.isnot(None),
     ).all():
         application = baseline.application
-        if isinstance(application, dict) and application.get("interventions"):
+        # A plan stored before the written application was kept is read once more.
+        if (
+            isinstance(application, dict)
+            and application.get("interventions")
+            and application.get("narrative_version") == NARRATIVE_VERSION
+        ):
             stored[baseline.go_stage_id] = application
     reused = 0
     for row, stage_id in pending:

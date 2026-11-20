@@ -6,6 +6,7 @@
 import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
 import { initExcelIoModal } from '../../components/excel-io-modal.js';
 import { initFormBuilderActionOverflow } from './action-overflow.js';
+import { initCollapsedSectionReorder } from './section-reorder.js';
 
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
@@ -707,7 +708,7 @@ export function initSectionSubsectionToggle() {
         // Section banner (title + chevron): click toggles; don't toggle when clicking action buttons
         document.querySelectorAll('.section-header-banner').forEach(banner => {
             banner.addEventListener('click', function(e) {
-                if (e.target.closest('.section-toggle')) return;
+                if (e.target.closest('.section-toggle, .section-drag-handle')) return;
                 const btn = this.querySelector('.section-toggle');
                 if (btn) btn.click();
             });
@@ -808,7 +809,7 @@ function enhance() {
         if (banner.dataset.fbWired === '1') return;
         banner.dataset.fbWired = '1';
         banner.addEventListener('click', function(e) {
-            if (e.target.closest('.section-toggle')) return;
+            if (e.target.closest('.section-toggle, .section-drag-handle')) return;
             if (e.target.closest('button, a, form')) return;
             const btn = banner.querySelector('.section-toggle');
             if (btn) btn.click();
@@ -1096,6 +1097,7 @@ export function initFormBuilder() {
     initVersionsModal();
     initPageSectionsToggle();
     initSectionSubsectionToggle();
+    initCollapsedSectionReorder();
     initBulkCollapseExpandControls();
     initExcelModal();
     initArchivedItemsToggle();

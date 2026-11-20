@@ -130,7 +130,7 @@
                         <input type="checkbox" name="ai_enabled" value="1" {% if settings.ai_enabled %}checked{% endif %}>
                         {{ dref_tr('AI draft reports') }}
                     </label>
-                    <p class="text-sm text-gray-600">{{ dref_tr('The model writes the GO chapters from the approved request and the monitoring history. It does not receive community feedback. Notes, delay reasons, and risks are sent as typed, so keep names and contact details out of them.') }}</p>
+                    <p class="text-sm text-gray-600">{{ dref_tr('The model writes the GO chapters from the approved request and its written application, the monitoring history, recent public GO field reports, and Databank documents the person generating the draft can read. It does not receive community feedback or contact details. Notes, delay reasons, and risks are sent as typed, so keep names and contact details out of them.') }}</p>
                     <label class="block text-sm text-gray-700">{{ dref_tr('Report language') }}
                         <select class="mt-1 w-full border border-gray-300 rounded px-3 py-2" name="ai_language">
                             {% for code, label in [('en', 'English'), ('fr', 'French'), ('es', 'Spanish'), ('ar', 'Arabic')] %}
@@ -139,6 +139,13 @@
                         </select>
                     </label>
                     <p class="text-sm text-gray-600">{{ dref_tr('Scheduled drafts use this language.') }}</p>
+                    <label class="block text-sm text-gray-700">{{ dref_tr('Model (optional)') }}
+                        <input class="mt-1 w-full border border-gray-300 rounded px-3 py-2" type="text" maxlength="64" name="ai_model" value="{{ settings.ai_model }}" placeholder="gpt-5-mini" autocomplete="off">
+                    </label>
+                    <label class="block text-sm text-gray-700">{{ dref_tr('Final report model (optional)') }}
+                        <input class="mt-1 w-full border border-gray-300 rounded px-3 py-2" type="text" maxlength="64" name="ai_final_report_model" value="{{ settings.ai_final_report_model }}" autocomplete="off">
+                    </label>
+                    <p class="text-sm text-gray-600">{{ dref_tr('Leave a model blank to use the Databank default. A stronger model writes better chapters.') }}</p>
                     <p class="text-sm text-gray-600">{{ dref_tr('Indicative until delegation finance validates it in ERP.') }}</p>
                     <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Save settings') }}</button>
                 </form>

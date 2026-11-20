@@ -98,10 +98,11 @@ def _section_plan(operation: DrefOperation) -> list[dict]:
     """Every sector, every emergency indicator, then the report questions.
 
     A temporary adapter match that points at a bank row which is not marked
-    emergency is included too, so the assignment can show it. The assignment
-    still hides indicators that are not on that operation's plan.
+    emergency is included too, so the assignment can show it. The shared template
+    keeps the full list. ``limit_entry_fields`` drops the indicators that are not
+    on that operation's plan before the assignment page is rendered.
 
-    ``operation`` is unused. The template is shared; the assignment filters it.
+    ``operation`` is unused. The template is shared; each assignment filters it.
     """
     del operation
     by_fold, by_go_key = _sector_index()
@@ -167,7 +168,9 @@ def _section_plan(operation: DrefOperation) -> list[dict]:
     built.append(
         {
             "key": _REPORT_KEY,
-            "name": "Report",
+            "name": "Note",
+            # One field. The section heading would repeat the question label.
+            "hide_header": True,
             "order": len(built) + 1,
             "indicators": [],
             "sector_questions": False,
@@ -184,8 +187,8 @@ def _entry_render(section_key: str) -> str:
     return "dref-sector"
 
 
-def _section_config(section_key: str) -> dict:
-    return {
+def _section_config(section_key: str, *, hide_header: bool = False) -> dict:
+    config = {
         "dref_managed": True,
         "dref_sector_key": section_key,
         # Core draws one target field, and stamps this key on the section for the sector script.
@@ -193,6 +196,9 @@ def _section_config(section_key: str) -> dict:
         "entry_key": section_key,
         "entry_render": _entry_render(section_key),
     }
+    if hide_header:
+        config["hide_section_header"] = True
+    return config
 
 
 def _sync_sections(template: FormTemplate, version: FormTemplateVersion, planned: list[dict]) -> None:
@@ -216,7 +222,7 @@ def _sync_sections(template: FormTemplate, version: FormTemplateVersion, planned
                 name=spec["name"],
                 order=float(spec["order"]),
                 section_type="standard",
-                config=_section_config(key),
+                config=_section_config(key, hide_header=bool(spec.get("hide_header"))),
             )
             db.session.add(section)
             db.session.flush()
@@ -226,7 +232,10 @@ def _sync_sections(template: FormTemplate, version: FormTemplateVersion, planned
             section.order = float(spec["order"])
             section.archived = False
             cfg = dict(section.config or {})
-            cfg.update(_section_config(key))
+            fresh = _section_config(key, hide_header=bool(spec.get("hide_header")))
+            if not spec.get("hide_header"):
+                cfg.pop("hide_section_header", None)
+            cfg.update(fresh)
             section.config = cfg
         _sync_items(template, version, section, spec)
 

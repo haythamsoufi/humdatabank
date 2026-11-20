@@ -30,7 +30,8 @@ FINANCE = {
     "final_report": "Financial report",
 }
 
-from plugins.dref_monitoring.services.drafts import EXPENDITURE_NOTE
+from plugins.dref_monitoring.constants import NARRATIVE_NONE
+from plugins.dref_monitoring.services.drafts import EXPENDITURE_NOTE, narrative_mode_of
 
 COVER_NOTE = (
     "Draft for filing in GO. Monitoring tables are filled from Databank. "
@@ -92,9 +93,42 @@ def _localize(blocks: list[Block]) -> list[Block]:
     return blocks
 
 
+DATA_COVER_NOTE = (
+    "Data report for filing in GO. Every table is filled from Databank and has no narrative chapters. "
+    "Reach and expenditure are the latest monitoring report, not a sum across periods. "
+    + EXPENDITURE_NOTE
+)
+
+
+def _without_empty_headings(blocks: list[Block]) -> list[Block]:
+    """Drop blank paragraphs, then every heading that has nothing under it.
+
+    A heading counts as filled when any non-heading block follows it before the
+    next heading of the same or a higher level, so a sector heading with a table
+    below its sub-headings stays.
+    """
+    kept = [block for block in blocks if not (block.kind == "paragraph" and not (block.text or "").strip())]
+    result: list[Block] = []
+    for index, block in enumerate(kept):
+        if block.kind != "heading":
+            result.append(block)
+            continue
+        for follower in kept[index + 1 :]:
+            if follower.kind == "heading":
+                if follower.level <= block.level:
+                    break
+                continue
+            result.append(block)
+            break
+    return result
+
+
 def build_report(source: dict) -> list[Block]:
     with override_locale(source.get("language")):
-        return _localize(_compose_report(source))
+        blocks = _compose_report(source)
+        if source.get("narrative_mode") == NARRATIVE_NONE:
+            blocks = _without_empty_headings(blocks)
+        return _localize(blocks)
 
 
 def _compose_report(source: dict) -> list[Block]:
@@ -102,7 +136,7 @@ def _compose_report(source: dict) -> list[Block]:
     blocks: list[Block] = [
         Block("title", TITLE[kind]),
         Block("subtitle", (source.get("disaster_name") or source.get("appeal_code") or "").strip()),
-        Block("note", COVER_NOTE),
+        Block("note", DATA_COVER_NOTE if source.get("narrative_mode") == NARRATIVE_NONE else COVER_NOTE),
         Block("kv", rows=tuple(_cover_rows(source, kind))),
     ]
     prose = [line.strip() for line in str(source.get("narrative") or "").splitlines() if line.strip()]
@@ -314,6 +348,7 @@ def source_for(operation, draft) -> dict:
 
     return {
         "kind": draft.report_kind,
+        "narrative_mode": narrative_mode_of(draft),
         "language": getattr(draft, "language", None) or "en",
         "appeal_code": operation.appeal_code,
         "disaster_name": operation.disaster_name,

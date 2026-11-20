@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from app.extensions import db
 from plugins.dref_monitoring.constants import (
@@ -34,6 +35,9 @@ from plugins.dref_monitoring.models import (
 from plugins.dref_monitoring.services.parsing import as_bool, as_date, as_int, as_money
 from plugins.dref_monitoring.services.periods import build_periods
 from plugins.dref_monitoring.services.plans import (
+    ACTIVITY_TYPE_CODES,
+    CARRIED_OUT_CODES,
+    _choice,
     activities_for,
     activity_status,
     groups_for,
@@ -55,6 +59,13 @@ def shares_to_counts(total, shares: dict) -> dict:
         else:
             counts[part] = int(round(int(total) * int(percent) / 100))
     return counts
+
+
+def disaggregation_reason(update) -> str:
+    if update is None or not update.disaggregation_na:
+        return ""
+    data = update.disaggregation if isinstance(update.disaggregation, dict) else {}
+    return str(data.get("reason") or "")
 
 
 def counts_to_shares(total, counts: dict | None) -> dict:
@@ -182,6 +193,88 @@ def _touches_activity(form, activity_id: int) -> bool:
     return any(key.startswith(prefix) for key in _form_keys(form))
 
 
+def _share_error(form, activity_id: int) -> str | None:
+    """Reject a sex or age percentage above 100, or four that add up to more than 100."""
+    numbers = []
+    saw = False
+    for part in SHARE_PARTS:
+        raw = form.get(f"activity_{activity_id}_pct_{part}")
+        text = "" if raw is None else str(raw).strip().replace(",", "")
+        if text == "":
+            continue
+        try:
+            number = Decimal(text)
+        except (InvalidOperation, ValueError):
+            return "Enter a number for the target."
+        if number < 0:
+            return "Amounts cannot be negative."
+        if number > 100:
+            return "A percentage cannot be more than 100."
+        numbers.append(number)
+        saw = True
+    if saw and sum(numbers) > 100:
+        return "The percentages together cannot be more than 100."
+    return None
+
+
+def _posted_amount(form, keys, field):
+    """Posted money, whether the field was posted, and an error message."""
+    if field not in keys:
+        return None, False, None
+    text = "" if form.get(field) is None else str(form.get(field)).strip()
+    if text == "":
+        return None, True, None
+    amount = as_money(text)
+    if amount is None:
+        return None, True, "Enter a number for the target."
+    if amount < 0:
+        return None, True, "Amounts cannot be negative."
+    return amount, True, None
+
+
+def _posted_date(form, keys, field, current):
+    """Posted date, or the current value when the field was not posted."""
+    if field not in keys:
+        return current, None
+    text = "" if form.get(field) is None else str(form.get(field)).strip()
+    if text == "":
+        return None, None
+    parsed = as_date(text)
+    if parsed is None:
+        return None, "Enter a valid date."
+    return parsed, None
+
+
+def _figure_error(form, keys, activity) -> str | None:
+    """Budget, target, and dates edited on the entry form."""
+    for suffix in ("budget", "target"):
+        _amount, _posted, error = _posted_amount(form, keys, f"activity_{activity.id}_{suffix}")
+        if error:
+            return error
+    start, start_error = _posted_date(form, keys, f"activity_{activity.id}_start_date", activity.start_date)
+    if start_error:
+        return start_error
+    end, end_error = _posted_date(form, keys, f"activity_{activity.id}_end_date", activity.end_date)
+    if end_error:
+        return end_error
+    if start and end and end < start:
+        return "The end date must be on or after the start date."
+    return None
+
+
+def _apply_figures(form, keys, activity) -> None:
+    budget, posted, _error = _posted_amount(form, keys, f"activity_{activity.id}_budget")
+    if posted:
+        activity.budget_chf = budget
+    target, posted, _error = _posted_amount(form, keys, f"activity_{activity.id}_target")
+    if posted:
+        activity.target = target
+    if f"activity_{activity.id}_start_date" in keys:
+        activity.start_date, _error = _posted_date(form, keys, f"activity_{activity.id}_start_date", activity.start_date)
+    if f"activity_{activity.id}_end_date" in keys:
+        activity.end_date, _error = _posted_date(form, keys, f"activity_{activity.id}_end_date", activity.end_date)
+
+
 def write_report_fields(operation, period, form) -> str | None:
     """Write one draft report from form fields. Does not commit and does not check a DREF role."""
     if period.operation_id != operation.id:
@@ -200,7 +293,16 @@ def write_report_fields(operation, period, form) -> str | None:
     for _group, activity, _indicators in _plan_activities(operation):
         if not _touches_activity(form, activity.id):
             continue
+        figure_error = _figure_error(form, keys, activity)
+        if figure_error:
+            return _named(activity.title, figure_error)
+        share_error = _share_error(form, activity.id)
+        if share_error:
+            return _named(activity.title, share_error)
         if as_bool(form.get(f"activity_{activity.id}_disaggregation_na")):
+            reason = str(form.get(f"activity_{activity.id}_disaggregation_reason") or "").strip()
+            if not reason:
+                return _named(activity.title, "Explain why this data is not available.")
             continue
         if not any(f"activity_{activity.id}_pct_{part}" in keys for part in SHARE_PARTS):
             continue
@@ -230,6 +332,9 @@ def write_report_fields(operation, period, form) -> str | None:
             individuals = as_int(form.get(f"activity_{activity.id}_reached"))
         expenditure = as_money(form.get(f"activity_{activity.id}_expenditure"))
         skipped = as_bool(form.get(f"activity_{activity.id}_disaggregation_na"))
+        share_error = _share_error(form, activity.id)
+        if share_error:
+            return _named(activity.title, share_error)
         percents = {
             part: as_int(form.get(f"activity_{activity.id}_pct_{part}"))
             for part in SHARE_PARTS
@@ -237,6 +342,7 @@ def write_report_fields(operation, period, form) -> str | None:
         percent_posted = any(f"activity_{activity.id}_pct_{part}" in keys for part in SHARE_PARTS)
         if skipped:
             disaggregation = {part: None for part in SHARE_PARTS}
+            disaggregation["reason"] = str(form.get(f"activity_{activity.id}_disaggregation_reason") or "").strip()[:2000]
         elif percent_posted and any(value is not None for value in percents.values()):
             if any(value is None for value in percents.values()) or sum(value or 0 for value in percents.values()) != 100:
                 return _named(activity.title, "The percentage split must add up to 100.")
@@ -262,6 +368,13 @@ def write_report_fields(operation, period, form) -> str | None:
         update.note = str(form.get(f"activity_{activity.id}_note") or "")[:2000]
         activity.status = status
         activity.percent = percent
+        type_field = f"activity_{activity.id}_activity_type"
+        actor_field = f"activity_{activity.id}_carried_out_by"
+        if type_field in keys:
+            activity.activity_type = _choice(form.get(type_field), ACTIVITY_TYPE_CODES)
+        if actor_field in keys:
+            activity.carried_out_by = _choice(form.get(actor_field), CARRIED_OUT_CODES)
+        _apply_figures(form, keys, activity)
         if expenditure is not None:
             saw_expenditure = True
             total += expenditure
@@ -309,6 +422,7 @@ def form_from_cycle_payload(data: dict) -> dict:
                 "pct_girls",
                 "pct_boys",
                 "disaggregation_na",
+                "disaggregation_reason",
                 "expenditure",
                 "note",
             ):
@@ -340,6 +454,7 @@ def _activity_row(activity, saved, actuals):
         "actuals": actuals,
         "shares": counts_to_shares(total, counts),
         "disaggregation_na": bool(update and update.disaggregation_na),
+        "disaggregation_reason": disaggregation_reason(update),
         "tracks_households": any(indicator.beneficiary_unit == "households" for indicator in indicators),
     }
 

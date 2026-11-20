@@ -1,0 +1,331 @@
+/**
+ * Dev-only entry-form section navigation preview.
+ * Active when .entry-form-root[data-section-nav="stepper"].
+ * Turns the sections pane into a horizontal stepper across the top.
+ */
+
+.entry-form-root[data-section-nav="stepper"] {
+  --step-dot: 0.875rem;
+  --step-line: 2px;
+  --step-line-top: calc((var(--step-dot) - var(--step-line)) / 2);
+  --step-red: #c8102e;
+  --step-muted: #9ca3af;
+  --step-dot-idle: #c5c8cc;
+  --step-line-color: #d5d8dc;
+}
+
+.entry-form-root[data-section-nav="stepper"] #entry-form-layout,
+.entry-form-root[data-section-nav="stepper"] #entry-form-skeleton-layout {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0.75rem !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar[data-collapsed="true"],
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar.force-mobile-mode,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar.force-mobile-mode.translate-x-0 {
+  position: sticky !important;
+  inset: auto !important;
+  top: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 30 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 0 0.25rem !important;
+  padding: 0.85rem 0.25rem 0.65rem !important;
+  transform: none !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 1px 0 #e5e7eb !important;
+  background: #fff !important;
+  align-self: stretch !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar:not([data-discussion-expanded="true"]) .entry-form-sections-pane__header {
+  display: none !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #sidebar-shared-pane,
+.entry-form-root[data-section-nav="stepper"] #sidebar-nav-scroll {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #sidebar-nav-scroll {
+  overflow: visible !important;
+  max-width: 100%;
+}
+
+.entry-form-root[data-section-nav="stepper"] #entry-form-sidebar-resizer,
+.entry-form-root[data-section-nav="stepper"] #sidebar-expand-button,
+.entry-form-root[data-section-nav="stepper"] #mobile-nav-toggle-button,
+.entry-form-root[data-section-nav="stepper"] #mobile-nav-overlay,
+.entry-form-root[data-section-nav="stepper"] #fab-menu {
+  display: none !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-nav-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 0.15rem 0.35rem 0.35rem !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-nav-list > * {
+  margin-top: 0 !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-scope-group,
+.entry-form-root[data-section-nav="stepper"] .sidebar-scope-group--page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-page-heading {
+  display: none;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-nav-list:has(.sidebar-scope-group--page ~ .sidebar-scope-group--page) .sidebar-page-heading {
+  display: block;
+  margin: 0.35rem 0 0.15rem;
+  padding: 0 0.35rem;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-nav-list:has(.sidebar-scope-group--page ~ .sidebar-scope-group--page) .sidebar-page-label {
+  padding: 0;
+}
+
+/* One horizontal row. Extra sections scroll instead of wrapping under the line.
+   overflow-x: auto also clips the block axis, so the top padding has to hold
+   the 3px ring and the active dot (larger, and nudged up to stay on the line). */
+.entry-form-root[data-section-nav="stepper"] .sidebar-section-list {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.5rem 0 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-section-item,
+.entry-form-root[data-section-nav="stepper"] .sidebar-nav-list > li:not(.sidebar-scope-group) {
+  position: relative;
+  display: flex;
+  flex: 1 0 7.25rem;
+  flex-direction: column;
+  align-items: center;
+  min-width: 7.25rem;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-section-item > ul,
+.entry-form-root[data-section-nav="stepper"] .repeat-entry-nav-list {
+  display: none !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-section-item::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: var(--step-line-top);
+  height: var(--step-line);
+  background: var(--step-line-color);
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-section-list > .sidebar-section-item:first-child::before {
+  inset-inline-start: 50%;
+}
+
+.entry-form-root[data-section-nav="stepper"] .sidebar-section-list > .sidebar-section-item:last-child::before {
+  inset-inline-end: 50%;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link {
+  position: relative;
+  z-index: 1;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  margin: 0;
+  padding: 0 0.4rem !important;
+  border: 0 !important;
+  border-inline-start: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--step-muted) !important;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link::before {
+  content: "";
+  display: block;
+  width: var(--step-dot);
+  height: var(--step-dot);
+  flex: 0 0 var(--step-dot);
+  border-radius: 999px;
+  background: var(--step-dot-idle);
+  box-shadow: 0 0 0 3px #fff;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-status-icon {
+  display: none !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link span {
+  flex: none;
+  min-width: 0;
+  max-width: 8.5rem;
+  overflow: visible !important;
+  color: var(--step-muted) !important;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  line-height: 1.25;
+  text-align: center;
+  text-overflow: unset !important;
+  text-transform: uppercase;
+  white-space: normal !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link:hover,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link:hover span {
+  background: transparent !important;
+  color: #6b7280 !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link.is-active,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .sidebar-section-item:has(.section-link.is-active) > .section-link,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link.is-active:hover,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .sidebar-section-item:has(.section-link.is-active) > .section-link:hover {
+  background: transparent !important;
+  color: var(--step-red) !important;
+  font-weight: 700;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link.is-active::before,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .sidebar-section-item:has(.section-link.is-active) > .section-link::before {
+  width: 1rem;
+  height: 1rem;
+  flex-basis: 1rem;
+  margin-top: -1px;
+  background: var(--step-red);
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link.is-active span,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link.is-active:hover span,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .sidebar-section-item:has(.section-link.is-active) > .section-link span,
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .sidebar-section-item:has(.section-link.is-active) > .section-link:hover span {
+  color: var(--step-red) !important;
+  font-weight: 700;
+}
+
+.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar .section-link:focus-visible {
+  outline: 2px solid var(--step-red);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.entry-form-root[data-section-nav="stepper"] #sidebar-bottom-dock:not(:has(*)) {
+  display: none !important;
+}
+
+/* Save, submit, and the other pane actions sit at the end of the form. */
+.entry-form-root[data-section-nav="stepper"] .section-nav-page-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 1.75rem 0 0.5rem;
+  padding: 1rem 0 0.25rem;
+  border-top: 1px solid #e5e7eb;
+  background: transparent;
+}
+
+.entry-form-root[data-section-nav="stepper"] .section-nav-page-footer .sidebar-scope-actions,
+.entry-form-root[data-section-nav="stepper"] .section-nav-page-footer .sidebar-scope-group--page > .sidebar-scope-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.entry-form-root[data-section-nav="stepper"] .section-nav-page-footer #sidebar-action-buttons {
+  width: auto;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.entry-form-root[data-section-nav="stepper"] .section-nav-page-footer #sidebar-action-buttons .flex {
+  justify-content: flex-end;
+}
+
+.entry-form-root[data-section-nav="stepper"] .section-nav-page-footer #sidebar-action-buttons .btn {
+  flex: 0 1 auto;
+  min-width: 8rem;
+}
+
+.entry-form-root[data-section-nav="stepper"] #sidebar-discussion-footer {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+/* Loading skeleton follows the same top bar so the layout does not jump. */
+.entry-form-root[data-section-nav="stepper"] #entry-form-skeleton-sidebar.entry-form-sections-pane {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  box-shadow: 0 1px 0 #e5e7eb !important;
+  background: #fff !important;
+}

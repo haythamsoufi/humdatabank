@@ -5,6 +5,10 @@
 {% for item in plugin_nav_items('analytics-monitoring') %}
 {% if is_system_manager or not item.permission or has_permission(item.permission) %}{% set plugin_analytics.items = plugin_analytics.items + [item] %}{% endif %}
 {% endfor %}
+{% set plugin_form_data = namespace(items=[]) %}
+{% for item in plugin_nav_items('form-data-management') %}
+{% if is_system_manager or not item.permission or has_permission(item.permission) %}{% set plugin_form_data.items = plugin_form_data.items + [item] %}{% endif %}
+{% endfor %}
 {% set can_access_general = can_access_dashboard or is_system_manager or has_permission('admin.analytics.view') or has_permission('admin.documents.manage') or has_permission('admin.translations.manage') or has_permission('admin.plugins.manage') or has_permission('admin.settings.manage') or has_permission('admin.communication.manage') or has_permission('admin.docs.view') %}
 {% if can_access_general %}
 <div class="space-y-2" data-category="general">
@@ -101,7 +105,7 @@
 {% set can_access_validation_dashboard = is_system_manager or has_permission('admin.validation.dashboard') %}
 {% set can_access_validation_questions = is_system_manager or has_permission('admin.validation.questions') %}
 {% set can_access_validation = can_access_validation_dashboard or can_access_validation_questions %}
-{% if is_system_manager or has_permission('admin.templates.view') or has_permission('admin.assignments.view') or has_permission('admin.assignments.public_submissions.manage') or has_permission('nsd_funds.pm_overview') or can_access_data_explorer or can_access_validation %}
+{% if is_system_manager or has_permission('admin.templates.view') or has_permission('admin.assignments.view') or has_permission('admin.assignments.public_submissions.manage') or has_permission('nsd_funds.pm_overview') or can_access_data_explorer or can_access_validation or plugin_form_data.items %}
 <div class="space-y-2 mt-4" data-category="form-data-management">
      <div class="collapsable-category-title">
          <h3 class="sidebar-section-title">{{ _('Form & Data Management') }}</h3>
@@ -138,6 +142,12 @@
             <span class="sidebar-text">{{ _('Validation Questions') }}</span>
         </a>
         {% endif %}
+        {% for item in plugin_form_data.items %}
+        <a href="{{ url_for(item.endpoint) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _(item.label)|forceescape }}">
+            <i class="{{ item.icon }} sidebar-icon w-6 h-6 mr-3 text-center"></i>
+            <span class="sidebar-text">{{ _(item.label) }}</span>
+        </a>
+        {% endfor %}
     </div>
 </div>
 {% endif %}

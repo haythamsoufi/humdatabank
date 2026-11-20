@@ -1,5 +1,6 @@
 /**
- * Dev tools pane (dashboard + entry form). Style preview is one tool.
+ * Dev tools pane (dashboard + entry form).
+ * Style preview and, on the entry form, section-nav preview are tools.
  * Requires .ui-style-root and optional #dev-tools (DEBUG + loopback).
  * The pane starts collapsed. Drag the header to move it; position,
  * open/closed state, and the active tool are saved in this browser.
@@ -14,6 +15,9 @@
     var ALLOWED = ['ifrc', 'go', 'erp', 'legacy'];
     /* Production/staging always use legacy until a shipped style is chosen. */
     var DEFAULT_STYLE = 'legacy';
+    var NAV_STORAGE_KEY = 'sectionNavPreview';
+    var NAV_ALLOWED = ['side', 'stepper'];
+    var DEFAULT_NAV = 'side';
     var DRAG_THRESHOLD = 4;
     var VIEWPORT_PAD = 8;
 
@@ -79,6 +83,8 @@
         var switcher = document.getElementById('dev-tools');
         syncButtons(switcher, active);
 
+        initSectionNavPreview(root, switcher);
+
         if (!switcher) {
             return;
         }
@@ -95,6 +101,127 @@
         });
 
         initPane(switcher);
+    }
+
+    function normalizeNav(value) {
+        return NAV_ALLOWED.indexOf(value) !== -1 ? value : DEFAULT_NAV;
+    }
+
+    function readStoredNav() {
+        try {
+            return normalizeNav(window.localStorage.getItem(NAV_STORAGE_KEY));
+        } catch (err) {
+            return DEFAULT_NAV;
+        }
+    }
+
+    function writeStoredNav(nav) {
+        try {
+            window.localStorage.setItem(NAV_STORAGE_KEY, nav);
+        } catch (err) {
+            /* ignore quota / private mode */
+        }
+    }
+
+    function applySectionNav(root, nav) {
+        var next = normalizeNav(nav);
+        root.setAttribute('data-section-nav', next);
+        placeSectionNavActions(next);
+        return next;
+    }
+
+    var PAGE_FOOTER_ID = 'section-nav-page-footer';
+
+    function sectionNavPageFooter(create) {
+        var footer = document.getElementById(PAGE_FOOTER_ID);
+        if (footer || !create) {
+            return footer;
+        }
+        var host = document.getElementById('focalDataEntryForm')
+            || document.getElementById('main-form-area')
+            || document.getElementById('entry-form-layout');
+        if (!host) {
+            return null;
+        }
+        footer = document.createElement('div');
+        footer.id = PAGE_FOOTER_ID;
+        footer.className = 'section-nav-page-footer';
+        host.appendChild(footer);
+        return footer;
+    }
+
+    function rememberSectionNavHome(el) {
+        if (el && !el._sectionNavHome) {
+            el._sectionNavHome = el.parentElement;
+        }
+    }
+
+    /* Stepper keeps the steps at the top. Save, submit, and the other
+       pane actions move to the end of the form. */
+    function placeSectionNavActions(nav) {
+        var buttons = document.getElementById('sidebar-action-buttons');
+        var scopes = Array.prototype.slice.call(document.querySelectorAll('.sidebar-scope-actions'));
+        if (nav !== 'stepper') {
+            scopes.forEach(function (el) {
+                if (el._sectionNavHome) {
+                    el._sectionNavHome.appendChild(el);
+                }
+            });
+            if (buttons && buttons._sectionNavHome) {
+                buttons._sectionNavHome.appendChild(buttons);
+            }
+            var existing = document.getElementById(PAGE_FOOTER_ID);
+            if (existing) {
+                existing.remove();
+            }
+            return;
+        }
+        var footer = sectionNavPageFooter(true);
+        if (!footer) {
+            return;
+        }
+        scopes.forEach(function (el) {
+            rememberSectionNavHome(el);
+            footer.appendChild(el);
+        });
+        if (buttons) {
+            rememberSectionNavHome(buttons);
+            footer.appendChild(buttons);
+        }
+    }
+
+    function syncNavButtons(switcher, activeNav) {
+        if (!switcher) {
+            return;
+        }
+        switcher.querySelectorAll('[data-section-nav-option]').forEach(function (btn) {
+            var option = btn.getAttribute('data-section-nav-option');
+            var isActive = option === activeNav;
+            btn.classList.toggle('is-active', isActive);
+            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    }
+
+    function initSectionNavPreview(root, switcher) {
+        if (!root || root.getAttribute('data-section-nav-preview') !== '1') {
+            return;
+        }
+        var active = applySectionNav(root, readStoredNav());
+        syncNavButtons(switcher, active);
+        if (!switcher) {
+            return;
+        }
+        switcher.addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-section-nav-option]');
+            if (!btn || !switcher.contains(btn)) {
+                return;
+            }
+            var next = normalizeNav(btn.getAttribute('data-section-nav-option'));
+            writeStoredNav(next);
+            active = applySectionNav(root, next);
+            syncNavButtons(switcher, active);
+            window.dispatchEvent(new Event('resize'));
+        });
     }
 
     function readPane() {

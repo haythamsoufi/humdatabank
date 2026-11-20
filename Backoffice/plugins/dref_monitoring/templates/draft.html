@@ -1,6 +1,12 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "plugins/dref_monitoring/_status.html" import dref_enum %}
+
+{% set draft_tab = request.args.get('tab', 'narrative') %}
+{% if draft_tab not in ('narrative', 'preview') %}
+  {% set draft_tab = 'narrative' %}
+{% endif %}
 
 {% block title %}{{ dref_tr('Draft 0') }}{% endblock %}
 
@@ -13,66 +19,144 @@
 {% set ui_style_root_id = 'dref-style-root' %}
 {% include "components/_ui_style_root_start.html" %}
 <div class="container mx-auto px-4 py-6 space-y-4">
-    {{ page_header(
+    {% call page_header(
         title=dref_tr('Draft 0'),
         icon='fas fa-clipboard-list',
         breadcrumbs=[
             {'name': dref_tr('DREF monitoring'), 'url': url_for('dref_monitoring.operations_page')},
             {'name': operation.appeal_code, 'url': url_for('dref_monitoring.operation_page', operation_id=operation.id, tab='drafts')},
             {'name': dref_tr('Draft 0')}
-        ],
-        actions=[
-            {
-                'type': 'link',
-                'url': url_for('dref_monitoring.draft_docx_route', operation_id=operation.id, draft_id=draft.id),
-                'text': dref_tr('Export Word'),
-                'icon': 'fas fa-file-word',
-                'classes': 'professional-action-btn',
-            },
-            {
-                'type': 'link',
-                'url': url_for('dref_monitoring.draft_pdf_route', operation_id=operation.id, draft_id=draft.id),
-                'text': dref_tr('Export PDF'),
-                'icon': 'fas fa-file-pdf',
-                'classes': 'professional-action-btn professional-action-btn-green',
-            },
         ]
-    ) }}
-    <p class="text-sm text-gray-600">
-        {{ dref_enum(draft.report_kind) }}
-        · {{ {'en': dref_tr('English'), 'fr': dref_tr('French'), 'es': dref_tr('Spanish'), 'ar': dref_tr('Arabic')}.get(draft.language or 'en', draft.language) }}
-        · {% if draft.status == 'submitted' %}{{ dref_tr('Submitted') }}{% elif draft.status == 'validated' %}{{ dref_tr('Validated') }}{% else %}{{ dref_tr('Draft') }}{% endif %}
-        · {{ dref_tr('AI draft reports') }}: {{ dref_tr('Enabled') if draft.ai_used else dref_tr('Disabled') }}
-        · {{ draft.model or '-' }}
-        · {{ dref_tr('GO reference') }}: {{ draft.go_reference or dref_tr('Not sent') }}
-    </p>
-    {% if draft.go_error %}
-    <p class="text-sm text-amber-800">{{ dref_tr(draft.go_error) }}</p>
-    {% endif %}
-    <p class="text-sm text-gray-600">{{ dref_tr('Review the chapters, then validate. Validation sends the report to GO for formal processing.') }}</p>
-    {% if can_edit %}
-    <form method="post" action="{{ url_for('dref_monitoring.draft_save_route', operation_id=operation.id, draft_id=draft.id) }}" class="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% for field in fields %}
-        <label class="block text-sm text-gray-700">{{ dref_tr(field.label) }}
-            <textarea class="mt-1 w-full border border-gray-300 rounded px-3 py-2" name="section_{{ field.key }}" rows="4">{{ field.text }}</textarea>
-        </label>
-        {% endfor %}
-        <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Save narrative') }}</button>
-    </form>
-    {% endif %}
-    {% if can_validate %}
-    <form method="post" action="{{ url_for('dref_monitoring.draft_validate_route', operation_id=operation.id, draft_id=draft.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Validate and send to GO') }}</button>
-    </form>
-    {% elif can_send %}
-    <form method="post" action="{{ url_for('dref_monitoring.draft_send_route', operation_id=operation.id, draft_id=draft.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Send to GO') }}</button>
-    </form>
-    {% endif %}
-    <p class="text-sm text-gray-600">{{ dref_tr('The preview matches the Word file and the PDF.') }}</p>
+    ) %}
+        <div class="relative" id="dref-export">
+            <button type="button" class="professional-action-btn" id="dref-export-btn"
+                    aria-haspopup="menu" aria-expanded="false" aria-controls="dref-export-menu">
+                <i class="fas fa-download" aria-hidden="true"></i>
+                <span>{{ dref_tr('Export') }}</span>
+                <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i>
+            </button>
+            <div id="dref-export-menu" class="hidden absolute right-0 z-50 mt-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg" role="menu">
+                <a class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" role="menuitem"
+                   href="{{ url_for('dref_monitoring.draft_docx_route', operation_id=operation.id, draft_id=draft.id) }}">
+                    <i class="fas fa-file-word" aria-hidden="true"></i>
+                    <span>{{ dref_tr('Export Word') }}</span>
+                </a>
+                <a class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" role="menuitem"
+                   href="{{ url_for('dref_monitoring.draft_pdf_route', operation_id=operation.id, draft_id=draft.id) }}">
+                    <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                    <span>{{ dref_tr('Export PDF') }}</span>
+                </a>
+            </div>
+        </div>
+    {% endcall %}
+    {% set draft_language = {'en': dref_tr('English'), 'fr': dref_tr('French'), 'es': dref_tr('Spanish'), 'ar': dref_tr('Arabic')}.get(draft.language or 'en', draft.language) %}
+    {% set narrative_label = {'none': dref_tr('Figures only'), 'manual': dref_tr('Written by hand'), 'ai': dref_tr('AI-drafted narrative')}.get('manual' if narrative_mode == 'ai' and not draft.ai_used else narrative_mode, narrative_mode) %}
+    <section class="bg-white rounded-lg shadow-md border border-gray-200">
+        <dl class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+                <dt class="text-xs font-medium text-gray-500">{{ dref_tr('Type') }}</dt>
+                <dd class="mt-1 text-sm font-medium text-gray-900">{{ dref_enum(draft.report_kind) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">{{ dref_tr('Language') }}</dt>
+                <dd class="mt-1 text-sm font-medium text-gray-900">{{ draft_language }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">{{ dref_tr('Status') }}</dt>
+                <dd class="mt-1 text-sm font-medium text-gray-900">{% if draft.status == 'submitted' %}{{ dref_tr('Submitted') }}{% elif draft.status == 'validated' %}{{ dref_tr('Validated') }}{% else %}{{ dref_tr('Draft') }}{% endif %}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">{{ dref_tr('Narrative') }}</dt>
+                <dd class="mt-1 text-sm font-medium text-gray-900">{{ narrative_label }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">{{ dref_tr('Model') }}</dt>
+                <dd class="mt-1 text-sm font-medium text-gray-900">{{ draft.model or dref_tr('Not set') }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">{{ dref_tr('GO reference') }}</dt>
+                <dd class="mt-1 text-sm font-medium text-gray-900 break-words">{{ draft.go_reference or dref_tr('Not sent') }}</dd>
+            </div>
+        </dl>
+        {% if draft.go_error %}
+        <p class="px-4 pb-3 text-sm text-amber-800">{{ dref_tr(draft.go_error) }}</p>
+        {% endif %}
+        <p class="px-4 py-3 border-t border-gray-200 text-sm text-gray-600">
+            {% if narrative_mode == 'none' and can_add_narrative %}
+            {{ dref_tr('This report is figures only. Add the chapters on the Narrative tab, or validate it to send the figures to GO.') }}
+            {% elif narrative_mode == 'none' %}
+            {{ dref_tr('This report is figures only. It has no narrative chapters. Validation sends it to GO for formal processing.') }}
+            {% else %}
+            {{ dref_tr('Review the chapters, then validate. Validation sends the report to GO for formal processing.') }}
+            {% endif %}
+        </p>
+    </section>
+    <div class="bg-white rounded-lg shadow-md border border-gray-200">
+        {% call scroll_tab_bar(inner_id='dref-draft-tabs', aria_label=dref_tr('Draft 0')) %}
+            <button type="button" role="tab" id="dref-draft-tab-narrative" data-tab="narrative"
+                    aria-controls="panel-narrative"
+                    aria-selected="{{ 'true' if draft_tab == 'narrative' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(draft_tab == 'narrative') }}">
+                <i class="fas fa-align-left mr-1.5"></i>{{ dref_tr('Narrative') }}
+            </button>
+            <button type="button" role="tab" id="dref-draft-tab-preview" data-tab="preview"
+                    aria-controls="panel-preview"
+                    aria-selected="{{ 'true' if draft_tab == 'preview' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(draft_tab == 'preview') }}">
+                <i class="fas fa-eye mr-1.5"></i>{{ dref_tr('Preview') }}
+            </button>
+        {% endcall %}
+
+        <div id="dref-draft-panels" class="p-6">
+            <div id="panel-narrative" role="tabpanel" aria-labelledby="dref-draft-tab-narrative"
+                 class="settings-panel space-y-4{% if draft_tab != 'narrative' %} hidden{% endif %}">
+                {% if can_add_narrative %}
+                <div class="space-y-3" data-dref-job-scope>
+                    <p class="text-sm text-gray-600">{{ dref_tr('Add the chapters to this draft. The figures stay as they are.') }}</p>
+                    <div class="flex flex-wrap gap-2">
+                        <form method="post" action="{{ url_for('dref_monitoring.draft_include_narrative_route', operation_id=operation.id, draft_id=draft.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="narrative" value="manual">
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Write the narrative myself') }}</button>
+                        </form>
+                        {% if ai_ready %}
+                        <form method="post" action="{{ url_for('dref_monitoring.draft_include_narrative_route', operation_id=operation.id, draft_id=draft.id) }}" data-dref-draft-form>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="narrative" value="ai">
+                            <button class="bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 text-sm border border-gray-300" type="submit">{{ dref_tr('AI-generated narrative') }}</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% if ai_ready %}{% include "plugins/dref_monitoring/_draft_job_panel.html" %}{% endif %}
+                </div>
+                {% endif %}
+                {% if can_edit %}
+                <form method="post" action="{{ url_for('dref_monitoring.draft_save_route', operation_id=operation.id, draft_id=draft.id) }}" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% for field in fields %}
+                    <label class="block text-sm text-gray-700">{{ dref_tr(field.label) }}
+                        <textarea class="mt-1 w-full border border-gray-300 rounded px-3 py-2" name="section_{{ field.key }}" rows="4">{{ field.text }}</textarea>
+                    </label>
+                    {% endfor %}
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Save narrative') }}</button>
+                </form>
+                {% endif %}
+                {% if can_validate %}
+                <form method="post" action="{{ url_for('dref_monitoring.draft_validate_route', operation_id=operation.id, draft_id=draft.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Validate and send to GO') }}</button>
+                </form>
+                {% elif can_send %}
+                <form method="post" action="{{ url_for('dref_monitoring.draft_send_route', operation_id=operation.id, draft_id=draft.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Send to GO') }}</button>
+                </form>
+                {% endif %}
+            </div>
+
+            <div id="panel-preview" role="tabpanel" aria-labelledby="dref-draft-tab-preview"
+                 class="settings-panel space-y-4{% if draft_tab != 'preview' %} hidden{% endif %}">
+                <p class="text-sm text-gray-600">{{ dref_tr('The preview matches the Word file and the PDF.') }}</p>
     <div class="dref-report-frame">
         <article class="dref-report" lang="{{ draft.language or 'en' }}" dir="{{ 'rtl' if (draft.language or 'en') == 'ar' else 'ltr' }}" aria-label="{{ dref_tr('Draft 0') }}">
             <p class="dref-report__runhead">{{ header }}</p>
@@ -133,6 +217,14 @@
             {% endfor %}
         </article>
     </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% include "components/_ui_style_root_end.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/draft_tabs.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/report_actions.js') }}?v=2" nonce="{{ csp_nonce() }}" defer></script>
 {% endblock %}

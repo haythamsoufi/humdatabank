@@ -765,3 +765,55 @@ class TestDiscussionSectionType:
         assert db_session.query(FormSection).filter_by(
             version_id=version_id, section_type='discussion'
         ).count() == 0
+
+
+class TestReorderTemplateSections:
+
+    def test_reorders_top_level_sections(self, logged_in_client, db_session, admin_user, app):
+        """POST saves the new top-level order and returns it."""
+        from app.models import FormSection
+        template = _make_owned_template(db_session, admin_user)
+        version_id = template.published_version_id
+        first = _make_section(db_session, template, name='First', order=1)
+        second = _make_section(db_session, template, name='Second', order=2)
+        third = _make_section(db_session, template, name='Third', order=3)
+        with patch('app.routes.admin.form_builder.sections.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/sections/reorder',
+                json={
+                    'version_id': version_id,
+                    'section_ids': [third.id, first.id, second.id],
+                },
+                headers={'Accept': 'application/json'},
+            )
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload['success'] is True
+        assert payload['orders'][str(third.id)] == 1
+        assert payload['orders'][str(first.id)] == 2
+        assert payload['orders'][str(second.id)] == 3
+        db_session.refresh(first)
+        db_session.refresh(second)
+        db_session.refresh(third)
+        assert int(first.order) == 2
+        assert int(second.order) == 3
+        assert int(third.order) == 1
+        assert db_session.query(FormSection).filter_by(version_id=version_id).count() == 3
+
+    def test_rejects_a_partial_section_list(self, logged_in_client, db_session, admin_user, app):
+        """A reorder must include every top-level section, so none are left behind."""
+        template = _make_owned_template(db_session, admin_user)
+        version_id = template.published_version_id
+        first = _make_section(db_session, template, order=1)
+        second = _make_section(db_session, template, order=2)
+        with patch('app.routes.admin.form_builder.sections.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/sections/reorder',
+                json={'version_id': version_id, 'section_ids': [second.id]},
+                headers={'Accept': 'application/json'},
+            )
+        assert resp.status_code == 400
+        db_session.refresh(first)
+        db_session.refresh(second)
+        assert int(first.order) == 1
+        assert int(second.order) == 2

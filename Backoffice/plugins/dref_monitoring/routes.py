@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -10,6 +11,7 @@ from flask_login import current_user, login_required
 from io import BytesIO
 
 from app.extensions import db
+from app.models import AIJob
 from app.plugins.plugin_utils import PLUGIN_MANAGE_PERMISSION, settings_plugin_info
 from app.routes.admin.shared import admin_permission_required_any, permission_required_any
 from plugins.dref_monitoring.access import current_actor, operations_for
@@ -19,6 +21,9 @@ from plugins.dref_monitoring.constants import (
     CARRIED_OUT_BY,
     ENTER_PERMISSION,
     MANAGE_PERMISSION,
+    NARRATIVE_AI,
+    NARRATIVE_NONE,
+    PLAN_VALIDATED,
     PLUGIN_ID,
     PORTFOLIO_PERMISSION,
     REVIEW_PERMISSION,
@@ -41,17 +46,30 @@ from plugins.dref_monitoring.models import (
 from plugins.dref_monitoring.services.assignment_sync import assignment_url
 from plugins.dref_monitoring.services.drafts import (
     generate_draft,
+    include_narrative,
     narrative_fields,
+    narrative_mode_of,
     report_language,
     save_sections,
     validate_draft,
 )
+from plugins.dref_monitoring.services.draft_job import (
+    ACTION_GENERATE,
+    ACTION_INCLUDE,
+    JOB_TYPE as DRAFT_JOB_TYPE,
+    active_draft_job,
+    ensure_draft_job_running,
+    queue_draft_job,
+    request_draft_cancel,
+    status_payload as draft_status_payload,
+)
 from plugins.dref_monitoring.services.go_submit import submit_draft
+from plugins.dref_monitoring.services.context import load_context
 from plugins.dref_monitoring.services.llm import complete_with_engine, configured_model
 from plugins.dref_monitoring.services.docx_export import render_docx
 from plugins.dref_monitoring.services.pdf_export import PdfUnavailable, render_pdf
 from plugins.dref_monitoring.services.report_document import build_report, running_header, source_for
-from plugins.dref_monitoring.services.excel_import import import_activities
+from plugins.dref_monitoring.services.excel_import import export_workbook, import_activities
 from plugins.dref_monitoring.services.go_parse import is_imminent
 from plugins.dref_monitoring.services.go_sync_job import (
     prepare_settings_sync,
@@ -66,9 +84,13 @@ from plugins.dref_monitoring.services.plans import (
     latest_baseline,
     latest_plan,
     plan_sections,
+    plan_source_label,
+    plans_for,
     realign_plan_activities,
     refresh_indicator_matches,
     remove_member,
+    reset_plan_from_sync,
+    restore_plan_version,
     sectors_not_on_plan,
     save_plan_activities,
     set_member,
@@ -93,6 +115,21 @@ def _(message, **variables):
 
 
 bp = Blueprint(PLUGIN_ID, __name__, template_folder="templates")
+
+
+@bp.before_request
+def _ensure_dref_access_group():
+    """Create the DREF access group and apply it to reporting assignments already opened."""
+    try:
+        from plugins.dref_monitoring.services.access_group import ensure_dref_assignment_access
+
+        ensure_dref_assignment_access()
+    except Exception:
+        current_app.logger.warning("DREF access group setup failed", exc_info=True)
+        from plugins.dref_monitoring.services import access_group as access_group_module
+
+        access_group_module._backfilled_for = None
+        db.session.rollback()
 
 _ANY = (
     ENTER_PERMISSION,
@@ -143,6 +180,8 @@ def settings_status() -> dict:
         "last_sync_status": "",
         "ai_enabled": False,
         "ai_language": "en",
+        "ai_model": "",
+        "ai_final_report_model": "",
         "openai_configured": bool(current_app.config.get("OPENAI_API_KEY")),
         "go_token_configured": bool(current_app.config.get("GO_API_TOKEN")),
         "schedule": {},
@@ -152,6 +191,8 @@ def settings_status() -> dict:
         config = get_config()
         payload["ai_enabled"] = bool((config.get("ai") or {}).get("enabled"))
         payload["ai_language"] = report_language((config.get("ai") or {}).get("language"))
+        payload["ai_model"] = str((config.get("ai") or {}).get("model") or "")
+        payload["ai_final_report_model"] = str((config.get("ai") or {}).get("final_report_model") or "")
         payload["schedule"] = config.get("schedule") or {}
         payload["go_url"] = (config.get("go") or {}).get("base_url") or ""
         payload["operation_count"] = DrefOperation.query.count()
@@ -191,6 +232,39 @@ def _operation(operation_id: int, action: str = "view") -> DrefOperation:
 
 _OPERATION_TABS = {"overview", "plan", "reporting", "changes", "drafts", "team"}
 _SETTINGS_TABS = {"overview", "settings", "sync"}
+
+
+def _day(value) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "date") and not isinstance(value, date):
+        return value.date().isoformat()
+    return value.isoformat()
+
+
+def _plan_version_rows(operation_id: int, current_id: int | None) -> list[dict]:
+    plans = plans_for(operation_id)
+    user_ids = [plan.validated_by_user_id for plan in plans if plan.validated_by_user_id]
+    users = {}
+    if user_ids:
+        from app.models.core import User
+
+        users = {user.id: user for user in User.query.filter(User.id.in_(user_ids)).all()}
+    rows = []
+    for plan in plans:
+        person = users.get(plan.validated_by_user_id)
+        rows.append(
+            {
+                "version": plan.version,
+                "status": plan.status,
+                "source_label": plan_source_label(plan.source),
+                "current": plan.id == current_id,
+                "opened_on": _day(plan.created_at),
+                "confirmed_on": _day(plan.validated_at),
+                "confirmed_by": (person.name or person.email) if person is not None else "",
+            }
+        )
+    return rows
 
 
 def _operation_redirect(operation_id: int, *, plan_draft: bool = False):
@@ -336,7 +410,19 @@ def operation_page(operation_id: int):
         except Exception:
             db.session.rollback()
             current_app.logger.warning("DREF plan tidy-up failed for operation %s", operation.id, exc_info=True)
-    sections = plan_sections(plan.id) if plan is not None else []
+            plan = latest_plan(operation.id)
+    view_plan = plan
+    plan_history = False
+    requested_version = request.args.get("plan_version", type=int)
+    if requested_version and (plan is None or requested_version != plan.version):
+        chosen = next((item for item in plans_for(operation.id) if item.version == requested_version), None)
+        if chosen is None:
+            flash(_("That plan version was not found."), "warning")
+        else:
+            view_plan = chosen
+            plan_history = True
+    current_sections = plan_sections(plan.id) if plan is not None else []
+    sections = current_sections if view_plan is plan else plan_sections(view_plan.id)
     periods = []
     for period in periods_for(operation.id):
         href = assignment_url(operation.id, period)
@@ -371,20 +457,33 @@ def operation_page(operation_id: int):
                 .order_by(func.lower(func.coalesce(User.name, User.email)))
                 .all()
             )
+    can_enter = actor.allows(operation, "enter")
+    can_validate = actor.allows(operation, "validate")
+    baseline = latest_baseline(operation.id)
+    can_reset_plan = baseline is not None and plan is not None and (
+        can_validate if plan.status == PLAN_VALIDATED else can_enter
+    )
     return render_template(
         f"plugins/{PLUGIN_ID}/operation.html",
         operation=operation,
-        actor_can_enter=actor.allows(operation, "enter"),
-        actor_can_validate=actor.allows(operation, "validate"),
+        active_job=draft_job_for_page(operation.id, ACTION_GENERATE) if can_enter else None,
+        actor_can_enter=can_enter,
+        can_enter=can_enter,
+        actor_can_validate=can_validate,
         actor_can_review=actor.allows(operation, "review"),
         actor_can_portfolio=actor.allows(operation, "portfolio") or actor.is_manager,
-        plan=plan,
-        baseline=latest_baseline(operation.id),
+        plan=view_plan,
+        current_plan=plan,
+        plan_history=plan_history,
+        plan_editable=can_enter and not plan_history,
+        plan_versions=_plan_version_rows(operation.id, None if plan is None else plan.id),
+        can_reset_plan=can_reset_plan,
+        baseline=baseline,
         sections=sections,
-        snapshot=monitoring_snapshot(operation, plan, sections),
+        snapshot=monitoring_snapshot(operation, plan, current_sections),
         activity_types=ACTIVITY_TYPES,
         carried_out_by=CARRIED_OUT_BY,
-        available_sectors=sectors_not_on_plan(plan.id) if plan is not None else [],
+        available_sectors=sectors_not_on_plan(view_plan.id) if view_plan is not None else [],
         plan_imminent=is_imminent(operation.appeal_type, operation.pillar),
         changes=DrefChangeRequest.query.filter_by(operation_id=operation.id).order_by(DrefChangeRequest.id.desc()).limit(30).all(),
         periods=periods,
@@ -397,6 +496,7 @@ def operation_page(operation_id: int):
         risks=DrefRisk.query.filter_by(operation_id=operation.id).all(),
         funds=DrefFundsEvent.query.filter_by(operation_id=operation.id).order_by(DrefFundsEvent.id.desc()).limit(5).all(),
         drafts=DrefDraft.query.filter_by(operation_id=operation.id).order_by(DrefDraft.id.desc()).limit(10).all(),
+        ai_ready=ai_enabled(),
         active_tab=request.args.get("tab") if request.args.get("tab") in _OPERATION_TABS else "overview",
     )
 
@@ -420,6 +520,39 @@ def generate_plan_route(operation_id: int):
 def validate_plan_route(operation_id: int):
     operation = _operation(operation_id, "validate")
     _flash_error(validate_plan(operation, _actor(), date.today())) or flash(_("Plan validated."), "success")
+    return _operation_redirect(operation.id)
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/plan/restore", methods=["POST"])
+@permission_required_any(*_ANY)
+def restore_plan_route(operation_id: int):
+    """Copy a stored plan version into a new draft. The stored version stays."""
+    operation = _operation(operation_id, "enter")
+    raw = str(request.form.get("version") or "").strip()
+    version = int(raw) if raw.isdigit() else 0
+    error = restore_plan_version(operation, version, _actor(), date.today())
+    if _flash_error(error):
+        db.session.rollback()
+    else:
+        db.session.commit()
+        flash(_("Version %(version)s was copied into a new draft.", version=version), "success")
+    return _operation_redirect(operation.id)
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/plan/reset", methods=["POST"])
+@permission_required_any(*_ANY)
+def reset_plan_route(operation_id: int):
+    """Leave the confirmed plan in the version list and open a draft from the GO sync."""
+    operation = _operation(operation_id, "enter")
+    error = reset_plan_from_sync(operation, _actor(), date.today())
+    if _flash_error(error):
+        db.session.rollback()
+    else:
+        db.session.commit()
+        flash(
+            _("The previous plan was kept. A new draft was built from the latest approved GO stage."),
+            "success",
+        )
     return _operation_redirect(operation.id)
 
 
@@ -588,6 +721,27 @@ def excel_route(operation_id: int):
     return _operation_redirect(operation.id)
 
 
+@bp.route("/dref-monitoring/operations/<int:operation_id>/export", methods=["GET"])
+@permission_required_any(*_ANY)
+def export_plan_route(operation_id: int):
+    """Download the plan as the Activities workbook an import reads back."""
+    operation = _operation(operation_id)
+    requested = request.args.get("plan_version", type=int)
+    plan = latest_plan(operation.id)
+    if requested and (plan is None or requested != plan.version):
+        plan = next((item for item in plans_for(operation.id) if item.version == requested), None)
+    if plan is None:
+        flash(_("There is no monitoring plan to export."), "warning")
+        return _operation_redirect(operation.id)
+    appeal = re.sub(r"[^A-Za-z0-9._-]+", "-", operation.appeal_code or "plan").strip("-") or "plan"
+    return send_file(
+        BytesIO(export_workbook(plan)),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"{appeal}-monitoring-plan-v{plan.version}.xlsx",
+    )
+
+
 @bp.route("/dref-monitoring/operations/<int:operation_id>/funds", methods=["POST"])
 @permission_required_any(*_ANY)
 def funds_route(operation_id: int):
@@ -628,14 +782,35 @@ def risk_route(operation_id: int):
     return _operation_redirect(operation.id)
 
 
+_ASSIGNMENT_PATH = re.compile(r"^/assignment/\d+$")
+
+
+def _assignment_return(value: str | None) -> str | None:
+    """A form page to return to after a failed draft. Only a plain /assignment/<id> path is followed."""
+    text = (value or "").strip()
+    return text if _ASSIGNMENT_PATH.match(text) else None
+
+
 @bp.route("/dref-monitoring/operations/<int:operation_id>/drafts", methods=["POST"])
 @permission_required_any(*_ANY)
 def draft_generate_route(operation_id: int):
     operation = _operation(operation_id, "enter")
     kind = request.form.get("kind") or "operational_update"
     language = report_language(request.form.get("language") or current_language())
-    model_name = configured_model()
+    narrative = (request.form.get("narrative") or "").strip() or None
+    model_name = configured_model(kind)
     complete = complete_with_engine if ai_enabled() else None
+    if _wants_json() and complete is not None and narrative in (None, NARRATIVE_AI):
+        return _queue_draft_response(
+            operation,
+            {
+                "action": ACTION_GENERATE,
+                "operation_id": operation.id,
+                "kind": kind,
+                "language": language,
+                "narrative": narrative or "",
+            },
+        )
     result = generate_draft(
         operation,
         kind,
@@ -643,11 +818,134 @@ def draft_generate_route(operation_id: int):
         complete=complete,
         model_name=model_name,
         language=language,
+        narrative=narrative,
+        context_loader=load_context if complete is not None else None,
     )
+    draft_url = (
+        url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=result["draft_id"])
+        if result.get("ok")
+        else ""
+    )
+    if _wants_json():
+        if not result.get("ok"):
+            return jsonify({"error": translate(result.get("error") or "Draft failed.")}), 400
+        return jsonify({"status": "completed", "redirect_url": draft_url, "summary": {"ai_used": bool(result.get("ai_used"))}})
     if not result.get("ok"):
         flash(translate(result.get("error") or "Draft failed."), "warning")
-        return _operation_redirect(operation.id)
-    return redirect(url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=result["draft_id"]))
+        return_to = _assignment_return(request.form.get("return_to"))
+        return redirect(return_to) if return_to else _operation_redirect(operation.id)
+    if narrative == NARRATIVE_AI and not result.get("ai_used"):
+        flash(translate("The model did not return text. The chapters are empty, so you can write them here."), "warning")
+    return redirect(draft_url)
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/narrative", methods=["POST"])
+@permission_required_any(*_ANY)
+def draft_include_narrative_route(operation_id: int, draft_id: int):
+    operation = _operation(operation_id, "enter")
+    draft = _draft_row(operation, draft_id)
+    narrative = (request.form.get("narrative") or "").strip()
+    complete = complete_with_engine if ai_enabled() and narrative == NARRATIVE_AI else None
+    draft_url = url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=draft.id)
+    if _wants_json() and complete is not None:
+        return _queue_draft_response(
+            operation,
+            {
+                "action": ACTION_INCLUDE,
+                "operation_id": operation.id,
+                "kind": draft.report_kind,
+                "draft_id": draft.id,
+                "narrative": narrative,
+            },
+        )
+    result = include_narrative(
+        draft,
+        operation,
+        _actor(),
+        narrative,
+        complete=complete,
+        model_name=configured_model(draft.report_kind) if complete is not None else "",
+        context_loader=load_context if complete is not None else None,
+    )
+    if _wants_json():
+        if not result.get("ok"):
+            return jsonify({"error": translate(result.get("error") or "Draft failed.")}), 400
+        return jsonify({"status": "completed", "redirect_url": draft_url, "summary": {"ai_used": bool(result.get("ai_used"))}})
+    if not result.get("ok"):
+        flash(translate(result.get("error") or "Draft failed."), "warning")
+    elif narrative == NARRATIVE_AI and not result.get("ai_used"):
+        flash(translate("The model did not return text. The chapters are empty, so you can write them here."), "warning")
+    return redirect(draft_url)
+
+
+def _wants_json() -> bool:
+    """True for the page script, which sends ``Accept: application/json`` and shows progress itself."""
+    return request.accept_mimetypes.best == "application/json"
+
+
+def _queue_draft_response(operation, params: dict):
+    """Queue an AI draft for this person and answer with the job, or the one already running."""
+    job_id, created = queue_draft_job(int(_actor().user_id), params, current_app._get_current_object())
+    job = db.session.get(AIJob, job_id)
+    body = draft_status_payload(job) if job is not None else {"job_id": job_id, "status": "queued"}
+    body["created"] = created
+    return jsonify(body), 202
+
+
+def draft_job_for_page(operation_id: int, action: str, draft_id: int | None = None) -> dict | None:
+    """This person's unfinished draft job of one kind on the operation, so a reloaded page shows it again."""
+    actor = _actor()
+    if actor.user_id is None:
+        return None
+    match = {"user_id": int(actor.user_id), "operation_id": operation_id, "action": action, "draft_id": draft_id}
+    job = active_draft_job(**match)
+    if job is None:
+        return None
+    ensure_draft_job_running(current_app._get_current_object(), str(job.id))
+    job = active_draft_job(**match)
+    return draft_status_payload(job) if job is not None else None
+
+
+def _draft_job_or_404(operation_id: int, job_id: str):
+    operation = _operation(operation_id, "enter")
+    if not job_id or len(job_id) > 36:
+        abort(404)
+    job = db.session.get(AIJob, job_id)
+    meta = dict(job.meta or {}) if job is not None else {}
+    if (
+        job is None
+        or str(job.job_type) != DRAFT_JOB_TYPE
+        or meta.get("operation_id") != operation.id
+        or job.user_id != _actor().user_id
+    ):
+        abort(404)
+    return operation, job
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/jobs/<job_id>", methods=["GET"])
+@permission_required_any(*_ANY)
+def draft_job_status(operation_id: int, job_id: str):
+    operation, job = _draft_job_or_404(operation_id, job_id)
+    ensure_draft_job_running(current_app._get_current_object(), str(job.id))
+    db.session.expire_all()
+    job = db.session.get(AIJob, str(job.id))
+    body = draft_status_payload(job)
+    draft_id = (body.get("summary") or {}).get("draft_id")
+    if body["status"] == "completed" and draft_id:
+        body["redirect_url"] = url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=draft_id)
+    return jsonify(body)
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/jobs/<job_id>/cancel", methods=["POST"])
+@permission_required_any(*_ANY)
+def draft_job_cancel(operation_id: int, job_id: str):
+    _, job = _draft_job_or_404(operation_id, job_id)
+    outcome = request_draft_cancel(str(job.id))
+    db.session.expire_all()
+    job = db.session.get(AIJob, str(job.id))
+    body = draft_status_payload(job)
+    body["outcome"] = outcome
+    return jsonify(body), 202 if outcome == "cancel_requested" else 200
 
 
 @bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>", methods=["GET"])
@@ -664,7 +962,13 @@ def draft_page(operation_id: int, draft_id: int):
         blocks=blocks,
         header=header,
         fields=narrative_fields(draft),
-        can_edit=actor.allows(operation, "enter") and status == "draft",
+        narrative_mode=narrative_mode_of(draft),
+        can_edit=actor.allows(operation, "enter") and status == "draft" and narrative_mode_of(draft) != NARRATIVE_NONE,
+        can_add_narrative=actor.allows(operation, "enter") and status == "draft" and narrative_mode_of(draft) == NARRATIVE_NONE,
+        ai_ready=ai_enabled(),
+        active_job=draft_job_for_page(operation.id, ACTION_INCLUDE, draft.id)
+        if actor.allows(operation, "enter") and status == "draft"
+        else None,
         can_validate=actor.allows(operation, "validate") and status == "draft",
         can_send=actor.allows(operation, "validate") and status == "validated" and draft.go_status != "sent",
     )

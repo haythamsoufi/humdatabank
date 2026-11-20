@@ -49,6 +49,28 @@
     margin-bottom: 0.35rem;
 }
 
+/* Budget and people targeted are half-width columns with a short number box,
+   which leaves a wide gap between them. Keep the pair together and let the
+   box fill that narrower column. */
+[data-entry-render="dref-sector"] [data-layout-row]:has([data-question-type="number"]) {
+    margin-left: 0;
+    margin-right: 0;
+    gap: 1rem;
+}
+
+[data-entry-render="dref-sector"] [data-layout-row] > div:has(> [data-question-type="number"]) {
+    width: auto !important;
+    flex: 1 1 16rem !important;
+    max-width: 22rem !important;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="question"][data-question-type="number"] input.w-32 {
+    width: 100%;
+    max-width: 22rem;
+}
+
 [data-entry-render="dref-sector"] input,
 [data-entry-render="dref-sector"] select,
 [data-entry-render="dref-activities"] input,
@@ -59,17 +81,92 @@
     border-radius: 2px;
 }
 
-/* Indicator name reads as the gray field in the wireframe, with "Indicator" above it. */
+/* Indicator name reads as the gray field in the wireframe, with "Indicator" above it.
+   The target stays beside the name. A long name wraps instead of pushing the target down. */
 [data-entry-render="dref-sector"] [data-item-type="indicator"].form-item-block {
+    position: relative;
     border: 1px solid #e5e7eb;
+    border-inline-start: 4px solid #4b5563;
     background: #fff;
     border-radius: 2px;
     padding: 0.85rem 1rem;
 }
 
+[data-entry-render="dref-sector"] [data-item-type="indicator"].form-item-block:has(> .mt-3) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 8.5rem;
+    column-gap: 0.75rem;
+    align-items: start;
+}
+
+/* The grid above outranks the hidden attribute, so an indicator the plan did not
+   include stayed on the assignment. Keep a hidden card off the page. */
+[data-entry-render="dref-sector"] [data-item-type="indicator"][hidden] {
+    display: none !important;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .dref-collapse,
+.dref-plan-activity > .dref-collapse,
+.dref-unmatched-indicator > .dref-collapse {
+    position: absolute;
+    top: 0.35rem;
+    inset-inline-end: 0.35rem;
+    margin: 0;
+    z-index: 2;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"]:has(> .dref-collapse) > .flex,
+.dref-plan-activity__top,
+.dref-unmatched-indicator__row {
+    padding-inline-end: 1.25rem;
+}
+
 [data-entry-render="dref-sector"] [data-item-type="indicator"] > .flex {
     flex-direction: column;
     align-items: stretch;
+    min-width: 0;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"].form-item-block:has(> .mt-3) > .flex {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .flex > .flex-1 {
+    min-width: 0;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"].form-item-block:has(> .mt-3) > .mt-3 {
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: 0;
+    min-width: 0;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"].form-item-block:has(> .mt-3) > .dref-plan-activities,
+[data-entry-render="dref-sector"] [data-item-type="indicator"].form-item-block:has(> .mt-3) > .text-red-600 {
+    grid-column: 1 / -1;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .mt-3 > .flex {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3rem;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .mt-3 label {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #374151;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .mt-3 .field-translation-slot,
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .mt-3 input {
+    width: 100%;
+    max-width: 100%;
 }
 
 [data-entry-render="dref-sector"] [data-item-type="indicator"] > .flex::before {
@@ -92,11 +189,243 @@
     border: 1px solid #d1d5db;
     border-radius: 2px;
     padding: 0.45rem 0.75rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Temporary listing for plan indicators the template has no field for. */
+.dref-unmatched-section {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.dref-unmatched-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.dref-unmatched-indicator {
+    position: relative;
+    border: 1px solid #e5e7eb;
+    border-inline-start: 4px solid #4b5563;
+    background: #fff;
+    border-radius: 2px;
+    padding: 0.85rem 1rem;
+}
+
+[data-entry-render="dref-sector"] > h3 .collapse-toggle {
+    margin-left: 0;
+}
+
+[data-entry-render="dref-sector"] > h3 .dref-collapse-all {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    margin: 0 0 0 auto;
+}
+
+[data-entry-render="dref-sector"] > h3 .dref-collapse-all button {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.dref-collapse-all button,
+.dref-collapse {
+    background: transparent;
+    border: 0;
+    border-radius: 2px;
+    color: #9ca3af;
+    cursor: pointer;
+}
+
+.dref-collapse-all button {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.2rem 0.35rem;
+    color: #a16207;
+}
+
+.dref-collapse:hover {
+    color: #4b5563;
+}
+
+.dref-collapse-all button:hover,
+.dref-collapse-all button[aria-pressed="true"] {
+    color: #854d0e;
+}
+
+.dref-collapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    align-self: flex-end;
+    margin-bottom: 0.2rem;
+}
+
+.dref-collapse::before {
+    content: "";
+    display: inline-block;
+    width: 0.35rem;
+    height: 0.35rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.dref-plan-activity.is-collapsed > .dref-collapse::before,
+.dref-unmatched-indicator.is-collapsed > .dref-collapse::before,
+[data-item-type="indicator"].is-collapsed > .dref-collapse::before {
+    transform: rotate(-45deg) translate(-1px, 1px);
+}
+
+.dref-unmatched-indicator.is-collapsed .dref-unmatched-indicator__more,
+.dref-unmatched-indicator.is-collapsed > .dref-plan-activities,
+[data-item-type="indicator"].is-collapsed > .dref-plan-activities {
+    display: none;
+}
+
+.dref-unmatched-indicator__row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.dref-unmatched-indicator__name {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dref-unmatched-indicator__caption,
+.dref-unmatched-indicator__target span {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #374151;
+}
+
+.dref-unmatched-indicator__title-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dref-unmatched-indicator__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: block;
+    font-size: 0.875rem;
+    color: #111827;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    padding: 0.45rem 0.75rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.dref-unmatched-flag {
+    position: relative;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #b45309;
+    cursor: help;
+}
+
+.dref-unmatched-flag::before {
+    content: "!";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    border: 1.5px solid #b45309;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.dref-unmatched-flag__tip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    width: max-content;
+    max-width: 16rem;
+    background: #1f2937;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: left;
+    letter-spacing: 0;
+    text-transform: none;
+    padding: 0.45rem 0.6rem;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    pointer-events: none;
+}
+
+.dref-unmatched-flag:hover .dref-unmatched-flag__tip,
+.dref-unmatched-flag:focus .dref-unmatched-flag__tip,
+.dref-unmatched-flag:focus-visible .dref-unmatched-flag__tip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.dref-unmatched-indicator__unit,
+.dref-unmatched-indicator__bank {
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.dref-unmatched-indicator__target {
+    flex: 0 0 8.5rem;
+    margin-top: 0;
+}
+
+.dref-unmatched-indicator__target input {
+    width: 100%;
+    background: #f9fafb;
+    color: #374151;
 }
 
 [data-entry-render="dref-sector"] .dref-plan-activities {
     margin-top: 1.25rem;
     padding-top: 0.25rem;
+}
+
+[data-entry-render="dref-sector"] .dref-plan-activities--under {
+    margin: 0.85rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f3f4f6;
 }
 
 .dref-plan-activities__title {
@@ -107,6 +436,7 @@
 }
 
 .dref-plan-activity {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem 1rem;
@@ -115,6 +445,29 @@
     border-radius: 2px;
     padding: 0.85rem 1rem 1rem;
     margin-bottom: 0.75rem;
+}
+
+.dref-plan-activity__top {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    flex: 1 1 100%;
+    min-width: 0;
+}
+
+.dref-plan-activity__top .dref-plan-field--12 {
+    flex: 1 1 auto;
+}
+
+.dref-plan-activity__body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    flex: 1 1 100%;
+}
+
+.dref-plan-activity.is-collapsed .dref-plan-activity__body {
+    display: none;
 }
 
 .dref-plan-field {
@@ -132,8 +485,17 @@
     color: #374151;
 }
 
+.dref-plan-field input[type="date"] {
+    color-scheme: light;
+}
+
+.dref-plan-field input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.75;
+}
+
 .dref-plan-field input,
-.dref-plan-field select {
+.dref-plan-field textarea {
     width: 100%;
     background: #fff;
     border: 1px solid #d1d5db;
@@ -143,9 +505,69 @@
     color: #111827;
 }
 
+.dref-plan-field select {
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    padding: 0.4rem 1.75rem 0.4rem 0.6rem;
+    font-size: 0.875rem;
+    color: #111827;
+    cursor: pointer;
+}
+
+.dref-plan-field select:disabled {
+    cursor: default;
+    color: #6b7280;
+    background-color: #f9fafb;
+}
+
+.dref-plan-field--disagg.is-unavailable input {
+    opacity: 0.5;
+    background: #f3f4f6 !important;
+    color: #9ca3af;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.dref-plan-field--reason[hidden],
+.dref-report-field .dref-disagg-reason[hidden] {
+    display: none !important;
+}
+
+.dref-plan-field--reason textarea {
+    min-height: 4.5rem;
+    resize: vertical;
+}
+
+.dref-report-field .dref-disagg-part.is-unavailable input {
+    opacity: 0.5;
+    background: #f3f4f6 !important;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .dref-plan-field input[readonly] {
     background: #f9fafb;
     color: #374151;
+}
+
+.dref-plan-static {
+    width: 100%;
+    background: #e5e7eb;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: #4b5563;
+    overflow-wrap: anywhere;
 }
 
 .dref-plan-field--12 { flex: 1 1 100%; }

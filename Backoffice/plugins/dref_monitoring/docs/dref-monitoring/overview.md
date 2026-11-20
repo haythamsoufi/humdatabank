@@ -159,7 +159,7 @@ Each period has one report: draft, submitted, validated, then reviewed.
 
 The country does not file that report from **Analytics & Monitoring → DREF monitoring**. A focal point for the country opens the project card on the country dashboard and saves the current cycle. The focal point does not need a DREF monitoring role to open the cycle.
 
-The cycle form is the template **DREF operational monitoring**, one master form for every operation. It has a section for every sector and every indicator-bank indicator marked Emergency. An assignment lists only the indicators from that operation's monitoring plan, in their sectors, and the planned activities as cards. Each of those indicators collects one target, stored on the plan. It does not collect a reported total or a sex or age split. A focal point reports progress on the activities and does not add any. A note for the period sits in the Report section. The questions are worded in `plugins/dref_monitoring/scripts/report_questions.py`. Saving stores the answers on the assignment and the activity progress on the report.
+The cycle form is the template **DREF operational monitoring**, one master form for every operation. It has a section for every sector and every indicator-bank indicator marked Emergency. An assignment lists only the indicators from that operation's monitoring plan, in their sectors, and the planned activities as cards. Each of those indicators collects one target, stored on the plan. It does not collect a reported total or a sex or age split. A focal point reports progress on the activities and does not add any. A note for the period is the last field on the form. The questions are worded in `plugins/dref_monitoring/scripts/report_questions.py`. Saving stores the answers on the assignment and the activity progress on the report.
 
 On the cycle:
 
@@ -179,7 +179,7 @@ A report that is no longer a draft is not reminded or escalated.
 - **Community feedback**: a channel and a summary.
 - **Risks**: a title, likelihood, impact, status (`open`, `mitigated`, `closed`), and a mitigation note.
 
-Community feedback stays on the operation and is not sent to the model. Delay reasons, change justifications, risks, and the monitoring history are included. Names and email addresses are not.
+Community feedback stays on the operation and is not sent to the model. Delay reasons, change justifications, risks, and the monitoring history are included, together with the approved application text, recent public GO field reports, and Databank documents the reader may open. Names, email addresses and contacts are not.
 
 ## Reminders and escalation
 
@@ -202,9 +202,41 @@ Membership is required for these messages. A user who can see the operation only
 
 ## Draft 0
 
-A data-entry user can generate **Draft 0** from the operation page, in English, French, Spanish, or Arabic. The daily job also creates one operational update when a reporting period falls due, and one final report when the operation end date is reached. A missed day is caught up for seven days. The same milestone is not drafted twice.
+A data-entry user can generate **Draft 0** from the operation page, in English, French, Spanish, or Arabic. The entry form of every reporting cycle also has **Operational update** and **Final report** buttons in its header. The final report button only appears on the last reporting cycle of the operation. Each button opens a dialog with three choices:
 
-The model is the Databank OpenAI provider (`OPENAI_API_KEY`, `OPENAI_MODEL`). The switch is **off** by default. The payload is the approved request (hazard, dates, allocation, sectors) plus the monitoring history: each period’s activity status, people reached, indicator actuals, expenditure, delay reasons, change justifications, and the risk register. It does not include user names, email addresses, or community feedback. Notes, delay reasons, justifications, and risks go as typed, so keep names and contact details out of them. The model returns GO chapter text and must leave a chapter empty when the figures do not support it. The call is stored on the draft: model name, prompt version, a hash of the input, language, and whether the model was actually used. If the call fails, the document is still the tables.
+| Choice | What the draft contains |
+|---|---|
+| AI-generated narrative | The model drafts the GO chapters, which the National Society can edit before validation. Shown only when the Draft 0 switch is on. |
+| Write the narrative myself | The chapters start empty and are written on the draft page. |
+| Data only | Tables and figures from the monitoring data. There are no narrative chapters, empty headings are left out, and the draft page has nothing to edit. |
+
+**AI drafts run in the background.** Writing the chapters takes a minute or more, so choosing the AI narrative starts a job and shows its progress right where you clicked: collecting the figures, reading the application, field reports and documents, then "Writing chapter 4 of 12". The draft page opens by itself when it is ready. You can leave the page and come back, and the progress shows again. **Cancel** stops the job and no draft is saved. Only the person who started a job sees it. The same applies when you add AI chapters to a data-only draft.
+
+The report uses the figures saved on the form, so save before generating. The daily job also creates one operational update when a reporting period falls due, and one final report when the operation end date is reached. A missed day is caught up for seven days. The same milestone is not drafted twice.
+
+The model is the Databank OpenAI provider (`OPENAI_API_KEY`, `OPENAI_MODEL`). The switch is **off** by default. The model can be changed on the settings page, with a separate one for final reports. A model set there wins over `OPENAI_MODEL`.
+
+### What the model reads
+
+Figures alone cannot answer "What happened?" or "Needs", so the model reads four kinds of input, in this order of trust.
+
+| Input | Source | Used for |
+| --- | --- | --- |
+| Monitoring records | The operation: sectors, activity status, people reached, indicator actuals, expenditure, delay reasons, change justifications, risks, procurement, and a progress summary with the counts and percentages worked out in code | Progress, achievements, challenges, summary of changes |
+| The written application | GO emergency page, saved on each approved stage at sync: event description, scope, needs by sector, who is targeted, summary of change, sector progress text, and earlier update summaries. The first stage is kept next to the latest | Situation, needs, targeting, strategy, objective |
+| GO field reports | The newest three public field reports of the emergency and the first one, read from GO when the draft is generated: description, figures, actions by the National Society, IFRC and partners, actions by others. Contacts and authors are dropped | Current situation and figures, who is acting |
+| Databank documents | A hybrid search on the operation's country for the event and for the response, limited to documents the person generating the draft may read. A scheduled draft has no user, so it sees public documents only. Excerpts dated before the event are dropped | Corroborating figures, other actors, ICRC |
+| The previous draft | The newest validated or edited draft of this operation | Carrying forward what is still true |
+
+The sync reads the written application once per stage. A stage stored before this existed is read again on the next sync. New wording on GO is saved on the stage without opening a new plan version.
+
+Every source is best effort. If GO, the vector store or a field report is unavailable, that source is left out and the draft is made from the rest. The model never receives user names, email addresses, contacts, or community feedback. Notes, delay reasons, justifications, and risks go as typed, so keep names and contact details out of them.
+
+### The prompt
+
+Prompt version 3 gives each GO chapter its own instructions: what GO expects there, which input answers it, and a word range. A final report has no "Summary of changes", and an operational update has no "Challenges". The rules tell the model to take progress only from monitoring, to continue the approved text instead of copying it, to prefer the newest field report and give both figures when sources differ, to use a document only when it is clearly about this event, to leave a chapter empty rather than write filler, and never to show input field names in the text. A model that spends its token budget before answering is retried once with less reasoning.
+
+The call is stored on the draft: model name, prompt version, a hash of the input, the input itself (including the background above), language, and whether the model was actually used. If the call fails, the document is still the tables.
 
 The National Society edits the chapters on the draft page. Validation sends the report to GO (`dref-op-update` or `dref-final-report`) as a GO draft for formal processing. That post needs `GO_API_TOKEN`. A failed post stays validated so it can be sent again. Word and PDF stay available either way.
 

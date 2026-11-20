@@ -24,6 +24,15 @@
                     data-dev-tool="style"
                     aria-selected="true"
                     aria-controls="dev-tools-panel-style">{{ _('Style preview') }}</button>
+            {% if show_section_nav_preview|default(false) %}
+            <button type="button"
+                    class="dev-tools__tool"
+                    role="tab"
+                    id="dev-tools-tab-section-nav"
+                    data-dev-tool="section-nav"
+                    aria-selected="false"
+                    aria-controls="dev-tools-panel-section-nav">{{ _('Section nav') }}</button>
+            {% endif %}
         </div>
         <div id="dev-tools-panel-style"
              class="dev-tools__panel"
@@ -38,6 +47,20 @@
             </div>
             <p class="dev-tools__hint">{{ _('Dev only · saved in this browser') }}</p>
         </div>
+        {% if show_section_nav_preview|default(false) %}
+        <div id="dev-tools-panel-section-nav"
+             class="dev-tools__panel"
+             role="tabpanel"
+             data-dev-tool-panel="section-nav"
+             aria-labelledby="dev-tools-tab-section-nav"
+             hidden>
+            <div id="section-nav-preview" class="dev-tools__options" role="group" aria-label="{{ _('Section navigation')|forceescape }}">
+                <button type="button" class="dev-tools__btn" data-section-nav-option="side" aria-pressed="false">{{ _('Side') }}</button>
+                <button type="button" class="dev-tools__btn" data-section-nav-option="stepper" aria-pressed="false">{{ _('Top stepper') }}</button>
+            </div>
+            <p class="dev-tools__hint">{{ _('Dev only · saved in this browser') }}</p>
+        </div>
+        {% endif %}
     </div>
 </aside>
 <script nonce="{{ csp_nonce() }}">
@@ -63,14 +86,21 @@
             el.style.left = x + 'px';
             el.style.top = y + 'px';
         }
-        if (typeof data.tool === 'string' && data.tool) {
+        var savedTool = (typeof data.tool === 'string' && /^[a-z0-9-]+$/.test(data.tool)) ? data.tool : '';
+        var savedToolExists = false;
+        if (savedTool) {
             el.querySelectorAll('[data-dev-tool]').forEach(function (tab) {
-                var on = tab.getAttribute('data-dev-tool') === data.tool;
+                if (tab.getAttribute('data-dev-tool') === savedTool) savedToolExists = true;
+            });
+        }
+        if (savedToolExists) {
+            el.querySelectorAll('[data-dev-tool]').forEach(function (tab) {
+                var on = tab.getAttribute('data-dev-tool') === savedTool;
                 tab.classList.toggle('is-active', on);
                 tab.setAttribute('aria-selected', on ? 'true' : 'false');
             });
             el.querySelectorAll('[data-dev-tool-panel]').forEach(function (panel) {
-                if (panel.getAttribute('data-dev-tool-panel') === data.tool) panel.removeAttribute('hidden');
+                if (panel.getAttribute('data-dev-tool-panel') === savedTool) panel.removeAttribute('hidden');
                 else panel.setAttribute('hidden', '');
             });
         }

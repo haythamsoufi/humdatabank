@@ -78,6 +78,25 @@ export function stabilizeScrollAfterLayoutChange(anchorElement = null) {
 const SECTION_START_INSET_PX = 8;
 
 /**
+ * Height of the entry-form top stepper when that dev preview is active.
+ * Section jumps need to clear it; side navigation does not cover the form.
+ * @returns {number}
+ */
+export function getStickySectionNavInset() {
+    const bar = document.querySelector(
+        '.entry-form-root[data-section-nav="stepper"] #section-navigation-sidebar'
+    );
+    if (!bar) return 0;
+    const style = window.getComputedStyle(bar);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+        return 0;
+    }
+    if (style.position !== 'sticky' && style.position !== 'fixed') return 0;
+    const height = bar.getBoundingClientRect().height;
+    return height > 0 ? Math.ceil(height) : 0;
+}
+
+/**
  * Read the element's scroll-margin-top, falling back when it is unset.
  * Used when the window itself scrolls under the sticky top nav.
  */
@@ -103,9 +122,10 @@ export function scrollElementToStart(element, options = {}) {
     const isMainContainer = scrollContainer !== window;
     // <main> starts below the sticky nav, so the section's scroll-margin would
     // leave the previous section on screen. Keep that margin only for window scroll.
-    const marginTop = isMainContainer
+    // The top stepper preview is a sticky bar inside <main>, so add its height.
+    const marginTop = (isMainContainer
         ? (scrollMarginTop != null ? scrollMarginTop : SECTION_START_INSET_PX)
-        : resolveScrollMarginTop(element, scrollMarginTop);
+        : resolveScrollMarginTop(element, scrollMarginTop)) + getStickySectionNavInset();
     const targetRect = element.getBoundingClientRect();
 
     let targetTop;

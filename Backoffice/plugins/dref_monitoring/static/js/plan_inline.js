@@ -1,8 +1,99 @@
 (function () {
     'use strict';
 
+    function attrValue(value) {
+        var text = String(value || '');
+        if (window.CSS && CSS.escape) return CSS.escape(text);
+        return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    }
+
+    function initPlanFolds(root) {
+        var table = root.querySelector('.dref-plan-table');
+        if (!table) return;
+
+        function setToggle(button, expanded) {
+            button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            var label = button.getAttribute(expanded ? 'data-label-open' : 'data-label-closed');
+            if (label) {
+                button.setAttribute('aria-label', label);
+                button.title = label;
+            }
+        }
+
+        function paint(body) {
+            var sectorToggle = body.querySelector('[data-dref-fold="sector"]');
+            var sectorOpen = !sectorToggle || sectorToggle.getAttribute('aria-expanded') !== 'false';
+            var indicatorOpen = {};
+            body.querySelectorAll('[data-dref-fold="indicator"]').forEach(function (button) {
+                var host = button.closest('tr');
+                var key = host ? host.getAttribute('data-dref-indicator') || '' : '';
+                indicatorOpen[key] = button.getAttribute('aria-expanded') !== 'false';
+            });
+            body.querySelectorAll('tr').forEach(function (row) {
+                if (row.querySelector('[data-dref-fold="sector"]')) {
+                    row.classList.remove('is-folded');
+                    return;
+                }
+                if (!sectorOpen) {
+                    row.classList.add('is-folded');
+                    return;
+                }
+                var key = row.getAttribute('data-dref-indicator');
+                if (!key || row.hasAttribute('data-dref-indicator-row')) {
+                    row.classList.remove('is-folded');
+                    return;
+                }
+                row.classList.toggle('is-folded', indicatorOpen[key] === false);
+            });
+        }
+
+        function flip(button) {
+            setToggle(button, button.getAttribute('aria-expanded') === 'false');
+            var body = button.closest('tbody[data-dref-sector-body]');
+            if (body) paint(body);
+        }
+
+        function expandRow(row) {
+            if (!row) return;
+            var body = row.closest('tbody[data-dref-sector-body]');
+            if (!body) return;
+            var sectorToggle = body.querySelector('[data-dref-fold="sector"]');
+            if (sectorToggle) setToggle(sectorToggle, true);
+            if (!row.hasAttribute('data-dref-indicator-row')) {
+                var key = row.getAttribute('data-dref-indicator') || '';
+                if (key) {
+                    var indicator = body.querySelector('tr[data-dref-indicator-row][data-dref-indicator="' + attrValue(key) + '"]');
+                    var indicatorToggle = indicator && indicator.querySelector('[data-dref-fold="indicator"]');
+                    if (indicatorToggle) setToggle(indicatorToggle, true);
+                }
+            }
+            paint(body);
+        }
+
+        table.addEventListener('click', function (event) {
+            var target = event.target;
+            if (!target || !target.closest) return;
+            var toggle = target.closest('[data-dref-fold]');
+            if (toggle && table.contains(toggle)) {
+                event.preventDefault();
+                flip(toggle);
+                return;
+            }
+            if (target.closest('a, button, input, select, textarea, label')) return;
+            var row = target.closest('tr');
+            var cell = target.closest('td');
+            if (!row || !cell || cell.cellIndex !== 0 || !row.contains(cell)) return;
+            if (row.classList.contains('dref-plan-extra')) return;
+            toggle = row.querySelector('[data-dref-fold]');
+            if (toggle) flip(toggle);
+        });
+
+        root.drefExpandPlanRow = expandRow;
+    }
+
     var root = document.querySelector('[data-dref-plan-edit]');
     if (!root) return;
+    initPlanFolds(root);
     var form = root.querySelector('[data-dref-plan-form]');
     var start = root.querySelector('[data-dref-plan-start]');
     if (!form || !start) return;
@@ -123,6 +214,9 @@
             notice.hidden = false;
             notice.textContent = lines.join(' ');
         }
+        problems.forEach(function (item) {
+            if (root.drefExpandPlanRow) root.drefExpandPlanRow(item.field.closest('tr'));
+        });
         if (problems[0]) {
             problems[0].field.scrollIntoView({ block: 'center' });
             problems[0].field.focus();
@@ -189,12 +283,6 @@
         return 'n' + activitySeq;
     }
 
-    function attrValue(value) {
-        var text = String(value || '');
-        if (window.CSS && CSS.escape) return CSS.escape(text);
-        return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    }
-
     function activityRows(indicatorKey) {
         return form.querySelectorAll('tr[data-dref-activity][data-dref-indicator="' + attrValue(indicatorKey) + '"]');
     }
@@ -239,6 +327,7 @@
         if (!anchor || !anchor.parentNode) return null;
         anchor.parentNode.insertBefore(row, anchor.nextSibling);
         showEmpty(indicatorKey);
+        if (root.drefExpandPlanRow) root.drefExpandPlanRow(row);
         var title = activityHost(row, key);
         if (focus && title) title.focus();
         return row;

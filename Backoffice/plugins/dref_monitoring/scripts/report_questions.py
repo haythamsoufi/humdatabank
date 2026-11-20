@@ -39,7 +39,8 @@ SECTOR_NAME_TO_KEY: dict[str, str] = {
 
 ACTIVITY_SECTION_NAME = "Selected activities"
 
-# Asked once, in the Report section, on every operation.
+# Asked once, on every operation. The builder puts this in a section named Note
+# and hides that section's heading, so the field is not wrapped in a second title.
 REPORT_QUESTIONS: tuple[dict, ...] = (
     {
         "key": "narrative",

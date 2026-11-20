@@ -8,12 +8,12 @@ from . import bp
 from app import db
 from app.models import FormTemplate, FormSection, FormItem, FormPage, FormTemplateVersion
 from app.forms.form_builder import FormSectionForm
-from app.routes.admin.shared import permission_required
-from app.utils.http.request_utils import is_json_request, get_request_data
+from app.routes.admin.shared import check_template_access, permission_required
+from app.utils.http.request_utils import is_json_request, get_request_data, get_request_list
 from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.database.transactions import request_transaction_rollback
 from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api.api_responses import json_ok, json_server_error, json_bad_request
+from app.utils.api.api_responses import json_ok, json_server_error, json_bad_request, json_forbidden
 from app.services.forms.section_duplication_service import SectionDuplicationService
 from config.config import Config
 from .helpers import (_update_version_timestamp, _ensure_template_access_or_redirect,
@@ -460,6 +460,128 @@ def new_template_section(template_id):
     # Preserve version context after adding a section
     version_id = version.id if version is not None else data.get('version_id')
     return redirect(url_for("form_builder.edit_template", template_id=template_id, version_id=version_id))
+
+def _orders_for_reordered_sections(ordered_sections, reserved_orders):
+    """Give each section one of this group's existing order numbers, in the new sequence.
+
+    Duplicate numbers are replaced with the next integers that no other section
+    on this version is already using.
+    """
+    current = sorted(int(float(section.order or 0)) for section in ordered_sections)
+    if len(set(current)) == len(current):
+        chosen = current
+    else:
+        used = {int(float(order)) for order in reserved_orders}
+        start = current[0] if current else 1
+        chosen = []
+        candidate = start
+        while len(chosen) < len(ordered_sections):
+            if candidate not in used:
+                chosen.append(candidate)
+                used.add(candidate)
+            candidate += 1
+    for section, order in zip(ordered_sections, chosen):
+        section.order = order
+    return {section.id: int(float(section.order)) for section in ordered_sections}
+
+
+@bp.route("/templates/<int:template_id>/sections/reorder", methods=["POST"])
+@permission_required('admin.templates.edit')
+def reorder_template_sections(template_id):
+    """Persist a new top-level section order for one page (or the whole template)."""
+    data = get_request_data()
+    version_id = data.get('version_id')
+    try:
+        version_id = int(version_id) if version_id not in (None, '') else None
+    except (TypeError, ValueError):
+        return json_bad_request('Invalid version.')
+
+    if not check_template_access(template_id, current_user.id):
+        return json_forbidden("Access denied. You don't have permission to modify this template.")
+
+    template = FormTemplate.query.get_or_404(template_id)
+    version = None
+    if version_id:
+        version = FormTemplateVersion.query.filter_by(id=version_id, template_id=template.id).first()
+    if not version and template.published_version_id:
+        version = FormTemplateVersion.query.get(template.published_version_id)
+    if not version:
+        version = FormTemplateVersion.query.filter_by(template_id=template.id).order_by(
+            FormTemplateVersion.created_at.desc()
+        ).first()
+    if not version:
+        return json_bad_request('Template version not found.')
+
+    raw_ids = get_request_list(data, 'section_ids')
+    try:
+        section_ids = [int(section_id) for section_id in raw_ids]
+    except (TypeError, ValueError):
+        return json_bad_request('Invalid section order.')
+    if not section_ids or len(section_ids) != len(set(section_ids)):
+        return json_bad_request('Invalid section order.')
+
+    sections = FormSection.query.filter(
+        FormSection.id.in_(section_ids),
+        FormSection.template_id == template.id,
+        FormSection.version_id == version.id,
+    ).all()
+    by_id = {section.id: section for section in sections}
+    if len(by_id) != len(section_ids):
+        return json_bad_request('One or more sections could not be reordered.')
+    ordered = [by_id[section_id] for section_id in section_ids]
+    if any(section.parent_section_id is not None for section in ordered):
+        return json_bad_request('Only top-level sections can be reordered here.')
+
+    if version.is_paginated:
+        page_ids = {section.page_id for section in ordered}
+        if len(page_ids) != 1:
+            return json_bad_request('Sections from different pages cannot be reordered together.')
+        page_id = next(iter(page_ids))
+        expected = FormSection.query.filter_by(
+            template_id=template.id,
+            version_id=version.id,
+            parent_section_id=None,
+            page_id=page_id,
+        ).all()
+    else:
+        expected = FormSection.query.filter_by(
+            template_id=template.id,
+            version_id=version.id,
+            parent_section_id=None,
+        ).all()
+    if {section.id for section in expected} != set(section_ids):
+        return json_bad_request('The section list does not match this page.')
+
+    reserved = [
+        section.order for section in FormSection.query.filter_by(
+            template_id=template.id,
+            version_id=version.id,
+            parent_section_id=None,
+        ).all()
+        if section.id not in by_id
+    ]
+    try:
+        orders = _orders_for_reordered_sections(ordered, reserved)
+        _update_version_timestamp(version.id, current_user.id)
+        db.session.flush()
+        try:
+            log_admin_action(
+                action_type='form_section_reorder',
+                description=f"Reordered sections in template '{template.name}'",
+                target_type='form_template',
+                target_id=template.id,
+                target_description=f"Template ID: {template.id}, Version ID: {version.id}",
+                risk_level='low',
+            )
+        except Exception as log_error:
+            current_app.logger.error(f"Error logging section reorder: {log_error}")
+    except Exception as exc:
+        request_transaction_rollback()
+        current_app.logger.error(f"Error reordering sections for template {template_id}: {exc}", exc_info=True)
+        return json_server_error('Could not save the new section order.')
+
+    return json_ok(orders={str(section_id): order for section_id, order in orders.items()})
+
 
 @bp.route("/sections/edit/<int:section_id>", methods=["POST"])
 @permission_required('admin.templates.edit')

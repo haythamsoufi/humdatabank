@@ -1,0 +1,23 @@
+{# Progress for an AI draft running in the background. static/js/report_actions.js drives it.
+   Expects `operation`. `active_job` is this person's unfinished job on the operation, when there is one. #}
+<div class="hidden rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3" role="status" aria-live="polite"
+     data-dref-job-panel
+     data-status-url="{{ url_for('dref_monitoring.draft_job_status', operation_id=operation.id, job_id='__JOB__') }}"
+     data-cancel-url="{{ url_for('dref_monitoring.draft_job_cancel', operation_id=operation.id, job_id='__JOB__') }}"
+     data-msg-start-failed="{{ dref_tr('Could not start the draft.') }}"
+     data-msg-status-failed="{{ dref_tr('Could not read the draft progress. Reload the page to check.') }}"
+     data-msg-empty="{{ dref_tr('The model did not return text. The chapters are empty, so you can write them here.') }}"
+     data-msg-cancelling="{{ dref_tr('Cancelling…') }}"
+     {% if active_job %}data-active-job='{{ active_job|tojson }}'{% endif %}>
+    <div class="flex items-center justify-between gap-3">
+        <p class="text-sm font-medium text-blue-900" data-job-message>{{ dref_tr('Starting the draft.') }}</p>
+        <span class="text-xs text-blue-800" data-job-count></span>
+    </div>
+    <div class="w-full bg-blue-100 rounded h-2 overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-job-meter>
+        <div class="bg-blue-600 h-2 rounded" style="width: 0%" data-job-bar></div>
+    </div>
+    <p class="text-xs text-blue-800" data-job-hint>{{ dref_tr('You can leave this page. The draft keeps running and appears under Drafts when it is ready.') }}</p>
+    <div class="flex justify-end">
+        <button type="button" class="btn btn-secondary" data-job-cancel>{{ dref_tr('Cancel') }}</button>
+    </div>
+</div>

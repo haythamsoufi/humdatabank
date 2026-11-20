@@ -37,6 +37,12 @@
 {% endfor %}
 {% endmacro %}
 
+{% macro fold_button(kind, label) %}
+<button type="button" class="dref-plan-toggle" data-dref-fold="{{ kind }}" aria-expanded="true" data-label-open="{{ dref_tr('Collapse') }}: {{ label }}" data-label-closed="{{ dref_tr('Expand') }}: {{ label }}" aria-label="{{ dref_tr('Collapse') }}: {{ label }}" title="{{ dref_tr('Collapse') }}: {{ label }}">
+  <i class="fas fa-chevron-down" aria-hidden="true"></i>
+</button>
+{% endmacro %}
+
 {% macro fact(label, value, wide=False) %}
 <div{% if wide %} class="sm:col-span-2"{% endif %}>
   <dt class="text-xs font-medium text-gray-500">{{ label }}</dt>
@@ -48,7 +54,7 @@
 
 {% block extra_css %}
 {% include "components/_ui_style_stylesheets.html" %}
-<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/plan_inline.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/plan_inline.css') }}?v=18">
 {% endblock %}
 
 {% block content %}
@@ -268,6 +274,8 @@
         </div>
 
         <div id="panel-plan" class="settings-panel space-y-6{% if active_tab != 'plan' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-plan" data-dref-plan-edit>
+            {# For this panel only, actor_can_enter means the version on screen can be edited. #}
+            {% set actor_can_enter = plan_editable %}
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2">
                     <h2 class="text-lg font-semibold text-gray-800">{{ dref_tr('Monitoring plan') }}</h2>
@@ -275,9 +283,9 @@
                         <i class="fas fa-info-circle" aria-hidden="true"></i>
                     </button>
                     {% if plan %}
-                    <span class="btn btn-secondary btn-sm inline-flex items-center dref-plan-version">
+                    <button type="button" id="dref-plan-versions-open" class="btn btn-secondary btn-sm inline-flex items-center dref-plan-version" title="{{ dref_tr('Plan versions') }}" aria-label="{{ dref_tr('Plan versions') }}">
                         <i class="fas fa-code-branch w-3 h-3 mr-1.5" aria-hidden="true"></i>{{ dref_tr('Version') }} {{ plan.version }}
-                    </span>
+                    </button>
                     {{ dref_status(plan.status) }}
                     {% endif %}
                 </div>
@@ -291,7 +299,7 @@
                         </button>
                     </form>
                     {% endif %}
-                    {% if actor_can_validate and plan and plan.status == 'draft' %}
+                    {% if actor_can_validate and not plan_history and current_plan and current_plan.status == 'draft' %}
                     <form action="{{ url_for('dref_monitoring.validate_plan_route', operation_id=operation.id) }}" method="POST" class="inline-block">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="tab" value="plan">
@@ -305,13 +313,20 @@
                         <i class="fas fa-pen" aria-hidden="true"></i>{{ dref_tr('Edit plan') }}
                     </button>
                     {% endif %}
-                    {% if actor_can_enter %}
+                    {% if plan %}
                     <button type="button" class="btn btn-secondary" data-excel-io-open="dref-plan-excel-modal" data-excel-modal-module="{{ static_url('js/components/excel-io-modal.js') }}" data-excel-dropzone-module="{{ static_url('js/components/excel-import-dropzone.js') }}">
-                        <i class="fas fa-file-excel" aria-hidden="true"></i>{{ dref_tr('Import Excel') }}
+                        <i class="fas fa-file-excel" aria-hidden="true"></i>{{ dref_tr('Excel') }}
                     </button>
                     {% endif %}
                 </div>
             </div>
+
+            {% if plan_history and current_plan %}
+            <div class="border border-gray-200 bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-700 flex flex-wrap items-center justify-between gap-3">
+                <p>{{ dref_tr('You are viewing version {version}. Reporting uses version {current}.').format(version=plan.version, current=current_plan.version) }}</p>
+                <a class="btn btn-secondary btn-sm" href="{{ url_for('dref_monitoring.operation_page', operation_id=operation.id, tab='plan') }}">{{ dref_tr('Back to the current version') }}</a>
+            </div>
+            {% endif %}
 
             {% if plan %}
             {% set field_class = "dref-plan-write dref-plan-field form-input w-full px-2 py-1 text-sm text-gray-900 bg-white" %}
@@ -369,17 +384,22 @@
                                 <th class="dref-plan-col dref-plan-col--date px-4 py-2 font-medium">{{ dref_tr('End') }}</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for section in sections %}
+                        {% for section in sections %}
+                        <tbody data-dref-sector-body="{{ section.group.id }}">
                             <tr class="dref-plan-sector border-t border-gray-200" data-dref-sector="{{ section.group.id }}">
                                 <td class="px-4 py-3" colspan="4" data-dref-sector-cell="{{ section.group.id }}">
-                                    <p class="font-medium text-gray-900">{{ dref_tr('Sector') }}: {{ dref_label(section.group.label) }}</p>
-                                    {% if section.group.unmatched %}
-                                    <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('No match in the indicator bank') }}</p>
-                                    {% endif %}
-                                    {% if actor_can_enter and not section.activities %}
-                                    <input type="hidden" class="dref-plan-field" name="group_id" value="{{ section.group.id }}" disabled>
-                                    {% endif %}
+                                    <div class="dref-plan-fold-head">
+                                        {{ fold_button('sector', dref_label(section.group.label)) }}
+                                        <div class="dref-plan-fold-body">
+                                            <p class="font-medium text-gray-900">{{ dref_tr('Sector') }}: {{ dref_label(section.group.label) }}</p>
+                                            {% if section.group.unmatched %}
+                                            <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('No match in the indicator bank') }}</p>
+                                            {% endif %}
+                                            {% if actor_can_enter and not section.activities %}
+                                            <input type="hidden" class="dref-plan-field" name="group_id" value="{{ section.group.id }}" disabled>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--budget px-4 py-3 font-medium text-gray-900">{{ money(section.group.budget_chf) }}</td>
                                 <td class="dref-plan-col dref-plan-col--target px-4 py-3 font-medium text-gray-900">{{ count(section.group.people_targeted) }}</td>
@@ -391,27 +411,32 @@
                             {% set indicator_key = indicator.id if indicator else 'other-' ~ section.group.id %}
                             <tr class="dref-plan-indicator border-t border-gray-200" data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}" data-dref-indicator-row>
                                 <td class="px-4 py-3" colspan="4" data-dref-indicator-cell="{{ indicator_key }}">
-                                    {% if indicator %}
-                                    <p class="font-medium text-gray-900">{{ dref_tr('Indicator') }}: {{ dref_label(indicator.title) }}</p>
-                                    {% if indicator.unit %}
-                                    <p class="mt-1 text-xs text-gray-500">{{ dref_label(indicator.unit) }}</p>
-                                    {% endif %}
-                                    {% if indicator.unmatched %}
-                                    <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('No match in the indicator bank') }}</p>
-                                    {% elif indicator.bank_adapted %}
-                                    <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('Temporarily matched to the indicator bank') }}</p>
-                                    {% if indicator.bank_name %}
-                                    <p class="text-xs text-gray-500">{{ indicator.bank_name }}</p>
-                                    {% endif %}
-                                    {% endif %}
-                                    {% else %}
-                                    <p class="text-sm font-medium text-gray-700">{{ dref_tr('Other activities') }}</p>
-                                    {% endif %}
-                                    {% if actor_can_enter %}
-                                    <button type="button" class="btn btn-secondary btn-sm dref-plan-write dref-plan-add-activity" data-dref-add-activity data-group-id="{{ section.group.id }}" data-indicator-id="{{ indicator.id if indicator else '' }}" data-indicator-key="{{ indicator_key }}" data-indicator-label="{{ dref_label(indicator.title) if indicator else '' }}" data-start="{{ operation.start_date.isoformat() if operation.start_date else '' }}" data-end="{{ operation.end_date.isoformat() if operation.end_date else '' }}">
-                                        <i class="fas fa-plus" aria-hidden="true"></i>{{ dref_tr('Add activity') }}
-                                    </button>
-                                    {% endif %}
+                                    <div class="dref-plan-fold-head">
+                                        {{ fold_button('indicator', dref_label(indicator.title) if indicator else dref_tr('Other activities')) }}
+                                        <div class="dref-plan-fold-body">
+                                            {% if indicator %}
+                                            <p class="font-medium text-gray-900">{{ dref_tr('Indicator') }}: {{ dref_label(indicator.title) }}</p>
+                                            {% if indicator.unit %}
+                                            <p class="mt-1 text-xs text-gray-500">{{ dref_label(indicator.unit) }}</p>
+                                            {% endif %}
+                                            {% if indicator.unmatched %}
+                                            <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('No match in the indicator bank') }}</p>
+                                            {% elif indicator.bank_adapted %}
+                                            <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('Temporarily matched to the indicator bank') }}</p>
+                                            {% if indicator.bank_name %}
+                                            <p class="text-xs text-gray-500">{{ indicator.bank_name }}</p>
+                                            {% endif %}
+                                            {% endif %}
+                                            {% else %}
+                                            <p class="text-sm font-medium text-gray-700">{{ dref_tr('Other activities') }}</p>
+                                            {% endif %}
+                                            {% if actor_can_enter %}
+                                            <button type="button" class="btn btn-secondary btn-sm dref-plan-write dref-plan-add-activity" data-dref-add-activity data-group-id="{{ section.group.id }}" data-indicator-id="{{ indicator.id if indicator else '' }}" data-indicator-key="{{ indicator_key }}" data-indicator-label="{{ dref_label(indicator.title) if indicator else '' }}" data-start="{{ operation.start_date.isoformat() if operation.start_date else '' }}" data-end="{{ operation.end_date.isoformat() if operation.end_date else '' }}">
+                                                <i class="fas fa-plus" aria-hidden="true"></i>{{ dref_tr('Add activity') }}
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="dref-plan-col dref-plan-col--budget px-4 py-3 text-gray-500">-</td>
                                 <td class="dref-plan-col dref-plan-col--target px-4 py-3" data-dref-indicator-target="{{ indicator_key }}">
@@ -496,10 +521,14 @@
                                 <td class="px-4 py-3 text-gray-500" colspan="8">{{ dref_tr('No activities on this plan yet') }}</td>
                             </tr>
                             {% endfor %}
+                        </tbody>
                             {% else %}
+                        <tbody>
                             <tr><td class="px-4 py-6 text-gray-500" colspan="8">{{ dref_tr('No activities on this plan yet') }}</td></tr>
+                        </tbody>
                             {% endfor %}
                             {% if actor_can_enter and available_sectors %}
+                        <tbody>
                             <tr class="dref-plan-extra border-t border-gray-200 bg-gray-50">
                                 <td class="px-4 py-2 text-xs font-medium text-gray-500" colspan="8">{{ dref_tr('Other sectors') }}</td>
                             </tr>
@@ -539,8 +568,8 @@
                                 </td>
                             </tr>
                             {% endfor %}
-                            {% endif %}
                         </tbody>
+                            {% endif %}
                     </table>
                 </div>
             </div>
@@ -561,6 +590,7 @@
             {% else %}
             <p class="text-sm text-gray-500 text-center py-8 border border-gray-200 rounded-lg">{{ dref_tr('No monitoring plan yet') }}</p>
             {% endif %}
+            {% set actor_can_enter = can_enter %}
 
         </div>
 
@@ -606,7 +636,7 @@
                         </tbody>
                     </table>
                 </div>
-                {% elif plan and plan.status == 'validated' %}
+                {% elif current_plan and current_plan.status == 'validated' %}
                 <p class="px-4 py-6 text-sm text-gray-500">{{ dref_tr('No reporting periods yet') }}</p>
                 {% else %}
                 <p class="px-4 py-8 text-sm text-gray-600 text-center">{{ dref_tr('There is no reporting schedule until the monitoring plan is confirmed.') }}</p>
@@ -770,8 +800,8 @@
         </div>
 
         <div id="panel-drafts" class="settings-panel space-y-6{% if active_tab != 'drafts' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-drafts">
-            <section class="border border-gray-200 rounded-lg overflow-hidden">
-                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <section class="border border-gray-200 rounded-lg">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
                     <h2 class="text-sm font-semibold text-gray-800">
                         <i class="fas fa-file-alt text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Draft 0') }}
                     </h2>
@@ -785,8 +815,24 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <a class="btn btn-secondary btn-sm" href="{{ url_for('dref_monitoring.draft_page', operation_id=operation.id, draft_id=draft.id) }}">{{ dref_tr('Open') }}</a>
-                            <a class="btn btn-secondary btn-sm" href="{{ url_for('dref_monitoring.draft_docx_route', operation_id=operation.id, draft_id=draft.id) }}">{{ dref_tr('Export Word') }}</a>
-                            <a class="btn btn-secondary btn-sm" href="{{ url_for('dref_monitoring.draft_pdf_route', operation_id=operation.id, draft_id=draft.id) }}">{{ dref_tr('Export PDF') }}</a>
+                            <div class="relative" data-dref-export>
+                                <button type="button" class="btn btn-secondary btn-sm" aria-haspopup="menu" aria-expanded="false" aria-controls="dref-export-menu-{{ draft.id }}">
+                                    {{ dref_tr('Export') }}
+                                    <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i>
+                                </button>
+                                <div id="dref-export-menu-{{ draft.id }}" class="hidden absolute right-0 z-50 mt-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg" role="menu">
+                                    <a class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" role="menuitem"
+                                       href="{{ url_for('dref_monitoring.draft_docx_route', operation_id=operation.id, draft_id=draft.id) }}">
+                                        <i class="fas fa-file-word" aria-hidden="true"></i>
+                                        <span>{{ dref_tr('Export Word') }}</span>
+                                    </a>
+                                    <a class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" role="menuitem"
+                                       href="{{ url_for('dref_monitoring.draft_pdf_route', operation_id=operation.id, draft_id=draft.id) }}">
+                                        <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                                        <span>{{ dref_tr('Export PDF') }}</span>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </li>
                     {% else %}
@@ -795,7 +841,7 @@
                 </ul>
             </section>
             {% if actor_can_enter %}
-            <form method="post" action="{{ url_for('dref_monitoring.draft_generate_route', operation_id=operation.id) }}" class="border border-gray-200 rounded-lg p-4 flex flex-wrap items-end gap-3">
+            <form method="post" action="{{ url_for('dref_monitoring.draft_generate_route', operation_id=operation.id) }}" class="border border-gray-200 rounded-lg p-4 flex flex-wrap items-end gap-3" data-dref-draft-form>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Type') }}
                     <select name="kind" class="{{ input_class }}">
@@ -810,16 +856,27 @@
                         {% endfor %}
                     </select>
                 </label>
+                <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Narrative') }}
+                    <select name="narrative" class="{{ input_class }}">
+                        <option value="ai" {% if not ai_ready %}disabled{% else %}selected{% endif %}>{{ dref_tr('AI-generated narrative') }}</option>
+                        <option value="manual" {% if not ai_ready %}selected{% endif %}>{{ dref_tr('Write the narrative myself') }}</option>
+                        <option value="none">{{ dref_tr('Data only') }}</option>
+                    </select>
+                </label>
                 <button class="btn btn-primary" type="submit"><i class="fas fa-file-alt" aria-hidden="true"></i>{{ dref_tr('Generate draft') }}</button>
             </form>
+            {% include "plugins/dref_monitoring/_draft_job_panel.html" %}
             {% endif %}
         </div>
 
         <div id="panel-team" class="settings-panel space-y-6{% if active_tab != 'team' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-team">
             <section class="border border-gray-200 rounded-lg overflow-hidden">
                 <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
-                    <h2 class="text-sm font-semibold text-gray-800">
-                        <i class="fas fa-users text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Members') }}
+                    <h2 class="text-sm font-semibold text-gray-800 inline-flex items-center gap-2">
+                        <span><i class="fas fa-users text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Members') }}</span>
+                        <button type="button" id="dref-member-help-open" class="inline-flex items-center justify-center text-gray-500 hover:text-gray-900" title="{{ dref_tr('What members do') }}" aria-label="{{ dref_tr('What members do') }}">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        </button>
                     </h2>
                     {% if actor_can_review %}
                     <button type="button" class="btn btn-icon btn-sm btn-success" data-dref-reveal="dref-member-form" aria-expanded="false" aria-controls="dref-member-form" title="{{ dref_tr('Add') }}" aria-label="{{ dref_tr('Add') }}">
@@ -1001,20 +1058,22 @@
         </div>
     </div>
 </div>
-{% if actor_can_enter %}
+{% if plan %}
 {% set _excel_hidden %}
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <input type="hidden" name="tab" value="plan">
 {% endset %}
-{% set _excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600" aria-hidden="true"></i> {{ dref_tr('Import Excel') }}{% endset %}
+{% set _excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600" aria-hidden="true"></i> {{ dref_tr('Excel') }}{% endset %}
 {% call excel_io_modal(
     'dref-plan-excel-modal',
     modal_title=_excel_title,
-    aria_label=dref_tr('Import Excel'),
+    aria_label=dref_tr('Excel'),
     max_width='max-w-lg',
     layout='simple',
-    show_export=false,
-    show_import=true,
+    show_export=true,
+    show_import=plan_editable,
+    export_url=url_for('dref_monitoring.export_plan_route', operation_id=operation.id, plan_version=plan.version),
+    export_label=dref_tr('Export Excel'),
     import_action=url_for('dref_monitoring.excel_route', operation_id=operation.id),
     import_submit_label=dref_tr('Import Excel'),
     dropzone_id='dref-plan-excel-dropzone',
@@ -1026,6 +1085,92 @@
     import_hidden_fields=_excel_hidden,
     import_note=dref_tr('Lines finer than a sector come from an Excel workbook.')
 ) %}{% endcall %}
+{% endif %}
+{% call modal_shell('dref-member-help-modal', dref_tr('What members do'), max_width='max-w-xl') %}
+    <div class="text-sm text-gray-600 space-y-3">
+        <p>{{ dref_tr('A member already holds a DREF role. This row chooses the operation they work on, and the highest tier they can use on it.') }}</p>
+        <p>{{ dref_tr('The tier is a ceiling. They act at the lower of this tier and their role. Country access to this operation keeps the full role. A tier cannot raise a lower role.') }}</p>
+        <ul class="list-disc pl-5 space-y-2">
+            <li><span class="font-medium text-gray-800">{{ dref_tr('Data entry') }}.</span> {{ dref_tr('Files the plan, funds, procurement, delays, feedback, risks, and drafts. A figure outside the approved budget, target, or dates becomes a change request.') }}</li>
+            <li><span class="font-medium text-gray-800">{{ dref_tr('Validation') }}.</span> {{ dref_tr('Confirms the plan and drafts, sends a validated draft to GO, and signs off changes when the National Society is the authority.') }}</li>
+            <li><span class="font-medium text-gray-800">{{ dref_tr('Technical review') }}.</span> {{ dref_tr('Adds and removes members, and signs off changes when the delegation is the authority. Approving an assignment with this role marks the report reviewed.') }}</li>
+            <li><span class="font-medium text-gray-800">{{ dref_tr('Portfolio') }}.</span> {{ dref_tr('Sets how often this operation reports and who signs off changes. The Portfolio role, not this row, shows every operation.') }}</li>
+        </ul>
+        <p>{{ dref_tr('Reminders go to members of the matching tier, and to people with a DREF role and access to this country. From three days before a report is due everyone is reminded; later reminders climb from validation to technical review to portfolio.') }}</p>
+        <p>{{ dref_tr('Opening a reporting assignment also requires the DREF access group. System managers are not limited by that group.') }}</p>
+    </div>
+    <div class="mt-4 flex justify-end">
+        <button type="button" class="btn btn-secondary close-modal">{{ dref_tr('Close') }}</button>
+    </div>
+{% endcall %}
+{% if plan_versions %}
+{% call modal_shell('dref-plan-versions-modal', dref_tr('Plan versions'), max_width='max-w-4xl') %}
+    <div class="text-sm text-gray-600 space-y-4">
+        <p>{{ dref_tr('The current version is the one reporting uses. An older version can be opened, or copied into a new draft. Reset builds a new draft from the latest approved GO stage and keeps every version already stored.') }}</p>
+        {% if can_reset_plan %}
+        <form method="post" action="{{ url_for('dref_monitoring.reset_plan_route', operation_id=operation.id) }}" data-dref-plan-confirm="{{ dref_tr('Open a new draft from the latest approved GO stage? Earlier versions, including a confirmed plan, stay in this list.') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="tab" value="plan">
+            <button type="submit" class="btn btn-secondary">
+                <i class="fas fa-undo" aria-hidden="true"></i>{{ dref_tr('Reset to GO draft') }}
+            </button>
+        </form>
+        {% endif %}
+        <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
+                    <tr>
+                        <th class="px-4 py-2 font-medium">{{ dref_tr('Version') }}</th>
+                        <th class="px-4 py-2 font-medium">{{ dref_tr('Status') }}</th>
+                        <th class="px-4 py-2 font-medium">{{ dref_tr('Source') }}</th>
+                        <th class="px-4 py-2 font-medium">{{ dref_tr('Opened') }}</th>
+                        <th class="px-4 py-2 font-medium">{{ dref_tr('Confirmed') }}</th>
+                        <th class="px-4 py-2 font-medium"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in plan_versions %}
+                    <tr class="border-t border-gray-200">
+                        <td class="px-4 py-3 font-medium text-gray-900">
+                            {{ row.version }}
+                            {% if row.current %}<span class="ml-1 text-xs font-medium text-gray-500">{{ dref_tr('Current') }}</span>{% endif %}
+                        </td>
+                        <td class="px-4 py-3">{{ dref_status(row.status) }}</td>
+                        <td class="px-4 py-3 text-gray-700">{{ dref_tr(row.source_label) if row.source_label else '-' }}</td>
+                        <td class="px-4 py-3 text-gray-700">{{ row.opened_on or '-' }}</td>
+                        <td class="px-4 py-3 text-gray-700">
+                            {% if row.confirmed_on %}
+                            {{ row.confirmed_on }}{% if row.confirmed_by %}<span class="block text-xs text-gray-500">{{ row.confirmed_by }}</span>{% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap items-center justify-end gap-2">
+                                {% if plan_history and plan and plan.version == row.version %}
+                                <span class="text-xs font-medium text-gray-500">{{ dref_tr('Viewing') }}</span>
+                                {% elif row.current and not plan_history %}
+                                {% else %}
+                                <a class="btn btn-secondary btn-sm" href="{{ url_for('dref_monitoring.operation_page', operation_id=operation.id, tab='plan') if row.current else url_for('dref_monitoring.operation_page', operation_id=operation.id, tab='plan', plan_version=row.version) }}">{{ dref_tr('View') }}</a>
+                                {% endif %}
+                                {% if can_enter and not row.current %}
+                                <form method="post" action="{{ url_for('dref_monitoring.restore_plan_route', operation_id=operation.id) }}" data-dref-plan-confirm="{{ dref_tr('Copy this version into a new draft? The version you are copying stays as it is.') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="tab" value="plan">
+                                    <input type="hidden" name="version" value="{{ row.version }}">
+                                    <button type="submit" class="btn btn-secondary btn-sm">{{ dref_tr('Use this version') }}</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="mt-4 flex justify-end">
+        <button type="button" class="btn btn-secondary close-modal">{{ dref_tr('Close') }}</button>
+    </div>
+{% endcall %}
 {% endif %}
 {% call modal_shell('dref-plan-source-modal', dref_tr('Where this plan comes from'), max_width='max-w-xl') %}
     <div class="text-sm text-gray-600 space-y-2">
@@ -1046,13 +1191,16 @@
         <p>{{ dref_tr('The groups below came from an Excel import. The ceilings still follow the latest approved GO stage.') }}</p>
         {% elif plan and plan.source == 'rebased' %}
         <p>{{ dref_tr('This version was opened because a later approved stage changed the total, the end date, or a sector budget or target. The previous validated plan is kept.') }}</p>
+        {% elif plan and plan.source == 'restored' %}
+        <p>{{ dref_tr('This version is a copy of an earlier plan. The earlier version is kept.') }}</p>
         {% endif %}
     </div>
     <div class="mt-4 flex justify-end">
         <button type="button" class="btn btn-secondary close-modal">{{ dref_tr('Close') }}</button>
     </div>
 {% endcall %}
-<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/operation_tabs.js') }}" nonce="{{ csp_nonce() }}" defer></script>
-<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/plan_inline.js') }}?v=12" nonce="{{ csp_nonce() }}" defer></script>
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/operation_tabs.js') }}?v=2" nonce="{{ csp_nonce() }}" defer></script>
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/report_actions.js') }}?v=2" nonce="{{ csp_nonce() }}" defer></script>
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/plan_inline.js') }}?v=13" nonce="{{ csp_nonce() }}" defer></script>
 {% include "components/_ui_style_root_end.html" %}
 {% endblock %}

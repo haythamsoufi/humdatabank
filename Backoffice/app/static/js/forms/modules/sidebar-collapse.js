@@ -728,7 +728,8 @@ class SidebarCollapseController {
   }
 
   /**
-   * Section nav: show full label on one line when hovering truncated names (position:fixed overlay)
+   * Side nav: show the full label on one line when a truncated name is hovered.
+   * The top stepper already wraps the name, so that preview stays off there.
    */
   initSectionNavHoverExpand() {
     const sidebar = this.elements.sidebar;
@@ -740,7 +741,15 @@ class SidebarCollapseController {
     overlay.style.cssText = 'position:fixed;z-index:9999;white-space:nowrap;pointer-events:none;display:none;background:#fff;padding:0 0.5rem 0 0;box-shadow:2px 0 4px rgba(0,0,0,0.08);';
     document.body.appendChild(overlay);
 
+    const stepperActive = () =>
+      document.querySelector('.entry-form-root')?.getAttribute('data-section-nav') === 'stepper';
+
+    const hideOverlay = () => {
+      overlay.style.display = 'none';
+    };
+
     const showOverlay = (link) => {
+      if (stepperActive()) return;
       const span = link.querySelector('span.truncate');
       if (!span) return;
       const text = span.textContent || '';
@@ -758,9 +767,13 @@ class SidebarCollapseController {
       overlay.style.display = 'block';
     };
 
-    const hideOverlay = () => {
-      overlay.style.display = 'none';
-    };
+    const root = sidebar.closest('.entry-form-root');
+    if (root) {
+      const navObserver = new MutationObserver(() => {
+        if (stepperActive()) hideOverlay();
+      });
+      navObserver.observe(root, { attributes: true, attributeFilter: ['data-section-nav'] });
+    }
 
     const links = sidebar.querySelectorAll('a.section-link');
     links.forEach((link) => {

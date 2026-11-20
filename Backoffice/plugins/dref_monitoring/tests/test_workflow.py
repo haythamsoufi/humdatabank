@@ -25,13 +25,16 @@ from plugins.dref_monitoring.models import (
 from plugins.dref_monitoring.services.drafts import build_payload, generate_draft
 from plugins.dref_monitoring.services.escalation import run_escalation
 from plugins.dref_monitoring.services.overview import build_overview
-from plugins.dref_monitoring.services.excel_import import import_activities, parse_workbook
+from plugins.dref_monitoring.services.excel_import import export_workbook, import_activities, parse_workbook
 from plugins.dref_monitoring.services.go_sync import apply_rows, fetch_rows
+from plugins.dref_monitoring.constants import ENTER_PERMISSION
 from plugins.dref_monitoring.services.plans import (
     activities_for,
     edit_activity,
     groups_for,
     latest_plan,
+    reset_plan_from_sync,
+    restore_plan_version,
     save_plan_activities,
     sectors_not_on_plan,
     validate_plan,
@@ -228,6 +231,143 @@ def test_a_negative_new_sector_does_not_keep_the_other_edits(seeded):
     assert "Deliver Livelihoods" in refused["error"]
     assert db.session.get(type(activity), activity.id).title != "Clinics"
     assert all(group.label != "Livelihoods" for group in groups_for(latest_plan(operation.id).id))
+
+
+def test_entry_form_uses_the_plan_lists_for_activity_type_and_actor(seeded):
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    activity = activities_for(groups_for(latest_plan(operation.id).id)[0].id)[0]
+    activity.activity_type = "procurement"
+    activity.carried_out_by = "ifrc"
+    db.session.flush()
+
+    from plugins.dref_monitoring.constants import ACTIVITY_TYPES, CARRIED_OUT_BY
+    from plugins.dref_monitoring.services.entry_activities import assignment_activity_payload
+    from plugins.dref_monitoring.services.reporting import write_report_fields
+
+    payload = assignment_activity_payload(operation, None)
+    cards = [row for rows in payload["sections"].values() for row in rows]
+    card = next(row for row in cards if row["id"] == activity.id)
+    assert card["activity_type"] == "procurement"
+    assert card["carried_out_by"] == "ifrc"
+    assert [(item["value"], item["label"]) for item in payload["choices"]["activity_type"]] == list(ACTIVITY_TYPES)
+    assert [(item["value"], item["label"]) for item in payload["choices"]["carried_out_by"]] == list(CARRIED_OUT_BY)
+
+    period = DrefPeriod(
+        operation_id=operation.id,
+        sequence=1,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+        due_date=date(2026, 1, 31),
+    )
+    db.session.add(period)
+    db.session.flush()
+    saved = write_report_fields(
+        operation,
+        period,
+        {
+            f"activity_{activity.id}_status": "ongoing",
+            f"activity_{activity.id}_activity_type": "direct_delivery",
+            f"activity_{activity.id}_carried_out_by": "national_society",
+        },
+    )
+    assert saved is None
+    assert activity.activity_type == "direct_delivery"
+    assert activity.carried_out_by == "national_society"
+    assert activity.status == "ongoing"
+
+    untouched = write_report_fields(
+        operation,
+        period,
+        {f"activity_{activity.id}_status": "completed"},
+    )
+    assert untouched is None
+    assert activity.activity_type == "direct_delivery"
+    assert activity.carried_out_by == "national_society"
+
+    rejected = write_report_fields(
+        operation,
+        period,
+        {
+            f"activity_{activity.id}_activity_type": "not_a_type",
+            f"activity_{activity.id}_carried_out_by": "not_an_actor",
+        },
+    )
+    assert rejected is None
+    assert activity.activity_type == ""
+    assert activity.carried_out_by == ""
+
+
+def test_entry_form_saves_budget_target_and_dates_and_caps_percentages(seeded):
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    activity = activities_for(groups_for(latest_plan(operation.id).id)[0].id)[0]
+    period = DrefPeriod(
+        operation_id=operation.id,
+        sequence=1,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+        due_date=date(2026, 1, 31),
+    )
+    db.session.add(period)
+    db.session.flush()
+    from plugins.dref_monitoring.services.reporting import write_report_fields
+
+    saved = write_report_fields(
+        operation,
+        period,
+        {
+            f"activity_{activity.id}_status": "ongoing",
+            f"activity_{activity.id}_budget": "1250.50",
+            f"activity_{activity.id}_target": "40",
+            f"activity_{activity.id}_start_date": "2026-02-01",
+            f"activity_{activity.id}_end_date": "2026-02-20",
+        },
+    )
+    assert saved is None
+    assert activity.budget_chf == Decimal("1250.50")
+    assert activity.target == Decimal("40.00")
+    assert activity.start_date == date(2026, 2, 1)
+    assert activity.end_date == date(2026, 2, 20)
+
+    ordered = write_report_fields(
+        operation,
+        period,
+        {
+            f"activity_{activity.id}_start_date": "2026-03-01",
+            f"activity_{activity.id}_end_date": "2026-02-01",
+        },
+    )
+    assert "The end date must be on or after the start date." in ordered
+    assert activity.start_date == date(2026, 2, 1)
+
+    negative = write_report_fields(operation, period, {f"activity_{activity.id}_budget": "-5"})
+    assert "Amounts cannot be negative." in negative
+    assert activity.budget_chf == Decimal("1250.50")
+
+    one = write_report_fields(
+        operation,
+        period,
+        {
+            f"activity_{activity.id}_pct_women": "101",
+            f"activity_{activity.id}_pct_men": "0",
+            f"activity_{activity.id}_pct_girls": "0",
+            f"activity_{activity.id}_pct_boys": "0",
+        },
+    )
+    assert "A percentage cannot be more than 100." in one
+
+    combined = write_report_fields(
+        operation,
+        period,
+        {
+            f"activity_{activity.id}_pct_women": "40",
+            f"activity_{activity.id}_pct_men": "40",
+            f"activity_{activity.id}_pct_girls": "30",
+            f"activity_{activity.id}_pct_boys": "0",
+        },
+    )
+    assert "The percentages together cannot be more than 100." in combined
 
 
 def test_generated_plan_puts_the_indicator_on_the_sector(seeded):
@@ -512,6 +652,59 @@ def test_a_new_allocation_opens_a_fresh_draft_and_keeps_the_validated_plan(seede
     assert str(operation.total_approved) in {"18000", "18000.00"}
 
 
+def test_reset_keeps_a_confirmed_plan_and_opens_a_draft_from_the_sync(seeded):
+    _country, user = seeded
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    assert validate_plan(operation, _manager(user.id), date(2026, 1, 10)) is None
+    approved = latest_plan(operation.id)
+    activity = activities_for(groups_for(approved.id)[0].id)[0]
+    activity.title = "Clinic support kept"
+    db.session.commit()
+
+    entry = Actor(user.id, False, frozenset({ENTER_PERMISSION}), frozenset({operation.country_id}), {})
+    assert reset_plan_from_sync(operation, entry, date(2026, 2, 1)) == "You cannot undo a confirmed plan."
+    assert latest_plan(operation.id).id == approved.id
+
+    assert reset_plan_from_sync(operation, _manager(user.id), date(2026, 2, 1)) is None
+    db.session.commit()
+    plans = DrefPlan.query.filter_by(operation_id=operation.id).order_by(DrefPlan.version).all()
+    assert [(plan.version, plan.status, plan.source) for plan in plans] == [
+        (1, "validated", "generated"),
+        (2, "draft", "generated"),
+    ]
+    assert activities_for(groups_for(plans[0].id)[0].id)[0].title == "Clinic support kept"
+    assert activities_for(groups_for(plans[1].id)[0].id)[0].title.startswith("Deliver ")
+    operation = db.session.get(DrefOperation, operation.id)
+    assert operation.workflow_status == "plan_draft"
+
+    assert restore_plan_version(operation, 1, entry, date(2026, 2, 2)) is None
+    db.session.commit()
+    restored = latest_plan(operation.id)
+    assert restored.version == 3
+    assert restored.status == "draft"
+    assert restored.source == "restored"
+    assert activities_for(groups_for(restored.id)[0].id)[0].title == "Clinic support kept"
+    assert db.session.get(DrefPlan, approved.id).status == "validated"
+    assert restore_plan_version(operation, 3, entry, date(2026, 2, 3)) == "This version is already the current plan."
+    assert restore_plan_version(operation, 9, entry, date(2026, 2, 3)) == "That plan version was not found."
+
+
+def test_reset_during_closure_does_not_reopen_the_workflow(seeded):
+    _country, user = seeded
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    assert validate_plan(operation, _manager(user.id), date(2026, 1, 10)) is None
+    operation.workflow_status = "closure"
+    db.session.commit()
+    assert reset_plan_from_sync(operation, _manager(user.id), date(2026, 2, 1)) is None
+    db.session.commit()
+    operation = db.session.get(DrefOperation, operation.id)
+    assert operation.workflow_status == "closure"
+    assert latest_plan(operation.id).status == "draft"
+    assert latest_plan(operation.id).version == 2
+
+
 def test_draft_payload_has_figures_only_and_records_the_model_call(seeded):
     _country, user = seeded
     apply_rows([_row()])
@@ -656,6 +849,69 @@ def test_excel_import_replaces_a_draft_plan(seeded):
     plan = latest_plan(operation.id)
     assert plan.source == "excel"
     assert groups_for(plan.id)[0].label == "Health"
+
+
+def test_export_writes_a_workbook_the_import_reads_back(seeded):
+    _country, user = seeded
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "Activities"
+    sheet.append(
+        [
+            "Group",
+            "Activity",
+            "Indicator",
+            "Indicator type",
+            "Target",
+            "Unit",
+            "Budget CHF",
+            "Start",
+            "End",
+            "Status",
+            "Activity type",
+            "Activity carried out by",
+        ]
+    )
+    sheet.append(
+        [
+            "Health",
+            "Distribute kits",
+            "Kits delivered",
+            "outcome",
+            10,
+            "kits",
+            500,
+            "2026-01-02",
+            "2026-02-01",
+            "ongoing",
+            "direct_delivery",
+            "national_society",
+        ]
+    )
+    buffer = BytesIO()
+    book.save(buffer)
+    imported = import_activities(operation, buffer.getvalue(), _manager(user.id), date(2026, 1, 10))
+    assert imported["ok"] is True
+    raw = export_workbook(latest_plan(operation.id))
+    rows = parse_workbook(raw)
+    assert rows[0]["activity"] == "Distribute kits"
+    assert rows[0]["indicator"] == "Kits delivered"
+    assert rows[0]["kind"] == "outcome"
+    assert float(rows[0]["target"]) == 10
+    assert float(rows[0]["budget_chf"]) == 500
+    assert rows[0]["status"] == "ongoing"
+    assert rows[0]["activity_type"] == "direct_delivery"
+    assert rows[0]["carried_out_by"] == "national_society"
+    again = import_activities(operation, raw, _manager(user.id), date(2026, 1, 10))
+    assert again["ok"] is True
+    plan = latest_plan(operation.id)
+    activity = activities_for(groups_for(plan.id)[0].id)[0]
+    assert activity.title == "Distribute kits"
+    assert activity.status == "ongoing"
+    assert activity.activity_type == "direct_delivery"
+    assert activity.carried_out_by == "national_society"
 
 
 def test_escalation_notifies_members_once_per_day(seeded):

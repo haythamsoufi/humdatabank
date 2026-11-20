@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 PLUGIN_ID = "dref_monitoring"
-VERSION = "0.7.0"
+VERSION = "0.10.0"
 DISPLAY_NAME = "DREF Monitoring"
 
 TEMPLATE_NAME = "DREF operational monitoring"
@@ -26,8 +26,13 @@ PORTFOLIO_ROLE = "dref_monitoring_portfolio"
 EXPLORE_TAB_ID = "dref-monitoring"
 
 GO_DREF3_URL = "https://goadmin.ifrc.org/api/v2/dref3/"
-PROMPT_VERSION = "2"
+PROMPT_VERSION = "3"
 REPORT_LANGUAGES = ("en", "fr", "es", "ar")
+# How a generated report treats narrative: figures only, chapters the National Society writes, or chapters the model drafts.
+NARRATIVE_NONE = "none"
+NARRATIVE_MANUAL = "manual"
+NARRATIVE_AI = "ai"
+NARRATIVE_MODES = (NARRATIVE_NONE, NARRATIVE_MANUAL, NARRATIVE_AI)
 LANGUAGE_NAMES = {"en": "English", "fr": "French", "es": "Spanish", "ar": "Arabic"}
 SECTION_KEYS = (
     "what_happened",
@@ -146,5 +151,11 @@ DEFAULT_CONFIG = {
         "escalation_review_days": 7,
         "escalation_portfolio_days": 14,
     },
-    "ai": {"enabled": False, "prompt_version": PROMPT_VERSION, "language": "en"},
+    "ai": {
+        "enabled": False,
+        "prompt_version": PROMPT_VERSION,
+        "language": "en",
+        "model": "",
+        "final_report_model": "",
+    },
 }

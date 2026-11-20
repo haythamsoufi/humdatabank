@@ -17,6 +17,24 @@
     z-index: 21;
 }
 
+/* Project cards stretch with the row so Enter Data lines up with other cards.
+   The action row is pushed to the bottom; recent-editor avatars keep the corner. */
+.dashboard-project-group-card {
+    height: 100%;
+}
+.dashboard-project-group-card .dashboard-project-card-main,
+.dashboard-project-group-card .dashboard-project-card-main > .dashboard-project-card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+/* Split spare card height so status, due date, and completion sit midway between the cycle button and Enter Data. */
+.dashboard-project-group-card .dashboard-project-card-body > div:not(.dashboard-assignment-contributors):not(.dashboard-card-actions),
+.dashboard-project-group-card .dashboard-card-actions {
+    margin-top: auto;
+}
+
 /* Card action row: Enter Data stays visible; overflow moves other actions to ⋮ menu */
 .dashboard-card-actions {
     min-width: 0;
@@ -331,7 +349,26 @@ html[dir="rtl"] .dashboard-assignment-contributors .contributor-avatar + .contri
 }
 
 /* Project card cycle switcher: slim custom scrollbar */
+.project-cycle-nav {
+    width: fit-content;
+}
+.project-cycle-nav-toggle[aria-expanded="true"] {
+    background-color: #f3f4f6;
+}
+.project-cycle-nav-chevron {
+    transition: transform 0.15s ease;
+}
+.project-cycle-nav-toggle[aria-expanded="true"] .project-cycle-nav-chevron {
+    transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+    .project-cycle-nav-chevron {
+        transition: none;
+    }
+}
 .project-cycle-nav-menu {
+    inset-inline-start: 0;
+    inset-inline-end: auto;
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
 }

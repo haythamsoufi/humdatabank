@@ -2,7 +2,10 @@
 
 The language model receives the approved request and the monitoring history:
 figures, activity notes, indicator actuals, delay reasons, and change
-justifications. It does not receive user names, email addresses, or community
+justifications. It also receives background (see ``services/context.py``): the
+written application GO approved, recent public GO field reports, Databank
+documents the person generating the draft may read, and the previous draft.
+It does not receive user names, email addresses, contacts, or community
 feedback. A reply is stored as GO chapter text. The National Society can edit
 those chapters before validation sends the report to GO.
 """
@@ -15,10 +18,15 @@ import logging
 from datetime import date, timedelta
 from decimal import Decimal
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.extensions import db
 from app.utils.common.datetime_helpers import utcnow
 from plugins.dref_monitoring.constants import (
-    LANGUAGE_NAMES,
+    NARRATIVE_AI,
+    NARRATIVE_MANUAL,
+    NARRATIVE_MODES,
+    NARRATIVE_NONE,
     PROMPT_VERSION,
     REPORT_LANGUAGES,
     SECTION_KEYS,
@@ -48,6 +56,11 @@ from plugins.dref_monitoring.services.plans import (
 from plugins.dref_monitoring.services.reporting import periods_for
 
 logger = logging.getLogger(__name__)
+
+
+class DraftCancelled(Exception):
+    """The person asked to stop. No draft is stored, and the model call is dropped."""
+
 
 EXPENDITURE_NOTE = (
     "Reported by the National Society. Indicative until delegation finance validates it in ERP."
@@ -85,6 +98,55 @@ def _counts(disaggregation) -> dict:
         key: source.get(key)
         for key in ("women", "men", "girls", "boys")
         if source.get(key) is not None
+    }
+
+
+def _percent(part, whole) -> int | None:
+    if part is None or not whole:
+        return None
+    return round(float(part) / float(whole) * 100)
+
+
+def _progress_summary(sectors: list[dict], total_approved, expenditure) -> dict:
+    """Counts and percentages worked out here, because a model gets sums and ratios wrong."""
+    statuses: dict[str, int] = {}
+    by_sector = []
+    indicators = []
+    for sector in sectors:
+        counts: dict[str, int] = {}
+        for activity in sector.get("activities") or []:
+            status = activity.get("status") or "planned"
+            counts[status] = counts.get(status, 0) + 1
+            statuses[status] = statuses.get(status, 0) + 1
+            for indicator in activity.get("indicators") or []:
+                actual = indicator.get("actual")
+                if actual is None:
+                    continue
+                indicators.append(
+                    {
+                        "sector": sector.get("label"),
+                        "title": indicator.get("title"),
+                        "target": indicator.get("target"),
+                        "actual": actual,
+                        "percent_of_target": _percent(actual, indicator.get("target")),
+                        "unit": indicator.get("unit"),
+                    }
+                )
+        by_sector.append(
+            {
+                "sector": sector.get("label"),
+                "budget_chf": sector.get("budget_chf"),
+                "people_targeted": sector.get("people_targeted"),
+                "activities_by_status": counts,
+            }
+        )
+    return {
+        "activities": sum(statuses.values()),
+        "activities_by_status": statuses,
+        "by_sector": by_sector,
+        "indicators_reported": indicators,
+        "expenditure_chf": expenditure,
+        "budget_used_percent": _percent(expenditure, None if total_approved is None else _number(total_approved)),
     }
 
 
@@ -160,10 +222,12 @@ def build_payload(operation) -> dict:
         )
     return {
         "appeal_code": operation.appeal_code,
+        "country_name": operation.country_name,
         "country_iso3": operation.country_iso3,
         "hazard": operation.hazard,
         "pillar": operation.pillar,
         "appeal_type": operation.appeal_type,
+        "allocation_type": operation.allocation_type,
         "operation_status": operation.operation_status,
         "start_date": _iso(operation.start_date),
         "end_date": _iso(operation.end_date),
@@ -171,6 +235,11 @@ def build_payload(operation) -> dict:
         "funds_received": bool(operation.funds_received),
         "people_targeted": operation.people_targeted,
         "sectors": sectors,
+        "progress_summary": _progress_summary(sectors, operation.total_approved, latest_expenditure),
+        "people_reached_note": (
+            "People reached are counted per activity. A person reached by two activities is counted twice, "
+            "so do not add them across activities."
+        ),
         "expenditure_reported_chf": latest_expenditure,
         "expenditure_note": EXPENDITURE_NOTE,
         "procurement": [
@@ -400,6 +469,15 @@ def narrative_map(draft) -> dict:
     return {}
 
 
+def narrative_mode_of(draft) -> str:
+    """How this draft treats narrative. Drafts from before the option was added read as manual or AI."""
+    stored = getattr(draft, "sections", None)
+    mode = stored.get("narrative_mode") if isinstance(stored, dict) else None
+    if mode in NARRATIVE_MODES:
+        return mode
+    return NARRATIVE_AI if getattr(draft, "ai_used", False) else NARRATIVE_MANUAL
+
+
 def narrative_fields(draft) -> list[dict]:
     current = narrative_map(draft)
     if current.get("legacy") and not any(current.get(key) for key in SECTION_KEYS):
@@ -413,6 +491,26 @@ def narrative_fields(draft) -> list[dict]:
         ]
 
 
+def _report(progress, stage: str, message: str, percent: float, **extra) -> None:
+    """Tell a listener where the work is. Only ``DraftCancelled`` may escape from it."""
+    if progress is None:
+        return
+    try:
+        progress({"stage": stage, "message": message, "percent": percent, **extra})
+    except DraftCancelled:
+        raise
+    except Exception:
+        logger.debug("DREF draft progress listener failed", exc_info=True)
+
+
+def _listener(progress) -> dict:
+    """Keyword arguments that hand a listener to a loader or a model call that accepts one.
+
+    Callers without a listener (the scheduler, tests with a plain stub) pass nothing extra.
+    """
+    return {} if progress is None else {"progress": progress}
+
+
 def generate_draft(
     operation,
     kind: str,
@@ -423,20 +521,56 @@ def generate_draft(
     trigger: str = "manual",
     period_id: int | None = None,
     system: bool = False,
+    narrative: str | None = None,
+    context_loader=None,
+    progress=None,
 ) -> dict:
+    """Create a draft report.
+
+    ``narrative`` picks how chapters are filled: ``none`` is the monitoring
+    figures only, ``manual`` leaves chapters for the National Society to write,
+    and ``ai`` has the model draft them (it needs ``complete``). Left unset, the
+    model drafts chapters whenever ``complete`` is given, as scheduled drafts do.
+
+    ``context_loader(operation, actor)`` returns the written application, field
+    reports and documents. It runs only when a model will read them, and a
+    failure there leaves the draft to the monitoring figures alone.
+
+    ``progress(event)`` is called as the work moves on, with ``stage``, ``message``
+    and ``percent``. It may raise ``DraftCancelled`` to stop, which is passed on.
+    """
     if kind not in {"operational_update", "final_report"}:
         return {"ok": False, "error": "Unknown report type."}
     if not system and (actor is None or not actor.allows(operation, "enter")):
         return {"ok": False, "error": "You cannot draft a report for this operation."}
+    if narrative is not None and narrative not in NARRATIVE_MODES:
+        return {"ok": False, "error": "Unknown narrative option."}
+    if narrative == NARRATIVE_AI and complete is None:
+        return {"ok": False, "error": "AI drafting is not enabled."}
+    if narrative in (NARRATIVE_NONE, NARRATIVE_MANUAL):
+        complete = None
     language = report_language(language)
+    _report(progress, "collecting", "Collecting the monitoring figures.", 5)
     payload = build_payload(operation)
     payload["language"] = language
     payload["report_kind"] = kind
+    if complete is not None and context_loader is not None:
+        try:
+            background = context_loader(operation, actor, **_listener(progress))
+        except DraftCancelled:
+            raise
+        except Exception:
+            logger.warning("DREF draft background failed for %s", operation.appeal_code, exc_info=True)
+            db.session.rollback()
+            background = None
+        if background:
+            payload["context"] = background
     body = ""
     ai_used = False
     if complete is not None:
+        _report(progress, "writing", "Writing the narrative.", 40)
         try:
-            generated = complete(payload, kind)
+            generated = complete(payload, kind, **_listener(progress))
             parsed = parse_model_sections(generated)
             if parsed and any(parsed.values()):
                 body = json.dumps(parsed, ensure_ascii=False)
@@ -444,19 +578,24 @@ def generate_draft(
             elif generated and str(generated).strip():
                 body = str(generated).strip()
                 ai_used = True
+        except DraftCancelled:
+            raise
         except Exception:
             logger.warning(
                 "DREF Draft 0 model call failed for %s; the document uses the monitoring tables.",
                 operation.appeal_code,
                 exc_info=True,
             )
+    _report(progress, "saving", "Saving the draft.", 96)
+    stored = dict(payload)
+    stored["narrative_mode"] = narrative or (NARRATIVE_AI if ai_used else NARRATIVE_MANUAL)
     draft = DrefDraft(
         operation_id=operation.id,
         report_kind=kind,
         model=model_name if ai_used else "",
         prompt_version=PROMPT_VERSION,
         input_hash=_hash(payload),
-        sections=payload,
+        sections=stored,
         body=body,
         ai_used=ai_used,
         language=language,
@@ -470,6 +609,79 @@ def generate_draft(
     return {"ok": True, "draft_id": draft.id, "ai_used": ai_used}
 
 
+def include_narrative(
+    draft: DrefDraft,
+    operation,
+    actor,
+    narrative: str,
+    complete=None,
+    model_name: str = "",
+    context_loader=None,
+    progress=None,
+) -> dict:
+    """Add chapters to a figures-only draft. The draft and its figures stay."""
+    if draft.operation_id != operation.id:
+        return {"ok": False, "error": "Draft not found."}
+    if (draft.status or "draft") != "draft":
+        return {"ok": False, "error": "This draft is already validated."}
+    if actor is None or not actor.allows(operation, "enter"):
+        return {"ok": False, "error": "You cannot edit this draft."}
+    if narrative_mode_of(draft) != NARRATIVE_NONE:
+        return {"ok": False, "error": "This draft already has narrative chapters."}
+    if narrative not in (NARRATIVE_MANUAL, NARRATIVE_AI):
+        return {"ok": False, "error": "Unknown narrative option."}
+    if narrative == NARRATIVE_AI and complete is None:
+        return {"ok": False, "error": "AI drafting is not enabled."}
+
+    stored = dict(draft.sections or {})
+    body = ""
+    ai_used = False
+    if narrative == NARRATIVE_AI:
+        payload = build_payload(operation)
+        payload["language"] = report_language(getattr(draft, "language", None) or "en")
+        payload["report_kind"] = draft.report_kind
+        _report(progress, "collecting", "Collecting the monitoring figures.", 5)
+        if context_loader is not None:
+            try:
+                background = context_loader(operation, actor, **_listener(progress))
+            except DraftCancelled:
+                raise
+            except Exception:
+                logger.warning("DREF draft background failed for %s", operation.appeal_code, exc_info=True)
+                db.session.rollback()
+                background = None
+            if background:
+                payload["context"] = background
+        _report(progress, "writing", "Writing the narrative.", 40)
+        try:
+            generated = complete(payload, draft.report_kind, **_listener(progress))
+            parsed = parse_model_sections(generated)
+            if parsed and any(parsed.values()):
+                body = json.dumps(parsed, ensure_ascii=False)
+                ai_used = True
+            elif generated and str(generated).strip():
+                body = str(generated).strip()
+                ai_used = True
+        except DraftCancelled:
+            raise
+        except Exception:
+            logger.warning(
+                "DREF Draft 0 model call failed for %s; the chapters stay empty.",
+                operation.appeal_code,
+                exc_info=True,
+            )
+        _report(progress, "saving", "Saving the draft.", 96)
+        stored = dict(payload)
+        draft.body = body
+        draft.ai_used = ai_used
+        draft.model = model_name if ai_used else ""
+    stored["narrative_mode"] = narrative
+    draft.sections = stored
+    flag_modified(draft, "sections")
+    db.session.commit()
+    return {"ok": True, "ai_used": ai_used}
+
+
 def save_sections(draft: DrefDraft, operation, form, actor) -> str | None:
     if draft.operation_id != operation.id:
         return "Draft not found."
@@ -477,6 +689,8 @@ def save_sections(draft: DrefDraft, operation, form, actor) -> str | None:
         return "This draft is already validated."
     if not actor.allows(operation, "enter"):
         return "You cannot edit this draft."
+    if narrative_mode_of(draft) == NARRATIVE_NONE:
+        return "This report is figures only and has no narrative to edit."
     updated = {key: _clip(form.get(f"section_{key}"), limit=4000) for key in SECTION_KEYS}
     draft.edited_body = json.dumps(updated, ensure_ascii=False)
     db.session.commit()
@@ -503,39 +717,29 @@ def validate_draft(draft: DrefDraft, operation, actor) -> str | None:
 
 
 def llm_messages(payload: dict, kind: str, language: str = "en") -> list[dict]:
+    from plugins.dref_monitoring.services.prompts import system_prompt, user_prompt
+
     language = report_language(language or payload.get("language"))
-    title = "operational update" if kind == "operational_update" else "final report"
     return [
-        {
-            "role": "system",
-            "content": (
-                "You draft an IFRC DREF "
-                + title
-                + " for filing in GO. Use only the JSON figures: the approved request and the monitoring history. "
-                "Do not invent people, places, activities, contacts, or numbers. "
-                "Leave a chapter as an empty string when the figures do not support it. "
-                "State that expenditure is indicative until ERP validation. "
-                "Write in "
-                + LANGUAGE_NAMES[language]
-                + ". Return one JSON object and nothing else. Keys: "
-                + ", ".join(SECTION_KEYS)
-                + "."
-            ),
-        },
-        {"role": "user", "content": json.dumps(payload, sort_keys=True, default=str)},
+        {"role": "system", "content": system_prompt(kind, language)},
+        {"role": "user", "content": user_prompt(payload)},
     ]
 
 
 def generate_scheduled_drafts(today: date | None = None, complete=None) -> int:
     """One operational update per due period, and one final report at the operation end date."""
     today = today or date.today()
+    loader = None
     if complete is None:
         from plugins.dref_monitoring.config_store import ai_enabled
 
         if ai_enabled():
+            from plugins.dref_monitoring.services.context import load_context
             from plugins.dref_monitoring.services.llm import complete_with_engine
 
             complete = complete_with_engine
+            # A caller that passes its own ``complete`` supplies its own input.
+            loader = load_context
     from plugins.dref_monitoring.config_store import ai_language
     from plugins.dref_monitoring.models import DrefOperation
 
@@ -558,11 +762,12 @@ def generate_scheduled_drafts(today: date | None = None, complete=None) -> int:
                 "operational_update",
                 None,
                 complete=complete,
-                model_name=_model_name() if complete is not None else "",
+                model_name=_model_name("operational_update") if complete is not None else "",
                 language=language,
                 trigger="milestone",
                 period_id=period.id,
                 system=True,
+                context_loader=loader,
             )
         except Exception:
             logger.warning("DREF milestone draft failed for %s", operation.appeal_code, exc_info=True)
@@ -587,10 +792,11 @@ def generate_scheduled_drafts(today: date | None = None, complete=None) -> int:
                 "final_report",
                 None,
                 complete=complete,
-                model_name=_model_name() if complete is not None else "",
+                model_name=_model_name("final_report") if complete is not None else "",
                 language=language,
                 trigger="closure",
                 system=True,
+                context_loader=loader,
             )
         except Exception:
             logger.warning("DREF closure draft failed for %s", operation.appeal_code, exc_info=True)
@@ -601,10 +807,10 @@ def generate_scheduled_drafts(today: date | None = None, complete=None) -> int:
     return created
 
 
-def _model_name() -> str:
+def _model_name(kind: str | None = None) -> str:
     try:
         from plugins.dref_monitoring.services.llm import configured_model
 
-        return configured_model()
+        return configured_model(kind)
     except Exception:
         return ""

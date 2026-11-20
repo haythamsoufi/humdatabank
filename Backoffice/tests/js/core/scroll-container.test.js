@@ -80,4 +80,38 @@ describe('scrollElementToStart', () => {
         expect(didScroll).toBe(false);
         expect(scrollCalls).toEqual([]);
     });
+
+    it('clears a sticky top stepper when that section-nav preview is on', () => {
+        const root = document.createElement('div');
+        root.className = 'entry-form-root';
+        root.setAttribute('data-section-nav', 'stepper');
+
+        const sidebar = document.createElement('div');
+        sidebar.id = 'section-navigation-sidebar';
+        sidebar.style.position = 'sticky';
+        sidebar.getBoundingClientRect = rect(56, 176);
+        root.appendChild(sidebar);
+
+        const main = document.createElement('main');
+        main.className = 'admin-scroll-main';
+        main.style.overflowY = 'auto';
+        Object.defineProperty(main, 'scrollHeight', { value: 5000, configurable: true });
+        Object.defineProperty(main, 'clientHeight', { value: 800, configurable: true });
+        main.scrollTop = 0;
+        main.scrollTo = (opts) => { scrollCalls.push(opts); };
+
+        const section = document.createElement('div');
+        section.getBoundingClientRect = rect(1400, 3200);
+        section.getClientRects = () => [{ top: 1400, bottom: 3200 }];
+        main.getBoundingClientRect = rect(56, 856);
+        main.appendChild(section);
+        root.appendChild(main);
+        document.body.appendChild(root);
+
+        const didScroll = scrollElementToStart(section, { behavior: 'auto' });
+
+        expect(didScroll).toBe(true);
+        // (1400 - 56) minus 8px inset minus the 120px stepper
+        expect(scrollCalls).toEqual([{ top: 1216, behavior: 'auto' }]);
+    });
 });

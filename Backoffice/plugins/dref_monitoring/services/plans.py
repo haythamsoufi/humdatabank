@@ -80,11 +80,33 @@ def ensure_standards() -> None:
     db.session.flush()
 
 
+PLAN_SOURCES = {
+    "generated": "From the GO sync",
+    "rebased": "Opened after a GO update",
+    "structure": "Opened by a plan edit",
+    "excel": "Excel import",
+    "restored": "Restored from an earlier version",
+}
+
+
+def plan_source_label(source: str | None) -> str:
+    key = str(source or "")
+    return PLAN_SOURCES.get(key, key)
+
+
 def latest_plan(operation_id: int) -> DrefPlan | None:
     return (
         DrefPlan.query.filter_by(operation_id=operation_id)
         .order_by(DrefPlan.version.desc())
         .first()
+    )
+
+
+def plans_for(operation_id: int) -> list[DrefPlan]:
+    return (
+        DrefPlan.query.filter_by(operation_id=operation_id)
+        .order_by(DrefPlan.version.desc(), DrefPlan.id.desc())
+        .all()
     )
 
 
@@ -795,6 +817,49 @@ def validate_plan(operation: DrefOperation, actor, today) -> str | None:
 
     open_cycles(operation)
     db.session.commit()
+    return None
+
+
+def restore_plan_version(operation: DrefOperation, version: int, actor, today) -> str | None:
+    """Copy an earlier plan into a new draft. The earlier plan stays as it was."""
+    if not actor.allows(operation, "enter"):
+        return "You cannot change this plan."
+    try:
+        number = int(version)
+    except (TypeError, ValueError):
+        return "That plan version was not found."
+    source = DrefPlan.query.filter_by(operation_id=operation.id, version=number).first()
+    if source is None:
+        return "That plan version was not found."
+    current = latest_plan(operation.id)
+    if current is not None and current.id == source.id:
+        return "This version is already the current plan."
+    closure = operation.workflow_status == WORKFLOW_CLOSURE
+    _clone(operation, source, today, "restored")
+    if not closure:
+        operation.workflow_status = WORKFLOW_PLAN_DRAFT
+    return None
+
+
+def reset_plan_from_sync(operation: DrefOperation, actor, today) -> str | None:
+    """Open a new draft from the latest approved GO stage and keep every stored version.
+
+    A confirmed plan stops being the plan reporting uses. It stays in the version
+    list, still confirmed, so it can be opened or copied back.
+    """
+    baseline = latest_baseline(operation.id)
+    if baseline is None:
+        return "There is no approved GO baseline to build a plan from."
+    current = latest_plan(operation.id)
+    if current is not None and current.status == PLAN_VALIDATED:
+        if not actor.allows(operation, "validate"):
+            return "You cannot undo a confirmed plan."
+    elif not actor.allows(operation, "enter"):
+        return "You cannot change this plan."
+    closure = operation.workflow_status == WORKFLOW_CLOSURE
+    generate_plan(operation, baseline, today)
+    if closure:
+        operation.workflow_status = WORKFLOW_CLOSURE
     return None
 
 

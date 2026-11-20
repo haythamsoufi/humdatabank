@@ -23,6 +23,7 @@ from plugins.dref_monitoring.constants import (
     MANAGE_PERMISSION,
     MANAGE_ROLE,
     PLUGIN_ID,
+    PORTFOLIO,
     PORTFOLIO_PERMISSION,
     PORTFOLIO_ROLE,
     REVIEW_PERMISSION,
@@ -85,6 +86,34 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         return bp
 
+    def register_validation_packs(self) -> None:
+        try:
+            from plugins.dref_monitoring.services.access_group import ensure_dref_assignment_access
+
+            ensure_dref_assignment_access()
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning("DREF access group setup failed", exc_info=True)
+
+    def project_report_audience(self, project, slot: str):
+        """Every DREF reporting cycle is limited to the DREF access group."""
+        del slot
+        if (getattr(project, "portfolio", None) or "").strip() != PORTFOLIO:
+            return []
+        try:
+            from plugins.dref_monitoring.services.access_group import ensure_dref_access_group
+
+            group = ensure_dref_access_group()
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning("DREF access group lookup failed", exc_info=True)
+            return []
+        if group is None:
+            return []
+        return [int(group.id)]
+
     def get_settings(self) -> Dict[str, Any]:
         from plugins.dref_monitoring.routes import settings_status
 
@@ -144,11 +173,24 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
         return [
             {"kind": "stylesheet", "url": asset("css/sector_section.css")},
             {"kind": "script", "url": asset("js/sector_section.js")},
+            {"kind": "script", "url": asset("js/report_actions.js")},
         ]
 
-    def prepare_entry_values(self, assignment_entity_status, existing_data) -> None:
-        from plugins.dref_monitoring.services.entry_activities import overlay_plan_targets
+    def get_entry_form_header_html(self, assignment_entity_status) -> str:
+        """Operational update and final report buttons for a cycle of this plugin."""
+        from flask import render_template
 
+        from plugins.dref_monitoring.services.entry_report_actions import report_actions_context
+
+        context = report_actions_context(assignment_entity_status)
+        if context is None:
+            return ""
+        return render_template(f"plugins/{self.plugin_id}/entry_report_actions.html", **context)
+
+    def prepare_entry_values(self, assignment_entity_status, existing_data) -> None:
+        from plugins.dref_monitoring.services.entry_activities import limit_entry_fields, overlay_plan_targets
+
+        limit_entry_fields(assignment_entity_status)
         overlay_plan_targets(assignment_entity_status, existing_data)
 
     def save_entry_extras(self, assignment_entity_status, form):
@@ -170,7 +212,7 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
             NavItem(
                 label="DREF monitoring",
                 endpoint="dref_monitoring.operations_page",
-                section="analytics-monitoring",
+                section="form-data-management",
                 icon="fas fa-clipboard-list",
                 permission=ENTER_PERMISSION,
                 priority=42,

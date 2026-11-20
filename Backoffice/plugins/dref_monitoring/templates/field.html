@@ -1,4 +1,4 @@
-<div class="dref-report-field" data-field-id="{{ field_name }}" data-msg-split="{{ dref_tr('The percentage split must add up to 100.') if dref_tr is defined else 'The percentage split must add up to 100.' }}" data-msg-reached="{{ dref_tr('Enter the reached total before the percentage split.') if dref_tr is defined else 'Enter the reached total before the percentage split.' }}" data-msg-expenditure="{{ dref_tr('Expenditure cannot be negative.') if dref_tr is defined else 'Expenditure cannot be negative.' }}">
+<div class="dref-report-field" data-field-id="{{ field_name }}" data-msg-split="{{ dref_tr('The percentage split must add up to 100.') if dref_tr is defined else 'The percentage split must add up to 100.' }}" data-msg-reached="{{ dref_tr('Enter the reached total before the percentage split.') if dref_tr is defined else 'Enter the reached total before the percentage split.' }}" data-msg-expenditure="{{ dref_tr('Expenditure cannot be negative.') if dref_tr is defined else 'Expenditure cannot be negative.' }}" data-msg-disagg="{{ dref_tr('Explain why this data is not available.') if dref_tr is defined else 'Explain why this data is not available.' }}">
     {% set matrix = dref_cycle_matrix() if dref_cycle_matrix is defined else none %}
     {% if not matrix %}
         <p class="text-sm text-gray-600">{{ dref_tr('No reporting periods yet') if dref_tr is defined else 'No reporting periods yet' }}</p>
@@ -53,22 +53,25 @@
                     </label>
                 </div>
                 <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <label>{{ dref_tr('Female') if dref_tr is defined else 'Female' }} %
+                    <label class="dref-disagg-part">{{ dref_tr('Female') if dref_tr is defined else 'Female' }} %
                         <input class="mt-1 w-full border border-gray-300 rounded px-2 py-1" type="number" min="0" max="100" data-part="pct_women" value="{{ row.shares.women if row.shares.women is not none else '' }}" {% if not editable %}disabled{% endif %}>
                     </label>
-                    <label>{{ dref_tr('Male') if dref_tr is defined else 'Male' }} %
+                    <label class="dref-disagg-part">{{ dref_tr('Male') if dref_tr is defined else 'Male' }} %
                         <input class="mt-1 w-full border border-gray-300 rounded px-2 py-1" type="number" min="0" max="100" data-part="pct_men" value="{{ row.shares.men if row.shares.men is not none else '' }}" {% if not editable %}disabled{% endif %}>
                     </label>
-                    <label>{{ dref_tr('Girls') if dref_tr is defined else 'Girls' }} %
+                    <label class="dref-disagg-part">{{ dref_tr('Girls') if dref_tr is defined else 'Girls' }} %
                         <input class="mt-1 w-full border border-gray-300 rounded px-2 py-1" type="number" min="0" max="100" data-part="pct_girls" value="{{ row.shares.girls if row.shares.girls is not none else '' }}" {% if not editable %}disabled{% endif %}>
                     </label>
-                    <label>{{ dref_tr('Boys') if dref_tr is defined else 'Boys' }} %
+                    <label class="dref-disagg-part">{{ dref_tr('Boys') if dref_tr is defined else 'Boys' }} %
                         <input class="mt-1 w-full border border-gray-300 rounded px-2 py-1" type="number" min="0" max="100" data-part="pct_boys" value="{{ row.shares.boys if row.shares.boys is not none else '' }}" {% if not editable %}disabled{% endif %}>
                     </label>
                 </div>
                 <label class="mt-2 inline-flex items-center gap-2 text-gray-700">
                     <input type="checkbox" data-part="disaggregation_na" {% if row.disaggregation_na %}checked{% endif %} {% if not editable %}disabled{% endif %}>
                     {{ dref_tr("Can't provide disaggregation") if dref_tr is defined else "Can't provide disaggregation" }}
+                </label>
+                <label class="dref-disagg-reason mt-2 block text-sm"{% if not row.disaggregation_na %} hidden{% endif %}>{{ dref_tr('Why is this data not available?') if dref_tr is defined else 'Why is this data not available?' }}
+                    <textarea class="mt-1 w-full border border-gray-300 rounded px-2 py-1" data-part="disaggregation_reason" rows="2" {% if not editable %}disabled{% endif %}>{{ row.disaggregation_reason }}</textarea>
                 </label>
             </div>
             {% endfor %}

@@ -244,6 +244,14 @@ select.calculated-select--stale-saved {
   padding-top: 0;
 }
 
+/* Open headers keep mb/pb to separate the title from the fields. Once the
+   fields are hidden, that space is an empty band under the title. */
+[data-collapsible-id]:has(> h3 > .collapse-toggle[aria-expanded="false"]) > h3,
+[data-collapsible-id]:has(> h4 > .collapse-toggle[aria-expanded="false"]) > h4 {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
 /* Section/sub-section disclosure toggles — chrome, not CTAs (do not use .btn-secondary). */
 .collapse-toggle.btn {
   background-color: var(--btn-secondary-bg, #ffffff);

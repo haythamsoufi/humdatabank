@@ -87,6 +87,8 @@ def open_cycles(operation: DrefOperation) -> int:
     """Open one project cycle per period that does not have one yet. Returns how many were attached."""
     from plugins.dref_monitoring.services.reporting import ensure_periods, periods_for
 
+    from plugins.dref_monitoring.services.access_group import attach_dref_audience
+
     ensure_periods(operation)
     project = sync_operation_project(operation)
     if project is None:
@@ -100,6 +102,7 @@ def open_cycles(operation: DrefOperation) -> int:
         if assignment is not None:
             if assignment.template_id != template.id:
                 assignment.template_id = template.id
+            attach_dref_audience(assignment)
             continue
         slot = cycle_slot(period.start_date, period.sequence, used)
         used.add(slot)
@@ -113,6 +116,7 @@ def open_cycles(operation: DrefOperation) -> int:
             due_date=due,
         )
         period.assigned_form_id = assignment.id
+        attach_dref_audience(assignment)
         attached += 1
     db.session.flush()
     return attached

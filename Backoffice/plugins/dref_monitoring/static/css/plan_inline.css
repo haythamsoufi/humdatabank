@@ -1,6 +1,6 @@
-/* Version chip sits beside the monitoring-plan heading. It is a label, not a control. */
+/* Version chip opens the list of stored plan versions. */
 .dref-plan-version {
-    cursor: default;
+    cursor: pointer;
 }
 
 .dref-funds-divider {
@@ -91,11 +91,71 @@
 }
 
 .dref-plan-indicator td:first-child {
-    padding-left: 2rem;
+    padding-left: 2.25rem;
 }
 
 .dref-plan-activity td:first-child {
-    padding-left: 2.75rem;
+    padding-left: 4.25rem;
+}
+
+.dref-plan-sector:not(.dref-plan-extra) td:first-child,
+tr[data-dref-indicator-row] td:first-child {
+    cursor: pointer;
+}
+
+.dref-plan-fold-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.dref-plan-fold-body {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.dref-plan-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-top: 0.05rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: #4b5563;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.dref-plan-toggle:hover {
+    background: rgba(17, 24, 39, 0.08);
+    color: #111827;
+}
+
+.dref-plan-toggle:focus-visible {
+    outline: 2px solid #111827;
+    outline-offset: 1px;
+}
+
+.dref-plan-toggle .fa-chevron-down {
+    font-size: 0.75rem;
+    transition: transform 0.15s ease;
+}
+
+.dref-plan-toggle[aria-expanded="false"] .fa-chevron-down {
+    transform: rotate(-90deg);
+}
+
+html[dir="rtl"] .dref-plan-toggle[aria-expanded="false"] .fa-chevron-down {
+    transform: rotate(90deg);
+}
+
+.dref-plan-table tr.is-folded {
+    display: none;
 }
 
 .dref-plan-sector td {
@@ -142,23 +202,28 @@
 
 .dref-timeline {
     display: grid;
-    gap: 1.25rem;
+    gap: 0;
     margin: 0;
-    padding: 0.65rem 0 0;
+    padding: 0.75rem 0 0;
     list-style: none;
 }
 
 .dref-timeline-event {
     position: relative;
     min-width: 0;
-    padding-top: 0.85rem;
+    padding-top: 1.05rem;
+    padding-right: 1.5rem;
+}
+
+.dref-timeline-event:last-child {
+    padding-right: 0;
 }
 
 .dref-timeline-mark {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0.3rem;
+    left: 0.35rem;
+    right: -1px;
     height: 2px;
     background: #e5e7eb;
 }
@@ -166,12 +231,15 @@
 .dref-timeline-mark::before {
     content: "";
     position: absolute;
-    left: 0;
-    top: -4px;
-    width: 10px;
-    height: 10px;
+    left: -0.35rem;
+    top: 50%;
+    width: 0.7rem;
+    height: 0.7rem;
+    transform: translateY(-50%);
     border-radius: 9999px;
     background: #d1d5db;
+    box-shadow: 0 0 0 2px #fff;
+    z-index: 1;
 }
 
 .dref-timeline-event.is-done .dref-timeline-mark,
@@ -182,6 +250,14 @@
 .dref-timeline-event.is-current .dref-timeline-mark,
 .dref-timeline-event.is-current .dref-timeline-mark::before {
     background: #b91c1c;
+}
+
+.dref-timeline-event:last-child .dref-timeline-mark,
+.dref-timeline-event.is-done:last-child .dref-timeline-mark,
+.dref-timeline-event.is-current:last-child .dref-timeline-mark {
+    right: auto;
+    width: 0;
+    background: transparent;
 }
 
 .dref-donut {

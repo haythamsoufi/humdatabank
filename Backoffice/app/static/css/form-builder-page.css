@@ -281,8 +281,52 @@ html[dir="rtl"] .fb-access-btn__chevron {
 .section-item.section-collapsed .section-body {
     display: none;
 }
+/* The open header keeps mb-4/pb-4 to separate it from the body. Once the
+   body is hidden, that space is an empty band under the title. */
 .section-item.section-collapsed .section-header-row {
     border-bottom-width: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* Reorder handle is only offered once the section is collapsed.
+   Specificity stays above #form-builder-ui .fb-icon-btn, which sets display. */
+#form-builder-ui .section-item .section-drag-handle {
+    display: none;
+    cursor: grab;
+    touch-action: none;
+}
+#form-builder-ui .section-item.section-collapsed .section-drag-handle {
+    display: inline-flex;
+}
+#form-builder-ui .section-item.dragging .section-drag-handle {
+    cursor: grabbing;
+}
+#form-builder-ui .section-item.dragging {
+    opacity: 0.55;
+}
+/* Drop slot sits in the gap between cards (mb-6), not on a card edge. */
+#form-builder-ui .section-item.drop-above,
+#form-builder-ui .section-item.drop-below {
+    position: relative;
+}
+#form-builder-ui .section-item.drop-above::before,
+#form-builder-ui .section-item.drop-below::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: #3b82f6;
+    pointer-events: none;
+    z-index: 2;
+}
+#form-builder-ui .section-item.drop-above::before {
+    top: calc(-0.75rem - 1.5px);
+}
+#form-builder-ui .section-item.drop-below::after {
+    bottom: calc(-0.75rem - 1.5px);
 }
 
 .page-row.dragging {

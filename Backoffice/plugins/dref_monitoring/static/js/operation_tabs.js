@@ -12,6 +12,37 @@
         });
     }
 
+    var versionsModal = document.getElementById('dref-plan-versions-modal');
+    var versionsOpen = document.getElementById('dref-plan-versions-open');
+    var versionsDialog = versionsModal && window.ModalUtils
+        ? window.ModalUtils.makeModal(versionsModal)
+        : null;
+    if (versionsOpen && versionsDialog) {
+        versionsOpen.addEventListener('click', function () {
+            versionsDialog.openModal();
+        });
+    }
+
+    document.querySelectorAll('[data-dref-plan-confirm]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            var message = form.getAttribute('data-dref-plan-confirm') || '';
+            if (message && !window.confirm(message)) {
+                event.preventDefault();
+            }
+        });
+    });
+
+    var memberHelpModal = document.getElementById('dref-member-help-modal');
+    var memberHelpOpen = document.getElementById('dref-member-help-open');
+    var memberHelpDialog = memberHelpModal && window.ModalUtils
+        ? window.ModalUtils.makeModal(memberHelpModal)
+        : null;
+    if (memberHelpOpen && memberHelpDialog) {
+        memberHelpOpen.addEventListener('click', function () {
+            memberHelpDialog.openModal();
+        });
+    }
+
     var excelOpen = document.querySelector('[data-excel-io-open="dref-plan-excel-modal"]');
     var excelDialog = null;
     if (excelOpen && excelOpen.dataset.excelModalModule && excelOpen.dataset.excelDropzoneModule) {
@@ -311,4 +342,37 @@
         input.value = panel.id.slice('panel-'.length);
         form.appendChild(input);
     }, true);
+
+    var exportMenus = document.querySelectorAll('[data-dref-export]');
+    function closeExportMenus(except) {
+        exportMenus.forEach(function (menuRoot) {
+            if (menuRoot === except) {
+                return;
+            }
+            var menu = menuRoot.querySelector('[role="menu"]');
+            var button = menuRoot.querySelector('button');
+            if (menu) menu.classList.add('hidden');
+            if (button) button.setAttribute('aria-expanded', 'false');
+        });
+    }
+    exportMenus.forEach(function (menuRoot) {
+        var button = menuRoot.querySelector('button');
+        var menu = menuRoot.querySelector('[role="menu"]');
+        if (!button || !menu) {
+            return;
+        }
+        button.addEventListener('click', function (event) {
+            event.stopPropagation();
+            var open = menu.classList.contains('hidden');
+            closeExportMenus(open ? menuRoot : null);
+            menu.classList.toggle('hidden', !open);
+            button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    });
+    document.addEventListener('click', function () {
+        closeExportMenus(null);
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeExportMenus(null);
+    });
 })();

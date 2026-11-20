@@ -14,5 +14,13 @@
         } catch (e) { /* ignore */ }
     }
     root.setAttribute('data-ui-style', style);
+    if (preview && root.getAttribute('data-section-nav-preview') === '1') {
+        var nav = 'side';
+        try {
+            var storedNav = window.localStorage.getItem('sectionNavPreview');
+            if (storedNav === 'stepper' || storedNav === 'side') nav = storedNav;
+        } catch (e) { /* ignore */ }
+        root.setAttribute('data-section-nav', nav);
+    }
 })();
 </script>

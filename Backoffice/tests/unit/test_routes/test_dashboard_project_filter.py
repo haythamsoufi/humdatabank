@@ -8,7 +8,11 @@ from app import db
 from app.models.enums import EntityType
 from app.models.projects import Project
 from app.routes.api.users import _project_dashboard_fields
-from app.routes.main.helpers import dashboard_assignment_entity_filter
+from app.routes.main.helpers import (
+    dashboard_assignment_entity_filter,
+    dashboard_cycle_label,
+    dashboard_project_card_heading,
+)
 from tests.factories import create_test_country
 
 pytestmark = pytest.mark.unit
@@ -84,3 +88,40 @@ class TestProjectDashboardFields:
             assert fields["project_title"] == "Water"
             assert fields["project_closed"] is True
             assert _project_dashboard_fields({}, SimpleNamespace(entity_type="country", entity_id=1)) == {}
+
+
+class TestDashboardProjectCardHeading:
+    def test_dref_card_puts_fund_code_and_name_in_the_title(self):
+        title, subtitle = dashboard_project_card_heading(
+            "DREF", "DREF", "MDRZZ001", "Zedland Flood"
+        )
+        assert title == "DREF MDRZZ001 — Zedland Flood"
+        assert subtitle == ""
+
+    def test_imminent_dref_uses_its_fund_label(self):
+        title, subtitle = dashboard_project_card_heading(
+            "DREF", "i-DREF", "MDRIM009", "Imminent flood"
+        )
+        assert title == "i-DREF MDRIM009 — Imminent flood"
+        assert subtitle == ""
+
+    def test_dref_without_a_distinct_name_has_no_subtitle(self):
+        title, subtitle = dashboard_project_card_heading("DREF", "", "MDRZZ001", "MDRZZ001")
+        assert title == "DREF MDRZZ001"
+        assert subtitle == ""
+
+    def test_other_portfolios_keep_the_name_as_the_title(self):
+        title, subtitle = dashboard_project_card_heading("NSD", "CBF", "NSD-1", "Water")
+        assert title == "Water"
+        assert subtitle == "NSD-1"
+
+
+class TestDashboardCycleLabel:
+    def test_dref_cycle_drops_the_appeal_code(self):
+        assert dashboard_cycle_label("MDRZZ001 · 2026-01", "DREF", "MDRZZ001") == "2026-01"
+
+    def test_dref_day_slot_keeps_the_date(self):
+        assert dashboard_cycle_label("MDRIM009 · 2026-01-15", "DREF", "MDRIM009") == "2026-01-15"
+
+    def test_other_portfolios_keep_the_full_period(self):
+        assert dashboard_cycle_label("NSD-1 · Y1Q2", "NSD", "NSD-1") == "NSD-1 · Y1Q2"

@@ -7,7 +7,11 @@ import pytest
 from app.extensions import db
 from app.models.indicator_bank import IndicatorBank, Sector
 from plugins.dref_monitoring.models import DrefOperation
-from plugins.dref_monitoring.services.entry_activities import plan_indicator_filter
+from plugins.dref_monitoring.services.entry_activities import (
+    activities_by_section,
+    indicators_missing_from_template,
+    plan_indicator_filter,
+)
 from plugins.dref_monitoring.services.go_application import application_from_emergency
 from plugins.dref_monitoring.services.go_sync import apply_rows
 from plugins.dref_monitoring.services.plans import (
@@ -238,6 +242,15 @@ def test_plan_uses_the_application_and_flags_unmatched_bank_rows(seeded):
     titles = [row.title for row in activities_for(health_group.id)]
     assert titles == ["Establish two service points", "Train volunteers"]
     assert all(row.indicator_id is None for row in activities_for(health_group.id))
+    health_rows = activities_for(health_group.id)
+    health_rows[0].indicator_id = indicators["Clinics opened this week"].id
+    health_rows[1].indicator_id = indicators["People reached with health services"].id
+    db.session.flush()
+    placed = {row["title"]: row for row in activities_by_section(operation)["health"]}
+    assert placed[health_rows[0].title]["indicator_id"] == indicators["Clinics opened this week"].id
+    assert placed[health_rows[0].title]["indicator_bank_id"] is None
+    assert placed[health_rows[1].title]["indicator_id"] == indicators["People reached with health services"].id
+    assert placed[health_rows[1].title]["indicator_bank_id"] == matched.id
     custom = next(group for key, group in groups.items() if key.startswith("other:"))
     assert custom.unmatched is True
     assert custom.label == "Custom sector"
@@ -246,6 +259,27 @@ def test_plan_uses_the_application_and_flags_unmatched_bank_rows(seeded):
     assert shown["filter_indicators"] is True
     assert shown["indicator_bank_ids"] == [matched.id, hygiene.id]
     assert "health" in shown["sector_keys"]
+
+    missing = {row["title"]: row for row in indicators_missing_from_template(operation)}
+    assert missing["Clinics opened this week"]["flag"] == "No match in the indicator bank"
+    assert missing["Clinics opened this week"]["section_key"] == "health"
+    assert missing["Clinics opened this week"]["target"] == "3"
+    assert missing["Clinics opened this week"]["bank_id"] is None
+    assert "Something else" in missing
+    assert missing["Something else"]["section_key"].startswith("other:")
+    assert "People reached with health services" not in missing
+    assert "# of people covered with hygiene promotion activities" not in missing
+
+    forced = {
+        row["title"]: row
+        for row in indicators_missing_from_template(operation, template_bank_ids={matched.id})
+    }
+    assert "People reached with health services" not in forced
+    hygiene_title = "# of people covered with hygiene promotion activities"
+    assert forced[hygiene_title]["flag"] == "Temporarily matched to the indicator bank"
+    assert forced[hygiene_title]["bank_id"] == hygiene.id
+    assert forced[hygiene_title]["bank_name"] == hygiene.name
+    assert forced[hygiene_title]["target"] == "10"
 
     hygiene_row.unmatched = True
     hygiene_row.bank_adapted = False

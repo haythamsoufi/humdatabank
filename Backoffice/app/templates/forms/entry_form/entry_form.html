@@ -54,6 +54,9 @@
 <link rel="stylesheet" href="{{ static_url('css/ui-style-ifrc.css') }}">
 <link rel="stylesheet" href="{{ static_url('css/ui-style-erp.css') }}">
 <link rel="stylesheet" href="{{ static_url('css/ui-style-go.css') }}">
+{% if show_ui_style_preview|default(false) %}
+<link rel="stylesheet" href="{{ static_url('css/section-nav-preview.css') }}">
+{% endif %}
 {% for asset in plugin_form_assets if asset.kind == 'stylesheet' %}
 <link rel="stylesheet" href="{{ asset.url }}">
 {% endfor %}
@@ -73,6 +76,7 @@
      class="entry-form-root ui-style-root w-full max-w-full mx-auto px-0 sm:px-2 pb-4 sm:pb-6 min-w-0"
      data-ui-style="legacy"
      data-style-preview="{{ '1' if show_ui_style_preview|default(false) else '0' }}"
+     {% if show_ui_style_preview|default(false) %}data-section-nav-preview="1"{% endif %}
      data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}"
      data-public-token="{{ public_token if is_public_submission else '' }}"
      {% if current_user.is_authenticated %}
@@ -252,6 +256,7 @@
                                 <div id="upr-scope-menu" class="upr-scope__menu" hidden role="menu"></div>
                             </div>
                             {% endif %}
+                            {% if _aes_id and plugin_entry_form_header is defined %}{{ plugin_entry_form_header(assignment_status) }}{% endif %}
                             {% if _aes_id and (_show_export or _show_import) %}
                             <button type="button" id="excel-options-btn" class="professional-action-btn professional-action-btn-green">
                                 <i class="fas fa-file-excel"></i>
@@ -1332,7 +1337,7 @@
                                                                         </span>
                                                                     </span>
                                                                     {% endif %}
-                                                                {% elif field.is_question and (field.definition or field.unit or field.type) %}
+                                                                {% elif field.is_question and (field.definition or field.unit) %}
                                                                     <span class="question-unit-tooltip cursor-help w-5 h-5 flex items-center justify-center">
                                                                         <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
                                                                         <span class="tooltip-text">
@@ -2308,7 +2313,7 @@
                                                                                 </span>
                                                                             </span>
                                                                             {% endif %}
-                                                                        {% elif field.is_question and (field.definition or field.unit or field.type) %}
+                                                                        {% elif field.is_question and (field.definition or field.unit) %}
                                                                             <span class="question-unit-tooltip cursor-help w-5 h-5 flex items-center justify-center">
                                                                                 <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
                                                                                 <span class="tooltip-text">
@@ -3333,6 +3338,7 @@
     </div>
     {% endif %}
 
+{% set show_section_nav_preview = true %}
 {% include "components/_ui_style_preview.html" %}
 
 </div>{# /#entry-form-root #}

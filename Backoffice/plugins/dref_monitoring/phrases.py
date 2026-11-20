@@ -4,6 +4,76 @@ from __future__ import annotations
 
 # english -> (french, spanish, arabic)
 ROWS: dict[str, tuple[str, str, str]] = {
+    "Generate operational update": ("Générer la mise à jour opérationnelle", "Generar la actualización operativa", "إنشاء التحديث التشغيلي"),
+    "Generate final report": ("Générer le rapport final", "Generar el informe final", "إنشاء التقرير النهائي"),
+    "Narrative": ("Récit", "Relato", "السرد"),
+    "Model": ("Modèle", "Modelo", "النموذج"),
+    "Preview": ("Aperçu", "Vista previa", "معاينة"),
+    "Export": ("Exporter", "Exportar", "تصدير"),
+    "AI-generated narrative": ("Récit généré par l'IA", "Relato generado por IA", "سرد مُنشأ بالذكاء الاصطناعي"),
+    "Write the narrative myself": ("Rédiger le récit moi-même", "Redactar el relato yo mismo", "كتابة السرد بنفسي"),
+    "Data only": ("Données uniquement", "Solo datos", "البيانات فقط"),
+    "Figures only": ("Chiffres uniquement", "Solo cifras", "الأرقام فقط"),
+    "Written by hand": ("Rédigé à la main", "Redactado a mano", "مكتوب يدويًا"),
+    "AI-drafted narrative": ("Récit rédigé par l'IA", "Relato redactado por IA", "سرد صاغه الذكاء الاصطناعي"),
+    "Generating…": ("Génération en cours…", "Generando…", "جارٍ الإنشاء…"),
+    "AI drafting is not enabled.": ("La rédaction par IA n'est pas activée.", "La redacción con IA no está activada.", "الصياغة بالذكاء الاصطناعي غير مفعّلة."),
+    "Unknown narrative option.": ("Option de récit inconnue.", "Opción de relato desconocida.", "خيار السرد غير معروف."),
+    "The report is built from the figures saved on this form. Save your changes first.": (
+        "Le rapport est construit à partir des chiffres enregistrés dans ce formulaire. Enregistrez d'abord vos modifications.",
+        "El informe se construye con las cifras guardadas en este formulario. Guarde primero sus cambios.",
+        "يُبنى التقرير من الأرقام المحفوظة في هذا النموذج. احفظ تغييراتك أولاً.",
+    ),
+    "The model drafts the GO chapters from the approved request, the monitoring history, recent GO field reports and the Databank documents you can access. It does not receive community feedback. It runs in the background and you can edit the text before validating.": (
+        "Le modèle rédige les chapitres GO à partir de la demande approuvée, de l'historique de suivi, des rapports de terrain récents de GO et des documents du Databank auxquels vous avez accès. Il ne reçoit pas les retours communautaires. Il s'exécute en arrière-plan et vous pouvez modifier le texte avant de valider.",
+        "El modelo redacta los capítulos de GO a partir de la solicitud aprobada, del historial de seguimiento, de los informes de campo recientes de GO y de los documentos del Databank a los que tiene acceso. No recibe los comentarios de la comunidad. Se ejecuta en segundo plano y puede editar el texto antes de validar.",
+        "يصيغ النموذج فصول GO من الطلب المعتمد وسجل المتابعة وتقارير الميدان الأخيرة من GO ومستندات Databank المتاحة لك. لا يتلقى ملاحظات المجتمع. يعمل في الخلفية ويمكنك تعديل النص قبل الاعتماد.",
+    ),
+    "The chapters start empty. You write them on the next page.": (
+        "Les chapitres sont vides au départ. Vous les rédigez sur la page suivante.",
+        "Los capítulos empiezan vacíos. Los redacta en la página siguiente.",
+        "تبدأ الفصول فارغة. تكتبها في الصفحة التالية.",
+    ),
+    "Tables and figures from the monitoring data, with no narrative chapters.": (
+        "Tableaux et chiffres issus des données de suivi, sans chapitres rédigés.",
+        "Tablas y cifras de los datos de seguimiento, sin capítulos narrativos.",
+        "جداول وأرقام من بيانات المتابعة، دون فصول سردية.",
+    ),
+    "This report is figures only and has no narrative to edit.": (
+        "Ce rapport ne contient que des chiffres : il n'y a pas de récit à modifier.",
+        "Este informe solo tiene cifras: no hay relato que editar.",
+        "هذا التقرير أرقام فقط ولا يحتوي على سرد للتعديل.",
+    ),
+    "Add the chapters to this draft. The figures stay as they are.": (
+        "Ajoutez les chapitres à ce brouillon. Les chiffres restent tels quels.",
+        "Añada los capítulos a este borrador. Las cifras se mantienen.",
+        "أضف الفصول إلى هذه المسودة. تبقى الأرقام كما هي.",
+    ),
+    "This report is figures only. Add the chapters on the Narrative tab, or validate it to send the figures to GO.": (
+        "Ce rapport ne contient que des chiffres. Ajoutez les chapitres dans l'onglet Récit, ou validez-le pour envoyer les chiffres à GO.",
+        "Este informe solo tiene cifras. Añada los capítulos en la pestaña Relato, o valídelo para enviar las cifras a GO.",
+        "هذا التقرير أرقام فقط. أضف الفصول في تبويب السرد، أو اعتمده لإرسال الأرقام إلى GO.",
+    ),
+    "This draft already has narrative chapters.": (
+        "Ce brouillon a déjà des chapitres rédigés.",
+        "Este borrador ya tiene capítulos narrativos.",
+        "هذه المسودة تحتوي بالفعل على فصول سردية.",
+    ),
+    "This report is figures only. It has no narrative chapters. Validation sends it to GO for formal processing.": (
+        "Ce rapport ne contient que des chiffres, sans chapitres rédigés. La validation l'envoie à GO pour traitement.",
+        "Este informe solo tiene cifras, sin capítulos narrativos. La validación lo envía a GO para su trámite.",
+        "هذا التقرير أرقام فقط دون فصول سردية. الاعتماد يرسله إلى GO للمعالجة الرسمية.",
+    ),
+    "The model did not return text. The chapters are empty, so you can write them here.": (
+        "Le modèle n'a pas renvoyé de texte. Les chapitres sont vides : vous pouvez les rédiger ici.",
+        "El modelo no devolvió texto. Los capítulos están vacíos, así que puede redactarlos aquí.",
+        "لم يُرجع النموذج نصًا. الفصول فارغة، يمكنك كتابتها هنا.",
+    ),
+    "Data report for filing in GO. Every table is filled from Databank and has no narrative chapters. Reach and expenditure are the latest monitoring report, not a sum across periods. Reported by the National Society. Indicative until delegation finance validates it in ERP.": (
+        "Rapport de données à déposer dans GO. Chaque tableau est rempli à partir de Databank et n'a pas de chapitres rédigés. Les personnes atteintes et les dépenses sont celles du dernier rapport de suivi, et non une somme sur plusieurs périodes. Déclaré par la Société nationale. Indicatif jusqu'à validation dans l'ERP par les finances de la délégation.",
+        "Informe de datos para presentar en GO. Cada tabla se rellena desde Databank y no tiene capítulos narrativos. El alcance y el gasto son los del último informe de seguimiento, no una suma de varios períodos. Informado por la Sociedad Nacional. Indicativo hasta que finanzas de la delegación lo valide en el ERP.",
+        "تقرير بيانات لتقديمه في GO. تُملأ كل الجداول من Databank ولا فصول سردية فيه. الوصول والإنفاق هما من أحدث تقرير متابعة وليسا مجموعًا عبر الفترات. أبلغت به الجمعية الوطنية. رقم إرشادي إلى أن تعتمده مالية البعثة في نظام التخطيط.",
+    ),
     "Activities by sector": ("Activités par secteur", "Actividades por sector", "الأنشطة حسب القطاع"),
     "Activities by status": ("Activités par statut", "Actividades por estado", "الأنشطة حسب الحالة"),
     "Add activity": ("Ajouter une activité", "Añadir una actividad", "إضافة نشاط"),
@@ -11,6 +81,12 @@ ROWS: dict[str, tuple[str, str, str]] = {
     "Other activities": ("Autres activités", "Otras actividades", "أنشطة أخرى"),
     "Actual": ("Réalisé", "Real", "الفعلي"),
     "Amounts cannot be negative.": ("Les montants ne peuvent pas être négatifs.", "Los importes no pueden ser negativos.", "لا يمكن أن تكون المبالغ سالبة."),
+    "Collapse": ("Replier", "Contraer", "طي"),
+    "Collapse all activities": ("Replier toutes les activités", "Contraer todas las actividades", "طي كل الأنشطة"),
+    "Collapse all indicators": ("Replier tous les indicateurs", "Contraer todos los indicadores", "طي كل المؤشرات"),
+    "Expand": ("Déplier", "Expandir", "توسيع"),
+    "Expand all activities": ("Déplier toutes les activités", "Expandir todas las actividades", "توسيع كل الأنشطة"),
+    "Expand all indicators": ("Déplier tous les indicateurs", "Expandir todos los indicadores", "توسيع كل المؤشرات"),
     "Enter a number for the target.": (
         "Saisissez un nombre pour la cible.",
         "Introduzca un número para la meta.",
@@ -26,6 +102,16 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "Saisissez les totaux cumulés à ce jour. Les dépenses restent indicatives jusqu'à validation dans l'ERP par les finances de la délégation.",
         "Introduzca los totales acumulados hasta la fecha. El gasto sigue siendo indicativo hasta que finanzas de la delegación lo valide en el ERP.",
         "أدخلوا المجاميع التراكمية حتى تاريخه. تبقى النفقات إرشادية إلى أن تعتمدها مالية الوفد في نظام ERP.",
+    ),
+    "Explain why this data is not available.": (
+        "Expliquez pourquoi ces données ne sont pas disponibles.",
+        "Explique por qué estos datos no están disponibles.",
+        "اشرحوا لماذا هذه البيانات غير متاحة.",
+    ),
+    "Why is this data not available?": (
+        "Pourquoi ces données ne sont-elles pas disponibles ?",
+        "¿Por qué no están disponibles estos datos?",
+        "لماذا هذه البيانات غير متاحة؟",
     ),
     "Enter the reached total before the percentage split.": (
         "Indiquez le total atteint avant la ventilation en pourcentages.",
@@ -62,10 +148,25 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "La fecha de fin debe ser igual o posterior a la fecha de inicio.",
         "يجب أن يكون تاريخ الانتهاء في يوم البدء أو بعده.",
     ),
+    "A percentage cannot be more than 100.": (
+        "Un pourcentage ne peut pas dépasser 100.",
+        "Un porcentaje no puede ser superior a 100.",
+        "لا يمكن أن تتجاوز النسبة 100.",
+    ),
+    "The percentages together cannot be more than 100.": (
+        "Les pourcentages réunis ne peuvent pas dépasser 100.",
+        "Los porcentajes en conjunto no pueden superar 100.",
+        "لا يمكن أن يتجاوز مجموع النسب 100.",
+    ),
     "The percentage split must add up to 100.": (
         "La ventilation en pourcentages doit totaliser 100.",
         "El reparto en porcentajes debe sumar 100.",
         "يجب أن يكون مجموع النسب 100.",
+    ),
+    "Enter a valid date.": (
+        "Saisissez une date valide.",
+        "Introduzca una fecha válida.",
+        "أدخلوا تاريخاً صالحاً.",
     ),
     "updates filed": ("mises à jour déposées", "actualizaciones presentadas", "تحديثات مُرسلة"),
     "Plan confirmed": ("Plan confirmé", "Plan confirmado", "تم تأكيد الخطة"),
@@ -599,6 +700,107 @@ ROWS: dict[str, tuple[str, str, str]] = {
     'Report not found.': ('Rapport introuvable.', 'Informe no encontrado.', 'التقرير غير موجود.'),
     'This report is already being sent to GO.': ("Ce rapport est déjà en cours d'envoi à GO.", 'Este informe ya se está enviando a GO.', 'يجري إرسال هذا التقرير إلى GO بالفعل.'),
     'That user has no DREF monitoring role. Assign a role first.': ("Cet utilisateur n'a aucun rôle de suivi DREF. Attribuez d'abord un rôle.", 'Ese usuario no tiene ningún rol de seguimiento DREF. Asigne primero un rol.', 'ليس لدى هذا المستخدم دور في متابعة DREF. عيّنوا له دوراً أولاً.'),
+    'What members do': ('Rôle des membres', 'Qué hacen los miembros', 'ما يفعله الأعضاء'),
+    'A member already holds a DREF role. This row chooses the operation they work on, and the highest tier they can use on it.': (
+        "Un membre a déjà un rôle de suivi DREF. Cette ligne choisit l'opération sur laquelle il travaille, et le niveau le plus élevé qu'il peut y exercer.",
+        'Un miembro ya tiene un rol de seguimiento DREF. Esta fila elige la operación en la que trabaja y el nivel más alto que puede ejercer en ella.',
+        'العضو لديه بالفعل دور في متابعة DREF. يحدد هذا الصف العملية التي يعمل عليها وأعلى مستوى يمكنه استخدامه فيها.',
+    ),
+    'The tier is a ceiling. They act at the lower of this tier and their role. Country access to this operation keeps the full role. A tier cannot raise a lower role.': (
+        "Le niveau est un plafond. La personne agit au plus bas entre ce niveau et son rôle. L'accès au pays de cette opération conserve le rôle complet. Un niveau ne peut pas élever un rôle plus faible.",
+        'El nivel es un tope. La persona actúa en el menor entre este nivel y su rol. El acceso al país de esta operación conserva el rol completo. Un nivel no puede elevar un rol inferior.',
+        'المستوى سقف. يتصرف الشخص عند الأدنى بين هذا المستوى ودوره. الوصول إلى بلد هذه العملية يُبقي الدور كاملاً. لا يمكن لمستوى أن يرفع دوراً أدنى.',
+    ),
+    'Files the plan, funds, procurement, delays, feedback, risks, and drafts. A figure outside the approved budget, target, or dates becomes a change request.': (
+        "Saisit le plan, les fonds, les achats, les retards, les retours, les risques et les brouillons. Un chiffre hors du budget, de la cible ou des dates approuvés devient une demande de modification.",
+        'Registra el plan, los fondos, las compras, los retrasos, los comentarios, los riesgos y los borradores. Una cifra fuera del presupuesto, la meta o las fechas aprobadas se guarda como una solicitud de cambio.',
+        'يسجّل الخطة والأموال والمشتريات والتأخيرات والملاحظات والمخاطر والمسودات. أي رقم خارج الميزانية أو الهدف أو التواريخ المعتمدة يصبح طلب تغيير.',
+    ),
+    'Confirms the plan and drafts, sends a validated draft to GO, and signs off changes when the National Society is the authority.': (
+        "Confirme le plan et les brouillons, envoie un brouillon validé à GO, et approuve les modifications lorsque la Société nationale est l'autorité.",
+        'Confirma el plan y los borradores, envía un borrador validado a GO y aprueba los cambios cuando la Sociedad Nacional es la autoridad.',
+        'يعتمد الخطة والمسودات، ويرسل المسودة المعتمدة إلى GO، ويوافق على التغييرات عندما تكون الجمعية الوطنية هي الجهة صاحبة الاعتماد.',
+    ),
+    'Adds and removes members, and signs off changes when the delegation is the authority. Approving an assignment with this role marks the report reviewed.': (
+        "Ajoute et retire des membres, et approuve les modifications lorsque la délégation est l'autorité. Approuver une affectation avec ce rôle marque le rapport comme examiné.",
+        'Añade y quita miembros, y aprueba los cambios cuando la delegación es la autoridad. Aprobar una asignación con este rol marca el informe como revisado.',
+        'يضيف الأعضاء ويزيلهم، ويعتمد التغييرات عندما تكون البعثة هي الجهة صاحبة الاعتماد. اعتماد مهمة بهذا الدور يعلّم التقرير كمراجَع.',
+    ),
+    'Sets how often this operation reports and who signs off changes. The Portfolio role, not this row, shows every operation.': (
+        "Définit la fréquence des rapports de cette opération et qui approuve les modifications. Le rôle Portefeuille, et non cette ligne, affiche toutes les opérations.",
+        'Define cada cuánto informa esta operación y quién aprueba los cambios. El rol Cartera, no esta fila, muestra todas las operaciones.',
+        'يحدد وتيرة تقارير هذه العملية ومن يعتمد التغييرات. دور الحافظة، لا هذا الصف، هو الذي يعرض كل العمليات.',
+    ),
+    'Reminders go to members of the matching tier, and to people with a DREF role and access to this country. From three days before a report is due everyone is reminded; later reminders climb from validation to technical review to portfolio.': (
+        "Les rappels vont aux membres du niveau correspondant, et aux personnes qui ont un rôle DREF et l'accès à ce pays. À partir de trois jours avant l'échéance, tout le monde est rappelé ; ensuite les rappels montent de la validation à l'examen technique, puis au portefeuille.",
+        'Los recordatorios llegan a los miembros del nivel correspondiente y a quienes tienen un rol DREF y acceso a este país. Desde tres días antes del vencimiento se recuerda a todos; después los recordatorios suben de la validación a la revisión técnica y luego a la cartera.',
+        'تصل التذكيرات إلى أعضاء المستوى المطابق وإلى من لديهم دور DREF ووصول إلى هذا البلد. ابتداءً من ثلاثة أيام قبل الاستحقاق يُذكَّر الجميع، ثم تصعد التذكيرات من الاعتماد إلى المراجعة الفنية ثم إلى الحافظة.',
+    ),
+    'Opening a reporting assignment also requires the DREF access group. System managers are not limited by that group.': (
+        "Ouvrir une affectation de rapport exige aussi le groupe d'accès DREF. Les gestionnaires système ne sont pas limités par ce groupe.",
+        'Abrir una asignación de informe también exige el grupo de acceso DREF. Los administradores del sistema no están limitados por ese grupo.',
+        'فتح مهمة التقرير يتطلب أيضاً مجموعة الوصول DREF. مديرو النظام غير مقيّدين بهذه المجموعة.',
+    ),
+    "Waiting to start the draft.": (
+        "En attente du démarrage du brouillon.",
+        "Esperando para iniciar el borrador.",
+        "في انتظار بدء المسودة.",
+    ),
+    "Starting the draft.": ("Démarrage du brouillon.", "Iniciando el borrador.", "جارٍ بدء المسودة."),
+    "Collecting the monitoring figures.": (
+        "Collecte des chiffres de suivi.",
+        "Reuniendo las cifras de seguimiento.",
+        "جارٍ جمع أرقام المتابعة.",
+    ),
+    "Reading the approved application and the previous draft.": (
+        "Lecture de la demande approuvée et du brouillon précédent.",
+        "Leyendo la solicitud aprobada y el borrador anterior.",
+        "جارٍ قراءة الطلب المعتمد والمسودة السابقة.",
+    ),
+    "Reading recent GO field reports.": (
+        "Lecture des rapports de terrain récents de GO.",
+        "Leyendo los informes de campo recientes de GO.",
+        "جارٍ قراءة تقارير الميدان الأخيرة من GO.",
+    ),
+    "Searching Databank documents.": (
+        "Recherche dans les documents du Databank.",
+        "Buscando en los documentos del Databank.",
+        "جارٍ البحث في مستندات Databank.",
+    ),
+    "Writing the narrative.": ("Rédaction du récit.", "Redactando el relato.", "جارٍ كتابة السرد."),
+    "Writing chapter %(current)s of %(total)s.": (
+        "Rédaction du chapitre %(current)s sur %(total)s.",
+        "Redactando el capítulo %(current)s de %(total)s.",
+        "جارٍ كتابة الفصل %(current)s من %(total)s.",
+    ),
+    "Saving the draft.": ("Enregistrement du brouillon.", "Guardando el borrador.", "جارٍ حفظ المسودة."),
+    "The draft is ready.": ("Le brouillon est prêt.", "El borrador está listo.", "المسودة جاهزة."),
+    "Draft generation was cancelled.": (
+        "La génération du brouillon a été annulée.",
+        "Se canceló la generación del borrador.",
+        "أُلغي إنشاء المسودة.",
+    ),
+    "The draft could not be generated. Try again in a moment.": (
+        "Le brouillon n'a pas pu être généré. Réessayez dans un instant.",
+        "No se pudo generar el borrador. Inténtelo de nuevo en un momento.",
+        "تعذر إنشاء المسودة. حاولوا مرة أخرى بعد قليل.",
+    ),
+    "You can leave this page. The draft keeps running and appears under Drafts when it is ready.": (
+        "Vous pouvez quitter cette page. Le brouillon continue en arrière-plan et apparaît sous Brouillons dès qu'il est prêt.",
+        "Puede salir de esta página. El borrador sigue en segundo plano y aparece en Borradores cuando esté listo.",
+        "يمكنكم مغادرة هذه الصفحة. تستمر المسودة في الخلفية وتظهر ضمن المسودات عند جاهزيتها.",
+    ),
+    "Could not start the draft.": (
+        "Impossible de démarrer le brouillon.",
+        "No se pudo iniciar el borrador.",
+        "تعذر بدء المسودة.",
+    ),
+    "Could not read the draft progress. Reload the page to check.": (
+        "Impossible de lire la progression du brouillon. Rechargez la page pour vérifier.",
+        "No se pudo leer el avance del borrador. Recargue la página para comprobarlo.",
+        "تعذر قراءة تقدّم المسودة. أعيدوا تحميل الصفحة للتحقق.",
+    ),
+    "Cancelling…": ("Annulation…", "Cancelando…", "جارٍ الإلغاء…"),
 }
 
 

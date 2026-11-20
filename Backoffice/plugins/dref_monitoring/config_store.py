@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from app.plugins.db_config import DbPluginConfig
@@ -42,6 +43,18 @@ def ai_language() -> str:
     return report_language((get_config().get("ai") or {}).get("language"))
 
 
+def ai_model(kind: str | None = None) -> str:
+    """A model chosen on the settings page. Empty means the Databank default.
+
+    A final report can have its own, and falls back to the general one.
+    """
+    ai = get_config().get("ai") or {}
+    general = str(ai.get("model") or "").strip()
+    if kind == "final_report":
+        return str(ai.get("final_report_model") or "").strip() or general
+    return general
+
+
 def go_base_url() -> str:
     return str((get_config().get("go") or {}).get("base_url") or DEFAULT_CONFIG["go"]["base_url"])
 
@@ -50,6 +63,14 @@ def _flag(value) -> bool:
     if isinstance(value, bool):
         return value
     return str(value or "").strip().lower() in _TRUE
+
+
+_MODEL_NAME = re.compile(r"[^A-Za-z0-9._:/\-]")
+
+
+def _model_name(value) -> str:
+    """A model id as typed. Anything outside the characters a model id uses is dropped."""
+    return _MODEL_NAME.sub("", str(value or "").strip())[:64]
 
 
 def save_posted_settings(form, *, partial: bool = False) -> bool:
@@ -89,6 +110,10 @@ def save_posted_settings(form, *, partial: bool = False) -> bool:
     language = form.get("ai_language") if "ai_language" in form else nested_ai.get("language")
     if language is not None or not partial:
         ai["language"] = report_language(str(language or "en"))
+    for field, setting in (("ai_model", "model"), ("ai_final_report_model", "final_report_model")):
+        given = form.get(field) if field in form else nested_ai.get(setting)
+        if given is not None or not partial:
+            ai[setting] = _model_name(given)
     if ai:
         ai["prompt_version"] = PROMPT_VERSION
         _store.update_section("ai", ai)

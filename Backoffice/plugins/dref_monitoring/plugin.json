@@ -2,7 +2,7 @@
   "plugin_id": "dref_monitoring",
   "name": "dref_monitoring",
   "display_name": "DREF Monitoring",
-  "version": "0.7.0",
+  "version": "0.10.0",
   "description": "Tracks DREF and Imminent DREF operations from GO approval through monitoring to closure, including routine reports, escalation, and draft operational updates and final reports.",
   "author": "Haytham Alsoufi",
   "homepage": "https://github.com/haythamsoufi",

@@ -127,7 +127,7 @@ class NavItem:
     """Sidebar link a plugin contributes. Shown only while the plugin is active.
 
     ``section`` is the ``data-category`` of the sidebar block that hosts the link
-    (``"analytics-monitoring"`` today). ``permission`` is checked with
+    (``"analytics-monitoring"`` or ``"form-data-management"``). ``permission`` is checked with
     ``has_permission`` and bypassed for system managers; ``None`` means any signed-in
     user. ``label`` is passed through gettext when rendered.
     """
@@ -459,6 +459,16 @@ class BasePlugin(ABC):
         this plugin's, or when the extra fields were stored.
         """
         return None
+
+    def get_entry_form_header_html(self, assignment_entity_status: Any) -> str:
+        """HTML this plugin adds to the action buttons in an assignment form header.
+
+        Core places the returned markup beside the built-in header buttons, so it
+        may include dialogs the buttons open. Return an empty string when the
+        assignment is not this plugin's. The plugin owns escaping and any script
+        (load it through ``get_entry_form_assets``).
+        """
+        return ""
 
     def get_csp_overrides(self) -> List[CspOverride]:
         """CSP overrides for plugin-served HTML assets."""

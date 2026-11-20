@@ -18,8 +18,11 @@ export class DrefOperationalReportField {
         this.root = match || container;
         this.hidden = this.root.querySelector("input.dref-report-value");
         this.restoreIfRejected();
-        this.write();
         this.bind();
+        if (this.root) {
+            this.root.querySelectorAll("[data-activity-id]").forEach((block) => this.applyDisaggregation(block));
+        }
+        this.write();
     }
 
     serialize() {
@@ -56,6 +59,45 @@ export class DrefOperationalReportField {
                 this.clear();
             }
         });
+        this.root.addEventListener("change", (event) => {
+            const box = event.target.closest('[data-part="disaggregation_na"]');
+            if (!box) {
+                return;
+            }
+            const block = box.closest("[data-activity-id]");
+            if (block) {
+                this.applyDisaggregation(block);
+            }
+        });
+    }
+
+    applyDisaggregation(block) {
+        const skipped = block.querySelector('[data-part="disaggregation_na"]');
+        const unavailable = Boolean(skipped && skipped.checked);
+        const locked = Boolean(skipped && skipped.disabled);
+        block.querySelectorAll(".dref-disagg-part").forEach((slot) => {
+            slot.classList.toggle("is-unavailable", unavailable);
+            const input = slot.querySelector("input");
+            if (!input) {
+                return;
+            }
+            if (unavailable) {
+                input.value = "";
+            }
+            input.disabled = unavailable || locked;
+        });
+        const reason = block.querySelector(".dref-disagg-reason");
+        if (reason) {
+            reason.hidden = !unavailable;
+        }
+        const area = block.querySelector('[data-part="disaggregation_reason"]');
+        if (!area) {
+            return;
+        }
+        area.required = unavailable && !locked;
+        if (!unavailable) {
+            area.value = "";
+        }
     }
 
     number(value) {
@@ -84,6 +126,14 @@ export class DrefOperationalReportField {
             }
             const skipped = block.querySelector('[data-part="disaggregation_na"]');
             if (skipped && skipped.checked) {
+                const reason = block.querySelector('[data-part="disaggregation_reason"]');
+                if (reason && !String(reason.value || "").trim()) {
+                    found.push({
+                        field: reason,
+                        title,
+                        message: this.message("data-msg-disagg", "Explain why this data is not available."),
+                    });
+                }
                 return;
             }
             const parts = ["pct_women", "pct_men", "pct_girls", "pct_boys"].map((part) => (
@@ -193,7 +243,7 @@ export class DrefOperationalReportField {
             return;
         }
         const failed = Array.from(document.querySelectorAll(".alert-danger")).some((alert) => (
-            /cannot be negative|percentage split|reached total/i.test(alert.textContent || "")
+            /cannot be negative|percentage split|reached total|not available/i.test(alert.textContent || "")
         ));
         if (!failed) {
             try {

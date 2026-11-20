@@ -1,4 +1,4 @@
-"""Import activity lines from a workbook.
+"""Import and export activity lines as a workbook.
 
 The expected sheet is named Activities. Columns, in any order:
 
@@ -20,14 +20,17 @@ from decimal import Decimal
 from io import BytesIO
 
 from app.extensions import db
-from plugins.dref_monitoring.constants import PLAN_DRAFT, SECTOR_LABELS
+from plugins.dref_monitoring.constants import ACTIVITY_TYPES, CARRIED_OUT_BY, PLAN_DRAFT, SECTOR_LABELS
 from plugins.dref_monitoring.i18n import translate
 from plugins.dref_monitoring.models import DrefActivity, DrefChangeRequest, DrefGroup, DrefIndicator
 from plugins.dref_monitoring.services.go_parse import is_imminent
 from plugins.dref_monitoring.services.parsing import as_date, as_int, as_money
 from plugins.dref_monitoring.services.plans import (
     _new_plan,
+    activities_for,
+    activity_status,
     groups_for,
+    indicators_for_activity,
     indicators_for_group,
     latest_baseline,
     latest_plan,
@@ -50,7 +53,29 @@ _HEADERS = {
     "start": "start",
     "end": "end",
     "beneficiary unit": "beneficiary_unit",
+    "status": "status",
+    "activity type": "activity_type",
+    "activity carried out by": "carried_out_by",
+    "carried out by": "carried_out_by",
 }
+
+_EXPORT_COLUMNS = (
+    "Group",
+    "Activity",
+    "Indicator",
+    "Indicator type",
+    "Target",
+    "Unit",
+    "Budget CHF",
+    "Start",
+    "End",
+    "Beneficiary unit",
+    "Status",
+    "Activity type",
+    "Activity carried out by",
+)
+_ACTIVITY_TYPE_CODES = {code for code, _label in ACTIVITY_TYPES}
+_CARRIED_OUT_CODES = {code for code, _label in CARRIED_OUT_BY}
 
 _PHASES = (
     ("early actions", "early_action"),
@@ -74,6 +99,52 @@ def _check_archive(raw: bytes) -> None:
                 raise WorkbookRejected("The workbook is too large once unpacked.")
     except zipfile.BadZipFile as exc:
         raise WorkbookRejected("The workbook is not a valid .xlsx file.") from exc
+
+
+def _number(value):
+    if value is None or value == "":
+        return None
+    return float(value)
+
+
+def _choice(raw, allowed: set[str]) -> str:
+    value = str(raw or "").strip()
+    return value if value in allowed else ""
+
+
+def export_workbook(plan) -> bytes:
+    """Write the plan as the same Activities sheet an import reads back."""
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "Activities"
+    sheet.append(list(_EXPORT_COLUMNS))
+    for group in groups_for(plan.id):
+        for activity in activities_for(group.id):
+            indicators = indicators_for_activity(activity.id)
+            indicator = indicators[0] if indicators else None
+            target = activity.target if activity.target is not None else (None if indicator is None else indicator.target)
+            sheet.append(
+                [
+                    group.label,
+                    activity.title,
+                    "" if indicator is None else indicator.title,
+                    "" if indicator is None else (indicator.kind or ""),
+                    _number(target),
+                    "" if indicator is None else (indicator.unit or ""),
+                    _number(activity.budget_chf),
+                    activity.start_date,
+                    activity.end_date,
+                    "" if indicator is None else (indicator.beneficiary_unit or ""),
+                    activity.status or "",
+                    activity.activity_type or "",
+                    activity.carried_out_by or "",
+                ]
+            )
+    buffer = BytesIO()
+    book.save(buffer)
+    return buffer.getvalue()
 
 
 def parse_workbook(raw: bytes) -> list[dict]:
@@ -277,6 +348,9 @@ def import_activities(operation, raw: bytes, actor, today) -> dict:
         activity = DrefActivity(
             group_id=group.id,
             title=str(row.get("activity") or label)[:255],
+            status=activity_status(row.get("status")) or "planned",
+            activity_type=_choice(row.get("activity_type"), _ACTIVITY_TYPE_CODES),
+            carried_out_by=_choice(row.get("carried_out_by"), _CARRIED_OUT_CODES),
             budget_chf=budget,
             start_date=as_date(row.get("start")) or operation.start_date,
             end_date=as_date(row.get("end")) or operation.end_date,

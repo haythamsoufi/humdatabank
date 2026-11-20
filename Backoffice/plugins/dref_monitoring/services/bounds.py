@@ -17,6 +17,15 @@ def _money(value) -> Decimal:
     return Decimal(value)
 
 
+def same_amount(left, right) -> bool:
+    """True when two money or target values are the same figure."""
+    if left is None and right is None:
+        return True
+    if left is None or right is None:
+        return False
+    return Decimal(str(left)).quantize(Decimal("0.01")) == Decimal(str(right)).quantize(Decimal("0.01"))
+
+
 def exceeds_group_budget(
     group_budget,
     activity_budgets: Iterable[tuple[int, object]],

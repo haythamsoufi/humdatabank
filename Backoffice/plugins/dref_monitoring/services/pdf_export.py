@@ -156,23 +156,58 @@ class PdfUnavailable(RuntimeError):
     """WeasyPrint is not installed in this environment."""
 
 
-def render_pdf(blocks: list, header: str) -> bytes:
+def render_pdf(blocks: list, header: str, language: str = "en") -> bytes:
     try:
         from weasyprint import CSS, HTML
         from weasyprint.text.fonts import FontConfiguration
     except ImportError as exc:
         raise PdfUnavailable("WeasyPrint is not available.") from exc
 
+    from plugins.dref_monitoring.i18n import override_locale
+
     font_config = FontConfiguration()
     base = _FONTS.resolve().as_uri() + "/"
-    stylesheet = CSS(string=_CSS, font_config=font_config, base_url=base)
-    document = HTML(string=_html(blocks, header), base_url=base)
-    return document.write_pdf(stylesheets=[stylesheet], font_config=font_config)
+    with override_locale(language):
+        stylesheet = CSS(string=_stylesheet(language), font_config=font_config, base_url=base)
+        document = HTML(string=_html(blocks, header, language), base_url=base)
+        return document.write_pdf(stylesheets=[stylesheet], font_config=font_config)
 
 
-def _html(blocks: list, header: str) -> str:
+def _stylesheet(language: str) -> str:
+    from plugins.dref_monitoring.i18n import translate
+
+    side = "left" if language == "ar" else "right"
+    label = translate("Page").replace('"', "")
+    css = _CSS.replace(
+        '@bottom-right {\n    content: "Page " counter(page) " / " counter(pages);',
+        f'@bottom-{side} {{\n    content: "{label} " counter(page) " / " counter(pages);',
+    )
+    if language != "ar":
+        return css
+    return css + """
+@font-face {
+  font-family: "Tajawal";
+  src: url("Tajawal-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Tajawal";
+  src: url("Tajawal-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+html[lang="ar"], html[lang="ar"] body, html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3,
+html[lang="ar"] p, html[lang="ar"] li, html[lang="ar"] td, html[lang="ar"] th {
+  font-family: "Tajawal", "Open Sans", sans-serif;
+}
+"""
+
+
+def _html(blocks: list, header: str, language: str = "en") -> str:
+    direction = "rtl" if language == "ar" else "ltr"
     parts = [
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"></head><body>",
+        f'<!DOCTYPE html><html lang="{escape(language)}" dir="{direction}"><head><meta charset="utf-8"></head><body>',
         f"<div class=\"run-head\">{escape(header)}</div>",
     ]
     for block in blocks:

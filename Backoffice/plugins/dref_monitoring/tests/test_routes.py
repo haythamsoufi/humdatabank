@@ -13,7 +13,7 @@ pytestmark = pytest.mark.db
 def test_plugin_class_loads():
     plugin = DrefMonitoringPlugin()
     assert plugin.plugin_id == "dref_monitoring"
-    assert plugin.version == "0.3.0"
+    assert plugin.version == "0.7.0"
     assert plugin.get_blueprint().name == "dref_monitoring"
     assert plugin.get_seed_permissions()
     assert plugin.get_scheduled_jobs()
@@ -139,5 +139,8 @@ def test_settings_page_renders_for_a_system_manager(app, db_session, logged_in_s
         assert "/dref-monitoring/operations" in body
         assert "dref-sync-filter" not in body
         assert "What Sync from GO does" in body
+        assert 'id="dref-go-sync-form"' in body
+        assert "go_sync.js" in body
+        assert "The sync runs in the background" in body
     finally:
         app.plugin_manager.active_plugins = previous

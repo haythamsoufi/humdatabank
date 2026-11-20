@@ -127,6 +127,22 @@ def test_template_prose_is_left_out_and_an_edit_is_kept():
     assert export_narrative(generated) == "The river stayed high."
 
 
+def test_messages_name_the_language_and_the_go_chapters():
+    from plugins.dref_monitoring.services.drafts import llm_messages
+
+    messages = llm_messages({"appeal_code": "MDRZZ001"}, "final_report", "ar")
+    assert "Arabic" in messages[0]["content"]
+    assert "what_happened" in messages[0]["content"]
+    assert "clear English" not in messages[0]["content"]
+
+
+def test_a_model_chapter_fills_the_go_heading():
+    blocks = build_report(_source(narratives={"what_happened": "The river rose overnight."}))
+    event = next(block for block in blocks if block.kind == "heading" and block.text == "What happened, where and when?")
+    following = blocks[blocks.index(event) + 1]
+    assert following.text == "The river rose overnight."
+
+
 def test_operational_update_follows_the_go_outline_and_does_not_invent_the_event():
     blocks = build_report(_source())
     headings = _headings(blocks, 1)

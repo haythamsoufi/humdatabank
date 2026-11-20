@@ -6,16 +6,11 @@ import datetime as dt
 
 from app.extensions import db
 from app.models.assignments import AssignedForm
-from app.models.enums import FormTemplateVersionStatusValue
-from app.models.form_items import FormItem
-from app.models.forms import FormSection, FormTemplate, FormTemplateVersion
 from app.services.projects.service import ensure_project_cycle_assignment, parse_cycle_slot, upsert_project
-from plugins.dref_monitoring.constants import FIELD_TYPE, PORTFOLIO, TEMPLATE_NAME
+from plugins.dref_monitoring.constants import PORTFOLIO
 from plugins.dref_monitoring.models import DrefOperation, DrefPeriod, DrefPlan
 from plugins.dref_monitoring.services.go_parse import appeal_kind
 from plugins.dref_monitoring.services.plans import latest_plan
-
-_FIELD_ITEM_TYPE = f"plugin_{FIELD_TYPE}"
 
 
 def fund_label(appeal_type: str) -> str:
@@ -66,77 +61,11 @@ def cycle_slot(start: dt.date, sequence: int, used: set[str]) -> str:
     return f"{day}-{sequence}"
 
 
-def ensure_monitoring_template() -> FormTemplate:
-    """Published ``DREF operational monitoring`` template with one plugin field."""
-    version = (
-        FormTemplateVersion.query.filter(FormTemplateVersion.name == TEMPLATE_NAME)
-        .order_by(FormTemplateVersion.id.desc())
-        .first()
-    )
-    if version is None:
-        template = FormTemplate()
-        db.session.add(template)
-        db.session.flush()
-        version = FormTemplateVersion(
-            template_id=template.id,
-            version_number=1,
-            status=FormTemplateVersionStatusValue.published,
-            name=TEMPLATE_NAME,
-            description=(
-                "Routine DREF monitoring report. One field reads the activities, "
-                "people reached, and indicative expenditure for the reporting period."
-            ),
-        )
-        db.session.add(version)
-        db.session.flush()
-        template.published_version_id = version.id
-    else:
-        template = version.template
-        if template is None:
-            raise RuntimeError(f"Form template version {version.id} has no template.")
-        status = getattr(version.status, "value", version.status)
-        if status != FormTemplateVersionStatusValue.published.value:
-            version.status = FormTemplateVersionStatusValue.published
-        if template.published_version_id != version.id:
-            template.published_version_id = version.id
+def ensure_monitoring_template(operation: DrefOperation):
+    """Update the published DREF operational monitoring template for this operation's sectors."""
+    from plugins.dref_monitoring.services.report_template import ensure_operation_template
 
-    section = (
-        FormSection.query.filter_by(version_id=version.id, name="Report")
-        .order_by(FormSection.id.asc())
-        .first()
-    )
-    if section is None:
-        section = FormSection(
-            template_id=template.id,
-            version_id=version.id,
-            name="Report",
-            order=1,
-            section_type="standard",
-        )
-        db.session.add(section)
-        db.session.flush()
-
-    item = FormItem.query.filter_by(version_id=version.id, item_type=_FIELD_ITEM_TYPE).first()
-    if item is None:
-        item = FormItem(
-            section_id=section.id,
-            version_id=version.id,
-            template_id=template.id,
-            item_type=_FIELD_ITEM_TYPE,
-            label="Operational report",
-            order=1,
-            description="Activity status, people reached, and indicative expenditure for this period.",
-            config={
-                "is_required": False,
-                "layout_column_width": 12,
-                "layout_break_after": False,
-                "exclude_from_completion_rate": True,
-                "plugin_config": {},
-            },
-        )
-        db.session.add(item)
-    db.session.flush()
-    return template
+    return ensure_operation_template(operation)
 
 
 def _used_slots(periods: list[DrefPeriod]) -> set[str]:
@@ -162,12 +91,15 @@ def open_cycles(operation: DrefOperation) -> int:
     project = sync_operation_project(operation)
     if project is None:
         return 0
-    template = ensure_monitoring_template()
+    template = ensure_monitoring_template(operation)
     periods = periods_for(operation.id)
     used = _used_slots(periods)
     attached = 0
     for period in sorted(periods, key=lambda row: (row.start_date, row.sequence)):
-        if period.assigned_form_id and db.session.get(AssignedForm, period.assigned_form_id) is not None:
+        assignment = db.session.get(AssignedForm, period.assigned_form_id) if period.assigned_form_id else None
+        if assignment is not None:
+            if assignment.template_id != template.id:
+                assignment.template_id = template.id
             continue
         slot = cycle_slot(period.start_date, period.sequence, used)
         used.add(slot)

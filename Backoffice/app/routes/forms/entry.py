@@ -799,6 +799,18 @@ def handle_assignment_form(aes_id):
                         )
                     return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
             try:
+                plugin_manager = getattr(current_app, "plugin_manager", None)
+                activity_error = (
+                    plugin_manager.save_entry_extras(assignment_entity_status, request.form)
+                    if plugin_manager is not None
+                    else None
+                )
+                if activity_error:
+                    request_transaction_rollback()
+                    if is_ajax:
+                        return json_bad_request(activity_error, success=False)
+                    flash(activity_error, "danger")
+                    return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
                 submission_result = FormDataService.process_form_submission(
                     assignment_entity_status, all_sections, csrf_form
                 )
@@ -1111,6 +1123,10 @@ def handle_assignment_form(aes_id):
             else:
                 flash(error_message, "danger")
                 return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
+
+    plugin_manager = getattr(current_app, "plugin_manager", None)
+    if plugin_manager is not None:
+        plugin_manager.prepare_entry_values(assignment_entity_status, existing_data_processed)
 
     template_structure = form_template
 

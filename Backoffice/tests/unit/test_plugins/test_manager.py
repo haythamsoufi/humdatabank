@@ -1602,3 +1602,25 @@ class TestGetDocumentationSources:
 
         assert pm.get_documentation_sources() == []
         plugin.get_documentation_source.assert_not_called()
+
+
+class TestEntryFormHooks:
+    def test_prepare_skips_a_failing_plugin_and_save_returns_the_first_error(self, tmp_path):
+        pm, _ = _make_manager(tmp_path)
+        broken = MagicMock()
+        broken.prepare_entry_values.side_effect = RuntimeError("boom")
+        broken.save_entry_extras.return_value = None
+        owner = MagicMock()
+        owner.prepare_entry_values.return_value = None
+        owner.save_entry_extras.return_value = "Enter a number for the target."
+        ignored = MagicMock()
+        pm.plugins = {"broken": broken, "owner": owner, "ignored": ignored}
+        pm.active_plugins = {"broken", "owner", "ignored"}
+        existing = {}
+
+        pm.prepare_entry_values(object(), existing)
+        broken.prepare_entry_values.assert_called_once()
+        owner.prepare_entry_values.assert_called_once()
+
+        assert pm.save_entry_extras(object(), {}) == "Enter a number for the target."
+        ignored.save_entry_extras.assert_not_called()

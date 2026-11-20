@@ -444,6 +444,22 @@ class BasePlugin(ABC):
         """
         return []
 
+    def prepare_entry_values(self, assignment_entity_status: Any, existing_data: Dict[str, Any]) -> None:
+        """Replace values shown on an assignment form before it renders.
+
+        ``existing_data`` is the map the entry form reads. A plugin that owns some of those
+        fields can put its own figures in place of a previously stored total.
+        """
+        return None
+
+    def save_entry_extras(self, assignment_entity_status: Any, form: Any) -> Optional[str]:
+        """Store posted fields this plugin owns, before the form processors run.
+
+        Return an error message to refuse the save. Return None when the assignment is not
+        this plugin's, or when the extra fields were stored.
+        """
+        return None
+
     def get_csp_overrides(self) -> List[CspOverride]:
         """CSP overrides for plugin-served HTML assets."""
         return []

@@ -81,7 +81,28 @@ def parse_stage(row: dict[str, Any]) -> dict[str, Any] | None:
         "operation_status": str(row.get("operation_status") or "").strip().lower(),
         "is_latest_stage": as_bool(row.get("is_latest_stage")),
         "sectors": sectors_from_row(row),
+        "application": row.get("application") if isinstance(row.get("application"), dict) else None,
     }
+
+
+def application_signature(application) -> tuple:
+    """Titles and targets of the planned interventions. Empty when GO sent none."""
+    if not isinstance(application, dict):
+        return ()
+    items = []
+    for item in application.get("interventions") or []:
+        if not isinstance(item, dict):
+            continue
+        indicators = tuple(
+            (str(indicator.get("title") or ""), indicator.get("target"))
+            for indicator in item.get("indicators") or []
+            if isinstance(indicator, dict)
+        )
+        activities = tuple(str(title) for title in item.get("activities") or [])
+        items.append(
+            (item.get("key"), str(item.get("budget")), item.get("people_targeted"), indicators, activities)
+        )
+    return tuple(items)
 
 
 def stage_signature(parsed: dict[str, Any]) -> tuple:
@@ -93,4 +114,5 @@ def stage_signature(parsed: dict[str, Any]) -> tuple:
         str(parsed.get("total_approved")),
         parsed.get("end_date"),
         sectors,
+        application_signature(parsed.get("application")),
     )

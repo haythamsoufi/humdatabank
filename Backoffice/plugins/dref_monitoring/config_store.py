@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.plugins.db_config import DbPluginConfig
-from plugins.dref_monitoring.constants import DEFAULT_CONFIG, PLUGIN_ID
+from plugins.dref_monitoring.constants import DEFAULT_CONFIG, PLUGIN_ID, PROMPT_VERSION
 
 _store = DbPluginConfig(PLUGIN_ID, DEFAULT_CONFIG, plugin_root=Path(__file__).resolve().parent)
 
@@ -27,6 +27,12 @@ def schedule_settings() -> dict:
 
 def ai_enabled() -> bool:
     return bool((get_config().get("ai") or {}).get("enabled"))
+
+
+def ai_language() -> str:
+    from plugins.dref_monitoring.services.drafts import report_language
+
+    return report_language((get_config().get("ai") or {}).get("language"))
 
 
 def go_base_url() -> str:
@@ -51,5 +57,14 @@ def save_posted_settings(form: dict) -> bool:
             "escalation_portfolio_days": _days("escalation_portfolio_days", 14),
         },
     )
-    _store.update_section("ai", {"enabled": str(form.get("ai_enabled") or "") in {"1", "on", "true"}})
+    from plugins.dref_monitoring.services.drafts import report_language
+
+    _store.update_section(
+        "ai",
+        {
+            "enabled": str(form.get("ai_enabled") or "") in {"1", "on", "true"},
+            "prompt_version": PROMPT_VERSION,
+            "language": report_language(str(form.get("ai_language") or "en")),
+        },
+    )
     return True

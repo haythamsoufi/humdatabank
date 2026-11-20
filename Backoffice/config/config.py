@@ -963,6 +963,9 @@ class Config:
     # Default LLM model (OPENAI_MODEL). Supported models depend on your OpenAI account.
     # Some models (e.g. GPT-5 family) reject sampling params; see app.utils.ai.ai_utils.openai_model_supports_sampling_params.
     OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-5-mini')
+    # Authenticated IFRC GO write API. Draft 0 posts here after National Society validation.
+    GO_API_TOKEN = os.environ.get('GO_API_TOKEN')
+    GO_API_BASE = os.environ.get('GO_API_BASE', 'https://goadmin.ifrc.org/api/v2/')
     # Optional: override model pricing (JSON). Keys: "chat" (model -> {input, output} per 1M tokens), "embedding" (model -> per 1M tokens). See app.utils.ai.ai_pricing.
     AI_MODEL_PRICING = os.environ.get('AI_MODEL_PRICING')  # JSON string or set in code
 

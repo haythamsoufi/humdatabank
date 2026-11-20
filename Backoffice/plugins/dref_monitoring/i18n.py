@@ -38,12 +38,47 @@ CATALOG = {
         "Disabled": "Désactivé",
         "OpenAI key configured": "Clé OpenAI configurée",
         "OpenAI key missing": "Clé OpenAI absente",
+        "AI engine": "Moteur d'IA",
+        "AI engine ready": "Moteur d'IA prêt",
+        "AI engine not configured": "Moteur d'IA non configuré",
+        "GO token configured": "Jeton GO configuré",
+        "GO token missing": "Jeton GO absent",
+        "Language": "Langue",
+        "English": "Anglais",
+        "French": "Français",
+        "Spanish": "Espagnol",
+        "Arabic": "Arabe",
+        "Report language": "Langue du rapport",
+        "Scheduled drafts use this language.": "Les brouillons planifiés utilisent cette langue.",
+        "Save narrative": "Enregistrer le récit",
+        "Validate and send to GO": "Valider et envoyer à GO",
+        "Send to GO": "Envoyer à GO",
+        "Narrative saved.": "Récit enregistré.",
+        "Report sent to GO.": "Rapport envoyé à GO.",
+        "GO did not accept the report.": "GO n'a pas accepté le rapport.",
+        "This draft is already validated.": "Ce brouillon est déjà validé.",
+        "You cannot validate this draft.": "Vous ne pouvez pas valider ce brouillon.",
+        "You cannot edit this draft.": "Vous ne pouvez pas modifier ce brouillon.",
+        "You cannot draft a report for this operation.": "Vous ne pouvez pas rédiger un rapport pour cette opération.",
+        "Validate the draft before sending it to GO.": "Validez le brouillon avant de l'envoyer à GO.",
+        "GO API token is not configured.": "Le jeton d'API GO n'est pas configuré.",
+        "Draft failed.": "Le brouillon a échoué.",
+        "Unknown report type.": "Type de rapport inconnu.",
+        "Draft not found.": "Brouillon introuvable.",
+        "The model writes the GO chapters from the approved request and the monitoring history. It does not receive names or community feedback.": "Le modèle rédige les chapitres GO à partir de la demande approuvée et de l'historique de suivi. Il ne reçoit ni noms ni retours communautaires.",
+        "Review the chapters, then validate. Validation sends the report to GO for formal processing.": "Relisez les chapitres, puis validez. La validation envoie le rapport à GO pour traitement.",
+        "Sent": "Envoyé",
+        "Not sent": "Non envoyé",
+        "GO reference": "Référence GO",
+        "Sync from GO copies approved operations from the public GO feed into this plugin. The sync does not send plans or monitoring reports. A validated Draft 0 is posted to GO when a GO API token is configured.": "La synchronisation copie les opérations approuvées du flux public de GO dans ce module. Elle n'envoie ni plans ni rapports de suivi. Un brouillon 0 validé est envoyé à GO lorsqu'un jeton d'API GO est configuré.",
         "Last sync": "Dernière synchronisation",
         "Never": "Jamais",
         "Monitoring plan": "Plan de suivi",
         "Validate plan": "Valider le plan",
         "Generate plan": "Générer le plan",
         "Activity": "Activité",
+        "Activity added": "Activité ajoutée",
+        "Activity removed": "Activité retirée",
         "Budget": "Budget",
         "Start": "Début",
         "End": "Fin",
@@ -57,6 +92,8 @@ CATALOG = {
         "Due": "Échéance",
         "Report": "Rapport",
         "People reached": "Personnes atteintes",
+        "Households reached": "Ménages atteints",
+        "Activities completed": "Activités achevées",
         "Households": "Ménages",
         "Individuals": "Personnes",
         "Expenditure": "Dépenses",
@@ -72,6 +109,12 @@ CATALOG = {
         "Select": "Sélectionner",
         "Search by name or email": "Rechercher par nom ou e-mail",
         "No matching users": "Aucun utilisateur correspondant",
+        "Select a user.": "Sélectionnez un utilisateur.",
+        "Name the item being procured.": "Indiquez l'article à acheter.",
+        "Describe the delay.": "Décrivez le retard.",
+        "Summarise the feedback.": "Résumez le retour.",
+        "Name the risk.": "Nommez le risque.",
+        "A mitigation is recorded when the risk is mitigated or closed.": "Une mesure d'atténuation se saisit lorsque le risque est atténué ou clos.",
         "Community feedback": "Retour des communautés",
         "Risks": "Risques",
         "Draft 0": "Brouillon 0",
@@ -271,12 +314,47 @@ CATALOG = {
         "Disabled": "Desactivado",
         "OpenAI key configured": "Clave de OpenAI configurada",
         "OpenAI key missing": "Falta la clave de OpenAI",
+        "AI engine": "Motor de IA",
+        "AI engine ready": "Motor de IA listo",
+        "AI engine not configured": "Motor de IA no configurado",
+        "GO token configured": "Token de GO configurado",
+        "GO token missing": "Falta el token de GO",
+        "Language": "Idioma",
+        "English": "Inglés",
+        "French": "Francés",
+        "Spanish": "Español",
+        "Arabic": "Árabe",
+        "Report language": "Idioma del informe",
+        "Scheduled drafts use this language.": "Los borradores programados usan este idioma.",
+        "Save narrative": "Guardar el relato",
+        "Validate and send to GO": "Validar y enviar a GO",
+        "Send to GO": "Enviar a GO",
+        "Narrative saved.": "Relato guardado.",
+        "Report sent to GO.": "Informe enviado a GO.",
+        "GO did not accept the report.": "GO no aceptó el informe.",
+        "This draft is already validated.": "Este borrador ya está validado.",
+        "You cannot validate this draft.": "No puede validar este borrador.",
+        "You cannot edit this draft.": "No puede editar este borrador.",
+        "You cannot draft a report for this operation.": "No puede redactar un informe para esta operación.",
+        "Validate the draft before sending it to GO.": "Valide el borrador antes de enviarlo a GO.",
+        "GO API token is not configured.": "El token de API de GO no está configurado.",
+        "Draft failed.": "El borrador falló.",
+        "Unknown report type.": "Tipo de informe desconocido.",
+        "Draft not found.": "Borrador no encontrado.",
+        "The model writes the GO chapters from the approved request and the monitoring history. It does not receive names or community feedback.": "El modelo redacta los capítulos de GO a partir de la solicitud aprobada y del historial de seguimiento. No recibe nombres ni comentarios de la comunidad.",
+        "Review the chapters, then validate. Validation sends the report to GO for formal processing.": "Revise los capítulos y luego valide. La validación envía el informe a GO para su trámite.",
+        "Sent": "Enviado",
+        "Not sent": "No enviado",
+        "GO reference": "Referencia de GO",
+        "Sync from GO copies approved operations from the public GO feed into this plugin. The sync does not send plans or monitoring reports. A validated Draft 0 is posted to GO when a GO API token is configured.": "La sincronización copia las operaciones aprobadas del flujo público de GO en este módulo. No envía planes ni informes de seguimiento. Un borrador 0 validado se envía a GO cuando hay un token de API de GO configurado.",
         "Last sync": "Última sincronización",
         "Never": "Nunca",
         "Monitoring plan": "Plan de seguimiento",
         "Validate plan": "Validar el plan",
         "Generate plan": "Generar el plan",
         "Activity": "Actividad",
+        "Activity added": "Actividad añadida",
+        "Activity removed": "Actividad eliminada",
         "Budget": "Presupuesto",
         "Start": "Inicio",
         "End": "Fin",
@@ -290,6 +368,8 @@ CATALOG = {
         "Due": "Vencimiento",
         "Report": "Informe",
         "People reached": "Personas alcanzadas",
+        "Households reached": "Hogares alcanzados",
+        "Activities completed": "Actividades completadas",
         "Households": "Hogares",
         "Individuals": "Personas",
         "Expenditure": "Gasto",
@@ -305,6 +385,12 @@ CATALOG = {
         "Select": "Seleccionar",
         "Search by name or email": "Buscar por nombre o correo",
         "No matching users": "Ningún usuario coincide",
+        "Select a user.": "Seleccione un usuario.",
+        "Name the item being procured.": "Indique el artículo que se adquiere.",
+        "Describe the delay.": "Describa el retraso.",
+        "Summarise the feedback.": "Resuma la retroalimentación.",
+        "Name the risk.": "Nombre el riesgo.",
+        "A mitigation is recorded when the risk is mitigated or closed.": "La mitigación se registra cuando el riesgo está mitigado o cerrado.",
         "Community feedback": "Retroalimentación comunitaria",
         "Risks": "Riesgos",
         "Draft 0": "Borrador 0",
@@ -504,12 +590,47 @@ CATALOG = {
         "Disabled": "غير مفعّل",
         "OpenAI key configured": "مفتاح OpenAI مُعد",
         "OpenAI key missing": "مفتاح OpenAI غير موجود",
+        "AI engine": "محرك الذكاء الاصطناعي",
+        "AI engine ready": "محرك الذكاء الاصطناعي جاهز",
+        "AI engine not configured": "محرك الذكاء الاصطناعي غير مُعد",
+        "GO token configured": "رمز GO مُعد",
+        "GO token missing": "رمز GO غير موجود",
+        "Language": "اللغة",
+        "English": "الإنجليزية",
+        "French": "الفرنسية",
+        "Spanish": "الإسبانية",
+        "Arabic": "العربية",
+        "Report language": "لغة التقرير",
+        "Scheduled drafts use this language.": "تستخدم المسودات المجدولة هذه اللغة.",
+        "Save narrative": "حفظ السرد",
+        "Validate and send to GO": "اعتماد وإرسال إلى GO",
+        "Send to GO": "إرسال إلى GO",
+        "Narrative saved.": "تم حفظ السرد.",
+        "Report sent to GO.": "أُرسل التقرير إلى GO.",
+        "GO did not accept the report.": "لم تقبل GO التقرير.",
+        "This draft is already validated.": "هذه المسودة معتمدة بالفعل.",
+        "You cannot validate this draft.": "لا يمكنك اعتماد هذه المسودة.",
+        "You cannot edit this draft.": "لا يمكنك تعديل هذه المسودة.",
+        "You cannot draft a report for this operation.": "لا يمكنك إعداد تقرير لهذه العملية.",
+        "Validate the draft before sending it to GO.": "اعتمد المسودة قبل إرسالها إلى GO.",
+        "GO API token is not configured.": "رمز واجهة GO غير مُعد.",
+        "Draft failed.": "فشل إنشاء المسودة.",
+        "Unknown report type.": "نوع التقرير غير معروف.",
+        "Draft not found.": "المسودة غير موجودة.",
+        "The model writes the GO chapters from the approved request and the monitoring history. It does not receive names or community feedback.": "يكتب النموذج فصول GO من الطلب المعتمد وسجل المتابعة. لا يتلقى أسماء ولا ملاحظات المجتمع.",
+        "Review the chapters, then validate. Validation sends the report to GO for formal processing.": "راجع الفصول ثم اعتمدها. الاعتماد يرسل التقرير إلى GO للمعالجة الرسمية.",
+        "Sent": "مُرسل",
+        "Not sent": "غير مُرسل",
+        "GO reference": "مرجع GO",
+        "Sync from GO copies approved operations from the public GO feed into this plugin. The sync does not send plans or monitoring reports. A validated Draft 0 is posted to GO when a GO API token is configured.": "تنسخ المزامنة العمليات المعتمدة من التغذية العامة لمنصة GO إلى هذه الوحدة. لا ترسل المزامنة خططاً ولا تقارير متابعة. تُرسل المسودة 0 بعد اعتمادها إلى GO عندما يكون رمز واجهة GO مُعداً.",
         "Last sync": "آخر مزامنة",
         "Never": "أبدًا",
         "Monitoring plan": "خطة المتابعة",
         "Validate plan": "اعتماد الخطة",
         "Generate plan": "إنشاء الخطة",
         "Activity": "النشاط",
+        "Activity added": "نشاط مضاف",
+        "Activity removed": "نشاط محذوف",
         "Budget": "الميزانية",
         "Start": "البداية",
         "End": "النهاية",
@@ -523,6 +644,8 @@ CATALOG = {
         "Due": "الاستحقاق",
         "Report": "التقرير",
         "People reached": "الأشخاص الذين تم الوصول إليهم",
+        "Households reached": "الأسر التي تم الوصول إليها",
+        "Activities completed": "الأنشطة المكتملة",
         "Households": "الأسر",
         "Individuals": "الأفراد",
         "Expenditure": "الإنفاق",
@@ -538,6 +661,12 @@ CATALOG = {
         "Select": "اختيار",
         "Search by name or email": "ابحث بالاسم أو البريد",
         "No matching users": "لا يوجد مستخدم مطابق",
+        "Select a user.": "اختر مستخدمًا.",
+        "Name the item being procured.": "سمِّ المادة المراد شراؤها.",
+        "Describe the delay.": "صف التأخير.",
+        "Summarise the feedback.": "لخّص الملاحظات.",
+        "Name the risk.": "سمِّ الخطر.",
+        "A mitigation is recorded when the risk is mitigated or closed.": "يُسجَّل التخفيف عندما يكون الخطر مخففًا أو مغلقًا.",
         "Community feedback": "ملاحظات المجتمع",
         "Risks": "المخاطر",
         "Draft 0": "المسودة صفر",
@@ -708,11 +837,181 @@ CATALOG = {
 }
 
 
-def translate(message: str) -> str:
+from contextvars import ContextVar, Token
+
+from plugins.dref_monitoring.constants import SECTOR_LABELS
+from plugins.dref_monitoring.phrases import CODE_LABELS, ROWS
+
+SUPPORTED = ("en", "fr", "es", "ar")
+_override: ContextVar[str | None] = ContextVar("dref_language", default=None)
+
+for _english, (_french, _spanish, _arabic) in ROWS.items():
+    CATALOG.setdefault("fr", {})
+    CATALOG.setdefault("es", {})
+    CATALOG.setdefault("ar", {})
+    CATALOG["fr"].setdefault(_english, _french)
+    CATALOG["es"].setdefault(_english, _spanish)
+    CATALOG["ar"].setdefault(_english, _arabic)
+
+_EXACT = set(SECTOR_LABELS.values()) | {
+    "Early actions",
+    "Early response",
+    "Operation",
+    "Application",
+    "Operational update",
+    "Final report",
+    "People reached",
+    "Households reached",
+    "Activities completed",
+    "Reported expenditure",
+    "people",
+    "households",
+    "activities",
+}
+_PATTERNS = (
+    ("Deliver {sector}", "Deliver "),
+    ("Early actions: {sector}", "Early actions: "),
+    ("Early response: {sector}", "Early response: "),
+    ("Early action: {sector}", "Early action: "),
+)
+
+
+def normalize_language(code: str | None) -> str:
+    base = str(code or "en").lower().replace("-", "_").split("_")[0]
+    return base if base in SUPPORTED else "en"
+
+
+def current_language() -> str:
+    forced = _override.get()
+    if forced:
+        return normalize_language(forced)
     try:
         from flask_babel import get_locale
 
-        code = str(get_locale() or "en").lower().split("_")[0]
+        code = str(get_locale() or "en")
     except Exception:
         code = "en"
-    return CATALOG.get(code, {}).get(message, message)
+    return normalize_language(code)
+
+
+def use_locale(code: str | None) -> Token | None:
+    if not code:
+        return None
+    return _override.set(normalize_language(code))
+
+
+def reset_locale(token: Token | None) -> None:
+    if token is not None:
+        _override.reset(token)
+
+
+class override_locale:
+    """Read report strings in one of the four supported languages."""
+
+    def __init__(self, code: str | None):
+        self.code = code
+        self.token: Token | None = None
+
+    def __enter__(self):
+        self.token = use_locale(self.code)
+        return self
+
+    def __exit__(self, *_args):
+        reset_locale(self.token)
+        return False
+
+
+def translate(message: str, lang: str | None = None, **variables) -> str:
+    if message is None:
+        return ""
+    text = str(message)
+    code = normalize_language(lang) if lang else current_language()
+    text = CATALOG.get(code, {}).get(text, text)
+    if not variables:
+        return text
+    try:
+        return text % variables
+    except (TypeError, ValueError, KeyError):
+        try:
+            return text.format(**variables)
+        except Exception:
+            return text
+
+
+def code_label(code: str | None) -> str:
+    raw = str(code or "").strip()
+    if not raw:
+        return ""
+    shown = CODE_LABELS.get(current_language(), {}).get(raw.lower())
+    if shown:
+        return shown
+    return raw.replace("_", " ")
+
+
+def localize_text(value, lang: str | None = None) -> str:
+    text = str(value or "")
+    if not text:
+        return text
+    code = normalize_language(lang) if lang else current_language()
+    catalog = CATALOG.get(code, {})
+    if text in _EXACT:
+        return catalog.get(text, text)
+    for template, prefix in _PATTERNS:
+        if text.startswith(prefix):
+            sector = text[len(prefix):]
+            if sector in _EXACT:
+                pattern = catalog.get(template, template)
+                return pattern.format(sector=catalog.get(sector, sector))
+    return text
+
+
+def named(label, message: str) -> str:
+    title = localize_text(str(label or "").strip())
+    sentence = translate(message)
+    if not title:
+        return sentence
+    return translate("{title}: {message}").format(title=title, message=sentence)
+
+
+def install_dref_gettext() -> None:
+    """Translate DREF labels that the shell looks up with gettext, such as the nav item."""
+    import flask_babel
+
+    current = flask_babel.gettext
+    if getattr(current, "_dref_catalog", False):
+        _bind_jinja(current)
+        return
+    original = current
+
+    def gettext(string, **variables):
+        if isinstance(string, str) and "DREF" in string:
+            code = current_language()
+            catalog = CATALOG.get(code, {})
+            if string in catalog:
+                try:
+                    baked = original(string)
+                except Exception:
+                    baked = string
+                if baked == string:
+                    text = catalog[string]
+                    if variables:
+                        try:
+                            return text % variables
+                        except Exception:
+                            return text
+                    return text
+        return original(string, **variables)
+
+    gettext._dref_catalog = True
+    flask_babel.gettext = gettext
+    _bind_jinja(gettext)
+
+
+def _bind_jinja(gettext) -> None:
+    try:
+        from flask import current_app, has_app_context
+
+        if has_app_context():
+            current_app.jinja_env.globals["_"] = gettext
+    except Exception:
+        return

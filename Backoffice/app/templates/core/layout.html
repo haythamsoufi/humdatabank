@@ -3,7 +3,7 @@
 {% from "components/_mobile_language_menu.html" import mobile_language_nav_button, mobile_language_modal %}
 {% set _ui_language = current_ui_language() %}
 <!DOCTYPE html>
-<html lang="{{ _ui_language }}"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
+<html lang="{{ _ui_language }}" dir="{{ 'rtl' if (_ui_language or '')[:2] == 'ar' else 'ltr' }}"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

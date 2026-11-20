@@ -19,7 +19,9 @@ class DrefOperationalReportField(BaseFieldType):
 
     @property
     def display_name(self) -> str:
-        return "DREF operational report"
+        from plugins.dref_monitoring.i18n import translate
+
+        return translate("DREF operational report")
 
     @property
     def category(self) -> str:
@@ -27,7 +29,11 @@ class DrefOperationalReportField(BaseFieldType):
 
     @property
     def description(self) -> str:
-        return "Activity status, people reached, expenditure, and indicator actuals for one DREF reporting period."
+        from plugins.dref_monitoring.i18n import translate
+
+        return translate(
+            "Activity status, people reached, expenditure, and indicator actuals for one DREF reporting period."
+        )
 
     @property
     def icon(self) -> str:

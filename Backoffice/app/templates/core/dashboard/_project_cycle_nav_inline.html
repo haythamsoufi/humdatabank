@@ -50,9 +50,9 @@
             <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0 {{ dot }}" aria-hidden="true"></span>
             <span class="min-w-0 flex-1">
                 <span class="block font-semibold text-gray-900 truncate">{{ period }}</span>
-                <span class="block text-xs text-gray-500 truncate">
-                    {% if cycle.date_info %}{{ _('Due') }} {{ cycle.date_info|format_date_localized('medium') }} · {% endif %}{{ localize_status(assignment_display_status(cycle.item_object)) }}
-                </span>
+                {% if cycle.date_info %}
+                <span class="block text-xs text-gray-500 truncate">{{ _('Due') }} {{ cycle.date_info|format_date_localized('medium') }}</span>
+                {% endif %}
             </span>
             <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium {{ tag_cls }}">{{ tag_text }}</span>
         </a>

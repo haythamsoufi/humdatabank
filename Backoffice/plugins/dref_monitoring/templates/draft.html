@@ -40,12 +40,41 @@
     ) }}
     <p class="text-sm text-gray-600">
         {{ dref_enum(draft.report_kind) }}
+        · {{ {'en': dref_tr('English'), 'fr': dref_tr('French'), 'es': dref_tr('Spanish'), 'ar': dref_tr('Arabic')}.get(draft.language or 'en', draft.language) }}
+        · {% if draft.status == 'submitted' %}{{ dref_tr('Submitted') }}{% elif draft.status == 'validated' %}{{ dref_tr('Validated') }}{% else %}{{ dref_tr('Draft') }}{% endif %}
         · {{ dref_tr('AI draft reports') }}: {{ dref_tr('Enabled') if draft.ai_used else dref_tr('Disabled') }}
         · {{ draft.model or '-' }}
+        · {{ dref_tr('GO reference') }}: {{ draft.go_reference or dref_tr('Not sent') }}
     </p>
+    {% if draft.go_error %}
+    <p class="text-sm text-amber-800">{{ dref_tr(draft.go_error) }}</p>
+    {% endif %}
+    <p class="text-sm text-gray-600">{{ dref_tr('Review the chapters, then validate. Validation sends the report to GO for formal processing.') }}</p>
+    {% if can_edit %}
+    <form method="post" action="{{ url_for('dref_monitoring.draft_save_route', operation_id=operation.id, draft_id=draft.id) }}" class="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for field in fields %}
+        <label class="block text-sm text-gray-700">{{ dref_tr(field.label) }}
+            <textarea class="mt-1 w-full border border-gray-300 rounded px-3 py-2" name="section_{{ field.key }}" rows="4">{{ field.text }}</textarea>
+        </label>
+        {% endfor %}
+        <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Save narrative') }}</button>
+    </form>
+    {% endif %}
+    {% if can_validate %}
+    <form method="post" action="{{ url_for('dref_monitoring.draft_validate_route', operation_id=operation.id, draft_id=draft.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Validate and send to GO') }}</button>
+    </form>
+    {% elif can_send %}
+    <form method="post" action="{{ url_for('dref_monitoring.draft_send_route', operation_id=operation.id, draft_id=draft.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit">{{ dref_tr('Send to GO') }}</button>
+    </form>
+    {% endif %}
     <p class="text-sm text-gray-600">{{ dref_tr('The preview matches the Word file and the PDF.') }}</p>
     <div class="dref-report-frame">
-        <article class="dref-report" aria-label="{{ dref_tr('Draft 0') }}">
+        <article class="dref-report" lang="{{ draft.language or 'en' }}" dir="{{ 'rtl' if (draft.language or 'en') == 'ar' else 'ltr' }}" aria-label="{{ dref_tr('Draft 0') }}">
             <p class="dref-report__runhead">{{ header }}</p>
             {% for block in blocks %}
                 {% if block.kind == 'title' %}

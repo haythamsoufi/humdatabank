@@ -275,6 +275,15 @@ function applyLayoutToSubSection(subSectionContainer) {
     const fieldGroups = groupFieldsByLayout(subSectionFields);
     debugLog('layout', `Created ${fieldGroups.length} field groups for sub-section`);
 
+    // Keep direct children that are not the fields being rearranged. A repeat
+    // sub-section's "Add Entry" control lives here; dropping it leaves the
+    // fields visible but makes the group impossible to repeat.
+    const preservedExtras = Array.from(subSectionContainer.children).filter(child => {
+        if (child.classList && child.classList.contains('form-item-block')) return false;
+        if (child.dataset && child.dataset.layoutRow) return false;
+        return true;
+    });
+
     // Create and apply the new layout
     const newContainer = createFlexibleLayoutContainer(fieldGroups);
     debugLog('layout', 'Created new layout container for sub-section');
@@ -283,6 +292,9 @@ function applyLayoutToSubSection(subSectionContainer) {
     subSectionContainer.replaceChildren();
     Array.from(newContainer.children).forEach(child => {
         subSectionContainer.appendChild(child);
+    });
+    preservedExtras.forEach(extra => {
+        subSectionContainer.appendChild(extra);
     });
 
     debugLog('layout', '✅ Sub-section layout applied successfully');

@@ -86,6 +86,7 @@ class DrefBaseline(db.Model):
     people_targeted = db.Column(db.Integer, nullable=True)
     people_assisted = db.Column(db.Integer, nullable=True)
     sectors = db.Column(_JSON, nullable=False, default=list)
+    application = db.Column(_JSON, nullable=True)
     is_latest = db.Column(db.Boolean, nullable=False, default=False)
     synced_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 
@@ -103,6 +104,7 @@ class DrefPlan(db.Model):
     status = db.Column(db.String(16), nullable=False, default="draft")
     source = db.Column(db.String(16), nullable=False, default="generated")
     validation_due = db.Column(db.Date, nullable=True)
+    validation_reminded_on = db.Column(db.Date, nullable=True)
     validated_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     validated_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
@@ -122,6 +124,8 @@ class DrefGroup(db.Model):
     group_kind = db.Column(db.String(32), nullable=False, default="sector")
     budget_chf = db.Column(db.Numeric(14, 2), nullable=True)
     people_targeted = db.Column(db.Integer, nullable=True)
+    bank_sector_id = db.Column(db.Integer, nullable=True)
+    unmatched = db.Column(db.Boolean, nullable=False, default=False)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
 
 
@@ -168,6 +172,10 @@ class DrefIndicator(db.Model):
     target = db.Column(db.Numeric(14, 2), nullable=True)
     unit = db.Column(db.String(32), nullable=False, default="")
     beneficiary_unit = db.Column(db.String(16), nullable=False, default="none")
+    indicator_bank_id = db.Column(db.Integer, nullable=True)
+    unmatched = db.Column(db.Boolean, nullable=False, default=False)
+    # True when the temporary GO-title adapter supplied indicator_bank_id.
+    bank_adapted = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class DrefStandardIndicator(db.Model):
@@ -334,8 +342,22 @@ class DrefDraft(db.Model):
     body = db.Column(db.Text, nullable=False, default="")
     edited_body = db.Column(db.Text, nullable=True)
     ai_used = db.Column(db.Boolean, nullable=False, default=False)
+    language = db.Column(db.String(8), nullable=False, default="en")
+    trigger = db.Column(db.String(32), nullable=False, default="manual")
+    period_id = db.Column(db.Integer, db.ForeignKey("dref_mon_period.id", ondelete="SET NULL"), nullable=True)
+    status = db.Column(db.String(16), nullable=False, default="draft")
+    validated_at = db.Column(db.DateTime, nullable=True)
+    validated_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    go_status = db.Column(db.String(16), nullable=False, default="")
+    go_reference = db.Column(db.String(64), nullable=False, default="")
+    go_error = db.Column(db.Text, nullable=False, default="")
+    go_submitted_at = db.Column(db.DateTime, nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+
+    __table_args__ = (
+        db.Index("ix_dref_mon_draft_period", "operation_id", "period_id", "report_kind"),
+    )
 
 
 class DrefSyncLog(db.Model):

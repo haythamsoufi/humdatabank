@@ -4,7 +4,7 @@ DREF monitoring tracks an operation after GO has approved it, from the monitorin
 
 Open it from **Analytics & Monitoring → DREF monitoring**, or go to `/dref-monitoring/operations`. Portfolio staff also see a **DREF monitoring** tab in **Explore Data**. Settings are at `/admin/plugins/dref_monitoring/settings`.
 
-The plugin does not replace GO. It reads approved stages from GO, keeps the monitoring record in the Databank, and exports a draft the National Society can paste into GO. It never posts a report back to GO.
+The plugin does not replace GO. It reads approved stages from GO and keeps the monitoring record in the Databank. A validated Draft 0 is posted to the GO write API when `GO_API_TOKEN` is set. The nightly sync itself only reads the public feed.
 
 ## What starts monitoring
 
@@ -59,11 +59,13 @@ GO does not push a webhook when an application is approved. The plugin pulls.
 | When | Every day at 05:10 UTC, and when someone with manage access clicks **Sync from GO** on the settings page |
 | Manual command | `flask dref-monitoring-sync` from `Backoffice/`. `--include-closed` is accepted and does the same thing. |
 
+**Sync from GO** queues a background job and returns immediately. The settings page shows the status and progress (reading the feed, reading emergency pages, saving operations) and keeps polling until the job finishes. Leaving the page does not stop the job; opening the sync tab again resumes the same progress. Cancelling stops the pull and rolls back operations that have not been saved yet. The daily job and the command skip the pull when one is already running.
+
 Each pull writes a row to the sync log (time, status, and how many appeals were created or updated). The settings page shows the last result.
 
 Authenticated GO endpoints (`/api/v2/dref/`, operational update, and final report) are not used. Those accept writes, but this plugin does not call them and does not send monitoring data back.
 
-`dref3` has no activity list. It has the appeal header and 14 sectors. Activity lines that are finer than a sector come from the Excel import described below.
+`dref3` has the appeal header and 14 sector totals. The planned indicators and activities are on the public emergency page (`/api/v2/emergency/{id}/`, the id in `link_to_emergency_page`), on the approved application's `planned_interventions`. An imminent application also lists activities under `proposed_action`. When that page has no application, the plan falls back to one activity per sector.
 
 ```mermaid
 flowchart LR
@@ -75,7 +77,8 @@ flowchart LR
   validate --> reports["Reporting periods and reports"]
   reports --> changes["Change requests"]
   reports --> draft["Draft 0"]
-  draft --> export["Word and PDF for GO"]
+  draft --> export["Word and PDF"]
+  draft --> goWrite["Validated report posted to GO"]
 ```
 
 ### Fields copied from each GO stage
@@ -96,18 +99,13 @@ The country link is a match on ISO3 against the Databank country list. If there 
 
 ## The monitoring plan
 
-The generated plan is organised as sector, then indicator, then activities.
+The generated plan is organised as sector, then indicator, then activities, taken from the approved GO application when that page is available.
 
-For a response DREF, each included sector keeps the approved budget and people targeted. Under that sits one indicator:
+Each planned intervention becomes a sector. Its indicators become the plan indicators, and each line of its description becomes an activity. An imminent application's proposed actions are added as activities on the sector they were tagged with. A sector or indicator that does not match the indicator bank is flagged on the plan. Until the DREF team aligns GO wording with the bank, a temporary adapter links a GO title that is the same bank indicator (``# of`` for ``Number of``, a short extra clause, a translation, or a row that is not marked emergency) and the plan keeps that link marked as a temporary match. When the emergency page has no application, each included sector keeps the approved budget and people targeted, with one People reached or Activities completed indicator and one “Deliver {sector}” activity.
 
-- **People reached**, when GO sent a people-targeted figure
-- **Activities completed**, when it did not
+Further activities can be added under the same indicator. Each activity has a type, who carries it out, its own target, a budget, dates, and a status (planned, ongoing, completed, blocked, or delayed).
 
-The sector starts with one activity, “Deliver {sector}”. Further activities can be added under the same indicator. Each activity has a type, who carries it out, its own target, a budget, dates, and a status (planned, ongoing, completed, blocked, or delayed).
-
-For an imminent or anticipatory operation, each sector becomes two groups: Early actions (a process indicator) and Early response (the sector budget, people targeted, and a people-reached indicator). If GO sent no sectors, the plan is a single Operation group, or Early actions plus Early response for an imminent operation.
-
-The National Society can edit the sector figures, the indicator, and the activities, and can replace the activity list with an Excel file. Adding or removing a sector, an indicator, or an activity after the plan is confirmed opens a new draft. Number changes inside the approved budget, targets, and dates still apply on the confirmed plan.
+The National Society can edit the sector figures, the indicator, and the activities, and can replace the activity list with an Excel file. Adding or removing a sector, an indicator, or an activity after the plan is confirmed opens a new draft. Adding, removing, or renaming an activity keeps the justification on that plan version. Number changes inside the approved budget, targets, and dates still apply on the confirmed plan.
 
 ### Validating the plan
 
@@ -157,19 +155,9 @@ There are at most 36 periods. The cadence can be changed on the operation by a p
 
 Each period has one report: draft, submitted, validated, then reviewed.
 
-The country does not file that report from **Analytics & Monitoring → DREF monitoring**. A focal point for the country opens the project card on the country dashboard and saves the current cycle. The cycle shows one field, the operational report for that period. Saving writes the DREF tables. The focal point does not need a DREF monitoring role to open the cycle.
+The country does not file that report from **Analytics & Monitoring → DREF monitoring**. A focal point for the country opens the project card on the country dashboard and saves the current cycle. The focal point does not need a DREF monitoring role to open the cycle.
 
-On a draft report the data-entry user records, per activity, the cumulative position to date:
-
-- status: planned, ongoing, completed, blocked, or delayed
-- percent complete
-- people reached as one total
-- the split of that total as percentages of women, men, girls, and boys, or a mark that disaggregation cannot be provided
-- expenditure in CHF
-- the actual for an indicator that is not people reached
-- a narrative note for the period
-
-Saving a draft on the cycle copies status and percent onto the activity and sums the expenditure lines onto the report.
+The cycle form is the template **DREF operational monitoring**, one master form for every operation. It has a section for every sector and every indicator-bank indicator marked Emergency. An assignment lists only the indicators from that operation's monitoring plan, in their sectors, and the planned activities as cards. Each of those indicators collects one target, stored on the plan. It does not collect a reported total or a sex or age split. A focal point reports progress on the activities and does not add any. A note for the period sits in the Report section. The questions are worded in `plugins/dref_monitoring/scripts/report_questions.py`. Saving stores the answers on the assignment and the activity progress on the report.
 
 On the cycle:
 
@@ -189,7 +177,7 @@ A report that is no longer a draft is not reminded or escalated.
 - **Community feedback**: a channel and a summary.
 - **Risks**: a title, likelihood, impact, status (`open`, `mitigated`, `closed`), and a mitigation note.
 
-Feedback text and risk text stay on the operation. They are not included in the Draft 0 payload.
+Community feedback stays on the operation and is not sent to the model. Delay reasons, change justifications, risks, and the monitoring history are included. Names and email addresses are not.
 
 ## Reminders and escalation
 
@@ -206,22 +194,24 @@ Notifications go to people listed as members of that operation, not to everyone 
 
 The day counts are the defaults. They can be changed on the settings page. A late period that was still `open` is marked `overdue`. The link in the notification opens the cycle on the country dashboard when the period has one, and uses the cycle due date.
 
+A plan that is still a draft is reminded separately. From 3 days before its validation date, and on every day after that until it is validated, the validation, delegation, and portfolio members of that operation are notified once a day. The link opens the operation.
+
 Membership is required for these messages. A user who can see the operation only through country access, and who is not on the operation member list, does not receive the reminder.
 
 ## Draft 0
 
-At an operational-update or final-report milestone, a data-entry user generates **Draft 0** from the operation page.
+A data-entry user can generate **Draft 0** from the operation page, in English, French, Spanish, or Arabic. The daily job also creates one operational update when a reporting period falls due, and one final report when the operation end date is reached. A missed day is caught up for seven days. The same milestone is not drafted twice.
 
-The draft is built from structured monitoring data: sectors, activity status, people reached, indicator actuals, reported expenditure, procurement milestones, and counts of delays and pending changes. It does not include names, email addresses, the report narrative, or community-feedback text.
+The model is the Databank OpenAI provider (`OPENAI_API_KEY`, `OPENAI_MODEL`). The switch is **off** by default. The payload is the approved request (hazard, dates, allocation, sectors) plus the monitoring history: each period’s activity status, people reached, indicator actuals, expenditure, delay reasons, and change justifications. It does not include names, email addresses, or community feedback. The model returns GO chapter text and must leave a chapter empty when the figures do not support it. The call is stored on the draft: model name, prompt version, a hash of the input, language, and whether the model was actually used. If the call fails, the document is still the tables.
 
-The language-model switch is **off** by default. Until it is enabled, and unless `OPENAI_API_KEY` is set, the draft is the monitoring tables in the GO chapter order. When the switch is on, the existing Databank OpenAI provider writes a narrative from that structured payload only. The call is stored on the draft: model name, prompt version, a hash of the input, and whether the model was actually used. If the call fails, the document is still the tables and the empty GO headings.
+The National Society edits the chapters on the draft page. Validation sends the report to GO (`dref-op-update` or `dref-final-report`) as a GO draft for formal processing. That post needs `GO_API_TOKEN`. A failed post stays validated so it can be sent again. Word and PDF stay available either way.
 
 The draft page shows that document. The same document downloads as:
 
 - **Word** (`.docx`), with Title, Heading 1, Heading 2, and Heading 3 styles, a cover table, and indicator tables
 - **PDF**
 
-Word and PDF follow the chapter order of a GO operational update or final report. Tables are filled from the latest monitoring report and the approved baselines. Chapters GO asks for that this record does not store (what happened, needs, strategy, contacts) stay in the outline empty, so they can be typed in Word. A model-written narrative is included as its own chapter. Reach and expenditure are the latest report, not a sum across periods. Someone still files the report in GO. The Word file and the PDF are the hand-off.
+Word and PDF follow the chapter order of a GO operational update or final report. Tables are filled from the latest monitoring report and the approved baselines. Chapter text comes from the model or from the National Society’s edit. Contact lines stay empty. Reach and expenditure in the tables are the latest report, not a sum across periods. The history sent to the model keeps each period.
 
 ## Who can do what
 
@@ -239,7 +229,7 @@ Partner National Society and delegation staff who are not in the operation’s c
 
 ## Data Explorer
 
-The **DREF monitoring** tab lists active operations, plans still awaiting validation, overdue reports, pending change requests, the sum of approved allocations, and the sum of reported expenditure. Reported expenditure is the indicative figure. The tab is visible to users with the portfolio or Data Explorer permission.
+The **DREF monitoring** tab lists active operations, plans still awaiting validation, overdue reports, pending change requests, the sum of approved allocations, and the sum of reported expenditure. It also totals people reached, households reached, and activities completed across operations. Reported expenditure is the indicative figure. People and households are the latest report for each operation. The tab is visible to users with the portfolio or Data Explorer permission.
 
 ## Where to work
 

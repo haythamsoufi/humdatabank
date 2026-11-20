@@ -23,14 +23,16 @@ _HEADING_FONT = "Montserrat"
 _BODY_FONT = "Open Sans"
 
 
-def render_docx(blocks: list, header: str) -> bytes:
+def render_docx(blocks: list, header: str, language: str = "en") -> bytes:
     document = Document()
     _apply_page(document)
     _apply_styles(document)
     _apply_header(document, header)
-    _apply_footer(document)
+    _apply_footer(document, language)
     for block in blocks:
         _add_block(document, block)
+    if language == "ar":
+        _mark_rtl(document)
     _properties(document, blocks, header)
     buffer = BytesIO()
     document.save(buffer)
@@ -175,15 +177,46 @@ def _apply_header(document, header: str) -> None:
     _border_below(paragraph, _RED)
 
 
-def _apply_footer(document) -> None:
+def _apply_footer(document, language: str = "en") -> None:
+    from plugins.dref_monitoring.i18n import override_locale, translate
+
     paragraph = document.sections[0].footer.paragraphs[0]
-    paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    run = paragraph.add_run("Page ")
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT if language == "ar" else WD_ALIGN_PARAGRAPH.RIGHT
+    with override_locale(language):
+        run = paragraph.add_run(translate("Page") + " ")
     _paint_run(run, _BODY_FONT, 8, color=_NAVY)
     _field(paragraph, " PAGE ")
     run = paragraph.add_run(" / ")
     _paint_run(run, _BODY_FONT, 8, color=_NAVY)
     _field(paragraph, " NUMPAGES ")
+
+
+def _mark_rtl(document) -> None:
+    for paragraph in document.paragraphs:
+        _bidi(paragraph)
+    for table in document.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    _bidi(paragraph)
+    for section in document.sections:
+        for paragraph in list(section.header.paragraphs) + list(section.footer.paragraphs):
+            _bidi(paragraph)
+        marker = OxmlElement("w:bidi")
+        section._sectPr.append(marker)
+
+
+def _bidi(paragraph) -> None:
+    properties = paragraph._p.get_or_add_pPr()
+    if properties.find(qn("w:bidi")) is None:
+        properties.append(OxmlElement("w:bidi"))
+    for run in paragraph.runs:
+        r_pr = run._r.get_or_add_rPr()
+        r_fonts = r_pr.find(qn("w:rFonts"))
+        if r_fonts is None:
+            r_fonts = OxmlElement("w:rFonts")
+            r_pr.append(r_fonts)
+        r_fonts.set(qn("w:cs"), "Tajawal")
 
 
 def _properties(document, blocks, header: str) -> None:

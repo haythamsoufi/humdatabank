@@ -15,6 +15,7 @@ from plugins.dref_monitoring.constants import (
     ACTIVITY_PLANNED,
     ACTIVITY_TYPES,
     CARRIED_OUT_BY,
+    CHANGE_APPROVED,
     PLAN_DRAFT,
     PLAN_VALIDATED,
     SECTOR_LABELS,
@@ -42,6 +43,7 @@ from plugins.dref_monitoring.services.bounds import (
     dates_outside_operation,
     exceeds_group_budget,
     people_over_cap,
+    same_amount,
 )
 from plugins.dref_monitoring.services.go_parse import is_imminent, stage_signature
 from plugins.dref_monitoring.services.parsing import as_date, as_int, as_money, date_text
@@ -116,9 +118,127 @@ def indicators_for_activity(activity_id: int) -> list[DrefIndicator]:
     return DrefIndicator.query.filter_by(activity_id=activity_id).order_by(DrefIndicator.id).all()
 
 
+_ACTIVITY_STOPWORDS = {
+    "a",
+    "an",
+    "the",
+    "of",
+    "and",
+    "or",
+    "to",
+    "for",
+    "in",
+    "on",
+    "by",
+    "with",
+    "from",
+    "number",
+    "percentage",
+    "people",
+    "who",
+    "that",
+    "this",
+    "these",
+    "those",
+    "are",
+    "was",
+    "been",
+    "into",
+    "over",
+    "per",
+    "its",
+    "their",
+}
+
+
+def _activity_words(text: str) -> set[str]:
+    """Stemmed words used to see whether an activity belongs to an indicator."""
+    import re
+
+    found: set[str] = set()
+    for word in re.findall(r"[a-z0-9]+", str(text or "").casefold()):
+        if len(word) < 4 or word in _ACTIVITY_STOPWORDS:
+            continue
+        if word.endswith("ing") and len(word) > 6:
+            word = word[:-3]
+        elif word.endswith("ed") and len(word) > 5:
+            word = word[:-2]
+        elif word.endswith("es") and len(word) > 5:
+            word = word[:-2]
+        elif word.endswith("s") and len(word) > 4:
+            word = word[:-1]
+        if len(word) >= 3:
+            found.add(word)
+    return found
+
+
+def indicator_for_activity(title: str, indicators: list):
+    """The indicator this activity is about, when the titles clearly match.
+
+    GO lists indicators and activities side by side on a sector. A shared title
+    (or the same distinctive words) puts the activity under that indicator.
+    A weak overlap stays unassigned so it is not pinned to the first indicator.
+    """
+    words = _activity_words(title)
+    if len(words) < 2:
+        return None
+    ranked = []
+    for indicator in indicators:
+        other = _activity_words(getattr(indicator, "title", "") or "")
+        if len(other) < 2:
+            continue
+        shared = words & other
+        if not shared:
+            continue
+        score = len(shared) / min(len(words), len(other))
+        ranked.append((score, len(shared), indicator))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    score, shared, indicator = ranked[0]
+    if score < 0.6 and not (score >= 0.5 and shared >= 3):
+        return None
+    if len(ranked) > 1 and ranked[1][0] >= score - 0.05 and ranked[1][1] >= shared:
+        return None
+    return indicator
+
+
+def realign_group_activities(group_id: int) -> bool:
+    """Move activities off the first indicator when the titles belong elsewhere.
+
+    Importing a GO application used to hang every activity on the sector's first
+    indicator. When that is still the case, place each activity by its title.
+    A plan someone has already split across indicators is left as they saved it.
+    """
+    activities = activities_for(group_id)
+    indicators = indicators_for_group(group_id)
+    if len(indicators) < 2 or not activities:
+        return False
+    linked = {activity.indicator_id for activity in activities if activity.indicator_id}
+    if len(linked) != 1:
+        return False
+    changed = False
+    for activity in activities:
+        match = indicator_for_activity(activity.title, indicators)
+        new_id = None if match is None else match.id
+        if activity.indicator_id != new_id:
+            activity.indicator_id = new_id
+            changed = True
+    return changed
+
+
+def realign_plan_activities(plan_id: int) -> bool:
+    changed = False
+    for group in groups_for(plan_id):
+        if realign_group_activities(group.id):
+            changed = True
+    return changed
+
+
 def plan_sections(plan_id: int) -> list[dict]:
     """Sector, then its indicators, then the activities under each indicator."""
     sections = []
+    adapted_ids: set[int] = set()
     for group in groups_for(plan_id):
         activities = activities_for(group.id)
         linked: set[int] = set()
@@ -128,12 +248,31 @@ def plan_sections(plan_id: int) -> list[dict]:
             if not rows:
                 rows = [activity for activity in activities if indicator.activity_id == activity.id]
             linked.update(activity.id for activity in rows)
+            if indicator.bank_adapted and indicator.indicator_bank_id:
+                adapted_ids.add(int(indicator.indicator_bank_id))
             blocks.append({"indicator": indicator, "activities": rows})
         orphans = [activity for activity in activities if activity.id not in linked]
         if orphans:
             blocks.append({"indicator": None, "activities": orphans})
         sections.append({"group": group, "blocks": blocks, "activities": activities})
+    names = _bank_names(adapted_ids)
+    for section in sections:
+        for block in section["blocks"]:
+            indicator = block["indicator"]
+            if indicator is not None:
+                indicator.bank_name = names.get(indicator.indicator_bank_id, "")
     return sections
+
+
+def _bank_names(ids: set[int]) -> dict[int, str]:
+    if not ids:
+        return {}
+    from app.models.indicator_bank import IndicatorBank
+
+    return {
+        row.id: row.name or ""
+        for row in IndicatorBank.query.filter(IndicatorBank.id.in_(ids)).all()
+    }
 
 
 def _choice(raw, allowed: set[str]) -> str:
@@ -283,6 +422,199 @@ def _add_group(plan: DrefPlan, operation: DrefOperation, spec: dict) -> DrefGrou
     return group
 
 
+_SYNTHETIC_CODES = {"PEOPLE_REACHED", "ACTIVITIES_COMPLETED"}
+
+
+def _interventions(baseline: DrefBaseline) -> list[dict]:
+    application = baseline.application if isinstance(getattr(baseline, "application", None), dict) else None
+    rows = (application or {}).get("interventions") or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _match_indicator(title: str, sector_id: int | None, indicators) -> object | None:
+    """An emergency indicator in this sector with the same name, or one unique contained name."""
+    from plugins.dref_monitoring.services.report_template import _fold
+
+    if sector_id is None:
+        return None
+    folded = _fold(title)
+    if not folded:
+        return None
+    exact = []
+    contained = []
+    seen = set()
+    for indicator in indicators:
+        raw = indicator.sector if isinstance(indicator.sector, dict) else {}
+        sector_ids = []
+        for level in ("primary", "secondary", "tertiary"):
+            value = raw.get(level)
+            try:
+                sector_ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        if sector_id not in sector_ids:
+            continue
+        name = _fold(indicator.name)
+        if not name or indicator.id in seen:
+            continue
+        if name == folded:
+            exact.append(indicator)
+            seen.add(indicator.id)
+        elif len(name) >= 6 and len(folded) >= 6 and (name in folded or folded in name):
+            contained.append(indicator)
+            seen.add(indicator.id)
+    if len(exact) == 1:
+        return exact[0]
+    if not exact and len(contained) == 1:
+        return contained[0]
+    return None
+
+
+def _load_banks():
+    """Emergency rows for the strict match, and the full bank for the temporary adapter."""
+    from app.models.indicator_bank import IndicatorBank
+
+    from plugins.dref_monitoring.services.indicator_adapter import BankCatalog
+
+    rows = (
+        IndicatorBank.query.filter(IndicatorBank.archived.is_(False))
+        .order_by(IndicatorBank.id.asc())
+        .all()
+    )
+    return [row for row in rows if row.emergency], BankCatalog(rows)
+
+
+def _resolve_bank(title: str, sector_id: int | None, emergency, catalog):
+    """Strict emergency match, then the temporary adapter. The bool is ``bank_adapted``."""
+    bank = _match_indicator(title, sector_id, emergency)
+    if bank is not None:
+        return bank, False
+    adapted = catalog.adapt(title, sector_id)
+    return adapted, adapted is not None
+
+
+def refresh_indicator_matches(plan_id: int) -> bool:
+    """Link GO titles the strict matcher missed. Leaves a clean match untouched."""
+    pending = []
+    for group in groups_for(plan_id):
+        sector_id = None if group.bank_sector_id is None else int(group.bank_sector_id)
+        for indicator in indicators_for_group(group.id):
+            if indicator.standard_code in _SYNTHETIC_CODES:
+                continue
+            if indicator.unmatched or indicator.bank_adapted:
+                pending.append((indicator, sector_id))
+    if not pending:
+        return False
+    emergency, catalog = _load_banks()
+    changed = False
+    for indicator, sector_id in pending:
+        bank, adapted = _resolve_bank(indicator.title, sector_id, emergency, catalog)
+        bank_id = None if bank is None else int(bank.id)
+        if (
+            indicator.indicator_bank_id != bank_id
+            or bool(indicator.unmatched) is not (bank is None)
+            or bool(indicator.bank_adapted) is not adapted
+        ):
+            indicator.indicator_bank_id = bank_id
+            indicator.unmatched = bank is None
+            indicator.bank_adapted = adapted
+            changed = True
+    return changed
+
+
+def _apply_application(plan: DrefPlan, operation: DrefOperation, interventions: list[dict]) -> None:
+    """Write GO sectors, indicators, and activities onto the plan and flag bank misses."""
+    from plugins.dref_monitoring.services.report_template import _fold, _resolve_bank_sector, _sector_index
+
+    by_fold, by_go_key = _sector_index()
+    emergency, catalog = _load_banks()
+    existing = {group.key: group for group in groups_for(plan.id)}
+    for index, item in enumerate(interventions):
+        key = str(item.get("key") or "").strip() or f"other:{index}"
+        label = str(item.get("label") or key)[:180]
+        sector = _resolve_bank_sector(key, label, by_fold, by_go_key) if item.get("key") else None
+        budget = as_money(item.get("budget"))
+        people = as_int(item.get("people_targeted"))
+        group = existing.get(key)
+        if group is None:
+            group = DrefGroup(
+                plan_id=plan.id,
+                key=key[:80],
+                label=label,
+                group_kind="sector",
+                budget_chf=budget,
+                people_targeted=people,
+                bank_sector_id=None if sector is None else int(sector.id),
+                unmatched=sector is None,
+                sort_order=index,
+            )
+            db.session.add(group)
+            db.session.flush()
+            existing[key] = group
+        else:
+            group.label = label
+            group.budget_chf = budget
+            group.people_targeted = people
+            group.bank_sector_id = None if sector is None else int(sector.id)
+            group.unmatched = sector is None
+        current = {_fold(indicator.title): indicator for indicator in indicators_for_group(group.id)}
+        written = []
+        for raw in item.get("indicators") or []:
+            if not isinstance(raw, dict):
+                continue
+            title = str(raw.get("title") or "").strip()[:255]
+            if not title:
+                continue
+            sector_id = None if sector is None else int(sector.id)
+            bank, adapted = _resolve_bank(title, sector_id, emergency, catalog)
+            row = current.get(_fold(title))
+            if row is None:
+                row = DrefIndicator(group_id=group.id, title=title, kind="outcome" if bank is not None else "process")
+                db.session.add(row)
+                db.session.flush()
+                current[_fold(title)] = row
+            row.title = title
+            row.target = as_money(raw.get("target"))
+            row.indicator_bank_id = None if bank is None else int(bank.id)
+            row.unmatched = bank is None
+            row.bank_adapted = adapted
+            if bank is not None and getattr(bank, "unit", None):
+                row.unit = str(bank.unit)[:32]
+            written.append(row)
+        if written:
+            for indicator in list(indicators_for_group(group.id)):
+                if indicator.standard_code in _SYNTHETIC_CODES:
+                    DrefActivity.query.filter_by(indicator_id=indicator.id).update({"indicator_id": None})
+                    db.session.delete(indicator)
+        titles = {_fold(activity.title) for activity in activities_for(group.id)}
+        go_activities = [str(title).strip()[:255] for title in item.get("activities") or [] if str(title).strip()]
+        if go_activities:
+            placeholders = {f"Deliver {label}", f"Early action: {label}", f"Early response: {label}"}
+            for activity in activities_for(group.id):
+                if activity.title in placeholders:
+                    db.session.delete(activity)
+                    titles.discard(_fold(activity.title))
+        hosts = written or indicators_for_group(group.id)
+        db.session.flush()
+        realign_group_activities(group.id)
+        for order, title in enumerate(go_activities):
+            if _fold(title) in titles:
+                continue
+            match = indicator_for_activity(title, hosts)
+            db.session.add(
+                DrefActivity(
+                    group_id=group.id,
+                    indicator_id=None if match is None else match.id,
+                    title=title,
+                    start_date=operation.start_date,
+                    end_date=operation.end_date,
+                    sort_order=order,
+                )
+            )
+            titles.add(_fold(title))
+    db.session.flush()
+
+
 def _new_plan(operation, source, today) -> DrefPlan:
     ensure_standards()
     current = latest_plan(operation.id)
@@ -308,13 +640,21 @@ def _new_plan(operation, source, today) -> DrefPlan:
 
 def generate_plan(operation: DrefOperation, baseline: DrefBaseline, today) -> DrefPlan:
     plan = _new_plan(operation, "generated", today)
-    for spec in _desired_groups(operation, list(baseline.sectors or [])):
-        _add_group(plan, operation, spec)
+    interventions = _interventions(baseline)
+    if interventions:
+        _apply_application(plan, operation, interventions)
+    else:
+        for spec in _desired_groups(operation, list(baseline.sectors or [])):
+            _add_group(plan, operation, spec)
     operation.workflow_status = WORKFLOW_PLAN_DRAFT
     return plan
 
 
 def _refresh_caps(plan: DrefPlan, operation: DrefOperation, baseline: DrefBaseline) -> None:
+    interventions = _interventions(baseline)
+    if interventions:
+        _apply_application(plan, operation, interventions)
+        return
     existing = {group.key: group for group in groups_for(plan.id)}
     for spec in _desired_groups(operation, list(baseline.sectors or [])):
         group = existing.get(spec["key"])
@@ -340,6 +680,8 @@ def _clone(operation: DrefOperation, source: DrefPlan, today, plan_source: str =
             group_kind=group.group_kind,
             budget_chf=group.budget_chf,
             people_targeted=group.people_targeted,
+            bank_sector_id=group.bank_sector_id,
+            unmatched=bool(group.unmatched),
             sort_order=group.sort_order,
         )
         db.session.add(copy)
@@ -354,6 +696,9 @@ def _clone(operation: DrefOperation, source: DrefPlan, today, plan_source: str =
                 target=indicator.target,
                 unit=indicator.unit,
                 beneficiary_unit=indicator.beneficiary_unit,
+                indicator_bank_id=indicator.indicator_bank_id,
+                unmatched=bool(indicator.unmatched),
+                bank_adapted=bool(indicator.bank_adapted),
             )
             db.session.add(copied_indicator)
             db.session.flush()
@@ -393,6 +738,9 @@ def _clone(operation: DrefOperation, source: DrefPlan, today, plan_source: str =
                         target=indicator.target,
                         unit=indicator.unit,
                         beneficiary_unit=indicator.beneficiary_unit,
+                        indicator_bank_id=indicator.indicator_bank_id,
+                        unmatched=bool(indicator.unmatched),
+                        bank_adapted=bool(indicator.bank_adapted),
                     )
                     db.session.add(copied_indicator)
                     db.session.flush()
@@ -408,6 +756,7 @@ def sync_plan(operation: DrefOperation, baseline: DrefBaseline, previous_signatu
             "total_approved": baseline.total_approved,
             "end_date": baseline.end_date,
             "sectors": list(baseline.sectors or []),
+            "application": baseline.application,
         }
     )
     plan = latest_plan(operation.id)
@@ -451,6 +800,29 @@ def validate_plan(operation: DrefOperation, actor, today) -> str | None:
 
 def _budget_pairs(group_id: int) -> list[tuple[int, object]]:
     return [(row.id, row.budget_chf) for row in activities_for(group_id)]
+
+
+def _record_applied_change(operation, plan, target_id, field, old_value, new_value, justification, user_id) -> None:
+    """Keep an in-bounds activity add, removal, or rename, with the justification already collected."""
+    if not target_id:
+        return
+    db.session.add(
+        DrefChangeRequest(
+            operation_id=operation.id,
+            plan_id=None if plan is None else plan.id,
+            target_type="activity",
+            target_id=target_id,
+            field=field,
+            old_value="" if old_value is None else str(old_value),
+            new_value="" if new_value is None else str(new_value),
+            within_bounds=True,
+            status=CHANGE_APPROVED,
+            justification=justification or "",
+            created_by_user_id=user_id,
+            decided_by_user_id=user_id,
+            decided_at=utcnow(),
+        )
+    )
 
 
 def _write_date_history(activity, field, old, new, justification, user_id) -> None:
@@ -539,23 +911,22 @@ def edit_activity(operation, activity, form, actor, *, commit=True) -> dict:
     justification = str(form.get("justification") or "").strip()
 
     if new_start and new_end and new_end < new_start:
-        return {"ok": False, "error": "The end date must be on or after the start date."}
+        return {"ok": False, "error": _named(activity.title, "The end date must be on or after the start date.")}
     if new_budget is not None and new_budget < 0:
-        return {"ok": False, "error": "Amounts cannot be negative."}
+        return {"ok": False, "error": _named(activity.title, "Amounts cannot be negative.")}
     if any(new_target is not None and new_target < 0 for _indicator, new_target in targets):
-        return {"ok": False, "error": "Amounts cannot be negative."}
+        return {"ok": False, "error": _named(activity.title, "Amounts cannot be negative.")}
 
     dates_changed = dates_need_justification(activity.start_date, activity.end_date, new_start, new_end)
     if dates_changed and not justification:
         return {"ok": False, "error": "A justification is required when dates change."}
     activity_target = as_money(form.get("activity_target")) if "activity_target" in form else activity.target
     if activity_target is not None and activity_target < 0:
-        return {"ok": False, "error": "Amounts cannot be negative."}
+        return {"ok": False, "error": _named(activity.title, "Amounts cannot be negative.")}
 
     outside = []
-    if "budget_chf" in form and exceeds_group_budget(
-        group.budget_chf, _budget_pairs(group.id), activity.id, new_budget
-    ):
+    budget_changed = "budget_chf" in form and not same_amount(activity.budget_chf, new_budget)
+    if budget_changed and exceeds_group_budget(group.budget_chf, _budget_pairs(group.id), activity.id, new_budget):
         outside.append(("budget_chf", activity.budget_chf, new_budget, None))
     if dates_outside_operation(operation.start_date, operation.end_date, new_start, new_end):
         if activity.start_date != new_start:
@@ -563,6 +934,8 @@ def edit_activity(operation, activity, form, actor, *, commit=True) -> dict:
         if activity.end_date != new_end:
             outside.append(("end_date", date_text(activity.end_date), date_text(new_end), None))
     for indicator, new_target in targets:
+        if same_amount(indicator.target, new_target):
+            continue
         if indicator.standard_code == "PEOPLE_REACHED" and people_over_cap(group.people_targeted, new_target):
             outside.append(("target", indicator.target, new_target, indicator))
 
@@ -571,8 +944,12 @@ def edit_activity(operation, activity, form, actor, *, commit=True) -> dict:
 
     outside_fields = {item[0] for item in outside if item[0] != "target"}
     outside_indicator_ids = {item[3].id for item in outside if item[0] == "target" and item[3] is not None}
+    renamed = None
     if "title" in form and "title" not in outside_fields:
+        previous_title = activity.title
         _apply_field(activity, primary, "title", new_title, actor.user_id, justification)
+        if new_title and new_title[:255] != (previous_title or ""):
+            renamed = (previous_title, new_title[:255])
     if "status" in form:
         _apply_field(activity, primary, "status", form.get("status"), actor.user_id, justification)
     if "budget_chf" in form and "budget_chf" not in outside_fields:
@@ -616,9 +993,27 @@ def edit_activity(operation, activity, form, actor, *, commit=True) -> dict:
                 created_by_user_id=actor.user_id,
             )
         )
+    if renamed:
+        _record_applied_change(operation, plan, activity.id, "title", renamed[0], renamed[1], justification, actor.user_id)
     if commit:
         db.session.commit()
-    return {"ok": True, "pending": bool(outside)}
+    held = []
+    for field, _old, new, _indicator in outside:
+        item = {"field": field, "title": activity.title, "value": new}
+        if field == "budget_chf":
+            item["limit"] = group.budget_chf
+        elif field == "target":
+            item["limit"] = group.people_targeted
+        elif field in ("start_date", "end_date"):
+            item["limit"] = f"{date_text(operation.start_date)} – {date_text(operation.end_date)}"
+        held.append(item)
+    return {"ok": True, "pending": bool(outside), "held": held}
+
+
+def _named(label, message: str) -> str:
+    from plugins.dref_monitoring.i18n import named
+
+    return named(label, message)
 
 
 def _posted_ids(form, key) -> list:
@@ -632,7 +1027,7 @@ def _posted_ids(form, key) -> list:
     return [raw]
 
 
-def add_plan_sectors(operation, plan, form) -> tuple[list[str], int]:
+def add_plan_sectors(operation, plan, form, justification="", user_id=None) -> tuple[list[str], int]:
     """Create groups for catalog sectors the plan edit form checked.
 
     A response plan gets one group. An imminent plan gets early actions and
@@ -656,15 +1051,16 @@ def add_plan_sectors(operation, plan, form) -> tuple[list[str], int]:
             continue
         budget = as_money(form.get(f"add_budget-{key}"))
         people = as_int(form.get(f"add_target-{key}"))
+        title = str(form.get(f"add_title-{key}") or "").strip()
+        who = title or label
         if (budget is not None and budget < 0) or (people is not None and people < 0):
-            errors.append("Amounts cannot be negative.")
+            errors.append(_named(who, "Amounts cannot be negative."))
             continue
         start = as_date(form.get(f"add_start-{key}")) or operation.start_date
         end = as_date(form.get(f"add_end-{key}")) or operation.end_date
         if start and end and end < start:
-            errors.append("The end date must be on or after the start date.")
+            errors.append(_named(who, "The end date must be on or after the start date."))
             continue
-        title = str(form.get(f"add_title-{key}") or "").strip()
         status = activity_status(form.get(f"add_status-{key}")) or ACTIVITY_PLANNED
         sector = {"key": key, "label": label, "budget_chf": budget, "people_targeted": people}
         for spec in _desired_groups(operation, [sector]):
@@ -677,6 +1073,9 @@ def add_plan_sectors(operation, plan, form) -> tuple[list[str], int]:
                 activity.start_date = start
                 activity.end_date = end
                 activity.status = status
+                activity.activity_type = _choice(form.get(f"add_type-{key}"), ACTIVITY_TYPE_CODES)
+                activity.carried_out_by = _choice(form.get(f"add_by-{key}"), CARRIED_OUT_CODES)
+                _record_applied_change(operation, plan, activity.id, "added", "", activity.title, justification, user_id)
         present.add(key)
         added += 1
     return errors, added
@@ -696,7 +1095,7 @@ def _apply_group_fields(operation, group, form, actor, original_id, justificatio
     if f"group_budget-{original_id}" in _form_keyset(form):
         new_budget = as_money(form.get(f"group_budget-{original_id}"))
         if new_budget is not None and new_budget < 0:
-            raise ValueError("Amounts cannot be negative.")
+            raise ValueError(_named(group.label, "Amounts cannot be negative."))
         ceiling = group.budget_chf
         if new_budget is not None and ceiling is not None and new_budget > ceiling:
             db.session.add(
@@ -720,7 +1119,7 @@ def _apply_group_fields(operation, group, form, actor, original_id, justificatio
     if f"group_people-{original_id}" in _form_keyset(form):
         new_people = as_int(form.get(f"group_people-{original_id}"))
         if new_people is not None and new_people < 0:
-            raise ValueError("Amounts cannot be negative.")
+            raise ValueError(_named(group.label, "Amounts cannot be negative."))
         ceiling = group.people_targeted
         if new_people is not None and ceiling is not None and new_people > ceiling:
             db.session.add(
@@ -751,56 +1150,104 @@ def _form_keyset(form) -> set[str]:
         return set(form)
 
 
-def add_plan_activities(operation, plan, form, indicator_map) -> tuple[list[str], int]:
-    """Add activities under an existing indicator. Posted ids are the ids from the page."""
+def _added_activity_place(form, token, indicator_map, group_map):
+    """Resolve one posted new activity to its indicator and sector group.
+
+    A legacy post uses the indicator id as the token. Repeatable rows keep
+    their own token and name the indicator, or the sector when it has none.
+    """
+    posted_indicator = form.get(f"add_activity_indicator-{token}")
+    indicator_key = f"add_activity_indicator-{token}"
+    indicator_id = as_int(posted_indicator) if posted_indicator not in (None, "") else None
+    if indicator_id is None and indicator_key not in _form_keyset(form):
+        indicator_id = as_int(token)
+    if indicator_id:
+        indicator_id = indicator_map.get(indicator_id, indicator_id)
+        indicator = db.session.get(DrefIndicator, indicator_id)
+        group = db.session.get(DrefGroup, indicator.group_id) if indicator and indicator.group_id else None
+        if group is not None:
+            return indicator, group
+    group_id = as_int(form.get(f"add_activity_group-{token}"))
+    if group_id:
+        group_id = group_map.get(group_id, group_id)
+        group = db.session.get(DrefGroup, group_id)
+        if group is not None:
+            return None, group
+    return None, None
+
+
+def _blank_new_activity(form, token) -> bool:
+    """An unused add-row has no title and no detail worth keeping."""
+    if str(form.get(f"add_activity_title-{token}") or "").strip():
+        return False
+    if as_money(form.get(f"add_activity_budget-{token}")) is not None:
+        return False
+    if as_money(form.get(f"add_activity_target-{token}")) is not None:
+        return False
+    status = str(form.get(f"add_activity_status-{token}") or "").strip()
+    if status and status != ACTIVITY_PLANNED:
+        return False
+    if str(form.get(f"add_activity_type-{token}") or "").strip():
+        return False
+    if str(form.get(f"add_activity_by-{token}") or "").strip():
+        return False
+    return True
+
+
+def add_plan_activities(
+    operation, plan, form, indicator_map, justification="", user_id=None, group_map=None
+) -> tuple[list[str], int]:
+    """Add one or more activities under a sector. Each posted token is one row."""
     if plan is None or plan.operation_id != operation.id:
         return ["Activity not found on this operation."], 0
+    group_map = group_map or {}
     errors = []
     added = 0
     for raw in _posted_ids(form, "add_activity"):
-        original = as_int(raw)
-        if not original:
+        token = str(raw or "").strip()
+        if not token:
             continue
-        indicator_id = indicator_map.get(original, original)
-        indicator = db.session.get(DrefIndicator, indicator_id)
-        group = db.session.get(DrefGroup, indicator.group_id) if indicator else None
+        if _blank_new_activity(form, token):
+            continue
+        indicator, group = _added_activity_place(form, token, indicator_map, group_map)
         if group is None or group.plan_id != plan.id:
             errors.append("Indicator not found on this plan.")
             continue
-        title = str(form.get(f"add_activity_title-{original}") or "").strip()
+        title = str(form.get(f"add_activity_title-{token}") or "").strip()
         if not title:
             errors.append("An activity needs a title.")
             continue
-        budget = as_money(form.get(f"add_activity_budget-{original}"))
-        target = as_money(form.get(f"add_activity_target-{original}"))
+        budget = as_money(form.get(f"add_activity_budget-{token}"))
+        target = as_money(form.get(f"add_activity_target-{token}"))
         if (budget is not None and budget < 0) or (target is not None and target < 0):
-            errors.append("Amounts cannot be negative.")
+            errors.append(_named(title, "Amounts cannot be negative."))
             continue
-        start = as_date(form.get(f"add_activity_start-{original}")) or operation.start_date
-        end = as_date(form.get(f"add_activity_end-{original}")) or operation.end_date
+        start = as_date(form.get(f"add_activity_start-{token}")) or operation.start_date
+        end = as_date(form.get(f"add_activity_end-{token}")) or operation.end_date
         if start and end and end < start:
-            errors.append("The end date must be on or after the start date.")
+            errors.append(_named(title, "The end date must be on or after the start date."))
             continue
-        db.session.add(
-            DrefActivity(
-                group_id=group.id,
-                indicator_id=indicator.id,
-                title=title[:255],
-                status=activity_status(form.get(f"add_activity_status-{original}")) or ACTIVITY_PLANNED,
-                activity_type=_choice(form.get(f"add_activity_type-{original}"), ACTIVITY_TYPE_CODES),
-                carried_out_by=_choice(form.get(f"add_activity_by-{original}"), CARRIED_OUT_CODES),
-                budget_chf=budget,
-                target=target,
-                start_date=start,
-                end_date=end,
-                sort_order=len(activities_for(group.id)),
-            )
+        activity = DrefActivity(
+            group_id=group.id,
+            indicator_id=indicator.id if indicator is not None else None,
+            title=title[:255],
+            status=activity_status(form.get(f"add_activity_status-{token}")) or ACTIVITY_PLANNED,
+            activity_type=_choice(form.get(f"add_activity_type-{token}"), ACTIVITY_TYPE_CODES),
+            carried_out_by=_choice(form.get(f"add_activity_by-{token}"), CARRIED_OUT_CODES),
+            budget_chf=budget,
+            target=target,
+            start_date=start,
+            end_date=end,
+            sort_order=len(activities_for(group.id)),
         )
+        db.session.add(activity)
+        db.session.flush()
+        _record_applied_change(operation, plan, activity.id, "added", "", activity.title, justification, user_id)
         added += 1
     return errors, added
 
 
-def remove_plan_activities(plan, activity_ids: list[int]) -> int:
+def remove_plan_activities(operation, plan, activity_ids: list[int], justification="", user_id=None) -> int:
     removed = 0
     if plan is None:
         return 0
@@ -811,6 +1258,7 @@ def remove_plan_activities(plan, activity_ids: list[int]) -> int:
         group = db.session.get(DrefGroup, activity.group_id)
         if group is None or group.plan_id != plan.id:
             continue
+        _record_applied_change(operation, plan, activity.id, "removed", activity.title, "", justification, user_id)
         db.session.delete(activity)
         removed += 1
     return removed
@@ -820,10 +1268,10 @@ def save_plan_activities(operation, form, actor) -> dict:
     """Save the monitoring plan. Adding or removing structure on a confirmed plan opens a new draft."""
     activity_ids = [activity_id for activity_id in (as_int(raw) for raw in _posted_ids(form, "activity_id")) if activity_id]
     add_keys = [str(key).strip() for key in _posted_ids(form, "add_sector") if str(key).strip()]
-    add_activities = [item for item in (as_int(raw) for raw in _posted_ids(form, "add_activity")) if item]
+    add_tokens = [str(raw).strip() for raw in _posted_ids(form, "add_activity") if str(raw).strip()]
     remove_ids = [item for item in (as_int(raw) for raw in _posted_ids(form, "remove_activity")) if item]
     group_ids = [item for item in (as_int(raw) for raw in _posted_ids(form, "group_id")) if item]
-    if not activity_ids and not add_keys and not add_activities and not remove_ids and not group_ids:
+    if not activity_ids and not add_keys and not add_tokens and not remove_ids and not group_ids:
         return {"ok": False, "error": "There is nothing to save.", "errors": [], "pending": False, "saved": 0}
 
     justification = str(form.get("justification") or "").strip()
@@ -854,6 +1302,7 @@ def save_plan_activities(operation, form, actor) -> dict:
 
     errors = []
     pending = False
+    held = []
     saved = 0
     try:
         for original in group_ids:
@@ -902,27 +1351,32 @@ def save_plan_activities(operation, form, actor) -> dict:
             continue
         saved += 1
         pending = pending or bool(result.get("pending"))
+        held.extend(result.get("held") or [])
 
     if errors:
         db.session.rollback()
         return {"ok": False, "error": errors[0], "errors": errors, "pending": False, "saved": 0}
 
-    saved += remove_plan_activities(plan, remove_ids)
-    add_errors, added = add_plan_activities(operation, plan, form, indicator_map)
+    saved += remove_plan_activities(operation, plan, remove_ids, justification, actor.user_id)
+    add_errors, added = add_plan_activities(
+        operation, plan, form, indicator_map, justification, actor.user_id, group_map=group_map
+    )
     errors.extend(add_errors)
     saved += added
-    sector_errors, sector_added = add_plan_sectors(operation, latest_plan(operation.id), form)
+    sector_errors, sector_added = add_plan_sectors(
+        operation, latest_plan(operation.id), form, justification, actor.user_id
+    )
     errors.extend(sector_errors)
     saved += sector_added
 
-    if errors and not saved:
+    if errors:
         db.session.rollback()
         return {"ok": False, "error": errors[0], "errors": errors, "pending": False, "saved": 0}
     if saved:
         db.session.commit()
     else:
         db.session.rollback()
-    return {"ok": True, "error": None, "errors": errors, "pending": pending, "saved": saved}
+    return {"ok": True, "error": None, "errors": errors, "pending": pending, "held": held, "saved": saved}
 
 
 def sign_off_rank(operation: DrefOperation) -> str:

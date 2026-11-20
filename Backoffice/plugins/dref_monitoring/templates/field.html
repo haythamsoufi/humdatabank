@@ -1,20 +1,20 @@
-<div class="dref-report-field" data-field-id="{{ field_name }}">
+<div class="dref-report-field" data-field-id="{{ field_name }}" data-msg-split="{{ dref_tr('The percentage split must add up to 100.') if dref_tr is defined else 'The percentage split must add up to 100.' }}" data-msg-reached="{{ dref_tr('Enter the reached total before the percentage split.') if dref_tr is defined else 'Enter the reached total before the percentage split.' }}" data-msg-expenditure="{{ dref_tr('Expenditure cannot be negative.') if dref_tr is defined else 'Expenditure cannot be negative.' }}">
     {% set matrix = dref_cycle_matrix() if dref_cycle_matrix is defined else none %}
     {% if not matrix %}
         <p class="text-sm text-gray-600">{{ dref_tr('No reporting periods yet') if dref_tr is defined else 'No reporting periods yet' }}</p>
     {% else %}
         {% set report = matrix.report %}
         {% set editable = can_edit and report.status == 'draft' %}
-        <p class="text-sm text-gray-600">{{ matrix.period.start_date }} – {{ matrix.period.end_date }} · {{ dref_tr('Due') if dref_tr is defined else 'Due' }} {{ matrix.period.due_date }} · {{ report.status }}</p>
+        <p class="text-sm text-gray-600">{{ matrix.period.start_date }} – {{ matrix.period.end_date }} · {{ dref_tr('Due') if dref_tr is defined else 'Due' }} {{ matrix.period.due_date }} · {{ dref_tr(report.status|replace('_', ' ')|title) if dref_tr is defined else report.status }}</p>
         <p class="mt-1 text-sm text-gray-600">{{ dref_tr('Enter cumulative totals to date. Expenditure stays indicative until delegation finance validates it in ERP.') if dref_tr is defined else 'Enter cumulative totals to date. Expenditure stays indicative until delegation finance validates it in ERP.' }}</p>
         {% for section in matrix.sections %}
         <fieldset class="border border-gray-200 rounded p-3 mt-3">
-            <legend class="px-2 font-semibold text-gray-800">{{ section.group.label }}</legend>
+            <legend class="px-2 font-semibold text-gray-800">{{ dref_label(section.group.label) if dref_label is defined else section.group.label }}</legend>
             <p class="text-sm text-gray-600">{{ dref_tr('Budget') if dref_tr is defined else 'Budget' }} {{ section.group.budget_chf if section.group.budget_chf is not none else '-' }} · {{ dref_tr('People targeted') if dref_tr is defined else 'People targeted' }} {{ section.group.people_targeted if section.group.people_targeted is not none else '-' }}</p>
             {% for block in section.blocks %}
             {% if block.indicator %}
             <div class="mt-3 flex flex-wrap items-end justify-between gap-3">
-                <p class="text-sm text-gray-800">{{ block.indicator.title }} · {{ dref_tr('Target') if dref_tr is defined else 'Target' }} {{ block.indicator.target if block.indicator.target is not none else '-' }}</p>
+                <p class="text-sm text-gray-800">{{ dref_label(block.indicator.title) if dref_label is defined else block.indicator.title }} · {{ dref_tr('Target') if dref_tr is defined else 'Target' }} {{ block.indicator.target if block.indicator.target is not none else '-' }}</p>
                 {% if block.indicator.standard_code != 'PEOPLE_REACHED' and block.activities %}
                 {% set actual = block.activities[0].actuals.get(block.indicator.id) %}
                 <label class="text-sm">{{ dref_tr('Actual') if dref_tr is defined else 'Actual' }}
@@ -26,13 +26,13 @@
             {% for row in block.activities %}
             {% set update = row.update %}
             <div class="mt-3 border border-gray-200 rounded p-3 text-sm" data-activity-id="{{ row.activity.id }}">
-                <p class="font-medium text-gray-900">{{ row.activity.title }}</p>
+                <p class="font-medium text-gray-900">{{ dref_label(row.activity.title) if dref_label is defined else row.activity.title }}</p>
                 <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                     <label>{{ dref_tr('Status') if dref_tr is defined else 'Status' }}
                         <select class="mt-1 w-full border border-gray-300 rounded px-2 py-1" data-part="status" {% if not editable %}disabled{% endif %}>
                             <option value="planned" {% if not update or update.status == 'planned' %}selected{% endif %}>{{ dref_tr('Planned') if dref_tr is defined else 'Planned' }}</option>
                             <option value="ongoing" {% if update and update.status == 'ongoing' %}selected{% endif %}>{{ dref_tr('Ongoing') if dref_tr is defined else 'Ongoing' }}</option>
-                            <option value="completed" {% if update and update.status == 'completed' %}selected{% endif %}>{{ dref_tr('Completed') if dref_tr is defined else 'Completed' }}</option>
+                            <option value="completed" {% if update and update.status == 'completed' %}selected{% endif %}>{{ dref_tr('Complete') if dref_tr is defined else 'Complete' }}</option>
                             <option value="blocked" {% if update and update.status == 'blocked' %}selected{% endif %}>{{ dref_tr('Blocked') if dref_tr is defined else 'Blocked' }}</option>
                             <option value="delayed" {% if update and update.status == 'delayed' %}selected{% endif %}>{{ dref_tr('Delayed') if dref_tr is defined else 'Delayed' }}</option>
                         </select>
@@ -43,6 +43,11 @@
                     <label>{{ dref_tr('Reached') if dref_tr is defined else 'Reached' }}
                         <input class="mt-1 w-full border border-gray-300 rounded px-2 py-1" type="number" min="0" data-part="reached" value="{{ update.people_individuals if update and update.people_individuals is not none else '' }}" {% if not editable %}disabled{% endif %}>
                     </label>
+                    {% if row.tracks_households %}
+                    <label>{{ dref_tr('Households') if dref_tr is defined else 'Households' }}
+                        <input class="mt-1 w-full border border-gray-300 rounded px-2 py-1" type="number" min="0" data-part="households" value="{{ update.people_households if update and update.people_households is not none else '' }}" {% if not editable %}disabled{% endif %}>
+                    </label>
+                    {% endif %}
                     <label>{{ dref_tr('Expenditure') if dref_tr is defined else 'Expenditure' }}
                         <input class="mt-1 w-full border border-gray-300 rounded px-2 py-1" data-part="expenditure" value="{{ update.expenditure if update and update.expenditure is not none else '' }}" {% if not editable %}disabled{% endif %}>
                     </label>

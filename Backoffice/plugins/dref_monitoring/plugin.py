@@ -35,9 +35,19 @@ from plugins.metadata import FirstPartyPluginMetadata
 
 
 def _sync_job() -> None:
-    from plugins.dref_monitoring.services.go_sync import sync_from_go
+    import logging
 
-    sync_from_go()
+    from plugins.dref_monitoring.services.go_sync import GoSyncBusy, sync_from_go
+    from plugins.dref_monitoring.services.go_sync_job import active_go_sync_job
+
+    log = logging.getLogger(__name__)
+    if active_go_sync_job() is not None:
+        log.info("DREF GO sync skipped; a background sync is already running.")
+        return
+    try:
+        sync_from_go()
+    except GoSyncBusy:
+        log.info("DREF GO sync skipped; another sync is already running.")
 
 
 def _escalation_job() -> None:
@@ -98,6 +108,42 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         return [DrefOperationalReportField()]
 
+    def get_entry_form_assets(self, template_id: int | None) -> List[Dict[str, str]]:
+        """Stylesheet and script that draw a DREF sector like the monitoring wireframe."""
+        if not template_id:
+            return []
+        from flask import url_for
+
+        from app.models.forms import FormTemplate
+        from plugins.dref_monitoring.constants import TEMPLATE_NAME
+
+        template = FormTemplate.query.get(template_id)
+        name = (template.name or "") if template is not None else ""
+        if name != TEMPLATE_NAME:
+            return []
+
+        def asset(filename: str) -> str:
+            return url_for(
+                "plugin_static.serve_plugin_static",
+                plugin_name=self.plugin_id,
+                filename=filename,
+            )
+
+        return [
+            {"kind": "stylesheet", "url": asset("css/sector_section.css") + "?v=5"},
+            {"kind": "script", "url": asset("js/sector_section.js") + "?v=6"},
+        ]
+
+    def prepare_entry_values(self, assignment_entity_status, existing_data) -> None:
+        from plugins.dref_monitoring.services.entry_activities import overlay_plan_targets
+
+        overlay_plan_targets(assignment_entity_status, existing_data)
+
+    def save_entry_extras(self, assignment_entity_status, form):
+        from plugins.dref_monitoring.services.entry_activities import save_posted_activities
+
+        return save_posted_activities(assignment_entity_status, form)
+
     def get_documentation_source(self) -> PluginDocsSource:
         return PluginDocsSource(
             category="dref-monitoring",
@@ -150,6 +196,9 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
                 "pending_changes": 0,
                 "approved_chf": 0,
                 "reported_chf": 0,
+                "people_reached": 0,
+                "households_reached": 0,
+                "activities_completed": 0,
                 "operations": [],
             }
         return {"dref_overview": overview, "explore_first_tab": first_tab}

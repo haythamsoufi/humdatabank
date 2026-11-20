@@ -1482,6 +1482,28 @@ class PluginManager:
                 ", ".join(registered),
             )
 
+    def prepare_entry_values(self, assignment_entity_status, existing_data) -> None:
+        """Let active plugins replace values shown on an assignment form. A failing plugin is skipped."""
+        if not isinstance(existing_data, dict):
+            return
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                plugin.prepare_entry_values(assignment_entity_status, existing_data)
+            except Exception as exc:
+                self.logger.warning("prepare_entry_values failed for plugin %s: %s", plugin_id, exc)
+
+    def save_entry_extras(self, assignment_entity_status, form) -> Optional[str]:
+        """Let active plugins store their own posted fields. The first error message stops the save."""
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                error = plugin.save_entry_extras(assignment_entity_status, form)
+            except Exception:
+                self.logger.exception("save_entry_extras failed for plugin %s", plugin_id)
+                raise
+            if isinstance(error, str) and error:
+                return error
+        return None
+
     def entry_form_assets(self, template_id=None) -> list:
         """Stylesheets and scripts active plugins contribute to an assignment form."""
         try:

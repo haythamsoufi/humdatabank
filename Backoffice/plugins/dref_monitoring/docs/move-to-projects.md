@@ -39,9 +39,9 @@ Reporting cadence stays as it is today. Imminent DREF and operations of about 60
 
 ## The form on the cycle
 
-Publish one form template, **DREF operational monitoring**, with a single plugin field. The field renders the report that already exists for that period: activity status, percent complete, the cumulative people reached, the percentage split of women, men, girls, and boys, expenditure, and indicator actuals.
+The form on each cycle is the existing template **DREF operational monitoring**. Validating a plan replaces its contents in place: one section per sector selected on the plan, emergency indicators from the indicator bank, and the other fields as questions. Question wording lives in `plugins/dref_monitoring/scripts/report_questions.py`.
 
-Saving still writes the `dref_mon_*` tables. Bounds checks, change requests, date history, and Draft 0 keep reading those tables. The template does not duplicate the matrix as generic form items, because the activities differ for every operation.
+Saving the cycle stores those answers on the assignment. Bounds checks, change requests, date history, and Draft 0 keep reading the `dref_mon_*` tables, which the operation page still maintains.
 
 Assignment status is the report status:
 
@@ -53,7 +53,7 @@ Assignment status is the report status:
 
 The separate submit, validate, and review buttons on the DREF operation page are no longer the path the country uses.
 
-Expenditure entered on the cycle stays indicative until delegation finance validates it in the ERP.
+Activity budgets entered on the cycle stay indicative until delegation finance validates them in the ERP.
 
 ## What stays in the plugin
 
@@ -90,7 +90,7 @@ An operation with no matching Databank country cannot become a project until the
 
 1. Link the operation to a project and upsert that project during sync.
 2. On plan validation, create the cycles and attach them to the periods.
-3. Publish the template and plugin field, and map assignment submit and approval onto the report status.
+3. Publish the per-operation template (sector sections, emergency indicators, and scripted questions), and map assignment submit and approval onto the report status.
 4. Backfill current operations.
 5. Point reminders at the assignment.
 6. Check as a country focal point: the dashboard card is there, the current cycle opens, and a saved report is stored on the operation.

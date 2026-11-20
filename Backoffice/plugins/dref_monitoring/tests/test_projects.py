@@ -222,7 +222,8 @@ def test_saving_a_cycle_stores_the_report_and_submit_moves_its_status(seeded, ap
         {"activities": {str(activity.id): {"expenditure": "-1"}}},
         user.id,
     )
-    assert refused == "Expenditure cannot be negative."
+    assert "Expenditure cannot be negative." in refused
+    assert activity.title in refused
 
     aes.status = AssignmentEntityStatusValue.submitted
     aes.status_changed_by_user_id = user.id
@@ -296,7 +297,8 @@ def test_a_percentage_split_is_stored_as_counts(seeded):
         },
         user.id,
     )
-    assert refused == "The percentage split must add up to 100."
+    assert "The percentage split must add up to 100." in refused
+    assert activity.title in refused
     assert db.session.get(DrefActivityUpdate, update.id).disaggregation["women"] == 4
 
 

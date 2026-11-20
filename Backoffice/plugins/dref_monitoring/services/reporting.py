@@ -162,6 +162,12 @@ def _plan_activities(operation):
     return rows
 
 
+def _named(label, message: str) -> str:
+    from plugins.dref_monitoring.i18n import named
+
+    return named(label, message)
+
+
 def _form_keys(form) -> set[str]:
     try:
         return {str(key) for key in form.keys()}
@@ -187,7 +193,7 @@ def write_report_fields(operation, period, form) -> str | None:
             continue
         expenditure = as_money(form.get(f"activity_{activity.id}_expenditure"))
         if expenditure is not None and expenditure < 0:
-            return "Expenditure cannot be negative."
+            return _named(activity.title, "Expenditure cannot be negative.")
 
     for _group, activity, _indicators in _plan_activities(operation):
         if not _touches_activity(form, activity.id):
@@ -200,12 +206,12 @@ def write_report_fields(operation, period, form) -> str | None:
         if not any(value is not None for value in percents):
             continue
         if any(value is None for value in percents) or sum(value or 0 for value in percents) != 100:
-            return "The percentage split must add up to 100."
+            return _named(activity.title, "The percentage split must add up to 100.")
         reached = as_int(form.get(f"activity_{activity.id}_reached"))
         if reached is None:
             reached = as_int(form.get(f"activity_{activity.id}_individuals"))
         if reached is None:
-            return "Enter the reached total before the percentage split."
+            return _named(activity.title, "Enter the reached total before the percentage split.")
 
     total = 0
     saw_expenditure = False
@@ -231,9 +237,9 @@ def write_report_fields(operation, period, form) -> str | None:
             disaggregation = {part: None for part in SHARE_PARTS}
         elif percent_posted and any(value is not None for value in percents.values()):
             if any(value is None for value in percents.values()) or sum(value or 0 for value in percents.values()) != 100:
-                return "The percentage split must add up to 100."
+                return _named(activity.title, "The percentage split must add up to 100.")
             if individuals is None:
-                return "Enter the reached total before the percentage split."
+                return _named(activity.title, "Enter the reached total before the percentage split.")
             disaggregation = shares_to_counts(individuals, percents)
         else:
             disaggregation = {
@@ -324,13 +330,15 @@ def _activity_row(activity, saved, actuals):
     update = saved.get(activity.id)
     counts = (update.disaggregation if update is not None else None) or {}
     total = None if update is None else update.people_individuals
+    indicators = indicators_for_activity(activity.id)
     return {
         "activity": activity,
-        "indicators": indicators_for_activity(activity.id),
+        "indicators": indicators,
         "update": update,
         "actuals": actuals,
         "shares": counts_to_shares(total, counts),
         "disaggregation_na": bool(update and update.disaggregation_na),
+        "tracks_households": any(indicator.beneficiary_unit == "households" for indicator in indicators),
     }
 
 
@@ -563,6 +571,7 @@ def add_risk(operation, form, actor) -> str | None:
     status = str(form.get("status") or "open")
     if likelihood not in RISK_LEVELS or impact not in RISK_LEVELS or status not in RISK_STATUSES:
         return "Unknown risk value."
+    mitigation = "" if status == "open" else str(form.get("mitigation") or "")
     risk_id = as_int(form.get("risk_id"))
     if risk_id:
         row = db.session.get(DrefRisk, risk_id)
@@ -572,7 +581,7 @@ def add_risk(operation, form, actor) -> str | None:
         row.likelihood = likelihood
         row.impact = impact
         row.status = status
-        row.mitigation = str(form.get("mitigation") or "")
+        row.mitigation = mitigation
     else:
         db.session.add(
             DrefRisk(
@@ -580,7 +589,7 @@ def add_risk(operation, form, actor) -> str | None:
                 title=title[:255],
                 likelihood=likelihood,
                 impact=impact,
-                mitigation=str(form.get("mitigation") or ""),
+                mitigation=mitigation,
                 status=status,
                 created_by_user_id=actor.user_id,
             )

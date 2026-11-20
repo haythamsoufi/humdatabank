@@ -17,9 +17,13 @@ def register_cli(app):
     @with_appcontext
     def dref_monitoring_sync():
         """Pull every approved DREF stage from the public GO dref3 API."""
-        from plugins.dref_monitoring.services.go_sync import sync_from_go
+        from plugins.dref_monitoring.services.go_sync import GoSyncBusy, sync_from_go
 
-        summary = sync_from_go()
+        try:
+            summary = sync_from_go()
+        except GoSyncBusy:
+            click.echo("A GO sync is already running.")
+            return
         click.echo(
             f"created={summary['created']} updated={summary['updated']} appeals={summary['appeals']}"
         )

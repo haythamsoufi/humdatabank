@@ -1394,8 +1394,8 @@
                             sharedChoices: sharedChoices,
                             currentOwner: currentOwner,
                             currentShared: currentShared,
-                            currentUserId: {{ current_user.id }},
-                            templateOwnerId: {{ template.owned_by }},
+                            currentUserId: {{ current_user.id | tojson }},
+                            templateOwnerId: {{ template.owned_by | tojson }},
                             onSave: function(data) {
                                 // Update owner field
                                 ownerField.value = data.owner;

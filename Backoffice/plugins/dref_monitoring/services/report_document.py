@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
-from plugins.dref_monitoring.services.drafts import EXPENDITURE_NOTE
+from plugins.dref_monitoring.i18n import code_label, localize_text, override_locale, translate
 
 TITLE = {
     "operational_update": "DREF Operational Update",
@@ -29,6 +29,8 @@ FINANCE = {
     "operational_update": "Budget overview",
     "final_report": "Financial report",
 }
+
+from plugins.dref_monitoring.services.drafts import EXPENDITURE_NOTE
 
 COVER_NOTE = (
     "Draft for filing in GO. Monitoring tables are filled from Databank. "
@@ -57,30 +59,45 @@ class Block:
     rows: tuple[tuple[str, ...], ...] = field(default_factory=tuple)
 
 
-def export_narrative(draft) -> str:
-    """Prose the National Society or the model actually wrote.
+def _section(source: dict, key: str) -> str:
+    narratives = source.get("narratives") or {}
+    return str(narratives.get(key) or "").strip()
 
-    The generated template repeats the tables, so it is left out. An edit that
-    puts the template back unchanged is left out as well.
-    """
-    body = (draft.body or "").strip()
-    edited = draft.edited_body
-    if edited is None:
-        return body if draft.ai_used else ""
-    text = edited.strip()
-    if not draft.ai_used and text == body:
-        return ""
-    return text
+
+def export_narrative(draft) -> str:
+    """Plain prose from an older draft. Structured chapters are not repeated here."""
+    from plugins.dref_monitoring.services.drafts import narrative_map
+
+    return narrative_map(draft).get("legacy") or ""
 
 
 def running_header(source: dict) -> str:
-    kind = source.get("kind") or "operational_update"
-    label = "Operational update" if kind == "operational_update" else "Final report"
-    code = (source.get("appeal_code") or "").strip()
-    return f"{code}  ·  {label}".strip(" ·")
+    with override_locale(source.get("language")):
+        kind = source.get("kind") or "operational_update"
+        label = translate("Operational update" if kind == "operational_update" else "Final report")
+        code = (source.get("appeal_code") or "").strip()
+        return f"{code}  ·  {label}".strip(" ·")
+
+
+def _localize(blocks: list[Block]) -> list[Block]:
+    """Translate the document chrome. Narrative the National Society wrote stays as stored."""
+    for block in blocks:
+        if block.kind in {"title", "heading", "note"} and block.text:
+            block.text = translate(block.text)
+        elif block.kind == "kv":
+            block.rows = tuple((translate(label), value) for label, value in block.rows)
+        elif block.kind == "table" and block.headers:
+            block.headers = tuple(translate(cell) for cell in block.headers)
+            block.rows = tuple(tuple(translate(cell) if cell in {"Approved allocation", "Sector"} else cell for cell in row) for row in block.rows)
+    return blocks
 
 
 def build_report(source: dict) -> list[Block]:
+    with override_locale(source.get("language")):
+        return _localize(_compose_report(source))
+
+
+def _compose_report(source: dict) -> list[Block]:
     kind = source.get("kind") if source.get("kind") in TITLE else "operational_update"
     blocks: list[Block] = [
         Block("title", TITLE[kind]),
@@ -97,25 +114,31 @@ def build_report(source: dict) -> list[Block]:
     blocks.append(Block("heading", "Date of event", 2))
     blocks.append(Block("paragraph", _show_date(source.get("date_of_disaster"))))
     blocks.append(Block("heading", "What happened, where and when?", 2))
-    blocks.append(Block("paragraph", ""))
+    blocks.append(Block("paragraph", _section(source, "what_happened")))
     blocks.append(Block("heading", "Scope and scale", 2))
-    scope = _scope(source)
+    scope = " ".join(part for part in (_scope(source), _section(source, "scope_and_scale")) if part).strip()
     blocks.append(Block("paragraph", scope))
 
     if kind == "operational_update":
         blocks.append(Block("heading", "Summary of changes", 1))
         blocks.extend(_change_blocks(source))
+        summary = _section(source, "summary_of_changes")
+        if summary:
+            blocks.append(Block("paragraph", summary))
 
-    for heading in (
-        "IFRC network actions related to the current event",
-        "ICRC actions related to the current event",
-        "Other actors actions related to the current event",
+    for heading, key in (
+        ("IFRC network actions related to the current event", "ifrc_actions"),
+        ("ICRC actions related to the current event", "icrc_actions"),
+        ("Other actors actions related to the current event", "other_actors"),
     ):
         blocks.append(Block("heading", heading, 1))
-        blocks.append(Block("paragraph", ""))
+        blocks.append(Block("paragraph", _section(source, key)))
 
     sectors = list(source.get("sectors") or [])
     blocks.append(Block("heading", "Needs (gaps) identified", 1))
+    needs = _section(source, "needs")
+    if needs:
+        blocks.append(Block("paragraph", needs))
     if sectors:
         for sector in sectors:
             blocks.append(Block("heading", sector.get("label") or "Sector", 2))
@@ -125,16 +148,16 @@ def build_report(source: dict) -> list[Block]:
 
     blocks.append(Block("heading", "Operational strategy", 1))
     blocks.append(Block("heading", "Overall objective of the operation", 2))
-    blocks.append(Block("paragraph", ""))
+    blocks.append(Block("paragraph", _section(source, "overall_objective")))
     blocks.append(Block("heading", "Operation strategy rationale", 2))
-    blocks.append(Block("paragraph", ""))
+    blocks.append(Block("paragraph", _section(source, "strategy_rationale")))
 
     who = "Who will be targeted through this operation?" if kind == "operational_update" else "Who was targeted by this operation?"
     blocks.append(Block("heading", "Targeting strategy", 1))
     blocks.append(Block("heading", who, 2))
-    blocks.append(Block("paragraph", ""))
+    blocks.append(Block("paragraph", _section(source, "who_targeted")))
     blocks.append(Block("heading", "Explain the selection criteria for the targeted population", 2))
-    blocks.append(Block("paragraph", ""))
+    blocks.append(Block("paragraph", _section(source, "selection_criteria")))
     population = _population_rows(source)
     if population:
         blocks.append(Block("heading", "Total targeted population" if kind == "operational_update" else "Total assisted population", 2))
@@ -291,6 +314,7 @@ def source_for(operation, draft) -> dict:
 
     return {
         "kind": draft.report_kind,
+        "language": getattr(draft, "language", None) or "en",
         "appeal_code": operation.appeal_code,
         "disaster_name": operation.disaster_name,
         "country_name": operation.country_name,
@@ -312,6 +336,7 @@ def source_for(operation, draft) -> dict:
         "funds_received": bool(operation.funds_received),
         "expenditure": None if report is None else report.expenditure_total,
         "narrative": export_narrative(draft),
+        "narratives": _chapters(draft),
         "baselines": baselines,
         "changes": [
             {
@@ -346,10 +371,18 @@ def source_for(operation, draft) -> dict:
     }
 
 
+def _chapters(draft) -> dict:
+    from plugins.dref_monitoring.services.drafts import narrative_map
+
+    chapters = narrative_map(draft)
+    chapters.pop("legacy", None)
+    return chapters
+
+
 def _cover_rows(source: dict, kind: str) -> list[tuple[str, str]]:
     rows = [
         ("Appeal", source.get("appeal_code") or ""),
-        ("Document", "Operational update" if kind == "operational_update" else "Final report"),
+        ("Document", translate("Operational update" if kind == "operational_update" else "Final report")),
         ("Country", source.get("country_name") or ""),
         ("Hazard", source.get("hazard") or ""),
         ("Crisis category", source.get("crisis_category") or ""),
@@ -367,7 +400,7 @@ def _cover_rows(source: dict, kind: str) -> list[tuple[str, str]]:
         ("Targeted areas", source.get("districts") or ""),
     ]
     if source.get("funds_received"):
-        rows.append(("Funds received by the National Society", "Yes"))
+        rows.append(("Funds received by the National Society", translate("Yes")))
     return [(label, value) for label, value in rows if str(value).strip()]
 
 
@@ -376,12 +409,12 @@ def _scope(source: dict) -> str:
     affected = _count(source.get("people_affected"))
     targeted = _count(source.get("people_targeted"))
     if affected:
-        parts.append(f"People affected: {affected}.")
+        parts.append(translate("People affected: {count}.").format(count=affected))
     if targeted:
-        parts.append(f"People targeted: {targeted}.")
+        parts.append(translate("People targeted: {count}.").format(count=targeted))
     districts = (source.get("districts") or "").strip()
     if districts:
-        parts.append(f"Targeted areas: {districts}.")
+        parts.append(translate("Targeted areas: {areas}.").format(areas=districts))
     return " ".join(parts)
 
 
@@ -391,18 +424,21 @@ def _change_blocks(source: dict) -> list[Block]:
     lines.extend(_request_lines(source.get("changes") or []))
     if lines:
         if len(baselines) >= 2:
-            intro = (
-                f"Comparing the {_stage_name(baselines[0])} stage with the {_stage_name(baselines[-1])} stage:"
+            intro = translate("Comparing the {before} stage with the {after} stage:").format(
+                before=_stage_name(baselines[0]),
+                after=_stage_name(baselines[-1]),
             )
         else:
-            intro = "Recorded changes:"
+            intro = translate("Recorded changes:")
         return [Block("paragraph", intro), Block("bullets", rows=tuple((line,) for line in lines))]
     if len(baselines) <= 1:
-        return [Block("paragraph", "One approved GO stage is stored. No revision between stages is recorded.")]
+        return [Block("paragraph", translate("One approved GO stage is stored. No revision between stages is recorded."))]
     return [
         Block(
             "paragraph",
-            "No change to the approved allocation, the operational end date, or a sector ceiling is recorded between the stored GO stages.",
+            translate(
+                "No change to the approved allocation, the operational end date, or a sector ceiling is recorded between the stored GO stages."
+            ),
         )
     ]
 
@@ -414,40 +450,57 @@ def _baseline_lines(baselines: list[dict]) -> list[str]:
     lines = []
     if not _same_money(first.get("total_approved"), last.get("total_approved")):
         lines.append(
-            "Approved allocation changed from CHF "
-            f"{_money(first.get('total_approved')) or '—'} to CHF {_money(last.get('total_approved')) or '—'}."
+            translate("Approved allocation changed from CHF {before} to CHF {after}.").format(
+                before=_money(first.get("total_approved")) or "—",
+                after=_money(last.get("total_approved")) or "—",
+            )
         )
     if _show_date(first.get("end_date")) != _show_date(last.get("end_date")):
         lines.append(
-            "Operational end date changed from "
-            f"{_show_date(first.get('end_date')) or '—'} to {_show_date(last.get('end_date')) or '—'}."
+            translate("Operational end date changed from {before} to {after}.").format(
+                before=_show_date(first.get("end_date")) or "—",
+                after=_show_date(last.get("end_date")) or "—",
+            )
         )
     if _count(first.get("people_targeted")) != _count(last.get("people_targeted")):
         lines.append(
-            "People targeted changed from "
-            f"{_count(first.get('people_targeted')) or '—'} to {_count(last.get('people_targeted')) or '—'}."
+            translate("People targeted changed from {before} to {after}.").format(
+                before=_count(first.get("people_targeted")) or "—",
+                after=_count(last.get("people_targeted")) or "—",
+            )
         )
     before = _sector_index(first.get("sectors"))
     after = _sector_index(last.get("sectors"))
     for key in list(dict.fromkeys([*before.keys(), *after.keys()])):
         old = before.get(key)
         new = after.get(key)
-        label = (new or old).get("label") or key
+        label = localize_text((new or old).get("label") or key)
         if old is None:
-            lines.append(f"{label} was added, with a budget of CHF {_money(new.get('budget_chf')) or '—'}.")
+            lines.append(
+                translate("{label} was added, with a budget of CHF {amount}.").format(
+                    label=label,
+                    amount=_money(new.get("budget_chf")) or "—",
+                )
+            )
             continue
         if new is None:
-            lines.append(f"{label} is no longer on the latest approved stage.")
+            lines.append(translate("{label} is no longer on the latest approved stage.").format(label=label))
             continue
         if not _same_money(old.get("budget_chf"), new.get("budget_chf")):
             lines.append(
-                f"{label} budget changed from CHF {_money(old.get('budget_chf')) or '—'} "
-                f"to CHF {_money(new.get('budget_chf')) or '—'}."
+                translate("{label} budget changed from CHF {before} to CHF {after}.").format(
+                    label=label,
+                    before=_money(old.get("budget_chf")) or "—",
+                    after=_money(new.get("budget_chf")) or "—",
+                )
             )
         if _count(old.get("people_targeted")) != _count(new.get("people_targeted")):
             lines.append(
-                f"{label} people targeted changed from {_count(old.get('people_targeted')) or '—'} "
-                f"to {_count(new.get('people_targeted')) or '—'}."
+                translate("{label} people targeted changed from {before} to {after}.").format(
+                    label=label,
+                    before=_count(old.get("people_targeted")) or "—",
+                    after=_count(new.get("people_targeted")) or "—",
+                )
             )
     return lines
 
@@ -458,12 +511,15 @@ def _request_lines(changes: list[dict]) -> list[str]:
         status = (row.get("status") or "").strip().lower()
         if status not in {"approved", "pending"}:
             continue
-        field_name = _FIELD_LABELS.get(row.get("field") or "", (row.get("field") or "field").replace("_", " "))
-        target = (row.get("target_type") or "operation").replace("_", " ")
-        prefix = "Approved change" if status == "approved" else "Pending change"
-        line = (
-            f"{prefix} to the {target} {field_name}: "
-            f"{row.get('old_value') or '—'} → {row.get('new_value') or '—'}."
+        field_name = translate(_FIELD_LABELS.get(row.get("field") or "", (row.get("field") or "field").replace("_", " ")))
+        target = translate((row.get("target_type") or "operation").replace("_", " "))
+        prefix = translate("Approved change" if status == "approved" else "Pending change")
+        line = translate("{prefix} to the {target} {field}: {old} → {new}.").format(
+            prefix=prefix,
+            target=target,
+            field=field_name,
+            old=row.get("old_value") or "—",
+            new=row.get("new_value") or "—",
         )
         justification = (row.get("justification") or "").strip()
         if justification and status == "approved":
@@ -489,9 +545,9 @@ def _population_rows(source: dict) -> list[tuple[str, str]]:
     rows = []
     targeted = _count(source.get("people_targeted"))
     if targeted:
-        rows.append(("People targeted", targeted))
+        rows.append((translate("People targeted"), targeted))
     if saw_reached:
-        rows.append(("People reached on activity lines", f"{reached:,}"))
+        rows.append((translate("People reached on activity lines"), f"{reached:,}"))
     labels = (
         ("women", "Women"),
         ("men", "Men"),
@@ -500,7 +556,7 @@ def _population_rows(source: dict) -> list[tuple[str, str]]:
     )
     for key, label in labels:
         if seen[key]:
-            rows.append((label, f"{totals[key]:,}"))
+            rows.append((translate(label), f"{totals[key]:,}"))
     return rows
 
 
@@ -515,10 +571,10 @@ def _risk_blocks(source: dict) -> list[Block]:
         rows.append(
             (
                 risk.get("title") or "",
-                (risk.get("likelihood") or "").replace("_", " "),
-                (risk.get("impact") or "").replace("_", " "),
+                code_label(risk.get("likelihood")),
+                code_label(risk.get("impact")),
                 risk.get("mitigation") or "",
-                (risk.get("status") or "").replace("_", " "),
+                code_label(risk.get("status")),
             )
         )
     blocks.append(
@@ -533,11 +589,14 @@ def _risk_blocks(source: dict) -> list[Block]:
 
 def _intervention_blocks(source: dict, kind: str) -> list[Block]:
     blocks = [Block("heading", INTERVENTION[kind], 1)]
+    achievements = _section(source, "achievements")
+    if achievements:
+        blocks.append(Block("paragraph", achievements))
     sectors = list(source.get("sectors") or [])
     if not sectors:
-        blocks.append(Block("paragraph", "No sector plan is recorded."))
+        blocks.append(Block("paragraph", translate("No sector plan is recorded.")))
     for sector in sectors:
-        blocks.append(Block("heading", sector.get("label") or "Sector", 2))
+        blocks.append(Block("heading", localize_text(sector.get("label") or "") or translate("Sector"), 2))
         blocks.append(Block("paragraph", _sector_lead(sector)))
         indicators = []
         progress = []
@@ -564,9 +623,13 @@ def _intervention_blocks(source: dict, kind: str) -> list[Block]:
         else:
             blocks.append(Block("paragraph", ""))
     delays = [str(item).strip() for item in (source.get("delays") or []) if str(item).strip()]
-    if delays and kind == "final_report":
+    challenge = _section(source, "challenges") if kind == "final_report" else ""
+    if kind == "final_report" and (delays or challenge):
         blocks.append(Block("heading", "Challenges", 2))
-        blocks.append(Block("bullets", rows=tuple((line,) for line in delays)))
+        if challenge:
+            blocks.append(Block("paragraph", challenge))
+        if delays:
+            blocks.append(Block("bullets", rows=tuple((line,) for line in delays)))
     return blocks
 
 
@@ -579,7 +642,7 @@ def _support_blocks(source: dict) -> list[Block]:
             Block(
                 "table",
                 headers=("Item", "Milestone"),
-                rows=tuple((row.get("item") or "", (row.get("milestone") or "").replace("_", " ")) for row in procurement),
+                rows=tuple((row.get("item") or "", code_label(row.get("milestone"))) for row in procurement),
             )
         )
     delays = [str(item).strip() for item in (source.get("delays") or []) if str(item).strip()]
@@ -598,7 +661,7 @@ def _finance_blocks(source: dict, kind: str) -> list[Block]:
     for sector in sectors:
         rows.append(
             (
-                sector.get("label") or "Sector",
+                localize_text(sector.get("label") or "") or translate("Sector"),
                 _money(sector.get("budget_chf")) or "—",
                 _money(sector.get("expenditure")) or "—",
             )
@@ -620,13 +683,15 @@ def _finance_blocks(source: dict, kind: str) -> list[Block]:
     if approved is not None and spent is not None:
         balance = Decimal(str(approved)) - Decimal(str(spent))
         if balance >= 0:
-            relation = f"CHF {_money(balance)} under the approved allocation"
+            relation = translate("CHF {amount} under the approved allocation").format(amount=_money(balance))
         else:
-            relation = f"CHF {_money(abs(balance))} over the approved allocation"
+            relation = translate("CHF {amount} over the approved allocation").format(amount=_money(abs(balance)))
         blocks.append(
             Block(
                 "paragraph",
-                f"Approved allocation is CHF {_money(approved)}. Reported expenditure is CHF {_money(spent)}, which is {relation}.",
+                translate(
+                    "Approved allocation is CHF {approved}. Reported expenditure is CHF {spent}, which is {relation}."
+                ).format(approved=_money(approved), spent=_money(spent), relation=relation),
             )
         )
     if kind == "final_report":
@@ -640,10 +705,10 @@ def _sector_lead(sector: dict) -> str:
     parts = []
     budget = _money(sector.get("budget_chf"))
     if budget:
-        parts.append(f"Budget: CHF {budget}.")
+        parts.append(translate("Budget: CHF {amount}.").format(amount=budget))
     targeted = _count(sector.get("people_targeted"))
     if targeted:
-        parts.append(f"People targeted: {targeted}.")
+        parts.append(translate("People targeted: {count}.").format(count=targeted))
     reached = 0
     saw = False
     for activity in sector.get("activities") or []:
@@ -651,47 +716,53 @@ def _sector_lead(sector: dict) -> str:
             saw = True
             reached += int(activity["individuals"])
     if saw:
-        parts.append(f"People reached on activity lines: {reached:,}.")
+        parts.append(translate("People reached on activity lines: {count}.").format(count=f"{reached:,}"))
     return " ".join(parts)
 
 
 def _activity_line(activity: dict) -> str:
-    title = (activity.get("title") or "").strip()
+    title = localize_text((activity.get("title") or "").strip())
     if not title and activity.get("status") is None and activity.get("individuals") is None and not (activity.get("note") or "").strip():
         return ""
+    status = code_label(activity.get("status"))
+    percent = activity.get("percent")
     bits = []
-    status = (activity.get("status") or "").replace("_", " ")
-    if title and status:
-        bits.append(f"{title} is {status}")
+    if title and status and percent is not None:
+        bits.append(
+            translate("{title} is {status} ({percent}% complete).").format(
+                title=title, status=status, percent=int(percent)
+            )
+        )
+    elif title and status:
+        bits.append(translate("{title} is {status}.").format(title=title, status=status))
     elif title:
-        bits.append(title)
+        bits.append(title if title.endswith(".") else f"{title}.")
+    elif status and percent is not None:
+        bits.append(
+            translate("The activity is {status} ({percent}% complete).").format(status=status, percent=int(percent))
+        )
     elif status:
-        bits.append(f"The activity is {status}")
-    if activity.get("percent") is not None and bits:
-        bits[-1] = f"{bits[-1]} ({int(activity['percent'])}% complete)"
+        bits.append(translate("The activity is {status}.").format(status=status))
     reach = []
     if activity.get("households") is not None:
-        reach.append(f"{int(activity['households']):,} households")
+        reach.append(translate("{count} households").format(count=f"{int(activity['households']):,}"))
     if activity.get("individuals") is not None:
-        reach.append(f"{int(activity['individuals']):,} people")
+        reach.append(translate("{count} people").format(count=f"{int(activity['individuals']):,}"))
     if reach:
-        bits.append("Reach: " + ", ".join(reach) + ".")
+        bits.append(translate("Reach: {reach}.").format(reach=", ".join(reach)))
     spent = _money(activity.get("expenditure"))
     if spent:
-        bits.append(f"Expenditure: CHF {spent}.")
+        bits.append(translate("Expenditure: CHF {amount}.").format(amount=spent))
     if not bits:
         return ""
-    text = bits[0]
-    if not text.endswith("."):
-        text += "."
-    return " ".join([text, *bits[1:]])
+    return " ".join(bits)
 
 
 def _indicator_row(indicator: dict) -> tuple[str, str, str]:
     unit = (indicator.get("unit") or "").strip()
     target = _measure(indicator.get("target"), unit)
     actual = _measure(indicator.get("actual"), unit)
-    return (indicator.get("title") or "", target or "—", actual or "—")
+    return (localize_text(indicator.get("title") or ""), target or "—", actual or "—")
 
 
 def _measure(value, unit: str) -> str:
@@ -704,7 +775,7 @@ def _measure(value, unit: str) -> str:
     if not shown:
         return ""
     if unit:
-        return f"{shown} {unit}"
+        return f"{shown} {localize_text(unit)}"
     return shown
 
 
@@ -719,21 +790,22 @@ def _sector_index(sectors) -> dict[str, dict]:
 
 def _stage_name(baseline: dict) -> str:
     stage = (baseline.get("stage") or "").strip()
-    return stage or "stored"
+    return localize_text(stage) if stage else translate("stored")
 
 
 def _timeframe(months) -> str:
     if months is None or months == "":
         return ""
     count = int(months)
-    return f"{count} month" if count == 1 else f"{count} months"
+    key = "{count} month" if count == 1 else "{count} months"
+    return translate(key).format(count=count)
 
 
 def _range(start, end) -> str:
     left = _show_date(start)
     right = _show_date(end)
     if left and right:
-        return f"{left} to {right}"
+        return translate("{start} to {end}").format(start=left, end=right)
     return left or right
 
 

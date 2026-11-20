@@ -91,6 +91,19 @@
         return $select;
     }
 
+    document.querySelectorAll('[data-dref-funds-toggle]').forEach(function (box) {
+        var form = box.form;
+        var date = form && form.querySelector('[data-dref-funds-date]');
+        if (!date) {
+            return;
+        }
+        function syncFundsDate() {
+            date.disabled = !box.checked;
+        }
+        box.addEventListener('change', syncFundsDate);
+        syncFundsDate();
+    });
+
     document.querySelectorAll('[data-dref-reveal]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var panel = document.getElementById(btn.getAttribute('data-dref-reveal') || '');
@@ -158,9 +171,131 @@
         });
     });
 
+    function fieldMessage(field) {
+        return field.getAttribute('data-dref-required') || '';
+    }
+
+    function isBlank(field) {
+        return !String(field.value || '').trim();
+    }
+
+    function errorAnchor(field) {
+        if (field.hasAttribute('data-dref-user-select') && window.jQuery) {
+            var api = window.jQuery(field).data('select2');
+            if (api && api.$container && api.$container[0]) {
+                return api.$container[0];
+            }
+        }
+        return field;
+    }
+
+    function clearFieldError(field) {
+        field.classList.remove('dref-invalid');
+        var anchor = errorAnchor(field);
+        anchor.classList.remove('dref-invalid');
+        var parent = anchor.parentElement;
+        var error = parent && parent.querySelector('[data-dref-field-error]');
+        if (error) {
+            error.remove();
+        }
+    }
+
+    function showFieldError(field) {
+        var anchor = errorAnchor(field);
+        var parent = anchor.parentElement;
+        if (!parent) {
+            return;
+        }
+        anchor.classList.add('dref-invalid');
+        field.classList.add('dref-invalid');
+        var error = parent.querySelector('[data-dref-field-error]');
+        if (!error) {
+            error = document.createElement('p');
+            error.className = 'dref-field-error mt-1 text-xs text-red-600';
+            error.setAttribute('data-dref-field-error', '');
+            error.setAttribute('role', 'alert');
+            anchor.insertAdjacentElement('afterend', error);
+        }
+        error.textContent = fieldMessage(field);
+    }
+
+    function syncRequired(field) {
+        if (field.disabled || field.hasAttribute('data-dref-user-select')) {
+            if (!field.hasAttribute('data-dref-user-select')) {
+                field.setCustomValidity('');
+            }
+            return;
+        }
+        field.setCustomValidity(isBlank(field) ? fieldMessage(field) : '');
+    }
+
+    document.querySelectorAll('[data-dref-required]').forEach(function (field) {
+        field.addEventListener('input', function () {
+            syncRequired(field);
+            if (!isBlank(field)) {
+                clearFieldError(field);
+            }
+        });
+        field.addEventListener('change', function () {
+            if (!isBlank(field)) {
+                clearFieldError(field);
+            }
+        });
+        field.addEventListener('invalid', function () {
+            syncRequired(field);
+            showFieldError(field);
+        });
+    });
+
+    document.addEventListener('click', function (event) {
+        var button = event.target && event.target.closest
+            ? event.target.closest('button, input[type="submit"]')
+            : null;
+        if (!button || button.type !== 'submit' || !button.form) {
+            return;
+        }
+        button.form.querySelectorAll('[data-dref-required]').forEach(syncRequired);
+    }, true);
+
+    document.querySelectorAll('[data-dref-risk-status]').forEach(function (status) {
+        var form = status.form;
+        var field = form && form.querySelector('[data-dref-mitigation-field]');
+        var note = form && form.querySelector('[data-dref-mitigation-note]');
+        if (!field) {
+            return;
+        }
+        function syncMitigation() {
+            var locked = status.value === 'open';
+            field.disabled = locked;
+            field.classList.toggle('bg-gray-50', locked);
+            field.classList.toggle('cursor-not-allowed', locked);
+            if (note) {
+                note.classList.toggle('hidden', !locked);
+            }
+            if (locked) {
+                field.setCustomValidity('');
+                clearFieldError(field);
+            }
+        }
+        status.addEventListener('change', syncMitigation);
+        syncMitigation();
+    });
+
     document.addEventListener('submit', function (event) {
         var form = event.target;
         if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+        var userSelect = form.querySelector('[data-dref-user-select]');
+        if (userSelect && isBlank(userSelect)) {
+            event.preventDefault();
+            event.stopPropagation();
+            showFieldError(userSelect);
+            if (window.jQuery && window.jQuery(userSelect).data('select2')) {
+                window.jQuery(userSelect).select2('open');
+            } else {
+                userSelect.focus();
+            }
             return;
         }
         var panel = form.closest('.settings-panel');

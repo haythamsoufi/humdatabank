@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 PLUGIN_ID = "dref_monitoring"
-VERSION = "0.3.0"
+VERSION = "0.7.0"
 DISPLAY_NAME = "DREF Monitoring"
 
 TEMPLATE_NAME = "DREF operational monitoring"
@@ -26,7 +26,43 @@ PORTFOLIO_ROLE = "dref_monitoring_portfolio"
 EXPLORE_TAB_ID = "dref-monitoring"
 
 GO_DREF3_URL = "https://goadmin.ifrc.org/api/v2/dref3/"
-PROMPT_VERSION = "1"
+PROMPT_VERSION = "2"
+REPORT_LANGUAGES = ("en", "fr", "es", "ar")
+LANGUAGE_NAMES = {"en": "English", "fr": "French", "es": "Spanish", "ar": "Arabic"}
+SECTION_KEYS = (
+    "what_happened",
+    "scope_and_scale",
+    "summary_of_changes",
+    "ifrc_actions",
+    "icrc_actions",
+    "other_actors",
+    "needs",
+    "overall_objective",
+    "strategy_rationale",
+    "who_targeted",
+    "selection_criteria",
+    "achievements",
+    "challenges",
+)
+SECTION_LABELS = {
+    "what_happened": "What happened, where and when?",
+    "scope_and_scale": "Scope and scale",
+    "summary_of_changes": "Summary of changes",
+    "ifrc_actions": "IFRC network actions related to the current event",
+    "icrc_actions": "ICRC actions related to the current event",
+    "other_actors": "Other actors actions related to the current event",
+    "needs": "Needs (gaps) identified",
+    "overall_objective": "Overall objective of the operation",
+    "strategy_rationale": "Operation strategy rationale",
+    "who_targeted": "Who was targeted",
+    "selection_criteria": "Explain the selection criteria for the targeted population",
+    "achievements": "Progress and achievements",
+    "challenges": "Challenges",
+}
+DRAFT_OPEN = "draft"
+DRAFT_VALIDATED = "validated"
+DRAFT_SUBMITTED = "submitted"
+GO_API_ROOT = "https://goadmin.ifrc.org/api/v2/"
 
 SIGN_OFF_NS = "ns"
 SIGN_OFF_DELEGATION = "delegation"
@@ -55,20 +91,15 @@ ACTIVITY_DELAYED = "delayed"
 
 ACTIVITY_TYPES: tuple[tuple[str, str], ...] = (
     ("preparedness_design", "Preparedness & Design"),
-    ("assessment", "Assessment"),
-    ("procurement", "Procurement"),
-    ("distribution", "Distribution"),
-    ("training", "Training"),
-    ("community_engagement", "Community engagement"),
-    ("cash_voucher", "Cash and voucher"),
-    ("other", "Other"),
+    ("procurement", "Procurement & Logistics"),
+    ("direct_delivery", "Direct Delivery"),
+    ("community_engagement_training", "Community Engagement & Training"),
+    ("quality_review", "Quality & Review"),
 )
 
 CARRIED_OUT_BY: tuple[tuple[str, str], ...] = (
-    ("national_society", "National Society"),
+    ("national_society", "Host National Society"),
     ("ifrc", "IFRC"),
-    ("pns", "Participating National Society"),
-    ("other", "Other"),
 )
 
 CHANGE_PENDING = "pending"
@@ -115,5 +146,5 @@ DEFAULT_CONFIG = {
         "escalation_review_days": 7,
         "escalation_portfolio_days": 14,
     },
-    "ai": {"enabled": False, "prompt_version": PROMPT_VERSION},
+    "ai": {"enabled": False, "prompt_version": PROMPT_VERSION, "language": "en"},
 }

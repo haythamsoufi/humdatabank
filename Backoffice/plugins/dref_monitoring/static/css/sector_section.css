@@ -1,0 +1,172 @@
+/* Assignment-form presentation for DREF sector sections.
+   The fields stay the core form controls. This only changes how they look. */
+
+[data-entry-render="dref-sector"].bg-gray-50,
+[data-entry-render="dref-report"].bg-gray-50 {
+    background-color: #fff;
+    border-color: #e5e7eb;
+    border-radius: 2px;
+    box-shadow: none;
+}
+
+[data-entry-render="dref-sector"] > h3 {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+    border-bottom-color: #e5e7eb;
+}
+
+[data-entry-render="dref-sector"] > h3 > .fa-layer-group,
+[data-entry-render="dref-sector"] > h3 .section-kind-badge,
+[data-entry-render="dref-activities"] > h4 > .fa-indent,
+[data-entry-render="dref-activities"] > h4 .section-kind-badge,
+[data-entry-render="dref-sector"] .entry-item-history,
+[data-entry-render="dref-activities"] .entry-item-history,
+[data-entry-render="dref-report"] .entry-item-history,
+[data-entry-render="dref-sector"] .indicator-definition-tooltip,
+[data-entry-render="dref-activities"] .indicator-definition-tooltip {
+    display: none;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="question"].form-item-block,
+[data-entry-render="dref-activities"] [data-item-type="question"].form-item-block,
+[data-entry-render="dref-report"] [data-item-type="question"].form-item-block {
+    border-width: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="question"] label.block,
+[data-entry-render="dref-activities"] [data-item-type="question"]:not([data-question-type="yesno"]) label.block {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #374151;
+    margin-bottom: 0.35rem;
+}
+
+[data-entry-render="dref-sector"] input,
+[data-entry-render="dref-sector"] select,
+[data-entry-render="dref-activities"] input,
+[data-entry-render="dref-activities"] select,
+[data-entry-render="dref-report"] textarea {
+    background-color: #fff;
+    border-color: #d1d5db;
+    border-radius: 2px;
+}
+
+/* Indicator name reads as the gray field in the wireframe, with "Indicator" above it. */
+[data-entry-render="dref-sector"] [data-item-type="indicator"].form-item-block {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 2px;
+    padding: 0.85rem 1rem;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .flex {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] > .flex::before {
+    content: "Indicator";
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #374151;
+}
+
+[data-entry-render="dref-sector"] [data-item-type="indicator"] label.block {
+    display: block;
+    font-weight: 400;
+    font-size: 0.875rem;
+    color: #111827;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    padding: 0.45rem 0.75rem;
+}
+
+[data-entry-render="dref-sector"] .dref-plan-activities {
+    margin-top: 1.25rem;
+    padding-top: 0.25rem;
+}
+
+.dref-plan-activities__title {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.dref-plan-activity {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 2px;
+    padding: 0.85rem 1rem 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.dref-plan-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.dref-plan-field span {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #374151;
+}
+
+.dref-plan-field input,
+.dref-plan-field select {
+    width: 100%;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.875rem;
+    color: #111827;
+}
+
+.dref-plan-field input[readonly] {
+    background: #f9fafb;
+    color: #374151;
+}
+
+.dref-plan-field--12 { flex: 1 1 100%; }
+.dref-plan-field--4 { flex: 1 1 30%; }
+.dref-plan-field--3 { flex: 1 1 20%; }
+.dref-plan-field--2 { flex: 1 1 14%; }
+
+.dref-plan-field--check {
+    flex-direction: row;
+    align-items: center;
+    text-transform: none;
+}
+
+.dref-plan-field--check span {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #6b7280;
+}
+
+.dref-plan-field--check input {
+    width: auto;
+}

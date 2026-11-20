@@ -93,7 +93,7 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
     def update_settings(self, settings: Dict[str, Any]) -> bool:
         from plugins.dref_monitoring.config_store import save_posted_settings
 
-        return save_posted_settings(settings)
+        return save_posted_settings(settings, partial=True)
 
     def get_models(self) -> List[Any]:
         from plugins.dref_monitoring import models as module
@@ -117,21 +117,33 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
         from app.models.forms import FormTemplate
         from plugins.dref_monitoring.constants import TEMPLATE_NAME
 
-        template = FormTemplate.query.get(template_id)
+        from app.extensions import db
+
+        template = db.session.get(FormTemplate, template_id)
         name = (template.name or "") if template is not None else ""
         if name != TEMPLATE_NAME:
             return []
 
+        root = Path(__file__).resolve().parent / "static"
+
         def asset(filename: str) -> str:
-            return url_for(
-                "plugin_static.serve_plugin_static",
-                plugin_name=self.plugin_id,
-                filename=filename,
+            # The file's modified time is the cache buster, so an edit never needs a manual bump.
+            try:
+                version = int((root / filename).stat().st_mtime)
+            except OSError:
+                version = 0
+            return (
+                url_for(
+                    "plugin_static.serve_plugin_static",
+                    plugin_name=self.plugin_id,
+                    filename=filename,
+                )
+                + f"?v={version}"
             )
 
         return [
-            {"kind": "stylesheet", "url": asset("css/sector_section.css") + "?v=5"},
-            {"kind": "script", "url": asset("js/sector_section.js") + "?v=6"},
+            {"kind": "stylesheet", "url": asset("css/sector_section.css")},
+            {"kind": "script", "url": asset("js/sector_section.js")},
         ]
 
     def prepare_entry_values(self, assignment_entity_status, existing_data) -> None:

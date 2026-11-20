@@ -15,15 +15,15 @@ Plugins are written by different people, teams and AI agents. Everything below i
 | # | Rule | Check id | Reference |
 |---|---|---|---|
 | 1 | Folder name = `plugin_id` = `plugin.json` `plugin_id` (`^[a-z][a-z0-9_]{0,63}$`). | `naming` | |
-| 2 | `plugin.json` has `plugin_id`, `name`, `display_name`, `version` (semver), `description`, `author`, `license`; `plugin_id` and `version` equal `plugin.py`. Bump both together. | `manifest` | `global_awards/plugin.json` |
-| 3 | **Settings page.** `GET /admin/plugins/<plugin_id>/settings` exists, even when the plugin has nothing to configure (show status, version, the info card). Plugin Management only shows the settings button when this URL resolves. | `settings-route` | `global_awards/routes.py` |
+| 2 | `plugin.json` has `plugin_id`, `name`, `display_name`, `version` (semver), `description`, `author`, `license`; `plugin_id` and `version` equal `plugin.py`. Bump both together. | `manifest` | `global_award/plugin.json` |
+| 3 | **Settings page.** `GET /admin/plugins/<plugin_id>/settings` exists, even when the plugin has nothing to configure (show status, version, the info card). Plugin Management only shows the settings button when this URL resolves. | `settings-route` | `global_award/routes.py` |
 | 4 | The settings route is guarded: `plugin_admin_route_wrapper(...)` or `@admin_permission_required_any(PLUGIN_MANAGE_PERMISSION, <your permission>)`. Never expose it with `login_required` alone. | `settings-guard` | |
 | 5 | `templates/settings.html` extends `core/layout.html`, uses the `page_header` macro with Admin > Plugins breadcrumbs, and includes `plugins/_plugin_info_card.html` (pass `plugin_info=settings_plugin_info(PLUGIN_ID)`). Render it as `plugins/<plugin_id>/settings.html`. | `settings-template` | |
 | 6 | `get_blueprint()` returns the blueprint that holds those routes. `get_settings()` returns a plain dict (it feeds the Plugin Management API). Secrets go through `secret_paths` (see below). | runtime test | |
 | 7 | Every other route has an auth decorator (`plugin_route_wrapper`, `plugin_admin_route_wrapper`, `login_required`, `permission_required`, ...). Public routes need an entry in `INTENTIONALLY_UNGUARDED` with a reason. | `test_plugin_route_access.py` | |
 | 8 | New permissions and roles come from `get_seed_permissions()` / `get_seed_roles()`. Do not edit core RBAC files. | `test_rbac_catalog_completeness.py` | |
-| 9 | `README.md` (200+ characters): what the plugin does, permissions, settings, config, how to test. | `readme` | `nsd_report_forms/README.md` |
-| 10 | Tests in `plugins/<id>/tests/test_*.py` (or `tests/unit/test_plugins/test_<id>*.py`): at least the plugin class loads, the settings page renders for an admin, and it is denied to anonymous users. | `tests` | `global_awards/tests/` |
+| 9 | `README.md` (200+ characters): what the plugin does, permissions, settings, config, how to test. | `readme` | `nsd_projects/README.md` |
+| 10 | Tests in `plugins/<id>/tests/test_*.py` (or `tests/unit/test_plugins/test_<id>*.py`): at least the plugin class loads, the settings page renders for an admin, and it is denied to anonymous users. | `tests` | `global_award/tests/` |
 | 11 | The id is listed in `BUNDLED_PLUGIN_IDS` in `plugins/metadata.py` (any plugin folder committed to the repo ships with the image). Add it to `FIRST_PARTY_PLUGIN_IDS` only when it is first-party. | `bundled` | `test_first_party_plugins.py` |
 | 12 | Core code never imports `plugins.*`. Add an extension point on `BasePlugin` instead. | `test_core_plugin_boundary.py` | |
 

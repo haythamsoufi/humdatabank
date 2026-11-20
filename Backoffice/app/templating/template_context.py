@@ -564,8 +564,9 @@ def register_template_context(app, config_class):
     app.jinja_env.globals['csp_style_nonce'] = get_style_nonce
 
     # Date formatting filters
-    from flask_babel import format_date, format_datetime
-    from app.utils.common.datetime_helpers import ensure_utc
+    from flask_babel import format_date
+    from app.utils.common.datetime_helpers import ensure_utc, format_for_viewer, viewer_wall_clock
+    from app.i18n.viewer_timezone import viewer_timezone_name
 
     @app.template_filter('datetime_iso')
     def datetime_iso_filter(dt):
@@ -582,32 +583,47 @@ def register_template_context(app, config_class):
 
     @app.template_filter('datetime_local')
     def datetime_local_filter(dt, format='datetime', css_class=''):
-        from markupsafe import Markup
+        from datetime import date as date_cls
+        from datetime import datetime as datetime_cls
+
+        from markupsafe import Markup, escape
 
         if not dt:
             return ''
+
+        # Calendar dates have no instant. Do not attach a data-datetime attribute:
+        # the client would treat midnight UTC as a timestamp and shift the day.
+        if isinstance(dt, date_cls) and not isinstance(dt, datetime_cls):
+            try:
+                return escape(format_date(dt, format='medium'))
+            except Exception as e:
+                current_app.logger.debug("datetime_local date format failed: %s", e)
+                return escape(dt.isoformat())
 
         try:
             dt_utc = ensure_utc(dt)
             iso_str = dt_utc.isoformat() if dt_utc else (dt.isoformat() if hasattr(dt, 'isoformat') else '')
 
             try:
-                if format == 'date':
-                    fallback = format_date(dt, format='medium')
-                elif format == 'time':
-                    fallback = dt.strftime('%H:%M')
-                else:
-                    fallback = format_datetime(dt, format='short')
+                fallback = format_for_viewer(dt, format if format else 'datetime')
             except Exception as e:
                 current_app.logger.debug("datetime_local fallback format failed: %s", e)
-                fallback = dt.strftime('%Y-%m-%d %H:%M') if hasattr(dt, 'strftime') else str(dt)
+                local = viewer_wall_clock(dt_utc) if dt_utc else None
+                fallback = local.strftime('%Y-%m-%d %H:%M') if local is not None else ''
 
             classes = 'datetime-local'
             if css_class:
                 classes += ' ' + css_class
 
             return Markup(
-                f'<span data-datetime="{iso_str}" data-datetime-format="{format}" class="{classes}">{fallback}</span>'
+                '<span data-datetime="{iso}" data-datetime-format="{fmt}" '
+                'class="{classes}" title="{tz}">{fallback}</span>'.format(
+                    iso=escape(iso_str),
+                    fmt=escape(format or 'datetime'),
+                    classes=escape(classes),
+                    tz=escape(viewer_timezone_name()),
+                    fallback=escape(fallback),
+                )
             )
         except Exception as e:
             current_app.logger.debug("datetime_local filter failed: %s", e)

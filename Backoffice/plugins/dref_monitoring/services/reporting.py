@@ -22,9 +22,11 @@ from plugins.dref_monitoring.models import (
     DrefDelay,
     DrefFeedback,
     DrefFundsEvent,
+    DrefGroup,
     DrefIndicator,
     DrefIndicatorValue,
     DrefPeriod,
+    DrefPlan,
     DrefProcurement,
     DrefReport,
     DrefRisk,
@@ -402,11 +404,16 @@ def matrix_for_request():
     }
 
 
-def monitoring_snapshot(operation) -> dict:
-    """Four timeline marks, plus activity counts by sector and status."""
+def monitoring_snapshot(operation, plan=None, sections=None) -> dict:
+    """Four timeline marks, plus activity counts by sector and status.
+
+    The operation page already holds the latest plan and its sections, so it
+    passes them in rather than reading them again.
+    """
     from plugins.dref_monitoring.services.assignment_sync import assignment_url
 
-    plan = latest_plan(operation.id)
+    if plan is None:
+        plan = latest_plan(operation.id)
     confirmed = plan.validated_at.date() if plan is not None and plan.validated_at else None
     events = [
         {
@@ -453,7 +460,9 @@ def monitoring_snapshot(operation) -> dict:
     status_counts = {key: 0 for key in known}
     by_sector = []
     if plan is not None:
-        for section in plan_sections(plan.id):
+        if sections is None:
+            sections = plan_sections(plan.id)
+        for section in sections:
             for activity in section["activities"]:
                 status_counts[activity.status] = status_counts.get(activity.status, 0) + 1
             by_sector.append({"label": section["group"].label, "count": len(section["activities"])})
@@ -517,6 +526,16 @@ def add_procurement(operation, form, actor) -> str | None:
     return None
 
 
+def _activity_on_operation(operation, activity_id: int) -> bool:
+    """True when the activity sits on any plan version of this operation."""
+    activity = db.session.get(DrefActivity, activity_id)
+    if activity is None:
+        return False
+    group = db.session.get(DrefGroup, activity.group_id)
+    plan = db.session.get(DrefPlan, group.plan_id) if group is not None else None
+    return plan is not None and plan.operation_id == operation.id
+
+
 def add_delay(operation, form, actor) -> str | None:
     if not actor.allows(operation, "enter"):
         return "You cannot log a delay on this operation."
@@ -524,15 +543,18 @@ def add_delay(operation, form, actor) -> str | None:
     if not reason:
         return "Describe the delay."
     activity_id = as_int(form.get("activity_id"))
-    if activity_id:
-        activity = db.session.get(DrefActivity, activity_id)
-        if activity is None:
-            return "Activity not found."
+    if activity_id and not _activity_on_operation(operation, activity_id):
+        return "Activity not found."
+    report_id = as_int(form.get("report_id"))
+    if report_id:
+        report = db.session.get(DrefReport, report_id)
+        if report is None or report.operation_id != operation.id:
+            return "Report not found."
     db.session.add(
         DrefDelay(
             operation_id=operation.id,
             activity_id=activity_id,
-            report_id=as_int(form.get("report_id")),
+            report_id=report_id,
             reason=reason,
             created_by_user_id=actor.user_id,
         )

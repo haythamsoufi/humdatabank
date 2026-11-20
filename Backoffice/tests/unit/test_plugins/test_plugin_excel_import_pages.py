@@ -1,4 +1,4 @@
-"""Global Awards and NSD settings use the shared Excel import tab."""
+"""Global Award and NSD settings use the shared Excel import tab."""
 import pytest
 
 
@@ -11,8 +11,8 @@ def _page(client, path):
 
 
 @pytest.mark.unit
-def test_global_awards_import_tab_uses_the_standard_dropzone(logged_in_sm_client):
-    html = _page(logged_in_sm_client, "/admin/plugins/global_awards/settings?tab=import")
+def test_global_award_import_tab_uses_the_standard_dropzone(logged_in_sm_client):
+    html = _page(logged_in_sm_client, "/admin/plugins/global_award/settings?tab=import")
     assert 'data-tab="import"' in html
     assert 'id="ga-import-dropzone"' in html
     assert "Files on disk" in html
@@ -24,7 +24,7 @@ def test_global_awards_import_tab_uses_the_standard_dropzone(logged_in_sm_client
 
 @pytest.mark.unit
 def test_nsd_import_tab_uses_the_standard_dropzone(logged_in_sm_client):
-    html = _page(logged_in_sm_client, "/admin/plugins/nsd_report_forms/settings?tab=import")
+    html = _page(logged_in_sm_client, "/admin/plugins/nsd_projects/settings?tab=import")
     assert 'data-tab="import"' in html
     assert 'id="nsd-import-dropzone"' in html
     assert "Files on disk" in html

@@ -19,7 +19,7 @@ from app.extensions import db
 from app.models import EmailDeliveryLog, Notification, NotificationCampaign
 from app.services.email.delivery import SKIP_ERROR_PREFIX
 from app.services.notification.service import NotificationService
-from app.utils.common.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import sql_stored_utc_local_date, utcnow, viewer_wall_clock
 
 ALLOWED_INSIGHTS_DAYS: Tuple[int, ...] = (7, 30, 90, 365)
 DEFAULT_INSIGHTS_DAYS = 30
@@ -54,12 +54,21 @@ def _as_iso_date(value: Any) -> str:
     return str(value)[:10]
 
 
-def _period_bounds(days: int) -> Tuple[datetime, datetime, datetime]:
+def _period_bounds(days: int):
+    """Window covering the last ``days`` calendar days in the browsing user's zone.
+
+    Returns UTC instants for filtering stored timestamps, plus the local
+    calendar dates used as chart labels. With no zone cookie this is UTC,
+    matching the previous behaviour.
+    """
     now = utcnow()
-    start_date = now.date() - timedelta(days=days - 1)
-    cutoff = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
-    today_start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
-    return cutoff, today_start, now
+    local_now = viewer_wall_clock(now)
+    today = local_now.date()
+    start_date = today - timedelta(days=days - 1)
+    tzinfo = local_now.tzinfo or timezone.utc
+    cutoff = datetime.combine(start_date, time.min, tzinfo=tzinfo).astimezone(timezone.utc)
+    today_start = datetime.combine(today, time.min, tzinfo=tzinfo).astimezone(timezone.utc)
+    return cutoff, today_start, now, start_date, today
 
 
 def _counts_by_date(query) -> Dict[str, int]:
@@ -125,12 +134,10 @@ def _type_label(type_key: str) -> str:
 def build_communications_insights(days: int = DEFAULT_INSIGHTS_DAYS) -> Dict[str, Any]:
     """
     Build Communication Center insights for the last ``days`` calendar days
-    (including today, UTC).
+    in the browsing user's time zone (including today).
     """
     days = clamp_insights_days(days)
-    cutoff, today_start, now = _period_bounds(days)
-    start_date = cutoff.date()
-    today = now.date()
+    cutoff, today_start, _now, start_date, today = _period_bounds(days)
 
     notif_in_period = Notification.created_at >= cutoff
     email_in_period = EmailDeliveryLog.created_at >= cutoff
@@ -232,29 +239,32 @@ def build_communications_insights(days: int = DEFAULT_INSIGHTS_DAYS) -> Dict[str
         for status, count in sorted(email_by_status_counts.items(), key=lambda item: item[1], reverse=True)
     ]
 
+    notif_day = sql_stored_utc_local_date(Notification.created_at)
+    email_day = sql_stored_utc_local_date(EmailDeliveryLog.created_at)
     notif_by_day = _counts_by_date(
         db.session.query(
-            func.date(Notification.created_at).label('day'),
+            notif_day.label('day'),
             func.count(Notification.id),
         )
         .filter(notif_in_period)
-        .group_by(func.date(Notification.created_at))
+        .group_by(notif_day)
     )
     email_by_day = _counts_by_date(
         db.session.query(
-            func.date(EmailDeliveryLog.created_at).label('day'),
+            email_day.label('day'),
             func.count(EmailDeliveryLog.id),
         )
         .filter(email_in_period)
-        .group_by(func.date(EmailDeliveryLog.created_at))
+        .group_by(email_day)
     )
+    orphan_day = sql_stored_utc_local_date(EmailDeliveryLog.created_at)
     orphan_by_day = _counts_by_date(
         db.session.query(
-            func.date(EmailDeliveryLog.created_at).label('day'),
+            orphan_day.label('day'),
             func.count(EmailDeliveryLog.id),
         )
         .filter(email_in_period, EmailDeliveryLog.notification_id.is_(None))
-        .group_by(func.date(EmailDeliveryLog.created_at))
+        .group_by(orphan_day)
     )
 
     by_day: List[Dict[str, Any]] = []
@@ -425,12 +435,12 @@ def build_communications_insights(days: int = DEFAULT_INSIGHTS_DAYS) -> Dict[str
 def empty_communications_insights(days: int = DEFAULT_INSIGHTS_DAYS) -> Dict[str, Any]:
     """Fallback payload when insights cannot be computed."""
     days = clamp_insights_days(days)
-    cutoff, _, now = _period_bounds(days)
+    _cutoff, _today_start, _now, start_date, today = _period_bounds(days)
     return {
         'success': True,
         'period_days': days,
-        'period_start': cutoff.date().isoformat(),
-        'period_end': now.date().isoformat(),
+        'period_start': start_date.isoformat(),
+        'period_end': today.isoformat(),
         'totals': {
             'communications': 0,
             'notifications': 0,
@@ -467,7 +477,7 @@ def empty_communications_insights(days: int = DEFAULT_INSIGHTS_DAYS) -> Dict[str
                 'orphan_emails': 0,
                 'communications': 0,
             }
-            for day in _date_series(cutoff.date(), now.date())
+            for day in _date_series(start_date, today)
         ],
         'by_type': [],
         'by_channel': [

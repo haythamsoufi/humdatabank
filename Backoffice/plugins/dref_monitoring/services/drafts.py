@@ -2,7 +2,7 @@
 
 The language model receives the approved request and the monitoring history:
 figures, activity notes, indicator actuals, delay reasons, and change
-justifications. It does not receive names, email addresses, or community
+justifications. It does not receive user names, email addresses, or community
 feedback. A reply is stored as GO chapter text. The National Society can edit
 those chapters before validation sends the report to GO.
 """
@@ -603,8 +603,8 @@ def generate_scheduled_drafts(today: date | None = None, complete=None) -> int:
 
 def _model_name() -> str:
     try:
-        from flask import current_app
+        from plugins.dref_monitoring.services.llm import configured_model
 
-        return str(current_app.config.get("OPENAI_MODEL") or "")
+        return configured_model()
     except Exception:
         return ""

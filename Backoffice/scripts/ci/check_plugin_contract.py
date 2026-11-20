@@ -34,7 +34,7 @@ and are checked for staleness, so the list can only shrink.
 Usage (from ``Backoffice/``)::
 
     python scripts/ci/check_plugin_contract.py
-    python scripts/ci/check_plugin_contract.py --plugin global_awards
+    python scripts/ci/check_plugin_contract.py --plugin global_award
     python scripts/ci/check_plugin_contract.py --github   # ::error annotations
 """
 

@@ -3,7 +3,8 @@
  * Centralized date/time formatting and timezone conversion for the application.
  *
  * All dates are stored in UTC in the database. This utility:
- * 1. Converts UTC dates to the user's local timezone for display
+ * 1. Converts UTC dates to the browsing user's timezone for display
+ *    (window.VIEWER_TIMEZONE, set from the browser's IANA zone)
  * 2. Provides consistent formatting across the application
  * 3. Supports localized date/time formats
  *
@@ -28,6 +29,22 @@
      * Get the user's locale from the page or browser
      * @returns {string} Locale string (e.g., 'en-US', 'ar-SA')
      */
+    /**
+     * IANA zone of the person looking at this page.
+     * The layout sets window.VIEWER_TIMEZONE from the browser before this file runs.
+     * @returns {string}
+     */
+    function getViewerTimeZone() {
+        if (typeof window.VIEWER_TIMEZONE === 'string' && window.VIEWER_TIMEZONE) {
+            return window.VIEWER_TIMEZONE;
+        }
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        } catch (e) {
+            return 'UTC';
+        }
+    }
+
     function getUserLocale() {
         // Try to get from HTML lang attribute
         const htmlLang = document.documentElement.lang;
@@ -166,8 +183,10 @@
             return formatRelative(date, locale);
         }
 
-        // Get format options
-        const formatOpts = FORMAT_OPTIONS[formatType] || FORMAT_OPTIONS.datetime;
+        // Get format options. timeZone makes the clock match the browsing user
+        // even when a stale cookie or a non-local default would otherwise differ.
+        const formatOpts = Object.assign({}, FORMAT_OPTIONS[formatType] || FORMAT_OPTIONS.datetime);
+        formatOpts.timeZone = getViewerTimeZone();
 
         try {
             let formatted = new Intl.DateTimeFormat(locale, formatOpts).format(date);
@@ -250,7 +269,7 @@
      */
     function getTimezoneAbbreviation(date) {
         try {
-            const options = { timeZoneName: 'short' };
+            const options = { timeZone: getViewerTimeZone(), timeZoneName: 'short' };
             const formatter = new Intl.DateTimeFormat('en-US', options);
             const parts = formatter.formatToParts(date);
             const tzPart = parts.find(function(p) { return p.type === 'timeZoneName'; });
@@ -314,6 +333,7 @@
         const formatted = format(utcDateStr, formatType, options);
         if (formatted) {
             element.textContent = formatted;
+            element.title = getViewerTimeZone();
             // Mark as converted to avoid re-processing
             element.dataset.datetimeConverted = 'true';
         }
@@ -539,6 +559,7 @@
 
         // Utility
         getUserLocale: getUserLocale,
+        getViewerTimeZone: getViewerTimeZone,
         getTimezoneAbbreviation: getTimezoneAbbreviation,
 
         // Format options reference (for customization)

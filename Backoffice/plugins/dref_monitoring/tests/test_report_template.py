@@ -175,8 +175,10 @@ def test_selected_sectors_use_emergency_indicators_and_scripted_questions(seeded
 
     assets = DrefMonitoringPlugin().get_entry_form_assets(cycle.template_id)
     assert [asset["kind"] for asset in assets] == ["stylesheet", "script"]
-    assert assets[0]["url"].endswith("css/sector_section.css?v=5")
-    assert assets[1]["url"].endswith("js/sector_section.js?v=6")
+    import re
+
+    assert re.search(r"css/sector_section\.css\?v=\d+$", assets[0]["url"])
+    assert re.search(r"js/sector_section\.js\?v=\d+$", assets[1]["url"])
 
     before = FormItem.query.filter_by(version_id=version.id).count()
     ensure_operation_template(operation)
@@ -366,7 +368,7 @@ def test_renamed_and_parenthetical_bank_sectors_place_indicators(seeded):
     assert cva_indicator.name in [item.label for item in _items(cash_section.id)]
 
 
-def test_a_cycle_stores_the_indicator_figure_as_a_plan_target(seeded):
+def test_a_cycle_stores_the_indicator_figure_as_a_plan_target(seeded, monkeypatch):
     from app.models.assignments import AssignmentEntityStatus
     from plugins.dref_monitoring.models import DrefIndicator
     from plugins.dref_monitoring.services.entry_activities import overlay_plan_targets, save_posted_targets
@@ -422,6 +424,16 @@ def test_a_cycle_stores_the_indicator_figure_as_a_plan_target(seeded):
     assert shown[f"field_value[{item.id}]"]["values"]["total"] == "5"
     assert f"field_value[{other_item.id}]" not in shown
 
+    from plugins.dref_monitoring import access
+
+    nobody = Actor(user.id, False, frozenset(), frozenset(), {})
+    monkeypatch.setattr(access, "current_actor", lambda: nobody)
+    assert save_posted_targets(aes, {f"indicator_{item.id}_total_value": "40"})
+    assert linked.target == 5
+    # Posting the unchanged figure needs no access, so a plain cycle save still works.
+    assert save_posted_targets(aes, {f"indicator_{item.id}_total_value": "5"}) is None
+
+    monkeypatch.setattr(access, "current_actor", lambda: _manager(user.id))
     assert save_posted_targets(aes, {f"indicator_{item.id}_total_value": "40"}) is None
     assert linked.target == 40
 

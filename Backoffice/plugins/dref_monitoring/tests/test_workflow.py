@@ -271,7 +271,7 @@ def test_adding_an_activity_to_a_confirmed_plan_opens_a_draft(seeded):
                 "add_activity": [str(indicator.id)],
                 f"add_activity_title-{indicator.id}": "Distribute kits",
                 f"add_activity_status-{indicator.id}": "planned",
-                f"add_activity_type-{indicator.id}": "distribution",
+                f"add_activity_type-{indicator.id}": "direct_delivery",
                 f"add_activity_by-{indicator.id}": "national_society",
             }
         ),
@@ -287,7 +287,7 @@ def test_adding_an_activity_to_a_confirmed_plan_opens_a_draft(seeded):
     titles = {row.title for row in activities_for(groups_for(plan.id)[0].id)}
     assert titles == {activity.title, "Distribute kits"}
     added = next(row for row in activities_for(groups_for(plan.id)[0].id) if row.title == "Distribute kits")
-    assert added.activity_type == "distribution"
+    assert added.activity_type == "direct_delivery"
     assert added.carried_out_by == "national_society"
     assert added.indicator_id is not None
 
@@ -331,7 +331,7 @@ def test_edit_mode_adds_several_activities_under_one_sector(seeded):
                 "add_activity_status-n3": "planned",
                 "add_activity_budget-n1": "100",
                 "add_activity_budget-n2": "250",
-                "add_activity_type-n1": "distribution",
+                "add_activity_type-n1": "direct_delivery",
                 "add_activity_by-n2": "national_society",
             }
         ),
@@ -344,7 +344,7 @@ def test_edit_mode_adds_several_activities_under_one_sector(seeded):
     titles = {row.title: row for row in rows}
     assert set(titles) == {activity.title, "Distribute kits", "Train volunteers"}
     assert titles["Distribute kits"].budget_chf == Decimal("100.00")
-    assert titles["Distribute kits"].activity_type == "distribution"
+    assert titles["Distribute kits"].activity_type == "direct_delivery"
     assert titles["Train volunteers"].status == "ongoing"
     assert titles["Train volunteers"].carried_out_by == "national_society"
     assert titles["Train volunteers"].budget_chf == Decimal("250.00")

@@ -511,9 +511,12 @@ TRANSITION_FORBIDDEN = "forbidden"
 
 
 def _naive_timestamp(value):
-    if value is None or getattr(value, "tzinfo", None) is None:
-        return value
-    return value.replace(tzinfo=None)
+    """UTC wall clock so a naive stored stamp matches the same aware instant."""
+    if value is None:
+        return None
+    from app.utils.common.datetime_helpers import naive_utc
+
+    return naive_utc(value)
 
 
 def _lock_aes_row(aes) -> str:

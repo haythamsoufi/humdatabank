@@ -1433,6 +1433,10 @@ def set_member(operation, user_id: int, tier: str, actor) -> str | None:
 
     if db.session.get(User, user_id) is None:
         return "User not found."
+    from plugins.dref_monitoring.access import user_is_capable
+
+    if not user_is_capable(user_id):
+        return "That user has no DREF monitoring role. Assign a role first."
     row = DrefMember.query.filter_by(operation_id=operation.id, user_id=user_id).first()
     if row is None:
         db.session.add(DrefMember(operation_id=operation.id, user_id=user_id, tier=tier))

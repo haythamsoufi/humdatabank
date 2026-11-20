@@ -28,24 +28,44 @@
     <script src="{{ static_url('js/core/csrf.js') }}" defer></script>
     <script src="{{ static_url('js/core/debug-indexeddb.js') }}" defer></script>
     <script src="{{ static_url('js/lib/indexeddb-error-guard.js') }}" defer></script>
+    {# JSON, not JavaScript: the editor's script checker does not parse this, and Flask's tojson escapes "<". #}
+    <script type="application/json" id="layout-branding-json">{{ {
+        "orgName": ORG_NAME,
+        "orgShortName": ORG_SHORT_NAME,
+        "chatbotName": CHATBOT_NAME or '',
+        "supportedLanguages": SUPPORTED_LANGUAGES or [],
+        "translatableLanguages": TRANSLATABLE_LANGUAGES or [],
+        "i18n": inject_js_translations()
+    } | tojson }}</script>
     <script nonce="{{ csp_nonce() }}">
-        // Inject organization branding for JavaScript
-        window.ORG_NAME = {{ ORG_NAME | tojson }};
-        window.ORG_SHORT_NAME = {{ ORG_SHORT_NAME | tojson }};
-        window.CHATBOT_NAME = {{ (CHATBOT_NAME or '') | tojson }};
-        // Inject languages for client-side features (chatbot, etc.)
-        window.SUPPORTED_LANGUAGES = {{ (SUPPORTED_LANGUAGES or []) | tojson | safe }};
-        window.TRANSLATABLE_LANGUAGES = {{ (TRANSLATABLE_LANGUAGES or []) | tojson | safe }};
-        // Workflow tour debug logging (disabled by default)
-        window.WORKFLOW_TOUR_DEBUG = false;
-        // Client-side translation shim.
+        // Remember the browsing user's IANA zone so the next response can
+        // render clocks in that zone. This page's DateTimeUtils still formats
+        // with the live zone below, including the first visit before the cookie exists.
+        (function () {
+            try {
+                var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (!tz) return;
+                window.VIEWER_TIMEZONE = tz;
+                var secure = location.protocol === 'https:' ? ';secure' : '';
+                document.cookie = 'hdb_tz=' + encodeURIComponent(tz)
+                    + ';path=/;max-age=31536000;samesite=lax' + secure;
+            } catch (e) {}
+        }());
+        // Organization branding, languages, and the client-side translation shim.
         // window.t(key) returns the UI-locale translation for a gettext msgid,
         // or the key itself as a fallback (which is the English source string).
-        // Usage: window.t('Cancel') → 'Annuler' (fr), 'إلغاء' (ar), etc.
-        // Strings are sourced from the server-side Flask-Babel catalog — no
-        // extra requests, no separate catalog file.
         (function () {
-            var _i18n = {{ inject_js_translations() | tojson | safe }};
+            var boot = {};
+            try {
+                boot = JSON.parse(document.getElementById('layout-branding-json').textContent);
+            } catch (e) {}
+            window.ORG_NAME = boot.orgName;
+            window.ORG_SHORT_NAME = boot.orgShortName;
+            window.CHATBOT_NAME = boot.chatbotName || '';
+            window.SUPPORTED_LANGUAGES = boot.supportedLanguages || [];
+            window.TRANSLATABLE_LANGUAGES = boot.translatableLanguages || [];
+            window.WORKFLOW_TOUR_DEBUG = false;
+            var _i18n = boot.i18n || {};
             window.t = function (key, fallback) {
                 if (_i18n && Object.prototype.hasOwnProperty.call(_i18n, key) && _i18n[key]) {
                     return _i18n[key];
@@ -60,42 +80,49 @@
     <script src="{{ static_url('js/tours/workflow-tour-parser.js') }}" defer></script>
     {% endif %}
     <link rel="manifest" href="{{ url_for('main.manifest') }}">
+    <script type="application/json" id="layout-static-json">{{ {
+        "assetVersion": ASSET_VERSION,
+        "staticCdnBase": STATIC_CDN_URL,
+        "mobileAppEmbedded": mobile_app_embedded|default(false),
+        "swRegister": current_user.is_authenticated and not mobile_app_embedded|default(false) and not config.DEBUG,
+        "userIsAuthenticated": current_user.is_authenticated
+    } | tojson }}</script>
     <script nonce="{{ csp_nonce() }}">
-        // Static file versioning helper for JavaScript
-        // This allows JavaScript to get versioned static file URLs
+        // Static file versioning helper for JavaScript.
+        // This allows JavaScript to get versioned static file URLs.
         (function() {
-            // Get per-boot asset version from template global
-            const assetVersion = '{{ ASSET_VERSION }}';
-            const staticCdnBase = {{ STATIC_CDN_URL | tojson }};
+            var boot = {};
+            try {
+                boot = JSON.parse(document.getElementById('layout-static-json').textContent);
+            } catch (e) {}
+            var assetVersion = boot.assetVersion || '';
+            var staticCdnBase = boot.staticCdnBase || '';
             window.getStaticUrl = function(filename) {
-                // Remove leading slash if present
                 filename = filename.replace(/^\//, '');
-                // Remove /static/ prefix if present (for consistency)
                 filename = filename.replace(/^static\//, '');
                 if (staticCdnBase) {
-                    return `${staticCdnBase.replace(/\/$/, '')}/${filename}?v=${assetVersion}`;
+                    return staticCdnBase.replace(/\/$/, '') + '/' + filename + '?v=' + assetVersion;
                 }
-                return `/static/${filename}?v=${assetVersion}`;
+                return '/static/' + filename + '?v=' + assetVersion;
             };
-            // Also expose version for service worker and other uses
             window.ASSET_VERSION = assetVersion;
-            // Expose CDN base so module loaders can compute app-origin fallback URLs
-            // when CDN is unreachable or returns CORS errors for the current hostname.
+            // CDN base so module loaders can fall back to the app origin when the CDN
+            // is unreachable or returns CORS errors for the current hostname.
             window.__staticCdnBase = staticCdnBase || null;
+            window.__layoutConfig = {
+                mobileAppEmbedded: boot.mobileAppEmbedded === true,
+                swRegister: boot.swRegister === true
+            };
+            // Used by csrf.js to route token refresh to /api/v1/csrf-token
+            // instead of re-fetching the full page HTML.
+            window.__userIsAuthenticated = boot.userIsAuthenticated === true;
         })();
-
-        window.__layoutConfig = {
-            mobileAppEmbedded: {{ mobile_app_embedded|default(false)|tojson }},
-            swRegister: {{ (current_user.is_authenticated and not mobile_app_embedded|default(false) and not config.DEBUG)|tojson }}
-        };
-        // Used by csrf.js to route token refresh to the lightweight /api/v1/csrf-token endpoint
-        // instead of re-fetching the full page HTML (which can be ~1.9 MB on large entry forms).
-        window.__userIsAuthenticated = {{ current_user.is_authenticated|tojson }};
     </script>
     <!-- Tours Component -->
     {% include 'tours/tours.html' %}
 
     <!-- Prevent sidebar flicker by applying collapsed state immediately (pre-render critical) -->
+    <script type="application/json" id="layout-language-json">{{ {"language": _ui_language} | tojson }}</script>
     <script nonce="{{ csp_nonce() }}">
         (function() {
             // Check if sidebar should be collapsed before page renders
@@ -114,7 +141,10 @@
             } catch (e) {}
 
             // Set RTL direction immediately for Arabic (before CSS applies)
-            const currentLanguage = {{ _ui_language | tojson }};
+            var currentLanguage = '';
+            try {
+                currentLanguage = JSON.parse(document.getElementById('layout-language-json').textContent).language || '';
+            } catch (e) {}
             if (currentLanguage === 'ar') {
                 document.documentElement.setAttribute('dir', 'rtl');
             } else {
@@ -581,26 +611,27 @@
         <span class="fab-label">{{ _('Translate') if not translation_review_active else _('Review mode') }}</span>
     </button>
     {% include 'components/_translation_review_modal.html' %}
-    <script nonce="{{ csp_nonce() }}">
-    window.__translationReviewConfig = {
-        enabled: {{ TRANSLATION_REVIEW_ENABLED | tojson }},
-        canUse: {{ translation_review_can_use | tojson }},
-        active: {{ translation_review_active | tojson }},
-        locale: {{ translation_review_locale | tojson }},
-        assignedLanguages: {{ translation_review_assigned_languages | tojson }},
-        urls: {
-            toggle: {{ url_for('translation_review.toggle_review_mode') | tojson }},
-            getString: {{ url_for('translation_review.get_review_string') | tojson }},
-            saveString: {{ url_for('translation_review.save_review_string') | tojson }},
-            status: {{ url_for('translation_review.review_status') | tojson }}
+    <script type="application/json" id="translation-review-config">{{ {
+        "enabled": TRANSLATION_REVIEW_ENABLED,
+        "canUse": translation_review_can_use,
+        "active": translation_review_active,
+        "locale": translation_review_locale,
+        "assignedLanguages": translation_review_assigned_languages,
+        "urls": {
+            "toggle": url_for('translation_review.toggle_review_mode'),
+            "getString": url_for('translation_review.get_review_string'),
+            "saveString": url_for('translation_review.save_review_string'),
+            "status": url_for('translation_review.review_status')
         },
-        i18n: {
-            missingPlaceholders: {{ _('Missing placeholders') | tojson }},
-            extraPlaceholders: {{ _('Unexpected placeholders') | tojson }},
-            translate: {{ _('Translate') | tojson }},
-            reviewMode: {{ _('Review mode') | tojson }}
+        "i18n": {
+            "missingPlaceholders": _('Missing placeholders'),
+            "extraPlaceholders": _('Unexpected placeholders'),
+            "translate": _('Translate'),
+            "reviewMode": _('Review mode')
         }
-    };
+    } | tojson }}</script>
+    <script nonce="{{ csp_nonce() }}">
+    window.__translationReviewConfig = JSON.parse(document.getElementById('translation-review-config').textContent);
     </script>
     <script src="{{ static_url('js/translation_review/core.js') }}" defer></script>
     {% endif %}
@@ -615,8 +646,9 @@
     <script src="{{ static_url('js/core/page-header-pin.js') }}"></script>
     <script src="{{ static_url('js/core/confirm-dialogs.js') }}"></script>
     <script src="{{ static_url('js/lib/modal-utils.js') }}"></script>
+    <script type="application/json" id="client-error-reporting-json">{{ {"enabled": not config.DEBUG} | tojson }}</script>
     <script nonce="{{ csp_nonce() }}">
-    window.__humdbClientErrorReportingEnabled = {{ (not config.DEBUG)|tojson }};
+    window.__humdbClientErrorReportingEnabled = JSON.parse(document.getElementById('client-error-reporting-json').textContent).enabled === true;
     </script>
     <script src="{{ static_url('js/lib/platform-error-reporter.js') }}"></script>
     <script src="{{ static_url('js/lib/api-fetch.js') }}"></script>
@@ -624,9 +656,16 @@
     <script src="{{ static_url('js/components/status-labels.js') }}"></script>
     <script src="{{ static_url('js/components/assignment-status-pipeline.js') }}"></script>
     {% if current_user.is_authenticated %}
+    <script type="application/json" id="layout-ws-json">{{ {
+        "notify": notify_websocket_enabled|default(false),
+        "chat": chat_websocket_enabled|default(false)
+    } | tojson }}</script>
     <script nonce="{{ csp_nonce() }}">
-    window.NOTIFY_WS_ENABLED = {{ notify_websocket_enabled|default(false)|tojson }};
-    window.CHAT_WEBSOCKET_ENABLED = {{ chat_websocket_enabled|default(false)|tojson }};
+    (function () {
+        var boot = JSON.parse(document.getElementById('layout-ws-json').textContent);
+        window.NOTIFY_WS_ENABLED = boot.notify === true;
+        window.CHAT_WEBSOCKET_ENABLED = boot.chat === true;
+    }());
     </script>
     {% endif %}
     <script src="{{ static_url('js/core/components.js') }}"></script>
@@ -641,12 +680,19 @@
     {% endif %}
 
     {# Global config for user hover profile popups #}
+    <script type="application/json" id="user-hover-config">{{ {
+        "canLinkUserDetails": can_manage_users,
+        "userDetailUrlPattern": (url_for('user_management.edit_user', user_id=0)|replace('0', '{id}')) if can_manage_users else none
+    } | tojson }}</script>
     <script nonce="{{ csp_nonce() }}">
-    window.UserHoverProfileConfig = window.UserHoverProfileConfig || {};
-    window.UserHoverProfileConfig.canLinkUserDetails = {{ can_manage_users|tojson|safe }};
-    {% if can_manage_users %}
-    window.UserHoverProfileConfig.userDetailUrlPattern = {{ url_for('user_management.edit_user', user_id=0)|replace('0', '{id}')|tojson|safe }};
-    {% endif %}
+    (function () {
+        var boot = JSON.parse(document.getElementById('user-hover-config').textContent);
+        window.UserHoverProfileConfig = window.UserHoverProfileConfig || {};
+        window.UserHoverProfileConfig.canLinkUserDetails = boot.canLinkUserDetails === true;
+        if (boot.userDetailUrlPattern) {
+            window.UserHoverProfileConfig.userDetailUrlPattern = boot.userDetailUrlPattern;
+        }
+    }());
     </script>
 
     {# User hover profile popups + detail links (global) #}

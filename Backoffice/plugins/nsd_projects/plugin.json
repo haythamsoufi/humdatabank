@@ -1,0 +1,9 @@
+{
+  "plugin_id": "nsd_projects",
+  "name": "nsd_projects",
+  "display_name": "NSD Projects",
+  "version": "0.18.2",
+  "description": "NSD funds monitoring (CBF): project registry, shared report slots, master import, overview, PM page, API and KPI badges.",
+  "author": "IFRC NSD data team",
+  "license": "MIT"
+}

@@ -1,0 +1,181 @@
+<link rel="stylesheet" href="{{ ga_static_url('css/ga-analysis.css') }}">
+<link rel="stylesheet" href="{{ ga_static_url('css/ga-analysis-export.css') }}">
+
+<div id="panel-global-award"
+     class="explore-panel{% if explore_first_tab != 'global-award' %} hidden{% endif %}"
+     role="tabpanel"
+     aria-labelledby="tab-global-award"
+     data-analysis-url="{{ url_for('global_award.analysis_data') }}">
+
+    <div class="gai-intro">
+        <h3 class="gai-intro__title">{{ _('Global Award') }}</h3>
+        <p class="gai-intro__lead">{{ _('MARC logframe coverage, reporting against the DHR calendar, and progress versus country targets. Charts feed the presentation and the A4 report.') }}</p>
+    </div>
+
+    <div class="gai-toolbar">
+        <label class="gai-field">
+            <span class="gai-field__label">{{ _('Region') }}</span>
+            <select id="gai-region" class="gai-select">
+                <option value="">{{ _('All regions') }}</option>
+            </select>
+        </label>
+        <label class="gai-field">
+            <span class="gai-field__label">{{ _('Country') }}</span>
+            <select id="gai-country" class="gai-select">
+                <option value="">{{ _('All countries') }}</option>
+            </select>
+        </label>
+        <label class="gai-field">
+            <span class="gai-field__label">{{ _('Cycle') }}</span>
+            <select id="gai-cycle" class="gai-select">
+                <option value="">{{ _('All cycles') }}</option>
+            </select>
+        </label>
+        <button type="button" id="gai-refresh" class="gai-btn" aria-label="{{ _('Refresh') }}">
+            <i class="fas fa-rotate-right" aria-hidden="true"></i><span>{{ _('Refresh') }}</span>
+        </button>
+        <div class="gai-toolbar__export">
+            <button type="button" class="gai-btn" data-gai-export="present" data-go-label="{{ _('Start presentation')|forceescape }}">
+                <i class="fas fa-display" aria-hidden="true"></i><span>{{ _('Presentation') }}</span>
+            </button>
+            <button type="button" class="gai-btn" data-gai-export="report" data-go-label="{{ _('Open report')|forceescape }}">
+                <i class="fas fa-file-pdf" aria-hidden="true"></i><span>{{ _('A4 report (PDF)') }}</span>
+            </button>
+        </div>
+    </div>
+
+    {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+    {% call scroll_tab_bar(inner_id='gai-subtabs', wrapper_class='mb-5', aria_label=_('Global Award sections')) %}
+        <button type="button" class="{{ admin_underline_tab_btn_classes(true) }}" id="gai-subtab-overview" role="tab"
+                aria-selected="true" aria-controls="gai-pane-overview" data-gai-pane="overview">{{ _('Overview') }}</button>
+        <button type="button" class="{{ admin_underline_tab_btn_classes(false) }}" id="gai-subtab-logframe" role="tab"
+                aria-selected="false" aria-controls="gai-pane-logframe" data-gai-pane="logframe">{{ _('Logframe') }}</button>
+        <button type="button" class="{{ admin_underline_tab_btn_classes(false) }}" id="gai-subtab-countries" role="tab"
+                aria-selected="false" aria-controls="gai-pane-countries" data-gai-pane="countries">{{ _('Countries') }}</button>
+    {% endcall %}
+
+    <div id="gai-loading" class="gai-state" hidden>
+        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+        <p>{{ _('Loading Global Award data…') }}</p>
+    </div>
+    <div id="gai-error" class="gai-state gai-state--error" hidden>
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        <p id="gai-error-text">{{ _('Could not load Global Award data. Try refreshing.') }}</p>
+    </div>
+    <div id="gai-empty" class="gai-state" hidden>
+        <i class="fas fa-award" aria-hidden="true"></i>
+        <p id="gai-empty-text">{{ _('Import the MARC logframe on the Global Award settings page to open this tab.') }}</p>
+        <p class="gai-empty-link">
+            <a href="{{ url_for('global_award.settings_page') }}">{{ _('Open Global Award settings') }}</a>
+        </p>
+    </div>
+
+    <div id="gai-content" hidden>
+        <p id="gai-note" class="gai-footnote" hidden></p>
+        <div class="gai-kpis" id="gai-kpis"></div>
+        <div id="gai-calendar" class="gai-calendar" hidden></div>
+
+        <div id="gai-pane-overview" class="gai-pane" role="tabpanel" aria-labelledby="gai-subtab-overview">
+            <div class="gai-grid" id="gai-grid-overview"></div>
+        </div>
+        <div id="gai-pane-logframe" class="gai-pane" role="tabpanel" aria-labelledby="gai-subtab-logframe" hidden>
+            <div class="gai-grid" id="gai-grid-logframe"></div>
+            <div class="gai-table-wrap" id="gai-indicator-table"></div>
+        </div>
+        <div id="gai-pane-countries" class="gai-pane" role="tabpanel" aria-labelledby="gai-subtab-countries" hidden>
+            <div class="gai-grid" id="gai-grid-countries"></div>
+            <div class="gai-table-wrap" id="gai-country-table"></div>
+        </div>
+    </div>
+
+    <dialog id="gai-export-dialog" class="gai-dialog gai-export" aria-labelledby="gai-export-title">
+        <form id="gai-export-form">
+            <div class="gai-dialog__head">
+                <h3 id="gai-export-title" class="gai-dialog__title"></h3>
+                <button type="button" class="gai-dialog__close" data-gai-close aria-label="{{ _('Close')|forceescape }}">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <p class="gai-dialog__note">{{ _('Choose what to include. The presentation and the report use the same charts as this tab.') }}</p>
+            <fieldset class="gai-export__fields" id="gai-export-cycles-fields" hidden>
+                <legend class="gai-field__label">{{ _('Cycles to present') }}</legend>
+                <p class="gai-export__hint">{{ _('Active and past cycles are selected by default.') }}</p>
+                <div id="gai-export-cycles"></div>
+            </fieldset>
+            <fieldset class="gai-export__fields" id="gai-export-fields">
+                <legend class="gai-field__label">{{ _('Include') }}</legend>
+                <div id="gai-export-list"></div>
+            </fieldset>
+            <label class="gai-check gai-export__extra" id="gai-export-tables-row">
+                <input type="checkbox" id="gai-export-tables">
+                <span>{{ _('Add the data tables to the report') }}</span>
+            </label>
+            <label class="gai-check gai-export__extra" id="gai-export-ai-row" hidden>
+                <input type="checkbox" id="gai-export-ai">
+                <span>
+                    {{ _('Add AI summaries') }}
+                    <small class="gai-export__hint">{{ _('Sends the figures for the chosen sections to the AI service and adds a short summary, findings and next steps. Review the text before sharing.') }}</small>
+                </span>
+            </label>
+            <p class="gai-export__empty" id="gai-export-empty" hidden></p>
+            <p class="gai-export__status" id="gai-export-status" role="status" aria-live="polite" hidden></p>
+            <div class="gai-export__actions">
+                <button type="button" class="gai-btn" data-gai-close>{{ _('Cancel') }}</button>
+                <button type="submit" class="gai-btn gai-btn--primary" id="gai-export-go"></button>
+            </div>
+        </form>
+    </dialog>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+window.GaAnalysisConfig = {
+    dataUrl: {{ url_for('global_award.analysis_data')|tojson }},
+    aiUrl: {{ url_for('global_award.ai_summary')|tojson }},
+    logoUrl: {{ url_for('static', filename='IFRC_logo_square.svg')|tojson }},
+    pdf: {
+        html2canvas: {{ url_for('static', filename='libs/html2canvas.min.js')|tojson }},
+        jspdf: {{ url_for('static', filename='js/forms/lib/jspdf.umd.min.js')|tojson }},
+        nonce: {{ csp_nonce()|tojson }}
+    },
+    ui: {
+        close: {{ _('Close')|tojson }},
+        refresh: {{ _('Refresh')|tojson }},
+        present: {{ _('Presentation')|tojson }},
+        report: {{ _('A4 report (PDF)')|tojson }},
+        export_print: {{ _('Download PDF')|tojson }},
+        export_pdf_working: {{ _('Preparing PDF…')|tojson }},
+        export_pdf_failed: {{ _('Could not create the PDF. Try again.')|tojson }},
+        export_prev: {{ _('Previous slide')|tojson }},
+        export_next: {{ _('Next slide')|tojson }},
+        export_fullscreen: {{ _('Full screen')|tojson }},
+        export_nothing: {{ _('Nothing to include yet. Load the tab first.')|tojson }},
+        ai_working: {{ _('Writing AI summaries…')|tojson }},
+        ai_failed: {{ _('Could not create the AI summaries. Try again, or untick the option to continue without them.')|tojson }},
+        ai_badge: {{ _('AI-generated summary. Review before sharing.')|tojson }},
+        ai_findings: {{ _('Key findings')|tojson }},
+        ai_attention: {{ _('Needs attention')|tojson }},
+        ai_next_steps: {{ _('Next steps')|tojson }},
+        export_cover_lead: {{ _('MARC logframe progress against country targets and the DHR reporting calendar.')|tojson }},
+        generated: {{ _('Generated')|tojson }},
+        all_regions: {{ _('All regions')|tojson }},
+        all_countries: {{ _('All countries')|tojson }},
+        all_cycles: {{ _('All cycles')|tojson }},
+        cycle_phase_active: {{ _('active')|tojson }},
+        cycle_phase_passed: {{ _('passed')|tojson }},
+        cycle_phase_upcoming: {{ _('upcoming')|tojson }},
+        export_no_cycles: {{ _('Select at least one cycle.')|tojson }},
+        export_failed: {{ _('Could not load the selected cycles. Try again.')|tojson }},
+        overview: {{ _('Overview')|tojson }},
+        logframe: {{ _('Logframe')|tojson }},
+        countries: {{ _('Countries')|tojson }},
+        kpis: {{ _('Headline figures')|tojson }},
+        calendar: {{ _('Reporting calendar')|tojson }},
+        due: {{ _('Country due')|tojson }},
+        page: {{ _('Page')|tojson }},
+        of: {{ _('of')|tojson }}
+    }
+};
+</script>
+<script nonce="{{ csp_nonce() }}" src="{{ url_for('static', filename='libs/apexcharts.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ ga_static_url('js/ga-analysis.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ ga_static_url('js/ga-analysis-export.js') }}"></script>

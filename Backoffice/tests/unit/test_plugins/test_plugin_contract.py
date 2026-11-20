@@ -97,7 +97,7 @@ def test_every_loaded_plugin_serves_a_get_settings_route(app):
             missing.append(plugin_id)
     assert not missing, (
         f"No GET /admin/plugins/<id>/settings route for: {missing}. "
-        "Register one (see plugins/global_awards/routes.py) and guard it with PLUGIN_MANAGE_PERMISSION."
+        "Register one (see plugins/global_award/routes.py) and guard it with PLUGIN_MANAGE_PERMISSION."
     )
 
 

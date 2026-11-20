@@ -1,0 +1,80 @@
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+<div id="panel-nsd_funds"
+     class="explore-panel{% if explore_first_tab != 'nsd_funds' %} hidden{% endif %}"
+     role="tabpanel"
+     aria-labelledby="tab-nsd_funds">
+  {% set show_nsd_subtabs = nsd_show_my_projects_tab and nsd_show_all_projects_tab %}
+  {% set nsd_subtab = nsd_funds_default_subtab|default('my-projects') %}
+
+  {% if show_nsd_subtabs %}
+  {% call scroll_tab_bar(inner_id='nsd-funds-subtabs', aria_label=_('NSD funds sections'), wrapper_class='mb-4') %}
+    <button type="button" role="tab" id="tab-nsd-my-projects" data-tab="my-projects"
+            aria-selected="{{ 'true' if nsd_subtab == 'my-projects' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(nsd_subtab == 'my-projects') }}">
+      <i class="fas fa-user-tie mr-1.5" aria-hidden="true"></i>{{ _('My projects') }}
+      {% if nsd_my_projects %}
+      <span class="ml-2 py-0.5 px-2 text-xs font-medium border border-gray-200 bg-gray-100 text-gray-600">{{ nsd_my_projects|length }}</span>
+      {% endif %}
+    </button>
+    <button type="button" role="tab" id="tab-nsd-all-projects" data-tab="all-projects"
+            aria-selected="{{ 'true' if nsd_subtab == 'all-projects' else 'false' }}"
+            class="{{ admin_underline_tab_btn_classes(nsd_subtab == 'all-projects') }}">
+      <i class="fas fa-table mr-1.5" aria-hidden="true"></i>{{ _('Projects') }}
+      {% if nsd_all_projects %}
+      <span class="ml-2 py-0.5 px-2 text-xs font-medium border border-gray-200 bg-gray-100 text-gray-600">{{ nsd_all_projects|length }}</span>
+      {% endif %}
+    </button>
+  {% endcall %}
+  {% endif %}
+
+  {% if nsd_show_my_projects_tab %}
+  <div id="panel-my-projects"
+       class="nsd-funds-subpanel space-y-3{% if show_nsd_subtabs and nsd_subtab != 'my-projects' %} hidden{% endif %}"
+       role="tabpanel"
+       {% if show_nsd_subtabs %}aria-labelledby="tab-nsd-my-projects"{% endif %}>
+    <p class="text-sm text-gray-600">{{ _('NSD projects where you are named as project manager.') }}</p>
+    {% set projects = nsd_my_projects %}
+    {% set empty_message = _('No projects name you as project manager.') %}
+    {% include "plugins/nsd_projects/nsd_explorer/_projects_table.html" with context %}
+  </div>
+  {% endif %}
+
+  {% if nsd_show_all_projects_tab %}
+  <div id="panel-all-projects"
+       class="nsd-funds-subpanel space-y-3{% if show_nsd_subtabs and nsd_subtab != 'all-projects' %} hidden{% elif nsd_show_my_projects_tab and not show_nsd_subtabs %} hidden{% endif %}"
+       role="tabpanel"
+       {% if show_nsd_subtabs %}aria-labelledby="tab-nsd-all-projects"{% endif %}>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="text-sm text-gray-600">{{ _('All NSD portfolio projects in the core registry.') }}</p>
+      <a href="{{ url_for('assignment_management.manage_assignments', type='project', portfolio='NSD') }}"
+         class="text-sm font-medium text-blue-700 hover:underline whitespace-nowrap">
+        {{ _('Open in Admin → Projects') }} <i class="fas fa-external-link-alt text-xs ml-0.5" aria-hidden="true"></i>
+      </a>
+    </div>
+    {% set projects = nsd_all_projects %}
+    {% set empty_message = _('No NSD projects in the registry yet.') %}
+    {% include "plugins/nsd_projects/nsd_explorer/_projects_table.html" with context %}
+  </div>
+  {% endif %}
+</div>
+
+{% include "admin/projects/_edit_modal.html" %}
+<script src="{{ static_url('js/admin/projects-modal.js') }}" nonce="{{ csp_nonce() }}"></script>
+
+{% if show_nsd_subtabs %}
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  function activateNsdFundsSubtab(tabId) {
+    if (!tabId || !window.AdminUnderlineTabs) return;
+    AdminUnderlineTabs.activateStripTab('#nsd-funds-subtabs', tabId, {
+      panelSelector: '#panel-nsd_funds .nsd-funds-subpanel'
+    });
+  }
+  document.querySelectorAll('#nsd-funds-subtabs [role="tab"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activateNsdFundsSubtab(btn.getAttribute('data-tab'));
+    });
+  });
+})();
+</script>
+{% endif %}

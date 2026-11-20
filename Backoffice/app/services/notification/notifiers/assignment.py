@@ -108,6 +108,7 @@ def _build_assignment_email_sample(
     message_params,
     title_key='notification.assignment_created.title',
     message_key='notification.assignment_created.message',
+    notification_type=NotificationType.assignment_created,
 ):
     """Build a notification-like object for grouped email rendering."""
     from types import SimpleNamespace
@@ -122,7 +123,7 @@ def _build_assignment_email_sample(
         id=None,
         title=title,
         message=message,
-        notification_type=NotificationType.assignment_created,
+        notification_type=notification_type,
         priority='normal',
         related_url=_assignment_created_related_url(aes),
         title_key=title_key,
@@ -178,15 +179,16 @@ def _notification_by_user_id_map(
     return result
 
 
-def _send_grouped_assignment_created_email(
+def _send_grouped_assignment_email(
     focal_user_ids,
     admin_user_ids,
     sample_notification,
     entity_name,
     notification_by_user_id=None,
     outcome=None,
+    attachments=None,
 ):
-    """One email per entity: focal points in To, admins in CC."""
+    """One email per entity: focal points in To, copied admins in CC."""
     from app.services.notification.emails import send_grouped_entity_email
 
     if not focal_user_ids and not admin_user_ids:
@@ -199,6 +201,26 @@ def _send_grouped_assignment_created_email(
         cc_user_ids=admin_user_ids,
         sample_notification=sample_notification,
         entity_name=entity_name,
+        notification_by_user_id=notification_by_user_id,
+        outcome=outcome,
+        attachments=attachments,
+    )
+
+
+def _send_grouped_assignment_created_email(
+    focal_user_ids,
+    admin_user_ids,
+    sample_notification,
+    entity_name,
+    notification_by_user_id=None,
+    outcome=None,
+):
+    """One email per entity: focal points in To, admins in CC."""
+    return _send_grouped_assignment_email(
+        focal_user_ids,
+        admin_user_ids,
+        sample_notification,
+        entity_name,
         notification_by_user_id=notification_by_user_id,
         outcome=outcome,
     )
@@ -914,8 +936,49 @@ def notify_assignment_returned_for_revision(assignment_entity_status):
         override_email_preferences=True,
     )
 
+def _resolve_country_fds_admin_user_id(assignment_entity_status):
+    """Active designated FDS admin for the assignment entity's country, if any."""
+    from app.services.organization.entity_service import EntityService
+
+    aes = assignment_entity_status
+    entity_type = getattr(aes, 'entity_type', None)
+    entity_id = getattr(aes, 'entity_id', None)
+    if not entity_type or entity_id is None:
+        return None
+    try:
+        country = EntityService.get_country_for_entity(entity_type, entity_id)
+    except Exception:
+        current_app.logger.exception(
+            "[NOTIFY] Failed resolving country for FDS admin copy (%s:%s, aes_id=%s)",
+            entity_type,
+            entity_id,
+            getattr(aes, 'id', '?'),
+        )
+        return None
+    if country is None or not getattr(country, 'fds_member_user_id', None):
+        return None
+    fds_user = User.query.get(int(country.fds_member_user_id))
+    if fds_user and fds_user.active:
+        return int(fds_user.id)
+    return None
+
+
+def _assignment_approved_snapshot_attachments(assignment_entity_status):
+    """PDF/Excel snapshot attached to assignment-approved emails. Empty on failure."""
+    from app.services.forms.assignment_email_snapshot import build_assignment_email_attachments
+
+    try:
+        return build_assignment_email_attachments(assignment_entity_status) or []
+    except Exception:
+        current_app.logger.exception(
+            "Failed building assignment email snapshot for approved AES %s",
+            getattr(assignment_entity_status, 'id', None),
+        )
+        return []
+
+
 def notify_assignment_approved(assignment_entity_status):
-    """Notify focal points when an assignment is approved for any entity type."""
+    """Notify focal points when an assignment is approved, and CC the country's FDS admin."""
     aes = assignment_entity_status
     entity_type = aes.entity_type
     entity_id = aes.entity_id
@@ -954,21 +1017,82 @@ def notify_assignment_approved(assignment_entity_status):
         actor_user_id=actor_user_id,
     )
     title_params = {'assignment_title': message_params['assignment_title']}
+    related_url = url_for('assignments.view_assignment', aes_id=aes.id)
+    notification_kwargs = {
+        'entity_type': entity_type,
+        'entity_id': entity_id,
+        'notification_type': NotificationType.assignment_approved,
+        'title_key': 'notification.assignment_approved.title',
+        'title_params': title_params,
+        'message_key': 'notification.assignment_approved.message',
+        'message_params': message_params,
+        'related_object_type': 'assignment',
+        'related_object_id': aes.id,
+        'related_url': related_url,
+        'priority': 'normal',
+    }
 
-    # Create notifications for focal points using translation keys
-    return notify_entity_focal_points(
+    focal_user_ids = (
+        get_assignment_editor_submitter_user_ids_for_entity(entity_type, entity_id)
+        if audience_bucket_enabled(NotificationType.assignment_approved, "focal_points")
+        else []
+    )
+    fds_admin_id = _resolve_country_fds_admin_user_id(aes)
+    # Already a focal point: they are on the To line of their own approval email.
+    cc_ids = [fds_admin_id] if fds_admin_id and fds_admin_id not in set(focal_user_ids) else []
+
+    if not cc_ids:
+        return notify_entity_focal_points(**notification_kwargs) or []
+
+    notifications = []
+    if focal_user_ids:
+        notifications = notify_entity_focal_points(
+            **notification_kwargs,
+            send_email_notifications=False,
+        ) or []
+
+    fds_notifications = create_notification(
+        user_ids=cc_ids,
+        send_email_notifications=False,
+        **{
+            **notification_kwargs,
+            'title_params': dict(title_params),
+            'message_params': dict(message_params),
+        },
+    ) or []
+
+    sample = _build_assignment_email_sample(
+        aes,
+        assigned_form,
+        title_params,
+        message_params,
+        title_key='notification.assignment_approved.title',
+        message_key='notification.assignment_approved.message',
+        notification_type=NotificationType.assignment_approved,
+    )
+    notification_by_user_id = _notification_by_user_id_map(
+        list(notifications) + list(fds_notifications),
         entity_type=entity_type,
         entity_id=entity_id,
-        notification_type=NotificationType.assignment_approved,
-        title_key='notification.assignment_approved.title',
-        title_params=title_params,
-        message_key='notification.assignment_approved.message',
-        message_params=message_params,
-        related_object_type='assignment',
         related_object_id=aes.id,
-        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
-        priority='normal'
+        notification_type=NotificationType.assignment_approved,
     )
+    try:
+        _send_grouped_assignment_email(
+            focal_user_ids=focal_user_ids,
+            admin_user_ids=cc_ids,
+            sample_notification=sample,
+            entity_name=message_params['country'],
+            notification_by_user_id=notification_by_user_id,
+            attachments=_assignment_approved_snapshot_attachments(aes),
+        )
+    except Exception as e:
+        current_app.logger.error(
+            "[NOTIFY] Failed assignment_approved email copying FDS admin for %s:%s: %s",
+            entity_type, entity_id, e, exc_info=True,
+        )
+
+    return list(notifications) + list(fds_notifications)
 
 
 def notify_assignment_reopened(assignment_entity_status):

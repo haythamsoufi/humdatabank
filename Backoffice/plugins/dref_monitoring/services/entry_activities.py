@@ -195,6 +195,21 @@ def _plan_indicators_by_bank(operation):
     return found
 
 
+def _rows_in_section(rows, section_key):
+    """Plan indicators that belong to one form section, so a shared bank id in another sector is untouched."""
+    return [(indicator, group) for indicator, group in rows if form_section_key(group.key) == section_key]
+
+
+def _can_change_targets(operation) -> bool:
+    """Targets are plan figures. Changing one needs DREF data entry on this operation."""
+    try:
+        from plugins.dref_monitoring.access import current_actor
+
+        return current_actor().allows(operation, "enter")
+    except Exception:
+        return False
+
+
 def _target_form_items(assignment, bank_ids: set[int]):
     from app.extensions import db
     from app.models.form_items import FormItem
@@ -219,7 +234,7 @@ def _target_form_items(assignment, bank_ids: set[int]):
 def save_posted_targets(aes, form) -> str | None:
     """Write posted indicator figures onto the plan as targets. No-op outside a DREF cycle."""
     from plugins.dref_monitoring.i18n import translate
-    from plugins.dref_monitoring.services.bounds import people_over_cap
+    from plugins.dref_monitoring.services.bounds import people_over_cap, same_amount
     from plugins.dref_monitoring.services.parsing import as_money
 
     operation, _period = resolve_cycle(aes)
@@ -252,8 +267,13 @@ def save_posted_targets(aes, form) -> str | None:
                 return translate("Enter a number for the target.")
             if target < 0:
                 return translate("Amounts cannot be negative.")
-        rows = by_bank.get(int(item.indicator_bank_id)) or []
-        for indicator, group in rows:
+        rows = _rows_in_section(by_bank.get(int(item.indicator_bank_id)) or [], section_cfg.get("dref_sector_key"))
+        changed = [(indicator, group) for indicator, group in rows if not same_amount(indicator.target, target)]
+        if not changed:
+            continue
+        if not _can_change_targets(operation):
+            return translate("Changing a target needs DREF monitoring data entry access on this operation.")
+        for indicator, group in changed:
             if indicator.standard_code == "PEOPLE_REACHED" and people_over_cap(group.people_targeted, target):
                 return translate(
                     "%(title)s: the people target of %(value)s is above the approved %(limit)s",
@@ -261,7 +281,7 @@ def save_posted_targets(aes, form) -> str | None:
                     value=_target_text(target),
                     limit=_target_text(group.people_targeted),
                 )
-        pending.append((rows, target))
+        pending.append((changed, target))
     if not pending:
         return None
     from app.extensions import db

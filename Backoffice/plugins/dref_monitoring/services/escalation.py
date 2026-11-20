@@ -23,13 +23,46 @@ _TIER_FOR_LEVEL = {
 }
 
 
+_RANK_FOR_LEVEL = {"reminder": 1, "validate": 2, "review": 3, "portfolio": 4}
+
+
+def _country_recipients(operation_id: int, level: str) -> list[int]:
+    """People with a DREF role and access to the operation's country, who are not members.
+
+    Most National Society staff are given country access and a role and are never
+    added as members, so members alone would leave them out of every reminder.
+    """
+    needed = _RANK_FOR_LEVEL.get(level)
+    operation = db.session.get(DrefOperation, operation_id)
+    if needed is None or operation is None or not operation.country_id:
+        return []
+    try:
+        from app.models.core import User, UserEntityPermission
+        from plugins.dref_monitoring.access import actor_for_user, capable_users_query
+
+        scoped = db.session.query(UserEntityPermission.user_id).filter(
+            UserEntityPermission.entity_type == "country",
+            UserEntityPermission.entity_id == operation.country_id,
+        )
+        users = capable_users_query().filter(User.id.in_(scoped)).all()
+        return [user.id for user in users if actor_for_user(user).rank_on(operation) >= needed]
+    except Exception:
+        logger.warning("DREF country recipients lookup failed for operation %s", operation_id, exc_info=True)
+        db.session.rollback()
+        return []
+
+
 def recipients(operation_id: int, level: str) -> list[int]:
     tiers = _TIER_FOR_LEVEL.get(level, set())
-    return [
+    found = [
         row.user_id
         for row in DrefMember.query.filter_by(operation_id=operation_id).all()
         if row.tier in tiers
     ]
+    for user_id in _country_recipients(operation_id, level):
+        if user_id not in found:
+            found.append(user_id)
+    return found
 
 
 def _already_sent(period_id: int, level: str, today: date) -> bool:
@@ -129,11 +162,20 @@ def run_escalation(today: date | None = None, notify=None) -> int:
     settings = schedule_settings()
     notify = notify or default_notify
     sent = 0
-    periods = DrefPeriod.query.filter(DrefPeriod.due_date <= today).all()
+    # Closed operations are never reminded, so leave their periods out of the read.
+    open_periods = DrefPeriod.query.join(DrefOperation, DrefOperation.id == DrefPeriod.operation_id).filter(
+        DrefOperation.operation_status != "closed"
+    )
+    periods = open_periods.filter(DrefPeriod.due_date <= today).all()
     # Also remind before the due date.
-    upcoming = DrefPeriod.query.filter(DrefPeriod.due_date > today).all()
-    for period in list(periods) + list(upcoming):
-        report = DrefReport.query.filter_by(period_id=period.id).first()
+    upcoming = open_periods.filter(DrefPeriod.due_date > today).all()
+    all_periods = list(periods) + list(upcoming)
+    reports = {
+        row.period_id: row
+        for row in DrefReport.query.filter(DrefReport.period_id.in_([period.id for period in all_periods] or [-1])).all()
+    }
+    for period in all_periods:
+        report = reports.get(period.id)
         submitted = report is not None and report.status != "draft"
         level = escalation_level(today, period.due_date, submitted, settings)
         if level is None or _already_sent(period.id, level, today):

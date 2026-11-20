@@ -16,7 +16,7 @@ from flask_login import current_user
 from sqlalchemy import DateTime, and_, case, or_, cast, func, inspect, literal, text, Integer
 from app import db
 from app.utils.security.client_ip import _strip_ip_port, get_client_ip  # noqa: F401 — canonical implementation, re-exported
-from app.utils.common.datetime_helpers import utcnow, ensure_utc, naive_utc
+from app.utils.common.datetime_helpers import ensure_utc, naive_utc, utcnow, viewer_strftime
 from app.utils.database.transactions import atomic, request_transaction_rollback
 from app.models import (
     UserLoginLog, UserActivityLog, UserSessionLog,
@@ -1493,7 +1493,7 @@ def get_user_login_analytics(user_id=None, days=30):
 
     # Daily activity
     for log in logs:
-        date_key = log.timestamp.strftime('%Y-%m-%d')
+        date_key = viewer_strftime(log.timestamp, '%Y-%m-%d')
         if date_key not in analytics['daily_activity']:
             analytics['daily_activity'][date_key] = {'logins': 0, 'failures': 0}
 
@@ -1531,7 +1531,7 @@ def get_user_activity_analytics(user_id=None, days=30):
         analytics['activity_breakdown'][log.activity_type] = analytics['activity_breakdown'].get(log.activity_type, 0) + 1
 
         # Daily activity
-        date_key = log.timestamp.strftime('%Y-%m-%d')
+        date_key = viewer_strftime(log.timestamp, '%Y-%m-%d')
         analytics['daily_activity'][date_key] = analytics['daily_activity'].get(date_key, 0) + 1
 
         # Popular pages

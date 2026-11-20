@@ -2,7 +2,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_status_label.html" import status_label %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
-{% from "plugins/nsd_report_forms/nsd_projects/_macros.html" import date, currency, no_decimal %}
+{% from "plugins/nsd_projects/nsd_projects/_macros.html" import date, currency, no_decimal %}
 
 {% block title %}{{ p.reference }} — {{ _('Project') }}{% endblock %}
 
@@ -316,11 +316,11 @@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-lg font-semibold text-gray-900">{{ _('Implementation monitoring') }}</h2>
-        {% if project.portfolio == 'Global Awards' %}
+        {% if project.portfolio == 'Global Award' %}
         <p class="text-xs text-gray-500 mt-1">{{ _('17–30 Sep 2026 was waived by DHR and is included in the first quarterly report and the final report. The deadline is the country-to-region date.') }}</p>
         {% endif %}
       </div>
-      {% if can_edit and project.portfolio != 'Global Awards' %}
+      {% if can_edit and project.portfolio != 'Global Award' %}
       <form method="post" action="{{ url_for('project_management.project_add_cycle', project_id=project.id) }}" class="flex flex-wrap items-end gap-2">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>

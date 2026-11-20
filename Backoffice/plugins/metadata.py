@@ -13,7 +13,7 @@ PLUGIN_LICENSE = "MIT"
 # Plugins whose author metadata is stamped by FirstPartyPluginMetadata.
 FIRST_PARTY_PLUGIN_IDS = (
     "dref_monitoring",
-    "global_awards",
+    "global_award",
     "interactive_map",
 )
 
@@ -26,10 +26,10 @@ BUNDLED_PLUGIN_IDS = (
     "dref_monitoring",
     "emergency_operations",
     "fdrs",
-    "global_awards",
+    "global_award",
     "ifrc",
     "interactive_map",
-    "nsd_report_forms",
+    "nsd_projects",
     "upr",
 )
 

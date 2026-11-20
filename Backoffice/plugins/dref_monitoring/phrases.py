@@ -587,6 +587,18 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "Estado de las actividades, personas alcanzadas, gasto y valores de indicadores de un período de informe del DREF.",
         "حالة الأنشطة والأشخاص الذين تم الوصول إليهم والنفقات والقيم الفعلية للمؤشرات لفترة تقرير واحدة لصندوق الطوارئ.",
     ),
+    'The workbook is not a valid .xlsx file.': ("Le classeur n'est pas un fichier .xlsx valide.", 'El libro no es un archivo .xlsx válido.', 'المصنف ليس ملف xlsx صالحاً.'),
+    'The workbook is too large once unpacked.': ('Le classeur est trop volumineux une fois décompressé.', 'El libro es demasiado grande una vez descomprimido.', 'حجم المصنف كبير جداً بعد فك الضغط.'),
+    'The workbook has too many rows.': ('Le classeur contient trop de lignes.', 'El libro tiene demasiadas filas.', 'يحتوي المصنف على صفوف كثيرة جداً.'),
+    '%(title)s: amounts cannot be negative.': ('%(title)s : les montants ne peuvent pas être négatifs.', '%(title)s: los importes no pueden ser negativos.', '%(title)s: لا يمكن أن تكون المبالغ سالبة.'),
+    '%(title)s: the end date must be on or after the start date.': ('%(title)s : la date de fin doit être égale ou postérieure à la date de début.', '%(title)s: la fecha de fin debe ser igual o posterior a la fecha de inicio.', '%(title)s: يجب أن يكون تاريخ الانتهاء في تاريخ البدء أو بعده.'),
+    '%(group)s is not an approved sector of this operation. Use the sector names from the GO application.': ("%(group)s n'est pas un secteur approuvé de cette opération. Utilisez les noms de secteurs de la demande GO.", '%(group)s no es un sector aprobado de esta operación. Use los nombres de sector de la solicitud de GO.', '%(group)s ليس قطاعاً معتمداً في هذه العملية. استخدموا أسماء القطاعات الواردة في طلب GO.'),
+    '%(group)s: the budget of %(value)s CHF is above the approved sector budget of %(limit)s CHF': ('%(group)s : le budget de %(value)s CHF dépasse le budget sectoriel approuvé de %(limit)s CHF', '%(group)s: el presupuesto de %(value)s CHF supera el presupuesto sectorial aprobado de %(limit)s CHF', '%(group)s: ميزانية %(value)s فرنك سويسري تتجاوز ميزانية القطاع المعتمدة البالغة %(limit)s فرنك سويسري'),
+    'The workbook budgets add up to %(value)s CHF, above the approved %(limit)s CHF.': ('Les budgets du classeur totalisent %(value)s CHF, au-dessus des %(limit)s CHF approuvés.', 'Los presupuestos del libro suman %(value)s CHF, por encima de los %(limit)s CHF aprobados.', 'مجموع ميزانيات المصنف %(value)s فرنك سويسري، وهو أعلى من %(limit)s فرنك سويسري المعتمدة.'),
+    'Changing a target needs DREF monitoring data entry access on this operation.': ("Modifier une cible exige l'accès à la saisie du suivi DREF sur cette opération.", 'Cambiar una meta requiere acceso a la entrada de datos del seguimiento DREF en esta operación.', 'يتطلب تغيير الهدف صلاحية إدخال بيانات متابعة DREF في هذه العملية.'),
+    'Report not found.': ('Rapport introuvable.', 'Informe no encontrado.', 'التقرير غير موجود.'),
+    'This report is already being sent to GO.': ("Ce rapport est déjà en cours d'envoi à GO.", 'Este informe ya se está enviando a GO.', 'يجري إرسال هذا التقرير إلى GO بالفعل.'),
+    'That user has no DREF monitoring role. Assign a role first.': ("Cet utilisateur n'a aucun rôle de suivi DREF. Attribuez d'abord un rôle.", 'Ese usuario no tiene ningún rol de seguimiento DREF. Asigne primero un rol.', 'ليس لدى هذا المستخدم دور في متابعة DREF. عيّنوا له دوراً أولاً.'),
 }
 
 

@@ -30,7 +30,13 @@ from plugins.dref_monitoring.services.plans import latest_plan, sync_plan
 logger = logging.getLogger(__name__)
 
 _PAGE_LIMIT = 200
-_MAX_PAGES = 50
+_MAX_PAGES = 100
+
+
+class FeedRows(list):
+    """Rows read from the feed. ``truncated`` is set when the page cap stopped the read."""
+
+    truncated = False
 _STATUS_UNSPECIFIED = "unspecified"
 # Session advisory lock shared by the manual job, the 05:10 UTC job, and the CLI.
 # Namespace is next to the digest locks (702348, 702349), clear of the AI-job range.
@@ -72,7 +78,7 @@ def fetch_rows(
     should_stop=None,
 ) -> list[dict]:
     """Read the public dref3 feed. Omit ``operation_status`` to include active and closed rows."""
-    rows: list[dict] = []
+    rows = FeedRows()
     for page in range(_MAX_PAGES):
         if should_stop and should_stop():
             raise GoSyncCancelled()
@@ -125,6 +131,7 @@ def fetch_rows(
                 )
             break
     else:
+        rows.truncated = True
         logger.warning("DREF GO sync stopped after %s rows; more pages may remain.", len(rows))
     return rows
 
@@ -374,6 +381,36 @@ def _country_ids(iso3s: set[str]) -> dict[str, int]:
     return found
 
 
+def _write_appeal(operation, stages, latest, baselines, today) -> bool:
+    """Save one appeal: header, stages, plan, workflow, and project. True when it is new."""
+    previous = None
+    current = next((row for row in baselines.values() if row.is_latest), None)
+    if current is not None:
+        previous = stage_signature(
+            {
+                "total_approved": current.total_approved,
+                "end_date": current.end_date,
+                "sectors": list(current.sectors or []),
+                "application": current.application,
+            }
+        )
+    operation, was_created = _apply_operation(latest, operation)
+    db.session.flush()
+    DrefBaseline.query.filter_by(operation_id=operation.id).update({"is_latest": False})
+    for stage in stages:
+        baseline = _upsert_baseline(operation, stage)
+        baseline.is_latest = stage["go_stage_id"] == latest["go_stage_id"]
+    db.session.flush()
+    latest_row = DrefBaseline.query.filter_by(operation_id=operation.id, is_latest=True).first()
+    if latest_row is not None:
+        sync_plan(operation, latest_row, previous, today)
+    _sync_workflow(operation)
+    from plugins.dref_monitoring.services.project_link import sync_operation_project
+
+    sync_operation_project(operation)
+    return was_created
+
+
 def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, should_stop=None) -> dict:
     """Upsert operations from parsed or raw dref3 rows. Commits once.
 
@@ -400,6 +437,7 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
     created = 0
     updated = 0
     unchanged = 0
+    failed: list[str] = []
     total = len(grouped)
     if progress:
         progress(
@@ -426,35 +464,16 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
         if _appeal_is_current(operation, stages, latest, baselines, country_ids.get((latest.get("country_iso3") or "").upper())):
             unchanged += 1
         else:
-            previous = None
-            current = next((row for row in baselines.values() if row.is_latest), None)
-            if current is not None:
-                previous = stage_signature(
-                    {
-                        "total_approved": current.total_approved,
-                        "end_date": current.end_date,
-                        "sectors": list(current.sectors or []),
-                        "application": current.application,
-                    }
-                )
-            operation, was_created = _apply_operation(latest, operation)
-            db.session.flush()
-            DrefBaseline.query.filter_by(operation_id=operation.id).update({"is_latest": False})
-            for stage in stages:
-                baseline = _upsert_baseline(operation, stage)
-                baseline.is_latest = stage["go_stage_id"] == latest["go_stage_id"]
-            db.session.flush()
-            latest_row = DrefBaseline.query.filter_by(operation_id=operation.id, is_latest=True).first()
-            if latest_row is not None:
-                sync_plan(operation, latest_row, previous, today)
-            _sync_workflow(operation)
-            from plugins.dref_monitoring.services.project_link import sync_operation_project
-
-            sync_operation_project(operation)
-            if was_created:
-                created += 1
-            else:
-                updated += 1
+            try:
+                with db.session.begin_nested():
+                    was_created = _write_appeal(operation, stages, latest, baselines, today)
+                if was_created:
+                    created += 1
+                else:
+                    updated += 1
+            except Exception:
+                logger.warning("DREF GO sync could not save %s", appeal_code, exc_info=True)
+                failed.append(appeal_code)
         if progress and total:
             progress(
                 {
@@ -475,6 +494,8 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
         "updated": updated,
         "unchanged": unchanged,
         "removed": removed,
+        "failed": len(failed),
+        "failed_codes": failed[:20],
         "appeals": len(grouped),
     }
 
@@ -485,6 +506,11 @@ def _drop_non_dref_operations() -> int:
     if not stale:
         return 0
     ids = [row.id for row in stale]
+    # This cascades to plans, reports, and drafts, so name what is removed.
+    logger.warning(
+        "DREF GO sync is removing non-DREF operations with their monitoring data: %s",
+        ", ".join(f"{row.appeal_code} ({row.appeal_type or 'no type'})" for row in stale),
+    )
     for row in stale:
         db.session.expunge(row)
     DrefOperation.query.filter(DrefOperation.id.in_(ids)).delete(synchronize_session=False)
@@ -698,6 +724,11 @@ def _success_text(summary: dict, applications: dict) -> str:
         message += f" {applications['missing']} emergency page(s) are not published."
     if summary.get("removed"):
         message += f" Removed {summary['removed']} non-DREF operation(s)."
+    if summary.get("failed"):
+        codes = ", ".join(summary.get("failed_codes") or [])
+        message += f" {summary['failed']} appeal(s) could not be saved and were skipped: {codes}."
+    if summary.get("truncated"):
+        message += " The GO feed is longer than one sync reads, so some appeals were not read."
     return message
 
 
@@ -721,6 +752,9 @@ def _run_sync(http_get, operation_status, progress, should_stop, log_id: int) ->
     if applications.get("cancelled"):
         raise GoSyncCancelled()
     summary = apply_rows(rows, progress=report, should_stop=should_stop)
+    summary["truncated"] = bool(getattr(rows, "truncated", False))
+    if summary["failed"] and not (summary["created"] or summary["updated"] or summary["unchanged"]):
+        raise RuntimeError(f"Every appeal failed to save: {', '.join(summary['failed_codes'])}")
     message = _success_text(summary, applications)
     _finish_log(log_id, "ok", message, summary["created"], summary["updated"])
     if progress:

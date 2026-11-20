@@ -1584,6 +1584,52 @@ class TestSendGroupedEntityEmail:
         assert log.notification_id == notification.id
         assert log.status == 'sent'
 
+    def test_grouped_email_ccs_and_attaches_snapshot(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+        from types import SimpleNamespace
+
+        snapshot = [('form.pdf', b'%PDF', 'application/pdf')]
+        captured = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with app.app_context():
+            focal = User(email='approved-focal@example.com', name='Focal', active=True)
+            focal.set_password('pw')
+            fds = User(email='approved-fds@example.com', name='FDS Admin', active=True)
+            fds.set_password('pw')
+            db.session.add_all([focal, fds])
+            db.session.flush()
+            for user in (focal, fds):
+                db.session.add(NotificationPreferences(
+                    user_id=user.id,
+                    email_notifications=True,
+                    notification_types_enabled=[],
+                    notification_frequency='instant',
+                ))
+            db.session.commit()
+
+            sample = SimpleNamespace(
+                id=None, title='Approved', message='Approved.',
+                notification_type=NotificationType.assignment_approved,
+                priority='normal', related_url='/assignment/1',
+                title_key=None, message_key=None, title_params=None, message_params=None,
+            )
+
+            with patch('app.services.notification.emails.send_email', side_effect=_capture):
+                result = send_grouped_entity_email(
+                    [focal.id], [fds.id], sample, 'Kenya', attachments=snapshot,
+                )
+
+        assert result is True
+        assert captured['recipients'] == ['approved-focal@example.com']
+        assert captured['cc'] == ['approved-fds@example.com']
+        assert captured['attachments'] == snapshot
+        assert 'snapshot of this assignment is attached' in captured['html']
+
 
 class TestSendAssignmentSubmittedTeamEmail:
     def test_logs_per_recipient_when_send_fails(self, app, db_session):

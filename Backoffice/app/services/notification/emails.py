@@ -1271,6 +1271,7 @@ def build_grouped_entity_email_preview(
     entity_name: str,
     *,
     preview_mode: bool = False,
+    attachments=None,
 ) -> dict:
     """
     Build subject, HTML body, and To/CC recipient lists for a grouped entity email (no send).
@@ -1397,6 +1398,7 @@ def build_grouped_entity_email_preview(
         sample_notification,
         locale=user_locale,
         email_audience=email_audience,
+        attachment_note=_assignment_snapshot_note(user_locale, bool(attachments)),
     )
 
     def _recipient_rows(eligible_ids, emails):
@@ -1442,6 +1444,7 @@ def send_grouped_entity_email(
     entity_name: str,
     notification_by_user_id=None,
     outcome: Optional[dict] = None,
+    attachments=None,
 ) -> bool:
     """
     Send one notification email per entity: focal points in To, admins in CC.
@@ -1473,7 +1476,11 @@ def send_grouped_entity_email(
         return False
 
     preview = build_grouped_entity_email_preview(
-        to_user_ids, cc_user_ids, sample_notification, entity_name
+        to_user_ids,
+        cc_user_ids,
+        sample_notification,
+        entity_name,
+        attachments=attachments,
     )
     if preview.get('empty_reason') or not preview.get('html_body'):
         _set_outcome('skipped', preview.get('empty_reason') or 'No email content to send.')
@@ -1526,6 +1533,7 @@ def send_grouped_entity_email(
             expose_recipients_in_to=True,
             _filtered_out=filtered_out,
             _failure_info=_failure_info,
+            **_assignment_snapshot_send_kwargs(attachments),
         )
         if success:
             current_app.logger.info(

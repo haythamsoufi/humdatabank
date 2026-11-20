@@ -745,8 +745,8 @@ msgstr ""
 msgid "A term with this English source and language already exists."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:42
-#: plugins/global_awards/templates/explorer/tab_panel.html:144
+#: plugins/global_award/templates/explorer/tab_panel.html:42
+#: plugins/global_award/templates/explorer/tab_panel.html:144
 #: plugins/upr/templates/upr/analysis_panel.html:40
 msgid "A4 report (PDF)"
 msgstr ""
@@ -886,7 +886,7 @@ msgstr ""
 msgid "AI-assisted analysis"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:154
+#: plugins/global_award/templates/explorer/tab_panel.html:154
 msgid "AI-generated summary. Review before sharing."
 msgstr ""
 
@@ -1338,7 +1338,7 @@ msgstr ""
 #: app/templates/forms/form_builder/field_mapping.html:351
 #: app/templates/forms/form_builder/partials/_sections_container.html:5
 #: app/templates/forms/form_builder/partials/_variables_modal.html:42
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:12
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:12
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:57
 msgid "Actions"
 msgstr "操作"
@@ -1434,7 +1434,7 @@ msgstr "活动"
 msgid "Active accounts with no successful login"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:102
+#: plugins/global_award/templates/explorer/tab_panel.html:102
 msgid "Active and past cycles are selected by default."
 msgstr ""
 
@@ -1571,7 +1571,7 @@ msgstr ""
 msgid "Add"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:116
+#: plugins/global_award/templates/explorer/tab_panel.html:116
 msgid "Add AI summaries"
 msgstr ""
 
@@ -1887,7 +1887,7 @@ msgstr ""
 msgid "Add term"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:111
+#: plugins/global_award/templates/explorer/tab_panel.html:111
 #: plugins/upr/templates/upr/analysis_panel.html:234
 msgid "Add the data tables to the report"
 msgstr ""
@@ -2444,7 +2444,7 @@ msgstr ""
 msgid "All Months"
 msgstr "上个月"
 
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:48
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:48
 msgid "All NSD portfolio projects in the core registry."
 msgstr ""
 
@@ -2529,13 +2529,13 @@ msgid "All columns"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:470
-#: plugins/global_awards/templates/explorer/tab_panel.html:25
-#: plugins/global_awards/templates/explorer/tab_panel.html:161
+#: plugins/global_award/templates/explorer/tab_panel.html:25
+#: plugins/global_award/templates/explorer/tab_panel.html:161
 msgid "All countries"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:31
-#: plugins/global_awards/templates/explorer/tab_panel.html:162
+#: plugins/global_award/templates/explorer/tab_panel.html:31
+#: plugins/global_award/templates/explorer/tab_panel.html:162
 msgid "All cycles"
 msgstr ""
 
@@ -2634,8 +2634,8 @@ msgstr ""
 msgid "All recorded agent traces"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:19
-#: plugins/global_awards/templates/explorer/tab_panel.html:160
+#: plugins/global_award/templates/explorer/tab_panel.html:19
+#: plugins/global_award/templates/explorer/tab_panel.html:160
 #: plugins/upr/analysis/analysis_labels.py:333
 #: plugins/upr/templates/upr/analysis_panel.html:29
 msgid "All regions"
@@ -3301,7 +3301,7 @@ msgstr ""
 #: app/templates/documents/_document_modal.html:241
 #: plugins/fdrs/templates/compliance/tab_panel.html:146
 #: plugins/fdrs/templates/compliance/tab_panel.html:237
-#: plugins/global_awards/analysis/data.py:611
+#: plugins/global_award/analysis/data.py:611
 msgid "Approved"
 msgstr "已批准"
 
@@ -5131,7 +5131,7 @@ msgstr ""
 #: app/templates/macros/translation_modal.html:248
 #: app/templates/notifications/center.html:208
 #: app/templates/tours/tours.html:17
-#: plugins/global_awards/templates/explorer/tab_panel.html:123
+#: plugins/global_award/templates/explorer/tab_panel.html:123
 #: plugins/ifrc/templates/pb_progress/manage.html:85
 #: plugins/ifrc/templates/pb_progress/tab_panel.html:95
 #: plugins/upr/templates/upr/_manage_tools.html:163
@@ -5675,7 +5675,7 @@ msgstr ""
 msgid "Choose translation service"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:99
+#: plugins/global_award/templates/explorer/tab_panel.html:99
 #: plugins/upr/templates/upr/analysis_panel.html:227
 msgid ""
 "Choose what to include. The presentation and the report use the same charts "
@@ -6055,8 +6055,8 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_variables_modal.html:56
 #: app/templates/forms/form_builder/partials/_versions_modal.html:139
 #: app/templates/macros/modal_shell.html:35 app/templates/tours/tours.html:499
-#: plugins/global_awards/templates/explorer/tab_panel.html:95
-#: plugins/global_awards/templates/explorer/tab_panel.html:141
+#: plugins/global_award/templates/explorer/tab_panel.html:95
+#: plugins/global_award/templates/explorer/tab_panel.html:141
 #: plugins/ifrc/templates/decisions/_i18n.html:102
 #: plugins/ifrc/templates/decisions/workspace.html:50
 #: plugins/upr/analysis/analysis_labels.py:321
@@ -6153,7 +6153,7 @@ msgstr "用户"
 #: app/templates/admin/rbac/roles.html:46
 #: app/templates/admin/validation_dashboard.html:505
 #: app/templates/admin/validation_rules.html:220
-#: plugins/global_awards/analysis/data.py:898
+#: plugins/global_award/analysis/data.py:898
 msgid "Code"
 msgstr "关闭"
 
@@ -7042,13 +7042,13 @@ msgstr ""
 msgid "Could not create account. Please try again."
 msgstr "提交表单失败。请重试。"
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:153
+#: plugins/global_award/templates/explorer/tab_panel.html:153
 msgid ""
 "Could not create the AI summaries. Try again, or untick the option to "
 "continue without them."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:147
+#: plugins/global_award/templates/explorer/tab_panel.html:147
 #: plugins/upr/analysis/analysis_labels.py:330
 msgid "Could not create the PDF. Try again."
 msgstr ""
@@ -7099,8 +7099,8 @@ msgstr ""
 msgid "Could not fetch sync status."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:63
-msgid "Could not load Global Awards data. Try refreshing."
+#: plugins/global_award/templates/explorer/tab_panel.html:63
+msgid "Could not load Global Award data. Try refreshing."
 msgstr ""
 
 #: plugins/upr/analysis/analysis_labels.py:361
@@ -7185,7 +7185,7 @@ msgstr ""
 msgid "Could not load the overview."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:167
+#: plugins/global_award/templates/explorer/tab_panel.html:167
 msgid "Could not load the selected cycles. Try again."
 msgstr ""
 
@@ -7345,11 +7345,11 @@ msgstr ""
 #: app/templates/admin/validation_dashboard.html:108
 #: app/templates/admin/validation_dashboard.html:321
 #: app/templates/admin/validation_dashboard.html:459
-#: plugins/global_awards/analysis/data.py:514
-#: plugins/global_awards/analysis/data.py:595
-#: plugins/global_awards/analysis/data.py:901
-#: plugins/global_awards/templates/explorer/tab_panel.html:54
-#: plugins/global_awards/templates/explorer/tab_panel.html:170
+#: plugins/global_award/analysis/data.py:514
+#: plugins/global_award/analysis/data.py:595
+#: plugins/global_award/analysis/data.py:901
+#: plugins/global_award/templates/explorer/tab_panel.html:54
+#: plugins/global_award/templates/explorer/tab_panel.html:170
 #: plugins/ifrc/templates/decisions/_i18n.html:83
 msgid "Countries"
 msgstr "国家"
@@ -7378,7 +7378,7 @@ msgstr ""
 msgid "Countries by prioritisation group"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:591
+#: plugins/global_award/analysis/data.py:591
 msgid "Countries by region"
 msgstr ""
 
@@ -7483,10 +7483,10 @@ msgstr ""
 #: app/templates/documents/_document_modal.html:69
 #: app/templates/public_submission_export_pdf.html:17
 #: plugins/fdrs/templates/compliance/tab_panel.html:315
-#: plugins/global_awards/analysis/data.py:862
-#: plugins/global_awards/templates/explorer/tab_panel.html:23
+#: plugins/global_award/analysis/data.py:862
+#: plugins/global_award/templates/explorer/tab_panel.html:23
 #: plugins/ifrc/templates/decisions/_i18n.html:10
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:8
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:8
 #: plugins/upr/analysis/analysis_labels.py:145
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:335
 #: plugins/upr/templates/admin/_upr_global_plan_panel.html:66
@@ -7562,7 +7562,7 @@ msgstr ""
 msgid "Country data only"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:173
+#: plugins/global_award/templates/explorer/tab_panel.html:173
 msgid "Country due"
 msgstr ""
 
@@ -7586,7 +7586,7 @@ msgstr ""
 msgid "Country prioritisation scores"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:860
+#: plugins/global_award/analysis/data.py:860
 msgid "Country reporting"
 msgstr ""
 
@@ -8105,7 +8105,7 @@ msgstr ""
 
 #: app/templates/admin/projects/detail.html:360
 #: app/templates/core/dashboard/_project_cycle_nav_inline.html:33
-#: plugins/global_awards/templates/explorer/tab_panel.html:29
+#: plugins/global_award/templates/explorer/tab_panel.html:29
 msgid "Cycle"
 msgstr ""
 
@@ -8113,11 +8113,11 @@ msgstr ""
 msgid "Cycles"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:868
+#: plugins/global_award/analysis/data.py:868
 msgid "Cycles submitted"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:101
+#: plugins/global_award/templates/explorer/tab_panel.html:101
 msgid "Cycles to present"
 msgstr ""
 
@@ -10083,7 +10083,7 @@ msgid "Download Excel Template"
 msgstr ""
 
 #: app/templates/forms/entry_form/validation_summary_progress.html:287
-#: plugins/global_awards/templates/explorer/tab_panel.html:145
+#: plugins/global_award/templates/explorer/tab_panel.html:145
 #: plugins/upr/analysis/analysis_labels.py:327
 msgid "Download PDF"
 msgstr ""
@@ -10640,7 +10640,7 @@ msgstr ""
 #: app/templates/components/ag_grid_i18n_js.html:46
 #: app/templates/core/chat_immersive.html:62
 #: app/templates/forms/form_builder/form_builder.html:508
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:44
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:44
 msgid "Edit"
 msgstr "编辑"
 
@@ -13803,7 +13803,7 @@ msgstr ""
 msgid "Full report only"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:150
+#: plugins/global_award/templates/explorer/tab_panel.html:150
 #: plugins/upr/analysis/analysis_labels.py:302
 #: plugins/upr/analysis/analysis_labels.py:336
 msgid "Full screen"
@@ -13820,7 +13820,7 @@ msgstr ""
 #: app/templates/admin/assignments/_project_registry_fields.html:59
 #: app/templates/admin/projects/_monitoring_panel.html:23
 #: app/templates/admin/projects/list.html:129
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:9
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:9
 msgid "Fund"
 msgstr ""
 
@@ -14028,7 +14028,7 @@ msgstr ""
 msgid "Generate validation questions for the selected scope?"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:159
+#: plugins/global_award/templates/explorer/tab_panel.html:159
 #: plugins/ifrc/templates/decisions/_i18n.html:56
 #: plugins/upr/templates/upr/tab_panel.html:495
 msgid "Generated"
@@ -14145,16 +14145,16 @@ msgstr ""
 msgid "Global"
 msgstr "全球"
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:11
-msgid "Global Awards"
+#: plugins/global_award/templates/explorer/tab_panel.html:11
+msgid "Global Award"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:592
-msgid "Global Awards projects currently in the registry."
+#: plugins/global_award/analysis/data.py:592
+msgid "Global Award projects currently in the registry."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:48
-msgid "Global Awards sections"
+#: plugins/global_award/templates/explorer/tab_panel.html:48
+msgid "Global Award sections"
 msgstr ""
 
 #: app/templates/admin/embed_content/manage_embed_content.html:179
@@ -14515,7 +14515,7 @@ msgstr ""
 msgid "Heading"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:171
+#: plugins/global_award/templates/explorer/tab_panel.html:171
 msgid "Headline figures"
 msgstr ""
 
@@ -15376,10 +15376,10 @@ msgstr ""
 msgid "Import template structure from Excel file"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:183
-#: plugins/global_awards/templates/explorer/tab_panel.html:67
+#: plugins/global_award/analysis/data.py:183
+#: plugins/global_award/templates/explorer/tab_panel.html:67
 msgid ""
-"Import the MARC logframe on the Global Awards settings page to open this "
+"Import the MARC logframe on the Global Award settings page to open this "
 "tab."
 msgstr ""
 
@@ -15505,7 +15505,7 @@ msgstr ""
 #: app/templates/admin/projects/_monitoring_panel.html:247
 #: app/templates/admin/validation_dashboard.html:453
 #: app/templates/admin/validation_dashboard.html:464
-#: plugins/global_awards/analysis/data.py:609
+#: plugins/global_award/analysis/data.py:609
 msgid "In progress"
 msgstr ""
 
@@ -15563,7 +15563,7 @@ msgstr ""
 msgid "In-app summary"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:864
+#: plugins/global_award/analysis/data.py:864
 msgid "In-scope lines"
 msgstr ""
 
@@ -15626,7 +15626,7 @@ msgstr ""
 msgid "Inbox"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:106
+#: plugins/global_award/templates/explorer/tab_panel.html:106
 #: plugins/upr/templates/upr/analysis_panel.html:229
 msgid "Include"
 msgstr ""
@@ -15690,7 +15690,7 @@ msgstr ""
 #: app/templates/admin/projects/detail.html:491
 #: app/templates/admin/validation_dashboard.html:397
 #: app/templates/admin/validation_questions.html:237
-#: plugins/global_awards/analysis/data.py:899
+#: plugins/global_award/analysis/data.py:899
 msgid "Indicator"
 msgstr ""
 
@@ -15835,7 +15835,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/indicator_bank.html:2332
 #: app/templates/admin/templates/new_template.html:455
 #: app/templates/admin/validation_dashboard.html:214
-#: plugins/global_awards/analysis/data.py:583
+#: plugins/global_award/analysis/data.py:583
 msgid "Indicators"
 msgstr "指标"
 
@@ -16458,7 +16458,7 @@ msgstr ""
 msgid "Key docs uploaded"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:155
+#: plugins/global_award/templates/explorer/tab_panel.html:155
 #: plugins/upr/analysis/analysis_labels.py:339
 msgid "Key findings"
 msgstr ""
@@ -16783,7 +16783,7 @@ msgstr ""
 msgid "Latest completed round: {round}."
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:866
+#: plugins/global_award/analysis/data.py:866
 msgid "Latest cycle"
 msgstr ""
 
@@ -17131,8 +17131,8 @@ msgstr ""
 msgid "Load summary first"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:59
-msgid "Loading Global Awards data…"
+#: plugins/global_award/templates/explorer/tab_panel.html:59
+msgid "Loading Global Award data…"
 msgstr ""
 
 #: plugins/upr/templates/upr/analysis_panel.html:179
@@ -17552,20 +17552,20 @@ msgstr ""
 msgid "Log in"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:52
-#: plugins/global_awards/templates/explorer/tab_panel.html:169
+#: plugins/global_award/templates/explorer/tab_panel.html:52
+#: plugins/global_award/templates/explorer/tab_panel.html:169
 msgid "Logframe"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:579
+#: plugins/global_award/analysis/data.py:579
 msgid "Logframe by outcome"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:896
+#: plugins/global_award/analysis/data.py:896
 msgid "Logframe indicators"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:520
+#: plugins/global_award/analysis/data.py:520
 msgid "Logframe lines"
 msgstr ""
 
@@ -17705,17 +17705,17 @@ msgstr "低"
 msgid "Low-quality traces needing review"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:516
+#: plugins/global_award/analysis/data.py:516
 msgid "MARC country projects"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:12
+#: plugins/global_award/templates/explorer/tab_panel.html:12
 msgid ""
 "MARC logframe coverage, reporting against the DHR calendar, and progress "
 "versus country targets. Charts feed the presentation and the A4 report."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:158
+#: plugins/global_award/templates/explorer/tab_panel.html:158
 msgid ""
 "MARC logframe progress against country targets and the DHR reporting "
 "calendar."
@@ -18229,7 +18229,7 @@ msgstr ""
 msgid "Meaningful form and data actions in the selected window"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:580
+#: plugins/global_award/analysis/data.py:580
 msgid "Measurable lines placed under each imported heading."
 msgstr ""
 
@@ -18681,7 +18681,7 @@ msgstr "我的仪表板"
 msgid "My Work"
 msgstr "我的工作"
 
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:14
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:14
 msgid "My projects"
 msgstr ""
 
@@ -18783,7 +18783,7 @@ msgstr ""
 msgid "NS hierarchy sections"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:904
+#: plugins/global_award/analysis/data.py:904
 msgid "NS reported"
 msgstr ""
 
@@ -18795,11 +18795,11 @@ msgstr ""
 msgid "NS-scoped countries"
 msgstr ""
 
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:10
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:10
 msgid "NSD funds sections"
 msgstr ""
 
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:35
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:35
 msgid "NSD projects where you are named as project manager."
 msgstr ""
 
@@ -19039,7 +19039,7 @@ msgstr "需要审查"
 #: app/templates/admin/validation_dashboard.html:484
 #: app/templates/forms/entry_form/entry_form.html:798
 #: app/templates/forms/entry_form/validation_summary_progress.html:307
-#: plugins/global_awards/templates/explorer/tab_panel.html:156
+#: plugins/global_award/templates/explorer/tab_panel.html:156
 msgid "Needs attention"
 msgstr ""
 
@@ -19303,12 +19303,12 @@ msgstr "下一页"
 msgid "Next Page"
 msgstr "下一页"
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:149
+#: plugins/global_award/templates/explorer/tab_panel.html:149
 #: plugins/upr/analysis/analysis_labels.py:335
 msgid "Next slide"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:157
+#: plugins/global_award/templates/explorer/tab_panel.html:157
 msgid "Next steps"
 msgstr ""
 
@@ -19393,9 +19393,9 @@ msgstr ""
 msgid "No FDRS indicator values were found for this analysis."
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:192
+#: plugins/global_award/analysis/data.py:192
 msgid ""
-"No Global Awards country projects yet. Import the logframe to create them."
+"No Global Award country projects yet. Import the logframe to create them."
 msgstr ""
 
 #: plugins/upr/templates/upr/analysis_panel.html:187
@@ -19419,7 +19419,7 @@ msgstr ""
 msgid "No NS sub-branches found matching your search."
 msgstr ""
 
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:55
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:55
 msgid "No NSD projects in the registry yet."
 msgstr ""
 
@@ -20219,12 +20219,12 @@ msgstr ""
 msgid "No projects match these filters."
 msgstr ""
 
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:37
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:37
 msgid "No projects name you as project manager."
 msgstr ""
 
 #: app/templates/admin/projects/list.html:48
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:55
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:55
 msgid "No projects yet."
 msgstr ""
 
@@ -20902,7 +20902,7 @@ msgstr "Not specified"
 #: app/templates/admin/projects/_monitoring_panel.html:242
 #: app/templates/admin/projects/_monitoring_panel.html:247
 #: app/templates/admin/validation_dashboard.html:452
-#: plugins/global_awards/analysis/data.py:608
+#: plugins/global_award/analysis/data.py:608
 msgid "Not started"
 msgstr ""
 
@@ -20982,7 +20982,7 @@ msgstr ""
 msgid "Nothing to compare yet"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:151
+#: plugins/global_award/templates/explorer/tab_panel.html:151
 msgid "Nothing to include yet. Load the tab first."
 msgstr ""
 
@@ -21470,8 +21470,8 @@ msgstr "红十字会与红新月会国际联合会助手"
 msgid "Open Form"
 msgstr "打开表单"
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:69
-msgid "Open Global Awards settings"
+#: plugins/global_award/templates/explorer/tab_panel.html:69
+msgid "Open Global Award settings"
 msgstr ""
 
 #: plugins/upr/templates/admin/_upr_guidance_script.html:19
@@ -21535,7 +21535,7 @@ msgstr ""
 msgid "Open events needing review"
 msgstr ""
 
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:51
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:51
 msgid "Open in Admin → Projects"
 msgstr ""
 
@@ -21586,7 +21586,7 @@ msgstr ""
 msgid "Open questions"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:41
+#: plugins/global_award/templates/explorer/tab_panel.html:41
 #: plugins/upr/templates/upr/analysis_panel.html:39
 msgid "Open report"
 msgstr ""
@@ -22038,8 +22038,8 @@ msgstr ""
 #: app/templates/admin/translations/quality_dashboard.html:57
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:47
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:78
-#: plugins/global_awards/templates/explorer/tab_panel.html:50
-#: plugins/global_awards/templates/explorer/tab_panel.html:168
+#: plugins/global_award/templates/explorer/tab_panel.html:50
+#: plugins/global_award/templates/explorer/tab_panel.html:168
 #: plugins/upr/analysis/analysis_labels.py:43
 #: plugins/upr/analysis/analysis_labels.py:346
 #: plugins/upr/templates/upr/analysis_panel.html:124
@@ -22235,7 +22235,7 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_section_modal.html:59
 #: app/templates/forms/form_builder/partials/_section_modal.html:60
 #: app/templates/forms/form_builder/partials/_sections_container.html:86
-#: plugins/global_awards/templates/explorer/tab_panel.html:174
+#: plugins/global_award/templates/explorer/tab_panel.html:174
 msgid "Page"
 msgstr "页面"
 
@@ -22674,7 +22674,7 @@ msgid "People"
 msgstr "人"
 
 #: app/templates/core/dashboard.html:1312
-#: plugins/global_awards/analysis/data.py:538
+#: plugins/global_award/analysis/data.py:538
 #: plugins/upr/analysis/analysis_labels.py:50
 msgid "People reached"
 msgstr ""
@@ -23403,7 +23403,7 @@ msgstr "预填充值通知"
 msgid "Prefilled value"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:146
+#: plugins/global_award/templates/explorer/tab_panel.html:146
 #: plugins/upr/analysis/analysis_labels.py:329
 msgid "Preparing PDF…"
 msgstr ""
@@ -23438,8 +23438,8 @@ msgstr ""
 msgid "Present"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:39
-#: plugins/global_awards/templates/explorer/tab_panel.html:143
+#: plugins/global_award/templates/explorer/tab_panel.html:39
+#: plugins/global_award/templates/explorer/tab_panel.html:143
 #: plugins/upr/templates/upr/analysis_panel.html:37
 msgid "Presentation"
 msgstr ""
@@ -23609,7 +23609,7 @@ msgstr ""
 msgid "Previous round"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:148
+#: plugins/global_award/templates/explorer/tab_panel.html:148
 #: plugins/upr/analysis/analysis_labels.py:334
 msgid "Previous slide"
 msgstr ""
@@ -23873,7 +23873,7 @@ msgstr ""
 #: app/templates/admin/projects/list.html:12
 #: app/templates/admin/projects/list.html:17
 #: app/templates/admin/settings/manage_settings.html:173
-#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:22
+#: plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:22
 msgid "Projects"
 msgstr ""
 
@@ -24718,7 +24718,7 @@ msgstr ""
 #: app/templates/admin/assignments/_project_registry_fields.html:39
 #: app/templates/admin/projects/detail.html:204
 #: app/templates/admin/projects/list.html:94
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:6
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:6
 msgid "Reference"
 msgstr ""
 
@@ -24749,9 +24749,9 @@ msgstr ""
 #: app/templates/admin/validation_questions.html:44
 #: plugins/fdrs/templates/compliance/tab_panel.html:99
 #: plugins/fdrs/templates/ecr/tab_panel.html:232
-#: plugins/global_awards/templates/explorer/tab_panel.html:34
-#: plugins/global_awards/templates/explorer/tab_panel.html:35
-#: plugins/global_awards/templates/explorer/tab_panel.html:142
+#: plugins/global_award/templates/explorer/tab_panel.html:34
+#: plugins/global_award/templates/explorer/tab_panel.html:35
+#: plugins/global_award/templates/explorer/tab_panel.html:142
 #: plugins/ifrc/templates/decisions/_i18n.html:121
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:43
 #: plugins/upr/templates/upr/analysis_panel.html:32
@@ -24807,8 +24807,8 @@ msgstr "生成的URL"
 
 #: app/templates/admin/projects/_monitoring_panel.html:30
 #: app/templates/admin/validation_dashboard.html:395
-#: plugins/global_awards/analysis/data.py:863
-#: plugins/global_awards/templates/explorer/tab_panel.html:17
+#: plugins/global_award/analysis/data.py:863
+#: plugins/global_award/templates/explorer/tab_panel.html:17
 #: plugins/ifrc/templates/decisions/_i18n.html:8
 #: plugins/upr/analysis/analysis_labels.py:144
 #: plugins/upr/analysis/analysis_labels.py:270
@@ -25324,13 +25324,13 @@ msgstr ""
 msgid "Report years updated."
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:685
-#: plugins/global_awards/analysis/data.py:903
+#: plugins/global_award/analysis/data.py:685
+#: plugins/global_award/analysis/data.py:903
 #: plugins/ifrc/templates/decisions/_i18n.html:94
 msgid "Reported"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:865
+#: plugins/global_award/analysis/data.py:865
 msgid "Reported (latest)"
 msgstr ""
 
@@ -25379,7 +25379,7 @@ msgstr ""
 msgid "Reporting by region"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:172
+#: plugins/global_award/templates/explorer/tab_panel.html:172
 msgid "Reporting calendar"
 msgstr ""
 
@@ -25430,7 +25430,7 @@ msgstr ""
 msgid "Reporting state"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:631
+#: plugins/global_award/analysis/data.py:631
 msgid "Reporting status by cycle"
 msgstr ""
 
@@ -25474,7 +25474,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/analytics/dashboard.html:134
-#: plugins/global_awards/analysis/data.py:526
+#: plugins/global_award/analysis/data.py:526
 #: plugins/upr/analysis/analysis_labels.py:199
 msgid "Reports submitted"
 msgstr ""
@@ -27126,7 +27126,7 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal.html:177
 #: app/templates/forms/form_builder/partials/_item_modal.html:178
 #: app/templates/public_submission_export_pdf.html:38
-#: plugins/global_awards/analysis/data.py:900
+#: plugins/global_award/analysis/data.py:900
 #: plugins/ifrc/templates/pb_progress/manage.html:175
 msgid "Section"
 msgstr "章节"
@@ -27620,7 +27620,7 @@ msgstr ""
 msgid "Select at least one country."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:166
+#: plugins/global_award/templates/explorer/tab_panel.html:166
 msgid "Select at least one cycle."
 msgstr ""
 
@@ -28076,7 +28076,7 @@ msgstr ""
 msgid "Sending…"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:117
+#: plugins/global_award/templates/explorer/tab_panel.html:117
 msgid ""
 "Sends the figures for the chosen sections to the AI service and adds a short"
 " summary, findings and next steps. Review the text before sharing."
@@ -29259,7 +29259,7 @@ msgstr ""
 msgid "Start period"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:38
+#: plugins/global_award/templates/explorer/tab_panel.html:38
 #: plugins/upr/templates/upr/analysis_panel.html:36
 msgid "Start presentation"
 msgstr ""
@@ -29397,10 +29397,10 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_versions_modal.html:12
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:59
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:71
-#: plugins/global_awards/analysis/data.py:867
+#: plugins/global_award/analysis/data.py:867
 #: plugins/ifrc/templates/decisions/_i18n.html:50
 #: plugins/ifrc/templates/pb_progress/manage.html:177
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:10
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:10
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:121
 msgid "Status"
 msgstr "状态"
@@ -29712,7 +29712,7 @@ msgstr ""
 #: app/templates/admin/validation_dashboard.html:461
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:204
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:535
-#: plugins/global_awards/analysis/data.py:610
+#: plugins/global_award/analysis/data.py:610
 #: plugins/ifrc/templates/decisions/_i18n.html:89
 msgid "Submitted"
 msgstr "已提交"
@@ -29881,7 +29881,7 @@ msgstr "会议"
 msgid "Sum"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:675
+#: plugins/global_award/analysis/data.py:675
 msgid ""
 "Sum of country targets from the logframe against the latest numeric value "
 "per country."
@@ -30271,8 +30271,8 @@ msgstr ""
 #: app/templates/admin/assignments/_project_registry_fields.html:112
 #: app/templates/admin/projects/detail.html:297
 #: app/templates/admin/security/dashboard.html:251
-#: plugins/global_awards/analysis/data.py:680
-#: plugins/global_awards/analysis/data.py:902
+#: plugins/global_award/analysis/data.py:680
+#: plugins/global_award/analysis/data.py:902
 msgid "Target"
 msgstr ""
 
@@ -30285,7 +30285,7 @@ msgstr ""
 msgid "Target term is required"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:674
+#: plugins/global_award/analysis/data.py:674
 msgid "Targets vs latest reported"
 msgstr ""
 
@@ -31742,7 +31742,7 @@ msgstr ""
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:66
 #: app/templates/admin/user_management/users.html:372
 #: app/templates/core/layout.html:381
-#: plugins/nsd_report_forms/templates/nsd_explorer/_projects_table.html:7
+#: plugins/nsd_projects/templates/nsd_explorer/_projects_table.html:7
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:53
 msgid "Title"
 msgstr "职位"
@@ -33154,7 +33154,7 @@ msgstr ""
 msgid "Unreviewed machine strings"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:574
+#: plugins/global_award/analysis/data.py:574
 msgid "Unspecified"
 msgstr ""
 
@@ -34107,7 +34107,7 @@ msgid ""
 "[Multilingual] will display in the user's selected language."
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:532
+#: plugins/global_award/analysis/data.py:532
 msgid "Values reported"
 msgstr ""
 
@@ -34971,7 +34971,7 @@ msgstr ""
 msgid "Workflow progress"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:632
+#: plugins/global_award/analysis/data.py:632
 msgid "Workflow status of each country report on the DHR calendar."
 msgstr ""
 
@@ -35015,7 +35015,7 @@ msgid ""
 "skipped by SUM and AVERAGE. Ticks are 0 or 1. Division by zero is blank."
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:152
+#: plugins/global_award/templates/explorer/tab_panel.html:152
 msgid "Writing AI summaries…"
 msgstr ""
 
@@ -35538,7 +35538,7 @@ msgstr ""
 msgid "a dot to select it and see similar indicators"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:163
+#: plugins/global_award/templates/explorer/tab_panel.html:163
 msgid "active"
 msgstr ""
 
@@ -36157,7 +36157,7 @@ msgstr ""
 msgid "last 30 days"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:540
+#: plugins/global_award/analysis/data.py:540
 msgid "latest reported total of indicator 1"
 msgstr ""
 
@@ -36322,7 +36322,7 @@ msgstr ""
 #: app/templates/components/pagination.html:59
 #: app/templates/core/dashboard/_assignments_tab.html:286
 #: app/templates/forms/entry_form/entry_form.html:4116
-#: plugins/global_awards/templates/explorer/tab_panel.html:175
+#: plugins/global_award/templates/explorer/tab_panel.html:175
 msgid "of"
 msgstr "共"
 
@@ -36334,7 +36334,7 @@ msgstr "共"
 msgid "of %(total)s in knowledge base"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:528
+#: plugins/global_award/analysis/data.py:528
 msgid "of assigned cycles"
 msgstr ""
 
@@ -36412,7 +36412,7 @@ msgstr ""
 msgid "part of"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:164
+#: plugins/global_award/templates/explorer/tab_panel.html:164
 msgid "passed"
 msgstr ""
 
@@ -36583,7 +36583,7 @@ msgstr ""
 msgid "running"
 msgstr ""
 
-#: plugins/global_awards/analysis/data.py:534
+#: plugins/global_award/analysis/data.py:534
 msgid "saved answers across cycles"
 msgstr ""
 
@@ -36856,7 +36856,7 @@ msgstr "无限制"
 msgid "unread"
 msgstr ""
 
-#: plugins/global_awards/templates/explorer/tab_panel.html:165
+#: plugins/global_award/templates/explorer/tab_panel.html:165
 msgid "upcoming"
 msgstr ""
 
@@ -36953,7 +36953,7 @@ msgstr ""
 msgid "yet."
 msgstr "。"
 
-#: plugins/global_awards/analysis/data.py:522
+#: plugins/global_award/analysis/data.py:522
 #, python-brace-format
 msgid "{bank} bank · {questions} questions"
 msgstr ""
@@ -37702,7 +37702,7 @@ msgstr ""
 #~ msgstr "可疑"
 
 # [Removed] was:
-# plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:23
+# plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:23
 #~ msgid ""
 #~ "All CBF projects with their status, reporting progress and reports, as in "
 #~ "MOMO. Opens in a new tab."
@@ -37713,12 +37713,12 @@ msgstr ""
 #~ msgstr ""
 
 # [Removed] was:
-# plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:29
+# plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:29
 #~ msgid "NSD master import"
 #~ msgstr ""
 
 # [Removed] was:
-# plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:21
+# plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:21
 #~ msgid "NSD project overview"
 #~ msgstr ""
 
@@ -37729,14 +37729,14 @@ msgstr ""
 #~ msgstr ""
 
 # [Removed] was:
-# plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:13
+# plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:13
 #~ msgid ""
 #~ "The CBF projects where you are named as IFRC project manager, with their "
 #~ "reporting status and deadlines, as in MOMO."
 #~ msgstr ""
 
 # [Removed] was:
-# plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:31
+# plugins/nsd_projects/templates/nsd_explorer/tab_panel.html:31
 #~ msgid ""
 #~ "Upload the master workbook to create or update projects, schedules, access "
 #~ "and report history."

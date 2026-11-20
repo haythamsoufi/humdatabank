@@ -53,7 +53,7 @@ from app.services.projects.service import (
     upsert_project,
 )
 from app.utils.api.api_responses import json_bad_request, json_ok
-from app.utils.common.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utc_sort_key, utcnow
 from app.utils.database.transactions import request_transaction_rollback
 from app.utils.http.request_utils import is_json_request
 
@@ -1118,7 +1118,7 @@ def project_grid_rows(user) -> list:
     for aes in aes_rows:
         if aes.due_date is not None:
             current = due_by_form.get(aes.assigned_form_id)
-            if current is None or aes.due_date < current:
+            if current is None or utc_sort_key(aes.due_date) < utc_sort_key(current):
                 due_by_form[aes.assigned_form_id] = aes.due_date
     grouped: dict = {}
     for project in projects:
@@ -1138,7 +1138,7 @@ def project_grid_rows(user) -> list:
                 if cycle.is_closed:
                     continue
                 due = due_by_form.get(cycle.id)
-                if due is not None and (next_due is None or due < next_due):
+                if due is not None and (next_due is None or utc_sort_key(due) < utc_sort_key(next_due)):
                     next_due = due
         label = _portfolio_label(key)
         country_count = len(members)

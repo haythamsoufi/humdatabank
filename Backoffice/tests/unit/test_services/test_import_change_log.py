@@ -346,7 +346,7 @@ class TestImportRunHistory:
         preview_id = "a" * 32
         import_id = "b" * 32
         publish_import_log(
-            kind="global_awards_logframe",
+            kind="global_award_logframe",
             log_id=preview_id,
             filename="preview.xlsx",
             source="disk",
@@ -359,7 +359,7 @@ class TestImportRunHistory:
             audit=False,
         )
         publish_import_log(
-            kind="global_awards_logframe",
+            kind="global_award_logframe",
             log_id=import_id,
             filename="Annex.xlsx",
             source="upload",
@@ -370,7 +370,7 @@ class TestImportRunHistory:
             log_dir=str(tmp_path),
             audit=False,
         )
-        runs = list_import_runs("global_awards_logframe", log_dir=str(tmp_path))
+        runs = list_import_runs("global_award_logframe", log_dir=str(tmp_path))
         assert [row["log_id"] for row in runs] == [import_id, preview_id]
         assert runs[0]["source_label"] == "Uploaded file"
         assert runs[0]["counts"] == [{"label": "Sections", "value": 4}]

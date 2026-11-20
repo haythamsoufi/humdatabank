@@ -93,6 +93,13 @@ def persist_queued_language_cookie(response):
     return response
 
 
+def get_display_timezone():
+    """Flask-Babel timezone selector: the browsing user's IANA zone, else UTC."""
+    from app.i18n.viewer_timezone import viewer_timezone_name
+
+    return viewer_timezone_name()
+
+
 def get_locale():
     """Determine locale from the dedicated cache, seeding it once when needed."""
     supported_langs = current_app.config.get('SUPPORTED_LANGUAGES', Config.LANGUAGES)

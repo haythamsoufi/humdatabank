@@ -4,10 +4,12 @@ Unit tests for app/utils/common/datetime_helpers.py – 100% coverage target.
 import pytest
 from datetime import datetime, timezone, timedelta
 
+from app.i18n.viewer_timezone import is_valid_timezone_name, viewer_timezone_name
 from app.utils.common.datetime_helpers import (
     ORG_TIMEZONE_LABEL,
     ORG_TIMEZONE_NAME,
     ensure_utc,
+    format_for_viewer,
     format_in_org_timezone,
     get_org_timezone,
     get_timezone,
@@ -18,6 +20,8 @@ from app.utils.common.datetime_helpers import (
     parse_iso_utc,
     utc_sort_key,
     utcnow,
+    viewer_strftime,
+    viewer_wall_clock,
 )
 
 
@@ -190,3 +194,53 @@ class TestUtcSortKey:
         stamp = datetime(2026, 10, 2, 12, 0)
         ordered = sorted([None, stamp], key=lambda value: utc_sort_key(value, empty="max"))
         assert ordered == [stamp, None]
+
+
+@pytest.mark.unit
+class TestViewerTimezone:
+    def test_invalid_names_rejected(self):
+        assert is_valid_timezone_name("Not/A_Real_Zone") is False
+        assert is_valid_timezone_name("UTC;inject") is False
+        assert is_valid_timezone_name("") is False
+
+    def test_common_iana_names_accepted(self):
+        assert is_valid_timezone_name("UTC") is True
+        assert is_valid_timezone_name("America/New_York") is True
+        assert is_valid_timezone_name("Asia/Tokyo") is True
+
+    def test_outside_request_is_utc(self):
+        assert viewer_timezone_name() == "UTC"
+        stamp = datetime(2024, 1, 15, 15, 0, tzinfo=timezone.utc)
+        local = viewer_wall_clock(stamp)
+        assert local.hour == 15
+        assert viewer_strftime(stamp, "%H:%M") == "15:00"
+
+    def test_cookie_shifts_display(self, app):
+        stamp = datetime(2024, 1, 15, 15, 0)  # naive stored UTC
+        with app.test_request_context("/", headers={"Cookie": "hdb_tz=America/New_York"}):
+            assert viewer_timezone_name() == "America/New_York"
+            local = viewer_wall_clock(stamp)
+            assert local.hour == 10
+            text = format_for_viewer(stamp, "time")
+            assert "10" in text
+
+    def test_bad_cookie_stays_utc(self, app):
+        with app.test_request_context("/", headers={"Cookie": "hdb_tz=Not/A_Zone"}):
+            assert viewer_timezone_name() == "UTC"
+
+    def test_babel_selector_formats_in_viewer_zone(self, app):
+        from flask_babel import format_datetime
+
+        stamp = datetime(2024, 7, 15, 12, 0, tzinfo=timezone.utc)
+        with app.test_request_context("/", headers={"Cookie": "hdb_tz=Asia/Tokyo"}):
+            assert format_datetime(stamp, "HH:mm") == "21:00"
+
+    def test_later_timestamp_compares_instants_not_wall_clocks(self):
+        from zoneinfo import ZoneInfo
+
+        from app.utils.api.api_serialization import _later_timestamp
+
+        naive_utc_1230 = datetime(2024, 1, 15, 12, 30)
+        zurich_1300 = datetime(2024, 1, 15, 13, 0, tzinfo=ZoneInfo("Europe/Zurich"))
+        # 13:00 in Zurich is 12:00 UTC, earlier than naive 12:30 UTC.
+        assert _later_timestamp(naive_utc_1230, zurich_1300) is naive_utc_1230

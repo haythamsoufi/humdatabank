@@ -9,6 +9,8 @@ review, which is the last step the assignment workflow can express.
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import event, inspect
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
@@ -93,6 +95,10 @@ def _before_flush(session, flush_context, instances) -> None:
         for aes in changed:
             _apply(session, aes)
     except (OperationalError, ProgrammingError):
+        return
+    except Exception:
+        # The report mirror must never block an unrelated assignment save.
+        logging.getLogger(__name__).warning("DREF assignment sync skipped", exc_info=True)
         return
 
 

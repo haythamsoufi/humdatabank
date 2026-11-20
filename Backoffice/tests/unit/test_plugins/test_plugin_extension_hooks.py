@@ -17,7 +17,7 @@ class TestCliDiscovery:
     def test_registers_commands_from_plugin_cli_modules(self):
         flask_app = Flask("cli-test")
         registered = register_plugin_cli_commands(flask_app)
-        assert "fdrs" in registered and "nsd_report_forms" in registered
+        assert "fdrs" in registered and "nsd_projects" in registered
         assert {"fdrs-public-export", "nsd-migrate-projects", "nsd-migrate-slots"} <= set(flask_app.cli.commands)
 
     def test_missing_plugins_root_is_not_an_error(self, tmp_path):

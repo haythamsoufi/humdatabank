@@ -121,6 +121,8 @@ Group, Activity, Indicator, Indicator type (`process` or `outcome`), Target, Uni
 
 Import replaces the groups on a draft plan. If the latest plan is already validated, import opens a new draft version and the workflow returns to `plan_draft`.
 
+The workbook does not set the approved ceilings. Group names must be sector names from the latest GO stage (for an imminent operation, `Early actions: Health` or `Early response: Health`). The sector budget and people targeted come from GO, and a sheet whose activity budgets add up to more than a sector budget is refused, as is a negative amount or an end date before its start. When GO has sent no sector breakdown, the total of all budgets must stay within the approved allocation. The upload may hold up to 2,000 activity rows.
+
 ## What must stay inside the approved bounds
 
 Bounds are the **latest** approved GO stage, not the original application. An operational update that raises the allocation becomes the new ceiling after the plan is rebased and validated again.
@@ -183,14 +185,14 @@ Community feedback stays on the operation and is not sent to the model. Delay re
 
 While the plugin is active, a job at 06:00 UTC checks reporting periods. Closed operations are skipped. A period with a submitted, validated, or reviewed report is skipped. The same level is not sent again for that period on the same calendar day.
 
-Notifications go to people listed as members of that operation, not to everyone with a role.
+Notifications go to people listed as members of that operation, and to people who hold a DREF role and have access to the operation's country. They do not go to everyone with a role. The level a person receives follows their tier: the membership tier, or the highest DREF role for country access.
 
 | When | Level | Who is notified |
 |---|---|---|
-| From 3 days before the due date through the due date | Reminder | Data entry, validation, delegation review, and portfolio members |
-| 3 or more days late | Validation | Validation, delegation review, and portfolio members |
-| 7 or more days late | Delegation | Delegation review and portfolio members |
-| 14 or more days late | Portfolio | Portfolio members |
+| From 3 days before the due date through the due date | Reminder | Data entry, validation, delegation review, and portfolio |
+| 3 or more days late | Validation | Validation, delegation review, and portfolio |
+| 7 or more days late | Delegation | Delegation review and portfolio |
+| 14 or more days late | Portfolio | Portfolio |
 
 The day counts are the defaults. They can be changed on the settings page. A late period that was still `open` is marked `overdue`. The link in the notification opens the cycle on the country dashboard when the period has one, and uses the cycle due date.
 
@@ -202,7 +204,7 @@ Membership is required for these messages. A user who can see the operation only
 
 A data-entry user can generate **Draft 0** from the operation page, in English, French, Spanish, or Arabic. The daily job also creates one operational update when a reporting period falls due, and one final report when the operation end date is reached. A missed day is caught up for seven days. The same milestone is not drafted twice.
 
-The model is the Databank OpenAI provider (`OPENAI_API_KEY`, `OPENAI_MODEL`). The switch is **off** by default. The payload is the approved request (hazard, dates, allocation, sectors) plus the monitoring history: each period’s activity status, people reached, indicator actuals, expenditure, delay reasons, and change justifications. It does not include names, email addresses, or community feedback. The model returns GO chapter text and must leave a chapter empty when the figures do not support it. The call is stored on the draft: model name, prompt version, a hash of the input, language, and whether the model was actually used. If the call fails, the document is still the tables.
+The model is the Databank OpenAI provider (`OPENAI_API_KEY`, `OPENAI_MODEL`). The switch is **off** by default. The payload is the approved request (hazard, dates, allocation, sectors) plus the monitoring history: each period’s activity status, people reached, indicator actuals, expenditure, delay reasons, change justifications, and the risk register. It does not include user names, email addresses, or community feedback. Notes, delay reasons, justifications, and risks go as typed, so keep names and contact details out of them. The model returns GO chapter text and must leave a chapter empty when the figures do not support it. The call is stored on the draft: model name, prompt version, a hash of the input, language, and whether the model was actually used. If the call fails, the document is still the tables.
 
 The National Society edits the chapters on the draft page. Validation sends the report to GO (`dref-op-update` or `dref-final-report`) as a GO draft for formal processing. That post needs `GO_API_TOKEN`. A failed post stays validated so it can be sent again. Word and PDF stay available either way.
 

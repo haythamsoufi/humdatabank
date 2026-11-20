@@ -11,7 +11,7 @@ from sqlalchemy import case, func, or_
 
 from app import db
 from app.models.api_usage import APIUsage
-from app.utils.common.datetime_helpers import utcnow
+from app.utils.common.datetime_helpers import utcnow, viewer_strftime, viewer_wall_clock
 
 _VAR_RE = re.compile(r"<([^>]+)>|\{([^}]+)\}")
 
@@ -152,10 +152,15 @@ def subtract_months(dt, months: int):
     return dt.replace(year=year, month=month, day=day)
 
 
+def _viewer_now():
+    """Current time in the browsing user's zone (UTC when no zone cookie is set)."""
+    return viewer_wall_clock(utcnow())
+
+
 def _group_counts_by_hour(timestamps) -> dict[str, int]:
     hour_counts: dict[str, int] = {}
     for ts in timestamps:
-        hour = ts.strftime('%H:00')
+        hour = viewer_strftime(ts, '%H:00')
         hour_counts[hour] = hour_counts.get(hour, 0) + 1
     return hour_counts
 
@@ -163,7 +168,7 @@ def _group_counts_by_hour(timestamps) -> dict[str, int]:
 def _group_counts_by_day(timestamps) -> dict[str, int]:
     day_counts: dict[str, int] = {}
     for ts in timestamps:
-        day = ts.strftime('%Y-%m-%d')
+        day = viewer_strftime(ts, '%Y-%m-%d')
         day_counts[day] = day_counts.get(day, 0) + 1
     return day_counts
 
@@ -171,13 +176,13 @@ def _group_counts_by_day(timestamps) -> dict[str, int]:
 def _group_counts_by_month(timestamps) -> dict[str, int]:
     month_counts: dict[str, int] = {}
     for ts in timestamps:
-        month = ts.strftime('%Y-%m')
+        month = viewer_strftime(ts, '%Y-%m')
         month_counts[month] = month_counts.get(month, 0) + 1
     return month_counts
 
 
 def _fill_hourly_buckets(hour_counts: dict[str, int]) -> list[dict[str, Any]]:
-    current = utcnow()
+    current = _viewer_now()
     all_hours = {}
     for i in range(24):
         hour = (current - timedelta(hours=i)).strftime('%H:00')
@@ -186,7 +191,7 @@ def _fill_hourly_buckets(hour_counts: dict[str, int]) -> list[dict[str, Any]]:
 
 
 def _fill_daily_buckets(day_counts: dict[str, int], days: int) -> list[dict[str, Any]]:
-    current = utcnow()
+    current = _viewer_now()
     all_days = {}
     for i in range(days):
         day = (current - timedelta(days=i)).strftime('%Y-%m-%d')
@@ -195,7 +200,7 @@ def _fill_daily_buckets(day_counts: dict[str, int], days: int) -> list[dict[str,
 
 
 def _fill_monthly_buckets(month_counts: dict[str, int], months: int) -> list[dict[str, Any]]:
-    current = utcnow()
+    current = _viewer_now()
     all_months = {}
     for i in range(months):
         month_dt = subtract_months(current, i)

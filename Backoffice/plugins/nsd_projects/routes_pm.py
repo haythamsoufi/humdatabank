@@ -1,0 +1,74 @@
+"""Personal PM pages of the NSD funds monitoring: only the projects that name the signed-in user as IFRC project manager.
+
+Own blueprint (``nsd_pm``, /nsd-funds), separate from the admin overview (``nsd_projects``, /admin/nsd-projects) and
+the import. A project manager only needs the permission ``nsd_funds.pm_overview``; they never get the admin pages.
+
+* GET /nsd-funds/pm-overview        the PM page (MOMO "pm_personal")
+* GET /nsd-funds/projects/<ref>     the project page, 404 unless the project's IFRC project manager email is the user's
+* GET /nsd-funds/links              {"pm_overview": url} for holders of the permission, {} for everybody else
+
+NSD admins (and System Managers) may add ``?as=<email>`` to preview another PM's pages; it is ignored for everyone else.
+"""
+from pathlib import Path
+
+from flask import Blueprint, abort, jsonify, redirect, request, url_for
+from flask_login import current_user
+
+from app.routes.admin.shared import permission_required
+from app.services.organization.authorization_service import AuthorizationService
+
+from app.models.projects import Project
+
+from plugins.nsd_projects.overview import data
+from plugins.nsd_projects.plugin import NSD_ADMIN_PERMISSION, NSD_PM_PERMISSION
+
+_PLUGIN_DIR = Path(__file__).resolve().parent
+
+pm_bp = Blueprint(
+    "nsd_pm",
+    __name__,
+    url_prefix="/nsd-funds",
+    template_folder=str(_PLUGIN_DIR / "templates"),
+)
+
+TEMPLATE_DIR = "plugins/nsd_projects"
+
+
+def _can_preview() -> bool:
+    return AuthorizationService.has_rbac_permission(current_user, NSD_ADMIN_PERMISSION)
+
+
+def _viewing():
+    """(email whose projects are shown, True when an NSD admin previews another PM)."""
+    own = data.norm_email(getattr(current_user, "email", ""))
+    asked = data.norm_email(request.args.get("as"))
+    if asked and _can_preview():
+        return asked, asked != own
+    return own, False
+
+
+@pm_bp.route("/pm-overview", methods=["GET"])
+@permission_required(NSD_PM_PERMISSION)
+def pm_overview():
+    email, _previewing = _viewing()
+    return redirect(url_for("assignment_management.manage_assignments", type="project", manager=email))
+
+
+@pm_bp.route("/projects/<path:reference>", methods=["GET"])
+@permission_required(NSD_PM_PERMISSION)
+def project_detail(reference):
+    email, _previewing = _viewing()
+    project = Project.query.filter_by(reference=reference.strip()).first()
+    if project is None or data.norm_email(project.manager_email) != email:
+        abort(404)
+    return redirect(url_for("project_assignments.project_page", project_id=project.id))
+
+
+@pm_bp.route("/links", methods=["GET"])
+def links():
+    out = {}
+    if current_user.is_authenticated and AuthorizationService.has_rbac_permission(current_user, NSD_PM_PERMISSION):
+        out["pm_overview"] = url_for("nsd_pm.pm_overview")
+    resp = jsonify(out)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp

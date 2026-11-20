@@ -97,6 +97,38 @@ def current_actor() -> Actor:
     return actor_for_user(current_user)
 
 
+_CAPABILITY_CODES = (
+    ENTER_PERMISSION,
+    VALIDATE_PERMISSION,
+    REVIEW_PERMISSION,
+    PORTFOLIO_PERMISSION,
+    MANAGE_PERMISSION,
+)
+
+
+def capable_users_query():
+    """Active users who hold a DREF monitoring permission through a role.
+
+    A membership only narrows a role, so these are the only people it can help.
+    System managers already see every operation and are left out.
+    """
+    from app.extensions import db
+    from app.models.core import User
+    from app.models.rbac import RbacPermission, RbacRolePermission, RbacUserRole
+
+    holders = (
+        db.session.query(RbacUserRole.user_id)
+        .join(RbacRolePermission, RbacRolePermission.role_id == RbacUserRole.role_id)
+        .join(RbacPermission, RbacPermission.id == RbacRolePermission.permission_id)
+        .filter(RbacPermission.code.in_(_CAPABILITY_CODES))
+    )
+    return User.query.filter(User.active.is_(True), User.id.in_(holders))
+
+
+def user_is_capable(user_id: int) -> bool:
+    return capable_users_query().filter_by(id=user_id).first() is not None
+
+
 def operations_for(actor: Actor):
     query = DrefOperation.query
     if actor.is_manager or PORTFOLIO_PERMISSION in actor.permissions:

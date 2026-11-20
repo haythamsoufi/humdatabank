@@ -1252,8 +1252,9 @@ def logout():
     _sid = session.get('session_id')
     if 'session_start' in session:
         with suppress(Exception):
-            session_start = datetime.fromisoformat(session['session_start'])
-            session_duration = int((utcnow() - session_start).total_seconds() / 60)
+            session_start = ensure_utc(datetime.fromisoformat(session['session_start']))
+            if session_start is not None:
+                session_duration = int((utcnow() - session_start).total_seconds() / 60)
 
     # Log logout activity
     log_user_activity(

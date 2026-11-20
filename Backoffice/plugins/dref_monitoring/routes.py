@@ -25,12 +25,6 @@ from plugins.dref_monitoring.constants import (
     VALIDATE_PERMISSION,
 )
 from plugins.dref_monitoring.i18n import current_language, install_dref_gettext, localize_text, translate
-
-
-def _(message, **variables):
-    return translate(message, **variables)
-
-
 from plugins.dref_monitoring.models import (
     DrefActivity,
     DrefChangeRequest,
@@ -53,7 +47,7 @@ from plugins.dref_monitoring.services.drafts import (
     validate_draft,
 )
 from plugins.dref_monitoring.services.go_submit import submit_draft
-from plugins.dref_monitoring.services.llm import complete_with_engine
+from plugins.dref_monitoring.services.llm import complete_with_engine, configured_model
 from plugins.dref_monitoring.services.docx_export import render_docx
 from plugins.dref_monitoring.services.pdf_export import PdfUnavailable, render_pdf
 from plugins.dref_monitoring.services.report_document import build_report, running_header, source_for
@@ -94,6 +88,10 @@ from plugins.dref_monitoring.services.reporting import (
     set_funds,
 )
 
+def _(message, **variables):
+    return translate(message, **variables)
+
+
 bp = Blueprint(PLUGIN_ID, __name__, template_folder="templates")
 
 _ANY = (
@@ -127,10 +125,12 @@ def _install_dref_translations():
 
 @bp.app_template_global("dref_cycle_matrix")
 def dref_cycle_matrix():
+    # A savepoint keeps a failure here from rolling back the rest of the request.
     try:
-        return matrix_for_request()
+        with db.session.begin_nested():
+            return matrix_for_request()
     except Exception:
-        db.session.rollback()
+        current_app.logger.warning("DREF cycle matrix could not be built", exc_info=True)
         return None
 
 
@@ -326,11 +326,16 @@ def operation_page(operation_id: int):
     operation = _operation(operation_id)
     actor = _actor()
     plan = latest_plan(operation.id)
-    if plan is not None:
-        changed = realign_plan_activities(plan.id)
-        changed = refresh_indicator_matches(plan.id) or changed
-        if changed:
-            db.session.commit()
+    # Tidying older plans writes rows, so only someone who can edit the plan triggers it.
+    if plan is not None and actor.allows(operation, "enter"):
+        try:
+            changed = realign_plan_activities(plan.id)
+            changed = refresh_indicator_matches(plan.id) or changed
+            if changed:
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.warning("DREF plan tidy-up failed for operation %s", operation.id, exc_info=True)
     sections = plan_sections(plan.id) if plan is not None else []
     periods = []
     for period in periods_for(operation.id):
@@ -352,6 +357,7 @@ def operation_page(operation_id: int):
         from sqlalchemy import func
 
         from app.models.core import User
+        from plugins.dref_monitoring.access import capable_users_query
 
         if members:
             member_users = {
@@ -359,8 +365,9 @@ def operation_page(operation_id: int):
                 for user in User.query.filter(User.id.in_([member.user_id for member in members])).all()
             }
         if can_review:
+            # Only people who hold a DREF role can act on an operation, so only they are offered.
             system_users = (
-                User.query.filter(User.active.is_(True))
+                capable_users_query()
                 .order_by(func.lower(func.coalesce(User.name, User.email)))
                 .all()
             )
@@ -374,7 +381,7 @@ def operation_page(operation_id: int):
         plan=plan,
         baseline=latest_baseline(operation.id),
         sections=sections,
-        snapshot=monitoring_snapshot(operation),
+        snapshot=monitoring_snapshot(operation, plan, sections),
         activity_types=ACTIVITY_TYPES,
         carried_out_by=CARRIED_OUT_BY,
         available_sectors=sectors_not_on_plan(plan.id) if plan is not None else [],
@@ -627,7 +634,7 @@ def draft_generate_route(operation_id: int):
     operation = _operation(operation_id, "enter")
     kind = request.form.get("kind") or "operational_update"
     language = report_language(request.form.get("language") or current_language())
-    model_name = str(current_app.config.get("OPENAI_MODEL") or "")
+    model_name = configured_model()
     complete = complete_with_engine if ai_enabled() else None
     result = generate_draft(
         operation,

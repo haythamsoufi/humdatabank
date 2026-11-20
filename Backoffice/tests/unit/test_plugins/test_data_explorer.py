@@ -31,7 +31,7 @@ def _plugin_manager_with_pb_progress():
 
 def test_fdrs_plugin_owns_fdrs_explorer_tabs():
     from plugins.fdrs.plugin import FdrsPlugin
-    from plugins.global_awards.plugin import GlobalAwardsPlugin
+    from plugins.global_award.plugin import GlobalAwardPlugin
     from plugins.ifrc.plugin import IfrcPlugin
     from plugins.upr.plugin import UprPlugin
 
@@ -59,11 +59,11 @@ def test_fdrs_plugin_owns_fdrs_explorer_tabs():
     assert upr_tabs["upr-analysis"].legacy_tab_ids == ("upr-impact",)
     assert upr_tabs["upr-analysis"].panel_template == "plugins/upr/upr/analysis_panel.html"
 
-    ga_tabs = {tab.tab_id: tab for tab in GlobalAwardsPlugin().get_data_explorer_tabs()}
-    assert list(ga_tabs) == ["global-awards"]
-    assert ga_tabs["global-awards"].plugin_id == "global_awards"
-    assert ga_tabs["global-awards"].permission == "admin.data_explore.global_awards"
-    assert ga_tabs["global-awards"].panel_template == "plugins/global_awards/explorer/tab_panel.html"
+    ga_tabs = {tab.tab_id: tab for tab in GlobalAwardPlugin().get_data_explorer_tabs()}
+    assert list(ga_tabs) == ["global-award"]
+    assert ga_tabs["global-award"].plugin_id == "global_award"
+    assert ga_tabs["global-award"].permission == "admin.data_explore.global_award"
+    assert ga_tabs["global-award"].panel_template == "plugins/global_award/explorer/tab_panel.html"
 
 
 def test_explore_first_tab_returns_lowest_priority_accessible_tab():
@@ -139,18 +139,18 @@ def test_each_explore_tab_has_its_own_permission_and_user_form_role():
         _permission_catalog,
     )
     from plugins.fdrs.plugin import FdrsPlugin
-    from plugins.global_awards.plugin import GlobalAwardsPlugin
+    from plugins.global_award.plugin import GlobalAwardPlugin
     from plugins.ifrc.plugin import IfrcPlugin
     from plugins.upr.plugin import UprPlugin
 
     tab_permissions = [tab["permission"] for tab in CORE_DATA_EXPLORER_TABS]
-    for plugin in (FdrsPlugin(), UprPlugin(), IfrcPlugin(), GlobalAwardsPlugin()):
+    for plugin in (FdrsPlugin(), UprPlugin(), IfrcPlugin(), GlobalAwardPlugin()):
         tab_permissions.extend(tab.permission for tab in plugin.get_data_explorer_tabs())
 
     assert len(tab_permissions) == len(set(tab_permissions))
 
     roles = list(_baseline_roles(_permission_catalog()))
-    for plugin in (FdrsPlugin(), UprPlugin(), IfrcPlugin(), GlobalAwardsPlugin()):
+    for plugin in (FdrsPlugin(), UprPlugin(), IfrcPlugin(), GlobalAwardPlugin()):
         for role in plugin.get_seed_roles():
             roles.append(
                 {

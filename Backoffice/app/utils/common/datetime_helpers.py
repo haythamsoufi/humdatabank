@@ -149,3 +149,106 @@ def format_in_org_timezone(
     local = ensure_utc(dt).astimezone(get_org_timezone())
     label = suffix if suffix is not None else ORG_TIMEZONE_LABEL
     return f"{local.strftime(fmt)} {label}"
+
+
+def viewer_wall_clock(dt: Optional[datetime]) -> Optional[datetime]:
+    """UTC instant expressed in the browsing user's time zone.
+
+    Outside a request, and before the browser cookie arrives, this is UTC.
+    Naive values are stored UTC wall-clock times.
+    """
+    aware = ensure_utc(dt)
+    if aware is None:
+        return None
+    from app.i18n.viewer_timezone import viewer_timezone_name
+
+    return aware.astimezone(get_timezone(viewer_timezone_name()))
+
+
+def viewer_strftime(dt: Optional[datetime], fmt: str) -> str:
+    """``strftime`` of a stored UTC timestamp in the browsing user's zone."""
+    local = viewer_wall_clock(dt)
+    if local is None:
+        return ""
+    return local.strftime(fmt)
+
+
+def sql_stored_utc_local_date(column):
+    """SQL calendar date of a ``timestamp without time zone`` UTC value.
+
+    PostgreSQL stores those columns as a UTC wall clock. Grouping with
+    ``date(column)`` is the UTC date. When the browser has sent a zone, shift
+    that wall clock into the viewer's zone before taking the date. UTC (and
+    non-PostgreSQL dialects) keep ``date(column)``.
+    """
+    from sqlalchemy import func
+
+    from app.i18n.viewer_timezone import viewer_timezone_name
+
+    tz_name = viewer_timezone_name()
+    if tz_name == "UTC":
+        return func.date(column)
+    return func.date(func.timezone(tz_name, func.timezone("UTC", column)))
+
+
+def _display_locale():
+    try:
+        from flask import has_request_context
+
+        if not has_request_context():
+            return "en"
+        from flask_babel import get_locale
+
+        return get_locale() or "en"
+    except Exception:
+        return "en"
+
+
+def format_for_viewer(dt, kind: str = "datetime") -> str:
+    """Locale-formatted clock time in the browsing user's time zone.
+
+    Pure ``date`` values are calendar dates and are not shifted. Datetimes are
+    instants: naive ones are UTC, aware ones are converted, then shown locally.
+    """
+    from datetime import date as date_cls
+    from datetime import datetime as datetime_cls
+
+    from babel.dates import format_date, format_datetime, format_time
+
+    if not dt:
+        return ""
+    locale = _display_locale()
+    if isinstance(dt, date_cls) and not isinstance(dt, datetime_cls):
+        return format_date(dt, format="medium", locale=locale)
+
+    local = viewer_wall_clock(dt)
+    if local is None:
+        return ""
+    kind = kind or "datetime"
+    if kind == "dateISO":
+        return local.strftime("%Y-%m-%d")
+    if kind in ("date", "dateShort"):
+        return format_date(
+            local.date(),
+            format="short" if kind == "dateShort" else "medium",
+            locale=locale,
+        )
+    if kind == "timeFull":
+        return local.strftime("%H:%M:%S")
+    if kind == "time":
+        return format_time(local.time(), format="short", locale=locale)
+
+    pattern = {
+        "datetimeShort": "short",
+        "datetimeFull": "long",
+        "datetime": "medium",
+    }.get(kind, "medium")
+    from app.i18n.viewer_timezone import viewer_timezone_name
+
+    aware = ensure_utc(dt)
+    return format_datetime(
+        aware,
+        format=pattern,
+        tzinfo=get_timezone(viewer_timezone_name()),
+        locale=locale,
+    )

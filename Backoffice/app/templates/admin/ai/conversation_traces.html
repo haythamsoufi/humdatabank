@@ -166,7 +166,7 @@
                 <div class="step-card trace-step-content {% if step.action == 'finish' %}step-finish{% else %}step-action{% endif %} pl-6 py-3 bg-gray-50 rounded-r-lg">
                     <div class="flex items-center justify-between mb-2">
                         {{ status_label(_('Step') ~ ' ' ~ (step.step or loop.index), 'info') }}
-                        {% if step.timestamp %}<span class="text-xs text-gray-400">{{ step.timestamp }}</span>{% endif %}
+                        {% if step.timestamp %}<span class="text-xs text-gray-400" data-datetime="{{ step.timestamp }}" data-datetime-format="datetimeShort">{{ step.timestamp }}</span>{% endif %}
                     </div>
                     {% if step.thought %}
                     <div class="mb-3">

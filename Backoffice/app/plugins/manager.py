@@ -97,12 +97,6 @@ class PluginLifecycleError(Exception):
 class PluginManager:
     """Manages plugin discovery, loading, and lifecycle."""
 
-    _PLUGIN_ID_ALIASES = {
-        "upr_visuals": "upr",
-        # Standalone P&B plugin folded into IFRC
-        "pb_progress": "ifrc",
-    }
-
     def __init__(self, app: Flask):
         self.app = app
         self.logger = logging.getLogger(__name__)
@@ -444,7 +438,7 @@ class PluginManager:
         self._migrate_legacy_activation_state()
         self._import_legacy_plugin_configs()
 
-        # Resolve which plugins are active using stored tokens (plugin_id or legacy display_name)
+        # Resolve which plugins are active using stored plugin ids
         self._resolve_active_plugins()
 
         # Extract field types from all plugins
@@ -643,27 +637,9 @@ class PluginManager:
                 )
 
     def _resolve_active_plugins(self):
-        """
-        Resolve active plugins from persisted state tokens.
-        Tokens may be plugin_id (new) or display_name/name (legacy).
-        Missing / empty tokens => all plugins inactive.
-        """
-        tokens = set(str(t) for t in (self._raw_active_tokens or []) if str(t).strip())
-        tokens = {self._PLUGIN_ID_ALIASES.get(token, token) for token in tokens}
-        resolved: Set[str] = set()
-        for plugin_id, plugin in self.plugins.items():
-            if plugin_id in tokens:
-                resolved.add(plugin_id)
-                continue
-            # legacy: display_name/name
-            if getattr(plugin, "display_name", "") in tokens:
-                resolved.add(plugin_id)
-                continue
-            if getattr(plugin, "name", "") in tokens:
-                resolved.add(plugin_id)
-                continue
-
-        self.active_plugins = resolved
+        """Activate plugins whose id is in the persisted id list. Empty means all inactive."""
+        tokens = {str(t).strip() for t in (self._raw_active_tokens or []) if str(t).strip()}
+        self.active_plugins = {plugin_id for plugin_id in self.plugins if plugin_id in tokens}
 
     def is_always_on(self, plugin_id: str) -> bool:
         """Activation is always DB-gated; retained for API compatibility (always False)."""

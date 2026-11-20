@@ -62,9 +62,15 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         "emitter_active": True,
         "audiences": ["focal_points"],
         "description": (
-            "Created when an assignment submission is approved relevant to the user."
+            "Created when an assignment submission is approved relevant to the user. "
+            "When the country has a designated FDS admin who is not already a focal point, "
+            "that admin is copied on the same email."
         ),
-        "recipients": "Focal points on the assignment entity.",
+        "recipients": (
+            "Focal points on the assignment entity. "
+            "The country's designated FDS admin is copied (CC) on the approval email "
+            "and receives the same in-app notification, unless they are already a focal point."
+        ),
     },
     {
         "group": "Assignments",

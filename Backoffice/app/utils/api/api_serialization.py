@@ -2214,20 +2214,25 @@ def format_dim_period(assigned_form):
 
 
 def _later_timestamp(current, candidate):
-    """Return the later of two timestamps, ignoring values that are not datetimes."""
+    """Return the later of two timestamps, ignoring values that are not datetimes.
+
+    Naive values are stored UTC. Aware values are converted to UTC before the
+    comparison, so a Zurich wall clock is not treated as later than the same
+    instant stored without a timezone.
+    """
     if not isinstance(candidate, datetime):
         return current
     if current is None:
         return candidate
-    try:
-        candidate_is_later = candidate > current
-    except TypeError:
-        # Workflow stamps may be timezone-aware while saved-answer stamps read
-        # back from the database are naive. Both represent UTC.
-        candidate_is_later = (
-            candidate.replace(tzinfo=None) > current.replace(tzinfo=None)
-        )
-    return candidate if candidate_is_later else current
+    from app.utils.common.datetime_helpers import ensure_utc
+
+    candidate_utc = ensure_utc(candidate)
+    current_utc = ensure_utc(current)
+    if candidate_utc is None:
+        return current
+    if current_utc is None or candidate_utc > current_utc:
+        return candidate
+    return current
 
 
 def _workflow_last_modified(aes):

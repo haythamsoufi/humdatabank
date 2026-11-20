@@ -121,8 +121,11 @@ def _iso(value) -> Optional[str]:
 
 
 def _naive_dt(value) -> dt.datetime:
+    """UTC wall clock for sorting. Aware values are converted before tzinfo is dropped."""
     if isinstance(value, dt.datetime):
-        return value.replace(tzinfo=None)
+        from app.utils.common.datetime_helpers import naive_utc
+
+        return naive_utc(value) or dt.datetime.min
     if isinstance(value, dt.date):
         return dt.datetime.combine(value, dt.time.min)
     return dt.datetime.min

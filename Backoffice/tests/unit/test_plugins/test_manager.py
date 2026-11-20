@@ -679,7 +679,7 @@ class TestResolveActivePlugins:
         pm._resolve_active_plugins()
         assert "plugin_a" in pm.active_plugins
 
-    def test_resolves_legacy_display_name(self, tmp_path):
+    def test_ignores_display_name_token(self, tmp_path):
         pm, plugins_dir = _make_manager(tmp_path)
         _create_plugin_dir(plugins_dir, "plugin_a", display_name="Legacy Display")
 
@@ -689,7 +689,7 @@ class TestResolveActivePlugins:
 
         pm._raw_active_tokens = ["Legacy Display"]
         pm._resolve_active_plugins()
-        assert "plugin_a" in pm.active_plugins
+        assert "plugin_a" not in pm.active_plugins
 
     def test_empty_tokens_means_all_inactive(self, tmp_path):
         pm, plugins_dir = _make_manager(tmp_path)
@@ -1380,25 +1380,21 @@ class TestFindPluginPath:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestResolveActivePluginsNameLegacy:
-    """Cover lines 334-335: legacy `name` property match."""
-
-    def test_resolves_by_name_property(self, tmp_path):
-        """Plugin matched via .name when .plugin_id and .display_name don't match token."""
+class TestResolveActivePluginsNameIgnored:
+    def test_ignores_name_property(self, tmp_path):
+        """A stored display name does not activate a plugin."""
         pm, plugins_dir = _make_manager(tmp_path)
 
-        # Create a mock plugin whose .name differs from .display_name
         mock_plugin = MagicMock()
         mock_plugin.plugin_id = "custom_id"
         mock_plugin.display_name = "Does Not Match"
-        # .name returns something different from display_name
         type(mock_plugin).name = property(lambda self: "Legacy Name")
 
         pm.plugins["custom_id"] = mock_plugin
         pm._raw_active_tokens = ["Legacy Name"]
         pm._resolve_active_plugins()
 
-        assert "custom_id" in pm.active_plugins
+        assert "custom_id" not in pm.active_plugins
 
 
 @pytest.mark.unit

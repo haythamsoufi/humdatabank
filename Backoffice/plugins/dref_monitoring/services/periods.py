@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 from plugins.dref_monitoring.constants import FREQ_BIWEEKLY, FREQ_MONTHLY
+
+MAX_PERIODS = 36
 
 
 def default_frequency(appeal_type: str, timeframe_months: int | None, start: date | None, end: date | None) -> str:
@@ -33,7 +36,7 @@ def build_periods(start: date, end: date, frequency: str) -> list[tuple[int, dat
     periods: list[tuple[int, date, date, date]] = []
     cursor = start
     sequence = 1
-    while cursor <= end and sequence <= 36:
+    while cursor <= end and sequence <= MAX_PERIODS:
         if frequency == FREQ_BIWEEKLY:
             period_end = min(cursor + timedelta(days=13), end)
         else:
@@ -45,6 +48,11 @@ def build_periods(start: date, end: date, frequency: str) -> list[tuple[int, dat
             break
         cursor = period_end + timedelta(days=1)
         sequence += 1
+    else:
+        if cursor <= end:
+            logging.getLogger(__name__).warning(
+                f"DREF reporting periods stopped at {MAX_PERIODS}; the operation runs to {end}."
+            )
     return periods
 
 
@@ -52,16 +60,27 @@ def escalation_level(today: date, due: date, submitted: bool, settings: dict) ->
     """None when nothing is due. Otherwise reminder, validate, review, or portfolio."""
     if submitted:
         return None
-    reminder_days = int(settings.get("reminder_days_before") or 0)
+    reminder_days = _days(settings, "reminder_days_before", 0)
     if today < due - timedelta(days=reminder_days):
         return None
     if today <= due:
         return "reminder"
     late = (today - due).days
-    if late >= int(settings.get("escalation_portfolio_days") or 14):
+    if late >= _days(settings, "escalation_portfolio_days", 14):
         return "portfolio"
-    if late >= int(settings.get("escalation_review_days") or 7):
+    if late >= _days(settings, "escalation_review_days", 7):
         return "review"
-    if late >= int(settings.get("escalation_validate_days") or 3):
+    if late >= _days(settings, "escalation_validate_days", 3):
         return "validate"
     return "reminder"
+
+
+def _days(settings: dict, key: str, default: int) -> int:
+    """Zero is a real setting. Only a missing or invalid value uses the default."""
+    value = settings.get(key)
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default

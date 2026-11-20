@@ -76,9 +76,10 @@ NS_SCOPED_COUNTRY_LIMIT = 5
 
 
 def _as_utc(dt: datetime) -> datetime:
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
+    """Label naive timestamps as UTC and convert aware ones to UTC."""
+    from app.utils.common.datetime_helpers import ensure_utc
+
+    return ensure_utc(dt)
 
 
 def _is_workday(dt: datetime) -> bool:

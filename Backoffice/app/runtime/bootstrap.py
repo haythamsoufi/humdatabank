@@ -7,7 +7,7 @@ from flask import redirect, request, url_for
 from flask_login import current_user
 
 from app.extensions import babel, configure_babel, csrf, db, limiter, login, mail, migrate
-from app.i18n import get_locale
+from app.i18n import get_display_timezone, get_locale
 from app.runtime.logging_config import validate_email_configuration
 from app.utils.api.api_responses import json_error
 from app.utils.http.request_utils import is_json_request
@@ -364,7 +364,11 @@ def init_flask_extensions(app, config_class, startup_start):
             g._login_user = user
 
     configure_babel(app)
-    babel.init_app(app, locale_selector=get_locale)
+    babel.init_app(
+        app,
+        locale_selector=get_locale,
+        timezone_selector=get_display_timezone,
+    )
     from app.services.translation_review.hooks import install_translation_review_hooks
     install_translation_review_hooks(app)
     limiter.init_app(app)

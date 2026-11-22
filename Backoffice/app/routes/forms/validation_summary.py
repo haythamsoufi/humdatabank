@@ -439,6 +439,67 @@ def register_validation_summary_routes(bp) -> None:
             return ""
         return str(v)
 
+    def _matrix_detail_lines_for_entry(
+        fd: FormData,
+        *,
+        template_id: int | None,
+        item_label: str = "",
+        section_name: str = "",
+        subsection_name: str = "",
+    ) -> list:
+        """Labeled matrix cells for the validation summary. Empty when this row is not a matrix."""
+        fi = getattr(fd, "form_item", None) if fd else None
+        if not fi or str(getattr(fi, "item_type", "") or "").lower() != "matrix":
+            return []
+        getter = getattr(fd, "get_display_disagg_data", None)
+        try:
+            disagg = getter() if callable(getter) else getattr(fd, "disagg_data", None)
+        except Exception:
+            disagg = getattr(fd, "disagg_data", None)
+        if not isinstance(disagg, dict) or not disagg:
+            return []
+        try:
+            from plugins.upr.ai.matrix_details import upr_matrix_detail_lines
+
+            lines = upr_matrix_detail_lines(
+                disagg_data=disagg,
+                form_item=fi,
+                template_id=template_id,
+                item_label=item_label or str(getattr(fi, "label", "") or ""),
+                section_name=section_name or "",
+                subsection_name=subsection_name or "",
+            )
+        except Exception as e:
+            logger.debug("matrix detail lines failed: %s", e)
+            lines = []
+        return lines
+
+    def _line_status(validation: dict | None, line_key: str | None) -> tuple[str, str]:
+        """(verdict, status) for one summary row. Matrix lines use their own verdict when present."""
+        v = validation or {}
+        status = str(v.get("status") or "").lower()
+        if line_key:
+            for line in v.get("line_verdicts") or []:
+                if isinstance(line, dict) and str(line.get("key") or "") == str(line_key):
+                    return str(line.get("verdict") or "").lower(), status
+        return str(v.get("verdict") or "").lower(), status
+
+    def _tally_summary_rows(rows: list[dict]) -> dict:
+        counts = {"good": 0, "discrepancy": 0, "uncertain": 0, "failed": 0, "missing": 0}
+        for row in rows:
+            verdict, status = _line_status(row.get("validation"), row.get("line_key"))
+            if not verdict:
+                counts["missing"] += 1
+            elif status == "failed":
+                counts["failed"] += 1
+            elif verdict == "good":
+                counts["good"] += 1
+            elif verdict == "discrepancy":
+                counts["discrepancy"] += 1
+            else:
+                counts["uncertain"] += 1
+        return counts
+
     def _serialize_validation(rec) -> dict:
         if not rec:
             return {}
@@ -471,6 +532,11 @@ def register_validation_summary_routes(bp) -> None:
             "opinion_basis": (opinion_ui.get("basis") if opinion_ui else None),
             "opinion_sources": (opinion_ui.get("sources") if opinion_ui else None),
             "suggestion": suggestion,
+            "line_verdicts": (
+                evidence.get("line_verdicts")
+                if isinstance(evidence, dict) and isinstance(evidence.get("line_verdicts"), list)
+                else None
+            ),
             "provider": getattr(rec, "provider", None),
             "model": getattr(rec, "model", None),
             "updated_at": rec.updated_at.isoformat() if getattr(rec, "updated_at", None) else None,
@@ -532,6 +598,10 @@ def register_validation_summary_routes(bp) -> None:
         issues: list[dict] = []
         field_opinions: list[dict] = []
         rank = {"discrepancy": 0, "failed": 1, "uncertain": 2}
+        opinion_rank = {"failed": 0, "discrepancy": 1, "uncertain": 2, "good": 3}
+        summary_template_id = None
+        with suppress(Exception):
+            summary_template_id = int(assignment_entity_status.assigned_form.template_id)
 
         for fd in entries:
             if not fd:
@@ -557,42 +627,82 @@ def register_validation_summary_routes(bp) -> None:
             status = _token((serialized or {}).get("status"))
             verdict = _token((serialized or {}).get("verdict"))
             summary = str((serialized or {}).get("opinion_summary") or "").strip()
-            if verdict:
-                field_opinions.append({
-                    "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
-                    "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else "",
-                    "verdict": verdict if status != "failed" else "failed",
-                    "opinion_summary": summary[:400],
-                })
-            if not verdict:
-                counts["missing"] += 1
-                continue
-            if status == "failed":
-                counts["failed"] += 1
-                bucket = "failed"
-            elif verdict == "good":
-                counts["good"] += 1
-                continue
-            elif verdict == "discrepancy":
-                counts["discrepancy"] += 1
-                bucket = "discrepancy"
+            parent_label = _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else ""
+            detail_lines = _matrix_detail_lines_for_entry(
+                fd,
+                template_id=summary_template_id,
+                item_label=parent_label,
+            )
+            line_verdicts = (serialized or {}).get("line_verdicts") or []
+            has_line_verdicts = any(isinstance(lv, dict) and lv.get("key") for lv in line_verdicts)
+            # Count each matrix cell once it has been judged, and also while it is still
+            # unrun, so the banner matches the details table. A finished matrix with no
+            # per-cell verdicts stays one row (the parent job).
+            units: list[tuple[str, str, str, str, Any]] = []
+            if detail_lines and (has_line_verdicts or not verdict):
+                by_key = {
+                    str(lv.get("key")): lv
+                    for lv in line_verdicts
+                    if isinstance(lv, dict) and lv.get("key")
+                }
+                blank_parent = not str(parent_label or "").strip() or str(parent_label).strip() in {"-", "—"}
+                for line in detail_lines:
+                    key = str(line.get("key") or "")
+                    line_verdict, line_status = _line_status(serialized, key or None)
+                    lv = by_key.get(key) or {}
+                    line_summary = str(lv.get("opinion") or "").strip() or summary
+                    line_label = str(line.get("label") or key)
+                    full_label = line_label if blank_parent else f"{parent_label}: {line_label}"
+                    units.append((
+                        line_verdict,
+                        line_status,
+                        full_label,
+                        line_summary,
+                        lv.get("confidence", (serialized or {}).get("confidence")),
+                    ))
             else:
-                counts["uncertain"] += 1
-                bucket = "uncertain"
+                units.append((verdict, status, parent_label, summary, (serialized or {}).get("confidence")))
 
-            if len(summary) > 220:
-                summary = summary[:217].rstrip() + "…"
-            issues.append({
-                "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
-                "form_data_id": int(fd.id) if getattr(fd, "id", None) else None,
-                "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else "",
-                "verdict": bucket,
-                "confidence": (serialized or {}).get("confidence"),
-                "opinion_summary": summary,
-            })
+            for unit_verdict, unit_status, unit_label, unit_summary, unit_conf in units:
+                shown_verdict = "failed" if unit_status == "failed" else unit_verdict
+                if shown_verdict:
+                    field_opinions.append({
+                        "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
+                        "label": unit_label,
+                        "verdict": shown_verdict,
+                        "opinion_summary": (unit_summary or "")[:400],
+                    })
+                if not unit_verdict:
+                    counts["missing"] += 1
+                    continue
+                if unit_status == "failed":
+                    counts["failed"] += 1
+                    bucket = "failed"
+                elif unit_verdict == "good":
+                    counts["good"] += 1
+                    continue
+                elif unit_verdict == "discrepancy":
+                    counts["discrepancy"] += 1
+                    bucket = "discrepancy"
+                else:
+                    counts["uncertain"] += 1
+                    bucket = "uncertain"
+
+                clipped = unit_summary or ""
+                if len(clipped) > 220:
+                    clipped = clipped[:217].rstrip() + "…"
+                issues.append({
+                    "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
+                    "form_data_id": int(fd.id) if getattr(fd, "id", None) else None,
+                    "label": unit_label,
+                    "verdict": bucket,
+                    "confidence": unit_conf,
+                    "opinion_summary": clipped,
+                })
 
         issues.sort(key=lambda row: (rank.get(row.get("verdict"), 9), str(row.get("label") or "")))
-        issues = issues[:8]
+        issues = issues[:12]
+        field_opinions.sort(key=lambda row: (opinion_rank.get(row.get("verdict"), 9), str(row.get("label") or "")))
 
         reviewed = counts["good"] + counts["discrepancy"] + counts["uncertain"] + counts["failed"]
         if reviewed == 0:
@@ -638,8 +748,9 @@ def register_validation_summary_routes(bp) -> None:
         tally (``base``) to build the final banner payload. Shared by the plain-JSON
         and streaming overview routes so both return the exact same shape.
         """
-        # Prefer assignment-review issues (flags/highlights) over truncated per-field opinions.
-        issues = base["issues"]
+        # Field checks lead once they have actually run. Structural assignment-review
+        # flags stay in the list (missing emergencies, empty sections) and are the
+        # whole list when nothing has been validated yet.
         review_issues = []
         for row in review.get("whats_not") or []:
             if not isinstance(row, dict) or not row.get("text"):
@@ -652,13 +763,34 @@ def register_validation_summary_routes(bp) -> None:
                 "confidence": None,
                 "opinion_summary": row.get("text"),
             })
-        if review_issues:
-            issues = review_issues[:10]
+        ordered = (base["issues"] + review_issues) if base.get("reviewed") else (review_issues or base["issues"])
+        issues = []
+        seen = set()
+        for row in ordered:
+            key = (
+                row.get("form_item_id"),
+                str(row.get("label") or "").strip(),
+                str(row.get("opinion_summary") or "").strip()[:80],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            issues.append(row)
+            if len(issues) >= 10:
+                break
+
+        counts = base["counts"]
+        # Once fields have been checked, the sentence above the chips has to match
+        # those chips. The assignment-review headline only names a structural gap
+        # ("1 item to double-check") and hides a pile of cell discrepancies.
+        headline = str(review.get("headline") or base["headline"])
+        if base.get("reviewed") and (counts.get("discrepancy") or counts.get("failed")):
+            headline = base["headline"]
 
         return {
-            "counts": base["counts"],
+            "counts": counts,
             "reviewed": base["reviewed"],
-            "headline": str(review.get("headline") or base["headline"]),
+            "headline": headline,
             "issues": issues,
             "overview_figures": review.get("overview_figures") or [],
             "whats_good": review.get("whats_good") or [],
@@ -900,6 +1032,7 @@ def register_validation_summary_routes(bp) -> None:
                     return og
             return (page_id, int(sec.id), None, page_name, sec_name, None)
 
+        summary_template_id = int(form_template.id) if form_template and getattr(form_template, "id", None) else None
         items = []
         for idx, fd in enumerate(entries):
             fi = fd.form_item
@@ -910,25 +1043,53 @@ def register_validation_summary_routes(bp) -> None:
             item_order = 0
             with suppress(Exception):
                 item_order = int(getattr(fi, "order", 0) or 0) if fi else 0
-            items.append({
+            parent_label = _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else ""
+            section_name = str(group_key[4]) if group_key[4] else ""
+            subsection_name = str(group_key[5]) if group_key[5] else ""
+            validation = (
+                _serialize_validation(existing.get(int(fd.id))) if getattr(fd, "id", None)
+                else _serialize_validation(missing_existing.get(int(fd.form_item_id))) if (fd and fd.form_item_id)
+                else None
+            )
+            base = {
                 "_order": idx,
                 "_item_order": item_order,
                 "form_data_id": key,
+                "validation_target": key,
+                "line_key": "",
                 "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
                 "item_type": (getattr(fi, "item_type", None) or "").lower() if fi else "",
-                "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else "",
+                "label": parent_label,
                 "value_display": _value_display(fd),
-                "validation": (
-                    _serialize_validation(existing.get(int(fd.id))) if getattr(fd, "id", None)
-                    else _serialize_validation(missing_existing.get(int(fd.form_item_id))) if (fd and fd.form_item_id)
-                    else None
-                ),
+                "value_is_text": False,
+                "validation": validation,
                 "group_index": group_index,
                 "page_display_name": str(group_key[3]) if group_key[3] else _dash,
-                "section_display_name": str(group_key[4]) if group_key[4] else _dash,
+                "section_display_name": section_name or _dash,
                 # Only set subsection when there is one (section has parent); otherwise None so we don't show "Subsection: —"
-                "subsection_display_name": str(group_key[5]) if group_key[5] else None,
-            })
+                "subsection_display_name": subsection_name or None,
+            }
+            detail_lines = _matrix_detail_lines_for_entry(
+                fd,
+                template_id=summary_template_id,
+                item_label=parent_label,
+                section_name=section_name,
+                subsection_name=subsection_name,
+            )
+            if not detail_lines:
+                items.append(base)
+                continue
+            blank_parent = not str(parent_label or "").strip() or str(parent_label).strip() in {"-", "—"}
+            for line_index, line in enumerate(detail_lines):
+                row = dict(base)
+                row["form_data_id"] = f"{key}__{line_index}"
+                row["line_key"] = line.get("key") or ""
+                line_label = str(line.get("label") or "")
+                row["label"] = line_label if blank_parent else f"{parent_label}: {line_label}"
+                row["value_display"] = line.get("value_display") if line.get("value_display") is not None else line.get("value")
+                row["value_is_text"] = bool(line.get("value_is_text"))
+                row["_line_index"] = line_index
+                items.append(row)
 
         # Group items for template: only emit a header for a level when that level *changed*
         # (so Page appears once, then Section rows under it, not "Page" repeated per section)
@@ -954,21 +1115,7 @@ def register_validation_summary_routes(bp) -> None:
                 prev_page, prev_section, prev_subsection = page_val, section_val, subsection_val
             items_grouped[-1]["items"].append(it)
 
-        initial_counts = {"good": 0, "discrepancy": 0, "uncertain": 0, "failed": 0, "missing": 0}
-        for it in items:
-            v = it.get("validation") or {}
-            status = str(v.get("status") or "").lower()
-            verdict = str(v.get("verdict") or "").lower()
-            if not verdict:
-                initial_counts["missing"] += 1
-            elif status == "failed":
-                initial_counts["failed"] += 1
-            elif verdict == "good":
-                initial_counts["good"] += 1
-            elif verdict == "discrepancy":
-                initial_counts["discrepancy"] += 1
-            else:
-                initial_counts["uncertain"] += 1
+        initial_counts = _tally_summary_rows(items)
         initial_existing = (
             initial_counts["good"]
             + initial_counts["discrepancy"]
@@ -1165,24 +1312,6 @@ def register_validation_summary_routes(bp) -> None:
                         "updated_at": None,
                     }
 
-        def _compute_counts(items_map: dict) -> dict:
-            counts = {"good": 0, "discrepancy": 0, "uncertain": 0, "failed": 0, "missing": 0}
-            for v in items_map.values():
-                status = (v.get("status") or "").lower()
-                verdict = (v.get("verdict") or "").lower()
-                if not verdict:
-                    counts["missing"] += 1
-                    continue
-                if status == "failed":
-                    counts["failed"] += 1
-                elif verdict == "good":
-                    counts["good"] += 1
-                elif verdict == "discrepancy":
-                    counts["discrepancy"] += 1
-                else:
-                    counts["uncertain"] += 1
-            return counts
-
         def _entry_key(fd) -> str:
             if getattr(fd, "id", None):
                 return str(int(fd.id))
@@ -1193,19 +1322,57 @@ def register_validation_summary_routes(bp) -> None:
                 return _serialize_validation(existing.get(int(fd.id)))
             return _serialize_validation(missing_existing.get(int(fd.form_item_id))) if (fd and fd.form_item_id) else {}
 
+        events_template_id = None
+        with suppress(Exception):
+            events_template_id = int(assignment_entity_status.assigned_form.template_id)
+
+        # One progress row per matrix cell (same split as the HTML table). Parent key is the FormData id.
+        display_rows: list[tuple[str, str | None]] = []
+        for fd in entries:
+            parent_key = _entry_key(fd)
+            fi = getattr(fd, "form_item", None)
+            parent_label = _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else ""
+            detail_lines = _matrix_detail_lines_for_entry(
+                fd,
+                template_id=events_template_id,
+                item_label=parent_label,
+            )
+            if detail_lines:
+                for line in detail_lines:
+                    display_rows.append((parent_key, str(line.get("key") or "")))
+            else:
+                display_rows.append((parent_key, None))
+
+        def _compute_counts(items_map: dict) -> dict:
+            counts = {"good": 0, "discrepancy": 0, "uncertain": 0, "failed": 0, "missing": 0}
+            for parent_key, line_key in display_rows:
+                verdict, status = _line_status(items_map.get(parent_key), line_key)
+                if not verdict:
+                    counts["missing"] += 1
+                elif status == "failed":
+                    counts["failed"] += 1
+                elif verdict == "good":
+                    counts["good"] += 1
+                elif verdict == "discrepancy":
+                    counts["discrepancy"] += 1
+                else:
+                    counts["uncertain"] += 1
+            return counts
+
         # Map of fid (int) -> validation dict for real entries (updated when worker returns)
         validations_map: dict[int, dict] = {int(fid): _serialize_validation(existing.get(int(fid))) for fid in form_data_ids}
         # Full map (all entries, string key) for counts and completed
         validations_map_full: dict[str, dict] = {_entry_key(fd): _validation_for_entry(fd) for fd in entries}
 
         def _count_completed() -> int:
-            return sum(
-                1
-                for v in validations_map_full.values()
-                if (v or {}).get("verdict") or ((v or {}).get("status") or "").lower() == "completed"
-            )
+            done = 0
+            for parent_key, line_key in display_rows:
+                verdict, status = _line_status(validations_map_full.get(parent_key), line_key)
+                if verdict or status == "completed":
+                    done += 1
+            return done
 
-        total_entries = len(entries)
+        total_entries = len(display_rows)
 
         def generate():
             # Initial payload: total = all entries (reported + non-reported when included), completed = those with a validation
@@ -1621,13 +1788,28 @@ def register_validation_summary_routes(bp) -> None:
                     by_form_data_id.get(int(entry.id)) if entry and entry.id
                     else missing_by_form_item_id.get(int(fi.id))
                 )
+                field_label = _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs)
+                field_value = entry.disagg_data if (entry and entry.disagg_data is not None) else (entry.value if entry else None)
+                if entry is not None:
+                    detail_lines = _matrix_detail_lines_for_entry(
+                        entry,
+                        template_id=int(form_template.id) if getattr(form_template, "id", None) else None,
+                        item_label=field_label,
+                    )
+                    if detail_lines:
+                        field_value = {
+                            str(line.get("label") or line.get("key")): (
+                                line.get("value_display") if line.get("value_display") is not None else line.get("value")
+                            )
+                            for line in detail_lines
+                        }
                 node["fields_ordered"].append({
                     "form_item_id": int(fi.id),
                     "kind": _item_kind(fi),
-                    "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs),
+                    "label": field_label,
                     "model": fi,
                     "form_data_id": int(entry.id) if entry and entry.id else None,
-                    "value": entry.disagg_data if (entry and entry.disagg_data is not None) else (entry.value if entry else None),
+                    "value": field_value,
                     "data_not_available": bool(entry.data_not_available) if entry else False,
                     "not_applicable": bool(entry.not_applicable) if entry else False,
                     "ai_validation": rec,

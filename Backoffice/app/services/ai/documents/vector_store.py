@@ -225,6 +225,20 @@ class AIVectorStore:
         return query.filter(ts_vector.op("@@")(phrase_ts))
 
     @staticmethod
+    def _document_ids_filter(document_ids):
+        """Match only these documents. An empty list matches nothing."""
+        cleaned = []
+        for item in document_ids or []:
+            try:
+                cleaned.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        unique = sorted(set(cleaned))
+        if not unique:
+            return AIDocument.id == -1
+        return AIDocument.id.in_(unique)
+
+    @staticmethod
     def _country_ids_filter(country_ids: List[int]):
         """Match documents related to any of the given country IDs (OR)."""
         unique_ids = sorted({int(cid) for cid in country_ids if cid is not None})
@@ -619,6 +633,8 @@ class AIVectorStore:
                     )
                 elif "country_id" in filters and filters.get("country_id"):
                     similarity_query = similarity_query.filter(self._country_id_filter(int(filters["country_id"])))
+                if filters.get("document_ids") is not None:
+                    similarity_query = similarity_query.filter(self._document_ids_filter(filters.get("document_ids")))
                 if "document_id" in filters:
                     similarity_query = similarity_query.filter(AIDocument.id == filters["document_id"])
                 if "file_type" in filters:
@@ -730,6 +746,8 @@ class AIVectorStore:
             # Apply country filter if provided
             if filters and filters.get("country_id"):
                 similarity_query = similarity_query.filter(self._country_id_filter(int(filters["country_id"])))
+            if filters and filters.get("document_ids") is not None:
+                similarity_query = similarity_query.filter(self._document_ids_filter(filters.get("document_ids")))
             if filters and filters.get("date_range"):
                 similarity_query = apply_date_range_filter(similarity_query, filters.get("date_range"))
 
@@ -883,6 +901,8 @@ class AIVectorStore:
             query = query.filter(AIVectorStore._country_ids_filter(list(country_ids)))
         elif filters.get("country_id"):
             query = query.filter(AIVectorStore._country_id_filter(int(filters["country_id"])))
+        if filters.get("document_ids") is not None:
+            query = query.filter(AIVectorStore._document_ids_filter(filters.get("document_ids")))
         if filters.get("country_name"):
             query = query.filter(AIVectorStore._country_name_filter(filters["country_name"]))
         if filters.get("file_type"):
@@ -1297,6 +1317,8 @@ class AIVectorStore:
             if filters:
                 if 'document_id' in filters:
                     query = query.filter(AIDocument.id == filters['document_id'])
+                if filters.get("document_ids") is not None:
+                    query = query.filter(self._document_ids_filter(filters.get("document_ids")))
                 if 'file_type' in filters:
                     query = query.filter(AIDocument.file_type == filters['file_type'])
                 if filters.get("country_ids"):
@@ -1367,6 +1389,8 @@ class AIVectorStore:
                 if filters:
                     if 'document_id' in filters:
                         query = query.filter(AIDocument.id == filters['document_id'])
+                    if filters.get("document_ids") is not None:
+                        query = query.filter(self._document_ids_filter(filters.get("document_ids")))
                     if 'file_type' in filters:
                         query = query.filter(AIDocument.file_type == filters['file_type'])
                     if 'country_id' in filters and filters.get('country_id'):

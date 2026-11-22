@@ -179,7 +179,7 @@ A report that is no longer a draft is not reminded or escalated.
 - **Community feedback**: a channel and a summary.
 - **Risks**: a title, likelihood, impact, status (`open`, `mitigated`, `closed`), and a mitigation note.
 
-Community feedback stays on the operation and is not sent to the model. Delay reasons, change justifications, risks, and the monitoring history are included, together with the approved application text, recent public GO field reports, and Databank documents the reader may open. Names, email addresses and contacts are not.
+Community feedback stays on the operation and is not sent to the model. Delay reasons, change justifications, risks, and the monitoring history are included, together with the approved application text, recent public GO field reports, and documents filed for this operation. Names, email addresses and contacts are not.
 
 ## Reminders and escalation
 
@@ -225,7 +225,7 @@ Figures alone cannot answer "What happened?" or "Needs", so the model reads four
 | Monitoring records | The operation: sectors, activity status, people reached, indicator actuals, expenditure, delay reasons, change justifications, risks, procurement, and a progress summary with the counts and percentages worked out in code | Progress, achievements, challenges, summary of changes |
 | The written application | GO emergency page, saved on each approved stage at sync: event description, scope, needs by sector, who is targeted, summary of change, sector progress text, and earlier update summaries. The first stage is kept next to the latest | Situation, needs, targeting, strategy, objective |
 | GO field reports | The newest three public field reports of the emergency and the first one, read from GO when the draft is generated: description, figures, actions by the National Society, IFRC and partners, actions by others. Contacts and authors are dropped | Current situation and figures, who is acting |
-| Databank documents | A hybrid search on the operation's country for the event and for the response, limited to documents the person generating the draft may read. A scheduled draft has no user, so it sees public documents only. Excerpts dated before the event are dropped | Corroborating figures, other actors, ICRC |
+| Documents for this operation | Documents whose title or filename carries this appeal code (the DREF, its operations updates and situation reports). The search then reads those files only, and only the parts the person generating the draft may open. A scheduled draft has no user, so it sees public documents only. Excerpts dated before the event are dropped. Country plans and other emergencies are not searched | Corroborating figures, other actors, ICRC |
 | The previous draft | The newest validated or edited draft of this operation | Carrying forward what is still true |
 
 The sync reads the written application once per stage. A stage stored before this existed is read again on the next sync. New wording on GO is saved on the stage without opening a new plan version.
@@ -238,7 +238,11 @@ Prompt version 3 gives each GO chapter its own instructions: what GO expects the
 
 The call is stored on the draft: model name, prompt version, a hash of the input, the input itself (including the background above), language, and whether the model was actually used. If the call fails, the document is still the tables.
 
-The National Society edits the chapters on the draft page. Validation sends the report to GO (`dref-op-update` or `dref-final-report`) as a GO draft for formal processing. That post needs `GO_API_TOKEN`. A failed post stays validated so it can be sent again. Word and PDF stay available either way.
+The National Society edits the chapters on the draft page, either directly in the preview or on the **Narrative** tab, which has one card per chapter. Both views stay in sync and save automatically. The toolbar covers bold, italic, underline, bullet and numbered lists, undo and redo; a chapter holds up to 6,000 characters. Each card can be reset to the AI text or rewritten by the model for that chapter alone. While the model writes, the chapter shows a shimmer and the text appears as it streams. A drafting run for the whole report shows the same live progress on the operation page and the entry form. Validated drafts and data-only drafts cannot be edited.
+
+People who prefer Word can export the draft, edit it, and use **Import Word file**. The import matches chapters by heading in English, French, Spanish, or Arabic, shows each chapter's words before and after, and stores nothing until the person confirms. Tables and sentences Databank writes from the figures are skipped. Text under headings it does not recognise is listed as ignored, and a file exported from another report gets a warning.
+
+Validation sends the report to GO (`dref-op-update` or `dref-final-report`) as a GO draft for formal processing. That post needs `GO_API_TOKEN`. A failed post stays validated so it can be sent again. Word and PDF stay available either way.
 
 The draft page shows that document. The same document downloads as:
 

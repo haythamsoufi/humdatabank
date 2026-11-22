@@ -69,7 +69,7 @@ def status_payload(job: AIJob) -> dict:
         current = int(meta.get("current") or 0)
     except (TypeError, ValueError):
         current = 0
-    return {
+    payload = {
         "job_id": str(job.id),
         "status": status,
         "status_label": translate(_STATUS_LABELS.get(status, status)),
@@ -81,6 +81,10 @@ def status_payload(job: AIJob) -> dict:
         "summary": summary,
         "error": translate(error) if error else None,
     }
+    # Drafting jobs add the chapter being written, so a page can show the text as it forms.
+    if isinstance(meta.get("live"), dict) and status not in _TERMINAL:
+        payload["live"] = meta["live"]
+    return payload
 
 
 def _expire_job(job_id: str) -> None:
@@ -113,7 +117,7 @@ def _write_progress(job_id: str, payload: dict, *, force: bool = False) -> None:
             if job is None:
                 return
             meta = dict(job.meta or {})
-            for key in ("stage", "message", "message_vars", "current", "total", "percent", "summary"):
+            for key in ("stage", "message", "message_vars", "current", "total", "percent", "summary", "live"):
                 if key not in payload or payload[key] is None:
                     continue
                 meta[key] = payload[key]

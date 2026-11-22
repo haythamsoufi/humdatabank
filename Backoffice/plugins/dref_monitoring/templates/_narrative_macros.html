@@ -1,0 +1,57 @@
+{# Pieces shared by the narrative cards and the editable preview of a draft. #}
+
+{% macro run(r) -%}
+{%- if r.is_break -%}<br>
+{%- else -%}
+{%- if r.href -%}<a href="{{ r.href }}" target="_blank" rel="noopener noreferrer">{%- endif -%}
+{%- if r.color or r.highlight -%}<span style="{%- if r.color -%}color:{{ r.color }}{%- endif -%}{%- if r.color and r.highlight -%};{%- endif -%}{%- if r.highlight -%}background-color:{{ r.highlight }}{%- endif -%}">{%- endif -%}
+{%- if r.strike -%}<s>{%- endif -%}{%- if r.underline -%}<u>{%- endif -%}{%- if r.italic -%}<em>{%- endif -%}{%- if r.bold -%}<strong>{%- endif -%}
+{{- r.text -}}
+{%- if r.bold -%}</strong>{%- endif -%}{%- if r.italic -%}</em>{%- endif -%}{%- if r.underline -%}</u>{%- endif -%}{%- if r.strike -%}</s>{%- endif -%}
+{%- if r.color or r.highlight -%}</span>{%- endif -%}
+{%- if r.href -%}</a>{%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{# A chapter as paragraphs and lists. Text is escaped by Jinja, and only these tags are written. #}
+{% macro rich(nodes) -%}
+{%- for node in nodes -%}
+{%- if node.is_list -%}
+{%- if node.type == 'ol' -%}<ol>{%- else -%}<ul>{%- endif -%}
+{%- for item in node.items -%}<li>{%- for r in item -%}{{ run(r) }}{%- endfor -%}</li>{%- endfor -%}
+{%- if node.type == 'ol' -%}</ol>{%- else -%}</ul>{%- endif -%}
+{%- else -%}
+<p>{%- for r in node.runs -%}{{ run(r) }}{%- endfor -%}</p>
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro %}
+
+{# The spark that travels round a chapter while the model writes it. #}
+{% macro ai_track() -%}
+<div class="dref-ai-track" aria-hidden="true"><span class="dref-ai-track__spark"></span>{% for i in range(6) %}<span class="dref-ai-track__dot"></span>{% endfor %}</div>
+{%- endmacro %}
+
+{# Badge, rewrite form slot and live text of a chapter. Placed above the text of every editable chapter. #}
+{% macro chapter_header_chrome() %}
+{{ ai_track() }}
+<div class="dref-chapter__badge hidden" data-chapter-badge>
+    <span class="dref-ai-badge">
+        <img src="{{ url_for('static', filename='images/ai-spark-icon.svg') }}" alt="" aria-hidden="true">
+        <span data-chapter-badge-text>{{ dref_tr('The model is writing this chapter') }}</span>
+        <span class="dref-ai-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <button type="button" data-act="cancel-ai">{{ dref_tr('Cancel') }}</button>
+    </span>
+</div>
+<div data-chapter-ai-slot></div>
+{% endmacro %}
+
+{# Live text, undo notice and error of a chapter. Placed below the text of every editable chapter. #}
+{% macro chapter_footer_chrome() %}
+<div class="dref-ai-live dref-ai-caret hidden" data-chapter-live aria-live="polite"></div>
+<div class="dref-chapter__undo hidden" role="status" data-chapter-undo>
+    <span data-chapter-undo-text></span>
+    <button type="button" data-act="undo">{{ dref_tr('Undo') }}</button>
+    <button type="button" data-act="keep">{{ dref_tr('Keep') }}</button>
+</div>
+<p class="dref-chapter__error hidden" role="alert" data-chapter-error></p>
+{% endmacro %}

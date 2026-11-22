@@ -136,7 +136,7 @@ def test_selected_sectors_use_emergency_indicators_and_scripted_questions(seeded
     )
     from plugins.dref_monitoring.constants import SECTORS
 
-    assert [section.name for section in sections] == [label for _key, label in SECTORS] + ["Note"]
+    assert [section.name for section in sections] == [label for _key, label in SECTORS] + ["Notes"]
     health_section = next(section for section in sections if section.config["dref_sector_key"] == "health")
     assert health_section.config["entry_render"] == "dref-sector"
     assert health_section.config["entry_key"] == "health"
@@ -168,8 +168,8 @@ def test_selected_sectors_use_emergency_indicators_and_scripted_questions(seeded
 
     report = next(section for section in sections if section.config["dref_sector_key"] == "__report__")
     report_labels = [item.label for item in _items(report.id)]
-    assert report.name == "Note"
-    assert report_labels == ["Note"]
+    assert report.name == "Notes"
+    assert report_labels == ["Notes"]
     assert report.config["entry_render"] == "dref-report"
     assert report.config["hide_section_header"] is True
     assert report.hide_section_header is True
@@ -194,7 +194,7 @@ def test_selected_sectors_use_emergency_indicators_and_scripted_questions(seeded
         .order_by(FormSection.order)
         .all()
     ]
-    assert names == [label for _key, label in SECTORS] + ["Note"]
+    assert names == [label for _key, label in SECTORS] + ["Notes"]
 
 
 def test_a_script_alias_places_indicators_when_the_sector_name_differs(seeded, monkeypatch):
@@ -516,4 +516,79 @@ def test_the_assignment_form_omits_indicators_that_are_not_on_the_plan(seeded):
 
     kept = [item.indicator_bank_id for item in health_section.fields_ordered if item.item_type == "indicator"]
     assert kept == [reached.id]
+    assert shelter_section.fields_ordered == []
+
+
+def test_a_generated_people_reached_plan_does_not_list_the_emergency_catalog(seeded):
+    from app.models.assignments import AssignmentEntityStatus
+    from plugins.dref_monitoring.services.entry_activities import limit_entry_fields, plan_indicator_filter
+
+    _country, user = seeded
+    health = Sector(name="Health", display_order=1, is_active=True)
+    db.session.add(health)
+    db.session.flush()
+    db.session.add_all(
+        [
+            IndicatorBank(
+                name="DREF catalog people reached with health services",
+                type="number",
+                unit="People",
+                emergency=True,
+                archived=False,
+                sector={"primary": health.id},
+            ),
+            IndicatorBank(
+                name="DREF catalog households receiving hygiene kits",
+                type="number",
+                unit="Households",
+                emergency=True,
+                archived=False,
+                sector={"primary": health.id},
+            ),
+        ]
+    )
+    db.session.commit()
+    apply_rows([_row(id="Dref-catalog", appeal_code="MDRCAT01")])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRCAT01").one()
+    assert validate_plan(operation, _manager(user.id), date(2026, 1, 10)) is None
+
+    from plugins.dref_monitoring.services.plans import (
+        go_source_notices,
+        groups_for,
+        indicators_for_group,
+        latest_baseline,
+        latest_plan,
+    )
+
+    people = indicators_for_group(
+        next(row.id for row in groups_for(latest_plan(operation.id).id) if row.key == "health")
+    )
+    assert people == []
+    notices = go_source_notices(latest_baseline(operation.id))
+    assert len(notices) == 1
+    assert "did not publish the planned indicators" in notices[0]
+
+    shown = plan_indicator_filter(operation)
+    assert shown["filter_indicators"] is True
+    assert shown["indicator_bank_ids"] == []
+    assert "health" in shown["sector_keys"]
+
+    cycle = (
+        AssignedForm.query.filter_by(project_id=operation.project_id, scope="project_cycle")
+        .order_by(AssignedForm.id)
+        .first()
+    )
+    aes = AssignmentEntityStatus.query.filter_by(assigned_form_id=cycle.id).one()
+    version = FormTemplateVersion.query.filter_by(template_id=cycle.template_id).one()
+    health_section = FormSection.query.filter_by(version_id=version.id, name="Health", archived=False).one()
+    shelter_section = FormSection.query.filter_by(
+        version_id=version.id, name="Shelter and basic household items", archived=False
+    ).one()
+    health_section.fields_ordered = _items(health_section.id)
+    shelter_section.fields_ordered = _items(shelter_section.id)
+
+    limit_entry_fields(aes)
+
+    assert [item for item in health_section.fields_ordered if item.item_type == "indicator"] == []
+    assert any(item.item_type == "question" for item in health_section.fields_ordered)
     assert shelter_section.fields_ordered == []

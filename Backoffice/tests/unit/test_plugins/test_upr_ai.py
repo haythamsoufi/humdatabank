@@ -818,7 +818,8 @@ class TestUprFormdataValidation:
         assert ctx["upr_form"] is True
         assert ctx["upr_item_kind"] == "funding"
         assert "upr_visuals" not in ctx
-        assert ctx["value"] == "matrix total 1"
+        assert ctx["value"] == ctx["upr_value_preview"]
+        assert ctx["value"] != "matrix total 1"
         assert "upr_skip_historical" not in ctx
         assert ctx["upr_matrix_reading"]["value_role"] == "possibly_not_chf_small_integers"
         assert "upr_value_preview" in ctx

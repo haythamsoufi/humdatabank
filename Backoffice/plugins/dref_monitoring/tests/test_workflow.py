@@ -32,7 +32,9 @@ from plugins.dref_monitoring.services.plans import (
     activities_for,
     edit_activity,
     groups_for,
+    latest_baseline,
     latest_plan,
+    plan_matches_sync,
     reset_plan_from_sync,
     restore_plan_version,
     save_plan_activities,
@@ -690,6 +692,40 @@ def test_reset_keeps_a_confirmed_plan_and_opens_a_draft_from_the_sync(seeded):
     assert restore_plan_version(operation, 9, entry, date(2026, 2, 3)) == "That plan version was not found."
 
 
+def test_a_plan_that_still_matches_go_is_named_and_a_draft_is_not_copied_again(seeded):
+    _country, user = seeded
+    apply_rows([_row()])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    baseline = latest_baseline(operation.id)
+    plan = latest_plan(operation.id)
+    assert plan_matches_sync(plan, operation, baseline)
+    groups = groups_for(plan.id)
+    groups[0].sort_order, groups[-1].sort_order = groups[-1].sort_order, groups[0].sort_order
+    db.session.commit()
+    assert plan_matches_sync(plan, operation, baseline)
+    assert reset_plan_from_sync(operation, _manager(user.id), date(2026, 2, 1)) == (
+        "The current plan already matches the latest approved GO stage."
+    )
+    assert DrefPlan.query.filter_by(operation_id=operation.id).count() == 1
+
+    assert validate_plan(operation, _manager(user.id), date(2026, 2, 2)) is None
+    confirmed = latest_plan(operation.id)
+    assert plan_matches_sync(confirmed, operation, baseline)
+    assert reset_plan_from_sync(operation, _manager(user.id), date(2026, 2, 3)) == (
+        "The current plan already matches the latest approved GO stage."
+    )
+    assert DrefPlan.query.filter_by(operation_id=operation.id).count() == 1
+
+    activity = activities_for(groups_for(confirmed.id)[0].id)[0]
+    activity.title = "Clinic support kept"
+    db.session.commit()
+    assert plan_matches_sync(confirmed, operation, baseline) is False
+    assert reset_plan_from_sync(operation, _manager(user.id), date(2026, 2, 4)) is None
+    db.session.commit()
+    assert latest_plan(operation.id).version == 2
+    assert latest_plan(operation.id).status == "draft"
+
+
 def test_reset_during_closure_does_not_reopen_the_workflow(seeded):
     _country, user = seeded
     apply_rows([_row()])
@@ -829,6 +865,35 @@ def test_validation_posts_go_chapters_and_a_missing_token_does_not(seeded):
     finally:
         current_app.config["GO_API_TOKEN"] = ""
         current_app.config["GO_API_BASE"] = "https://goadmin.ifrc.org/api/v2/"
+
+
+def test_a_draft_can_be_deleted_until_it_is_sent_to_go(seeded):
+    from plugins.dref_monitoring.services.drafts import delete_draft, draft_deletable
+
+    _country, user = seeded
+    apply_rows([_row(appeal_id=92)])
+    operation = DrefOperation.query.filter_by(appeal_code="MDRZZ001").one()
+    actor = _manager(user.id)
+
+    first = db.session.get(DrefDraft, generate_draft(operation, "operational_update", actor)["draft_id"])
+    other = db.session.get(DrefDraft, generate_draft(operation, "final_report", actor)["draft_id"])
+    first_id, other_id = first.id, other.id
+    assert draft_deletable(first, operation, actor)
+    assert delete_draft(first, operation, actor) is None
+    assert db.session.get(DrefDraft, first_id) is None
+    assert db.session.get(DrefDraft, other_id) is not None
+
+    # Someone without data-entry rights cannot delete.
+    nobody = Actor(user.id, False, frozenset(), frozenset(), {})
+    assert delete_draft(other, operation, nobody) == "You cannot delete this draft."
+
+    # A report GO already holds is kept as the record.
+    other.status = "submitted"
+    other.go_status = "sent"
+    db.session.commit()
+    assert not draft_deletable(other, operation, actor)
+    assert delete_draft(other, operation, actor) == "A report already sent to GO cannot be deleted."
+    assert db.session.get(DrefDraft, other_id) is not None
 
 
 def test_excel_import_replaces_a_draft_plan(seeded):

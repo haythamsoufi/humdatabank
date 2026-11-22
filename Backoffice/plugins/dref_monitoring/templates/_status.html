@@ -18,6 +18,7 @@
   {%- elif key == 'draft' -%}{{ dref_tr('Draft') }}
   {%- elif key == 'pending' -%}{{ dref_tr('Pending') }}
   {%- elif key == 'upcoming' -%}{{ dref_tr('Upcoming') }}
+  {%- elif key == 'overdue' -%}{{ dref_tr('Overdue') }}
   {%- elif key == 'approved' -%}{{ dref_tr('Approved') }}
   {%- elif key == 'rejected' -%}{{ dref_tr('Rejected') }}
   {%- elif key == 'active' -%}{{ dref_tr('Active') }}
@@ -55,15 +56,15 @@
     {{ status_label(text, variant) }}
   {%- elif key in ['approved', 'validated', 'active', 'completed', 'received', 'distributed', 'mitigated', 'reviewed'] -%}
     {{ status_label(text, 'success') }}
-  {%- elif key in ['rejected', 'failed', 'high', 'blocked'] -%}
+  {%- elif key in ['rejected', 'failed', 'high', 'blocked', 'overdue'] -%}
     {{ status_label(text, 'danger') }}
   {%- elif key in ['pending', 'draft', 'planned', 'not_started', 'stub', 'plan_draft', 'requested', 'open'] -%}
     {{ status_label(text, 'pending') }}
-  {%- elif key in ['ordered', 'ongoing', 'medium', 'submitted', 'delayed'] -%}
+  {%- elif key in ['ordered', 'ongoing', 'medium', 'delayed'] -%}
     {{ status_label(text, 'warning') }}
   {%- elif key in ['monitoring', 'in_progress'] -%}
     {{ status_label(text, 'active') }}
-  {%- elif key in ['low', 'enter', 'validate', 'review', 'portfolio', 'closure', 'monthly', 'biweekly'] -%}
+  {%- elif key in ['submitted', 'low', 'enter', 'validate', 'review', 'portfolio', 'closure', 'monthly', 'biweekly'] -%}
     {{ status_label(text, 'info') }}
   {%- else -%}
     {{ status_label(text, 'neutral') }}

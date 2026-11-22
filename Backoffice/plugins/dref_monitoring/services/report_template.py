@@ -168,7 +168,12 @@ def _section_plan(operation: DrefOperation) -> list[dict]:
     built.append(
         {
             "key": _REPORT_KEY,
-            "name": "Note",
+            "name": "Notes",
+            "name_translations": {
+                "fr": "Notes",
+                "es": "Notas",
+                "ar": "ملاحظات",
+            },
             # One field. The section heading would repeat the question label.
             "hide_header": True,
             "order": len(built) + 1,
@@ -220,6 +225,7 @@ def _sync_sections(template: FormTemplate, version: FormTemplateVersion, planned
                 template_id=template.id,
                 version_id=version.id,
                 name=spec["name"],
+                name_translations=_titled_translations(None, spec["name"], spec.get("name_translations")),
                 order=float(spec["order"]),
                 section_type="standard",
                 config=_section_config(key, hide_header=bool(spec.get("hide_header"))),
@@ -229,6 +235,7 @@ def _sync_sections(template: FormTemplate, version: FormTemplateVersion, planned
             by_key[key] = section
         else:
             section.name = spec["name"]
+            section.name_translations = _titled_translations(section.name_translations, spec["name"], spec.get("name_translations"))
             section.order = float(spec["order"])
             section.archived = False
             cfg = dict(section.config or {})
@@ -395,6 +402,7 @@ def _upsert_question(template, version, section, item, spec: dict, key: str, ord
             template_id=template.id,
             item_type="question",
             label=label,
+            label_translations=_titled_translations(None, label, spec.get("label_translations")),
             type=qtype,
             order=order,
             definition=definition,
@@ -405,6 +413,7 @@ def _upsert_question(template, version, section, item, spec: dict, key: str, ord
         return
     item.item_type = "question"
     item.label = label
+    item.label_translations = _titled_translations(item.label_translations, label, spec.get("label_translations"))
     item.type = qtype
     item.order = order
     item.archived = False
@@ -413,6 +422,19 @@ def _upsert_question(template, version, section, item, spec: dict, key: str, ord
     cfg = dict(item.config or {})
     cfg.update(config)
     item.config = cfg
+
+
+def _titled_translations(existing, title: str, extra) -> dict:
+    """Keep the English title on the generator. Other languages in ``extra`` are written with it."""
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    merged["en"] = title
+    if isinstance(extra, dict):
+        for key, value in extra.items():
+            code = str(key or "").strip().lower()
+            text = str(value or "").strip()
+            if code and code != "en" and text:
+                merged[code] = text
+    return merged
 
 
 def _managed_config(**extra) -> dict:

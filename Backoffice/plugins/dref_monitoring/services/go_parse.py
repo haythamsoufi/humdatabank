@@ -118,8 +118,9 @@ def narrative_signature(application) -> str:
         "version": application.get("narrative_version"),
         "narrative": application.get("narrative"),
         "context": application.get("context"),
+        "contacts": application.get("contacts"),
     }
-    if not material["narrative"] and not material["context"]:
+    if not material["narrative"] and not material["context"] and not material["contacts"]:
         return ""
     raw = json.dumps(material, sort_keys=True, default=str, ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()

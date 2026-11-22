@@ -222,6 +222,14 @@ class FormDataService(
         action = request.form.get('action')
         if action == 'save_page':
             action = 'save'
+        # Approved assignments stay approved. A submit (including a stale
+        # button) saves the corrections and does not move the workflow back.
+        if (
+            not is_public_submission
+            and action in ('submit', 'send_for_review', 'submit_page')
+            and status == AssignmentEntityStatusValue.approved.value
+        ):
+            action = 'save'
         from app.services.assignments.page_submission_service import (
             PAGE_ACTIONS,
             all_participating_pages_submitted,

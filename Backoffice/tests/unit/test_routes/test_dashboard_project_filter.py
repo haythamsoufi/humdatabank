@@ -110,18 +110,40 @@ class TestDashboardProjectCardHeading:
         assert title == "DREF MDRZZ001"
         assert subtitle == ""
 
-    def test_other_portfolios_keep_the_name_as_the_title(self):
-        title, subtitle = dashboard_project_card_heading("NSD", "CBF", "NSD-1", "Water")
+    def test_nsd_card_title_is_the_project_name_without_a_code_subtitle(self):
+        title, subtitle = dashboard_project_card_heading(
+            "NSD", "CBF", "CBF-AF-2412-258", "Bridging the digital divide"
+        )
+        assert title == "Bridging the digital divide"
+        assert subtitle == ""
+
+    def test_nsd_without_a_name_uses_the_reference_as_the_title(self):
+        title, subtitle = dashboard_project_card_heading("NSD", "CBF", "CBF-AF-2412-258", "")
+        assert title == "CBF-AF-2412-258"
+        assert subtitle == ""
+
+    def test_project_cards_omit_the_code_subtitle(self):
+        title, subtitle = dashboard_project_card_heading("Global Award", "CBF", "GA-1", "Water")
         assert title == "Water"
-        assert subtitle == "NSD-1"
+        assert subtitle == ""
+
+    def test_a_project_without_a_name_uses_the_reference_as_the_title(self):
+        title, subtitle = dashboard_project_card_heading("Global Award", "", "GA-1", "")
+        assert title == "GA-1"
+        assert subtitle == ""
 
 
 class TestDashboardCycleLabel:
     def test_dref_cycle_drops_the_appeal_code(self):
-        assert dashboard_cycle_label("MDRZZ001 · 2026-01", "DREF", "MDRZZ001") == "2026-01"
+        assert dashboard_cycle_label("MDRZZ001 · 2026-01", "MDRZZ001") == "2026-01"
 
     def test_dref_day_slot_keeps_the_date(self):
-        assert dashboard_cycle_label("MDRIM009 · 2026-01-15", "DREF", "MDRIM009") == "2026-01-15"
+        assert dashboard_cycle_label("MDRIM009 · 2026-01-15", "MDRIM009") == "2026-01-15"
 
-    def test_other_portfolios_keep_the_full_period(self):
-        assert dashboard_cycle_label("NSD-1 · Y1Q2", "NSD", "NSD-1") == "NSD-1 · Y1Q2"
+    def test_project_cycle_drops_the_code(self):
+        assert dashboard_cycle_label("CBF-AF-2412-258 · Y2Q3", "CBF-AF-2412-258") == "Y2Q3"
+        assert dashboard_cycle_label("GA-1 · Y1Q2", "GA-1") == "Y1Q2"
+        assert dashboard_cycle_label("CBF-AF-2412-258 · Final", "CBF-AF-2412-258") == "Final"
+
+    def test_a_period_without_the_code_prefix_is_unchanged(self):
+        assert dashboard_cycle_label("2026 Annual", "GA-1") == "2026 Annual"

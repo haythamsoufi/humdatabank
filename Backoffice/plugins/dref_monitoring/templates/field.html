@@ -1,4 +1,4 @@
-<div class="dref-report-field" data-field-id="{{ field_name }}" data-msg-split="{{ dref_tr('The percentage split must add up to 100.') if dref_tr is defined else 'The percentage split must add up to 100.' }}" data-msg-reached="{{ dref_tr('Enter the reached total before the percentage split.') if dref_tr is defined else 'Enter the reached total before the percentage split.' }}" data-msg-expenditure="{{ dref_tr('Expenditure cannot be negative.') if dref_tr is defined else 'Expenditure cannot be negative.' }}" data-msg-disagg="{{ dref_tr('Explain why this data is not available.') if dref_tr is defined else 'Explain why this data is not available.' }}">
+<div class="dref-report-field" data-field-id="{{ field_name }}" data-msg-split="{{ dref_tr('The percentage split must add up to 100.') if dref_tr is defined else 'The percentage split must add up to 100.' }}" data-msg-reached="{{ dref_tr('Enter the reached total before the percentage split.') if dref_tr is defined else 'Enter the reached total before the percentage split.' }}" data-msg-expenditure="{{ dref_tr('Expenditure cannot be negative.') if dref_tr is defined else 'Expenditure cannot be negative.' }}" data-msg-disagg="{{ dref_tr('Explain why this data is not available.') if dref_tr is defined else 'Explain why this data is not available.' }}" data-msg-percent-each="{{ dref_tr('A percentage cannot be more than 100.') if dref_tr is defined else 'A percentage cannot be more than 100.' }}" data-msg-percent-sum="{{ dref_tr('The percentages together cannot be more than 100.') if dref_tr is defined else 'The percentages together cannot be more than 100.' }}">
     {% set matrix = dref_cycle_matrix() if dref_cycle_matrix is defined else none %}
     {% if not matrix %}
         <p class="text-sm text-gray-600">{{ dref_tr('No reporting periods yet') if dref_tr is defined else 'No reporting periods yet' }}</p>
@@ -22,6 +22,9 @@
                 </label>
                 {% endif %}
             </div>
+            {% endif %}
+            {% if block.indicator and not block.activities %}
+            <p class="mt-2 text-sm text-gray-500">{{ dref_tr('No activities were added to this indicator.') if dref_tr is defined else 'No activities were added to this indicator.' }}</p>
             {% endif %}
             {% for row in block.activities %}
             {% set update = row.update %}
@@ -78,7 +81,7 @@
             {% endfor %}
         </fieldset>
         {% endfor %}
-        <label class="block text-sm mt-3">{{ dref_tr('Note') if dref_tr is defined else 'Note' }}
+        <label class="block text-sm mt-3">{{ dref_tr('Notes') if dref_tr is defined else 'Notes' }}
             <textarea class="mt-1 w-full border border-gray-300 rounded px-2 py-1" data-part="narrative" rows="4" {% if not editable %}disabled{% endif %}>{{ report.narrative }}</textarea>
         </label>
     {% endif %}

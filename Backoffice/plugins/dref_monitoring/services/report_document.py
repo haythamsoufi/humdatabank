@@ -7,11 +7,13 @@ store, stay in the outline as empty paragraphs. Nothing is invented there.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
 from plugins.dref_monitoring.i18n import code_label, localize_text, override_locale, translate
+from plugins.dref_monitoring.services import narrative_format as fmt
 
 TITLE = {
     "operational_update": "DREF Operational Update",
@@ -53,16 +55,139 @@ _FIELD_LABELS = {
 
 @dataclass
 class Block:
+    """One piece of the document.
+
+    A chapter the National Society writes is a ``paragraph`` with ``key`` set to the chapter, and
+    ``html`` holding its formatted text (``text`` stays the plain version). ``generated`` marks
+    text Databank writes from the figures: the Word file styles it apart so an import leaves it alone.
+    """
+
     kind: str
     text: str = ""
     level: int = 1
     headers: tuple[str, ...] = ()
     rows: tuple[tuple[str, ...], ...] = field(default_factory=tuple)
+    html: str = ""
+    key: str = ""
+    generated: bool = False
+    vacant: bool = False
+    figure: bool = False
+    label: str = ""
+
+    @property
+    def nodes(self) -> list:
+        """The formatted text as paragraphs and lists. Pages, Word and PDF all read this."""
+        return fmt.parse(self.html) if self.html else []
 
 
-def _section(source: dict, key: str) -> str:
+def chapter_headings(kind: str) -> dict[str, str]:
+    """The heading each chapter sits under in the document, in English.
+
+    The Word import reads the same table, so a heading rename here cannot drift from it.
+    """
+    who = "Who will be targeted through this operation?" if kind == "operational_update" else "Who was targeted by this operation?"
+    headings = {
+        "what_happened": "What happened, where and when?",
+        "scope_and_scale": "Scope and scale",
+        "ifrc_actions": "IFRC network actions related to the current event",
+        "icrc_actions": "ICRC actions related to the current event",
+        "other_actors": "Other actors actions related to the current event",
+        "needs": "Needs (gaps) identified",
+        "overall_objective": "Overall objective of the operation",
+        "strategy_rationale": "Operation strategy rationale",
+        "who_targeted": who,
+        "selection_criteria": "Explain the selection criteria for the targeted population",
+        "achievements": INTERVENTION[kind if kind in INTERVENTION else "operational_update"],
+    }
+    if kind == "final_report":
+        headings["challenges"] = "Challenges"
+    else:
+        headings["summary_of_changes"] = "Summary of changes"
+    return headings
+
+
+def _chapter(source: dict, key: str) -> Block:
+    """The block a chapter's text goes in. An empty chapter stays as a blank place to write."""
     narratives = source.get("narratives") or {}
-    return str(narratives.get(key) or "").strip()
+    html = fmt.to_html(narratives.get(key))
+    return Block("paragraph", fmt.to_plain(html), html=html, key=key)
+
+
+# Prose the page can edit that is not one of the GO narrative chapters. The Word file still styles it
+# as generated text, so an import does not fold it into the chapter above it.
+BLOCK_EDIT_KEY = re.compile(
+    r"^(?:date-of-event|scope-figures|recorded-changes|risks|delays|support|sectors|finance-note|variances|contacts"
+    r"|needs-\d{1,10}|sector-\d{1,10}|progress-\d{1,10})$"
+)
+
+
+def block_edits_of(draft) -> dict[str, str]:
+    """Text a person wrote over a figure section. Unknown keys are dropped."""
+    stored = getattr(draft, "sections", None)
+    raw = stored.get("block_edits") if isinstance(stored, dict) else None
+    if not isinstance(raw, dict):
+        return {}
+    return {key: value for key, value in raw.items() if isinstance(key, str) and isinstance(value, str) and BLOCK_EDIT_KEY.fullmatch(key)}
+
+
+def _mark_generated(blocks: list[Block]) -> list[Block]:
+    """Text Databank wrote from the figures. A figure section stays marked so Word import leaves it alone."""
+    for block in blocks:
+        if block.figure:
+            if (block.text or block.html or "").strip():
+                block.generated = True
+            continue
+        if block.key:
+            continue
+        if block.kind == "bullets" or (block.kind == "paragraph" and (block.text or "").strip()):
+            block.generated = True
+    return blocks
+
+
+def _figure(key: str, label: str, text: str = "", *, intro: str = "", lines: list[str] | None = None, bullets: bool = False) -> Block:
+    """One editable section. ``lines`` are the sentences Databank would have written under the heading."""
+    chunks: list[str] = []
+    if intro.strip():
+        chunks.append(intro.strip())
+    body = [line.strip() for line in (lines or []) if line and str(line).strip()]
+    if bullets and body:
+        chunks.append("\n".join(f"- {line}" for line in body))
+    elif body:
+        chunks.extend(body)
+    elif text.strip():
+        chunks.append(text.strip())
+    source = "\n\n".join(chunks)
+    html = fmt.to_html(source) if source else ""
+    return Block("paragraph", fmt.to_plain(html) if html else "", html=html, key=key, figure=True, label=label)
+
+
+def _sector_token(sector: dict, index: int) -> str:
+    raw = sector.get("id")
+    if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0:
+        return str(raw)
+    if isinstance(raw, str) and raw.isdigit() and int(raw) > 0:
+        return str(int(raw))
+    return str(index + 1)
+
+
+def _sector_label(sector: dict) -> str:
+    return localize_text(sector.get("label") or "") or translate("Sector")
+
+
+def _apply_edits(blocks: list[Block], edits) -> list[Block]:
+    """Use a saved edit where there is one. The generated wording stays until the person changes it."""
+    if not isinstance(edits, dict):
+        return blocks
+    for block in blocks:
+        if not block.figure or not block.key:
+            continue
+        value = edits.get(block.key)
+        if not isinstance(value, str):
+            continue
+        html = fmt.to_html(value)
+        block.html = html
+        block.text = fmt.to_plain(html) if html else ""
+    return blocks
 
 
 def export_narrative(draft) -> str:
@@ -123,12 +248,28 @@ def _without_empty_headings(blocks: list[Block]) -> list[Block]:
     return result
 
 
+def _mark_vacant(blocks: list[Block]) -> list[Block]:
+    """A section the preview hides until asked for: a blank chapter, or a heading with nothing under it."""
+    kept = {id(block) for block in _without_empty_headings(blocks)}
+    for block in blocks:
+        block.vacant = id(block) not in kept
+    return blocks
+
+
+def blocks_for_export(blocks: list[Block], include_empty: bool) -> list[Block]:
+    """Word and PDF leave empty sections out unless the preview toggle asked for them."""
+    if include_empty:
+        return blocks
+    return _without_empty_headings(blocks)
+
+
 def build_report(source: dict) -> list[Block]:
     with override_locale(source.get("language")):
         blocks = _compose_report(source)
         if source.get("narrative_mode") == NARRATIVE_NONE:
             blocks = _without_empty_headings(blocks)
-        return _localize(blocks)
+        blocks = _apply_edits(blocks, source.get("block_edits"))
+        return _mark_vacant(_localize(blocks))
 
 
 def _compose_report(source: dict) -> list[Block]:
@@ -144,54 +285,51 @@ def _compose_report(source: dict) -> list[Block]:
         blocks.append(Block("heading", "Draft narrative", 1))
         blocks.extend(Block("paragraph", line) for line in prose)
 
+    headings = chapter_headings(kind)
     blocks.append(Block("heading", "Description of the event", 1))
     blocks.append(Block("heading", "Date of event", 2))
-    blocks.append(Block("paragraph", _show_date(source.get("date_of_disaster"))))
-    blocks.append(Block("heading", "What happened, where and when?", 2))
-    blocks.append(Block("paragraph", _section(source, "what_happened")))
-    blocks.append(Block("heading", "Scope and scale", 2))
-    scope = " ".join(part for part in (_scope(source), _section(source, "scope_and_scale")) if part).strip()
-    blocks.append(Block("paragraph", scope))
+    blocks.append(_figure("date-of-event", translate("Date of event"), _show_date(source.get("date_of_disaster"))))
+    blocks.append(Block("heading", headings["what_happened"], 2))
+    blocks.append(_chapter(source, "what_happened"))
+    blocks.append(Block("heading", headings["scope_and_scale"], 2))
+    scope = _scope(source)
+    if scope:
+        blocks.append(_figure("scope-figures", translate("People affected and targeted"), scope))
+    blocks.append(_chapter(source, "scope_and_scale"))
 
     if kind == "operational_update":
-        blocks.append(Block("heading", "Summary of changes", 1))
+        blocks.append(Block("heading", headings["summary_of_changes"], 1))
         blocks.extend(_change_blocks(source))
-        summary = _section(source, "summary_of_changes")
-        if summary:
-            blocks.append(Block("paragraph", summary))
+        blocks.append(_chapter(source, "summary_of_changes"))
 
-    for heading, key in (
-        ("IFRC network actions related to the current event", "ifrc_actions"),
-        ("ICRC actions related to the current event", "icrc_actions"),
-        ("Other actors actions related to the current event", "other_actors"),
-    ):
-        blocks.append(Block("heading", heading, 1))
-        blocks.append(Block("paragraph", _section(source, key)))
+    for key in ("ifrc_actions", "icrc_actions", "other_actors"):
+        blocks.append(Block("heading", headings[key], 1))
+        blocks.append(_chapter(source, key))
 
     sectors = list(source.get("sectors") or [])
-    blocks.append(Block("heading", "Needs (gaps) identified", 1))
-    needs = _section(source, "needs")
-    if needs:
-        blocks.append(Block("paragraph", needs))
-    if sectors:
-        for sector in sectors:
-            blocks.append(Block("heading", sector.get("label") or "Sector", 2))
-            blocks.append(Block("paragraph", ""))
-    else:
-        blocks.append(Block("paragraph", ""))
+    blocks.append(Block("heading", headings["needs"], 1))
+    blocks.append(_chapter(source, "needs"))
+    for index, sector in enumerate(sectors):
+        label = _sector_label(sector)
+        blocks.append(Block("heading", sector.get("label") or "Sector", 2))
+        blocks.append(
+            _figure(
+                f"needs-{_sector_token(sector, index)}",
+                f"{translate('Needs (gaps) identified')} — {label}",
+            )
+        )
 
     blocks.append(Block("heading", "Operational strategy", 1))
-    blocks.append(Block("heading", "Overall objective of the operation", 2))
-    blocks.append(Block("paragraph", _section(source, "overall_objective")))
-    blocks.append(Block("heading", "Operation strategy rationale", 2))
-    blocks.append(Block("paragraph", _section(source, "strategy_rationale")))
+    blocks.append(Block("heading", headings["overall_objective"], 2))
+    blocks.append(_chapter(source, "overall_objective"))
+    blocks.append(Block("heading", headings["strategy_rationale"], 2))
+    blocks.append(_chapter(source, "strategy_rationale"))
 
-    who = "Who will be targeted through this operation?" if kind == "operational_update" else "Who was targeted by this operation?"
     blocks.append(Block("heading", "Targeting strategy", 1))
-    blocks.append(Block("heading", who, 2))
-    blocks.append(Block("paragraph", _section(source, "who_targeted")))
-    blocks.append(Block("heading", "Explain the selection criteria for the targeted population", 2))
-    blocks.append(Block("paragraph", _section(source, "selection_criteria")))
+    blocks.append(Block("heading", headings["who_targeted"], 2))
+    blocks.append(_chapter(source, "who_targeted"))
+    blocks.append(Block("heading", headings["selection_criteria"], 2))
+    blocks.append(_chapter(source, "selection_criteria"))
     population = _population_rows(source)
     if population:
         blocks.append(Block("heading", "Total targeted population" if kind == "operational_update" else "Total assisted population", 2))
@@ -211,8 +349,37 @@ def _compose_report(source: dict) -> list[Block]:
         blocks.extend(_support_blocks(source))
     blocks.extend(_finance_blocks(source, kind))
     blocks.append(Block("heading", "Contact information", 1))
-    blocks.append(Block("paragraph", ""))
-    return blocks
+    blocks.append(_figure("contacts", translate("Contact information"), lines=_contact_lines(source.get("contacts")), bullets=True))
+    return _mark_generated(blocks)
+
+
+def _contact_lines(contacts) -> list[str]:
+    """One line per person GO lists on the approved stage: role, name, title, email, phone."""
+    lines = []
+    for item in contacts or []:
+        if not isinstance(item, dict):
+            continue
+        details = [str(item.get(key) or "").strip() for key in ("name", "title", "email", "phone")]
+        details = [part for part in details if part]
+        if not details:
+            continue
+        role = translate(str(item.get("role") or "").strip())
+        text = ", ".join(details)
+        lines.append(f"{role}: {text}" if role else text)
+    return lines
+
+
+def contacts_of(operation_id: int) -> list[dict]:
+    """Contacts saved with the newest approved stage that has any. Not read by the model."""
+    from plugins.dref_monitoring.models import DrefBaseline
+
+    rows = DrefBaseline.query.filter_by(operation_id=operation_id).order_by(DrefBaseline.id).all()
+    stored = [row for row in rows if isinstance(row.application, dict) and row.application.get("contacts")]
+    if not stored:
+        return []
+    chosen = next((row for row in reversed(stored) if row.is_latest), stored[-1])
+    contacts = chosen.application.get("contacts")
+    return [item for item in contacts if isinstance(item, dict)] if isinstance(contacts, list) else []
 
 
 def source_for(operation, draft) -> dict:
@@ -318,6 +485,7 @@ def source_for(operation, draft) -> dict:
                 )
             sectors.append(
                 {
+                    "id": group.id,
                     "label": group.label,
                     "budget_chf": group.budget_chf,
                     "people_targeted": group.people_targeted,
@@ -370,9 +538,12 @@ def source_for(operation, draft) -> dict:
         "people_targeted": operation.people_targeted,
         "funds_received": bool(operation.funds_received),
         "expenditure": None if report is None else report.expenditure_total,
-        "narrative": export_narrative(draft),
+        # Older plain prose is shown as the first chapter (see ``chapters_of``), so it is not repeated.
+        "narrative": "",
         "narratives": _chapters(draft),
+        "block_edits": block_edits_of(draft),
         "baselines": baselines,
+        "contacts": contacts_of(operation.id),
         "changes": [
             {
                 "status": row.status,
@@ -407,11 +578,12 @@ def source_for(operation, draft) -> dict:
 
 
 def _chapters(draft) -> dict:
-    from plugins.dref_monitoring.services.drafts import narrative_map
+    """The written chapters. Plain text from an older draft that has no chapters is read as the first one."""
+    from plugins.dref_monitoring.services.drafts import chapters_of
 
-    chapters = narrative_map(draft)
-    chapters.pop("legacy", None)
-    return chapters
+    return {key: text for key, text in chapters_of(draft).items() if text.strip()}
+
+
 
 
 def _cover_rows(source: dict, kind: str) -> list[tuple[str, str]]:
@@ -457,6 +629,7 @@ def _change_blocks(source: dict) -> list[Block]:
     baselines = list(source.get("baselines") or [])
     lines = _baseline_lines(baselines)
     lines.extend(_request_lines(source.get("changes") or []))
+    label = translate("Recorded changes:").rstrip(":").strip() or translate("Recorded changes:")
     if lines:
         if len(baselines) >= 2:
             intro = translate("Comparing the {before} stage with the {after} stage:").format(
@@ -465,12 +638,13 @@ def _change_blocks(source: dict) -> list[Block]:
             )
         else:
             intro = translate("Recorded changes:")
-        return [Block("paragraph", intro), Block("bullets", rows=tuple((line,) for line in lines))]
+        return [_figure("recorded-changes", label, intro=intro, lines=lines, bullets=True)]
     if len(baselines) <= 1:
-        return [Block("paragraph", translate("One approved GO stage is stored. No revision between stages is recorded."))]
+        return [_figure("recorded-changes", label, translate("One approved GO stage is stored. No revision between stages is recorded."))]
     return [
-        Block(
-            "paragraph",
+        _figure(
+            "recorded-changes",
+            label,
             translate(
                 "No change to the approved allocation, the operational end date, or a sector ceiling is recorded between the stored GO stages."
             ),
@@ -599,7 +773,7 @@ def _risk_blocks(source: dict) -> list[Block]:
     blocks = [Block("heading", "Risk and security considerations", 1)]
     risks = list(source.get("risks") or [])
     if not risks:
-        blocks.append(Block("paragraph", ""))
+        blocks.append(_figure("risks", translate("Risk and security considerations")))
         return blocks
     rows = []
     for risk in risks:
@@ -624,15 +798,15 @@ def _risk_blocks(source: dict) -> list[Block]:
 
 def _intervention_blocks(source: dict, kind: str) -> list[Block]:
     blocks = [Block("heading", INTERVENTION[kind], 1)]
-    achievements = _section(source, "achievements")
-    if achievements:
-        blocks.append(Block("paragraph", achievements))
+    blocks.append(_chapter(source, "achievements"))
     sectors = list(source.get("sectors") or [])
     if not sectors:
-        blocks.append(Block("paragraph", translate("No sector plan is recorded.")))
-    for sector in sectors:
-        blocks.append(Block("heading", localize_text(sector.get("label") or "") or translate("Sector"), 2))
-        blocks.append(Block("paragraph", _sector_lead(sector)))
+        blocks.append(_figure("sectors", translate(INTERVENTION[kind]), translate("No sector plan is recorded.")))
+    for index, sector in enumerate(sectors):
+        label = _sector_label(sector)
+        token = _sector_token(sector, index)
+        blocks.append(Block("heading", label, 2))
+        blocks.append(_figure(f"sector-{token}", f"{label} — {translate('Budget and reach')}", _sector_lead(sector)))
         indicators = []
         progress = []
         for activity in sector.get("activities") or []:
@@ -653,18 +827,19 @@ def _intervention_blocks(source: dict, kind: str) -> list[Block]:
                 )
             )
         blocks.append(Block("heading", PROGRESS[kind], 3))
-        if progress:
-            blocks.extend(Block("paragraph", line) for line in progress)
-        else:
-            blocks.append(Block("paragraph", ""))
+        blocks.append(
+            _figure(
+                f"progress-{token}",
+                f"{translate(PROGRESS[kind])} — {label}",
+                lines=progress,
+            )
+        )
     delays = [str(item).strip() for item in (source.get("delays") or []) if str(item).strip()]
-    challenge = _section(source, "challenges") if kind == "final_report" else ""
-    if kind == "final_report" and (delays or challenge):
-        blocks.append(Block("heading", "Challenges", 2))
-        if challenge:
-            blocks.append(Block("paragraph", challenge))
+    if kind == "final_report":
+        blocks.append(Block("heading", chapter_headings(kind)["challenges"], 2))
+        blocks.append(_chapter(source, "challenges"))
         if delays:
-            blocks.append(Block("bullets", rows=tuple((line,) for line in delays)))
+            blocks.append(_figure("delays", translate("Delays"), lines=delays, bullets=True))
     return blocks
 
 
@@ -683,9 +858,9 @@ def _support_blocks(source: dict) -> list[Block]:
     delays = [str(item).strip() for item in (source.get("delays") or []) if str(item).strip()]
     if delays and (source.get("kind") or "operational_update") != "final_report":
         blocks.append(Block("heading", "Delays", 2))
-        blocks.append(Block("bullets", rows=tuple((line,) for line in delays)))
-    if not procurement and not delays:
-        blocks.append(Block("paragraph", ""))
+        blocks.append(_figure("delays", translate("Delays"), lines=delays, bullets=True))
+    elif not delays:
+        blocks.append(_figure("support", translate("About support services")))
     return blocks
 
 
@@ -715,23 +890,20 @@ def _finance_blocks(source: dict, kind: str) -> list[Block]:
             rows=tuple(rows),
         )
     )
+    sentence = ""
     if approved is not None and spent is not None:
         balance = Decimal(str(approved)) - Decimal(str(spent))
         if balance >= 0:
             relation = translate("CHF {amount} under the approved allocation").format(amount=_money(balance))
         else:
             relation = translate("CHF {amount} over the approved allocation").format(amount=_money(abs(balance)))
-        blocks.append(
-            Block(
-                "paragraph",
-                translate(
-                    "Approved allocation is CHF {approved}. Reported expenditure is CHF {spent}, which is {relation}."
-                ).format(approved=_money(approved), spent=_money(spent), relation=relation),
-            )
-        )
+        sentence = translate(
+            "Approved allocation is CHF {approved}. Reported expenditure is CHF {spent}, which is {relation}."
+        ).format(approved=_money(approved), spent=_money(spent), relation=relation)
+    blocks.append(_figure("finance-note", translate(FINANCE[kind]), sentence))
     if kind == "final_report":
         blocks.append(Block("heading", "Please explain variances (if any)", 2))
-        blocks.append(Block("paragraph", ""))
+        blocks.append(_figure("variances", translate("Please explain variances (if any)")))
     blocks.append(Block("note", EXPENDITURE_NOTE))
     return blocks
 

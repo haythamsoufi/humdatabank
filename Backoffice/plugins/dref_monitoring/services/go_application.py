@@ -17,8 +17,8 @@ from plugins.dref_monitoring.services.parsing import plain_text
 
 logger = logging.getLogger(__name__)
 
-# Bump when ``narrative`` or ``context`` gain fields, so stored applications are read again once.
-NARRATIVE_VERSION = 1
+# Bump when ``narrative``, ``context`` or ``contacts`` gain fields, so stored applications are read again once.
+NARRATIVE_VERSION = 2
 NARRATIVE_LIMIT = 6000
 
 # GO planned-intervention title -> the sector key used on dref3 and in this plugin.
@@ -257,6 +257,42 @@ def _update_history(dref: dict) -> list[dict]:
     return found[-6:]
 
 
+def _contact_rows(raw) -> list[dict]:
+    found = []
+    if not isinstance(raw, list):
+        return found
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        row = {
+            key: " ".join(str(item.get(source_key) or "").split())[:limit]
+            for key, source_key, limit in (
+                ("role", "ctype", 80),
+                ("name", "name", 120),
+                ("title", "title", 160),
+                ("email", "email", 160),
+                ("phone", "phone", 60),
+            )
+        }
+        if not row["name"] and not row["email"]:
+            continue
+        found.append(row)
+    return found
+
+
+def contacts_from_emergency(source: dict, dref: dict) -> list[dict]:
+    """The contact people listed on the approved stage, as GO shows them on the emergency page.
+
+    These go to the exported document only. They are kept apart from ``narrative``, which is what
+    the model reads, so a draft never receives a name or an address.
+    """
+    for holder in (source, dref):
+        rows = _contact_rows(holder.get("dref_contacts"))
+        if rows:
+            return rows
+    return []
+
+
 def narrative_from_emergency(payload: dict, dref: dict, source: dict, source_name: str) -> dict:
     """The written part of the approved stage. Drafts continue this text instead of inventing it."""
     narrative = {
@@ -332,13 +368,17 @@ def application_from_emergency(payload: Any, stage: str = "", event_id: int | No
     _merge_proposed_actions(interventions, dref.get("proposed_action"))
     if not interventions:
         return None
-    return {
+    application = {
         "source": source_name,
         "interventions": interventions,
         "narrative": narrative_from_emergency(payload, dref, source, source_name),
         "context": context_from_emergency(payload, dref, event_id),
         "narrative_version": NARRATIVE_VERSION,
     }
+    contacts = contacts_from_emergency(source, dref)
+    if contacts:
+        application["contacts"] = contacts
+    return application
 
 
 def _fast_get(url, params):

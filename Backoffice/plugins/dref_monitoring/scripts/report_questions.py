@@ -39,12 +39,17 @@ SECTOR_NAME_TO_KEY: dict[str, str] = {
 
 ACTIVITY_SECTION_NAME = "Selected activities"
 
-# Asked once, on every operation. The builder puts this in a section named Note
+# Asked once, on every operation. The builder puts this in a section named Notes
 # and hides that section's heading, so the field is not wrapped in a second title.
 REPORT_QUESTIONS: tuple[dict, ...] = (
     {
         "key": "narrative",
-        "label": "Note",
+        "label": "Notes",
+        "label_translations": {
+            "fr": "Notes",
+            "es": "Notas",
+            "ar": "ملاحظات",
+        },
         "type": "textarea",
         "description": "Cumulative position for this reporting period.",
         "width": 12,

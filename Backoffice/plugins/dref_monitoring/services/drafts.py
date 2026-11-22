@@ -4,7 +4,7 @@ The language model receives the approved request and the monitoring history:
 figures, activity notes, indicator actuals, delay reasons, and change
 justifications. It also receives background (see ``services/context.py``): the
 written application GO approved, recent public GO field reports, Databank
-documents the person generating the draft may read, and the previous draft.
+documents the person generating the draft may read, and the last approved report.
 It does not receive user names, email addresses, contacts, or community
 feedback. A reply is stored as GO chapter text. The National Society can edit
 those chapters before validation sends the report to GO.
@@ -13,6 +13,7 @@ those chapters before validation sends the report to GO.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import logging
 from datetime import date, timedelta
@@ -46,6 +47,15 @@ from plugins.dref_monitoring.models import (
     DrefProcurement,
     DrefReport,
     DrefRisk,
+)
+from plugins.dref_monitoring.services import narrative_format as fmt
+from plugins.dref_monitoring.services.sources import (
+    model_object,
+    narrative_sources,
+    replace_chapter_sources,
+    resolve_sources,
+    source_claims,
+    stamp_catalog,
 )
 from plugins.dref_monitoring.services.plans import (
     activities_for,
@@ -99,6 +109,85 @@ def _counts(disaggregation) -> dict:
         for key in ("women", "men", "girls", "boys")
         if source.get(key) is not None
     }
+
+
+def _long_date(value) -> str:
+    if not value:
+        return ""
+    return f"{value.day} {value.strftime('%B')} {value.year}"
+
+
+def _figure(value) -> str:
+    if value is None or value == "":
+        return ""
+    try:
+        number = Decimal(str(value))
+    except Exception:
+        return str(value)
+    if number == number.to_integral():
+        return f"{int(number):,}"
+    return f"{number:,.2f}"
+
+
+def monitoring_reports(operation_id: int) -> list[dict]:
+    """One citable row per reporting period that has figures, newest first.
+
+    The link is the assignment where those figures were entered. A period with
+    no assignment stays in the list so the model can still name it, without a link.
+    """
+    from plugins.dref_monitoring.services.assignment_sync import assignment_url
+
+    reports = DrefReport.query.filter_by(operation_id=operation_id).order_by(DrefReport.id.desc()).all()
+    rows = []
+    for report in reports:
+        period = db.session.get(DrefPeriod, report.period_id)
+        if period is None:
+            continue
+        updates = DrefActivityUpdate.query.filter_by(report_id=report.id).all()
+        values = DrefIndicatorValue.query.filter_by(report_id=report.id).all()
+        if not updates and not values and report.expenditure_total is None:
+            continue
+        people = sum(int(row.people_individuals or 0) for row in updates)
+        households = sum(int(row.people_households or 0) for row in updates)
+        counts: dict[str, int] = {}
+        for row in updates:
+            status = row.status or "planned"
+            counts[status] = counts.get(status, 0) + 1
+        bits = []
+        if people:
+            bits.append(f"{_figure(people)} people reached")
+        if households:
+            bits.append(f"{_figure(households)} households")
+        if updates:
+            detail = ", ".join(f"{count} {name}" for name, count in sorted(counts.items()))
+            bits.append(f"{len(updates)} activities ({detail})")
+        elif values:
+            bits.append(f"{len(values)} indicator actuals")
+        spent = _figure(report.expenditure_total)
+        if spent:
+            bits.append(f"expenditure CHF {spent}")
+        href = ""
+        try:
+            href = assignment_url(operation_id, period)
+        except Exception:
+            logger.debug("DREF assignment link failed for period %s", period.id, exc_info=True)
+        if not str(href).startswith("/assignment/"):
+            href = ""
+        start, end = _long_date(period.start_date), _long_date(period.end_date)
+        title = f"{start} to {end}" if start and end else f"Reporting period {period.sequence}"
+        rows.append(
+            {
+                "id": f"mon-{report.id}",
+                "title": title,
+                "date": period.end_date.isoformat() if period.end_date else "",
+                "locator": " · ".join(bits)[:160],
+                "url": href,
+                "status": report.status or "",
+            }
+        )
+        if len(rows) >= 6:
+            break
+    return rows
 
 
 def _percent(part, whole) -> int | None:
@@ -240,6 +329,7 @@ def build_payload(operation) -> dict:
             "People reached are counted per activity. A person reached by two activities is counted twice, "
             "so do not add them across activities."
         ),
+        "monitoring_reports": monitoring_reports(operation.id),
         "expenditure_reported_chf": latest_expenditure,
         "expenditure_note": EXPENDITURE_NOTE,
         "procurement": [
@@ -429,27 +519,27 @@ def _hash(payload: dict) -> str:
 
 
 def parse_model_sections(text: str | None) -> dict | None:
-    """Read a model reply as GO chapter text. Plain prose returns None."""
-    raw = (text or "").strip()
-    if not raw:
-        return None
-    if raw.startswith("```"):
-        raw = raw.strip("`").strip()
-        if raw.lower().startswith("json"):
-            raw = raw[4:].strip()
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        start, end = raw.find("{"), raw.rfind("}")
-        if start < 0 or end <= start:
-            return None
-        try:
-            data = json.loads(raw[start : end + 1])
-        except json.JSONDecodeError:
-            return None
-    if not isinstance(data, dict):
+    """Read a model reply as GO chapter text. Plain prose returns None.
+
+    A ``sources`` array on the same object is ignored here. See ``sources_from_reply``.
+    """
+    data = model_object(text)
+    if data is None:
         return None
     return {key: _clip(data.get(key), limit=4000) for key in SECTION_KEYS}
+
+
+def sources_from_reply(text: str | None, catalog: list, chapters: dict | None) -> list | None:
+    """Sources for the chapters the reply actually filled. None when the reply is not chapter JSON."""
+    if not chapters or not any(chapters.values()):
+        return None
+    filled = {key for key, value in chapters.items() if str(value or "").strip()}
+    return resolve_sources(source_claims(text), catalog, filled)
+
+
+def _visible_payload(payload: dict) -> dict:
+    """The payload the model is shown. Link maps stay off the stored copy and the hash."""
+    return {key: value for key, value in payload.items() if not str(key).startswith("_")}
 
 
 def narrative_map(draft) -> dict:
@@ -478,17 +568,86 @@ def narrative_mode_of(draft) -> str:
     return NARRATIVE_AI if getattr(draft, "ai_used", False) else NARRATIVE_MANUAL
 
 
-def narrative_fields(draft) -> list[dict]:
+def chapters_of(draft) -> dict[str, str]:
+    """Every chapter as stored (plain text or formatted HTML), with an empty string for the unwritten."""
     current = narrative_map(draft)
     if current.get("legacy") and not any(current.get(key) for key in SECTION_KEYS):
         current = {**current, "what_happened": current["legacy"]}
+    return {key: str(current.get(key) or "") for key in SECTION_KEYS}
+
+
+def ai_original(draft) -> dict[str, str]:
+    """What the model first wrote, so a chapter can be taken back to it. Empty when no model wrote it."""
+    if not getattr(draft, "ai_used", False):
+        return {}
+    parsed = parse_model_sections(getattr(draft, "body", "") or "")
+    return {key: text for key, text in (parsed or {}).items() if text}
+
+
+def chapter_keys_for(draft) -> tuple[str, ...]:
+    """The chapters GO has for this report type, in outline order."""
+    from plugins.dref_monitoring.services.prompts import chapter_keys
+
+    return chapter_keys(getattr(draft, "report_kind", None) or "operational_update")
+
+
+def narrative_fields(draft, blocks=None) -> list[dict]:
+    """The chapters of one draft with what an editor needs: formatted text, counts, and whether it was edited."""
     from plugins.dref_monitoring.i18n import override_locale, translate
 
+    current = chapters_of(draft)
+    original = ai_original(draft)
+    rows = []
     with override_locale(getattr(draft, "language", None) or "en"):
-        return [
-            {"key": key, "label": translate(SECTION_LABELS[key]), "text": current.get(key) or ""}
-            for key in SECTION_KEYS
-        ]
+        for key in chapter_keys_for(draft):
+            raw = current.get(key) or ""
+            html = fmt.to_html(raw)
+            rows.append(
+                {
+                    "key": key,
+                    "label": translate(SECTION_LABELS[key]),
+                    "text": fmt.to_plain(raw),
+                    "html": html,
+                    "words": fmt.word_count(raw),
+                    "chars": fmt.plain_length(raw),
+                    "filled": bool(html),
+                    "ai_original": key in original,
+                    "edited": key in original and not fmt.same(raw, original[key]),
+                    "narrative": True,
+                }
+            )
+    if not blocks:
+        return rows
+    by_key = {row["key"]: row for row in rows}
+    ordered = []
+    seen: set[str] = set()
+    for block in blocks:
+        key = getattr(block, "key", "") or ""
+        if not key or key in seen:
+            continue
+        if key in by_key:
+            ordered.append(by_key[key])
+            seen.add(key)
+            continue
+        if not getattr(block, "figure", False):
+            continue
+        html = block.html or ""
+        ordered.append(
+            {
+                "key": key,
+                "label": block.label or key,
+                "text": block.text or "",
+                "html": html,
+                "words": fmt.word_count(html or block.text),
+                "chars": fmt.plain_length(html or block.text),
+                "filled": bool((block.text or "").strip()),
+                "ai_original": False,
+                "edited": False,
+                "narrative": False,
+            }
+        )
+        seen.add(key)
+    return ordered
 
 
 def _report(progress, stage: str, message: str, percent: float, **extra) -> None:
@@ -509,6 +668,19 @@ def _listener(progress) -> dict:
     Callers without a listener (the scheduler, tests with a plain stub) pass nothing extra.
     """
     return {} if progress is None else {"progress": progress}
+
+
+def _load_background(context_loader, operation, actor, progress, exclude_draft_id=None):
+    """Load background, telling a loader that accepts it which draft is being written."""
+    kwargs = _listener(progress)
+    if exclude_draft_id is not None:
+        try:
+            accepted = inspect.signature(context_loader).parameters
+        except (TypeError, ValueError):
+            accepted = {}
+        if "exclude_draft_id" in accepted:
+            kwargs["exclude_draft_id"] = exclude_draft_id
+    return context_loader(operation, actor, **kwargs)
 
 
 def generate_draft(
@@ -567,11 +739,14 @@ def generate_draft(
             payload["context"] = background
     body = ""
     ai_used = False
+    cited = None
     if complete is not None:
+        catalog = stamp_catalog(payload, getattr(operation, "id", None))
         _report(progress, "writing", "Writing the narrative.", 40)
         try:
             generated = complete(payload, kind, **_listener(progress))
             parsed = parse_model_sections(generated)
+            cited = sources_from_reply(generated, catalog, parsed)
             if parsed and any(parsed.values()):
                 body = json.dumps(parsed, ensure_ascii=False)
                 ai_used = True
@@ -587,14 +762,17 @@ def generate_draft(
                 exc_info=True,
             )
     _report(progress, "saving", "Saving the draft.", 96)
-    stored = dict(payload)
+    stored = _visible_payload(payload)
     stored["narrative_mode"] = narrative or (NARRATIVE_AI if ai_used else NARRATIVE_MANUAL)
+    if cited is not None:
+        stored["narrative_sources"] = cited
+        stored["narrative_sources_original"] = list(cited)
     draft = DrefDraft(
         operation_id=operation.id,
         report_kind=kind,
         model=model_name if ai_used else "",
         prompt_version=PROMPT_VERSION,
-        input_hash=_hash(payload),
+        input_hash=_hash(_visible_payload(payload)),
         sections=stored,
         body=body,
         ai_used=ai_used,
@@ -643,7 +821,7 @@ def include_narrative(
         _report(progress, "collecting", "Collecting the monitoring figures.", 5)
         if context_loader is not None:
             try:
-                background = context_loader(operation, actor, **_listener(progress))
+                background = _load_background(context_loader, operation, actor, progress, draft.id)
             except DraftCancelled:
                 raise
             except Exception:
@@ -652,10 +830,14 @@ def include_narrative(
                 background = None
             if background:
                 payload["context"] = background
+        payload["draft_id"] = draft.id
+        catalog = stamp_catalog(payload, operation.id)
         _report(progress, "writing", "Writing the narrative.", 40)
+        cited = None
         try:
             generated = complete(payload, draft.report_kind, **_listener(progress))
             parsed = parse_model_sections(generated)
+            cited = sources_from_reply(generated, catalog, parsed)
             if parsed and any(parsed.values()):
                 body = json.dumps(parsed, ensure_ascii=False)
                 ai_used = True
@@ -671,7 +853,10 @@ def include_narrative(
                 exc_info=True,
             )
         _report(progress, "saving", "Saving the draft.", 96)
-        stored = dict(payload)
+        stored = _visible_payload(payload)
+        if cited is not None:
+            stored["narrative_sources"] = cited
+            stored["narrative_sources_original"] = list(cited)
         draft.body = body
         draft.ai_used = ai_used
         draft.model = model_name if ai_used else ""
@@ -682,19 +867,209 @@ def include_narrative(
     return {"ok": True, "ai_used": ai_used}
 
 
-def save_sections(draft: DrefDraft, operation, form, actor) -> str | None:
+TOO_LONG = "A chapter can hold up to 6,000 characters."
+
+
+def _writable(draft: DrefDraft, operation, actor) -> str | None:
+    """Why this person cannot change the chapters of this draft, or None when they can."""
     if draft.operation_id != operation.id:
         return "Draft not found."
     if (draft.status or "draft") != "draft":
         return "This draft is already validated."
-    if not actor.allows(operation, "enter"):
+    if actor is None or not actor.allows(operation, "enter"):
         return "You cannot edit this draft."
     if narrative_mode_of(draft) == NARRATIVE_NONE:
         return "This report is figures only and has no narrative to edit."
-    updated = {key: _clip(form.get(f"section_{key}"), limit=4000) for key in SECTION_KEYS}
-    draft.edited_body = json.dumps(updated, ensure_ascii=False)
-    db.session.commit()
     return None
+
+
+def _store(draft: DrefDraft, chapters: dict[str, str]) -> None:
+    draft.edited_body = json.dumps({key: chapters.get(key) or "" for key in SECTION_KEYS}, ensure_ascii=False)
+    db.session.commit()
+
+
+def save_sections(draft: DrefDraft, operation, form, actor) -> str | None:
+    """Save the chapters a form sends. A chapter the form leaves out keeps its text."""
+    error = _writable(draft, operation, actor)
+    if error:
+        return error
+    chapters = chapters_of(draft)
+    for key in SECTION_KEYS:
+        name = f"section_{key}"
+        if name not in form:
+            continue
+        html = fmt.to_html(form.get(name))
+        if fmt.too_long(html):
+            return TOO_LONG
+        chapters[key] = html
+    _store(draft, chapters)
+    return None
+
+
+def save_chapters(
+    draft: DrefDraft, operation, sections: dict, actor, sources: dict | None = None
+) -> tuple[str | None, dict[str, str], dict[str, str]]:
+    """Save some chapters at once. Returns an error for the whole request, the stored HTML of each
+    chapter that saved, and the error of each chapter that did not."""
+    error = _writable(draft, operation, actor)
+    if error:
+        return error, {}, {}
+    from plugins.dref_monitoring.services.report_document import BLOCK_EDIT_KEY
+
+    allowed = set(chapter_keys_for(draft))
+    chapters = chapters_of(draft)
+    stored = dict(draft.sections or {}) if isinstance(draft.sections, dict) else {}
+    edits = dict(stored.get("block_edits") or {}) if isinstance(stored.get("block_edits"), dict) else {}
+    saved: dict[str, str] = {}
+    failed: dict[str, str] = {}
+    wrote_chapters = False
+    wrote_edits = False
+    for key, value in (sections or {}).items():
+        slot = isinstance(key, str) and BLOCK_EDIT_KEY.fullmatch(key)
+        if key not in allowed and not slot:
+            failed[str(key)[:64]] = "Unknown chapter."
+            continue
+        html = fmt.to_html(value if isinstance(value, str) else "")
+        if fmt.too_long(html):
+            failed[key] = TOO_LONG
+            continue
+        if key in allowed:
+            chapters[key] = html
+            saved[key] = html
+            wrote_chapters = True
+            continue
+        edits[key] = html
+        saved[key] = html
+        wrote_edits = True
+    if not saved:
+        return None, saved, failed
+    if isinstance(sources, dict):
+        updates = {key: sources.get(key) for key in saved if key in sources and key in allowed}
+        if updates:
+            replace_chapter_sources(draft, updates)
+            stored = dict(draft.sections or {}) if isinstance(draft.sections, dict) else stored
+    if wrote_chapters:
+        draft.edited_body = json.dumps({key: chapters.get(key) or "" for key in SECTION_KEYS}, ensure_ascii=False)
+    if wrote_edits:
+        stored["block_edits"] = edits
+        draft.sections = stored
+        flag_modified(draft, "sections")
+    db.session.commit()
+    return None, saved, failed
+
+
+def save_section(draft: DrefDraft, operation, key: str, text, actor) -> tuple[str | None, str]:
+    """Save one chapter. Returns an error or None, and the HTML as stored."""
+    error, saved, failed = save_chapters(draft, operation, {key: text if isinstance(text, str) else ""}, actor)
+    if error:
+        return error, ""
+    if key in failed:
+        return failed[key], ""
+    return None, saved.get(key, "")
+
+
+def reset_section(draft: DrefDraft, operation, key: str, actor) -> tuple[str | None, str]:
+    """Take one chapter back to the text the model first wrote."""
+    error = _writable(draft, operation, actor)
+    if error:
+        return error, ""
+    if key not in chapter_keys_for(draft):
+        return "Unknown chapter.", ""
+    original = ai_original(draft).get(key)
+    if not original:
+        return "The model did not write this chapter.", ""
+    chapters = chapters_of(draft)
+    chapters[key] = fmt.to_html(original)
+    stored_now = draft.sections if isinstance(draft.sections, dict) else {}
+    if "narrative_sources" in stored_now or "narrative_sources_original" in stored_now:
+        original_sources = [row for row in narrative_sources(draft, original=True) if row.get("chapter") == key]
+        replace_chapter_sources(draft, {key: original_sources})
+    _store(draft, chapters)
+    return None, chapters[key]
+
+
+def regenerate_section(
+    draft: DrefDraft,
+    operation,
+    actor,
+    key: str,
+    complete_section=None,
+    instruction: str = "",
+    current: str | None = None,
+    context_loader=None,
+    progress=None,
+) -> dict:
+    """Have the model write one chapter again. Nothing is stored: the editor shows the text and the
+    person keeps it or takes it back, and the chapter is saved like any other edit.
+
+    ``current`` is the text in the editor, which may be newer than the stored one. The other
+    chapters go along so the model does not repeat what they say.
+    """
+    error = _writable(draft, operation, actor)
+    if error:
+        return {"ok": False, "error": error}
+    if key not in chapter_keys_for(draft):
+        return {"ok": False, "error": "Unknown chapter."}
+    if complete_section is None:
+        return {"ok": False, "error": "AI drafting is not enabled."}
+
+    language = report_language(getattr(draft, "language", None) or "en")
+    _report(progress, "collecting", "Collecting the monitoring figures.", 5)
+    payload = build_payload(operation)
+    payload["language"] = language
+    payload["report_kind"] = draft.report_kind
+    if context_loader is not None:
+        try:
+            background = _load_background(context_loader, operation, actor, progress, draft.id)
+        except DraftCancelled:
+            raise
+        except Exception:
+            logger.warning("DREF chapter background failed for %s", operation.appeal_code, exc_info=True)
+            db.session.rollback()
+            background = None
+        if background:
+            payload["context"] = background
+
+    payload["draft_id"] = draft.id
+    catalog = stamp_catalog(payload, operation.id)
+    stored = chapters_of(draft)
+    payload["rewrite"] = {
+        "chapter": key,
+        "current_text": fmt.to_plain(current if current is not None else stored.get(key)),
+        "instruction": " ".join(str(instruction or "").split())[:400],
+        "other_chapters": {
+            other: _clip(fmt.to_plain(text), 600)
+            for other, text in stored.items()
+            if other != key and other in chapter_keys_for(draft) and fmt.to_plain(text)
+        },
+    }
+    _report(progress, "writing", "Writing the narrative.", 40)
+    try:
+        generated = complete_section(payload, draft.report_kind, key, **_listener(progress))
+    except DraftCancelled:
+        raise
+    except Exception:
+        logger.warning("DREF chapter %s failed for %s", key, operation.appeal_code, exc_info=True)
+        return {"ok": False, "error": "The model could not write this chapter. Try again in a moment."}
+    parsed = parse_model_sections(generated)
+    if not parsed:
+        return {"ok": False, "error": "The model did not return text for this chapter."}
+    text = parsed.get(key) or ""
+    if not text.strip():
+        # The instructions say to leave a chapter blank when no source supports it. That is an answer,
+        # not a failed call: the approved text, the field reports and this operation's documents said
+        # nothing the chapter could use.
+        return {
+            "ok": False,
+            "error": "Nothing in the sources for this operation covers this chapter, so it stays empty.",
+        }
+    _report(progress, "saving", "Finishing the chapter.", 96)
+    return {
+        "ok": True,
+        "key": key,
+        "html": fmt.to_html(text, limit=fmt.CHAPTER_LIMIT),
+        "sources": resolve_sources(source_claims(generated), catalog, {key}),
+    }
 
 
 def save_edit(draft: DrefDraft, operation, text: str, actor) -> str | None:
@@ -716,12 +1091,42 @@ def validate_draft(draft: DrefDraft, operation, actor) -> str | None:
     return None
 
 
-def llm_messages(payload: dict, kind: str, language: str = "en") -> list[dict]:
+def draft_deletable(draft: DrefDraft, operation, actor) -> bool:
+    """True when this person may delete the draft. See delete_draft for the rules."""
+    return delete_draft_error(draft, operation, actor) is None
+
+
+def delete_draft_error(draft: DrefDraft, operation, actor) -> str | None:
+    if draft.operation_id != operation.id:
+        return "Draft not found."
+    status = draft.status or "draft"
+    if status == "submitted" or (draft.go_status or "") in ("sent", "sending"):
+        return "A report already sent to GO cannot be deleted."
+    if not actor.allows(operation, "enter" if status == "draft" else "validate"):
+        return "You cannot delete this draft."
+    return None
+
+
+def delete_draft(draft: DrefDraft, operation, actor) -> str | None:
+    """Remove a draft that GO has not received. A report already sent to GO stays as the record.
+
+    Entering data is enough for a plain draft. A validated draft needs the validation tier,
+    the same as validating or sending it.
+    """
+    error = delete_draft_error(draft, operation, actor)
+    if error:
+        return error
+    db.session.delete(draft)
+    db.session.commit()
+    return None
+
+
+def llm_messages(payload: dict, kind: str, language: str = "en", only: str | None = None) -> list[dict]:
     from plugins.dref_monitoring.services.prompts import system_prompt, user_prompt
 
     language = report_language(language or payload.get("language"))
     return [
-        {"role": "system", "content": system_prompt(kind, language)},
+        {"role": "system", "content": system_prompt(kind, language, only=only)},
         {"role": "user", "content": user_prompt(payload)},
     ]
 

@@ -2103,14 +2103,14 @@ def dashboard_assignment_entity_filter(entity_type: str, entity_id: int):
     )
 
 
-def dashboard_cycle_label(period_name: str, portfolio: str = "", reference: str = "") -> str:
+def dashboard_cycle_label(period_name: str, reference: str = "") -> str:
     """Cycle text on a project card.
 
-    DREF period names are ``<appeal code> · <slot>``. The code is already in
-    the card title, so the cycle line keeps the slot only.
+    Stored period names are ``<project code> · <slot>``. The cycle line keeps
+    the slot only (``Y2Q3``, ``2026-01``).
     """
     raw = (period_name or "").strip()
-    if (portfolio or "").strip() != "DREF" or not raw:
+    if not raw:
         return raw
     from app.services.projects.service import CYCLE_PERIOD_SEP
 
@@ -2124,8 +2124,8 @@ def dashboard_project_card_heading(portfolio, fund, reference, title) -> tuple[s
     """Title and subtitle for one project assignment card.
 
     A DREF card title is the fund, the appeal code, and the disaster name.
-    Other portfolios keep the project name as the title and the reference
-    as the subtitle.
+    Every project card uses the project name as the title and leaves the
+    subtitle empty, so the project code is not repeated under the title.
     """
     ref = (reference or "").strip()
     name = (title or "").strip()
@@ -2135,9 +2135,7 @@ def dashboard_project_card_heading(portfolio, fund, reference, title) -> tuple[s
         if name and name != ref:
             heading = f"{heading} — {name}"
         return heading, ""
-    if name:
-        return name, ref
-    return ref, ""
+    return (name or ref), ""
 
 
 def group_dashboard_project_assignments(items, current_date):
@@ -2175,7 +2173,6 @@ def group_dashboard_project_assignments(items, current_date):
             form = getattr(aes, "assigned_form", None) if aes is not None else None
             cycle["cycle_label"] = dashboard_cycle_label(
                 form.period_name if form is not None else "",
-                portfolio,
                 reference,
             )
         groups[pid] = {

@@ -835,6 +835,16 @@
     gap: 0.5rem;
 }
 
+/* Menus passed in through the header caller sit inside .action-controls, so the
+   rule above would size each item to its label (inline-flex). Stretch them to
+   one shared width instead. */
+.executive-page-header .action-controls [role="menu"] a,
+.executive-page-header .action-controls [role="menu"] button {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+}
+
 /* Header action display beats Tailwind .hidden (one class). Honor .hidden so
    tab-scoped actions (e.g. Explore Data "Manage report") stay off other tabs. */
 .executive-page-header .action-controls a.hidden,

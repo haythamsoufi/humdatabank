@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -10,14 +11,15 @@ import pytest
 from app.extensions import db
 from plugins.dref_monitoring.access import Actor
 from plugins.dref_monitoring.constants import SECTION_KEYS
-from plugins.dref_monitoring.models import DrefBaseline, DrefDraft, DrefOperation
+from plugins.dref_monitoring.models import DrefBaseline, DrefDraft, DrefOperation, DrefPeriod, DrefReport
 from plugins.dref_monitoring.services.context import (
     databank_documents,
     field_report_summary,
     field_reports,
     load_context,
+    previous_report,
 )
-from plugins.dref_monitoring.services.drafts import build_payload, generate_draft, llm_messages
+from plugins.dref_monitoring.services.drafts import build_payload, generate_draft, llm_messages, monitoring_reports
 from plugins.dref_monitoring.services.go_application import (
     NARRATIVE_VERSION,
     application_from_emergency,
@@ -50,7 +52,17 @@ EMERGENCY = {
             {"title": "shelter_housing_and_settlements", "title_display": "Shelter", "description": "3,000 homes were damaged."}
         ],
         "people_assisted": "The operation targets 2,000 families.",
-        "dref_contacts": [{"name": "Private Person", "email": "private@example.org"}],
+        "dref_contacts": [
+            {
+                "id": "9-national_society_contact",
+                "ctype": "National Society Contact",
+                "name": "Private  Person",
+                "title": "Secretary General",
+                "email": "private@example.org",
+                "phone": "+1 555 0100",
+            },
+            {"id": "9-ifrc_emergency", "ctype": "IFRC Emergency", "name": "", "title": "", "email": "", "phone": ""},
+        ],
         "planned_interventions": [
             {
                 "title": "health",
@@ -111,7 +123,22 @@ def test_html_becomes_plain_paragraphs_and_a_clip_ends_on_a_sentence():
     assert plain_text(None) == ""
 
 
-def test_the_emergency_page_keeps_the_written_application_and_no_contacts():
+def test_the_contacts_are_kept_for_the_document_and_stay_out_of_the_text_the_model_reads():
+    application = application_from_emergency(EMERGENCY, "Application", 4321)
+    assert application["contacts"] == [
+        {
+            "role": "National Society Contact",
+            "name": "Private Person",
+            "title": "Secretary General",
+            "email": "private@example.org",
+            "phone": "+1 555 0100",
+        }
+    ]
+    assert "private@example.org" not in json.dumps(application["narrative"])
+    assert "private@example.org" not in json.dumps(application["context"])
+
+
+def test_the_emergency_page_keeps_the_written_application_and_no_contacts_in_it():
     application = application_from_emergency(EMERGENCY, "Application", 4321)
     narrative = application["narrative"]
     assert application["narrative_version"] == NARRATIVE_VERSION
@@ -125,7 +152,7 @@ def test_the_emergency_page_keeps_the_written_application_and_no_contacts():
     assert context["hazard"] == "Flood"
     # The three newest reports and the first one.
     assert context["field_report_ids"] == [11, 13, 14, 15]
-    assert "private@example.org" not in json.dumps(application)
+    assert "private@example.org" not in json.dumps({key: value for key, value in application.items() if key != "contacts"})
 
 
 def test_an_update_stage_uses_the_update_text_and_its_sector_progress():
@@ -218,14 +245,19 @@ def _operation(**overrides):
     return SimpleNamespace(**base)
 
 
-def test_documents_are_limited_to_the_event_and_clipped():
+def test_documents_are_limited_to_the_event_and_clipped(monkeypatch):
     from datetime import date
 
+    monkeypatch.setattr(
+        "plugins.dref_monitoring.services.context._operation_document_ids",
+        lambda operation: [9],
+    )
     seen = {}
 
     def search(query, filters, user_id, top_k):
         seen["filters"] = filters
         seen["user_id"] = user_id
+        seen["query"] = query
         return [
             {"chunk_id": 1, "document_title": "Flash Update 3", "source_organization": "OCHA",
              "document_date": "2026-04-26", "content": "Homes were damaged. " * 100, "combined_score": 0.9},
@@ -235,18 +267,76 @@ def test_documents_are_limited_to_the_event_and_clipped():
         ]
 
     documents = databank_documents(_operation(date_of_disaster=date(2026, 3, 28)), 77, search)
-    assert seen["filters"] == {"country_id": 5}
+    assert seen["filters"]["document_ids"] == [9]
+    assert seen["filters"]["country_id"] == 5
+    assert "MDRZZ001" in seen["query"]
     assert seen["user_id"] == 77
     assert [item["title"] for item in documents] == ["Flash Update 3"]
     assert len(documents[0]["excerpt"]) <= 900
     assert documents[0]["organization"] == "OCHA"
 
 
-def test_a_failing_document_search_leaves_the_rest(app):
+def test_a_failing_document_search_leaves_the_rest(app, monkeypatch):
+    monkeypatch.setattr(
+        "plugins.dref_monitoring.services.context._operation_document_ids",
+        lambda operation: [9],
+    )
+
     def search(*args):
         raise RuntimeError("vector store down")
 
     assert databank_documents(_operation(), None, search) == []
+
+
+def test_only_files_named_for_this_appeal_are_searched(seeded):
+    from app.models.embeddings import AIDocument
+    from app.models.enums import AIDocumentProcessingStatusValue
+
+    operation = _synced_operation()
+    kept = AIDocument(
+        title="MDRCTX01 DREF operation",
+        filename="MDRCTX01do.pdf",
+        file_type="pdf",
+        searchable=True,
+        processing_status=AIDocumentProcessingStatusValue.completed,
+        country_id=operation.country_id,
+    )
+    other = AIDocument(
+        title="Zedland Unified Plan",
+        filename="Zedland_INP_2026.pdf",
+        file_type="pdf",
+        searchable=True,
+        processing_status=AIDocumentProcessingStatusValue.completed,
+        country_id=operation.country_id,
+    )
+    db.session.add_all([kept, other])
+    db.session.commit()
+    seen = {}
+
+    def search(query, filters, user_id, top_k):
+        seen["ids"] = filters["document_ids"]
+        seen["query"] = query
+        return []
+
+    assert databank_documents(operation, seeded.id, search) == []
+    assert seen["ids"] == [kept.id]
+    assert "MDRCTX01" in seen["query"]
+    assert "Unified" not in seen["query"]
+
+
+def test_an_operation_with_no_filed_documents_is_not_searched(app, monkeypatch):
+    called = {}
+
+    def search(*args):
+        called["yes"] = True
+        return [{"chunk_id": 1, "content": "A country plan.", "combined_score": 1}]
+
+    monkeypatch.setattr(
+        "plugins.dref_monitoring.services.context._operation_document_ids",
+        lambda operation: [],
+    )
+    assert databank_documents(_operation(), 7, search) == []
+    assert called == {}
 
 
 @pytest.fixture
@@ -285,7 +375,11 @@ def _synced_operation():
     return DrefOperation.query.filter_by(appeal_code="MDRCTX01").one()
 
 
-def test_load_context_joins_every_source(seeded):
+def test_load_context_joins_every_source(seeded, monkeypatch):
+    monkeypatch.setattr(
+        "plugins.dref_monitoring.services.context._operation_document_ids",
+        lambda operation: [9],
+    )
     operation = _synced_operation()
     baseline = DrefBaseline.query.filter_by(operation_id=operation.id).one()
     assert baseline.application["narrative"]["event_scope"]
@@ -355,6 +449,73 @@ def test_the_next_draft_sees_the_previous_validated_one(seeded):
     context = load_context(operation, actor, http_get=lambda *a: {}, search=lambda *a: [])
     assert context["previous_report"]["chapters"]["what_happened"] == "Water entered the clinic."
     assert context["previous_report"]["status"] == "validated"
+    assert context["previous_report"]["draft_id"] == draft.id
+
+
+def test_an_open_draft_is_not_treated_as_the_previous_report(seeded):
+    operation = _synced_operation()
+    actor = Actor(seeded.id, True, frozenset(), frozenset(), {})
+    def written(payload, kind):
+        return json.dumps({"what_happened": "Water entered the clinic."})
+
+    first = generate_draft(operation, "operational_update", actor, complete=written)
+    approved = db.session.get(DrefDraft, first["draft_id"])
+    approved.edited_body = json.dumps({"what_happened": "Still being edited."})
+    db.session.commit()
+    assert previous_report(operation) is None
+    approved.status = "validated"
+    db.session.commit()
+    assert previous_report(operation)["draft_id"] == approved.id
+    assert previous_report(operation, exclude_draft_id=approved.id) is None
+    second = generate_draft(operation, "operational_update", actor, complete=written)
+    editing = db.session.get(DrefDraft, second["draft_id"])
+    editing.edited_body = json.dumps({"what_happened": "The chapter I am writing now."})
+    db.session.commit()
+    assert previous_report(operation)["draft_id"] == approved.id
+    editing.status = "submitted"
+    db.session.commit()
+    latest = previous_report(operation)
+    assert latest["draft_id"] == editing.id
+    assert latest["status"] == "submitted"
+    kept = load_context(
+        operation, actor, http_get=lambda *a: {}, search=lambda *a: [], exclude_draft_id=editing.id
+    )
+    assert kept["previous_report"]["draft_id"] == approved.id
+
+
+def test_a_monitoring_period_is_cited_through_its_assignment(seeded, monkeypatch):
+    operation = _synced_operation()
+    period = DrefPeriod(
+        operation_id=operation.id,
+        sequence=1,
+        start_date=date(2026, 9, 14),
+        end_date=date(2026, 10, 31),
+        due_date=date(2026, 11, 15),
+    )
+    db.session.add(period)
+    db.session.flush()
+    report = DrefReport(
+        period_id=period.id,
+        operation_id=operation.id,
+        status="submitted",
+        expenditure_total=1200,
+    )
+    db.session.add(report)
+    db.session.commit()
+    monkeypatch.setattr(
+        "plugins.dref_monitoring.services.assignment_sync.assignment_url",
+        lambda operation_id, period: "/assignment/88",
+    )
+    rows = monitoring_reports(operation.id)
+    assert rows[0]["id"] == f"mon-{report.id}"
+    assert rows[0]["title"] == "14 September 2026 to 31 October 2026"
+    assert rows[0]["url"] == "/assignment/88"
+    assert "expenditure CHF 1,200" in rows[0]["locator"]
+    monkeypatch.setattr(
+        "plugins.dref_monitoring.services.assignment_sync.assignment_url",
+        lambda operation_id, period: f"/dref-monitoring/operations/{operation_id}",
+    )
+    assert monitoring_reports(operation.id)[0]["url"] == ""
 
 
 def test_the_payload_carries_worked_out_progress(seeded):
@@ -377,6 +538,7 @@ def test_the_prompt_asks_only_for_the_chapters_a_report_has():
         assert f'"{key}"' in final
     assert "Never write filler" in update
     assert "indicative until" in final
+    assert '"used_for"' in update and "source_catalog" in update
 
 
 def test_background_comes_before_the_tables_in_the_user_message():

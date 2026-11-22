@@ -320,6 +320,12 @@
             body.appendChild(slot);
         });
 
+        var percentError = document.createElement("p");
+        percentError.className = "dref-percent-error";
+        percentError.setAttribute("role", "alert");
+        percentError.hidden = true;
+        body.appendChild(percentError);
+
         var box = document.createElement("input");
         box.type = "checkbox";
         box.name = "activity_" + row.id + "_disaggregation_na";
@@ -360,15 +366,18 @@
             input.disabled = unavailable || locked;
         });
         var reasonField = article.querySelector(".dref-plan-field--reason");
-        if (!reasonField) return;
-        reasonField.hidden = !unavailable;
-        var area = reasonField.querySelector("textarea");
-        if (!area) return;
-        area.required = unavailable && !locked;
-        if (!unavailable) {
-            area.value = "";
-            area.setCustomValidity("");
+        if (reasonField) {
+            reasonField.hidden = !unavailable;
+            var area = reasonField.querySelector("textarea");
+            if (area) {
+                area.required = unavailable && !locked;
+                if (!unavailable) {
+                    area.value = "";
+                    area.setCustomValidity("");
+                }
+            }
         }
+        paintPercents(article);
     }
 
     function revealActivity(article) {
@@ -425,42 +434,99 @@
         return Number.isFinite(parsed) ? parsed : null;
     }
 
+    function activePercentInputs(article) {
+        return SHARE_PARTS.map(function (part) {
+            return article.querySelector('input[name$="_' + part + '"]');
+        }).filter(function (input) {
+            return input && !input.disabled;
+        });
+    }
+
+    function describePercents(inputs, prefer) {
+        var over = null;
+        var sum = 0;
+        var any = false;
+        inputs.forEach(function (input) {
+            var value = percentNumber(input);
+            if (value === null) return;
+            any = true;
+            sum += value;
+            if (value > 100 && !over) over = input;
+        });
+        if (over) {
+            return {
+                kind: "each",
+                field: over,
+                inputs: inputs,
+                message: labelText(uiLabels, "percent_each", "A percentage cannot be more than 100.")
+            };
+        }
+        if (any && sum > 100 + 1e-9) {
+            var field = prefer && inputs.indexOf(prefer) !== -1 ? prefer : inputs[0];
+            return {
+                kind: "sum",
+                field: field,
+                inputs: inputs,
+                message: labelText(uiLabels, "percent_sum", "The percentages together cannot be more than 100.")
+            };
+        }
+        return null;
+    }
+
     function percentageProblem() {
         var found = null;
         document.querySelectorAll(".dref-plan-activity").forEach(function (article) {
             if (found) return;
-            var inputs = SHARE_PARTS.map(function (part) {
-                return article.querySelector('input[name$="_' + part + '"]');
-            }).filter(function (input) {
-                return input && !input.disabled;
-            });
-            var over = null;
-            var sum = 0;
-            var any = false;
-            inputs.forEach(function (input) {
-                var value = percentNumber(input);
-                if (value === null) return;
-                any = true;
-                sum += value;
-                if (value > 100 && !over) over = input;
-            });
-            if (over) {
-                found = {
-                    article: article,
-                    field: over,
-                    message: labelText(uiLabels, "percent_each", "A percentage cannot be more than 100.")
-                };
-                return;
-            }
-            if (any && sum > 100 + 1e-9) {
-                found = {
-                    article: article,
-                    field: inputs[0],
-                    message: labelText(uiLabels, "percent_sum", "The percentages together cannot be more than 100.")
-                };
-            }
+            var issue = describePercents(activePercentInputs(article));
+            if (!issue) return;
+            found = { article: article, field: issue.field, message: issue.message };
         });
         return found;
+    }
+
+    function paintPercents(article, edited) {
+        var inputs = activePercentInputs(article);
+        article.querySelectorAll(".dref-plan-field--disagg input").forEach(function (input) {
+            input.setCustomValidity("");
+            input.classList.remove("dref-percent-invalid");
+            input.removeAttribute("aria-invalid");
+        });
+        var note = article.querySelector(".dref-percent-error");
+        var issue = describePercents(inputs, edited);
+        if (!issue) {
+            article.removeAttribute("data-dref-percent-alert");
+            if (note) {
+                note.hidden = true;
+                note.textContent = "";
+            }
+            return;
+        }
+        var marked = issue.kind === "sum"
+            ? inputs.filter(function (input) { return percentNumber(input) !== null; })
+            : inputs.filter(function (input) {
+                var value = percentNumber(input);
+                return value !== null && value > 100;
+            });
+        if (marked.indexOf(issue.field) === -1) marked.push(issue.field);
+        marked.forEach(function (input) {
+            input.classList.add("dref-percent-invalid");
+            input.setAttribute("aria-invalid", "true");
+        });
+        issue.field.setCustomValidity(issue.message);
+        if (note) {
+            note.hidden = false;
+            note.textContent = issue.message;
+        }
+        if (!edited) return;
+        var key = (issue.field.getAttribute("name") || "") + "\n" + issue.message;
+        if (article.getAttribute("data-dref-percent-alert") === key) return;
+        article.setAttribute("data-dref-percent-alert", key);
+        var field = issue.field;
+        var message = issue.message;
+        window.setTimeout(function () {
+            if (!field.isConnected || field.validationMessage !== message) return;
+            field.reportValidity();
+        }, 0);
     }
 
     function demandField(problem) {
@@ -502,7 +568,10 @@
                 if (area.value.trim()) area.setCustomValidity("");
                 return;
             }
-            if (area.matches(".dref-plan-field--disagg input")) area.setCustomValidity("");
+            if (area.matches(".dref-plan-field--disagg input")) {
+                var article = area.closest(".dref-plan-activity");
+                if (article) paintPercents(article, area);
+            }
         });
     }
 
@@ -781,8 +850,7 @@
             if (section.hidden || section.dataset.drefActivitiesReady) return;
             section.dataset.drefActivitiesReady = "1";
             var rows = sections[section.getAttribute("data-entry-key")] || [];
-            if (!rows.length) return;
-            var editable = sectionIsEditable(section);
+            var editable = rows.length ? sectionIsEditable(section) : false;
             var posted = payload.choices || {};
             var choices = {
                 activity_type: posted.activity_type || [],
@@ -799,19 +867,32 @@
                 var key = anchorKey(anchor);
                 hostAfter(anchor, key).appendChild(card(row, labels, payload.statuses, editable, choices));
             });
-            if (!loose.length) return;
-            var host = document.createElement("div");
-            host.className = "dref-plan-activities";
-            host.setAttribute("data-dref-under", "other");
-            var heading = document.createElement("h4");
-            heading.className = "dref-plan-activities__title";
-            heading.textContent = labelText(extraLabels, "other_activities", "Other activities");
-            host.appendChild(heading);
-            loose.forEach(function (row) {
-                host.appendChild(card(row, labels, payload.statuses, editable, choices));
-            });
-            var content = section.querySelector("[data-collapsible-content]") || section;
-            content.appendChild(host);
+            if (loose.length) {
+                var host = document.createElement("div");
+                host.className = "dref-plan-activities";
+                host.setAttribute("data-dref-under", "other");
+                var heading = document.createElement("h4");
+                heading.className = "dref-plan-activities__title";
+                heading.textContent = labelText(extraLabels, "other_activities", "Other activities");
+                host.appendChild(heading);
+                loose.forEach(function (row) {
+                    host.appendChild(card(row, labels, payload.statuses, editable, choices));
+                });
+                var content = section.querySelector("[data-collapsible-content]") || section;
+                content.appendChild(host);
+            }
+            noteIndicatorsWithoutActivities(section, labelText(extraLabels, "no_activities", "No activities were added to this indicator."));
+        });
+    }
+
+    function noteIndicatorsWithoutActivities(section, message) {
+        section.querySelectorAll('.form-item-block[data-item-type="indicator"], .dref-unmatched-indicator').forEach(function (node) {
+            if (node.hidden || node.closest("[hidden]") || node.classList.contains("relevance-hidden")) return;
+            if (node.querySelector(".dref-plan-activity") || node.querySelector(".dref-indicator-empty")) return;
+            var line = document.createElement("p");
+            line.className = "dref-indicator-empty";
+            line.textContent = message;
+            node.appendChild(line);
         });
     }
 

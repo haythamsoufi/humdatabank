@@ -23,7 +23,15 @@ _HEADING_FONT = "Montserrat"
 _BODY_FONT = "Open Sans"
 
 
-def render_docx(blocks: list, header: str, language: str = "en") -> bytes:
+# Paragraph styles the import reads. Text Databank writes from the figures uses the first two, so an
+# edited Word file gives back only what a person wrote. They look exactly like Normal and List Bullet.
+GENERATED_TEXT_STYLE = "Generated text"
+GENERATED_BULLET_STYLE = "Generated bullet"
+
+
+def render_docx(blocks: list, header: str, language: str = "en", reference: str = "") -> bytes:
+    """The report as a Word file. ``reference`` is stored in the file so an import can tell whether
+    it was exported from the same draft."""
     document = Document()
     _apply_page(document)
     _apply_styles(document)
@@ -33,7 +41,7 @@ def render_docx(blocks: list, header: str, language: str = "en") -> bytes:
         _add_block(document, block)
     if language == "ar":
         _mark_rtl(document)
-    _properties(document, blocks, header)
+    _properties(document, blocks, header, reference)
     buffer = BytesIO()
     document.save(buffer)
     return buffer.getvalue()
@@ -54,14 +62,141 @@ def _add_block(document, block) -> None:
     elif kind == "table":
         _add_table(document, block.headers, block.rows)
     elif kind == "bullets":
-        style = "List Bullet" if _has_style(document, "List Bullet") else "Normal"
+        generated = getattr(block, "generated", False) and _has_style(document, GENERATED_BULLET_STYLE)
+        style = GENERATED_BULLET_STYLE if generated else ("List Bullet" if _has_style(document, "List Bullet") else "Normal")
         for row in block.rows:
             text = row[0] if row else ""
             if style == "Normal":
                 text = f"• {text}"
             document.add_paragraph(text, style=style)
+    elif getattr(block, "html", "") and getattr(block, "generated", False):
+        _add_generated_rich(document, block)
+    elif getattr(block, "html", ""):
+        _add_rich(document, block)
     else:
-        document.add_paragraph(block.text or "", style="Normal")
+        style = GENERATED_TEXT_STYLE if getattr(block, "generated", False) and block.text else "Normal"
+        document.add_paragraph(block.text or "", style=style)
+
+
+_HYPERLINK_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
+
+
+def _add_runs(paragraph, runs) -> None:
+    for run in runs:
+        if run.is_break:
+            paragraph.add_run().add_break()
+            continue
+        item = paragraph.add_run(run.text)
+        if run.bold:
+            item.bold = True
+        if run.italic:
+            item.italic = True
+        if run.underline:
+            item.underline = True
+        if getattr(run, "strike", False):
+            item.font.strike = True
+        color = getattr(run, "color", "") or ""
+        if color:
+            item.font.color.rgb = RGBColor.from_string(color[1:].upper())
+        highlight = getattr(run, "highlight", "") or ""
+        if highlight:
+            _shade_text(item, highlight[1:].upper())
+        href = getattr(run, "href", "") or ""
+        if href:
+            _attach_link(item, href)
+
+
+def _shade_text(run, fill: str) -> None:
+    """A highlight behind the words. Word's highlight names cannot hold an arbitrary colour."""
+    properties = run._r.get_or_add_rPr()
+    shading = properties.find(qn("w:shd"))
+    if shading is None:
+        shading = OxmlElement("w:shd")
+        properties.append(shading)
+    shading.set(qn("w:val"), "clear")
+    shading.set(qn("w:color"), "auto")
+    shading.set(qn("w:fill"), fill)
+
+
+def _attach_link(run, url: str) -> None:
+    from plugins.dref_monitoring.services.narrative_format import safe_href
+
+    address = safe_href(url)
+    if not address:
+        return
+    element = run._r
+    parent = element.getparent()
+    index = list(parent).index(element)
+    parent.remove(element)
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), run.part.relate_to(address, _HYPERLINK_REL, is_external=True))
+    link.append(element)
+    parent.insert(index, link)
+
+
+def _plain_runs(runs) -> str:
+    return "".join("\n" if getattr(run, "is_break", False) else run.text for run in runs)
+
+
+def _add_generated_rich(document, block) -> None:
+    """Figure text with the generated styles, so a Word import does not read it back as a chapter."""
+    text_style = GENERATED_TEXT_STYLE if _has_style(document, GENERATED_TEXT_STYLE) else "Normal"
+    bullet_style = GENERATED_BULLET_STYLE if _has_style(document, GENERATED_BULLET_STYLE) else "Normal"
+    nodes = block.nodes
+    if not nodes:
+        document.add_paragraph(block.text or "", style=text_style if (block.text or "").strip() else "Normal")
+        return
+    for node in nodes:
+        if not node.is_list:
+            text = _plain_runs(node.runs)
+            document.add_paragraph(text, style=text_style if text.strip() else "Normal")
+            continue
+        for item in node.items:
+            text = _plain_runs(item)
+            if bullet_style == "Normal":
+                text = f"• {text}"
+            document.add_paragraph(text, style=bullet_style)
+
+
+def _add_rich(document, block) -> None:
+    """A chapter with its paragraphs, lists, and the marks a person applied."""
+    nodes = block.nodes
+    if not nodes:
+        document.add_paragraph("", style="Normal")
+        return
+    for node in nodes:
+        if not node.is_list:
+            _add_runs(document.add_paragraph(style="Normal"), node.runs)
+            continue
+        numbered = node.type == "ol" and _has_style(document, "List Number")
+        bulleted = node.type == "ul" and _has_style(document, "List Bullet")
+        style = "List Number" if numbered else ("List Bullet" if bulleted else "Normal")
+        paragraphs = []
+        for number, item in enumerate(node.items, start=1):
+            paragraph = document.add_paragraph(style=style)
+            if style == "Normal":
+                paragraph.add_run(f"{number}. " if node.type == "ol" else "\u2022 ")
+            _add_runs(paragraph, item)
+            paragraphs.append(paragraph)
+        if numbered:
+            _restart_numbering(document, paragraphs)
+
+
+def _restart_numbering(document, paragraphs) -> None:
+    """Start the list at 1. Word counts every ``List Number`` paragraph in one run unless told otherwise."""
+    try:
+        numbering = document.part.numbering_part.numbering_definitions._numbering
+        number_id = document.styles["List Number"].element.pPr.numPr.numId.val
+        base = numbering.num_having_numId(number_id)
+        fresh = numbering.add_num(base.abstractNumId.val)
+        fresh.add_lvlOverride(ilvl=0).add_startOverride(1)
+        for paragraph in paragraphs:
+            properties = paragraph._p.get_or_add_pPr()
+            numbering_properties = properties.get_or_add_numPr()
+            numbering_properties.get_or_add_ilvl().val = 0
+            numbering_properties.get_or_add_numId().val = fresh.numId
+    except Exception:  # The list still reads in order. Only the restart is lost.
+        return
 
 
 def _add_kv(document, rows) -> None:
@@ -152,6 +287,14 @@ def _apply_styles(document) -> None:
     if bullet is not None:
         _paint_style(bullet, _BODY_FONT, 10.5, color="000000")
         bullet.paragraph_format.space_after = Pt(2)
+        generated_bullet = _ensure_style(document, GENERATED_BULLET_STYLE)
+        generated_bullet.base_style = bullet
+    number = document.styles["List Number"] if _has_style(document, "List Number") else None
+    if number is not None:
+        _paint_style(number, _BODY_FONT, 10.5, color="000000")
+        number.paragraph_format.space_after = Pt(2)
+    generated = _ensure_style(document, GENERATED_TEXT_STYLE)
+    generated.base_style = normal
 
     _set_document_font(document, _BODY_FONT)
 
@@ -219,12 +362,14 @@ def _bidi(paragraph) -> None:
         r_fonts.set(qn("w:cs"), "Tajawal")
 
 
-def _properties(document, blocks, header: str) -> None:
+def _properties(document, blocks, header: str, reference: str = "") -> None:
     title = next((block.text for block in blocks if block.kind == "title"), header)
     document.core_properties.title = title
     document.core_properties.subject = header
     document.core_properties.author = "IFRC Databank"
     document.core_properties.category = "DREF"
+    if reference:
+        document.core_properties.identifier = reference
 
 
 def _paint_style(style, name: str, size: float, *, bold: bool = False, italic: bool = False, color: str) -> None:

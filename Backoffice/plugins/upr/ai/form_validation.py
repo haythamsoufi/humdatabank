@@ -15,6 +15,7 @@ from plugins.upr.ai.prompts import (
     get_upr_formdata_validation_prompt,
     is_upr_form_template,
 )
+from plugins.upr.ai.matrix_details import upr_matrix_detail_lines
 from plugins.upr.ai.matrix_reading import (
     compare_upr_matrix_to_history,
     format_upr_historical_matrices_for_prompt,
@@ -302,6 +303,20 @@ def apply_upr_validation_context(
     out["upr_form"] = True
     out["upr_effective_label"] = effective_upr_item_label(out)
     out["upr_item_kind"] = infer_upr_item_kind(out)
+    try:
+        detail_lines = upr_matrix_detail_lines(
+            disagg_data=out.get("disagg_raw") or out.get("disagg_values"),
+            matrix_schema=out.get("matrix_schema"),
+            template_id=out.get("template_id"),
+            item_label=out.get("upr_effective_label") or out.get("form_item_label") or "",
+            section_name=out.get("section_name") or "",
+            subsection_name=out.get("subsection_name") or "",
+        )
+    except Exception:
+        logger.debug("upr matrix detail lines failed", exc_info=True)
+        detail_lines = []
+    if detail_lines:
+        out["matrix_lines"] = detail_lines
     if is_upr_comment_field(out):
         out["upr_skip_historical"] = True
 
@@ -316,6 +331,9 @@ def apply_upr_validation_context(
         preview = reading.get("value_preview")
         if preview:
             out["upr_value_preview"] = preview
+            out["value"] = preview
+    elif detail_lines:
+        out["value"] = f"{len(detail_lines)} reported matrix values"
         # Flags / PNS ticks are not comparable as a single historical *total*,
         # but cell-level history must still be retrieved and compared.
     return out

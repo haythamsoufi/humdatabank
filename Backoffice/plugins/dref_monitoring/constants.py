@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 PLUGIN_ID = "dref_monitoring"
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 DISPLAY_NAME = "DREF Monitoring"
 
 TEMPLATE_NAME = "DREF operational monitoring"
@@ -26,7 +26,7 @@ PORTFOLIO_ROLE = "dref_monitoring_portfolio"
 EXPLORE_TAB_ID = "dref-monitoring"
 
 GO_DREF3_URL = "https://goadmin.ifrc.org/api/v2/dref3/"
-PROMPT_VERSION = "3"
+PROMPT_VERSION = "5"
 REPORT_LANGUAGES = ("en", "fr", "es", "ar")
 # How a generated report treats narrative: figures only, chapters the National Society writes, or chapters the model drafts.
 NARRATIVE_NONE = "none"

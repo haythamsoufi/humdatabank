@@ -172,6 +172,7 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         return [
             {"kind": "stylesheet", "url": asset("css/sector_section.css")},
+            {"kind": "stylesheet", "url": asset("css/ai_writing.css")},
             {"kind": "script", "url": asset("js/sector_section.js")},
             {"kind": "script", "url": asset("js/report_actions.js")},
         ]

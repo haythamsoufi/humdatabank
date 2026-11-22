@@ -13,6 +13,7 @@ from plugins.dref_monitoring.services.docx_export import render_docx
 from plugins.dref_monitoring.services.report_document import (
     FINANCE,
     INTERVENTION,
+    blocks_for_export,
     build_report,
     export_narrative,
     running_header,
@@ -141,6 +142,43 @@ def test_a_model_chapter_fills_the_go_heading():
     event = next(block for block in blocks if block.kind == "heading" and block.text == "What happened, where and when?")
     following = blocks[blocks.index(event) + 1]
     assert following.text == "The river rose overnight."
+
+
+def test_the_contacts_from_the_approved_stage_fill_contact_information():
+    contacts = [
+        {"role": "National Society Contact", "name": "Sam Doe", "title": "Secretary General", "email": "sg@example.org", "phone": "+1 555 0100"},
+        {"role": "IFRC Appeal Manager", "name": "Alex Roe", "title": "", "email": "alex@example.org", "phone": ""},
+        {"role": "IFRC Emergency", "name": "", "title": "", "email": "", "phone": ""},
+    ]
+    blocks = build_report(_source(contacts=contacts))
+    contact = next(block for block in blocks if block.key == "contacts")
+    assert contact.vacant is False
+    assert contact.html == (
+        "<ul><li>National Society Contact: Sam Doe, Secretary General, sg@example.org, +1 555 0100</li>"
+        "<li>IFRC Appeal Manager: Alex Roe, alex@example.org</li></ul>"
+    )
+    french = next(block for block in build_report({**_source(contacts=contacts), "language": "fr"}) if block.key == "contacts")
+    assert "<li>Contact de la Société nationale: Sam Doe" in french.html
+    assert any(block.text == "Contact information" for block in blocks_for_export(blocks, False))
+
+
+def test_without_contacts_the_heading_drops_out_of_an_export():
+    blocks = build_report(_source())
+    assert next(block for block in blocks if block.key == "contacts").vacant is True
+    assert all(block.text != "Contact information" for block in blocks_for_export(blocks, False))
+
+
+def test_empty_chapters_stay_in_the_preview_but_drop_out_of_an_export():
+    blocks = build_report(_source(narratives={"what_happened": "The river rose overnight."}))
+    event = next(block for block in blocks if block.kind == "heading" and block.text == "What happened, where and when?")
+    assert event.vacant is False
+    assert blocks[blocks.index(event) + 1].vacant is False
+    icrc = next(block for block in blocks if block.text == "ICRC actions related to the current event")
+    assert icrc.vacant is True
+    exported = blocks_for_export(blocks, False)
+    assert all(block.text != "ICRC actions related to the current event" for block in exported)
+    assert any(block.text == "The river rose overnight." for block in exported)
+    assert any(block.text == "ICRC actions related to the current event" for block in blocks_for_export(blocks, True))
 
 
 def test_operational_update_follows_the_go_outline_and_does_not_invent_the_event():

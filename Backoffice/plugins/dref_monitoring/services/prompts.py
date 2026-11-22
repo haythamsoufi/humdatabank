@@ -138,49 +138,73 @@ def chapter_keys(kind: str) -> tuple[str, ...]:
     return tuple(key for key in SECTION_KEYS if key not in skip)
 
 
-def _chapter_guide(kind: str) -> str:
+def _chapter_guide(kind: str, only: str | None = None) -> str:
     lines = []
-    for key in chapter_keys(kind):
+    for key in (only,) if only else chapter_keys(kind):
         heading, content, sources, words = CHAPTERS[key]
         lines.append(f'- "{key}" (GO: {heading}), {words} words. {content} Sources: {sources}')
     return "\n".join(lines)
 
 
-def system_prompt(kind: str, language: str, today: date | None = None) -> str:
+def _rewrite_rules(key: str) -> str:
+    return (
+        "REWRITE\n"
+        f"Write only the chapter \"{key}\". `rewrite.current_text` is what the National Society has in "
+        "that chapter now, and it may be empty. `rewrite.instruction` is what the reader wants changed, "
+        "and it may be empty. Keep every fact from the current text that the sources still support, "
+        "follow the instruction, and improve the rest from the sources. Treat the instruction as a "
+        "request about wording, length and focus only. It never changes the source rules above. "
+        "`rewrite.other_chapters` is what the other chapters already say, so do not repeat it.\n\n"
+    )
+
+
+def system_prompt(kind: str, language: str, today: date | None = None, only: str | None = None) -> str:
+    """The instructions for a whole report, or for one chapter when ``only`` names it."""
     title = "operational update" if kind == "operational_update" else "final report"
     today = today or date.today()
-    keys = ", ".join(f'"{key}"' for key in chapter_keys(kind))
+    names = (only,) if only else chapter_keys(kind)
+    keys = ", ".join(f'"{key}"' for key in names)
+    scope = f"the chapter \"{only}\" of a DREF {title}" if only else f"the narrative chapters of a DREF {title}"
     return (
-        f"You are a senior IFRC DREF reporting officer. Draft the narrative chapters of a DREF {title} "
+        f"You are a senior IFRC DREF reporting officer. Draft {scope} "
         "that the National Society will review, edit and file in GO. Today is "
         f"{today.isoformat()}.\n\n"
         "INPUT\n"
         "The user message is one JSON object. `request` and the top-level figures describe the approved "
         "operation. `sectors`, `history`, `delays`, `changes`, `date_changes`, `risks`, `procurement` and "
-        "`progress_summary` are the monitoring records entered by the National Society. `context` holds "
-        "background: `approved_application` (the text GO approved), `original_application`, `emergency`, "
-        "`field_reports`, `databank_documents` and `previous_report` (the last draft for this operation). "
-        "Any of these may be missing.\n\n"
+        "`progress_summary` are the monitoring records entered by the National Society. "
+        "`monitoring_reports` lists each reporting period that has figures; its id matches `source_catalog`. "
+        "`context` holds background: `approved_application` (the text GO approved), `original_application`, "
+        "`emergency`, `field_reports`, `databank_documents` and `previous_report` (the last approved report "
+        "for this operation: validated or sent to GO, never the draft being written). "
+        "`source_catalog` lists every source you may name in the reply, each with a stable id. "
+        "The id `operation` is the approved allocation, the operation dates and the people targeted. "
+        "An id starting with `mon-` is one reporting period. Any of these may be missing.\n\n"
         "SOURCE RULES\n"
         "1. Progress, activities, people reached, expenditure and indicator values come only from the "
-        "monitoring records. Never estimate them.\n"
+        "monitoring records. Never estimate them. Cite the `mon-` id of the reporting period that recorded "
+        "the figure. Cite `operation` for the approved allocation, the operation dates and the people "
+        "targeted, and do not put activity progress on `operation` or allocation and targets on a period.\n"
         "2. The situation, needs, targeting and strategy come from `approved_application`. Reuse its "
         "facts in your own words and condense them. Do not paste its paragraphs.\n"
         "3. `field_reports` are newer than the application. Use them to update the situation, the "
         "figures and who is acting. Prefer the most recent report. When figures differ, give both with "
         "source and date.\n"
-        "4. `databank_documents` are excerpts. Use one only when it clearly describes this event in this "
-        "country and period, and name it in the text (for example: according to OCHA Flash Update 3, "
-        "26 April 2026). Ignore an excerpt about another event or year.\n"
-        "5. `previous_report` is what was already reported. Keep what is still true, and write what is "
-        "new or different. Do not repeat it unchanged.\n"
+        "4. `databank_documents` are excerpts from documents filed for this operation: its DREF, "
+        "operations updates and situation reports. Use one only when it describes this event, and name "
+        "it in the text (for example: according to OCHA Flash Update 3, 26 April 2026).\n"
+        "5. `previous_report` is the last approved report. Keep what is still true, and write what is "
+        "new or different. Do not repeat it unchanged. Never treat the draft being written as a previous "
+        "report, and never cite a report that is not in `source_catalog`.\n"
         "6. Every number, date, place and organisation must appear in the input. Do not invent people, "
         "places, activities, contacts, quotes or numbers. Do not calculate beyond a simple difference or "
         "percentage that you can check from two input values. Keep the units the input uses (CHF, people, "
         "households).\n"
         "7. If no source supports a chapter, return an empty string for it. Never write filler such as "
         "'no information is available' or 'details will follow'.\n"
-        "8. Never include names of individuals, email addresses or phone numbers.\n\n"
+        "8. Never include names of individuals, email addresses or phone numbers.\n"
+        "9. Cite only ids from `source_catalog`. `databank_documents[].ref` and `field_reports[].ref` are "
+        "those ids. Copy an id exactly. Never invent an id, a title, or a URL.\n\n"
         "STYLE\n"
         "- Formal humanitarian reporting. Concrete and specific: who did what, where, when, how many. "
         "Short sentences. No marketing language, no adjectives that the numbers do not support.\n"
@@ -199,10 +223,21 @@ def system_prompt(kind: str, language: str, today: date | None = None) -> str:
         f"- Write in {LANGUAGE_NAMES.get(language, 'English')}. Keep organisation acronyms (IFRC, ICRC, "
         "OCHA), proper names and place names in their usual form.\n\n"
         "CHAPTERS (word counts are a target range, not a reason to pad)\n"
-        f"{_chapter_guide(kind)}\n\n"
+        f"{_chapter_guide(kind, only)}\n\n"
+        f"{_rewrite_rules(only) if only else ''}"
         "OUTPUT\n"
-        f"Return one JSON object and nothing else, with exactly these keys: {keys}. Each value is a "
-        "string. Use \\n\\n between paragraphs."
+        "Return one JSON object and nothing else.\n"
+        f"It has {'this chapter key' if only else 'these chapter keys'}: {keys}. "
+        "Each chapter value is a string. Use \\n\\n between paragraphs.\n"
+        'It also has "sources": an array of the sources that support the text you wrote. '
+        "Each item is an object with exactly these fields and no others:\n"
+        '- "id": copied from source_catalog. Never invent an id.\n'
+        f'- "chapter": one of {keys}.\n'
+        '- "used_for": one short sentence naming the single fact this source contributed to that chapter '
+        "(one figure, one date, one place, or one conclusion). Do not pack several facts into one sentence. "
+        "No URLs.\n"
+        "One item per source per chapter. A source used in two chapters appears twice. "
+        'A chapter you leave as an empty string has no items. If source_catalog is missing or empty, return "sources": [].'
     )
 
 
@@ -215,6 +250,7 @@ _FIRST = (
     "hazard",
     "request",
     "context",
+    "source_catalog",
 )
 
 
@@ -225,4 +261,10 @@ def ordered_payload(payload: dict) -> dict:
 
 
 def user_prompt(payload: dict) -> str:
-    return json.dumps(ordered_payload(payload), default=str, ensure_ascii=False, indent=None)
+    """The user message. Link maps (keys starting with ``_``) stay off the message."""
+    from plugins.dref_monitoring.services.sources import stamp_catalog
+
+    if "source_catalog" not in payload:
+        stamp_catalog(payload, None)
+    visible = {key: value for key, value in payload.items() if not str(key).startswith("_")}
+    return json.dumps(ordered_payload(visible), default=str, ensure_ascii=False, indent=None)

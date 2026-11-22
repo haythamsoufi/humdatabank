@@ -13,7 +13,7 @@ pytestmark = pytest.mark.db
 def test_plugin_class_loads():
     plugin = DrefMonitoringPlugin()
     assert plugin.plugin_id == "dref_monitoring"
-    assert plugin.version == "0.10.0"
+    assert plugin.version == "0.11.0"
     assert plugin.get_blueprint().name == "dref_monitoring"
     assert plugin.get_seed_permissions()
     assert plugin.get_scheduled_jobs()
@@ -70,9 +70,10 @@ def test_operations_page_hides_closed_until_requested(app, db_session, logged_in
         assert "MDRSHUT1" not in hidden_body
         assert "MDRNONE1" not in hidden_body
         assert "Show closed" in hidden_body
+        assert "Active approved DREF applications from GO." in hidden_body
         assert "Plan draft" in hidden_body
         assert "status-label--pending" in hidden_body
-        assert "status-label--success" in hidden_body
+        assert ">Status</th>" not in hidden_body
         assert "plan_draft" not in hidden_body
 
         shown = logged_in_sm_client.get("/dref-monitoring/operations?include_closed=1")
@@ -82,6 +83,8 @@ def test_operations_page_hides_closed_until_requested(app, db_session, logged_in
         assert "MDRSHUT1" in shown_body
         assert "MDRNONE1" in shown_body
         assert "Not set" in shown_body
+        assert ">Status</th>" in shown_body
+        assert "Active approved DREF applications from GO." not in shown_body
         assert "Hide closed" in shown_body
         assert 'data-closed="1"' in shown_body
         assert "data-closed" not in hidden_body

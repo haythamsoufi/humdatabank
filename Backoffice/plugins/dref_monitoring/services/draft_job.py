@@ -17,14 +17,26 @@ from app.services.ai import ai_job_runner
 from plugins.dref_monitoring.access import actor_for_user
 from plugins.dref_monitoring.constants import NARRATIVE_AI
 from plugins.dref_monitoring.models import DrefDraft, DrefOperation
-from plugins.dref_monitoring.services.drafts import DraftCancelled, generate_draft, include_narrative
-from plugins.dref_monitoring.services.go_sync_job import _expire_job, _mark_item, _status_str, _write_progress, status_payload
+from plugins.dref_monitoring.services.drafts import (
+    DraftCancelled,
+    generate_draft,
+    include_narrative,
+    regenerate_section,
+)
+from plugins.dref_monitoring.services.go_sync_job import (
+    _expire_job,
+    _mark_item,
+    _status_str,
+    _write_progress,
+    status_payload as _job_payload,
+)
 
 logger = logging.getLogger(__name__)
 
 JOB_TYPE = "dref.draft"
 ACTION_GENERATE = "generate"
 ACTION_INCLUDE = "include"
+ACTION_SECTION = "section"
 _ACTIVE = ("queued", "running", "cancel_requested")
 _TERMINAL = {"completed", "failed", "cancelled"}
 _FAILURE = "The draft could not be generated. Try again in a moment."
@@ -33,8 +45,10 @@ _CANCELLED = "Draft generation was cancelled."
 __all__ = [
     "ACTION_GENERATE",
     "ACTION_INCLUDE",
+    "ACTION_SECTION",
     "JOB_TYPE",
     "active_draft_job",
+    "active_draft_jobs",
     "ensure_draft_job_running",
     "queue_draft_job",
     "request_draft_cancel",
@@ -42,26 +56,43 @@ __all__ = [
 ]
 
 
+def status_payload(job: AIJob) -> dict:
+    """The job as the page polls it: progress, plus the report type and the chapter a rewrite is for."""
+    body = _job_payload(job)
+    meta = dict(job.meta or {})
+    body["kind"] = meta.get("kind")
+    body["section"] = meta.get("section")
+    return body
+
+
 def _key(user_id: int, params: dict) -> str:
     """Two requests with the same key are the same piece of work."""
-    parts = (user_id, params.get("action"), params.get("operation_id"), params.get("kind"), params.get("draft_id"))
+    parts = (
+        user_id,
+        params.get("action"),
+        params.get("operation_id"),
+        params.get("kind"),
+        params.get("draft_id"),
+        params.get("section"),
+    )
     return ":".join(str(part or "") for part in parts)
 
 
-def active_draft_job(
+def active_draft_jobs(
     *,
     user_id: int | None = None,
     operation_id: int | None = None,
     key: str | None = None,
     action: str | None = None,
     draft_id: int | None = None,
-) -> AIJob | None:
-    """The oldest unfinished draft job that matches. Few are ever active, so the filter runs here."""
+) -> list[AIJob]:
+    """Every unfinished draft job that matches, oldest first. Few are ever active, so the filter runs here."""
     rows = (
         AIJob.query.filter(AIJob.job_type == JOB_TYPE, AIJob.status.in_(_ACTIVE))
         .order_by(AIJob.created_at.asc(), AIJob.id.asc())
         .all()
     )
+    found = []
     for job in rows:
         meta = dict(job.meta or {})
         if user_id is not None and job.user_id != int(user_id):
@@ -74,8 +105,14 @@ def active_draft_job(
             continue
         if draft_id is not None and meta.get("draft_id") != int(draft_id):
             continue
-        return job
-    return None
+        found.append(job)
+    return found
+
+
+def active_draft_job(**match) -> AIJob | None:
+    """The oldest unfinished draft job that matches, if any."""
+    jobs = active_draft_jobs(**match)
+    return jobs[0] if jobs else None
 
 
 def _process_item(app, *, job_id: str, item_id: int) -> None:
@@ -119,18 +156,28 @@ def _process_item(app, *, job_id: str, item_id: int) -> None:
             outcome = _run(params, progress)
             if outcome.get("ok"):
                 _mark_item(item_id, "completed", None)
+                summary = {
+                    "draft_id": outcome.get("draft_id"),
+                    "ai_used": bool(outcome.get("ai_used")),
+                    "action": params.get("action"),
+                }
+                if params.get("action") == ACTION_SECTION:
+                    # The page puts the text in its editor. A chapter has no draft to open.
+                    summary.update(
+                        {
+                            "section": outcome.get("key"),
+                            "html": outcome.get("html") or "",
+                            "sources": outcome.get("sources") or [],
+                        }
+                    )
                 _write_progress(
                     job_id,
                     {
                         "status": "completed",
                         "stage": "completed",
-                        "message": "The draft is ready.",
+                        "message": "The chapter is ready." if params.get("action") == ACTION_SECTION else "The draft is ready.",
                         "percent": 100.0,
-                        "summary": {
-                            "draft_id": outcome.get("draft_id"),
-                            "ai_used": bool(outcome.get("ai_used")),
-                            "action": params.get("action"),
-                        },
+                        "summary": summary,
                     },
                     force=True,
                 )
@@ -168,7 +215,11 @@ def _run(params: dict, progress) -> dict:
     from app.models.core import User
     from plugins.dref_monitoring.config_store import ai_enabled
     from plugins.dref_monitoring.services.context import load_context
-    from plugins.dref_monitoring.services.llm import complete_with_engine, configured_model
+    from plugins.dref_monitoring.services.llm import (
+        complete_section_with_engine,
+        complete_with_engine,
+        configured_model,
+    )
 
     user = db.session.get(User, int(params.get("user_id") or 0))
     operation = db.session.get(DrefOperation, int(params.get("operation_id") or 0))
@@ -177,6 +228,21 @@ def _run(params: dict, progress) -> dict:
     actor = actor_for_user(user)
     kind = params.get("kind") or "operational_update"
     complete = complete_with_engine if ai_enabled() else None
+    if params.get("action") == ACTION_SECTION:
+        draft = db.session.get(DrefDraft, int(params.get("draft_id") or 0))
+        if draft is None or draft.operation_id != operation.id:
+            return {"ok": False, "error": "Draft not found."}
+        return regenerate_section(
+            draft,
+            operation,
+            actor,
+            str(params.get("section") or ""),
+            complete_section=complete_section_with_engine if complete is not None else None,
+            instruction=params.get("instruction") or "",
+            current=params.get("current"),
+            context_loader=load_context if complete is not None else None,
+            progress=progress,
+        )
     if params.get("action") == ACTION_INCLUDE:
         draft = db.session.get(DrefDraft, int(params.get("draft_id") or 0))
         if draft is None or draft.operation_id != operation.id:
@@ -243,6 +309,8 @@ def queue_draft_job(user_id: int, params: dict, app) -> tuple[str, bool]:
                 "operation_id": int(params.get("operation_id") or 0),
                 "action": params.get("action"),
                 "draft_id": int(params["draft_id"]) if params.get("draft_id") else None,
+                "section": str(params.get("section") or "")[:64] or None,
+                "kind": str(params.get("kind") or "")[:32] or None,
                 "key": key,
             },
         )

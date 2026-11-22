@@ -45,19 +45,27 @@ from plugins.dref_monitoring.models import (
 )
 from plugins.dref_monitoring.services.assignment_sync import assignment_url
 from plugins.dref_monitoring.services.drafts import (
+    chapter_keys_for,
+    delete_draft,
+    draft_deletable,
     generate_draft,
     include_narrative,
     narrative_fields,
     narrative_mode_of,
     report_language,
+    reset_section,
+    save_chapters,
     save_sections,
     validate_draft,
 )
+from plugins.dref_monitoring.services.sources import narrative_sources, sources_state
 from plugins.dref_monitoring.services.draft_job import (
     ACTION_GENERATE,
     ACTION_INCLUDE,
+    ACTION_SECTION,
     JOB_TYPE as DRAFT_JOB_TYPE,
     active_draft_job,
+    active_draft_jobs,
     ensure_draft_job_running,
     queue_draft_job,
     request_draft_cancel,
@@ -66,9 +74,16 @@ from plugins.dref_monitoring.services.draft_job import (
 from plugins.dref_monitoring.services.go_submit import submit_draft
 from plugins.dref_monitoring.services.context import load_context
 from plugins.dref_monitoring.services.llm import complete_with_engine, configured_model
+from plugins.dref_monitoring.services import narrative_format as fmt
 from plugins.dref_monitoring.services.docx_export import render_docx
+from plugins.dref_monitoring.services.docx_import import DocxImportError, analyze_docx, expected_reference
 from plugins.dref_monitoring.services.pdf_export import PdfUnavailable, render_pdf
-from plugins.dref_monitoring.services.report_document import build_report, running_header, source_for
+from plugins.dref_monitoring.services.report_document import (
+    blocks_for_export,
+    build_report,
+    running_header,
+    source_for,
+)
 from plugins.dref_monitoring.services.excel_import import export_workbook, import_activities
 from plugins.dref_monitoring.services.go_parse import is_imminent
 from plugins.dref_monitoring.services.go_sync_job import (
@@ -80,9 +95,10 @@ from plugins.dref_monitoring.services.go_sync_job import (
 from plugins.dref_monitoring.services.plans import (
     decide_change,
     edit_activity,
-    generate_plan,
+    go_source_notices,
     latest_baseline,
     latest_plan,
+    plan_matches_sync,
     plan_sections,
     plan_source_label,
     plans_for,
@@ -153,6 +169,24 @@ def dref_language() -> str:
 @bp.app_template_global("dref_label")
 def dref_label(value) -> str:
     return localize_text(value)
+
+
+@bp.app_template_global("dref_nodes")
+def dref_nodes(text):
+    """A stored chapter as paragraphs and lists, so a template draws it without trusting its markup."""
+    return fmt.parse(text)
+
+
+@bp.app_template_global("dref_chapter_outline")
+def dref_chapter_outline() -> dict:
+    """The chapters of each report type with their labels, for the page that shows drafting progress."""
+    from plugins.dref_monitoring.constants import SECTION_LABELS
+    from plugins.dref_monitoring.services.prompts import chapter_keys
+
+    return {
+        kind: [{"key": key, "label": translate(SECTION_LABELS[key])} for key in chapter_keys(kind)]
+        for kind in ("operational_update", "final_report")
+    }
 
 
 @bp.before_app_request
@@ -242,8 +276,8 @@ def _day(value) -> str:
     return value.isoformat()
 
 
-def _plan_version_rows(operation_id: int, current_id: int | None) -> list[dict]:
-    plans = plans_for(operation_id)
+def _plan_version_rows(operation: DrefOperation, baseline, current_id: int | None) -> list[dict]:
+    plans = plans_for(operation.id)
     user_ids = [plan.validated_by_user_id for plan in plans if plan.validated_by_user_id]
     users = {}
     if user_ids:
@@ -259,6 +293,7 @@ def _plan_version_rows(operation_id: int, current_id: int | None) -> list[dict]:
                 "status": plan.status,
                 "source_label": plan_source_label(plan.source),
                 "current": plan.id == current_id,
+                "matches_go": plan_matches_sync(plan, operation, baseline),
                 "opened_on": _day(plan.created_at),
                 "confirmed_on": _day(plan.validated_at),
                 "confirmed_by": (person.name or person.email) if person is not None else "",
@@ -460,9 +495,12 @@ def operation_page(operation_id: int):
     can_enter = actor.allows(operation, "enter")
     can_validate = actor.allows(operation, "validate")
     baseline = latest_baseline(operation.id)
+    plan_versions = _plan_version_rows(operation, baseline, None if plan is None else plan.id)
+    current_plan_matches_go = any(row["current"] and row["matches_go"] for row in plan_versions)
     can_reset_plan = baseline is not None and plan is not None and (
         can_validate if plan.status == PLAN_VALIDATED else can_enter
     )
+    drafts = DrefDraft.query.filter_by(operation_id=operation.id).order_by(DrefDraft.id.desc()).limit(10).all()
     return render_template(
         f"plugins/{PLUGIN_ID}/operation.html",
         operation=operation,
@@ -476,9 +514,11 @@ def operation_page(operation_id: int):
         current_plan=plan,
         plan_history=plan_history,
         plan_editable=can_enter and not plan_history,
-        plan_versions=_plan_version_rows(operation.id, None if plan is None else plan.id),
+        plan_versions=plan_versions,
+        current_plan_matches_go=current_plan_matches_go,
         can_reset_plan=can_reset_plan,
         baseline=baseline,
+        go_source_notices=go_source_notices(baseline),
         sections=sections,
         snapshot=monitoring_snapshot(operation, plan, current_sections),
         activity_types=ACTIVITY_TYPES,
@@ -495,24 +535,11 @@ def operation_page(operation_id: int):
         feedback=DrefFeedback.query.filter_by(operation_id=operation.id).order_by(DrefFeedback.id.desc()).limit(20).all(),
         risks=DrefRisk.query.filter_by(operation_id=operation.id).all(),
         funds=DrefFundsEvent.query.filter_by(operation_id=operation.id).order_by(DrefFundsEvent.id.desc()).limit(5).all(),
-        drafts=DrefDraft.query.filter_by(operation_id=operation.id).order_by(DrefDraft.id.desc()).limit(10).all(),
+        drafts=drafts,
+        deletable_draft_ids={row.id for row in drafts if draft_deletable(row, operation, actor)},
         ai_ready=ai_enabled(),
         active_tab=request.args.get("tab") if request.args.get("tab") in _OPERATION_TABS else "overview",
     )
-
-
-@bp.route("/dref-monitoring/operations/<int:operation_id>/plan/generate", methods=["POST"])
-@permission_required_any(*_ANY)
-def generate_plan_route(operation_id: int):
-    operation = _operation(operation_id, "enter")
-    baseline = latest_baseline(operation.id)
-    if baseline is None:
-        flash(_("There is no approved GO baseline to build a plan from."), "warning")
-    else:
-        generate_plan(operation, baseline, date.today())
-        db.session.commit()
-        flash(_("A draft monitoring plan was created."), "success")
-    return _operation_redirect(operation.id)
 
 
 @bp.route("/dref-monitoring/operations/<int:operation_id>/plan/validate", methods=["POST"])
@@ -903,7 +930,9 @@ def draft_job_for_page(operation_id: int, action: str, draft_id: int | None = No
         return None
     ensure_draft_job_running(current_app._get_current_object(), str(job.id))
     job = active_draft_job(**match)
-    return draft_status_payload(job) if job is not None else None
+    if job is None:
+        return None
+    return draft_status_payload(job)
 
 
 def _draft_job_or_404(operation_id: int, job_id: str):
@@ -955,22 +984,31 @@ def draft_page(operation_id: int, draft_id: int):
     actor = _actor()
     draft, blocks, header = _draft_blocks(operation, draft_id)
     status = draft.status or "draft"
+    can_edit = actor.allows(operation, "enter") and status == "draft" and narrative_mode_of(draft) != NARRATIVE_NONE
+    fields = narrative_fields(draft, blocks)
+    source_rows = narrative_sources(draft)
     return render_template(
         f"plugins/{PLUGIN_ID}/draft.html",
         operation=operation,
         draft=draft,
         blocks=blocks,
         header=header,
-        fields=narrative_fields(draft),
+        fields=fields,
+        fields_by_key={field["key"]: field for field in fields},
+        source_rows=source_rows,
+        sources_state=sources_state(draft),
         narrative_mode=narrative_mode_of(draft),
-        can_edit=actor.allows(operation, "enter") and status == "draft" and narrative_mode_of(draft) != NARRATIVE_NONE,
+        can_edit=can_edit,
         can_add_narrative=actor.allows(operation, "enter") and status == "draft" and narrative_mode_of(draft) == NARRATIVE_NONE,
         ai_ready=ai_enabled(),
+        chapter_limit=fmt.CHAPTER_LIMIT,
+        section_jobs=_section_jobs_for_page(operation, draft) if can_edit else [],
         active_job=draft_job_for_page(operation.id, ACTION_INCLUDE, draft.id)
         if actor.allows(operation, "enter") and status == "draft"
         else None,
         can_validate=actor.allows(operation, "validate") and status == "draft",
         can_send=actor.allows(operation, "validate") and status == "validated" and draft.go_status != "sent",
+        can_delete=draft_deletable(draft, operation, actor),
     )
 
 
@@ -982,6 +1020,128 @@ def draft_save_route(operation_id: int, draft_id: int):
     error = save_sections(draft, operation, request.form, _actor())
     flash(translate(error or "Narrative saved."), "warning" if error else "success")
     return redirect(url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=draft.id))
+
+
+def _section_jobs_for_page(operation, draft) -> list[dict]:
+    """Chapter rewrites this person started on the draft that have not finished, so a reload shows them."""
+    actor = _actor()
+    if actor.user_id is None:
+        return []
+    rows = []
+    for job in active_draft_jobs(
+        user_id=int(actor.user_id), operation_id=operation.id, action=ACTION_SECTION, draft_id=draft.id
+    ):
+        ensure_draft_job_running(current_app._get_current_object(), str(job.id))
+        rows.append(draft_status_payload(job))
+    return rows
+
+
+def _json_error(message: str, status: int = 400):
+    return jsonify({"ok": False, "error": translate(message)}), status
+
+
+def _chapter_state(key: str, html: str) -> dict:
+    return {"key": key, "html": html, "words": fmt.word_count(html), "chars": fmt.plain_length(html)}
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/chapters", methods=["POST"])
+@permission_required_any(*_ANY)
+def draft_chapters_route(operation_id: int, draft_id: int):
+    """Save one or more chapters from the page. The body is ``{"sections": {"needs": "<p>…</p>"}}``."""
+    operation = _operation(operation_id, "enter")
+    draft = _draft_row(operation, draft_id)
+    body = request.get_json(silent=True) or {}
+    sections = body.get("sections")
+    if not isinstance(sections, dict) or not sections or len(sections) > 20:
+        return _json_error("Nothing to save.")
+    sources = body.get("sources")
+    error, saved, failed = save_chapters(
+        draft, operation, sections, _actor(), sources if isinstance(sources, dict) else None
+    )
+    if error:
+        return _json_error(error, 403 if "cannot" in error else 400)
+    return jsonify(
+        {
+            "ok": not failed,
+            "saved": {key: _chapter_state(key, html) for key, html in saved.items()},
+            "failed": {key: translate(message) for key, message in failed.items()},
+        }
+    ), (200 if saved or not failed else 400)
+
+
+@bp.route(
+    "/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/chapters/<key>/reset", methods=["POST"]
+)
+@permission_required_any(*_ANY)
+def draft_chapter_reset_route(operation_id: int, draft_id: int, key: str):
+    """Take one chapter back to the text the model first wrote."""
+    operation = _operation(operation_id, "enter")
+    draft = _draft_row(operation, draft_id)
+    error, html = reset_section(draft, operation, key, _actor())
+    if error:
+        return _json_error(error)
+    chapter_sources = [row for row in narrative_sources(draft) if row.get("chapter") == key]
+    return jsonify({"ok": True, **_chapter_state(key, html), "sources": chapter_sources})
+
+
+@bp.route(
+    "/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/chapters/<key>/generate", methods=["POST"]
+)
+@permission_required_any(*_ANY)
+def draft_chapter_generate_route(operation_id: int, draft_id: int, key: str):
+    """Queue the model to write one chapter again. The text comes back in the job summary and is not stored."""
+    operation = _operation(operation_id, "enter")
+    draft = _draft_row(operation, draft_id)
+    if not ai_enabled():
+        return _json_error("AI drafting is not enabled.")
+    if (draft.status or "draft") != "draft":
+        return _json_error("This draft is already validated.")
+    if narrative_mode_of(draft) == NARRATIVE_NONE:
+        return _json_error("This report is figures only and has no narrative to edit.")
+    if key not in chapter_keys_for(draft):
+        return _json_error("Unknown chapter.", 404)
+    body = request.get_json(silent=True) or {}
+    current = body.get("current")
+    params = {
+        "action": ACTION_SECTION,
+        "operation_id": operation.id,
+        "kind": draft.report_kind,
+        "draft_id": draft.id,
+        "section": key,
+        "instruction": " ".join(str(body.get("instruction") or "").split())[:400],
+        "current": str(current)[:20000] if isinstance(current, str) else None,
+    }
+    response, status = _queue_draft_response(operation, params)
+    payload = response.get_json()
+    payload["section"] = key
+    return jsonify(payload), status
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/import.docx", methods=["POST"])
+@permission_required_any(*_ANY)
+def draft_docx_import_route(operation_id: int, draft_id: int):
+    """Read an edited Word export and say what each chapter would become. Nothing is saved here."""
+    operation = _operation(operation_id, "enter")
+    draft = _draft_row(operation, draft_id)
+    if (draft.status or "draft") != "draft":
+        return _json_error("This draft is already validated.")
+    if narrative_mode_of(draft) == NARRATIVE_NONE:
+        return _json_error("This report is figures only and has no narrative to edit.")
+    upload = request.files.get("document")
+    if upload is None or not upload.filename:
+        return _json_error("Choose a Word document.")
+    if not upload.filename.lower().endswith(".docx"):
+        return _json_error("Use a Word document saved as .docx.")
+    raw = upload.read(5 * 1024 * 1024 + 1)
+    try:
+        result = analyze_docx(raw, draft, operation)
+    except DocxImportError as exc:
+        return _json_error(str(exc))
+    except Exception:
+        current_app.logger.warning("DREF Word import failed for draft %s", draft.id, exc_info=True)
+        return _json_error("The Word file could not be read.")
+    result["warnings"] = [translate(message) for message in result["warnings"]]
+    return jsonify(result)
 
 
 @bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/validate", methods=["POST"])
@@ -1014,6 +1174,19 @@ def draft_send_route(operation_id: int, draft_id: int):
     return redirect(url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=draft.id))
 
 
+@bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/delete", methods=["POST"])
+@permission_required_any(*_ANY)
+def draft_delete_route(operation_id: int, draft_id: int):
+    operation = _operation(operation_id, "enter")
+    draft = _draft_row(operation, draft_id)
+    error = delete_draft(draft, operation, _actor())
+    if error:
+        flash(translate(error), "warning")
+        return redirect(url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=draft.id))
+    flash(translate("The draft was deleted."), "success")
+    return redirect(url_for(f"{PLUGIN_ID}.operation_page", operation_id=operation.id, tab="drafts"))
+
+
 def _draft_row(operation, draft_id: int):
     draft = db.session.get(DrefDraft, draft_id)
     if draft is None or draft.operation_id != operation.id:
@@ -1027,12 +1200,23 @@ def _draft_blocks(operation, draft_id: int):
     return draft, build_report(source), running_header(source)
 
 
+def _export_blocks(operation, draft_id: int):
+    """Empty sections stay out of a download unless the preview toggle asked for them."""
+    draft, blocks, header = _draft_blocks(operation, draft_id)
+    return draft, blocks_for_export(blocks, request.args.get("include_empty") == "1"), header
+
+
 @bp.route("/dref-monitoring/operations/<int:operation_id>/drafts/<int:draft_id>/export.docx", methods=["GET"])
 @permission_required_any(*_ANY)
 def draft_docx_route(operation_id: int, draft_id: int):
     operation = _operation(operation_id, "enter")
-    draft, blocks, header = _draft_blocks(operation, draft_id)
-    payload = render_docx(blocks, header, language=draft.language or "en")
+    draft, blocks, header = _export_blocks(operation, draft_id)
+    payload = render_docx(
+        blocks,
+        header,
+        language=draft.language or "en",
+        reference=expected_reference(operation.id, draft.id),
+    )
     return send_file(
         BytesIO(payload),
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1045,7 +1229,7 @@ def draft_docx_route(operation_id: int, draft_id: int):
 @permission_required_any(*_ANY)
 def draft_pdf_route(operation_id: int, draft_id: int):
     operation = _operation(operation_id, "enter")
-    draft, blocks, header = _draft_blocks(operation, draft_id)
+    draft, blocks, header = _export_blocks(operation, draft_id)
     try:
         payload = render_pdf(blocks, header, language=draft.language or "en")
     except PdfUnavailable:

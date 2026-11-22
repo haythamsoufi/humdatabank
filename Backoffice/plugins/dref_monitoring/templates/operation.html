@@ -54,7 +54,8 @@
 
 {% block extra_css %}
 {% include "components/_ui_style_stylesheets.html" %}
-<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/plan_inline.css') }}?v=18">
+<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/plan_inline.css') }}?v=21">
+<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/ai_writing.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
@@ -290,15 +291,6 @@
                     {% endif %}
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    {% if actor_can_enter %}
-                    <form action="{{ url_for('dref_monitoring.generate_plan_route', operation_id=operation.id) }}" method="POST" class="inline-block">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="tab" value="plan">
-                        <button type="submit" class="btn btn-secondary">
-                            <i class="fas fa-clipboard-list" aria-hidden="true"></i>{{ dref_tr('Generate plan') }}
-                        </button>
-                    </form>
-                    {% endif %}
                     {% if actor_can_validate and not plan_history and current_plan and current_plan.status == 'draft' %}
                     <form action="{{ url_for('dref_monitoring.validate_plan_route', operation_id=operation.id) }}" method="POST" class="inline-block">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -320,6 +312,14 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if go_source_notices %}
+            <div class="border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 text-sm text-amber-950 space-y-1" role="status">
+                {% for notice in go_source_notices %}
+                <p>{{ notice }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
 
             {% if plan_history and current_plan %}
             <div class="border border-gray-200 bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-700 flex flex-wrap items-center justify-between gap-3">
@@ -409,6 +409,7 @@
                             {% for block in section.blocks %}
                             {% set indicator = block.indicator %}
                             {% set indicator_key = indicator.id if indicator else 'other-' ~ section.group.id %}
+                            {% if not block.bare %}
                             <tr class="dref-plan-indicator border-t border-gray-200" data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}" data-dref-indicator-row>
                                 <td class="px-4 py-3" colspan="4" data-dref-indicator-cell="{{ indicator_key }}">
                                     <div class="dref-plan-fold-head">
@@ -419,13 +420,13 @@
                                             {% if indicator.unit %}
                                             <p class="mt-1 text-xs text-gray-500">{{ dref_label(indicator.unit) }}</p>
                                             {% endif %}
-                                            {% if indicator.unmatched %}
-                                            <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('No match in the indicator bank') }}</p>
-                                            {% elif indicator.bank_adapted %}
+                                            {% if indicator.bank_adapted %}
                                             <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('Temporarily matched to the indicator bank') }}</p>
                                             {% if indicator.bank_name %}
                                             <p class="text-xs text-gray-500">{{ indicator.bank_name }}</p>
                                             {% endif %}
+                                            {% elif indicator.unmatched %}
+                                            <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('No match in the indicator bank') }}</p>
                                             {% endif %}
                                             {% else %}
                                             <p class="text-sm font-medium text-gray-700">{{ dref_tr('Other activities') }}</p>
@@ -452,6 +453,7 @@
                                 <td class="dref-plan-col dref-plan-col--date px-4 py-3 text-gray-500">-</td>
                                 <td class="dref-plan-col dref-plan-col--date px-4 py-3 text-gray-500">-</td>
                             </tr>
+                            {% endif %}
                             {% for row in block.activities %}
                             <tr class="dref-plan-activity border-t border-gray-200" data-dref-activity data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}">
                                 <td class="dref-plan-wrap px-4 py-3">
@@ -833,6 +835,19 @@
                                     </a>
                                 </div>
                             </div>
+                            {% if draft.id in deletable_draft_ids %}
+                            <form method="post" action="{{ url_for('dref_monitoring.draft_delete_route', operation_id=operation.id, draft_id=draft.id) }}"
+                                  data-confirm-danger="true">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="tab" value="drafts">
+                                <button class="btn btn-danger btn-sm" type="submit"
+                                        data-confirm-title="{{ dref_tr('Delete this draft?')|forceescape }}"
+                                        data-confirm-label="{{ dref_tr('Delete')|forceescape }}"
+                                        data-confirm-message="{{ dref_tr('Delete this draft? The figures, the chapters and any edits are removed. This cannot be undone.')|forceescape }}">
+                                    <i class="fas fa-trash" aria-hidden="true"></i>{{ dref_tr('Delete') }}
+                                </button>
+                            </form>
+                            {% endif %}
                         </div>
                     </li>
                     {% else %}
@@ -1107,7 +1122,36 @@
 {% call modal_shell('dref-plan-versions-modal', dref_tr('Plan versions'), max_width='max-w-4xl') %}
     <div class="text-sm text-gray-600 space-y-4">
         <p>{{ dref_tr('The current version is the one reporting uses. An older version can be opened, or copied into a new draft. Reset builds a new draft from the latest approved GO stage and keeps every version already stored.') }}</p>
-        {% if can_reset_plan %}
+        {% if baseline %}
+        <p>{{ dref_tr('Compared with the latest stored GO stage, {stage}, synced on {date}.').format(stage=baseline.stage, date=baseline.synced_at.date().isoformat() if baseline.synced_at else '-') }}</p>
+        <p>{{ dref_tr('A change on GO to sectors, budgets, targets, or activities is picked up on the next sync. A confirmed plan stays in this list, and that sync opens a new draft.') }}</p>
+        {% endif %}
+        {% if baseline and current_plan %}
+        <div class="border border-gray-200 bg-gray-50 rounded-lg px-4 py-3 flex items-center justify-between gap-3">
+            <p class="font-medium text-gray-900">
+                {% if current_plan_matches_go %}
+                {{ dref_tr('The current plan already matches the latest approved GO stage.') }}
+                {% elif current_plan.status == 'draft' %}
+                {{ dref_tr('The current plan is not the same as the latest approved GO stage.') }}
+                {% else %}
+                {{ dref_tr('This confirmed plan is not the same as the latest approved GO stage.') }}
+                {% endif %}
+            </p>
+            {% if can_reset_plan and current_plan_matches_go %}
+            <button type="button" class="btn btn-secondary" disabled>
+                <i class="fas fa-undo" aria-hidden="true"></i>{{ dref_tr('Reset to GO draft') }}
+            </button>
+            {% elif can_reset_plan %}
+            <form method="post" action="{{ url_for('dref_monitoring.reset_plan_route', operation_id=operation.id) }}" data-dref-plan-confirm="{{ dref_tr('Open a new draft from the latest approved GO stage? Earlier versions, including a confirmed plan, stay in this list.') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="tab" value="plan">
+                <button type="submit" class="btn btn-secondary">
+                    <i class="fas fa-undo" aria-hidden="true"></i>{{ dref_tr('Reset to GO draft') }}
+                </button>
+            </form>
+            {% endif %}
+        </div>
+        {% elif can_reset_plan %}
         <form method="post" action="{{ url_for('dref_monitoring.reset_plan_route', operation_id=operation.id) }}" data-dref-plan-confirm="{{ dref_tr('Open a new draft from the latest approved GO stage? Earlier versions, including a confirmed plan, stay in this list.') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="tab" value="plan">
@@ -1133,7 +1177,8 @@
                     <tr class="border-t border-gray-200">
                         <td class="px-4 py-3 font-medium text-gray-900">
                             {{ row.version }}
-                            {% if row.current %}<span class="ml-1 text-xs font-medium text-gray-500">{{ dref_tr('Current') }}</span>{% endif %}
+                            {% if row.current %}<div class="text-xs font-medium text-gray-500">{{ dref_tr('Current') }}</div>{% endif %}
+                            {% if row.matches_go %}<div class="dref-plan-match text-xs font-medium text-gray-800">{{ dref_tr('Matches GO') }}</div>{% elif baseline %}<div class="dref-plan-match text-xs font-medium text-gray-800">{{ dref_tr('Differs from GO') }}</div>{% endif %}
                         </td>
                         <td class="px-4 py-3">{{ dref_status(row.status) }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ dref_tr(row.source_label) if row.source_label else '-' }}</td>
@@ -1186,7 +1231,7 @@
             {%- endfor %}.
         </p>
         {% endif %}
-        <p>{{ dref_tr('Each sector GO switched on keeps its budget and people targeted, with one indicator and a starting activity. More activities can be added under that indicator. An imminent or anticipatory DREF uses Early actions and Early response instead. Adding or removing a sector, an indicator, or an activity after confirmation opens a new draft.') }}</p>
+        <p>{{ dref_tr('Each sector GO switched on keeps its budget and people targeted. Indicator titles are added only when GO publishes the application. When that application is missing, the plan flags the gap instead of inventing an indicator. A starting activity remains so the sector can be reported. An imminent or anticipatory DREF uses Early actions and Early response instead. Adding or removing a sector, an indicator, or an activity after confirmation opens a new draft.') }}</p>
         {% if plan and plan.source == 'excel' %}
         <p>{{ dref_tr('The groups below came from an Excel import. The ceilings still follow the latest approved GO stage.') }}</p>
         {% elif plan and plan.source == 'rebased' %}
@@ -1200,7 +1245,7 @@
     </div>
 {% endcall %}
 <script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/operation_tabs.js') }}?v=2" nonce="{{ csp_nonce() }}" defer></script>
-<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/report_actions.js') }}?v=2" nonce="{{ csp_nonce() }}" defer></script>
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/report_actions.js') }}?v=3" nonce="{{ csp_nonce() }}" defer></script>
 <script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/plan_inline.js') }}?v=13" nonce="{{ csp_nonce() }}" defer></script>
 {% include "components/_ui_style_root_end.html" %}
 {% endblock %}

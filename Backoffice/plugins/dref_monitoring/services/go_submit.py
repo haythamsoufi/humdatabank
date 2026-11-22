@@ -20,6 +20,7 @@ from app.utils.common.datetime_helpers import ensure_utc, utcnow
 from plugins.dref_monitoring.constants import GO_API_ROOT
 from plugins.dref_monitoring.models import DrefDraft
 from plugins.dref_monitoring.services.drafts import narrative_map
+from plugins.dref_monitoring.services.narrative_format import to_plain
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,8 @@ _REJECTED = "GO did not accept the report."
 
 
 def go_payload(operation, draft) -> dict:
-    chapters = narrative_map(draft)
+    # GO takes plain text. Lists keep their "- " and "1. " markers, paragraphs are split by a blank line.
+    chapters = {key: to_plain(text) for key, text in narrative_map(draft).items()}
     payload = {
         "title": (operation.disaster_name or operation.appeal_code or "")[:255],
         "appeal_code": operation.appeal_code,

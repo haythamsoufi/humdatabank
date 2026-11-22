@@ -114,6 +114,116 @@ def latest_baseline(operation_id: int) -> DrefBaseline | None:
     return DrefBaseline.query.filter_by(operation_id=operation_id, is_latest=True).first()
 
 
+def _shape_text(value) -> str:
+    return " ".join(str(value or "").casefold().split())
+
+
+def _shape_number(value) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = Decimal(str(value).replace(",", "").strip())
+    except Exception:
+        return str(value)
+    text = format(number.normalize(), "f")
+    return "0" if text == "-0" else text
+
+
+def _sync_indicators(raw_rows) -> tuple:
+    found = []
+    for raw in raw_rows or []:
+        if not isinstance(raw, dict):
+            continue
+        title = str(raw.get("title") or "").strip()[:255]
+        if not title:
+            continue
+        found.append((_shape_text(title), _shape_number(as_money(raw.get("target")))))
+    return tuple(sorted(found))
+
+
+def _sync_activities(titles, budget=None) -> tuple:
+    found = []
+    for title in titles or []:
+        text = str(title or "").strip()[:255]
+        if text:
+            found.append((_shape_text(text), _shape_number(budget)))
+    return tuple(sorted(found))
+
+
+def sync_plan_shape(operation: DrefOperation, baseline: DrefBaseline) -> tuple:
+    """Sectors, indicators, and activities a new draft from this GO stage would contain."""
+    interventions = _interventions(baseline)
+    if interventions:
+        rows = []
+        for index, item in enumerate(interventions):
+            key = str(item.get("key") or "").strip() or f"other:{index}"
+            label = str(item.get("label") or key)[:180]
+            rows.append(
+                (
+                    key[:80],
+                    _shape_text(label),
+                    _shape_number(as_money(item.get("budget"))),
+                    _shape_number(as_int(item.get("people_targeted"))),
+                    _sync_indicators(item.get("indicators")),
+                    _sync_activities(item.get("activities")),
+                )
+            )
+        return tuple(rows)
+    rows = []
+    for spec in _desired_groups(operation, list(baseline.sectors or [])):
+        rows.append(
+            (
+                spec["key"],
+                _shape_text(spec["label"]),
+                _shape_number(spec["budget_chf"]),
+                _shape_number(spec["people_targeted"]),
+                (),
+                _sync_activities([spec["activity_title"]], spec["budget_chf"]),
+            )
+        )
+    return tuple(rows)
+
+
+def plan_shape(plan: DrefPlan) -> tuple:
+    """The same sectors, indicators, and activities, read back from a stored plan."""
+    rows = []
+    for group in groups_for(plan.id):
+        indicators = tuple(
+            sorted(
+                (_shape_text(indicator.title), _shape_number(indicator.target))
+                for indicator in indicators_for_group(group.id)
+                if indicator.standard_code not in _SYNTHETIC_CODES
+            )
+        )
+        activities = tuple(
+            sorted(
+                (_shape_text(activity.title), _shape_number(activity.budget_chf))
+                for activity in activities_for(group.id)
+            )
+        )
+        rows.append(
+            (
+                group.key,
+                _shape_text(group.label),
+                _shape_number(group.budget_chf),
+                _shape_number(group.people_targeted),
+                indicators,
+                activities,
+            )
+        )
+    return tuple(rows)
+
+
+def plan_matches_sync(plan: DrefPlan | None, operation: DrefOperation, baseline: DrefBaseline | None) -> bool:
+    """True when this plan still has the sectors and activities the latest GO stage would generate.
+
+    Sector order is ignored. A reordered application is the same plan.
+    """
+    if plan is None or baseline is None:
+        return False
+    return tuple(sorted(plan_shape(plan))) == tuple(sorted(sync_plan_shape(operation, baseline)))
+
+
 def groups_for(plan_id: int) -> list[DrefGroup]:
     return DrefGroup.query.filter_by(plan_id=plan_id).order_by(DrefGroup.sort_order, DrefGroup.id).all()
 
@@ -265,17 +375,22 @@ def plan_sections(plan_id: int) -> list[dict]:
         activities = activities_for(group.id)
         linked: set[int] = set()
         blocks = []
-        for indicator in indicators_for_group(group.id):
+        real_indicators = [
+            indicator
+            for indicator in indicators_for_group(group.id)
+            if indicator.standard_code not in _SYNTHETIC_CODES
+        ]
+        for indicator in real_indicators:
             rows = [activity for activity in activities if activity.indicator_id == indicator.id]
             if not rows:
                 rows = [activity for activity in activities if indicator.activity_id == activity.id]
             linked.update(activity.id for activity in rows)
             if indicator.bank_adapted and indicator.indicator_bank_id:
                 adapted_ids.add(int(indicator.indicator_bank_id))
-            blocks.append({"indicator": indicator, "activities": rows})
+            blocks.append({"indicator": indicator, "activities": rows, "bare": False})
         orphans = [activity for activity in activities if activity.id not in linked]
         if orphans:
-            blocks.append({"indicator": None, "activities": orphans})
+            blocks.append({"indicator": None, "activities": orphans, "bare": not real_indicators})
         sections.append({"group": group, "blocks": blocks, "activities": activities})
     names = _bank_names(adapted_ids)
     for section in sections:
@@ -418,29 +533,6 @@ def _add_group(plan: DrefPlan, operation: DrefOperation, spec: dict) -> DrefGrou
     )
     db.session.add(activity)
     db.session.flush()
-    if spec["track_people"] and spec["people_targeted"] is not None:
-        indicator = DrefIndicator(
-            group_id=group.id,
-            title="People reached",
-            kind="outcome",
-            standard_code="PEOPLE_REACHED",
-            target=spec["people_targeted"],
-            unit="people",
-            beneficiary_unit="individuals",
-        )
-    else:
-        indicator = DrefIndicator(
-            group_id=group.id,
-            title="Activities completed",
-            kind="process",
-            standard_code="ACTIVITIES_COMPLETED",
-            target=Decimal("1"),
-            unit="activities",
-            beneficiary_unit="none",
-        )
-    db.session.add(indicator)
-    db.session.flush()
-    activity.indicator_id = indicator.id
     return group
 
 
@@ -515,8 +607,56 @@ def _resolve_bank(title: str, sector_id: int | None, emergency, catalog):
     return adapted, adapted is not None
 
 
+def drop_generated_indicators(plan_id: int) -> bool:
+    """Remove People reached and Activities completed lines this plugin invented.
+
+    Those titles are not on the GO feed. Sector budgets and people targeted stay
+    on the group. A starting activity stays, no longer hanging off a made-up indicator.
+    """
+    changed = False
+    for group in groups_for(plan_id):
+        for indicator in list(indicators_for_group(group.id)):
+            if indicator.standard_code not in _SYNTHETIC_CODES:
+                continue
+            DrefActivity.query.filter_by(indicator_id=indicator.id).update({"indicator_id": None})
+            db.session.delete(indicator)
+            changed = True
+    return changed
+
+
+def go_source_notices(baseline: DrefBaseline | None) -> list[str]:
+    """Gaps in what GO published, apart from an indicator title that missed the bank."""
+    from plugins.dref_monitoring.i18n import translate
+
+    if baseline is None:
+        return [translate("No approved GO stage is stored for this operation.")]
+    if not _interventions(baseline):
+        return [
+            translate(
+                "GO did not publish the planned indicators for this stage. "
+                "Sector budgets and people targeted come from the public feed. "
+                "No indicator title was added in their place."
+            )
+        ]
+    notices = []
+    for item in _interventions(baseline):
+        titles = [
+            row
+            for row in (item.get("indicators") or [])
+            if isinstance(row, dict) and str(row.get("title") or "").strip()
+        ]
+        if titles:
+            continue
+        label = str(item.get("label") or item.get("key") or "Sector")
+        notices.append(
+            translate("{sector}: GO sent this sector with no indicators.").format(sector=label)
+        )
+    return notices
+
+
 def refresh_indicator_matches(plan_id: int) -> bool:
     """Link GO titles the strict matcher missed. Leaves a clean match untouched."""
+    changed = drop_generated_indicators(plan_id)
     pending = []
     for group in groups_for(plan_id):
         sector_id = None if group.bank_sector_id is None else int(group.bank_sector_id)
@@ -526,9 +666,8 @@ def refresh_indicator_matches(plan_id: int) -> bool:
             if indicator.unmatched or indicator.bank_adapted:
                 pending.append((indicator, sector_id))
     if not pending:
-        return False
+        return changed
     emergency, catalog = _load_banks()
-    changed = False
     for indicator, sector_id in pending:
         bank, adapted = _resolve_bank(indicator.title, sector_id, emergency, catalog)
         bank_id = None if bank is None else int(bank.id)
@@ -851,6 +990,8 @@ def reset_plan_from_sync(operation: DrefOperation, actor, today) -> str | None:
     if baseline is None:
         return "There is no approved GO baseline to build a plan from."
     current = latest_plan(operation.id)
+    if current is not None and plan_matches_sync(current, operation, baseline):
+        return "The current plan already matches the latest approved GO stage."
     if current is not None and current.status == PLAN_VALIDATED:
         if not actor.allows(operation, "validate"):
             return "You cannot undo a confirmed plan."

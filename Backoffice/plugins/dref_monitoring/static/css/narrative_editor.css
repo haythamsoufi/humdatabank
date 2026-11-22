@@ -1,0 +1,775 @@
+/* Editing the chapters of a draft: cards on the Narrative tab, chapters edited in place in the
+   preview, the formatting bar, the save status and the Word import. js/narrative_editor.js drives it.
+   Tailwind does not read plugin scripts, so everything the script builds is styled here. */
+
+/* Text of a chapter -------------------------------------------------------- */
+
+.dref-rich {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: #111827;
+    overflow-wrap: anywhere;
+}
+
+.dref-rich p {
+    margin: 0 0 0.6em;
+}
+
+.dref-rich p:last-child,
+.dref-rich ul:last-child,
+.dref-rich ol:last-child {
+    margin-bottom: 0;
+}
+
+.dref-rich ul,
+.dref-rich ol {
+    margin: 0 0 0.6em;
+    padding-inline-start: 1.4em;
+}
+
+.dref-rich ul { list-style: disc; }
+.dref-rich ol { list-style: decimal; }
+.dref-rich li { margin: 0 0 0.2em; }
+.dref-rich strong { font-weight: 700; }
+.dref-rich em { font-style: italic; }
+.dref-rich u { text-decoration: underline; }
+.dref-rich s { text-decoration: line-through; }
+.dref-rich a {
+    color: #1d4ed8;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+}
+.dref-rich a:hover { color: #1e3a8a; }
+
+.dref-report .dref-rich {
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* Edit bar: formatting tools, save status ---------------------------------- */
+
+.dref-editbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+}
+
+.dref-editbar--sticky {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 30;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.dref-editbar__toolbar {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.dref-editbar[data-active="1"] .dref-editbar__toolbar {
+    flex: 1 1 auto;
+}
+
+.dref-editbar__hint {
+    flex: 1 1 auto;
+    margin: 0;
+    padding-inline-start: 0.25rem;
+    font-size: 0.8125rem;
+    color: #6b7280;
+}
+
+.dref-editbar[data-active="1"] .dref-editbar__hint {
+    display: none;
+}
+
+.dref-editbar__side {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    margin-inline-start: auto;
+}
+
+.dref-editbar .tox-tinymce,
+.dref-editbar .tox-tinymce-inline {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+.dref-editbar .tox .tox-editor-header,
+.dref-editbar .tox .tox-toolbar,
+.dref-editbar .tox .tox-toolbar__primary,
+.dref-editbar .tox .tox-toolbar-overlord {
+    background: transparent;
+    background-image: none;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    min-height: 0;
+}
+
+.dref-editbar .tox .tox-toolbar__group {
+    margin: 0 0.1rem;
+    padding: 0 0.25rem;
+}
+
+.dref-editbar .tox .tox-tbtn {
+    min-width: 1.9rem;
+    min-height: 1.9rem;
+    border-radius: 0.375rem;
+    color: #374151;
+}
+
+.dref-editbar .tox .tox-tbtn:hover,
+.dref-editbar .tox .tox-tbtn--enabled {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.dref-editbar .tox .tox-tbtn--bespoke {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.dref-editbar .tox .tox-tbtn svg {
+    fill: currentColor;
+}
+
+.dref-editbar .tox .tox-tbtn:disabled {
+    color: #9ca3af;
+}
+
+/* Save status -------------------------------------------------------------- */
+
+.dref-save-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #047857;
+    white-space: nowrap;
+}
+
+.dref-save-status::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: currentColor;
+}
+
+.dref-save-status[data-state="saving"],
+.dref-save-status[data-state="unsaved"] {
+    color: #b45309;
+}
+
+.dref-save-status[data-state="saving"]::before {
+    width: 0.7rem;
+    height: 0.7rem;
+    background: none;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    animation: dref-ai-spin 0.8s linear infinite;
+}
+
+.dref-save-status[data-state="error"] {
+    color: #b91c1c;
+}
+
+/* Chapter chips and tools -------------------------------------------------- */
+
+.dref-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.dref-chip[data-state="written"] { background: #d1fae5; color: #065f46; }
+.dref-chip[data-state="ai"] { background: #ede9fe; color: #5b21b6; }
+.dref-chip[data-state="edited"] { background: #dbeafe; color: #1e40af; }
+.dref-chip[data-state="saving"],
+.dref-chip[data-state="unsaved"] { background: #fef3c7; color: #92400e; }
+.dref-chip[data-state="error"] { background: #fee2e2; color: #991b1b; }
+.dref-chip[data-state="generating"] { background: #f3e8ff; color: #6d28d9; }
+
+.dref-tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+}
+
+.dref-tool:hover {
+    background: #f9fafb;
+}
+
+.dref-tool:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dref-tool img {
+    width: 14px;
+    height: 14px;
+}
+
+.dref-tool--ai {
+    border-color: #d8b4fe;
+    color: #6d28d9;
+}
+
+.dref-tool--ai:hover {
+    background: #faf5ff;
+}
+
+/* Chapter cards (Narrative tab) -------------------------------------------- */
+
+.dref-chapter {
+    position: relative;
+    scroll-margin-top: 4.5rem;
+}
+
+section.dref-chapter {
+    padding: 0.9rem 1rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.dref-chapter__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.dref-chapter__title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.dref-chapter__count {
+    margin-inline-start: auto;
+    font-size: 0.75rem;
+    color: #6b7280;
+    white-space: nowrap;
+}
+
+.dref-chapter__count.is-over {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.dref-chapter__tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.dref-chapter__body {
+    position: relative;
+    min-height: 4.5rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+section.dref-chapter.is-readonly .dref-chapter__body {
+    border-color: transparent;
+    background: #f9fafb;
+}
+
+.dref-chapter__body:hover {
+    border-color: #cbd5e1;
+}
+
+.dref-chapter__body:focus,
+.dref-chapter__body.mce-edit-focus {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+    outline: none;
+}
+
+.dref-chapter__body[data-empty="1"]::before {
+    content: attr(data-placeholder);
+    position: absolute;
+    top: 0.55rem;
+    inset-inline-start: 0.75rem;
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.dref-chapter__body > p:first-child {
+    margin-top: 0;
+}
+
+.dref-chapter__badge {
+    margin-bottom: 0.5rem;
+}
+
+.dref-chapter.is-generating .dref-chapter__body {
+    display: none;
+}
+
+.dref-chapter .dref-ai-live {
+    margin-top: 0;
+}
+
+.dref-chapter .dref-ai-live.is-typed {
+    background: #fff;
+    border: 1px solid #e9d5ff;
+    color: #111827;
+    white-space: normal;
+}
+
+.dref-chapter__undo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.375rem;
+    background: #eff6ff;
+    font-size: 0.75rem;
+    color: #1e3a8a;
+}
+
+.dref-chapter__undo button {
+    font-weight: 600;
+    text-decoration: underline;
+    color: #1d4ed8;
+}
+
+.dref-chapter__error {
+    margin: 0.4rem 0 0;
+    font-size: 0.75rem;
+    color: #b91c1c;
+}
+
+.dref-chapter [data-chapter-ai-slot]:not(:empty) {
+    margin-bottom: 0.6rem;
+}
+
+/* Chapter navigation ------------------------------------------------------- */
+
+.dref-chapter-nav {
+    position: sticky;
+    top: 4.5rem;
+    align-self: start;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+}
+
+.dref-chapter-nav ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.dref-chapter-nav__link {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    text-align: start;
+    color: #4b5563;
+}
+
+.dref-chapter-nav__link:hover {
+    background: #f3f4f6;
+}
+
+.dref-chapter-nav__link.is-current {
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+.dref-chapter-nav__dot {
+    flex: none;
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-top: 0.25rem;
+    border-radius: 9999px;
+    border: 2px solid #d1d5db;
+}
+
+.dref-chapter-nav__link[data-state="written"] .dref-chapter-nav__dot,
+.dref-chapter-nav__link[data-state="filled"] .dref-chapter-nav__dot {
+    border-color: #10b981;
+    background: #10b981;
+}
+
+.dref-chapter-nav__link[data-state="edited"] .dref-chapter-nav__dot {
+    border-color: #2563eb;
+    background: #2563eb;
+}
+
+.dref-chapter-nav__link[data-state="ai"] .dref-chapter-nav__dot {
+    border-color: #7c3aed;
+    background: #7c3aed;
+}
+
+.dref-chapter-nav__link[data-state="saving"] .dref-chapter-nav__dot,
+.dref-chapter-nav__link[data-state="unsaved"] .dref-chapter-nav__dot {
+    border-color: #f59e0b;
+    background: #f59e0b;
+}
+
+.dref-chapter-nav__link[data-state="error"] .dref-chapter-nav__dot {
+    border-color: #ef4444;
+    background: #ef4444;
+}
+
+.dref-chapter-nav__link[data-state="generating"] .dref-chapter-nav__dot {
+    border-color: #a855f7;
+    border-top-color: transparent;
+    animation: dref-ai-spin 0.9s linear infinite;
+}
+
+/* Chapters edited in the preview ------------------------------------------- */
+
+.dref-report .dref-chapter--inline {
+    margin: 0 -0.5rem 8pt;
+    padding: 0.2rem 0.5rem;
+    border: 1px dashed transparent;
+    border-radius: 0.375rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.dref-report .dref-chapter--inline:hover {
+    border-color: #bfdbfe;
+    background: #f8fbff;
+    padding-top: 1.7rem;
+}
+
+.dref-report .dref-chapter--inline:focus-within {
+    border: 1px solid #93c5fd;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14);
+    padding-top: 1.7rem;
+}
+
+.dref-report .dref-chapter--inline .dref-chapter__body {
+    min-height: 2.4rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.dref-report .dref-chapter--inline .dref-chapter__body[data-empty="1"]::before {
+    top: 0.1rem;
+    inset-inline-start: 0;
+    font-size: 0.85em;
+}
+
+.dref-chapter__flag {
+    position: absolute;
+    top: 0.2rem;
+    inset-inline-end: 0.35rem;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    pointer-events: none;
+}
+
+.dref-chapter--inline:hover .dref-chapter__flag,
+.dref-chapter--inline:focus-within .dref-chapter__flag {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+.dref-chapter__flag .dref-tool {
+    padding: 0.2rem 0.4rem;
+}
+
+.dref-report .dref-chapter--inline.is-generating .dref-chapter__flag {
+    opacity: 1;
+    pointer-events: none;
+}
+
+/* The preview is the document. While the model writes, the editor field stays
+   out of the way and the live text uses the same type as the page. */
+.dref-report .dref-chapter--inline.is-generating .dref-chapter__body {
+    display: none;
+}
+
+.dref-report .dref-chapter--inline .dref-ai-live,
+.dref-report .dref-chapter--inline .dref-ai-live.is-typed {
+    margin: 0;
+    padding: 0;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #000;
+    font-size: inherit;
+    line-height: inherit;
+    box-shadow: none;
+}
+
+.dref-report .dref-chapter--inline .dref-ai-live,
+.dref-report .dref-chapter--inline .dref-chapter__undo {
+    font-family: "Open Sans", "Segoe UI", sans-serif;
+}
+
+.dref-report ol {
+    margin: 0 0 8pt 1.3em;
+    padding: 0;
+}
+
+.dref-report ol li {
+    margin: 0 0 2pt;
+}
+
+.dref-report[dir="rtl"] ul,
+.dref-report[dir="rtl"] ol {
+    margin: 0 1.2em 8pt 0;
+}
+
+/* Word import -------------------------------------------------------------- */
+
+.dref-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.dref-status[data-status="changed"] { background: #dbeafe; color: #1e40af; }
+.dref-status[data-status="added"] { background: #d1fae5; color: #065f46; }
+.dref-status[data-status="cleared"] { background: #fef3c7; color: #92400e; }
+.dref-status[data-status="too_long"] { background: #fee2e2; color: #991b1b; }
+
+.dref-diff {
+    max-height: 10rem;
+    margin: 0.2rem 0 0;
+    padding: 0.4rem 0.5rem;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background: #f9fafb;
+    font-family: inherit;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #1f2937;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dref-save-status[data-state="saving"]::before,
+    .dref-chapter-nav__link[data-state="generating"] .dref-chapter-nav__dot {
+        animation: none;
+    }
+
+    .dref-chapter__flag,
+    .dref-chapter__body,
+    .dref-report .dref-chapter--inline {
+        transition: none;
+    }
+}
+
+@media print {
+    .dref-editbar,
+    .dref-chapter__flag {
+        display: none;
+    }
+}
+
+/* These set their own display, which would otherwise beat the hidden utility the script toggles.
+   Kept to the element itself so a responsive class such as "hidden lg:block" still works. */
+.dref-chapter__undo.hidden,
+.dref-tool.hidden {
+    display: none;
+}
+
+/* Empty sections stay out of the preview until the toggle asks for them. */
+.dref-empty-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: fit-content;
+    font-size: 0.875rem;
+    color: #374151;
+    cursor: pointer;
+}
+
+.dref-report[data-show-empty="0"] .dref-vacant {
+    display: none;
+}
+
+.dref-report[data-show-empty="1"] .dref-vacant {
+    margin: 0.25rem 0 0.35rem;
+    padding: 0.05rem 0.5rem 0.15rem;
+    border: 1px dotted #94a3b8;
+    border-radius: 0.375rem;
+    background: #f8fafc;
+    color: #94a3b8;
+}
+
+.dref-report[data-show-empty="1"] .dref-vacant :is(.dref-report__h1, .dref-report__h2, .dref-report__h3) {
+    margin: 0.3rem 0 0;
+    font-size: 0.95rem;
+    line-height: 1.2;
+}
+
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline {
+    margin: 0 0 0.1rem;
+    padding: 0 0.25rem;
+}
+
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline .dref-chapter__body {
+    min-height: 1.15rem;
+}
+
+/* Give a section its active box as soon as it is focused, before the first
+   letter. The letter itself must not resize or move the field. */
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline:focus-within,
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline.is-filled {
+    margin: 0 -0.5rem 8pt;
+    padding: 1.7rem 0.5rem 0.2rem;
+    border: 1px solid #93c5fd;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14);
+}
+
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline:focus-within .dref-chapter__body,
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline.is-filled .dref-chapter__body {
+    min-height: 2.4rem;
+}
+
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline.is-filled .dref-rich,
+.dref-report[data-show-empty="1"] .dref-vacant .dref-chapter--inline.is-filled .dref-rich :is(p, li),
+.dref-report[data-show-empty="1"] .dref-vacant :is(h2, h3, h4).is-filled {
+    color: #111827;
+}
+
+.dref-report[data-show-empty="1"] .dref-vacant :is(h2, h3, h4, p, li),
+.dref-report[data-show-empty="1"] .dref-vacant .dref-rich,
+.dref-report[data-show-empty="1"] .dref-vacant .dref-rich :is(p, li) {
+    color: #94a3b8;
+}
+
+/* Sources named by the model ------------------------------------------------ */
+
+.dref-section-sources {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 0.35rem;
+}
+
+.dref-section-sources:has(.dref-tool.hidden) {
+    display: none;
+}
+
+.dref-sources {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-top: 1rem;
+}
+
+.dref-sources.hidden,
+.dref-sources__intro.hidden,
+.dref-sources__empty.hidden {
+    display: none;
+}
+
+.dref-sources__empty {
+    margin: 0.75rem 0 0;
+    font-size: 0.875rem;
+    color: #4b5563;
+}
+
+.dref-sources__chapter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.dref-sources__heading {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.dref-sources__chapter.is-current .dref-sources__heading {
+    color: #6d28d9;
+}
+
+.dref-sources__item {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.75rem;
+}
+
+.dref-sources__title {
+    font-weight: 600;
+    color: #111827;
+}
+
+a.dref-sources__title {
+    color: #1d4ed8;
+    text-decoration: underline;
+}
+
+.dref-sources__meta,
+.dref-sources__locator,
+.dref-sources__fact {
+    margin: 0.2rem 0 0;
+    font-size: 0.8125rem;
+    color: #4b5563;
+}
+
+.dref-sources__locator {
+    color: #111827;
+}
+
+.dref-sources__meta {
+    color: #6b7280;
+}

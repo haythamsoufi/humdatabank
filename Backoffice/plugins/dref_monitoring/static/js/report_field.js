@@ -22,6 +22,7 @@ export class DrefOperationalReportField {
         if (this.root) {
             this.root.querySelectorAll("[data-activity-id]").forEach((block) => this.applyDisaggregation(block));
         }
+        this.paintPercentLimits();
         this.write();
     }
 
@@ -54,9 +55,16 @@ export class DrefOperationalReportField {
             this.clear();
             this.remember();
         }, true);
-        this.root.addEventListener("input", () => {
+        this.root.addEventListener("input", (event) => {
+            const target = event.target;
+            const isPercent = target && target.matches && target.matches(
+                "[data-part='pct_women'], [data-part='pct_men'], [data-part='pct_girls'], [data-part='pct_boys']"
+            );
             if (!this.problems().length) {
                 this.clear();
+            }
+            if (isPercent) {
+                this.paintPercentLimits(target);
             }
         });
         this.root.addEventListener("change", (event) => {
@@ -67,6 +75,7 @@ export class DrefOperationalReportField {
             const block = box.closest("[data-activity-id]");
             if (block) {
                 this.applyDisaggregation(block);
+                this.paintPercentLimits();
             }
         });
     }
@@ -157,6 +166,91 @@ export class DrefOperationalReportField {
         return found;
     }
 
+    paintPercentLimits(edited) {
+        if (!this.root) {
+            return;
+        }
+        const eachMessage = this.message("data-msg-percent-each", "A percentage cannot be more than 100.");
+        const sumMessage = this.message("data-msg-percent-sum", "The percentages together cannot be more than 100.");
+        this.root.querySelectorAll("[data-activity-id]").forEach((block) => {
+            const parts = ["pct_women", "pct_men", "pct_girls", "pct_boys"].map((part) => (
+                block.querySelector(`[data-part="${part}"]`)
+            ));
+            if (parts.some((field) => !field)) {
+                return;
+            }
+            parts.forEach((field) => {
+                field.classList.remove("dref-percent-invalid");
+                field.setCustomValidity("");
+                field.removeAttribute("aria-invalid");
+            });
+            let note = block.querySelector("[data-dref-percent-error]");
+            const skipped = block.querySelector('[data-part="disaggregation_na"]');
+            if (skipped && skipped.checked) {
+                if (note) note.remove();
+                block.removeAttribute("data-dref-percent-alert");
+                return;
+            }
+            const active = parts.filter((field) => !field.disabled);
+            let over = null;
+            let sum = 0;
+            let any = false;
+            active.forEach((field) => {
+                const value = this.number(field.value);
+                if (value === null) return;
+                any = true;
+                sum += value;
+                if (value > 100 && !over) over = field;
+            });
+            let message = "";
+            let field = null;
+            let marked = [];
+            if (over) {
+                message = eachMessage;
+                field = over;
+                marked = active.filter((item) => {
+                    const value = this.number(item.value);
+                    return value !== null && value > 100;
+                });
+            } else if (any && sum > 100 + 1e-9) {
+                message = sumMessage;
+                field = active.includes(edited) ? edited : active.find((item) => this.number(item.value) !== null);
+                marked = active.filter((item) => this.number(item.value) !== null);
+            }
+            if (!message || !field) {
+                if (note) note.remove();
+                block.removeAttribute("data-dref-percent-alert");
+                return;
+            }
+            if (!marked.includes(field)) marked.push(field);
+            marked.forEach((item) => {
+                item.classList.add("dref-percent-invalid");
+                item.setAttribute("aria-invalid", "true");
+            });
+            field.setCustomValidity(message);
+            if (!note) {
+                note = document.createElement("p");
+                note.className = "dref-percent-error";
+                note.setAttribute("data-dref-percent-error", "");
+                note.setAttribute("role", "alert");
+                const grid = block.querySelector(".dref-disagg-part");
+                const row = grid && grid.parentElement;
+                if (row) row.insertAdjacentElement("afterend", note);
+                else block.appendChild(note);
+            }
+            note.hidden = false;
+            note.textContent = message;
+            if (!edited || !block.contains(edited)) return;
+            const key = `${field.getAttribute("data-part") || ""}\n${message}`;
+            if (block.getAttribute("data-dref-percent-alert") === key) return;
+            block.setAttribute("data-dref-percent-alert", key);
+            window.setTimeout(() => {
+                if (!field.isConnected || field.validationMessage !== message) return;
+                field.reportValidity();
+            }, 0);
+        });
+    }
+
     show(problems) {
         this.clear();
         problems.forEach((item) => {
@@ -193,11 +287,13 @@ export class DrefOperationalReportField {
         if (!this.root) {
             return;
         }
-        this.root.querySelectorAll(".dref-invalid").forEach((field) => {
-            field.classList.remove("dref-invalid");
+        this.root.querySelectorAll(".dref-invalid, .dref-percent-invalid").forEach((field) => {
+            field.classList.remove("dref-invalid", "dref-percent-invalid");
             field.style.borderColor = "";
+            field.removeAttribute("aria-invalid");
+            if (field.setCustomValidity) field.setCustomValidity("");
         });
-        this.root.querySelectorAll("[data-dref-report-error]").forEach((note) => note.remove());
+        this.root.querySelectorAll("[data-dref-report-error], [data-dref-percent-error]").forEach((note) => note.remove());
     }
 
     snapshot() {

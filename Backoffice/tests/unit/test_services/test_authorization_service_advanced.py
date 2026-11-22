@@ -342,6 +342,17 @@ class TestCanEditAssignment:
                 result = AuthorizationService.can_edit_assignment(aes, admin)
         assert result is True
 
+    def test_admin_can_edit_approved_without_reopen(self, db_session, app):
+        with app.app_context():
+            admin = create_test_admin(db_session, can_manage_assignments=False)
+            aes = create_test_assignment_entity_status(
+                db_session, status=AssignmentEntityStatusValue.approved.value
+            )
+            with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
+                 patch.object(AuthorizationService, '_assignment_is_effectively_closed', return_value=False):
+                result = AuthorizationService.can_edit_assignment(aes, admin)
+        assert result is True
+
     def test_submitted_status_is_locked(self, db_session, app):
         with app.app_context():
             user, country, aes = create_focal_point_with_country(db_session)
@@ -425,6 +436,34 @@ class TestCanSubmitAssignment:
             result = AuthorizationService.can_submit_assignment(aes, user)
         assert result is False
 
+    def test_admin_cannot_submit_approved(self, db_session, app):
+        with app.app_context():
+            admin = create_test_admin(db_session, can_manage_assignments=False)
+            aes = create_test_assignment_entity_status(
+                db_session, status=AssignmentEntityStatusValue.approved.value
+            )
+            with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
+                 patch.object(AuthorizationService, 'is_system_manager', return_value=False), \
+                 patch.object(AuthorizationService, 'has_rbac_permission', return_value=True):
+                result = AuthorizationService.can_submit_assignment(aes, admin)
+        assert result is False
+
+    def test_system_manager_cannot_submit_approved(self, db_session, app):
+        with app.app_context():
+            sm = create_test_user(db_session, role="system_manager")
+            aes = create_test_assignment_entity_status(
+                db_session, status=AssignmentEntityStatusValue.approved.value
+            )
+            result = AuthorizationService.can_submit_assignment(aes, sm)
+        assert result is False
+
+    def test_system_manager_can_submit_in_progress(self, db_session, app):
+        with app.app_context():
+            sm = create_test_user(db_session, role="system_manager")
+            aes = create_test_assignment_entity_status(db_session, status="in_progress")
+            result = AuthorizationService.can_submit_assignment(aes, sm)
+        assert result is True
+
     def test_sent_for_review_delegation_user_can_submit(self, db_session, app):
         with app.app_context():
             user, country, aes = create_focal_point_with_country(db_session)
@@ -501,6 +540,19 @@ class TestCanSendForReview:
                 with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
                     result = AuthorizationService.can_send_for_review(aes, sm)
         assert result is True
+
+    def test_system_manager_cannot_send_approved_for_review(self, db_session, app):
+        with app.app_context():
+            sm = create_test_user(db_session, role="system_manager")
+            aes = create_test_assignment_entity_status(
+                db_session, status=AssignmentEntityStatusValue.approved.value
+            )
+            aes.assigned_form.requires_delegation_review = True
+            db_session.commit()
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=False):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
+                    result = AuthorizationService.can_send_for_review(aes, sm)
+        assert result is False
 
     def test_wrong_status_cannot_send_for_review(self, db_session, app):
         with app.app_context():

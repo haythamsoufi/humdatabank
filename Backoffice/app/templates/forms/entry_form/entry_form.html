@@ -143,6 +143,7 @@
                             <p class="page-subtitle">
                                 {% if True %}
                                     {# Show entity hierarchy for non-country entities #}
+                                    {% if assignment_status.entity_type != 'project' %}
                                     <span class="mr-2">{{ status_label(
                                         ('NS Branch' if assignment_status.entity_type == 'ns_branch' else
                                          'NS Sub-branch' if assignment_status.entity_type == 'ns_subbranch' else
@@ -151,8 +152,9 @@
                                          'Department' if assignment_status.entity_type == 'department' else
                                          assignment_status.entity_type),
                                         'info') }}</span>
+                                    {% endif %}
                                     <span class="font-medium">{{ assignment_status.entity.name if assignment_status.entity else 'Entity' }}</span>
-                                    {% if assignment_status.country %}
+                                    {% if assignment_status.country and assignment_status.entity_type != 'project' %}
                                         <span class="text-gray-500 text-xs">
                                             ({{ get_localized_country_name(assignment_status.country) }})
                                         </span>
@@ -792,6 +794,9 @@
                     <div id="validation-summary-banner"
                          class="hidden mb-6 rounded-lg border border-purple-200 bg-white p-4 shadow-sm"
                          data-i18n-loading="{{ _('Generating validation summary…')|forceescape }}"
+                         data-i18n-validating-start="{{ _('Validating fields…')|forceescape }}"
+                         data-i18n-validating="{{ _('Validating fields… %(done)s of %(total)s')|forceescape }}"
+                         data-i18n-interrupted="{{ _('Validation did not finish. Open the summary again to continue.')|forceescape }}"
                          {# Same wording as the real "stage" events the backend streams while it
                             actually reads the assignment / checks the figures / calls the LLM
                             (see validation_summary_overview_stream) — used as the very first
@@ -2852,7 +2857,7 @@
                     <i class="fas fa-save"></i>
                     <span class="tooltip-text">{{ _('Save') }}</span>
                 </button>
-                {% if show_whole_form_submit or enable_page_submission %}
+                {% if is_public_submission or ((show_whole_form_submit or enable_page_submission) and (can_finalize_submit or can_send_for_review)) %}
                 <button type="button" id="fab-submit-btn"
                         class="fab-tooltip w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center border-2 border-white/30 mt-2"
                         aria-label="{{ _('Submit')|forceescape }}">

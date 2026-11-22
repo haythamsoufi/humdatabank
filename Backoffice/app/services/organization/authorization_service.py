@@ -1210,10 +1210,21 @@ class AuthorizationService:
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
             return False
 
+        from app.models.enums import AssignmentEntityStatusValue
+        status = assignment_entity_status.status
+        if hasattr(status, 'value'):
+            status = status.value
+
+        # Already validated. Admins and system managers may still save
+        # corrections (can_edit_assignment) but must not submit again —
+        # that would move the assignment back to submitted.
+        if status == AssignmentEntityStatusValue.approved.value:
+            return False
+
         if AuthorizationService._assignment_is_effectively_closed(assignment_entity_status):
             return False
 
-        # System managers can always submit
+        # System managers can submit any open assignment that is not approved.
         if AuthorizationService.is_system_manager(user):
             return True
 
@@ -1233,14 +1244,6 @@ class AuthorizationService:
                 "assigned_form_id": assignment_entity_status.assigned_form_id,
             }
         if not AuthorizationService.has_rbac_permission(user, "assignment.submit", scope=scope):
-            return False
-
-        from app.models.enums import AssignmentEntityStatusValue
-        status = assignment_entity_status.status
-        if hasattr(status, 'value'):
-            status = status.value
-
-        if status == AssignmentEntityStatusValue.approved.value:
             return False
 
         if status == AssignmentEntityStatusValue.cancelled.value:
@@ -1271,6 +1274,9 @@ class AuthorizationService:
         if hasattr(status, 'value'):
             status = status.value
         if status == AssignmentEntityStatusValue.cancelled.value:
+            return False
+        # Approved work stays approved. Corrections are saved, not sent back into review.
+        if status == AssignmentEntityStatusValue.approved.value:
             return False
         # Delegation users submit, they don't send for review.
         # Note: system-manager check is intentionally after this — a system manager

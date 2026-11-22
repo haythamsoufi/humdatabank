@@ -305,6 +305,28 @@
       refreshRunButton();
     }
 
+    function validationForRow(row, validation) {
+      const key = row && row.getAttribute ? (row.getAttribute('data-line-key') || '') : '';
+      if (!key) return validation || {};
+      const lines = Array.isArray(validation?.line_verdicts) ? validation.line_verdicts : [];
+      const line = lines.find((entry) => entry && String(entry.key) === key);
+      if (!line) return validation || {};
+      return {
+        ...(validation || {}),
+        verdict: line.verdict || validation?.verdict,
+        confidence: line.confidence != null ? line.confidence : validation?.confidence,
+        opinion_summary: line.opinion || validation?.opinion_summary,
+        opinion_text: line.opinion || validation?.opinion_text,
+        opinion_details: validation?.opinion_details || validation?.opinion_summary || '',
+      };
+    }
+
+    function rowsForValidationTarget(fid) {
+      if (fid === null || fid === undefined || fid === '') return [];
+      const target = String(fid).replace(/"/g, '');
+      return Array.from(document.querySelectorAll('[data-validation-target="' + target + '"]'));
+    }
+
     function renderBadge(fid, validation) {
       const badge = $(`badge-${fid}`);
       if (!badge) return;
@@ -328,15 +350,15 @@
       badge.textContent = capitalizeFirst(cfg.labels.uncertain);
     }
 
-    function renderRowUpdate(fid, validation) {
-      renderBadge(fid, validation);
-      const confEl = $(`conf-${fid}`);
+    function paintRow(rowId, validation) {
+      renderBadge(rowId, validation);
+      const confEl = $(`conf-${rowId}`);
       if (confEl) {
         const c = validation?.confidence;
         const n = (c !== null && c !== undefined) ? Number(c) : NaN;
         confEl.textContent = Number.isFinite(n) ? `${Math.round(n * 100)}%` : '-';
       }
-      const opEl = $(`op-${fid}`);
+      const opEl = $(`op-${rowId}`);
       if (opEl) {
         const opinionHtml = formatOpinionHtml(validation);
         if (window.SafeDom && window.SafeDom.setHtml) {
@@ -347,11 +369,27 @@
       }
     }
 
+    function renderRowUpdate(fid, validation) {
+      const rows = rowsForValidationTarget(fid);
+      if (!rows.length) {
+        paintRow(fid, validation);
+        return;
+      }
+      rows.forEach((row) => {
+        const rowId = row.getAttribute('data-form-data-id') || fid;
+        paintRow(rowId, validationForRow(row, validation));
+      });
+    }
+
     function markRunning(fid) {
-      const badge = $(`badge-${fid}`);
-      if (!badge) return;
-      badge.className = 'badge run';
-      badge.textContent = capitalizeFirst(cfg.labels.running);
+      const rows = rowsForValidationTarget(fid);
+      const badges = rows.length
+        ? rows.map((row) => $(`badge-${row.getAttribute('data-form-data-id')}`)).filter(Boolean)
+        : [$(`badge-${fid}`)].filter(Boolean);
+      badges.forEach((badge) => {
+        badge.className = 'badge run';
+        badge.textContent = capitalizeFirst(cfg.labels.running);
+      });
     }
 
     let es = null;

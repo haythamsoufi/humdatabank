@@ -94,24 +94,94 @@
         var meter = panel.querySelector('[data-job-meter]');
         var hint = panel.querySelector('[data-job-hint]');
         var cancelBtn = panel.querySelector('[data-job-cancel]');
-        var state = { jobId: '', timer: null, misses: 0, percent: 0, busy: false, locked: [] };
+        var dotsEl = panel.querySelector('[data-job-dots]');
+        var chaptersEl = panel.querySelector('[data-job-chapters]');
+        var liveWrap = panel.querySelector('[data-job-live-wrap]');
+        var liveEl = panel.querySelector('[data-job-live]');
+        var liveTitle = panel.querySelector('[data-job-live-title]');
+        var outline = {};
+        try {
+            outline = JSON.parse(panel.getAttribute('data-outline') || '{}') || {};
+        } catch (error) {
+            outline = {};
+        }
+        var state = { jobId: '', timer: null, misses: 0, percent: 0, busy: false, locked: [], kind: '', rows: {}, labels: {} };
 
         function say(text, failed) {
             if (messageEl) {
                 messageEl.textContent = text || '';
                 messageEl.classList.toggle('text-red-700', !!failed);
-                messageEl.classList.toggle('text-blue-900', !failed);
+                messageEl.classList.toggle('text-purple-900', !failed);
+            }
+        }
+
+        // One row per chapter of the report being drafted, so the page shows which one is being written.
+        function buildChapters(kind) {
+            var list = outline[kind] || outline.operational_update || [];
+            if (!chaptersEl || !list.length || state.kind === kind) {
+                return;
+            }
+            state.kind = kind;
+            state.rows = {};
+            state.labels = {};
+            chaptersEl.textContent = '';
+            list.forEach(function (chapter) {
+                var row = document.createElement('li');
+                row.className = 'dref-ai-chapter';
+                var mark = document.createElement('span');
+                mark.className = 'dref-ai-chapter__mark';
+                mark.setAttribute('aria-hidden', 'true');
+                var label = document.createElement('span');
+                label.textContent = chapter.label;
+                row.appendChild(mark);
+                row.appendChild(label);
+                chaptersEl.appendChild(row);
+                state.rows[chapter.key] = row;
+                state.labels[chapter.key] = chapter.label;
+            });
+            chaptersEl.classList.remove('hidden');
+        }
+
+        function markChapters(live, completed) {
+            Object.keys(state.rows).forEach(function (key) {
+                var row = state.rows[key];
+                var done = completed || (live && (live.done || []).indexOf(key) >= 0);
+                var writing = !done && live && live.writing === key;
+                row.classList.toggle('is-done', !!done);
+                row.classList.toggle('is-writing', !!writing);
+            });
+            if (!liveWrap || !liveEl) {
+                return;
+            }
+            var showing = !completed && live && live.writing && live.text;
+            liveWrap.classList.toggle('hidden', !showing);
+            if (showing) {
+                if (liveTitle) {
+                    liveTitle.textContent = (panel.getAttribute('data-msg-writing') || '') + ' ' + (state.labels[live.writing] || '');
+                }
+                liveEl.textContent = live.text;
+                liveEl.scrollTop = liveEl.scrollHeight;
             }
         }
 
         function render(payload) {
             panel.classList.remove('hidden');
+            if (payload.kind) {
+                buildChapters(payload.kind);
+            }
             var pct = Number(payload.percent || 0);
             if (pct < state.percent && !isTerminal(payload.status)) {
                 pct = state.percent;
             }
             state.percent = pct;
             var failed = payload.status === 'failed';
+            var running = !isTerminal(payload.status);
+            panel.classList.toggle('is-running', running);
+            panel.classList.toggle('is-failed', failed);
+            if (dotsEl) {
+                dotsEl.classList.toggle('hidden', !running);
+            }
+            markChapters(payload.live, payload.status === 'completed');
             say(failed && payload.error ? payload.error : payload.message, failed);
             if (bar) {
                 bar.style.width = Math.max(0, Math.min(100, pct)) + '%';
@@ -123,7 +193,6 @@
             if (countEl) {
                 countEl.textContent = Math.round(pct) + '%';
             }
-            var running = !isTerminal(payload.status);
             if (cancelBtn) {
                 cancelBtn.classList.toggle('hidden', !running);
                 if (running && payload.status !== 'cancel_requested') {
@@ -165,6 +234,14 @@
         function fail(text) {
             stopPolling();
             panel.classList.remove('hidden');
+            panel.classList.remove('is-running');
+            panel.classList.add('is-failed');
+            if (dotsEl) {
+                dotsEl.classList.add('hidden');
+            }
+            if (liveWrap) {
+                liveWrap.classList.add('hidden');
+            }
             say(text, true);
             if (cancelBtn) {
                 cancelBtn.classList.add('hidden');
@@ -197,7 +274,8 @@
                     say(panel.getAttribute('data-msg-empty') || '', false);
                     open(payload.redirect_url, READ_DELAY_MS);
                 } else {
-                    open(payload.redirect_url, 400);
+                    // Let the last chapter tick off before the page changes.
+                    open(payload.redirect_url, 900);
                 }
                 return;
             }
@@ -256,6 +334,9 @@
             var data = new FormData(form);
             lock();
             state.percent = 0;
+            panel.classList.remove('is-failed');
+            buildChapters(String(data.get('kind') || ''));
+            markChapters(null, false);
             panel.classList.remove('hidden');
             render({ status: 'queued', message: messageEl ? messageEl.textContent : '', percent: 0 });
             http(form.getAttribute('action') || window.location.href, {

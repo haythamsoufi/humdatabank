@@ -120,7 +120,7 @@ p.note {
   color: #58595b;
   margin: 2pt 0 8pt;
 }
-ul { margin: 0 0 8pt 14pt; padding: 0; }
+ul, ol { margin: 0 0 8pt 14pt; padding: 0; }
 li { margin: 0 0 2pt; }
 table {
   width: 100%;
@@ -235,8 +235,17 @@ def _block_html(block) -> str:
     if kind == "bullets":
         items = "".join(f"<li>{escape(row[0] if row else '')}</li>" for row in block.rows)
         return f"<ul>{items}</ul>"
+    if getattr(block, "html", ""):
+        # The stored text is already reduced to paragraphs, lists and bold, italic and underline.
+        return _rich_html(block.nodes) or "<p>&nbsp;</p>"
     text = escape(block.text or "") or "&nbsp;"
     return f"<p>{text}</p>"
+
+
+def _rich_html(nodes) -> str:
+    from plugins.dref_monitoring.services.narrative_format import nodes_to_html
+
+    return nodes_to_html(list(nodes))
 
 
 def _table_html(headers, rows, *, kv: bool) -> str:

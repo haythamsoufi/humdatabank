@@ -12,6 +12,7 @@ from plugins.dref_monitoring.constants import ACTIVITY_TYPES, CARRIED_OUT_BY
 from plugins.dref_monitoring.models import DrefActivityUpdate, DrefOperation, DrefPeriod
 from plugins.dref_monitoring.scripts import report_questions
 from plugins.dref_monitoring.services.plans import (
+    _SYNTHETIC_CODES,
     _bank_names,
     activities_for,
     groups_for,
@@ -101,7 +102,14 @@ def activities_by_section(operation: DrefOperation, period: DrefPeriod | None = 
         section_key = form_section_key(group.key)
         cards = grouped.setdefault(section_key, [])
         activities = activities_for(group.id)
-        owners = _owners_for(activities, indicators_for_group(group.id))
+        owners = _owners_for(
+            activities,
+            [
+                indicator
+                for indicator in indicators_for_group(group.id)
+                if indicator.standard_code not in _SYNTHETIC_CODES
+            ],
+        )
         for activity in activities:
             update = updates.get(activity.id)
             reached = update.people_individuals if update is not None else None
@@ -137,26 +145,23 @@ def plan_indicator_filter(operation: DrefOperation) -> dict:
     """Sector sections on the plan, and the indicator-bank rows the assignment should show.
 
     A plan built from the GO application keeps the bank rows its indicators matched,
-    including a temporary adapter match. An older plan, with only the generated
-    people-reached line, keeps every emergency indicator in its sectors.
+    including a temporary adapter match. When GO did not publish indicator titles,
+    the sector stays and the emergency catalog is not used to fill the gap.
     """
     plan = latest_plan(operation.id)
     if plan is None:
         return {"sector_keys": [], "indicator_bank_ids": [], "filter_indicators": False}
     sector_keys = []
     bank_ids = []
-    filter_indicators = False
     for group in groups_for(plan.id):
         sector_keys.append(form_section_key(group.key))
         for indicator in indicators_for_group(group.id):
-            if indicator.indicator_bank_id or indicator.unmatched:
-                filter_indicators = True
             if indicator.indicator_bank_id and not indicator.unmatched:
                 bank_ids.append(int(indicator.indicator_bank_id))
     return {
         "sector_keys": sector_keys,
         "indicator_bank_ids": bank_ids,
-        "filter_indicators": filter_indicators,
+        "filter_indicators": bool(sector_keys),
     }
 
 
@@ -220,6 +225,8 @@ def indicators_missing_from_template(operation: DrefOperation, template_bank_ids
     for group in groups_for(plan.id):
         section_key = form_section_key(group.key)
         for indicator in indicators_for_group(group.id):
+            if indicator.standard_code in _SYNTHETIC_CODES:
+                continue
             if not _absent_from_template(indicator, template_bank_ids):
                 continue
             pending.append((group, section_key, indicator))
@@ -267,6 +274,7 @@ def assignment_activity_payload(operation: DrefOperation, period: DrefPeriod | N
                 "indicator": translate("Indicator"),
                 "target": translate("Target"),
                 "other_activities": translate("Other activities"),
+                "no_activities": translate("No activities were added to this indicator."),
                 "collapse": translate("Collapse"),
                 "expand": translate("Expand"),
                 "collapse_activities": translate("Collapse all activities"),
@@ -444,8 +452,9 @@ def limit_entry_fields(aes) -> None:
     """Drop indicators the monitoring plan did not include, before the form is rendered.
 
     The published template lists every emergency indicator. This assignment only
-    keeps the sectors on the plan, and, once the plan names its own indicators,
-    only the bank rows those indicators matched. The shared template is not changed.
+    keeps the sectors on the plan, and only the bank rows the plan's indicators
+    matched. A sector whose plan indicator has no bank row keeps its questions
+    and the plan card, not the catalog. The shared template is not changed.
     """
     operation, _period = resolve_cycle(aes)
     if operation is None:

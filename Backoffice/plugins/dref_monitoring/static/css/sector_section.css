@@ -294,8 +294,18 @@
 
 .dref-unmatched-indicator.is-collapsed .dref-unmatched-indicator__more,
 .dref-unmatched-indicator.is-collapsed > .dref-plan-activities,
-[data-item-type="indicator"].is-collapsed > .dref-plan-activities {
+.dref-unmatched-indicator.is-collapsed > .dref-indicator-empty,
+[data-item-type="indicator"].is-collapsed > .dref-plan-activities,
+[data-item-type="indicator"].is-collapsed > .dref-indicator-empty {
     display: none;
+}
+
+.dref-indicator-empty {
+    margin: 0.85rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+    font-size: 0.875rem;
+    color: #6b7280;
 }
 
 .dref-unmatched-indicator__row {
@@ -534,6 +544,28 @@
     color: #9ca3af;
     cursor: not-allowed;
     pointer-events: none;
+}
+
+.dref-plan-field--disagg input.dref-percent-invalid,
+.dref-report-field input.dref-percent-invalid {
+    border-color: #b91c1c;
+    background: #fef2f2;
+}
+
+.dref-percent-error {
+    flex: 1 1 100%;
+    margin: 0;
+    color: #b91c1c;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.dref-report-field .dref-percent-error {
+    margin-top: 0.5rem;
+}
+
+.dref-percent-error[hidden] {
+    display: none !important;
 }
 
 .dref-plan-field--reason[hidden],

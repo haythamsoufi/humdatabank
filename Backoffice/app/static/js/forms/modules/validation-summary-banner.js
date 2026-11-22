@@ -108,13 +108,20 @@ export function initValidationSummaryBanner() {
     let stallTimer = null;
     let lastStageAt = 0;
     let stallIndex = 0;
+    let holdPhrase = false;
+    let activeSource = null;
+    let activeRunId = null;
+    let abortRun = null;
 
     const hideBanner = () => {
         banner.classList.add('hidden');
     };
 
     if (dismissBtn) {
-        dismissBtn.addEventListener('click', hideBanner);
+        dismissBtn.addEventListener('click', () => {
+            if (abortRun) abortRun();
+            hideBanner();
+        });
     }
 
     const setBusy = (busy) => {
@@ -155,6 +162,7 @@ export function initValidationSummaryBanner() {
         lastStageAt = Date.now();
         setLoadingPhrase(loadingPhrases[0]);
         stallTimer = window.setInterval(() => {
+            if (holdPhrase) return;
             if (Date.now() - lastStageAt < STAGE_STALL_MS) return;
             stallIndex += 1;
             setLoadingPhrase(loadingPhrases[stallIndex % loadingPhrases.length]);
@@ -197,19 +205,22 @@ export function initValidationSummaryBanner() {
         banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
+    const paintCounts = (counts) => {
+        if (!countsEl || !counts) return;
+        countsEl.innerHTML = [
+            countChip(labelFor(banner, 'good', 'Good'), counts.good, 'good'),
+            countChip(labelFor(banner, 'discrepancy', 'Discrepancy'), counts.discrepancy, 'discrepancy'),
+            countChip(labelFor(banner, 'uncertain', 'Uncertain'), counts.uncertain, 'uncertain'),
+            countChip(labelFor(banner, 'failed', 'Failed'), counts.failed, 'failed'),
+            countChip(labelFor(banner, 'not-run', 'Not run'), counts.missing, 'missing'),
+        ].join('');
+    };
+
     const render = (payload, detailsUrl) => {
         stopLoadingAnimation();
         const counts = payload.counts || {};
         if (headlineEl) headlineEl.textContent = payload.headline || '';
-        if (countsEl) {
-            countsEl.innerHTML = [
-                countChip(labelFor(banner, 'good', 'Good'), counts.good, 'good'),
-                countChip(labelFor(banner, 'discrepancy', 'Discrepancy'), counts.discrepancy, 'discrepancy'),
-                countChip(labelFor(banner, 'uncertain', 'Uncertain'), counts.uncertain, 'uncertain'),
-                countChip(labelFor(banner, 'failed', 'Failed'), counts.failed, 'failed'),
-                countChip(labelFor(banner, 'not-run', 'Not run'), counts.missing, 'missing'),
-            ].join('');
-        }
+        paintCounts(counts);
         const figures = Array.isArray(payload.overview_figures) ? payload.overview_figures : [];
         if (figuresEl) {
             if (figures.length) {
@@ -327,6 +338,28 @@ export function initValidationSummaryBanner() {
         }
     }
 
+    const storedSources = () => {
+        const fallback = ['historical', 'system_documents', 'upr_documents'];
+        try {
+            const raw = localStorage.getItem('ifrc_ai_validation_sources_v2');
+            if (!raw) return fallback;
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return fallback;
+            const allowed = new Set(fallback);
+            const normalized = parsed
+                .map((v) => String(v || '').trim())
+                .filter((v, idx, arr) => !!v && allowed.has(v) && arr.indexOf(v) === idx);
+            return normalized.length ? normalized : fallback;
+        } catch {
+            return fallback;
+        }
+    };
+
+    const formatValidating = (done, total) => {
+        const pattern = labelFor(banner, 'validating', 'Validating fields… %(done)s of %(total)s');
+        return pattern.replaceAll('%(done)s', String(done)).replaceAll('%(total)s', String(total));
+    };
+
     button.addEventListener('click', (event) => {
         event.preventDefault();
         if (inFlight) return;
@@ -341,6 +374,8 @@ export function initValidationSummaryBanner() {
         setBusy(true);
         startLoadingAnimation();
         banner.classList.remove('hidden');
+        holdPhrase = true;
+        onRealStage(labelFor(banner, 'validating-start', 'Validating fields…'));
 
         const hidden = collectHiddenIds('focalDataEntryForm');
         const params = new URLSearchParams();
@@ -349,69 +384,189 @@ export function initValidationSummaryBanner() {
         const qs = params.toString();
         const detailsParams = new URLSearchParams(params);
         detailsParams.set('run', '0');
+        detailsParams.set('run_mode', 'missing');
+        detailsParams.set('concurrency', '8');
         const detailsUrl = `/forms/assignment_status/${aesId}/validation_summary?${detailsParams.toString()}`;
+
+        const closeSource = () => {
+            if (!activeSource) return;
+            try { activeSource.close(); } catch { /* already closed */ }
+            activeSource = null;
+        };
 
         const finish = () => {
             inFlight = false;
+            holdPhrase = false;
+            activeRunId = null;
+            closeSource();
+            abortRun = null;
             setBusy(false);
+            stopLoadingAnimation();
         };
 
-        // Plain single-request path — used when the browser has no EventSource, or as
-        // a resilience fallback if the SSE stream below errors before ever producing a
-        // "result" (e.g. blocked by some proxy). Same summary either way, just without
-        // live stage updates (the loading animation keeps itself honest via its own
-        // stall-cycling instead of freezing).
+        let aborted = false;
+        abortRun = () => {
+            aborted = true;
+            const runId = activeRunId;
+            activeRunId = null;
+            closeSource();
+            if (runId) {
+                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                const fn = (window.getFetch && window.getFetch()) || fetch;
+                fn(`/forms/assignment_status/${aesId}/validation_summary/cancel`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({ run_id: runId }),
+                }).catch(() => {});
+            }
+            finish();
+        };
+
+        // Used when the browser has no EventSource, or when the overview stream drops
+        // after the field checks have already been stored.
         const fetchOnce = () => {
+            if (aborted) return;
             fetch(`/forms/assignment_status/${aesId}/validation_summary/overview${qs ? `?${qs}` : ''}`, {
                 credentials: 'same-origin',
                 headers: { Accept: 'application/json' },
             })
                 .then((res) => res.json().catch(() => ({})).then((data) => {
+                    if (aborted) return;
                     if (!res.ok || data.success === false) {
                         throw new Error(data.error || data.message || `HTTP ${res.status}`);
                     }
                     render(data, detailsUrl);
                 }))
                 .catch((err) => {
+                    if (aborted) return;
                     debugWarn(MODULE_NAME, 'overview fetch failed', err);
                     showError(labelFor(banner, 'error', 'Could not load the validation summary.'));
                 })
-                .finally(finish);
+                .finally(() => {
+                    if (!aborted) finish();
+                });
+        };
+
+        const loadOverview = () => {
+            if (aborted) return;
+            holdPhrase = false;
+            lastStageAt = Date.now();
+            onRealStage(loadingPhrases[0]);
+
+            if (typeof window.EventSource !== 'function') {
+                fetchOnce();
+                return;
+            }
+
+            let settled = false;
+            const streamUrl = `/forms/assignment_status/${aesId}/validation_summary/overview_stream${qs ? `?${qs}` : ''}`;
+            const es = new window.EventSource(streamUrl, { withCredentials: true });
+            activeSource = es;
+
+            es.addEventListener('stage', (ev) => {
+                const data = parseSseJson(ev.data);
+                onRealStage(data && data.label);
+            });
+            es.addEventListener('result', (ev) => {
+                if (aborted || settled) return;
+                settled = true;
+                closeSource();
+                render(parseSseJson(ev.data), detailsUrl);
+                finish();
+            });
+            es.addEventListener('error', () => {
+                if (aborted || settled) return;
+                settled = true;
+                closeSource();
+                debugWarn(MODULE_NAME, 'overview stream failed, falling back to single request');
+                fetchOnce();
+            });
         };
 
         if (typeof window.EventSource !== 'function') {
+            holdPhrase = false;
             fetchOnce();
             return;
         }
 
-        let settled = false;
-        const streamUrl = `/forms/assignment_status/${aesId}/validation_summary/overview_stream${qs ? `?${qs}` : ''}`;
-        const es = new window.EventSource(streamUrl, { withCredentials: true });
-        const closeStream = () => {
-            try { es.close(); } catch { /* already closed */ }
-        };
+        const runId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+            ? window.crypto.randomUUID()
+            : `run-${Date.now()}`;
+        activeRunId = runId;
+        const runParams = new URLSearchParams(params);
+        runParams.set('run', '1');
+        runParams.set('run_mode', 'missing');
+        runParams.set('concurrency', '8');
+        runParams.set('run_id', runId);
+        runParams.set('ai_sources', storedSources().join(','));
 
-        es.addEventListener('stage', (ev) => {
+        let settled = false;
+        let sawInit = false;
+        let jobsDone = 0;
+        let jobsTotal = 0;
+        const eventsUrl = `/forms/assignment_status/${aesId}/validation_summary/events?${runParams.toString()}`;
+        const es = new window.EventSource(eventsUrl, { withCredentials: true });
+        activeSource = es;
+
+        es.addEventListener('init', (ev) => {
+            if (aborted) return;
+            sawInit = true;
             const data = parseSseJson(ev.data);
-            onRealStage(data && data.label);
+            jobsTotal = Array.isArray(data.to_run) ? data.to_run.length : 0;
+            jobsDone = 0;
+            paintCounts(data.counts);
+            if (jobsTotal > 0) {
+                holdPhrase = true;
+                onRealStage(formatValidating(0, jobsTotal));
+            }
         });
-        es.addEventListener('result', (ev) => {
+        es.addEventListener('item', (ev) => {
+            if (aborted) return;
+            const data = parseSseJson(ev.data);
+            if (jobsTotal) {
+                jobsDone += 1;
+                holdPhrase = true;
+                onRealStage(formatValidating(Math.min(jobsDone, jobsTotal), jobsTotal));
+            }
+            paintCounts(data.counts);
+        });
+        es.addEventListener('done', () => {
+            if (aborted || settled) return;
             settled = true;
-            closeStream();
-            render(parseSseJson(ev.data), detailsUrl);
+            activeRunId = null;
+            closeSource();
+            loadOverview();
+        });
+        es.addEventListener('cancelled', () => {
+            if (aborted || settled) return;
+            settled = true;
+            activeRunId = null;
+            closeSource();
+            loadOverview();
+        });
+        // EventSource reconnects on error, which would start a second run. Close once.
+        es.addEventListener('error', (ev) => {
+            if (aborted || settled) return;
+            settled = true;
+            const serverMsg = ev && ev.data ? (parseSseJson(ev.data).error || '') : '';
+            activeRunId = null;
+            closeSource();
+            if (serverMsg && !sawInit) {
+                showError(serverMsg);
+                finish();
+                return;
+            }
+            if (jobsDone > 0) {
+                loadOverview();
+                return;
+            }
+            showError(labelFor(banner, 'interrupted', 'Validation did not finish. Open the summary again to continue.'));
             finish();
-        });
-        // Covers both a server-sent "event: error" frame (e.g. access denied) and the
-        // browser's native connection-level error — the codebase's other SSE consumer
-        // (validation-summary-progress.js) treats these the same way. Fall back to the
-        // plain request instead of just giving up, so a blocked/dropped stream still
-        // resolves correctly for the user.
-        es.addEventListener('error', () => {
-            if (settled) return;
-            settled = true;
-            closeStream();
-            debugWarn(MODULE_NAME, 'overview stream failed, falling back to single request');
-            fetchOnce();
         });
     });
 

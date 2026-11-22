@@ -392,8 +392,10 @@ class AIFormDataValidationService:
         )
 
         # When the reported value is missing, we only suggest — do not show a "good" validation verdict.
+        # Matrix numbers live on the cell lines / disagg map, not in the scalar value.
         reported_value_raw = context.get("value")
-        has_reported_value = not _is_blankish_value(reported_value_raw)
+        has_matrix_values = bool(context.get("matrix_lines") or context.get("disagg_values"))
+        has_reported_value = (not _is_blankish_value(reported_value_raw)) or has_matrix_values
         if not has_reported_value:
             previous_verdict = verdict
             verdict = "uncertain"
@@ -448,6 +450,22 @@ class AIFormDataValidationService:
         }
         if suggestion_obj:
             evidence["suggestion"] = suggestion_obj
+
+        try:
+            from plugins.upr.ai.matrix_details import build_matrix_line_verdicts
+
+            line_verdicts = build_matrix_line_verdicts(
+                context.get("matrix_lines"),
+                parent_verdict=str(verdict) if verdict is not None else None,
+                parent_opinion=opinion_text,
+                parent_confidence=confidence,
+                comparison=context.get("upr_historical_comparison"),
+                llm_json=verdict_payload if isinstance(verdict_payload, dict) else None,
+            )
+            if line_verdicts:
+                evidence["line_verdicts"] = line_verdicts
+        except Exception as e:
+            logger.debug("matrix line verdicts failed: %s", e)
 
         try:
             opinion_ui = build_opinion_ui(
@@ -997,8 +1015,12 @@ class AIFormDataValidationService:
                     disagg_values_resolved = None
 
             # Prefer scalar as "value" preview (stable), but still include disagg_values separately.
+            # Matrices have no scalar: a summed total would hide the cells and get validated as one number.
+            item_type_now = str(getattr(item, "item_type", "") or "").lower() if item else ""
             if scalar_value_preview:
                 value_preview = scalar_value_preview
+            elif item_type_now == "matrix":
+                value_preview = None
             elif disagg_clean is not None:
                 # Provide a compact, readable preview for evidence retrieval when scalar is missing.
                 try:
@@ -1133,6 +1155,8 @@ class AIFormDataValidationService:
             "data_status": data_status,
             "value": value_preview,
             "disagg_values": disagg_values_resolved,  # Resolved matrix values for LLM validation
+            # Raw cell keys (row_column). Labelled lines are built from this, not from the resolved map.
+            "disagg_raw": disagg_clean if str(item_type or "").lower() == "matrix" else None,
         }
         return ctx
 
@@ -2469,6 +2493,18 @@ class AIFormDataValidationService:
         # Build matrix-specific guidance if disagg_values present.
         # UPR forms get domain-specific matrix rules from upr_validation_prompt_section instead.
         matrix_guidance = ""
+        line_verdict_schema = ""
+        line_verdict_rules = ""
+        if context.get("matrix_lines"):
+            line_verdict_schema = (
+                '  "line_verdicts": [{"key": string, "verdict": "good"|"discrepancy"|"uncertain", '
+                '"opinion": string}],\n'
+            )
+            line_verdict_rules = (
+                "- context.matrix_lines lists every reported matrix cell (key, label, value, unit). "
+                "Validate each line on its own. Return line_verdicts with one object per matrix_lines key, "
+                "using that key. Do not treat a summed total as the reported value.\n"
+            )
         if context.get("disagg_values") and not context.get("upr_form"):
             matrix_guidance = (
                 "\nMATRIX/DISAGGREGATION DATA VALIDATION:\n"
@@ -2599,7 +2635,7 @@ class AIFormDataValidationService:
         # Structured visuals/matrix reading are already rendered above; keep the JSON dump compact.
         context_for_llm = {
             k: v for k, v in (context or {}).items()
-            if k not in ("upr_visuals", "upr_historical_matrices", "upr_assignment_review")
+            if k not in ("upr_visuals", "upr_historical_matrices", "upr_assignment_review", "disagg_raw")
         }
         if context.get("upr_value_preview"):
             context_for_llm["value"] = context.get("upr_value_preview")
@@ -2627,6 +2663,7 @@ class AIFormDataValidationService:
             '  \"suggested_value\": string|number|array|null (optional; for multi-select questions use an array of strings),\n'
             '  \"suggested_disagg_data\": object|null (optional; ONLY when context.suggestion_disagg_format indicates a disaggregation/matrix format),\n'
             '  \"suggestion_reason\": string|null (optional; short reason for suggested_value),\n'
+            + line_verdict_schema +
             '  \"citations\": [\n'
             "    {\n"
             '      \"document_id\": number|null,\n'
@@ -2637,6 +2674,7 @@ class AIFormDataValidationService:
             "  ]\n"
             "}\n\n"
             "Rules:\n"
+            + line_verdict_rules +
             "- If evidence AND historical data are both insufficient, use verdict=uncertain.\n"
             "- If document evidence explicitly conflicts with the value, use discrepancy.\n"
             "- Historical consistency (same value across periods) is strong supporting evidence even without documents.\n"

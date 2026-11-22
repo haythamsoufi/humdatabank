@@ -5,7 +5,7 @@ model therefore also receives, in order of trust:
 
 1. the written application GO approved for this operation (stored at sync time),
 2. the latest public GO field reports about the same emergency,
-3. Databank documents about the country that the person generating the draft may read,
+3. Documents filed for this operation (its DREF, operations updates and situation reports),
 4. the previous draft for this operation, so an update continues rather than restarts.
 
 Everything here is best effort. A missing page, a GO timeout, or an unavailable vector
@@ -125,7 +125,12 @@ def field_reports(report_ids: list[int], http_get: Callable | None = None) -> li
         except Exception as exc:
             logger.info("DREF field report %s could not be read: %s", report_id, exc)
             return None
-        return field_report_summary(payload) if isinstance(payload, dict) else None
+        if not isinstance(payload, dict):
+            return None
+        summary = field_report_summary(payload)
+        if summary is not None:
+            summary["id"] = int(report_id)
+        return summary
 
     if not report_ids:
         return []
@@ -136,12 +141,42 @@ def field_reports(report_ids: list[int], http_get: Callable | None = None) -> li
 
 
 def _search_queries(operation) -> list[str]:
+    code = (getattr(operation, "appeal_code", None) or "").strip()
     place = " ".join(part for part in (operation.country_name, operation.hazard) if part).strip()
     name = (operation.disaster_name or "").strip()
+    subject = " ".join(part for part in (code, name or place) if part)
     return [
-        f"{name or place} situation overview people affected damage humanitarian needs".strip(),
-        f"{place} humanitarian response government ICRC UN OCHA Red Cross Red Crescent actions coordination".strip(),
+        f"{subject} situation people affected damage humanitarian needs".strip(),
+        f"{subject} National Society IFRC ICRC government UN response".strip(),
     ]
+
+
+def _operation_document_ids(operation) -> list[int]:
+    """Documents filed for this appeal. A country plan or another emergency is not one of them.
+
+    The appeal code is what ties a file to the operation (MDRBD041do.pdf, an operations update,
+    a situation report). Nothing else in the knowledge base is searched.
+    """
+    code = (getattr(operation, "appeal_code", None) or "").strip()
+    if len(code) < 6:
+        return []
+    from sqlalchemy import or_
+
+    from app.models.embeddings import AIDocument
+    from app.models.enums import AIDocumentProcessingStatusValue
+
+    needle = f"%{code}%"
+    rows = (
+        AIDocument.query.filter(
+            AIDocument.searchable.is_(True),
+            AIDocument.processing_status == AIDocumentProcessingStatusValue.completed,
+            or_(AIDocument.title.ilike(needle), AIDocument.filename.ilike(needle)),
+        )
+        .with_entities(AIDocument.id)
+        .order_by(AIDocument.id)
+        .all()
+    )
+    return [row[0] for row in rows]
 
 
 def _default_search(query: str, filters: dict, user_id: int | None, top_k: int) -> list[dict]:
@@ -162,13 +197,14 @@ def _not_before(operation) -> date | None:
 
 
 def databank_documents(operation, user_id: int | None, search: Callable | None = None) -> list[dict]:
-    """Excerpts the reader may open. Someone without a user (a scheduled job) sees public documents only."""
-    if not (operation.country_id or operation.country_name):
+    """Excerpts from documents filed for this operation. Someone without a user sees public ones only."""
+    document_ids = _operation_document_ids(operation)
+    if not document_ids:
         return []
-    filters: dict[str, Any] = {}
+    filters: dict[str, Any] = {"document_ids": document_ids}
     if operation.country_id:
         filters["country_id"] = int(operation.country_id)
-    else:
+    elif operation.country_name:
         filters["country_name"] = operation.country_name
     run = search or _default_search
     floor = _not_before(operation)
@@ -203,34 +239,46 @@ def databank_documents(operation, user_id: int | None, search: Callable | None =
             "date": str(row.get("document_date") or "")[:10],
             "page": row.get("page_number"),
             "excerpt": excerpt,
+            "document_id": row.get("document_id"),
+            "source_url": str(row.get("source_url") or "").strip(),
+            "has_file": bool(row.get("has_local_file")),
         }
         documents.append({key: value for key, value in item.items() if value not in ("", None)})
     return documents
 
 
-def previous_report(operation) -> dict | None:
-    """The newest earlier draft's chapters, so the new one carries forward what is still true."""
+def previous_report(operation, *, exclude_draft_id: int | None = None) -> dict | None:
+    """The newest approved report's chapters, so the new one carries forward what is still true.
+
+    Only a validated or submitted report counts. The draft being written is never included,
+    even when it has already been approved.
+    """
     from plugins.dref_monitoring.models import DrefDraft
     from plugins.dref_monitoring.services.drafts import narrative_map
+    from plugins.dref_monitoring.services.narrative_format import to_plain
 
+    skip = int(exclude_draft_id) if exclude_draft_id else None
     rows = (
         DrefDraft.query.filter_by(operation_id=operation.id)
         .order_by(DrefDraft.id.desc())
-        .limit(6)
+        .limit(20)
         .all()
     )
     for row in rows:
+        if skip and row.id == skip:
+            continue
         status = row.status or "draft"
-        if status == "draft" and not row.edited_body:
+        if status not in {"validated", "submitted"}:
             continue
         chapters = {
-            key: text
+            key: to_plain(text)
             for key, text in narrative_map(row).items()
-            if key in SECTION_KEYS and str(text or "").strip()
+            if key in SECTION_KEYS and to_plain(text).strip()
         }
         if not chapters:
             continue
         return {
+            "draft_id": row.id,
             "kind": row.report_kind,
             "status": status,
             "written_on": row.created_at.date().isoformat() if row.created_at else "",
@@ -283,6 +331,7 @@ def load_context(
     http_get: Callable | None = None,
     search: Callable | None = None,
     progress: Callable | None = None,
+    exclude_draft_id: int | None = None,
 ) -> dict:
     """Everything outside the monitoring tables that the model may use.
 
@@ -322,7 +371,7 @@ def load_context(
     if reports:
         context["field_reports"] = reports
     user_id = getattr(actor, "user_id", None)
-    _say(progress, "documents", "Searching Databank documents.", 32)
+    _say(progress, "documents", "Searching documents for this operation.", 32)
     try:
         documents = databank_documents(operation, user_id, search)
     except Exception:
@@ -331,7 +380,7 @@ def load_context(
     if documents:
         context["databank_documents"] = documents
     try:
-        earlier = previous_report(operation)
+        earlier = previous_report(operation, exclude_draft_id=exclude_draft_id)
     except Exception:
         logger.warning("DREF previous report unavailable for %s", operation.appeal_code, exc_info=True)
         earlier = None

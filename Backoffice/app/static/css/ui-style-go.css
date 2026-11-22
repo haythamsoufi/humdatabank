@@ -302,10 +302,17 @@ main.admin-scroll-main:has(.ui-style-root[data-ui-style="go"]) {
 }
 
 /* ——— Entry form ——— */
+/* Side nav is a white GO card on the gray canvas, same surface as section cards. */
 .entry-form-root.ui-style-root[data-ui-style="go"] .entry-form-sections-pane {
-  background: transparent;
+  background: var(--dash-card-bg);
   border: 0;
-  box-shadow: none;
+  box-shadow: var(--dash-card-shadow);
+}
+
+@media (min-width: 1100px) {
+  .entry-form-root.ui-style-root[data-ui-style="go"] .entry-form-sections-pane {
+    border-radius: var(--dash-radius);
+  }
 }
 
 .ui-style-root[data-ui-style="go"] #sections-container > [id^="section-container-"],
@@ -363,6 +370,21 @@ main.admin-scroll-main:has(.ui-style-root[data-ui-style="go"]) {
 .ui-style-root[data-ui-style="go"] .form-item-block.border:focus-within,
 .ui-style-root[data-ui-style="go"] .form-group.form-item-block:focus-within {
   border-color: var(--dash-accent) !important;
+}
+
+/* DREF sector number questions drop card padding and stretch the input to the
+   card edge. Under the GO card that leaves a right-aligned value in an empty
+   box. Inset the label and input like other GO fields. */
+.ui-style-root[data-ui-style="go"] [data-entry-render="dref-sector"] [data-item-type="question"][data-question-type="number"].form-item-block {
+  padding: 0.75rem 1rem !important;
+}
+
+.ui-style-root[data-ui-style="go"] [data-entry-render="dref-sector"] [data-item-type="question"][data-question-type="number"] input.w-32 {
+  display: block;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  text-align: start;
 }
 
 .ui-style-root[data-ui-style="go"] .form-item-block input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),

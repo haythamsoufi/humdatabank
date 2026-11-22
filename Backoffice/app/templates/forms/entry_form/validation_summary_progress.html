@@ -332,13 +332,13 @@
             </tr>
             {% endfor %}
             {% for it in group['items'] %}
-            <tr id="row-{{ it.form_data_id }}" data-form-data-id="{{ it.form_data_id }}" data-item-id="{{ it.form_item_id or '' }}">
+            <tr id="row-{{ it.form_data_id }}" data-form-data-id="{{ it.form_data_id }}" data-validation-target="{{ it.validation_target or it.form_data_id }}" data-line-key="{{ it.line_key or '' }}" data-item-id="{{ it.form_item_id or '' }}">
                 <td>
                     <div><strong>{{ it.label or '-' }}</strong></div>
-                    <div class="muted">{{ _('FormData ID:') }} {{ it.form_data_id }}</div>
+                    <div class="muted">{{ _('FormData ID:') }} {{ it.validation_target or it.form_data_id }}</div>
                 </td>
                 <td>{{ _(it.item_type) if it.item_type else '-' }}</td>
-                <td>{{ it.value_display | format_number or '-' }}</td>
+                <td>{% if it.value_is_text %}{{ it.value_display or '-' }}{% else %}{{ it.value_display | format_number or '-' }}{% endif %}</td>
                 <td><span class="badge miss" id="badge-{{ it.form_data_id }}">{{ _('not run')|capitalize }}</span></td>
                 <td class="small" id="conf-{{ it.form_data_id }}">-</td>
                 <td class="opinion" id="op-{{ it.form_data_id }}">-</td>

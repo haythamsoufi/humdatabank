@@ -79,6 +79,11 @@ ROWS: dict[str, tuple[str, str, str]] = {
     "Add activity": ("Ajouter une activité", "Añadir una actividad", "إضافة نشاط"),
     "Indicator": ("Indicateur", "Indicador", "المؤشر"),
     "Other activities": ("Autres activités", "Otras actividades", "أنشطة أخرى"),
+    "No activities were added to this indicator.": (
+        "Aucune activité n'a été ajoutée à cet indicateur.",
+        "No se añadieron actividades a este indicador.",
+        "لم تُضف أنشطة إلى هذا المؤشر.",
+    ),
     "Actual": ("Réalisé", "Real", "الفعلي"),
     "Amounts cannot be negative.": ("Les montants ne peuvent pas être négatifs.", "Los importes no pueden ser negativos.", "لا يمكن أن تكون المبالغ سالبة."),
     "Collapse": ("Replier", "Contraer", "طي"),
@@ -119,6 +124,26 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "أدخلوا إجمالي من تم الوصول إليهم قبل التقسيم بالنسب.",
     ),
     "Expenditure cannot be negative.": ("Les dépenses ne peuvent pas être négatives.", "El gasto no puede ser negativo.", "لا يمكن أن تكون النفقات سالبة."),
+    "GO did not publish the planned indicators for this stage. Sector budgets and people targeted come from the public feed. No indicator title was added in their place.": (
+        "GO n'a pas publié les indicateurs prévus pour cette étape. Les budgets sectoriels et les personnes ciblées viennent du flux public. Aucun titre d'indicateur n'a été ajouté à leur place.",
+        "GO no publicó los indicadores previstos para esta etapa. Los presupuestos sectoriales y las personas meta vienen del flujo público. No se añadió un título de indicador en su lugar.",
+        "لم تنشر GO المؤشرات المخططة لهذه المرحلة. ميزانيات القطاعات والأشخاص المستهدفون من التغذية العامة. لم يُضف عنوان مؤشر بدلاً منها.",
+    ),
+    "No approved GO stage is stored for this operation.": (
+        "Aucune étape GO approuvée n'est enregistrée pour cette opération.",
+        "No hay una etapa de GO aprobada guardada para esta operación.",
+        "لا توجد مرحلة GO معتمدة محفوظة لهذه العملية.",
+    ),
+    "{sector}: GO sent this sector with no indicators.": (
+        "{sector} : GO a envoyé ce secteur sans indicateurs.",
+        "{sector}: GO envió este sector sin indicadores.",
+        "{sector}: أرسلت GO هذا القطاع بلا مؤشرات.",
+    ),
+    "Each sector GO switched on keeps its budget and people targeted. Indicator titles are added only when GO publishes the application. When that application is missing, the plan flags the gap instead of inventing an indicator. A starting activity remains so the sector can be reported. An imminent or anticipatory DREF uses Early actions and Early response instead. Adding or removing a sector, an indicator, or an activity after confirmation opens a new draft.": (
+        "Chaque secteur activé par GO conserve son budget et les personnes ciblées. Les titres d'indicateurs ne sont ajoutés que lorsque GO publie la demande. Si cette demande manque, le plan signale l'écart au lieu d'inventer un indicateur. Une activité de départ reste pour que le secteur puisse être suivi. Un DREF imminent ou anticipatoire utilise des actions précoces et une réponse précoce. Ajouter ou retirer un secteur, un indicateur ou une activité après confirmation ouvre un nouveau brouillon.",
+        "Cada sector que GO activó conserva su presupuesto y las personas meta. Los títulos de indicador se añaden solo cuando GO publica la solicitud. Si esa solicitud falta, el plan señala el hueco en lugar de inventar un indicador. Queda una actividad inicial para poder informar el sector. Un DREF inminente o anticipatorio usa acciones tempranas y respuesta temprana. Añadir o quitar un sector, un indicador o una actividad después de la confirmación abre un borrador nuevo.",
+        "كل قطاع فعّلته GO يحتفظ بميزانيته والأشخاص المستهدفين. تُضاف عناوين المؤشرات فقط عندما تنشر GO الطلب. إذا غاب هذا الطلب، تشير الخطة إلى الفجوة بدلاً من اختراع مؤشر. يبقى نشاط بداية حتى يمكن الإبلاغ عن القطاع. صندوق الطوارئ الاستباقي يستخدم الإجراءات المبكرة والاستجابة المبكرة. إضافة أو إزالة قطاع أو مؤشر أو نشاط بعد التأكيد تفتح مسودة جديدة.",
+    ),
     "No match in the indicator bank": (
         "Aucune correspondance dans la banque d'indicateurs",
         "Sin correspondencia en el banco de indicadores",
@@ -294,6 +319,20 @@ ROWS: dict[str, tuple[str, str, str]] = {
     "You cannot validate this draft.": ("Vous ne pouvez pas valider ce brouillon.", "No puede validar este borrador.", "لا يمكنكم اعتماد هذه المسودة."),
     "Draft failed.": ("Échec du brouillon.", "Error al crear el borrador.", "فشل إنشاء المسودة."),
     "Report sent to GO.": ("Rapport envoyé à GO.", "Informe enviado a GO.", "أُرسل التقرير إلى GO."),
+    "Delete": ("Supprimer", "Eliminar", "حذف"),
+    "Delete this draft?": ("Supprimer ce brouillon ?", "¿Eliminar este borrador?", "حذف هذه المسودة؟"),
+    "Delete this draft? The figures, the chapters and any edits are removed. This cannot be undone.": (
+        "Supprimer ce brouillon ? Les chiffres, les chapitres et les modifications sont supprimés. Cette action est irréversible.",
+        "¿Eliminar este borrador? Se eliminan las cifras, los capítulos y las ediciones. Esta acción no se puede deshacer.",
+        "حذف هذه المسودة؟ ستُحذف الأرقام والفصول وأي تعديلات. لا يمكن التراجع عن هذا الإجراء.",
+    ),
+    "The draft was deleted.": ("Le brouillon a été supprimé.", "Se eliminó el borrador.", "تم حذف المسودة."),
+    "A report already sent to GO cannot be deleted.": (
+        "Un rapport déjà envoyé à GO ne peut pas être supprimé.",
+        "Un informe ya enviado a GO no se puede eliminar.",
+        "لا يمكن حذف تقرير أُرسل بالفعل إلى GO.",
+    ),
+    "You cannot delete this draft.": ("Vous ne pouvez pas supprimer ce brouillon.", "No puede eliminar este borrador.", "لا يمكنك حذف هذه المسودة."),
     "GO did not accept the report.": ("GO n'a pas accepté le rapport.", "GO no aceptó el informe.", "لم تقبل GO التقرير."),
     "GO API token is not configured.": ("Le jeton d'API GO n'est pas configuré.", "El token de la API de GO no está configurado.", "رمز واجهة GO غير مُعد."),
     "Validate the draft before sending it to GO.": (
@@ -381,7 +420,6 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "No hay una línea de base aprobada en GO para elaborar un plan.",
         "لا يوجد خط أساس معتمد من GO لبناء خطة.",
     ),
-    "A draft monitoring plan was created.": ("Un plan de suivi en brouillon a été créé.", "Se creó un borrador del plan de seguimiento.", "تم إنشاء مسودة خطة المتابعة."),
     "Plan validated.": ("Plan validé.", "Plan validado.", "تم اعتماد الخطة."),
     "an activity": ("une activité", "una actividad", "نشاط"),
     "%(title)s: the budget of %(value)s CHF is above the approved sector budget of %(limit)s CHF": (
@@ -481,6 +519,9 @@ ROWS: dict[str, tuple[str, str, str]] = {
     "Date of event": ("Date de l'événement", "Fecha del evento", "تاريخ الحدث"),
     "What happened, where and when?": ("Que s'est-il passé, où et quand ?", "¿Qué ocurrió, dónde y cuándo?", "ماذا حدث، وأين، ومتى؟"),
     "Scope and scale": ("Portée et ampleur", "Alcance y escala", "النطاق والحجم"),
+    "People affected and targeted": ("Personnes affectées et ciblées", "Personas afectadas y objetivo", "الأشخاص المتضررون والمستهدفون"),
+    "Budget and reach": ("Budget et personnes atteintes", "Presupuesto y personas alcanzadas", "الميزانية والأشخاص الذين تم الوصول إليهم"),
+    "Delays": ("Retards", "Retrasos", "التأخيرات"),
     "Summary of changes": ("Résumé des changements", "Resumen de los cambios", "ملخص التغييرات"),
     "IFRC network actions related to the current event": (
         "Actions du réseau de la FICR liées à l'événement en cours",
@@ -535,6 +576,11 @@ ROWS: dict[str, tuple[str, str, str]] = {
     "Challenges": ("Difficultés", "Desafíos", "التحديات"),
     "About support services": ("Services d'appui", "Servicios de apoyo", "خدمات الدعم"),
     "Contact information": ("Coordonnées", "Información de contacto", "معلومات الاتصال"),
+    "National Society Contact": ("Contact de la Société nationale", "Contacto de la Sociedad Nacional", "جهة اتصال الجمعية الوطنية"),
+    "IFRC Appeal Manager": ("Responsable de l'appel de la FICR", "Gestor del llamamiento de la FICR", "مدير النداء في الاتحاد الدولي"),
+    "IFRC Project Manager": ("Responsable de projet de la FICR", "Gestor de proyecto de la FICR", "مدير المشروع في الاتحاد الدولي"),
+    "IFRC Emergency": ("Urgences de la FICR", "Emergencias de la FICR", "طوارئ الاتحاد الدولي"),
+    "Media Contact": ("Contact médias", "Contacto de medios", "جهة الاتصال الإعلامية"),
     "Document": ("Document", "Documento", "الوثيقة"),
     "Event onset": ("Début de l'événement", "Inicio del evento", "بداية الحدث"),
     "Operation start date": ("Date de début de l'opération", "Fecha de inicio de la operación", "تاريخ بدء العملية"),
@@ -762,10 +808,10 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "Leyendo los informes de campo recientes de GO.",
         "جارٍ قراءة تقارير الميدان الأخيرة من GO.",
     ),
-    "Searching Databank documents.": (
-        "Recherche dans les documents du Databank.",
-        "Buscando en los documentos del Databank.",
-        "جارٍ البحث في مستندات Databank.",
+    "Searching documents for this operation.": (
+        "Recherche des documents de cette opération.",
+        "Buscando los documentos de esta operación.",
+        "جارٍ البحث في مستندات هذه العملية.",
     ),
     "Writing the narrative.": ("Rédaction du récit.", "Redactando el relato.", "جارٍ كتابة السرد."),
     "Writing chapter %(current)s of %(total)s.": (
@@ -860,3 +906,9 @@ CODE_LABELS = {
         "distributed": "موزّع",
     },
 }
+
+
+from plugins.dref_monitoring.phrases_narrative import ROWS as _NARRATIVE_ROWS  # noqa: E402
+
+ROWS.update(_NARRATIVE_ROWS)
+

@@ -87,6 +87,7 @@ from plugins.dref_monitoring.services.report_document import (
 from plugins.dref_monitoring.services.excel_import import export_workbook, import_activities
 from plugins.dref_monitoring.services.go_parse import is_imminent
 from plugins.dref_monitoring.services.go_sync_job import (
+    current_sync_payload,
     prepare_settings_sync,
     queue_go_sync,
     request_go_sync_cancel,
@@ -374,6 +375,16 @@ def sync_start():
     return jsonify(payload), 202
 
 
+@bp.route(f"/admin/plugins/{PLUGIN_ID}/sync/current", methods=["GET"])
+@admin_permission_required_any(PLUGIN_MANAGE_PERMISSION, MANAGE_PERMISSION)
+def sync_current():
+    """Progress of a sync that has no job id on the page (started by the scheduler or CLI)."""
+    payload = current_sync_payload()
+    if payload is None:
+        return jsonify({"job_id": "", "status": "completed", "percent": 100.0, "message": ""})
+    return jsonify(payload)
+
+
 @bp.route(f"/admin/plugins/{PLUGIN_ID}/sync/jobs/<job_id>", methods=["GET"])
 @admin_permission_required_any(PLUGIN_MANAGE_PERMISSION, MANAGE_PERMISSION)
 def sync_status(job_id: str):
@@ -500,7 +511,16 @@ def operation_page(operation_id: int):
     can_reset_plan = baseline is not None and plan is not None and (
         can_validate if plan.status == PLAN_VALIDATED else can_enter
     )
-    drafts = DrefDraft.query.filter_by(operation_id=operation.id).order_by(DrefDraft.id.desc()).limit(10).all()
+    # Up to ten per report type, so a run of one type never hides the other box.
+    drafts = [
+        row
+        for kind in ("operational_update", "final_report")
+        for row in DrefDraft.query.filter_by(operation_id=operation.id, report_kind=kind)
+        .order_by(DrefDraft.id.desc())
+        .limit(10)
+        .all()
+    ]
+    drafts.sort(key=lambda row: row.id, reverse=True)
     return render_template(
         f"plugins/{PLUGIN_ID}/operation.html",
         operation=operation,

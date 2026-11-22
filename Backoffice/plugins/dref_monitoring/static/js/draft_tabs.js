@@ -212,7 +212,8 @@
     }
 
     var article = document.querySelector('.dref-report');
-    var emptyToggle = document.querySelector('[data-show-empty]');
+    var narrativePanel = document.getElementById('panel-narrative');
+    var emptyToggle = document.querySelector('input[data-show-empty]');
     var EMPTY_KEY = 'dref-show-empty';
 
     function exportLinks(includeEmpty) {
@@ -230,6 +231,9 @@
     function showEmpty(on) {
         if (article) {
             article.setAttribute('data-show-empty', on ? '1' : '0');
+        }
+        if (narrativePanel) {
+            narrativePanel.setAttribute('data-show-empty', on ? '1' : '0');
         }
         exportLinks(on);
     }

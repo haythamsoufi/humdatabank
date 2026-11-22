@@ -190,6 +190,8 @@
                     <form id="dref-go-sync-form" method="post"
                           data-start-url="{{ url_for('dref_monitoring.sync_start') }}"
                           data-status-url="{{ url_for('dref_monitoring.sync_status', job_id='__JOB__') }}"
+                          data-current-url="{{ url_for('dref_monitoring.sync_current') }}"
+                          data-external="{{ '1' if active_sync and active_sync.external else '' }}"
                           data-cancel-url="{{ url_for('dref_monitoring.sync_cancel', job_id='__JOB__') }}"
                           data-active-job="{{ active_sync.job_id if active_sync else '' }}"
                           data-active-percent="{{ active_sync.percent if active_sync else 0 }}"
@@ -200,7 +202,7 @@
                         <input type="hidden" name="tab" value="sync">
                         <div class="flex gap-2">
                             <button id="dref-go-sync-start" class="bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg px-4 py-2 text-sm" type="submit"{% if active_sync %} disabled{% endif %}>{{ dref_tr('Sync from GO') }}</button>
-                            <button id="dref-go-sync-cancel" class="bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 text-sm border border-gray-300{% if not active_sync %} hidden{% endif %}" type="button">{{ dref_tr('Cancel') }}</button>
+                            <button id="dref-go-sync-cancel" class="bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 text-sm border border-gray-300{% if not active_sync or active_sync.external %} hidden{% endif %}" type="button">{{ dref_tr('Cancel') }}</button>
                         </div>
                     </form>
                 </div>

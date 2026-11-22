@@ -46,17 +46,44 @@ _CSS = """
 }
 @page {
   size: A4;
-  margin: 18mm 16mm 16mm 16mm;
+  margin: 18mm 16mm 22mm 16mm;
   @top-left {
     content: element(running-head);
   }
-  @bottom-right {
-    content: "Page " counter(page) " / " counter(pages);
-    font-family: "Open Sans", sans-serif;
-    font-size: 8pt;
-    color: #011e41;
+  @bottom-left {
+    content: element(running-foot);
+    vertical-align: top;
+    padding-top: 4mm;
+    width: 100%;
   }
 }
+.run-foot {
+  position: running(running-foot);
+  font-family: "Open Sans", sans-serif;
+  font-size: 9pt;
+  color: #011e41;
+  white-space: nowrap;
+}
+.run-foot .pg::before {
+  content: counter(page);
+  font-size: 11pt;
+  font-weight: 700;
+  margin-right: 8pt;
+}
+.run-foot .dot { color: #ef3340; font-weight: 700; }
+.run-foot .name { font-weight: 700; }
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 12mm;
+  margin: 0 0 4pt;
+}
+.cards p {
+  margin: 0 0 10pt;
+  line-height: 1.4;
+  break-inside: avoid;
+}
+.cards a { color: inherit; text-decoration: underline; }
 html, body {
   margin: 0;
   padding: 0;
@@ -174,14 +201,9 @@ def render_pdf(blocks: list, header: str, language: str = "en") -> bytes:
 
 
 def _stylesheet(language: str) -> str:
-    from plugins.dref_monitoring.i18n import translate
-
-    side = "left" if language == "ar" else "right"
-    label = translate("Page").replace('"', "")
-    css = _CSS.replace(
-        '@bottom-right {\n    content: "Page " counter(page) " / " counter(pages);',
-        f'@bottom-{side} {{\n    content: "{label} " counter(page) " / " counter(pages);',
-    )
+    css = _CSS
+    if language == "ar":
+        css = css.replace("@bottom-left {", "@bottom-right {")
     if language != "ar":
         return css
     return css + """
@@ -209,10 +231,26 @@ def _html(blocks: list, header: str, language: str = "en") -> str:
     parts = [
         f'<!DOCTYPE html><html lang="{escape(language)}" dir="{direction}"><head><meta charset="utf-8"></head><body>',
         f"<div class=\"run-head\">{escape(header)}</div>",
+        _footer_html(blocks),
     ]
     for block in blocks:
         parts.append(_block_html(block))
     parts.append("</body></html>")
+    return "".join(parts)
+
+
+def _footer_html(blocks: list) -> str:
+    """The page number, the report type and the operation name, set in the bottom margin of every page."""
+    from plugins.dref_monitoring.services.docx_export import footer_parts
+
+    title, subtitle = footer_parts(blocks)
+    parts = ['<div class="run-foot"><span class="pg"></span>']
+    if title:
+        parts.append(f"<span class=\"title\">{escape(title)}</span>")
+    if subtitle:
+        parts.append(f"<span class=\"dot\"> \u2022 </span>" if title else "")
+        parts.append(f"<span class=\"name\">{escape(subtitle)}</span>")
+    parts.append("</div>")
     return "".join(parts)
 
 
@@ -235,6 +273,11 @@ def _block_html(block) -> str:
     if kind == "bullets":
         items = "".join(f"<li>{escape(row[0] if row else '')}</li>" for row in block.rows)
         return f"<ul>{items}</ul>"
+    if getattr(block, "is_grid", False):
+        from plugins.dref_monitoring.services.narrative_format import Node
+
+        cards = [Node("p", runs=tuple(runs)) for runs in block.cards]
+        return f"<div class=\"cards\">{_rich_html(cards)}</div>"
     if getattr(block, "html", ""):
         # The stored text is already reduced to paragraphs, lists and bold, italic and underline.
         return _rich_html(block.nodes) or "<p>&nbsp;</p>"

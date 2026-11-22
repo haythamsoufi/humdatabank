@@ -19,6 +19,8 @@
     var startBtn = document.getElementById('dref-go-sync-start');
     var cancelBtn = document.getElementById('dref-go-sync-cancel');
     var settingsForm = document.querySelector('#panel-settings form');
+    var currentUrl = form.getAttribute('data-current-url') || '';
+    var external = form.getAttribute('data-external') === '1';
     var jobId = form.getAttribute('data-active-job') || '';
     var percentSeen = Number(form.getAttribute('data-active-percent') || 0);
     var timer = null;
@@ -67,7 +69,7 @@
             startBtn.disabled = running;
         }
         if (cancelBtn) {
-            cancelBtn.classList.toggle('hidden', !running);
+            cancelBtn.classList.toggle('hidden', !running || !!payload.external);
             if (running) {
                 cancelBtn.disabled = false;
             }
@@ -108,7 +110,9 @@
             window.clearTimeout(timer);
             timer = null;
         }
-        remember(payload);
+        if (payload.job_id) {
+            remember(payload);
+        }
         if (settingsForm && settingsForm.getAttribute('data-dirty') === '1') {
             return;
         }
@@ -120,10 +124,10 @@
     }
 
     function poll() {
-        if (!jobId) {
+        if (!jobId && !external) {
             return;
         }
-        http(jobUrl(statusTemplate, jobId), { headers: { Accept: 'application/json' } })
+        http(jobId ? jobUrl(statusTemplate, jobId) : currentUrl, { headers: { Accept: 'application/json' } })
             .then(function (response) {
                 if (!response.ok) {
                     throw new Error('status');
@@ -179,6 +183,7 @@
             })
             .then(function (payload) {
                 jobId = payload.job_id;
+                external = false;
                 render(payload);
                 if (timer) {
                     window.clearTimeout(timer);
@@ -217,7 +222,7 @@
         });
     }
 
-    if (jobId) {
+    if (jobId || external) {
         poll();
     }
 })();

@@ -79,6 +79,21 @@ class Block:
         """The formatted text as paragraphs and lists. Pages, Word and PDF all read this."""
         return fmt.parse(self.html) if self.html else []
 
+    @property
+    def cards(self) -> list:
+        """Each paragraph and list item of a section laid out in a grid, as runs. Contacts use it."""
+        found = []
+        for node in self.nodes:
+            if node.is_list:
+                found.extend(node.items)
+            elif fmt.has_text(node.runs):
+                found.append(node.runs)
+        return found
+
+    @property
+    def is_grid(self) -> bool:
+        return self.key == "contacts" and bool(self.cards)
+
 
 def chapter_headings(kind: str) -> dict[str, str]:
     """The heading each chapter sits under in the document, in English.
@@ -349,24 +364,57 @@ def _compose_report(source: dict) -> list[Block]:
         blocks.extend(_support_blocks(source))
     blocks.extend(_finance_blocks(source, kind))
     blocks.append(Block("heading", "Contact information", 1))
-    blocks.append(_figure("contacts", translate("Contact information"), lines=_contact_lines(source.get("contacts")), bullets=True))
+    blocks.append(_contact_block(source.get("contacts")))
     return _mark_generated(blocks)
 
 
-def _contact_lines(contacts) -> list[str]:
-    """One line per person GO lists on the approved stage: role, name, title, email, phone."""
-    lines = []
+def _contact_block(contacts) -> Block:
+    """The people GO lists on the approved stage, one paragraph each.
+
+    A paragraph reads: bold name, title, the role in grey, ``T`` and the phone, then the email in red
+    as a link. The preview, Word and PDF lay the paragraphs out two to a row (see ``Block.cards``).
+    The section stays editable text like any other figure section.
+    """
+    nodes = []
     for item in contacts or []:
         if not isinstance(item, dict):
             continue
-        details = [str(item.get(key) or "").strip() for key in ("name", "title", "email", "phone")]
-        details = [part for part in details if part]
-        if not details:
+        runs: list = []
+
+        def line(*parts) -> None:
+            if runs:
+                runs.append(fmt.Run("\n"))
+            runs.extend(parts)
+
+        name = str(item.get("name") or "").strip()
+        title = str(item.get("title") or "").strip()
+        role = translate(str(item.get("role") or "").strip()) if str(item.get("role") or "").strip() else ""
+        phone = str(item.get("phone") or "").strip()
+        email = str(item.get("email") or "").strip()
+        if not (name or title or phone or email):
             continue
-        role = translate(str(item.get("role") or "").strip())
-        text = ", ".join(details)
-        lines.append(f"{role}: {text}" if role else text)
-    return lines
+        if name:
+            line(fmt.Run(name, bold=True))
+        if title:
+            line(fmt.Run(title))
+        if role:
+            line(fmt.Run(role, color="#58595b"))
+        if phone:
+            line(fmt.Run("T", bold=True), fmt.Run(f" {phone}"))
+        if email:
+            href = fmt.safe_href(f"mailto:{email}")
+            line(fmt.Run(email, underline=True, href=href, color="#ef3340"))
+        if runs:
+            nodes.append(fmt.Node("p", runs=fmt.merge_runs(runs)))
+    html = fmt.nodes_to_html(nodes)
+    return Block(
+        "paragraph",
+        fmt.to_plain(html) if html else "",
+        html=html,
+        key="contacts",
+        figure=True,
+        label=translate("Contact information"),
+    )
 
 
 def contacts_of(operation_id: int) -> list[dict]:

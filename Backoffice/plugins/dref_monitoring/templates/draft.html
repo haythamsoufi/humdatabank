@@ -154,6 +154,7 @@
 
         <div id="dref-draft-panels" class="p-6">
             <div id="panel-narrative" role="tabpanel" aria-labelledby="dref-draft-tab-narrative"
+                 data-show-empty="0"
                  class="settings-panel space-y-4{% if draft_tab != 'narrative' %} hidden{% endif %}">
                 {% if can_add_narrative %}
                 <div class="space-y-3" data-dref-job-scope>
@@ -224,7 +225,7 @@
                     <div class="space-y-4 min-w-0">
                         {% for field in fields %}
                         <section class="dref-chapter{% if not can_edit %} is-readonly{% endif %}" id="chapter-{{ field.key }}"
-                                 {% if can_edit %}data-chapter="{{ field.key }}" data-area="narrative"{% endif %}>
+                                 {% if can_edit %}data-chapter="{{ field.key }}" data-area="narrative"{% endif %}{% if not field.filled %} data-vacant="1"{% endif %}>
                             {% if can_edit %}{{ chapter_header_chrome() }}{% endif %}
                             <header class="dref-chapter__head">
                                 <h3 class="dref-chapter__title">{{ field.label }}</h3>
@@ -366,7 +367,7 @@
                             </button>
                             {% endif %}
                         </div>
-                        <div class="dref-chapter__body dref-rich" data-chapter-body
+                        <div class="dref-chapter__body dref-rich{% if block.key == 'contacts' %} dref-rich--cards{% endif %}" data-chapter-body
                              data-placeholder="{{ dref_tr('Click here and start writing this chapter.') }}"
                              {% if not field.filled %}data-empty="1"{% endif %}>{{ rich(dref_nodes(field.html)) }}</div>
                         {{ chapter_footer_chrome() }}
@@ -380,10 +381,10 @@
                         </button>
                     </div>
                     {% endif %}
-                    <div class="dref-rich">{{ rich(block.nodes) }}</div>
+                    <div class="dref-rich{% if block.key == 'contacts' %} dref-rich--cards{% endif %}">{{ rich(block.nodes) }}</div>
                     {% endif %}
                 {% elif block.html %}
-                    <div class="dref-rich">{{ rich(block.nodes) }}</div>
+                    <div class="dref-rich{% if block.key == 'contacts' %} dref-rich--cards{% endif %}">{{ rich(block.nodes) }}</div>
                 {% elif block.text %}
                     <p{% if block.generated %} class="dref-report__generated"{% endif %}>{{ block.text }}</p>
                 {% else %}

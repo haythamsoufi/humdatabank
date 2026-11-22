@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 
@@ -365,13 +366,49 @@ def settle_orphan_logs() -> None:
     db.session.commit()
 
 
+def external_sync_payload() -> dict | None:
+    """Status of a sync started outside this page (scheduler or CLI), read from its history row.
+
+    Those syncs hold the lock but have no job, so the page has no job id to poll.
+    """
+    if not go_sync_lock_held():
+        return None
+    row = DrefSyncLog.query.filter_by(status="running").order_by(DrefSyncLog.id.desc()).first()
+    if row is None:
+        return None
+    message = str(row.message or "")
+    current = total = None
+    match = re.search(r"\((\d+) of (\d+)\)", message)
+    if match:
+        current, total = int(match.group(1)), int(match.group(2))
+    percent = (current / total * 100.0) if total else 0.0
+    return {
+        "job_id": "",
+        "status": "running",
+        "status_label": translate("Running"),
+        "stage": "running",
+        "message": message,
+        "current": current or 0,
+        "total": total,
+        "percent": max(0.0, min(100.0, percent)),
+        "summary": None,
+        "error": None,
+        "external": True,
+    }
+
+
+def current_sync_payload() -> dict | None:
+    """Live sync for the page: the tracked job if there is one, else an external run."""
+    job = active_go_sync_job()
+    if job is not None:
+        return status_payload(job)
+    return external_sync_payload()
+
+
 def prepare_settings_sync(app) -> dict | None:
-    """Resume an orphaned runner, then return the live job for the page."""
+    """Resume an orphaned runner, then return the live sync for the page."""
     current = active_go_sync_job()
     if current is not None:
         ensure_go_sync_job_running(app, str(current.id))
     settle_orphan_logs()
-    current = active_go_sync_job()
-    if current is None:
-        return None
-    return status_payload(current)
+    return current_sync_payload()

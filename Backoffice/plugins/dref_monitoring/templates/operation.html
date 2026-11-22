@@ -5,6 +5,7 @@
 {% from "plugins/dref_monitoring/_status.html" import dref_enum, dref_status %}
 {% from "macros/modal_shell.html" import modal_shell %}
 {% from "macros/excel_io_modal.html" import excel_io_modal %}
+{% from "plugins/dref_monitoring/_draft_box.html" import draft_box with context %}
 
 {% macro money(value) -%}
   {%- if value is not none and value != '' -%}{{ value|format_number }} CHF{%- else -%}-{%- endif -%}
@@ -801,87 +802,12 @@
             {% endfor %}
         </div>
 
-        <div id="panel-drafts" class="settings-panel space-y-6{% if active_tab != 'drafts' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-drafts">
-            <section class="border border-gray-200 rounded-lg">
-                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-                    <h2 class="text-sm font-semibold text-gray-800">
-                        <i class="fas fa-file-alt text-gray-500 mr-2" aria-hidden="true"></i>{{ dref_tr('Draft 0') }}
-                    </h2>
-                </div>
-                <ul class="divide-y divide-gray-200">
-                    {% for draft in drafts %}
-                    <li class="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p class="text-sm font-medium text-gray-900">{{ dref_enum(draft.report_kind) }}</p>
-                            <p class="mt-1 text-xs text-gray-500">{{ draft.created_at.strftime('%Y-%m-%d') if draft.created_at else '-' }} · {{ {'en': dref_tr('English'), 'fr': dref_tr('French'), 'es': dref_tr('Spanish'), 'ar': dref_tr('Arabic')}.get(draft.language or 'en', draft.language) }} · {% if draft.status == 'submitted' %}{{ dref_tr('Submitted') }}{% elif draft.status == 'validated' %}{{ dref_tr('Validated') }}{% else %}{{ dref_tr('Draft') }}{% endif %}</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <a class="btn btn-secondary btn-sm" href="{{ url_for('dref_monitoring.draft_page', operation_id=operation.id, draft_id=draft.id) }}">{{ dref_tr('Open') }}</a>
-                            <div class="relative" data-dref-export>
-                                <button type="button" class="btn btn-secondary btn-sm" aria-haspopup="menu" aria-expanded="false" aria-controls="dref-export-menu-{{ draft.id }}">
-                                    {{ dref_tr('Export') }}
-                                    <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i>
-                                </button>
-                                <div id="dref-export-menu-{{ draft.id }}" class="hidden absolute right-0 z-50 mt-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg" role="menu">
-                                    <a class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" role="menuitem"
-                                       href="{{ url_for('dref_monitoring.draft_docx_route', operation_id=operation.id, draft_id=draft.id) }}">
-                                        <i class="fas fa-file-word" aria-hidden="true"></i>
-                                        <span>{{ dref_tr('Export Word') }}</span>
-                                    </a>
-                                    <a class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" role="menuitem"
-                                       href="{{ url_for('dref_monitoring.draft_pdf_route', operation_id=operation.id, draft_id=draft.id) }}">
-                                        <i class="fas fa-file-pdf" aria-hidden="true"></i>
-                                        <span>{{ dref_tr('Export PDF') }}</span>
-                                    </a>
-                                </div>
-                            </div>
-                            {% if draft.id in deletable_draft_ids %}
-                            <form method="post" action="{{ url_for('dref_monitoring.draft_delete_route', operation_id=operation.id, draft_id=draft.id) }}"
-                                  data-confirm-danger="true">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="tab" value="drafts">
-                                <button class="btn btn-danger btn-sm" type="submit"
-                                        data-confirm-title="{{ dref_tr('Delete this draft?')|forceescape }}"
-                                        data-confirm-label="{{ dref_tr('Delete')|forceescape }}"
-                                        data-confirm-message="{{ dref_tr('Delete this draft? The figures, the chapters and any edits are removed. This cannot be undone.')|forceescape }}">
-                                    <i class="fas fa-trash" aria-hidden="true"></i>{{ dref_tr('Delete') }}
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </li>
-                    {% else %}
-                    <li class="px-4 py-6 text-sm text-gray-500">{{ dref_tr('No drafts yet') }}</li>
-                    {% endfor %}
-                </ul>
-            </section>
-            {% if actor_can_enter %}
-            <form method="post" action="{{ url_for('dref_monitoring.draft_generate_route', operation_id=operation.id) }}" class="border border-gray-200 rounded-lg p-4 flex flex-wrap items-end gap-3" data-dref-draft-form>
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Type') }}
-                    <select name="kind" class="{{ input_class }}">
-                        <option value="operational_update">{{ dref_tr('Operational update') }}</option>
-                        <option value="final_report">{{ dref_tr('Final report') }}</option>
-                    </select>
-                </label>
-                <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Language') }}
-                    <select name="language" class="{{ input_class }}">
-                        {% for code, label in [('en', 'English'), ('fr', 'French'), ('es', 'Spanish'), ('ar', 'Arabic')] %}
-                        <option value="{{ code }}" {% if dref_language() == code %}selected{% endif %}>{{ dref_tr(label) }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label class="block text-sm font-medium text-gray-700">{{ dref_tr('Narrative') }}
-                    <select name="narrative" class="{{ input_class }}">
-                        <option value="ai" {% if not ai_ready %}disabled{% else %}selected{% endif %}>{{ dref_tr('AI-generated narrative') }}</option>
-                        <option value="manual" {% if not ai_ready %}selected{% endif %}>{{ dref_tr('Write the narrative myself') }}</option>
-                        <option value="none">{{ dref_tr('Data only') }}</option>
-                    </select>
-                </label>
-                <button class="btn btn-primary" type="submit"><i class="fas fa-file-alt" aria-hidden="true"></i>{{ dref_tr('Generate draft') }}</button>
-            </form>
-            {% include "plugins/dref_monitoring/_draft_job_panel.html" %}
-            {% endif %}
+        <div id="panel-drafts" class="settings-panel{% if active_tab != 'drafts' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-drafts">
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                {% for kind in ['operational_update', 'final_report'] %}
+                {{ draft_box(operation, kind, drafts|selectattr('report_kind', 'equalto', kind)|list, actor_can_enter, ai_ready, deletable_draft_ids, active_job, dref_language(), csrf_token()) }}
+                {% endfor %}
+            </div>
         </div>
 
         <div id="panel-team" class="settings-panel space-y-6{% if active_tab != 'team' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-team">

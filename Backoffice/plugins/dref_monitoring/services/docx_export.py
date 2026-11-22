@@ -36,7 +36,7 @@ def render_docx(blocks: list, header: str, language: str = "en", reference: str 
     _apply_page(document)
     _apply_styles(document)
     _apply_header(document, header)
-    _apply_footer(document, language)
+    _apply_footer(document, blocks, language)
     for block in blocks:
         _add_block(document, block)
     if language == "ar":
@@ -69,6 +69,8 @@ def _add_block(document, block) -> None:
             if style == "Normal":
                 text = f"• {text}"
             document.add_paragraph(text, style=style)
+    elif getattr(block, "is_grid", False):
+        _add_cards(document, block.cards)
     elif getattr(block, "html", "") and getattr(block, "generated", False):
         _add_generated_rich(document, block)
     elif getattr(block, "html", ""):
@@ -199,6 +201,22 @@ def _restart_numbering(document, paragraphs) -> None:
         return
 
 
+def _add_cards(document, cards) -> None:
+    """Short entries (the contact people) two to a row, with no borders. Word skips tables on import."""
+    columns = 2
+    table = document.add_table(rows=(len(cards) + columns - 1) // columns, cols=columns)
+    table.autofit = False
+    _set_widths(table, (89, 89))
+    for index, runs in enumerate(cards):
+        cell = table.rows[index // columns].cells[index % columns]
+        paragraph = cell.paragraphs[0]
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(10)
+        paragraph.paragraph_format.line_spacing = 1.1
+        _add_runs(paragraph, runs)
+    _keep_rows(table)
+
+
 def _add_kv(document, rows) -> None:
     if not rows:
         return
@@ -306,9 +324,9 @@ def _apply_page(document) -> None:
     section.left_margin = Mm(16)
     section.right_margin = Mm(16)
     section.top_margin = Mm(18)
-    section.bottom_margin = Mm(16)
+    section.bottom_margin = Mm(22)
     section.header_distance = Mm(8)
-    section.footer_distance = Mm(8)
+    section.footer_distance = Mm(14)
 
 
 def _apply_header(document, header: str) -> None:
@@ -320,18 +338,29 @@ def _apply_header(document, header: str) -> None:
     _border_below(paragraph, _RED)
 
 
-def _apply_footer(document, language: str = "en") -> None:
-    from plugins.dref_monitoring.i18n import override_locale, translate
+def footer_parts(blocks) -> tuple[str, str]:
+    """The report type and the operation name the footer carries: ``22  DREF Operational Update • Zedland``."""
+    title = next((block.text for block in blocks if block.kind == "title"), "")
+    subtitle = next((block.text for block in blocks if block.kind == "subtitle"), "")
+    return (title or "").strip(), (subtitle or "").strip()
 
+
+def _apply_footer(document, blocks, language: str = "en") -> None:
+    title, subtitle = footer_parts(blocks)
     paragraph = document.sections[0].footer.paragraphs[0]
-    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT if language == "ar" else WD_ALIGN_PARAGRAPH.RIGHT
-    with override_locale(language):
-        run = paragraph.add_run(translate("Page") + " ")
-    _paint_run(run, _BODY_FONT, 8, color=_NAVY)
-    _field(paragraph, " PAGE ")
-    run = paragraph.add_run(" / ")
-    _paint_run(run, _BODY_FONT, 8, color=_NAVY)
-    _field(paragraph, " NUMPAGES ")
+    # In a right-to-left file Word reads "left" as the start of the line, which is the right edge.
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+    _field(paragraph, " PAGE ", bold=True, size=11)
+    if title:
+        run = paragraph.add_run("   " + title)
+        _paint_run(run, _BODY_FONT, 9, color=_NAVY)
+    if subtitle:
+        run = paragraph.add_run(" \u2022 " if title else "   ")
+        _paint_run(run, _BODY_FONT, 9, bold=True, color=_RED)
+        run = paragraph.add_run(subtitle)
+        _paint_run(run, _BODY_FONT, 9, bold=True, color=_NAVY)
 
 
 def _mark_rtl(document) -> None:
@@ -494,9 +523,9 @@ def _border_below(paragraph, color: str) -> None:
     p_pr.append(borders)
 
 
-def _field(paragraph, instruction: str) -> None:
+def _field(paragraph, instruction: str, *, bold: bool = False, size: float = 8) -> None:
     run = paragraph.add_run()
-    _paint_run(run, _BODY_FONT, 8, color=_NAVY)
+    _paint_run(run, _BODY_FONT, size, bold=bold, color=_NAVY)
     begin = OxmlElement("w:fldChar")
     begin.set(qn("w:fldCharType"), "begin")
     instr = OxmlElement("w:instrText")

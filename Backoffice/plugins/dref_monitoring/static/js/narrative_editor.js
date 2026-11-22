@@ -359,6 +359,13 @@
         st.chars = text.length;
         var state = chipState(st);
         viewsOf(st.key).forEach(function (view) {
+            if (view.area === 'narrative') {
+                if (state === 'empty') {
+                    view.el.setAttribute('data-vacant', '1');
+                } else {
+                    view.el.removeAttribute('data-vacant');
+                }
+            }
             var chip = view.el.querySelector('[data-chapter-chip]');
             if (chip) {
                 chip.setAttribute('data-state', state);

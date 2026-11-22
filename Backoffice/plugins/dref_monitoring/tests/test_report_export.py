@@ -154,11 +154,18 @@ def test_the_contacts_from_the_approved_stage_fill_contact_information():
     contact = next(block for block in blocks if block.key == "contacts")
     assert contact.vacant is False
     assert contact.html == (
-        "<ul><li>National Society Contact: Sam Doe, Secretary General, sg@example.org, +1 555 0100</li>"
-        "<li>IFRC Appeal Manager: Alex Roe, alex@example.org</li></ul>"
+        "<p><strong>Sam Doe</strong><br>Secretary General<br>"
+        '<span style="color:#58595b">National Society Contact</span><br><strong>T</strong> +1 555 0100<br>'
+        '<a href="mailto:sg@example.org" target="_blank" rel="noopener noreferrer">'
+        '<span style="color:#ef3340"><u>sg@example.org</u></span></a></p>'
+        "<p><strong>Alex Roe</strong><br>"
+        '<span style="color:#58595b">IFRC Appeal Manager</span><br>'
+        '<a href="mailto:alex@example.org" target="_blank" rel="noopener noreferrer">'
+        '<span style="color:#ef3340"><u>alex@example.org</u></span></a></p>'
     )
+    assert contact.is_grid and len(contact.cards) == 2
     french = next(block for block in build_report({**_source(contacts=contacts), "language": "fr"}) if block.key == "contacts")
-    assert "<li>Contact de la Société nationale: Sam Doe" in french.html
+    assert "Contact de la Société nationale" in french.html
     assert any(block.text == "Contact information" for block in blocks_for_export(blocks, False))
 
 

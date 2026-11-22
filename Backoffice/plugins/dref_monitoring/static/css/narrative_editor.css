@@ -47,6 +47,25 @@
     color: inherit;
 }
 
+/* Short entries laid out two to a row, such as the contact people. Each paragraph is one entry. */
+.dref-rich--cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 2.5rem;
+}
+
+.dref-rich--cards > p,
+.dref-rich--cards > ul,
+.dref-rich--cards > ol {
+    margin: 0 0 1rem;
+}
+
+.dref-rich--cards a { color: inherit; }
+
+@media (max-width: 40rem) {
+    .dref-rich--cards { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Edit bar: formatting tools, save status ---------------------------------- */
 
 .dref-editbar {
@@ -639,6 +658,12 @@ section.dref-chapter.is-readonly .dref-chapter__body {
 }
 
 .dref-report[data-show-empty="0"] .dref-vacant {
+    display: none;
+}
+
+/* The Narrative tab follows the same toggle. A chapter being edited stays put. */
+#panel-narrative[data-show-empty="0"] section.dref-chapter[data-vacant="1"]:not(:focus-within),
+#panel-narrative[data-show-empty="0"] .dref-chapter-nav li:has(> .dref-chapter-nav__link[data-state="empty"]) {
     display: none;
 }
 

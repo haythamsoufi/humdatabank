@@ -122,7 +122,7 @@
 
     <div id="upr-vis-pane-preview" class="upr-vis-preview-pane" role="tabpanel" aria-labelledby="upr-vis-tab-preview">
         <div class="upr-embed__toolbar">
-            <div id="upr-vis-preview-tabs" class="upr-embed__tabs" role="tablist" aria-label="{{ _('Dashboards')|forceescape }}"></div>
+            {% call scroll_tab_bar(inner_id='upr-vis-preview-tabs', aria_label=_('Dashboards'), wrapper_class='min-w-0 flex-1') %}{% endcall %}
             <div class="upr-embed__tools">
             {% include "plugins/upr/upr/_language_select.html" %}
             <div class="upr-download">

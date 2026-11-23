@@ -357,10 +357,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function setActiveSheet(sheet) {
         document.querySelectorAll('#fdrs-docs-sheet-tabs [data-docs-sheet]').forEach(function (btn) {
             const on = btn.getAttribute('data-docs-sheet') === sheet;
-            btn.classList.toggle('bg-blue-50', on);
-            btn.classList.toggle('text-blue-700', on);
-            btn.classList.toggle('text-gray-600', !on);
-            btn.classList.toggle('bg-white', !on);
+            if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, on);
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
     }
 

@@ -704,8 +704,6 @@
 
     #uploadImportModal .scroll-tab-bar__track {
         overflow-x: scroll;
-        scrollbar-width: thin;
-        scrollbar-color: #64748b #e5e7eb;
     }
 
     #uploadImportModal .scroll-tab-bar__track::-webkit-scrollbar {

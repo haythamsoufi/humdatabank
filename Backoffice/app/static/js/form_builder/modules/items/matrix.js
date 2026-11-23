@@ -538,7 +538,7 @@ export const MatrixItem = {
                 panel.dataset.colorTarget = nextTarget;
                 panel.querySelectorAll('.group-color-tab').forEach(tab => {
                     const selected = tab === colorTab;
-                    tab.classList.toggle('is-active', selected);
+                    if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(tab, selected);
                     tab.setAttribute('aria-selected', selected ? 'true' : 'false');
                 });
                 this._syncGroupColorPanel(groupEl);

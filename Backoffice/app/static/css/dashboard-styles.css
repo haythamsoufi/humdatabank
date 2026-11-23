@@ -142,8 +142,7 @@
   cursor: grabbing;
 }
 
-.dev-tools__toggle:focus-visible,
-.dev-tools__tool:focus-visible {
+.dev-tools__toggle:focus-visible {
   outline: 2px solid #5eead4;
   outline-offset: -2px;
 }
@@ -188,35 +187,6 @@
   text-transform: uppercase;
   color: #94a3b8;
   font-size: 0.625rem;
-}
-
-.dev-tools__tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  border-bottom: 1px solid #1e3a4c;
-}
-
-.dev-tools__tool {
-  margin: 0;
-  padding: 0.4rem 0.65rem;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: #94a3b8;
-  font: inherit;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.dev-tools__tool:hover {
-  color: #e2e8f0;
-}
-
-.dev-tools__tool.is-active {
-  color: #f8fafc;
-  border-bottom-color: #C8102E;
 }
 
 .dev-tools__panel {

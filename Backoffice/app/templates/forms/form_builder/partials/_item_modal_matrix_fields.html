@@ -516,10 +516,10 @@
                                             <span class="group-color-swatch" style="background-color:#f3f4f6"><span class="group-color-swatch-text" style="color:#4b5563">A</span></span>
                                         </button>
                                         <div class="group-color-panel hidden" role="dialog" data-color-target="background" aria-label="{{ _('Group header colour')|forceescape }}">
-                                            <div class="group-color-tabs" role="tablist">
-                                                <button type="button" class="group-color-tab is-active" role="tab" aria-selected="true" data-color-target="background">{{ _('Background') }}</button>
-                                                <button type="button" class="group-color-tab" role="tab" aria-selected="false" data-color-target="text">{{ _('Text') }}</button>
-                                            </div>
+                                            {% call scroll_tab_bar(aria_label=_('Group header colour'), wrapper_class='mb-2') %}
+                                                <button type="button" class="group-color-tab {{ admin_underline_tab_btn_classes(true, size='compact') }}" role="tab" aria-selected="true" data-color-target="background">{{ _('Background') }}</button>
+                                                <button type="button" class="group-color-tab {{ admin_underline_tab_btn_classes(false, size='compact') }}" role="tab" aria-selected="false" data-color-target="text">{{ _('Text') }}</button>
+                                            {% endcall %}
                                             <div class="group-color-sv" role="presentation">
                                                 <span class="group-color-sv-cursor"></span>
                                             </div>

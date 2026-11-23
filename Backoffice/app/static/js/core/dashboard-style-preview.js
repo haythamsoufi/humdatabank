@@ -333,7 +333,7 @@
             state.tool = next;
             switcher.querySelectorAll('[data-dev-tool]').forEach(function (tab) {
                 var on = tab.getAttribute('data-dev-tool') === next;
-                tab.classList.toggle('is-active', on);
+                if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(tab, on);
                 tab.setAttribute('aria-selected', on ? 'true' : 'false');
             });
             switcher.querySelectorAll('[data-dev-tool-panel]').forEach(function (panel) {

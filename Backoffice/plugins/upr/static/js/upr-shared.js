@@ -41,6 +41,18 @@
     return cache;
   }
 
+  function underlineTabClass(selected) {
+    if (global.AdminUnderlineTabs && global.AdminUnderlineTabs.buttonClasses) {
+      return global.AdminUnderlineTabs.buttonClasses(!!selected);
+    }
+    return (
+      "settings-tab inline-flex items-center whitespace-nowrap text-sm font-medium border-b-2 py-3 px-4 cursor-pointer " +
+      (selected
+        ? "border-blue-500 text-blue-600"
+        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300")
+    );
+  }
+
   function renderDashboardTabs({ container, dashboards, activeId, onSelect, tablistId }) {
     if (!container) return;
     container.replaceChildren();
@@ -48,7 +60,7 @@
       const btn = document.createElement("button");
       btn.type = "button";
       const selected = dash.id === activeId;
-      btn.className = "upr-embed__tab" + (selected ? " is-active" : "");
+      btn.className = underlineTabClass(selected);
       btn.textContent = dash.title;
       btn.dataset.dashboard = dash.id;
       btn.setAttribute("role", "tab");
@@ -61,60 +73,6 @@
       btn.addEventListener("click", () => onSelect(dash.id));
       container.appendChild(btn);
     });
-    bindTabOverflow(container);
-  }
-
-  function ensureTabOverflowButton(wrap, className, icon) {
-    let button = wrap.querySelector("." + className);
-    if (button) return button;
-    button = document.createElement("button");
-    button.type = "button";
-    button.className = className;
-    button.tabIndex = -1;
-    button.setAttribute("aria-hidden", "true");
-    const chevron = document.createElement("i");
-    chevron.className = "fas " + icon;
-    chevron.setAttribute("aria-hidden", "true");
-    button.replaceChildren(chevron);
-    wrap.appendChild(button);
-    return button;
-  }
-
-  function updateTabOverflow(scroller) {
-    const wrap = scroller && scroller.closest(".upr-embed__tabs-wrap");
-    if (!wrap) return;
-    const max = scroller.scrollWidth - scroller.clientWidth;
-    wrap.classList.toggle("is-overflow-start", scroller.scrollLeft > 2);
-    wrap.classList.toggle("is-overflow-end", max - scroller.scrollLeft > 2);
-  }
-
-  function bindTabOverflow(scroller) {
-    if (!scroller) return;
-    let wrap = scroller.closest(".upr-embed__tabs-wrap");
-    if (!wrap) {
-      wrap = document.createElement("div");
-      wrap.className = "upr-embed__tabs-wrap";
-      scroller.parentNode.insertBefore(wrap, scroller);
-      wrap.appendChild(scroller);
-    }
-    const more = ensureTabOverflowButton(wrap, "upr-embed__tabs-more", "fa-chevron-right");
-    const prev = ensureTabOverflowButton(wrap, "upr-embed__tabs-prev", "fa-chevron-left");
-    if (scroller.dataset.uprOverflowBound !== "1") {
-      scroller.dataset.uprOverflowBound = "1";
-      const step = () => Math.max(scroller.clientWidth * 0.7, 160);
-      more.addEventListener("click", () => {
-        scroller.scrollBy({ left: step(), behavior: "smooth" });
-      });
-      prev.addEventListener("click", () => {
-        scroller.scrollBy({ left: -step(), behavior: "smooth" });
-      });
-      scroller.addEventListener("scroll", () => updateTabOverflow(scroller), { passive: true });
-      if (typeof ResizeObserver !== "undefined") {
-        new ResizeObserver(() => updateTabOverflow(scroller)).observe(scroller);
-      }
-      window.addEventListener("resize", () => updateTabOverflow(scroller));
-    }
-    requestAnimationFrame(() => updateTabOverflow(scroller));
   }
 
   const LANG_STORAGE_KEY = "upr-export-lang";
@@ -482,13 +440,11 @@
 
   function markActiveTab(container, dashboardId) {
     if (!container) return;
-    container.querySelectorAll('[role="tab"], .upr-embed__tab').forEach((el) => {
+    container.querySelectorAll('[role="tab"]').forEach((el) => {
       const selected = el.dataset.dashboard === dashboardId;
-      el.classList.toggle("is-active", selected);
-      if (el.getAttribute("role") === "tab") {
-        el.setAttribute("aria-selected", selected ? "true" : "false");
-        el.tabIndex = selected ? 0 : -1;
-      }
+      if (global.AdminUnderlineTabs) global.AdminUnderlineTabs.setStripButtonActive(el, selected);
+      el.setAttribute("aria-selected", selected ? "true" : "false");
+      el.tabIndex = selected ? 0 : -1;
     });
   }
 

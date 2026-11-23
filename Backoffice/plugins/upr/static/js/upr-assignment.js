@@ -96,8 +96,10 @@
       return;
     }
     if (!tabsEl) return;
-    tabsEl.querySelectorAll(".upr-embed__tab").forEach((el) => {
-      el.classList.toggle("is-active", el.dataset.dashboard === dashboardId);
+    tabsEl.querySelectorAll('[role="tab"]').forEach((el) => {
+      const on = el.dataset.dashboard === dashboardId;
+      if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(el, on);
+      el.setAttribute("aria-selected", on ? "true" : "false");
     });
   }
 
@@ -144,7 +146,11 @@
     (dashboards || []).forEach((dash) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "upr-embed__tab" + (dash.id === activeDashboard ? " is-active" : "");
+      btn.setAttribute("role", "tab");
+      btn.className = window.AdminUnderlineTabs
+        ? window.AdminUnderlineTabs.buttonClasses(dash.id === activeDashboard)
+        : "settings-tab inline-flex items-center whitespace-nowrap text-sm font-medium border-b-2 py-3 px-4 cursor-pointer " +
+          (dash.id === activeDashboard ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500");
       btn.textContent = dash.title;
       btn.dataset.dashboard = dash.id;
       btn.addEventListener("click", () => {

@@ -222,10 +222,51 @@ a.modal-action-btn {
   -webkit-overflow-scrolling: touch;
   /* Avoid subpixel vertical overflow from inline-flex children + borders */
   line-height: 0;
+  /* Firefox has no ::-webkit-scrollbar. Chromium on Windows paints the native
+     bar (arrow buttons) when these standard props are set, and ignores the
+     webkit rules below — so they stay Firefox-only. */
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  .scroll-tab-bar__track {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+
+.scroll-tab-bar__track::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+
+.scroll-tab-bar__track::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.scroll-tab-bar__track::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-tab-bar__track::-webkit-scrollbar-thumb {
+  background-color: #94a3b8;
+  border-radius: 9999px;
+}
+
+.scroll-tab-bar__track::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b;
 }
 
 .scroll-tab-bar__track > * {
   line-height: normal;
+}
+
+/* Sit the active underline on the scrollbar. -mb-px would pull it into the bar. */
+.scroll-tab-bar__track > .flex {
+  margin-bottom: 0;
 }
 
 /*

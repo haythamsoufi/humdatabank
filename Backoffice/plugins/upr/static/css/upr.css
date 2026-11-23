@@ -6,8 +6,7 @@
   font-family: "Open Sans", "Segoe UI", sans-serif;
 }
 
-.upr-embed__toolbar,
-.upr-embed__tab {
+.upr-embed__toolbar {
   font-family: "Open Sans", "Segoe UI", sans-serif;
 }
 
@@ -2002,85 +2001,6 @@
 
 .upr-download__status.is-error {
   color: #8a1f28;
-}
-
-.upr-embed__tabs-wrap {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.upr-embed__tabs {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.upr-embed__tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.upr-embed__tabs-more,
-.upr-embed__tabs-prev {
-  display: none;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1.75rem;
-  padding: 0;
-  border: 0;
-  color: #4b5563;
-  cursor: pointer;
-  z-index: 2;
-  align-items: center;
-}
-
-.upr-embed__tabs-more {
-  right: 0;
-  justify-content: flex-end;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 55%);
-  box-shadow: -10px 0 14px rgba(255, 255, 255, 0.85);
-}
-
-.upr-embed__tabs-prev {
-  left: 0;
-  justify-content: flex-start;
-  background: linear-gradient(to left, rgba(255, 255, 255, 0), #fff 55%);
-  box-shadow: 10px 0 14px rgba(255, 255, 255, 0.85);
-}
-
-.upr-embed__tabs-wrap.is-overflow-end .upr-embed__tabs-more,
-.upr-embed__tabs-wrap.is-overflow-start .upr-embed__tabs-prev {
-  display: flex;
-}
-
-.upr-embed__tabs-more:hover,
-.upr-embed__tabs-prev:hover {
-  color: #011e41;
-}
-
-.upr-embed__tab {
-  flex: 0 0 auto;
-  white-space: nowrap;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
-  font-size: 0.8rem;
-  padding: 0.35rem 0.65rem;
-  border-radius: 0.35rem;
-  cursor: pointer;
-}
-
-.upr-embed__tab.is-active {
-  border-color: #f5333f;
-  color: #f5333f;
-  font-weight: 600;
 }
 
 #upr-toggle.is-active {

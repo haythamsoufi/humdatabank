@@ -1,6 +1,7 @@
 {# In-page Sync tab — config windows plus progress above the results table. #}
 {% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap %}
 {% from "macros/modal_shell.html" import modal_shell %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% set fdrs_years_start = fdrs_years_start | default(0) %}
 {% set fdrs_years_end = fdrs_years_end | default(0) %}
 
@@ -100,14 +101,14 @@
       <div id="sync-verify-stats-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3"></div>
       <p class="text-xs text-gray-500 mb-2">{{ _('One row per national society, year, and base KPI (2010–2025 is 16 years). Sex and age breakdowns are merged into that KPI. Network-support partner lists and their amounts stay separate rows. The total also includes skipped rows: those network fields, workflow flags, zeros, and unpublished values.') }}</p>
       <div class="flex flex-wrap items-center gap-2 mb-3">
-        <div id="sync-verify-sheet-tabs" class="inline-flex rounded-md border border-gray-200 overflow-hidden" role="tablist" aria-label="{{ _('Verification sheets')|forceescape }}">
-          <button type="button" data-verify-sheet="data_points" class="px-3 py-1.5 text-sm font-medium bg-blue-50 text-blue-700">{{ _('Data points') }}</button>
-          <button type="button" data-verify-sheet="summary" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('Summary') }}</button>
-          <button type="button" data-verify-sheet="kpi_coverage" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('KPI coverage') }}</button>
-        </div>
+        {% call scroll_tab_bar(inner_id='sync-verify-sheet-tabs', aria_label=_('Verification sheets'), wrapper_class='min-w-0 flex-1') %}
+          <button type="button" role="tab" data-verify-sheet="data_points" aria-selected="true" class="{{ admin_underline_tab_btn_classes(true, size='compact') }}">{{ _('Data points') }}</button>
+          <button type="button" role="tab" data-verify-sheet="summary" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false, size='compact') }}">{{ _('Summary') }}</button>
+          <button type="button" role="tab" data-verify-sheet="kpi_coverage" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false, size='compact') }}">{{ _('KPI coverage') }}</button>
+        {% endcall %}
         <label for="sync-verify-search" class="sr-only">{{ _('Search verification rows') }}</label>
         <input type="search" id="sync-verify-search" placeholder="{{ _('Search all rows…')|forceescape }}"
-               class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white w-48">
+               class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white w-full min-w-0 sm:w-48 sm:max-w-full">
         <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
           <input type="checkbox" id="sync-verify-problems-only" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
           <span>{{ _('Missing and mismatch only') }}</span>

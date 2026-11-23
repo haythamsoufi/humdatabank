@@ -1,6 +1,7 @@
 {# FDRS document URL / availability log — injected by plugins.fdrs.routes.fdrs_tools. #}
 {% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 {% from "macros/modal_shell.html" import modal_shell %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 <style nonce="{{ csp_nonce() }}">
 #fdrs-docs-grid-toolbar {
   align-items: center !important;
@@ -180,14 +181,14 @@
       <div class="px-3 py-3">
         <p id="fdrs-docs-grid-error" class="hidden text-sm text-red-700 mb-2"></p>
         <div id="fdrs-docs-grid-toolbar" class="ag-grid-header-toolbar mb-2" data-ag-grid-toolbar="true">
-          <div id="fdrs-docs-sheet-tabs" class="inline-flex shrink-0 rounded-md border border-gray-200 overflow-hidden" role="tablist" aria-label="{{ _('Document sheets') }}">
-            <button type="button" data-docs-sheet="documents" class="px-3 py-1.5 text-sm font-medium bg-blue-50 text-blue-700">{{ _('Documents') }}</button>
-            <button type="button" data-docs-sheet="summary" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('Summary') }}</button>
-            <button type="button" data-docs-sheet="meta" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('Meta') }}</button>
-          </div>
+          {% call scroll_tab_bar(inner_id='fdrs-docs-sheet-tabs', aria_label=_('Document sheets'), wrapper_class='min-w-0 flex-1') %}
+            <button type="button" role="tab" data-docs-sheet="documents" aria-selected="true" class="{{ admin_underline_tab_btn_classes(true, size='compact') }}">{{ _('Documents') }}</button>
+            <button type="button" role="tab" data-docs-sheet="summary" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false, size='compact') }}">{{ _('Summary') }}</button>
+            <button type="button" role="tab" data-docs-sheet="meta" aria-selected="false" class="{{ admin_underline_tab_btn_classes(false, size='compact') }}">{{ _('Meta') }}</button>
+          {% endcall %}
           <label for="fdrs-docs-search" class="sr-only">{{ _('Search documents') }}</label>
           <input type="search" id="fdrs-docs-search" placeholder="{{ _('Search ISO3, name, type…') }}"
-                 class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white w-56 shrink-0">
+                 class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white w-full min-w-0 sm:w-56 sm:max-w-full">
           <div class="ag-grid-header-actions flex justify-end items-center gap-2">
             <div id="fdrsDocsGrid-colvis"></div>
           </div>

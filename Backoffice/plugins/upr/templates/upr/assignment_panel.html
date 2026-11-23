@@ -1,4 +1,5 @@
 {# Live UPR panel on Unified Plan / Report assignment pages. #}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
 <div id="upr-panel" class="bg-white p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6"
      data-aes-id="{{ assignment_status.id }}"
      data-loading="{{ _('Loading visuals…')|forceescape }}"
@@ -6,7 +7,7 @@
      data-remaining="{{ _('{pending} remaining')|forceescape }}"
      data-failed="{{ _('Could not load visuals.')|forceescape }}">
     <div class="upr-embed__toolbar">
-        <div id="upr-tabs" class="upr-embed__tabs" role="tablist" aria-label="{{ _('UPR')|forceescape }}"></div>
+        {% call scroll_tab_bar(inner_id='upr-tabs', aria_label=_('UPR'), wrapper_class='min-w-0 flex-1') %}{% endcall %}
         <div class="upr-embed__tools">
             {% include "plugins/upr/upr/_language_select.html" %}
             <div class="upr-download">

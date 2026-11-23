@@ -3160,21 +3160,10 @@
 
     chips.forEach(function (chip) {
       var isActive = chip.dataset.providerId === providerId;
-      chip.classList.toggle('border-blue-500', isActive);
-      chip.classList.toggle('bg-blue-50', isActive);
-      chip.classList.toggle('text-blue-700', isActive);
-      chip.classList.toggle('shadow-sm', isActive);
-      chip.classList.toggle('border-gray-200', !isActive);
-      chip.classList.toggle('bg-white', !isActive);
-      chip.classList.toggle('text-gray-600', !isActive);
-      chip.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      var circle = chip.querySelector('.provider-circle');
-      if (circle) {
-        circle.classList.toggle('bg-blue-200', isActive);
-        circle.classList.toggle('text-blue-800', isActive);
-        circle.classList.toggle('bg-gray-100', !isActive);
-        circle.classList.toggle('text-gray-600', !isActive);
+      if (window.AdminUnderlineTabs) {
+        window.AdminUnderlineTabs.setOrgMainTabButton(chip, isActive, '.provider-circle');
       }
+      chip.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
 
     panels.forEach(function (panel) {

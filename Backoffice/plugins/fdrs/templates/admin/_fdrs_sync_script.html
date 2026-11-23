@@ -283,10 +283,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function setActiveSheetButton(sheet) {
         document.querySelectorAll('#sync-verify-sheet-tabs [data-verify-sheet]').forEach(function (btn) {
             const on = btn.getAttribute('data-verify-sheet') === sheet;
-            btn.classList.toggle('bg-blue-50', on);
-            btn.classList.toggle('text-blue-700', on);
-            btn.classList.toggle('text-gray-600', !on);
-            btn.classList.toggle('bg-white', !on);
+            if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(btn, on);
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
     }
 

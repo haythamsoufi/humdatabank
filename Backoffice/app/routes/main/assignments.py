@@ -653,6 +653,40 @@ def request_country_access():
                         f"{[r.country_id for r in created_requests]}"
                     )
 
+                    pending_confirmation_ids = [
+                        req.id
+                        for req in created_requests
+                        if req.status == CountryAccessRequestStatus.PENDING and req.id
+                    ]
+                    if pending_confirmation_ids:
+                        try:
+                            from app.services.email.access_request_confirmation import (
+                                queue_access_request_confirmation_email,
+                            )
+                            if queue_access_request_confirmation_email(
+                                current_user.id,
+                                pending_confirmation_ids,
+                            ):
+                                flash(
+                                    _(
+                                        "A confirmation email will be sent to %(email)s.",
+                                        email=current_user.email,
+                                    ),
+                                    "info",
+                                )
+                        except Exception:
+                            current_app.logger.exception(
+                                "Failed to queue country access request confirmation email for %s",
+                                current_user.email,
+                            )
+                    else:
+                        current_app.logger.info(
+                            "Country access request confirmation email not sent to %s: "
+                            "%d request(s) auto-approved",
+                            current_user.email,
+                            len(created_requests),
+                        )
+
                 # Inform about skipped countries
                 if skipped_already_pending:
                     if len(skipped_already_pending) == 1:

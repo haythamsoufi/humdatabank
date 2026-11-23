@@ -426,6 +426,7 @@ class TestAccessRequestsListRoute:
         assert b'id="openFdsDigestSettingsBtn"' in resp.data
         assert b'id="fds-access-request-digest-modal"' in resp.data
         assert b'id="fds-access-request-digest-local-hour"' in resp.data
+        assert b'id="access-request-confirmation-email"' in resp.data
         assert b'digest-settings' in resp.data
         assert b'Send digest now' in resp.data or b'send digest now' in resp.data.lower()
         assert b'Last sent' in resp.data or b'last sent' in resp.data.lower()
@@ -498,6 +499,25 @@ class TestAccessRequestsListRoute:
             settings = get_fds_access_request_digest_settings()
             assert settings["enabled"] is True
             assert settings["local_hour"] == 8
+
+    def test_confirmation_email_setting_saved_with_digest_form(self, logged_in_sm_client, db_session, app):
+        with app.app_context():
+            from app.services.platform.app_settings_service import (
+                get_access_request_confirmation_email_enabled,
+            )
+
+            resp = _admin_post(
+                logged_in_sm_client,
+                "/admin/access-requests/digest-settings",
+                data={
+                    "fds_access_request_digest_enabled": "1",
+                    "fds_access_request_digest_local_hour": "8",
+                    "access_request_confirmation_email_present": "1",
+                },
+                follow_redirects=False,
+            )
+            assert resp.status_code == 302
+            assert get_access_request_confirmation_email_enabled() is False
 
     def test_regular_user_denied(self, client, test_user, app):
         login_session(client, test_user.id)

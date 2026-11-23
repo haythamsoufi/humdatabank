@@ -153,7 +153,7 @@
 {% if can_manage_fds_digest %}
     {% set __ = header_actions.items.append({
         'type': 'button',
-        'text': _('Digest emails'),
+        'text': _('Email settings'),
         'icon': 'fas fa-envelope-open-text',
         'classes': 'professional-action-btn',
         'attributes': {'id': 'openFdsDigestSettingsBtn', 'aria-haspopup': 'dialog'}
@@ -274,15 +274,37 @@
 </div>
 
 {% if can_manage_fds_digest %}
-{% call modal_shell('fds-access-request-digest-modal', _('FDS digest emails'), max_width='max-w-3xl') %}
+{% call modal_shell('fds-access-request-digest-modal', _('Access request emails'), max_width='max-w-3xl') %}
   <p class="text-sm text-gray-600 leading-relaxed mb-5">
-    {{ _('Daily email to FDS members who have pending country access requests for countries they oversee. Skipped when auto-approve is enabled via environment variable. Edit the email template under System Configuration → Emails.') }}
+    {{ _('Confirmation email to the person who submitted a request, and a daily digest to FDS members with pending requests. The digest is skipped when auto-approve is enabled via environment variable. Edit the templates under System Configuration → Emails.') }}
   </p>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 items-start">
     <form method="POST" action="{{ url_for('user_management.update_access_requests_digest_settings') }}" class="space-y-4 min-w-0">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <h3 class="text-sm font-semibold text-gray-900">{{ _('Schedule') }}</h3>
+      <input type="hidden" name="access_request_confirmation_email_present" value="1">
+      <h3 class="text-sm font-semibold text-gray-900">{{ _('Requester confirmation') }}</h3>
+      <div class="rounded-lg border border-gray-200 overflow-hidden">
+        <div class="flex items-start justify-between gap-4 p-4 bg-white">
+          <div class="min-w-0 pr-2">
+            <span class="block text-sm font-medium text-gray-900">{{ _('Email the requester') }}</span>
+            <span class="block text-xs text-gray-500 mt-1 leading-snug">
+              {{ _('Send one confirmation to the account address when a country access request is submitted. Auto-approved requests are not included; those users are notified that access was granted.') }}
+            </span>
+          </div>
+          <label class="relative inline-flex shrink-0 items-center cursor-pointer select-none mt-0.5" title="{{ _('Email the requester')|forceescape }}">
+            <input type="checkbox"
+                   id="access-request-confirmation-email"
+                   name="access_request_confirmation_email_enabled"
+                   value="1"
+                   {% if access_request_confirmation_email_enabled %}checked{% endif %}
+                   class="sr-only peer" />
+            <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+      </div>
+
+      <h3 class="text-sm font-semibold text-gray-900">{{ _('FDS digest schedule') }}</h3>
 
       <div class="rounded-lg border border-gray-200 overflow-hidden">
       <div class="flex items-start justify-between gap-4 p-4 bg-white">
@@ -326,7 +348,7 @@
           {{ _('Cancel') }}
         </button>
         <button type="submit" class="btn btn-primary w-full sm:w-auto">
-          <i class="fas fa-save mr-1.5"></i>{{ _('Save digest settings') }}
+          <i class="fas fa-save mr-1.5"></i>{{ _('Save email settings') }}
         </button>
       </div>
     </form>

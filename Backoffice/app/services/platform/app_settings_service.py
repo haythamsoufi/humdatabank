@@ -1429,6 +1429,35 @@ def set_fds_access_request_digest_settings(
     return write_settings(data, user_id=user_id)
 
 
+# ---------------------------------------------------------------------------
+# Requester confirmation when a country access request is submitted
+# ---------------------------------------------------------------------------
+
+ACCESS_REQUEST_CONFIRMATION_EMAIL_SETTINGS_KEY = "access_request_confirmation_email"
+_DEFAULT_ACCESS_REQUEST_CONFIRMATION_EMAIL_ENABLED = True
+
+
+def get_access_request_confirmation_email_enabled() -> bool:
+    """Whether the requester is emailed when they submit a country access request."""
+    data = read_settings()
+    raw = data.get(ACCESS_REQUEST_CONFIRMATION_EMAIL_SETTINGS_KEY)
+    if isinstance(raw, dict):
+        return _coerce_bool(raw.get("enabled"), _DEFAULT_ACCESS_REQUEST_CONFIRMATION_EMAIL_ENABLED)
+    if raw is None:
+        return _DEFAULT_ACCESS_REQUEST_CONFIRMATION_EMAIL_ENABLED
+    return _coerce_bool(raw, _DEFAULT_ACCESS_REQUEST_CONFIRMATION_EMAIL_ENABLED)
+
+
+def set_access_request_confirmation_email_enabled(
+    enabled: bool,
+    user_id: Optional[int] = None,
+) -> bool:
+    """Persist the requester confirmation-email toggle (Country Access Requests admin page)."""
+    data = read_settings()
+    data[ACCESS_REQUEST_CONFIRMATION_EMAIL_SETTINGS_KEY] = {"enabled": bool(enabled)}
+    return write_settings(data, user_id=user_id)
+
+
 # Email Template Management Functions
 # Stored under "email_templates" as: key -> { lang: content }
 EMAIL_TEMPLATE_KEYS = [
@@ -1438,6 +1467,7 @@ EMAIL_TEMPLATE_KEYS = [
     'email_template_welcome',
     'email_template_notification',
     'email_template_fds_access_request_digest',
+    'email_template_access_request_confirmation',
 ]
 
 # Legacy metadata keys (no longer written; ignored when reading HTML content).

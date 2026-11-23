@@ -425,6 +425,9 @@ def seed_templates(force: bool = False, user_id: Optional[int] = None) -> dict:
     Returns:
         ``{"email": {"seeded": N, "skipped": N}}``
     """
+    from app.services.email.access_request_confirmation import (
+        DEFAULT_ACCESS_REQUEST_CONFIRMATION_TEMPLATE,
+    )
     from app.services.platform.app_settings_service import (
         get_all_email_templates,
         set_all_email_templates,
@@ -437,8 +440,14 @@ def seed_templates(force: bool = False, user_id: Optional[int] = None) -> dict:
     existing_email = get_all_email_templates()
     merged_email = dict(existing_email)
 
-    for key in DEFAULT_EMAIL_TEMPLATES:
-        lang_dict = DEFAULT_EMAIL_TEMPLATES[key]
+    # Runtime fallback lives in access_request_confirmation.py so unseeded installs still send.
+    templates_to_seed = dict(DEFAULT_EMAIL_TEMPLATES)
+    templates_to_seed["email_template_access_request_confirmation"] = {
+        "en": DEFAULT_ACCESS_REQUEST_CONFIRMATION_TEMPLATE,
+    }
+
+    for key in templates_to_seed:
+        lang_dict = templates_to_seed[key]
         if key in merged_email and merged_email[key] and not force:
             stats["email"]["skipped"] += 1
             logger.info("  [skip]  template '%s' already has content", key)

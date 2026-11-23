@@ -518,6 +518,15 @@ class TestRequestCountryAccess:
 
     URL = "/request_country_access"
 
+    @pytest.fixture(autouse=True)
+    def _no_confirmation_email(self):
+        """Keep route tests from sending mail. Assert on this mock when the queue matters."""
+        with patch(
+            "app.services.email.access_request_confirmation.queue_access_request_confirmation_email",
+            return_value=True,
+        ) as mocked:
+            yield mocked
+
     def _post(self, client, data: dict, follow_redirects: bool = False):
         # Job title is required on the access-request form; default it for route tests
         # unless the caller explicitly sets (or clears) it.
@@ -544,7 +553,7 @@ class TestRequestCountryAccess:
         resp = self._post(client, {"requested_country_id": []}, follow_redirects=True)
         assert resp.status_code == 200
 
-    def test_success_single_country_request(self, client, db_session, app, test_user):
+    def test_success_single_country_request(self, client, db_session, app, test_user, _no_confirmation_email):
         country = create_test_country(db_session)
         _login(client, test_user)
         with patch("app.routes.main.assignments.is_organization_email", return_value=False), \
@@ -552,6 +561,10 @@ class TestRequestCountryAccess:
              patch(f"{_NOTIF_AUDIENCE}.collect_entity_admin_audience_recipient_ids", return_value=[]):
             resp = self._post(client, {"requested_country_id": country.id}, follow_redirects=False)
         assert_redirect(resp)
+        _no_confirmation_email.assert_called_once()
+        user_id, request_ids = _no_confirmation_email.call_args.args
+        assert user_id == test_user.id
+        assert len(request_ids) == 1
 
     def test_success_persists_job_title(self, client, db_session, app, test_user):
         from app.models import User
@@ -673,7 +686,7 @@ class TestRequestCountryAccess:
             resp = self._post(client, {"requested_country_id": 99999999}, follow_redirects=True)
         assert resp.status_code == 200
 
-    def test_auto_approve_grants_access(self, client, db_session, app, test_user):
+    def test_auto_approve_grants_access(self, client, db_session, app, test_user, _no_confirmation_email):
         country = create_test_country(db_session)
         _login(client, test_user)
         with patch("app.routes.main.assignments.is_organization_email", return_value=False), \
@@ -682,6 +695,7 @@ class TestRequestCountryAccess:
              patch(f"{_NOTIF_CORE}.notify_user_added_to_country", return_value=None):
             resp = self._post(client, {"requested_country_id": country.id}, follow_redirects=True)
         assert resp.status_code == 200
+        _no_confirmation_email.assert_not_called()
 
     def test_return_to_account_settings_redirects_there(self, client, db_session, app, test_user):
         country = create_test_country(db_session)

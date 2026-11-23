@@ -1300,7 +1300,10 @@ class Config:
         os.environ.get('SCHEDULER_DIGEST_EMAIL_INTERVAL_MINUTES', '5')
     )
 
-    # FDS access request digest schedule: System Configuration → Emails (DB-backed).
+    # Country access request emails are DB-backed (Admin → Country Access Requests):
+    # requester confirmation (`access_request_confirmation_email`, default on) and the
+    # FDS digest schedule (`fds_access_request_digest`). Templates live under
+    # System Configuration → Emails.
 
     # Verbose AI SSE logs (delta sampling, persist/engine summary lines). Default false.
     AI_STREAM_DEBUG = _parse_bool(os.environ.get("AI_STREAM_DEBUG"), default=False)

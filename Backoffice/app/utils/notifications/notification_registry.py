@@ -196,7 +196,8 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         ),
         "recipients": (
             "Org admins covering the requested country and/or system managers (requester excluded); "
-            "not sent when auto-approved."
+            "in-app only, and not sent when auto-approved. The requester is emailed a separate "
+            "confirmation when that setting is enabled (Admin → Country Access Requests)."
         ),
     },
     {

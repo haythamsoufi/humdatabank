@@ -243,6 +243,9 @@
                                     {% else %}
                                         {{ _('Request access for the country whose databank data you are responsible for managing.') }}
                                     {% endif %}
+                                    {% if access_request_confirmation_email_enabled %}
+                                        {{ _('A confirmation email will be sent to your account address.') }}
+                                    {% endif %}
                                 </p>
                             </div>
 

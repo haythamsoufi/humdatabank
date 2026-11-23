@@ -33,7 +33,10 @@ from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE, PAST_ASSIGNMENT_DAY
 from app.utils.api.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.http.request_utils import is_top_level_navigation
 from app.utils.common.error_handling import handle_json_view_exception
-from app.services.platform.app_settings_service import is_organization_email
+from app.services.platform.app_settings_service import (
+    get_access_request_confirmation_email_enabled,
+    is_organization_email,
+)
 from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.data_explorer import get_data_explorer_nav_permissions
 
@@ -1029,6 +1032,7 @@ def dashboard():
                        pending_access_requests=pending_access_requests,
                        all_access_requests=all_access_requests,
                        can_request_multiple_countries=can_request_multiple_countries,
+                       access_request_confirmation_email_enabled=get_access_request_confirmation_email_enabled(),
                        can_view_assignment_dashboard=can_view_assignment_dashboard,
                        is_delegation_user=is_organization_email(getattr(current_user, 'email', '')),
                        non_org_has_counting_request=non_org_has_counting_request,

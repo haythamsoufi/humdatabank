@@ -273,7 +273,10 @@ def access_requests():
     )
 
     from app.services.organization.authorization_service import AuthorizationService
-    from app.services.platform.app_settings_service import get_fds_access_request_digest_settings
+    from app.services.platform.app_settings_service import (
+        get_access_request_confirmation_email_enabled,
+        get_fds_access_request_digest_settings,
+    )
     from app.services.email.fds_access_request_digest import (
         get_fds_access_request_digest_last_sent_summary,
     )
@@ -305,6 +308,9 @@ def access_requests():
         ),
         fds_access_request_digest_timezone_label=ORG_TIMEZONE_LABEL,
         fds_digest_last_sent=fds_digest_last_sent,
+        access_request_confirmation_email_enabled=(
+            get_access_request_confirmation_email_enabled() if can_manage_fds_digest else False
+        ),
     )
 
 
@@ -350,18 +356,27 @@ def send_access_requests_digest_now():
 def update_access_requests_digest_settings():
     """Update FDS access request digest schedule (system managers only)."""
     from app.services.organization.authorization_service import AuthorizationService
-    from app.services.platform.app_settings_service import set_fds_access_request_digest_settings
+    from app.services.platform.app_settings_service import (
+        set_access_request_confirmation_email_enabled,
+        set_fds_access_request_digest_settings,
+    )
 
     if not AuthorizationService.is_system_manager(current_user):
         flash("Only system managers can change digest email settings.", "danger")
         return redirect(url_for("user_management.access_requests"))
 
+    saved_confirmation = request.form.get("access_request_confirmation_email_present") == "1"
     try:
         ok = set_fds_access_request_digest_settings(
             enabled=request.form.get("fds_access_request_digest_enabled") == "1",
             local_hour=request.form.get("fds_access_request_digest_local_hour", 7),
             user_id=current_user.id,
         )
+        if ok and saved_confirmation:
+            ok = set_access_request_confirmation_email_enabled(
+                enabled=request.form.get("access_request_confirmation_email_enabled") == "1",
+                user_id=current_user.id,
+            )
     except ValueError as e:
         flash(str(e), "danger")
         return redirect(url_for("user_management.access_requests"))
@@ -371,7 +386,10 @@ def update_access_requests_digest_settings():
         return redirect(url_for("user_management.access_requests"))
 
     if ok:
-        flash("Digest email settings saved.", "success")
+        flash(
+            "Email settings saved." if saved_confirmation else "Digest email settings saved.",
+            "success",
+        )
     else:
         flash("Failed to save digest email settings.", "danger")
     return redirect(url_for("user_management.access_requests"))

@@ -179,6 +179,20 @@ def get_email_template_preview_context(
             "org_name": org_name,
         }
 
+    if template_key == "email_template_access_request_confirmation":
+        return {
+            "user_name": "Jamie Example",
+            "request_count": 1,
+            "country_names": "Example Country",
+            "country_list_html": (
+                "<li>Example Country<br><span class=\"muted\">Need access for reporting</span></li>"
+            ),
+            "dashboard_url": f"{base_url}/",
+            "team_email": get_org_team_email() or "",
+            "org_name": org_name,
+            "copyright_year": copyright_year,
+        }
+
     if template_key == "email_template_fds_access_request_digest":
         return {
             "user_name": "Alex Admin",

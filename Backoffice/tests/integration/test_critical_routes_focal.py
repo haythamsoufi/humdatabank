@@ -219,11 +219,15 @@ class TestCriticalCountryAccessRoute:
         login_session(client, user_id)
         # WTF_CSRF_ENABLED is False in tests; avoid GET /api/v1/csrf-token before POST
         # (that request commits and detaches the ORM user instance Flask-Login may reuse).
-        resp = client.post(
-            "/request_country_access",
-            data={"title": "Focal Point", "requested_country_id": str(country_id)},
-            follow_redirects=False,
-        )
+        with patch(
+            "app.services.email.access_request_confirmation.queue_access_request_confirmation_email",
+            return_value=True,
+        ):
+            resp = client.post(
+                "/request_country_access",
+                data={"title": "Focal Point", "requested_country_id": str(country_id)},
+                follow_redirects=False,
+            )
         assert resp.status_code in (301, 302, 303, 307, 308)
 
 

@@ -284,6 +284,11 @@ class TestClassifyOrphanEmailLog:
     def test_fds_access_request_digest(self):
         assert classify_orphan_email_log('Country Access Requests - 2 pending request(s)') == 'fds_access_request_digest'
 
+    def test_access_request_confirmation(self):
+        assert classify_orphan_email_log(
+            'Country access request received — Kenya · Chad'
+        ) == 'access_request_confirmation'
+
     def test_unsupported(self):
         assert classify_orphan_email_log('Random subject') == 'unsupported'
 

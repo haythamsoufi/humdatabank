@@ -40,7 +40,12 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from flask import current_app
 from app.extensions import mail, csrf
 from app.services.email.client import send_email
-from app.services.platform.app_settings_service import get_organization_name, is_organization_email, user_has_ai_beta_access
+from app.services.platform.app_settings_service import (
+    get_access_request_confirmation_email_enabled,
+    get_organization_name,
+    is_organization_email,
+    user_has_ai_beta_access,
+)
 from app.utils.common.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
 from app.utils.http.request_utils import clear_mobile_app_embed_cookie
 from app.utils.auth.azure_b2c_config import is_azure_b2c_configured
@@ -1527,6 +1532,7 @@ def register():
             except Exception as e:
                 current_app.logger.warning(f"RBAC: could not assign default role for registered user: {e}", exc_info=True)
             # Create a pending country access request for the selected country
+            created_access_request_id = None
             with suppress(Exception):
                 from app.models import CountryAccessRequest
                 requested_country_id = form.requested_country_id.data
@@ -1538,7 +1544,20 @@ def register():
                         status='pending'
                     )
                     db.session.add(access_request)
+                    db.session.flush()
+                    created_access_request_id = access_request.id
             db.session.flush()
+            if created_access_request_id:
+                try:
+                    from app.services.email.access_request_confirmation import (
+                        queue_access_request_confirmation_email,
+                    )
+                    queue_access_request_confirmation_email(user.id, [created_access_request_id])
+                except Exception:
+                    current_app.logger.exception(
+                        "Failed to queue country access request confirmation email for %s",
+                        user.email,
+                    )
             with suppress(Exception):
                 log_user_activity_for_user(
                     user.id,
@@ -1871,6 +1890,7 @@ def account_settings():
                          all_access_requests=all_access_requests,
                          pending_access_requests=pending_access_requests,
                          can_request_multiple_countries=is_organization_email(getattr(current_user, 'email', '')),
+                         access_request_confirmation_email_enabled=get_access_request_confirmation_email_enabled(),
                          notification_preferences=notification_preferences,
                          notification_types=notification_types_info['for_user'],
                          notification_type_labels=get_notification_type_labels(),

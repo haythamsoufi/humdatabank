@@ -123,6 +123,9 @@
                     {% else %}
                         {{ _('You can request one country at a time.') }}
                     {% endif %}
+                    {% if access_request_confirmation_email_enabled %}
+                        {{ _('A confirmation email will be sent to your account address.') }}
+                    {% endif %}
                 </p>
             </form>
         </div>

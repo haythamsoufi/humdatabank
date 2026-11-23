@@ -1573,6 +1573,7 @@ _EMAIL_TEMPLATE_TEST_LABELS = {
     "email_template_welcome": "Welcome Email",
     "email_template_notification": "Notification Email Wrapper",
     "email_template_fds_access_request_digest": "FDS Access Request Digest",
+    "email_template_access_request_confirmation": "Country Access Request Confirmation",
 }
 
 _EMAIL_TEST_SEND_FAILURE_MESSAGES = {

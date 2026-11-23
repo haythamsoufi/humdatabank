@@ -252,6 +252,9 @@
                                         {% else %}
                                             {{ _('You can only request one country in total.') }}
                                         {% endif %}
+                                        {% if access_request_confirmation_email_enabled %}
+                                            {{ _('A confirmation email will be sent to your account address.') }}
+                                        {% endif %}
                                     </p>
                                 </section>
 

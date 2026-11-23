@@ -71,7 +71,11 @@ class TestRegisterRoute:
             country_id = country.id
         with patch('app.routes.auth.is_azure_b2c_configured', return_value=False), \
              patch('app.routes.auth.validate_password_strength', return_value=(True, [])), \
-             patch('app.routes.auth.log_user_activity_for_user'):
+             patch('app.routes.auth.log_user_activity_for_user'), \
+             patch(
+                 'app.services.email.access_request_confirmation.queue_access_request_confirmation_email',
+                 return_value=True,
+             ):
             resp = client.post('/register', data={
                 'email': f'register-{uuid4().hex[:8]}@example.com',
                 'name': 'New User',

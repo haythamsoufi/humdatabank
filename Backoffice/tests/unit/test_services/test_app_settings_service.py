@@ -1514,6 +1514,21 @@ class TestFdsAccessRequestDigestSettings:
                 svc.set_fds_access_request_digest_settings(True, 24)
 
 
+class TestAccessRequestConfirmationEmailSettings:
+    def test_defaults_enabled(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            assert svc.get_access_request_confirmation_email_enabled() is True
+
+    def test_set_and_get(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            assert svc.set_access_request_confirmation_email_enabled(False) is True
+            assert svc.get_access_request_confirmation_email_enabled() is False
+            assert svc.set_access_request_confirmation_email_enabled(True) is True
+            assert svc.get_access_request_confirmation_email_enabled() is True
+
+
 # ---------------------------------------------------------------------------
 # Email templates
 # ---------------------------------------------------------------------------

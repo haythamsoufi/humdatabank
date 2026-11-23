@@ -936,7 +936,7 @@
       <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('System Email Templates') }}</label>
       {# Placeholder names stay literal (not gettext): they match Jinja variables and should not be auto-translated. #}
       <p class="text-xs text-gray-500 mb-3">
-        {{ _('HTML templates used when the system sends email automatically (registration welcome, security alerts, indicator suggestions, and the Communication Center email wrapper). Use Jinja2 syntax. Typical placeholder names include:') }}
+        {{ _('HTML templates used when the system sends email automatically (registration welcome, security alerts, indicator suggestions, country access request confirmations, and the Communication Center email wrapper). Use Jinja2 syntax. Typical placeholder names include:') }}
         <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">org_name, org_short_name, copyright_year, user_name, submitter_name, title, message, etc.</span>
       </p>
 
@@ -970,6 +970,11 @@
           'key': 'email_template_fds_access_request_digest',
           'label': _('FDS Access Request Digest'),
           'description': _('Daily email sent to FDS members with pending country access requests for their countries. Variables: user_name, request_count, request_rows_html, access_requests_url, org_name, copyright_year')
+        },
+        {
+          'key': 'email_template_access_request_confirmation',
+          'label': _('Country Access Request Confirmation'),
+          'description': _('Email sent to a user when they submit a country access request. Variables: user_name, request_count, country_names, country_list_html, dashboard_url, team_email, org_name, copyright_year')
         }
       ] %}
 

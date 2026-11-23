@@ -210,8 +210,10 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
             calcInput.setAttribute('data-max-decimals', String(calcDecimals));
             calcInput.setAttribute('aria-label', `Calculated value for ${rowLabel} and ${columnDisplayName}`);
             calcInput.value = '';
-            this._applyMatrixInputEditability(calcInput, container, false);
+            // The input has to be inside the cell first: header gating paints
+            // the cell from input.closest('td').
             cell.appendChild(calcInput);
+            this._applyMatrixInputEditability(calcInput, container, false);
             row.appendChild(cell);
             return;
         }
@@ -275,12 +277,14 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
         input.setAttribute('data-column', columnName);
         input.setAttribute('data-cell-key', cellKey);
 
+        // Append before editability. A selectable header with no emergency
+        // chosen greys the cell via input.closest('td'); that is null until
+        // the input is inside the cell, so a newly added row stayed white.
+        cell.appendChild(input);
         const variableReadonlyForCell = isVariable
             ? (typeof column === 'object' ? (column.variable_readonly !== false) : true)
             : false;
         this._applyMatrixInputEditability(input, container, variableReadonlyForCell);
-
-        cell.appendChild(input);
         row.appendChild(cell);
     });
 

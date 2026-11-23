@@ -124,3 +124,44 @@ describe('addDynamicRow de-duplication', () => {
     matrixHandler.matrices.clear();
   });
 });
+
+describe('addDynamicRow header gating', () => {
+  afterEach(async () => {
+    const { matrixHandler } = await import('../../../app/static/js/forms/modules/matrix-handler.js');
+    matrixHandler.variableResolutionDebounceTimers?.forEach((id) => clearTimeout(id));
+    matrixHandler.variableResolutionDebounceTimers?.clear();
+    matrixHandler.matrices.clear();
+    document.body.innerHTML = '';
+  });
+
+  it('greys a selectable column that has no header value on a newly added row', async () => {
+    const { matrixHandler } = await import('../../../app/static/js/forms/modules/matrix-handler.js');
+    document.body.innerHTML = `
+      <div class="matrix-container" data-field-id="${FIELD_ID}" data-can-edit="true">
+        <table><tbody id="matrix-tbody-${FIELD_ID}"></tbody></table>
+      </div>`;
+    const container = document.querySelector('.matrix-container');
+    matrixHandler.matrices.set(FIELD_ID, {
+      container,
+      config: {
+        row_mode: 'list_library',
+        show_row_totals: false,
+        show_column_totals: false,
+        columns: [
+          { name: 'EA3', type: 'number', header_type: 'selectable' },
+          { name: 'SP2', type: 'number' },
+        ],
+      },
+      data: {},
+    });
+
+    matrixHandler.addDynamicRow(FIELD_ID, 'Bhutan Red Cross Society', { _id: '49', id: '49' }, '49', false);
+
+    const emergency = container.querySelector('input[data-column="EA3"]');
+    const disasters = container.querySelector('input[data-column="SP2"]');
+    expect(emergency.disabled).toBe(true);
+    expect(emergency.closest('td').classList.contains('matrix-cell-header-gated')).toBe(true);
+    expect(disasters.disabled).toBe(false);
+    expect(disasters.closest('td').classList.contains('matrix-cell-header-gated')).toBe(false);
+  });
+});

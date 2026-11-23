@@ -13,10 +13,17 @@ from typing import List, Optional
 
 
 def redirect_if_assignment_entry_blocked(assigned_form, *, inactive_message: str):
-    """Return a dashboard redirect when a deactivated assignment cannot be opened, else None."""
+    """Return a dashboard redirect when a deactivated assignment cannot be opened, else None.
+
+    System managers may open inactive assignments. Other users are sent to the dashboard.
+    """
     if assigned_form is None:
         return None
     if not assigned_form.is_entry_allowed:
+        from app.services.organization.authorization_service import AuthorizationService
+
+        if AuthorizationService.is_system_manager(current_user):
+            return None
         flash(inactive_message, "warning")
         return redirect(url_for("main.dashboard"))
     return None

@@ -48,6 +48,29 @@ class TestRedirectIfAssignmentEntryBlocked:
         assert result is not None
         assert result.status_code in (301, 302, 303, 307, 308)
 
+    def test_system_manager_can_open_inactive_assignment(self, app):
+        assigned = MagicMock()
+        assigned.is_entry_allowed = False
+        with app.test_request_context():
+            with patch(
+                'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
+                return_value=True,
+            ):
+                result = redirect_if_assignment_entry_blocked(assigned, inactive_message='inactive')
+        assert result is None
+
+    def test_non_system_manager_inactive_assignment_still_redirects(self, app):
+        assigned = MagicMock()
+        assigned.is_entry_allowed = False
+        with app.test_request_context():
+            with patch(
+                'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
+                return_value=False,
+            ):
+                result = redirect_if_assignment_entry_blocked(assigned, inactive_message='inactive')
+        assert result is not None
+        assert result.status_code in (301, 302, 303, 307, 308)
+
 
 @pytest.mark.unit
 class TestFormAuthorizationWrappers:

@@ -698,6 +698,69 @@ class TestPassthrough:
     def test_subscribe_requires_a_key(self, client, scenario):
         assert client.post("/api/documentSubscribe", json={"email": "a@example.org"}).status_code == 401
 
+    def test_only_the_switched_endpoint_is_forwarded(self, client, app, scenario, key, monkeypatch):
+        import plugins.fdrs.public_compat_routes as routes
+        from plugins.fdrs.services.fdrs_endpoint_source import (
+            PUBLIC_ENDPOINTS,
+            SOURCE_DATABANK,
+            SOURCE_ORIGINAL,
+            save_endpoint_sources,
+        )
+
+        monkeypatch.setitem(app.config, "FDRS_DATA_API_BASE", "https://legacy.example.org")
+        monkeypatch.setitem(app.config, "FDRS_DATA_API_KEY", "server-key")
+        calls = []
+
+        def fake_request(method, url, **kwargs):
+            calls.append((method, url, kwargs))
+            return _FakeUpstream()
+
+        monkeypatch.setattr(routes.requests, "request", fake_request)
+        choices = {endpoint.id: SOURCE_DATABANK for endpoint in PUBLIC_ENDPOINTS if endpoint.switchable}
+        choices["lastpublishedyear"] = SOURCE_ORIGINAL
+        assert save_endpoint_sources(choices) is None
+
+        forwarded = _get(client, key, "/api/lastpublishedyear")
+        assert forwarded.status_code == 200
+        assert forwarded.data == b"a,b\n1,2\n"
+        method, url, kwargs = calls[0]
+        assert (method, url) == ("GET", "https://legacy.example.org/api/lastpublishedyear")
+        params = dict(kwargs["params"])
+        assert params["apiKey"] == "server-key"
+        assert key not in params.values()
+
+        documents = _get(client, key, "/api/documents")
+        assert documents.status_code == 200
+        assert documents.is_json
+        assert len(calls) == 1
+
+    def test_one_society_forwards_only_a_plain_don_code(self, client, app, scenario, key, monkeypatch):
+        import plugins.fdrs.public_compat_routes as routes
+        from plugins.fdrs.services.fdrs_endpoint_source import (
+            PUBLIC_ENDPOINTS,
+            SOURCE_DATABANK,
+            SOURCE_ORIGINAL,
+            save_endpoint_sources,
+        )
+
+        monkeypatch.setitem(app.config, "FDRS_DATA_API_BASE", "https://legacy.example.org")
+        monkeypatch.setitem(app.config, "FDRS_DATA_API_KEY", "server-key")
+        calls = []
+
+        def fake_request(method, url, **kwargs):
+            calls.append(url)
+            return _FakeUpstream()
+
+        monkeypatch.setattr(routes.requests, "request", fake_request)
+        choices = {endpoint.id: SOURCE_DATABANK for endpoint in PUBLIC_ENDPOINTS if endpoint.switchable}
+        choices["entities_ns_one"] = SOURCE_ORIGINAL
+        assert save_endpoint_sources(choices) is None
+
+        assert _get(client, key, "/api/entities/ns/DCAA001").status_code == 200
+        assert calls == ["https://legacy.example.org/api/entities/ns/DCAA001"]
+        assert _get(client, key, "/api/entities/ns/DCA.A").status_code == 404
+        assert calls == ["https://legacy.example.org/api/entities/ns/DCAA001"]
+
 
 def _csv_rows(response):
     import csv

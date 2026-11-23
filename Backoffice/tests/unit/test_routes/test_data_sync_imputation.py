@@ -189,6 +189,10 @@ class TestFdrsToolsRoute:
         assert tab_ids[0] == "sync"
         assert "documents" in tab_ids
         assert "publication" in tab_ids
+        assert "endpoints" in tab_ids
+        endpoint_paths = [row["path"] for row in kwargs["fdrs_endpoints"]]
+        assert "/api/data" in endpoint_paths
+        assert "/api/offices" in endpoint_paths
 
     def test_legacy_url_redirects(self, logged_in_client, db_session, app):
         with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
@@ -201,6 +205,63 @@ class TestFdrsToolsRoute:
         resp = client.get("/admin/fdrs-tools", follow_redirects=False)
         assert resp.status_code == 302
         assert "login" in resp.location.lower()
+
+
+class TestFdrsEndpointSources:
+    def test_post_requires_login(self, client):
+        resp = client.post("/admin/fdrs-tools/endpoints", data={"action": "all_databank"}, follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" in resp.location.lower()
+
+    def test_save_forwards_one_path_and_restore_clears_it(self, logged_in_client, db_session):
+        from plugins.fdrs.services.fdrs_endpoint_source import (
+            PUBLIC_ENDPOINTS,
+            SOURCE_DATABANK,
+            SOURCE_ORIGINAL,
+            original_endpoint_paths,
+        )
+
+        data = {"action": "save"}
+        for endpoint in PUBLIC_ENDPOINTS:
+            if endpoint.switchable:
+                data[f"source-{endpoint.id}"] = SOURCE_DATABANK
+        data["source-lastpublishedyear"] = SOURCE_ORIGINAL
+        with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True):
+            resp = logged_in_client.post("/admin/fdrs-tools/endpoints", data=data, follow_redirects=False)
+        assert resp.status_code == 302
+        assert "/admin/fdrs-tools" in (resp.location or "")
+        assert (resp.location or "").endswith("#endpoints")
+        assert original_endpoint_paths() == ["/api/lastpublishedyear"]
+        with logged_in_client.session_transaction() as sess:
+            messages = [message for _category, message in sess.get("_flashes", [])]
+        assert any("/api/lastpublishedyear" in message for message in messages)
+
+        with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True):
+            restored = logged_in_client.post(
+                "/admin/fdrs-tools/endpoints",
+                data={"action": "all_databank"},
+                follow_redirects=False,
+            )
+        assert restored.status_code == 302
+        assert original_endpoint_paths() == []
+
+    def test_unknown_action_does_not_change_sources(self, logged_in_client, db_session):
+        from plugins.fdrs.services.fdrs_endpoint_source import original_endpoint_paths
+
+        with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True):
+            resp = logged_in_client.post(
+                "/admin/fdrs-tools/endpoints",
+                data={"action": "drop-database"},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        assert original_endpoint_paths() == []
+        with logged_in_client.session_transaction() as sess:
+            messages = [message for _category, message in sess.get("_flashes", [])]
+        assert any("Unknown endpoint action" in message for message in messages)
 
 
 class TestUprToolsRoute:

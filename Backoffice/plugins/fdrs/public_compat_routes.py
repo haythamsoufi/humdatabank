@@ -18,6 +18,9 @@ the mailing list, and the other embed types (OCAC, BOCA) are forwarded to
 ``https://data-api.ifrc.org`` (or ``FDRS_DATA_API_BASE``) using ``FDRS_DATA_API_KEY``.
 ``/csv/export`` and ``/csv/exportns`` serve the daily snapshot when it is present,
 and build the file on the request when it is not.
+
+FDRS Tools → Endpoints can forward a Databank path to the legacy data API
+instead. Translations, offices, and the mailing list always forward.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from app.utils.common.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
 from plugins.fdrs.services import fdrs_public_adapter as adapter
 from plugins.fdrs.services import fdrs_public_export_cache as export_cache
+from plugins.fdrs.services.fdrs_endpoint_source import PUBLIC_ENDPOINTS, uses_original_api
 
 CACHE_SECONDS = 300
 PASSTHROUGH_TIMEOUT_SECONDS = 25
@@ -345,6 +349,9 @@ def _year_or_latest():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_last_published_year():
     try:
+        forwarded = _original_response("lastpublishedyear")
+        if forwarded is not None:
+            return forwarded
         return _json(adapter.last_published_year())
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -354,6 +361,9 @@ def fdrs_public_compat_last_published_year():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_societies():
     try:
+        forwarded = _original_response("entities_ns")
+        if forwarded is not None:
+            return forwarded
         return _json(adapter.list_societies())
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -363,6 +373,11 @@ def fdrs_public_compat_societies():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_society(don_code):
     try:
+        if uses_original_api("entities_ns_one"):
+            code = don_code or ""
+            if not code.isalnum() or len(code) > 32:
+                return api_error("National Society not found", 404)
+            return _passthrough(f"/api/entities/ns/{code}")
         society = adapter.get_society(don_code)
         if society is None:
             return api_error("National Society not found", 404)
@@ -388,6 +403,9 @@ def _data_tree_response():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_data():
     try:
+        forwarded = _original_response("data")
+        if forwarded is not None:
+            return forwarded
         return _data_tree_response()
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -397,6 +415,9 @@ def fdrs_public_compat_data():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_data_imputed():
     try:
+        forwarded = _original_response("dataimputed")
+        if forwarded is not None:
+            return forwarded
         return _data_tree_response()
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -406,6 +427,9 @@ def fdrs_public_compat_data_imputed():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_imputed_values():
     try:
+        forwarded = _original_response("kpi_imputed")
+        if forwarded is not None:
+            return forwarded
         kpi_code = (request.args.get("kpicode") or "").strip()
         if not kpi_code:
             return api_error("kpicode is required", 400)
@@ -421,6 +445,9 @@ def fdrs_public_compat_imputed_values():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_global_validation():
     try:
+        forwarded = _original_response("global_validation")
+        if forwarded is not None:
+            return forwarded
         year, error = _year_or_latest()
         if error is not None:
             return error
@@ -433,6 +460,9 @@ def fdrs_public_compat_global_validation():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_kpi_value():
     try:
+        forwarded = _original_response("kpi_value")
+        if forwarded is not None:
+            return forwarded
         year, error = _year_or_latest()
         if error is not None:
             return error
@@ -447,6 +477,24 @@ def fdrs_public_compat_kpi_value():
 # ---------------------------------------------------------------------------
 # Paths Backoffice does not serve itself: optional forward to the legacy data API
 # ---------------------------------------------------------------------------
+
+
+_UPSTREAM_PATH = {
+    endpoint.id: endpoint.path
+    for endpoint in PUBLIC_ENDPOINTS
+    if "<" not in endpoint.path
+}
+
+
+def _original_response(endpoint_id: str, upstream_path: str | None = None):
+    """Legacy response when FDRS Tools has this path set to the original API."""
+    if not uses_original_api(endpoint_id):
+        return None
+    path = upstream_path or _UPSTREAM_PATH.get(endpoint_id)
+    if not path or "<" in path:
+        current_app.logger.error("FDRS endpoint %s has no upstream path", endpoint_id)
+        return api_error("Legacy data API is misconfigured", 502)
+    return _passthrough(path)
 
 
 def _passthrough(upstream_path: str):
@@ -524,6 +572,9 @@ for _path in ("/api/smarttran", "/api/tran", "/api/offices"):
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_embedded_content():
     try:
+        forwarded = _original_response("embeddedcontent")
+        if forwarded is not None:
+            return forwarded
         from plugins.fdrs.services.fdrs_public_embeds import legacy_embeds, serves_embed_type
 
         embed_type = request.args.get("type") or ""
@@ -538,6 +589,9 @@ def fdrs_public_compat_embedded_content():
 @require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_documents():
     try:
+        forwarded = _original_response("documents")
+        if forwarded is not None:
+            return forwarded
         from plugins.fdrs.services.fdrs_public_documents import list_documents
 
         payload = list_documents(
@@ -584,6 +638,9 @@ def _export_file(don_code: str | None):
 @bp.route("/csv/export", methods=["GET"])
 def fdrs_public_compat_csv_export():
     try:
+        forwarded = _original_response("csv_export")
+        if forwarded is not None:
+            return forwarded
         return _export_file(None)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -595,6 +652,9 @@ fdrs_public_compat_csv_export._ep_auth = "public"
 @bp.route("/csv/exportns", methods=["GET"])
 def fdrs_public_compat_csv_export_ns():
     try:
+        forwarded = _original_response("csv_export_ns")
+        if forwarded is not None:
+            return forwarded
         don_code = (request.args.get("doncode") or "").strip().upper()
         if not don_code:
             return api_error("doncode is required", 400)

@@ -22,6 +22,8 @@ The three split tabs are seeded through `get_seed_permissions()` / `get_seed_rol
 
 Admin → Plugins → FDRS → Settings (`/admin/plugins/fdrs/settings`) shows the sync script status and the default reporting years. Syncs, document scans and publication jobs run from the Data Explorer and admin panels. Command line tools are in `cli.py`.
 
+Admin → FDRS Tools → Endpoints (`/admin/fdrs-tools#endpoints`) chooses, for each legacy public path, whether this server answers from Databank or forwards the request to the legacy data API (`FDRS_DATA_API_BASE`, using `FDRS_DATA_API_KEY`). Forwarding is the contingency when a path should be served by the original system again. The public site keeps calling this server either way. Translations, offices, and the document mailing list always forward, because they have no Databank source.
+
 ## Configuration
 
 | Key | Purpose |

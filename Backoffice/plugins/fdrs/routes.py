@@ -11,7 +11,7 @@ import uuid
 from contextlib import suppress
 from typing import Any, Dict, List, Optional
 
-from flask import after_this_request, current_app, redirect, render_template, request, send_file, url_for
+from flask import after_this_request, current_app, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user
 
 from app.models import FormTemplate
@@ -132,12 +132,36 @@ def fdrs_settings_status() -> Dict[str, Any]:
         years_start, years_end = fdrs_default_years_bounds()
     except Exception:
         current_app.logger.warning("FDRS default year bounds unavailable", exc_info=True)
+    original_paths = None
+    try:
+        from plugins.fdrs.services.fdrs_endpoint_source import original_endpoint_paths
+
+        original_paths = original_endpoint_paths()
+    except Exception:
+        current_app.logger.warning("FDRS endpoint sources unavailable", exc_info=True)
     return {
         "template_id": FDRS_TEMPLATE_ID,
         "sync_script_available": fdrs_sync_script_available(),
         "years_start": years_start,
         "years_end": years_end,
         "data_source": "data-api.ifrc.org",
+        "original_endpoint_paths": original_paths,
+    }
+
+
+def _endpoint_admin_context() -> Dict[str, Any]:
+    from plugins.fdrs.public_compat_routes import DEFAULT_LEGACY_DATA_API_BASE
+    from plugins.fdrs.services.fdrs_endpoint_source import SOURCE_ORIGINAL, endpoint_choices
+
+    rows = endpoint_choices()
+    base = (current_app.config.get("FDRS_DATA_API_BASE") or DEFAULT_LEGACY_DATA_API_BASE).rstrip("/")
+    return {
+        "fdrs_endpoints": rows,
+        "fdrs_endpoints_on_original": [
+            row["path"] for row in rows if row["switchable"] and row["source"] == SOURCE_ORIGINAL
+        ],
+        "fdrs_legacy_api_base": base,
+        "fdrs_legacy_api_key_set": bool((current_app.config.get("FDRS_DATA_API_KEY") or "").strip()),
     }
 
 
@@ -191,7 +215,7 @@ def parse_reported_import_states(data: Dict[str, Any]) -> Optional[List[int]]:
 @admin_required
 @system_manager_required
 def fdrs_tools():
-    """FDRS tools hub: preview, imputation, Sync (run/verify), documents, and publication."""
+    """FDRS tools hub: preview, imputation, Sync, documents, publication, and endpoints."""
     from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
     from app.utils.indicators.data_quality_constants import FDRS_TEMPLATE_ID as fdrs_template_id
     from flask import current_app
@@ -240,6 +264,11 @@ def fdrs_tools():
                 "label": "Manage Publication",
                 "icon": "fas fa-tower-broadcast",
             },
+            {
+                "id": "endpoints",
+                "label": "Endpoints",
+                "icon": "fas fa-exchange-alt",
+            },
         ],
         extra_panel_templates=[
             {
@@ -254,6 +283,10 @@ def fdrs_tools():
                 "id": "publication",
                 "template": "plugins/fdrs/admin/_fdrs_publication_panel.html",
             },
+            {
+                "id": "endpoints",
+                "template": "plugins/fdrs/admin/_fdrs_endpoints_panel.html",
+            },
         ],
         extra_script_templates=[
             "plugins/fdrs/admin/_fdrs_sync_script.html",
@@ -267,8 +300,71 @@ def fdrs_tools():
             "active_fdrs_document_jobs": active_document_jobs,
             "fdrs_verify_latest": artifacts.load_verify_latest_meta(fdrs_template_id),
             "fdrs_documents_latest": artifacts.load_documents_latest_meta(),
+            **_endpoint_admin_context(),
         },
     )
+
+
+@bp.route("/admin/fdrs-tools/endpoints", methods=["POST"])
+@admin_required
+@system_manager_required
+def fdrs_endpoint_sources():
+    """Save which public paths use Databank and which forward to the legacy API."""
+    from app.utils.audit.audit_context import set_audit_description, set_audit_details, skip_activity_log
+    from plugins.fdrs.services.fdrs_endpoint_source import (
+        SOURCE_DATABANK,
+        SOURCE_ORIGINAL,
+        apply_source_to_all_switchable,
+        endpoint_choices,
+        original_endpoint_paths,
+        save_endpoint_sources,
+    )
+
+    action = (request.form.get("action") or "save").strip()
+    before = original_endpoint_paths()
+    if action == "all_original":
+        error = apply_source_to_all_switchable(SOURCE_ORIGINAL)
+    elif action == "all_databank":
+        error = apply_source_to_all_switchable(SOURCE_DATABANK)
+    elif action == "save":
+        choices = {}
+        for row in endpoint_choices():
+            if row["switchable"]:
+                choices[row["id"]] = (request.form.get(f"source-{row['id']}") or "").strip()
+        error = save_endpoint_sources(choices)
+    else:
+        error = "Unknown endpoint action."
+
+    if error:
+        flash(error, "error")
+        skip_activity_log()
+        return redirect(url_for("fdrs.fdrs_tools", _anchor="endpoints"))
+
+    after = original_endpoint_paths()
+    if before == after:
+        if action == "all_original" and after:
+            flash("Those endpoints already forward to the original data API.", "success")
+        elif action == "all_databank":
+            flash("Those endpoints already use Databank data.", "success")
+        else:
+            flash("No endpoint changes to save.", "success")
+        skip_activity_log()
+        return redirect(url_for("fdrs.fdrs_tools", _anchor="endpoints"))
+
+    if after:
+        flash(
+            "These public endpoints now forward to the original data API: " + ", ".join(after) + ".",
+            "success",
+        )
+    else:
+        flash("Every switchable public endpoint now uses Databank data.", "success")
+    set_audit_description("Changed which FDRS public endpoints use Databank data")
+    set_audit_details(**{"Forwarded to the original API": ", ".join(after) or "none"})
+    current_app.logger.warning(
+        "FDRS public endpoint sources changed. Now forwarded: %s",
+        ", ".join(after) or "(none)",
+    )
+    return redirect(url_for("fdrs.fdrs_tools", _anchor="endpoints"))
 
 
 @bp.route("/admin/fdrs-sync-imputation", methods=["GET"])

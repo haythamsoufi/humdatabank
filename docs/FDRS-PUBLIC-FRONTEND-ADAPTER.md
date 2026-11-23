@@ -23,8 +23,11 @@ Implemented in the FDRS plugin:
 | `GET /api/documents` | Publications (`resource_type = publication`, subcategory → `EveryoneCounts` / `Analysis` / `FrontendVideo`) and, with `ns`, public approved submitted documents |
 | `GET /api/embeddedcontent` | `UNIFIED-PLANNING`, `OVERVIEW-INTERNATIONAL`, and `GLOBAL-INITIATIVES` are active embeds with page slots Unified Planning, International Overview, and Global Initiatives, in sort order. `EmbedCode` is the admin Copy iframe. OCAC and BOCA still forward |
 | Tests | `Backoffice/tests/unit/test_plugins/test_fdrs_public_compat.py` |
+| Endpoint source | FDRS Tools → Endpoints. Each Databank path can be forwarded to the legacy data API (`plugins/fdrs/services/fdrs_endpoint_source.py`) |
 
 Not implemented: translations and offices (see [Content that is not the indicator bank](#content-that-is-not-the-indicator-bank)). `/api/embeddedcontent` for unified planning, the international overview, and global initiatives reads Admin → Embed Content. `/api/documents` reads Manage Resources publications and public approved submitted documents. `/csv/export` and `/csv/exportns` are files of the published snapshot.
+
+Contingency: FDRS Tools → Endpoints can forward any of those Databank paths to the legacy data API without changing the public site. The request still arrives here; Backoffice fetches it from `FDRS_DATA_API_BASE` with `FDRS_DATA_API_KEY` and returns that response. Translations, offices, and the mailing list always take that path. Switching every Databank endpoint back is the "switch all to original API" action on that tab.
 
 ### Set up
 

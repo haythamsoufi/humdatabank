@@ -35,6 +35,11 @@
                     <i class="fas fa-tower-broadcast mr-2"></i>
                     Manage Publication
                 </a>
+                <a href="{{ url_for('fdrs.fdrs_tools') }}#endpoints"
+                   class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-800 font-medium py-2 px-4 rounded-lg border border-gray-300">
+                    <i class="fas fa-exchange-alt mr-2"></i>
+                    Endpoints
+                </a>
             </div>
             <div class="mt-4 pt-4 border-t border-gray-200">
                 <p class="text-sm text-gray-600 break-words">
@@ -71,6 +76,18 @@
                         {{ settings.years_start }}–{{ settings.years_end }}
                     {% else %}
                         —
+                    {% endif %}
+                </span>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 p-3 bg-gray-50 rounded-lg">
+                <span class="text-gray-600">Public endpoints</span>
+                <span class="font-medium text-gray-900 break-words text-right">
+                    {% if settings.original_endpoint_paths is none %}
+                        —
+                    {% elif settings.original_endpoint_paths %}
+                        {{ settings.original_endpoint_paths|length }} on original API
+                    {% else %}
+                        Databank
                     {% endif %}
                 </span>
             </div>

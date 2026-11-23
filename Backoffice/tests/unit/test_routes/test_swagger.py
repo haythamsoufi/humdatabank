@@ -77,6 +77,10 @@ class TestGetOpenApiSpec:
         assert "Countries" in tag_names
         assert "Indicator bank" in tag_names
         assert "Templates" in tag_names
+        assert "AI" in tag_names
+        assert "Public data" in tag_names
+        assert "Reports" in tag_names
+        assert "Public" not in tag_names
         assert "Indicators" not in tag_names
         assert "Users" not in tag_names
         assert "Quiz" not in tag_names
@@ -686,6 +690,14 @@ class TestOpenApiSpecIntegrity:
         assert "/public/documents/search" in paths
         assert "/public/reports/country" in paths
         assert paths["/public/global-trend"]["get"].get("security") == []
+        assert paths["/public/documents/search"]["get"]["tags"] == ["AI"]
+        assert paths["/public/documents/catalog"]["get"]["tags"] == ["AI"]
+        assert paths["/public/global-trend"]["get"]["tags"] == ["Public data"]
+        assert paths["/public/indicators/resolve"]["get"]["tags"] == ["Public data"]
+        assert paths["/public/countries/resolve"]["get"]["tags"] == ["Public data"]
+        assert paths["/public/submissions/coverage"]["get"]["tags"] == ["Public data"]
+        assert paths["/public/reports/country"]["get"]["tags"] == ["Reports"]
+        assert paths["/public/reports/template"]["get"]["tags"] == ["Reports"]
 
     def test_every_v1_route_is_in_the_spec(self, app):
         """A new /api/v1 route must appear unless it is on the omit list."""
@@ -734,6 +746,11 @@ class TestDocsWording:
         assert _tag_for("/nskeydata") == "NS key data"
         assert _tag_for("/upr/data") == "UPR"
         assert _tag_for("/upr/documents") == "UPR"
+        assert _tag_for("/public/documents/search") == "AI"
+        assert _tag_for("/public/documents/{public_id}/download") == "AI"
+        assert _tag_for("/public/documents/chunks/{chunk_public_id}/context") == "AI"
+        assert _tag_for("/public/global-trend") == "Public data"
+        assert _tag_for("/public/reports/country") == "Reports"
 
     def test_plugin_overlays_document_the_live_query_parameters(self):
         from app.swagger.overlays import operation_overlays

@@ -25,6 +25,32 @@ _CONVERTER_SCHEMA = {
     "string": {"type": "string"},
 }
 
+# Longer OpenAPI path prefixes win over the first-segment map below.
+# ``/public`` used to be one tag; split it by what the route actually returns.
+_TAG_BY_PREFIX = (
+    (
+        "/public/documents",
+        (
+            "AI",
+            "Public AI knowledge-base documents: search, catalog, metadata, file download, and neighboring chunk context.",
+        ),
+    ),
+    (
+        "/public/reports",
+        (
+            "Reports",
+            "One-country report data and the HTML skeleton used to render it.",
+        ),
+    ),
+    (
+        "/public",
+        (
+            "Public data",
+            "Unauthenticated lookups for public figures: global indicator totals, submission coverage, and resolving an indicator or country name.",
+        ),
+    ),
+)
+
 # First URL segment -> (tag name, tag description).
 _TAG_BY_SEGMENT = {
     "countrymap": ("Countries", "Countries, national societies, and reporting periods."),
@@ -46,7 +72,6 @@ _TAG_BY_SEGMENT = {
     "resources": ("Resources", "Published resources."),
     "embed-content": ("Resources", "Published resources."),
     "submitted-documents": ("Documents", "Submitted documents."),
-    "public": ("Public", "Unauthenticated integration endpoints for assistants and public data."),
     "fdrs": ("FDRS", "Published FDRS figures for a public website."),
     "nsd-funds": ("NSD funds", "NSD fund deadlines, projects, and implementation KPIs."),
     "nskeydata": ("NS key data", "Approved National Society key indicators by country and year."),
@@ -201,6 +226,9 @@ def _summary(doc: str, method: str, path: str) -> str:
 
 
 def _tag_for(path: str) -> str:
+    for prefix, (name, _description) in _TAG_BY_PREFIX:
+        if path == prefix or path.startswith(prefix + "/"):
+            return name
     segment = path.strip("/").split("/", 1)[0] if path.strip("/") else "api"
     name, _description = _TAG_BY_SEGMENT.get(segment, (segment.replace("-", " ").title(), f"Routes under /{segment}."))
     return name
@@ -211,6 +239,8 @@ def tag_definitions(used: Iterable[str]) -> List[dict]:
     descriptions = {}
     for name, description in _TAG_BY_SEGMENT.values():
         descriptions.setdefault(name, description)
+    for _prefix, (name, description) in _TAG_BY_PREFIX:
+        descriptions[name] = description
     tags = []
     for name in sorted(used_set):
         tags.append({

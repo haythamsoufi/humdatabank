@@ -250,8 +250,8 @@ def get_openapi_spec() -> dict:
             "title": f"{org_name} API",
             "description": (
                 f"Integration API for the {org_name}. It covers the data an API key or a public client can read: "
-                "countries, the indicator bank, templates, submissions, form data, resources, documents, and the "
-                "public assistant endpoints. "
+                "countries, the indicator bank, templates, submissions, form data, resources, submitted documents, "
+                "public data lookups, country reports, and the public AI document endpoints. "
                 "Click Authorize and paste a key. Swagger sends `Authorization: Bearer` or `X-API-Key`. "
                 "Public routes can be tried with no key. "
                 "A route that accepts only a logged-in session cannot be called with an API key. "

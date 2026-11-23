@@ -1089,6 +1089,30 @@ def _projects_visible_to(user) -> list:
     return query.order_by(Project.reference.asc()).all()
 
 
+def _declared_template_names(project: Project) -> list:
+    """Template names the programme offers when no report cycle has been created yet."""
+    ids = []
+    for item in plugin_report_types(project):
+        raw = item.get("template_id") if isinstance(item, dict) else None
+        if raw is None:
+            continue
+        try:
+            template_id = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if template_id not in ids:
+            ids.append(template_id)
+    if not ids:
+        return []
+    templates = (
+        FormTemplate.query.options(joinedload(FormTemplate.published_version))
+        .filter(FormTemplate.id.in_(ids))
+        .all()
+    )
+    by_id = {int(tpl.id): (tpl.name or "").strip() for tpl in templates}
+    return [by_id[template_id] for template_id in ids if by_id.get(template_id)]
+
+
 def project_grid_rows(user) -> list:
     """One Assignments-list row per programme. Country projects are listed inside that record."""
     filters = _list_filters()
@@ -1127,12 +1151,11 @@ def project_grid_rows(user) -> list:
     for key in sorted(grouped, key=lambda item: _portfolio_label(item).casefold()):
         members = grouped[key]
         template_names = []
-        report_count = 0
         next_due = None
         for project in members:
             for cycle in by_project.get(project.id, []):
-                report_count += 1
-                name = cycle.template.name if cycle.template else ""
+                name = (cycle.template.name if cycle.template else "") or ""
+                name = name.strip()
                 if name and name not in template_names:
                     template_names.append(name)
                 if cycle.is_closed:
@@ -1140,13 +1163,10 @@ def project_grid_rows(user) -> list:
                 due = due_by_form.get(cycle.id)
                 if due is not None and (next_due is None or utc_sort_key(due) < utc_sort_key(next_due)):
                     next_due = due
+        if not template_names:
+            template_names = _declared_template_names(members[0])
         label = _portfolio_label(key)
-        country_count = len(members)
-        template_label = _("%(n)s country projects", n=country_count)
-        if report_count:
-            template_label = f"{template_label} · " + _("%(n)s reports", n=report_count)
-        if template_names:
-            template_label = f"{template_label} · {', '.join(template_names)}"
+        template_label = ", ".join(template_names)
         rows.append({
             "row_type": "project",
             "id": members[0].id,

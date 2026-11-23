@@ -79,7 +79,8 @@ class TestProjectAssignmentRoutes:
         assert response.status_code == 200
         body = response.get_data(as_text=True)
         assert "Test" in body
-        assert "country projects" in body
+        assert template.name in body
+        assert "country projects" not in body
         assert assignment.period_name not in body
         assert "P-LIST" not in body
         assert 'data-tab="monitoring"' not in body

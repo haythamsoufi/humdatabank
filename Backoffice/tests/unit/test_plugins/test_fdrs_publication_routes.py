@@ -76,6 +76,11 @@ class TestRoutesRegistered:
         assert endpoint == "fdrs.publication_summary"
         assert values == {"assigned_form_id": 5}
 
+    def test_publication_years_registered(self, app):
+        endpoint, values = app.url_map.bind("localhost").match("/admin/plugins/fdrs/publication/years")
+        assert endpoint == "fdrs.publication_years"
+        assert values == {}
+
     def test_publication_country_detail_registered(self, app):
         endpoint, values = app.url_map.bind("localhost").match(
             "/admin/plugins/fdrs/publication/5/countries/9/detail"
@@ -119,6 +124,35 @@ class TestPublicationPage:
     def test_denied_for_admin_without_system_manager_role(self, logged_in_admin_client, db_session, fdrs_route_scenario):
         response = logged_in_admin_client.get("/admin/plugins/fdrs/publication", follow_redirects=False)
         assert response.status_code in (302, 403)
+
+
+class TestPublicationYears:
+    def test_success_for_system_manager(self, logged_in_sm_client, db_session, fdrs_route_scenario):
+        response = logged_in_sm_client.get("/admin/plugins/fdrs/publication/years")
+        assert_api_response(
+            response, 200,
+            expected_keys=["success", "years", "years_total", "years_with_later_changes", "years_unpublished"],
+        )
+        data = response.get_json()
+        match = [row for row in data["years"] if row["id"] == fdrs_route_scenario["assigned_form_id"]]
+        assert len(match) == 1
+        assert match[0]["period_name"] == "2024"
+        assert match[0]["status"] == "unpublished"
+        assert match[0]["totals"]["new"] == 1
+
+    def test_denied_for_admin_without_template_access(self, logged_in_admin_client, db_session, fdrs_route_scenario):
+        response = logged_in_admin_client.get(
+            "/admin/plugins/fdrs/publication/years",
+            headers={"Accept": "application/json"},
+        )
+        assert response.status_code == 403
+
+    def test_requires_login(self, client, db_session, fdrs_route_scenario):
+        response = client.get(
+            "/admin/plugins/fdrs/publication/years",
+            headers={"Accept": "application/json"},
+        )
+        assert response.status_code in (302, 401)
 
 
 class TestPublicationSummary:

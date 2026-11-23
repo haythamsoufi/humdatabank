@@ -38,6 +38,7 @@ from plugins.fdrs.services.fdrs_publication_service import (
     _get_fdrs_assigned_form_or_404,
     get_assignment_publication_summary,
     get_country_change_detail,
+    get_publication_years_summary,
 )
 
 
@@ -56,6 +57,22 @@ def _fdrs_template_access_denied():
 def publication_page():
     """Legacy URL: Manage Publication is now a tab on FDRS Tools."""
     return redirect(url_for("fdrs.fdrs_tools") + "#publication")
+
+
+@bp.route("/admin/plugins/fdrs/publication/years", methods=["GET"])
+@admin_permission_required("admin.templates.view")
+def publication_years():
+    """Every FDRS reporting year, with which ones changed after their last publish."""
+    denied = _fdrs_template_access_denied()
+    if denied is not None:
+        return denied
+    try:
+        summary = get_publication_years_summary()
+        return json_ok(success=True, **summary)
+    except HTTPException:
+        raise
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
 @bp.route("/admin/plugins/fdrs/publication/<int:assigned_form_id>/summary", methods=["GET"])

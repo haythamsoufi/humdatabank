@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Set
 
 from flask import abort
+from sqlalchemy import func
 from sqlalchemy.orm import contains_eager
 
 from app.extensions import db
@@ -157,6 +158,177 @@ def _prior_baseline_numerics(prior_assignment_id: int) -> Dict[tuple, float]:
             continue
         out[(int(country_id), int(row.form_item_id))] = num
     return out
+
+
+def _later_timestamp(current, candidate):
+    """Later of two datetimes, ignoring a missing side and mixed naive/aware values."""
+    if candidate is None:
+        return current
+    if current is None:
+        return candidate
+    try:
+        return candidate if candidate > current else current
+    except TypeError:
+        return current
+
+
+def _assignment_sort_ordinal(assigned_form: AssignedForm) -> int:
+    """Chronological key so an older reporting year sorts before a later one."""
+    if assigned_form.period_end is not None:
+        return int(assigned_form.period_end.toordinal())
+    name = (assigned_form.period_name or "").strip()
+    if name.isdigit():
+        return int(name) * 366
+    return 0
+
+
+def _year_publication_status(counts: Dict[str, int], *, ever_published: bool) -> str:
+    """``republish`` when a published year drifted, ``unpublished`` when it never shipped, else ``current``."""
+    pending = sum(counts[kind] for kind in PENDING_DIFF_KINDS)
+    if pending and ever_published:
+        return "republish"
+    if pending:
+        return "unpublished"
+    return "current"
+
+
+def get_publication_years_summary() -> Dict[str, Any]:
+    """One row per FDRS reporting year, flagging years that changed after they were published.
+
+    The Manage Publication review screen opens a single period. A later edit to an
+    older year (2019 changed while the open year is 2026) is invisible there until
+    someone selects that period. This scan uses the same diff as
+    ``FormData.publication_diff_kind`` across every FDRS assignment, without the
+    per-country review analysis, so those years can be listed up front.
+
+    ``republish`` means a snapshot already exists and at least one public value
+    would change on the next publish. ``unpublished`` means there is data to
+    publish and nothing has been published yet. ``current`` means the snapshot
+    matches what a publish would write.
+    """
+    assignments = list_fdrs_assignments()
+    if not assignments:
+        return {
+            "years": [],
+            "years_total": 0,
+            "years_with_later_changes": 0,
+            "years_unpublished": 0,
+        }
+
+    assignment_ids = [assigned_form.id for assigned_form in assignments]
+    counts_by_assignment = {assigned_form_id: _empty_counts() for assigned_form_id in assignment_ids}
+    pending_countries: Dict[int, Set[int]] = {assigned_form_id: set() for assigned_form_id in assignment_ids}
+    has_snapshot = {assigned_form_id: False for assigned_form_id in assignment_ids}
+    row_published_at: Dict[int, Any] = {}
+
+    aes_stats = {
+        assigned_form_id: (int(country_count or 0), last_published)
+        for assigned_form_id, country_count, last_published in (
+            db.session.query(
+                AssignmentEntityStatus.assigned_form_id,
+                func.count(AssignmentEntityStatus.id),
+                func.max(AssignmentEntityStatus.published_at),
+            )
+            .filter(AssignmentEntityStatus.assigned_form_id.in_(assignment_ids))
+            .filter(AssignmentEntityStatus.entity_type == "country")
+            .group_by(AssignmentEntityStatus.assigned_form_id)
+            .all()
+        )
+    }
+
+    # One transient row so classification stays the model method, not a second copy of it.
+    probe = FormData()
+    public_rows = (
+        db.session.query(
+            AssignmentEntityStatus.assigned_form_id,
+            FormData.assignment_entity_status_id,
+            FormData.value,
+            FormData.disagg_data,
+            FormData.imputed_value,
+            FormData.imputed_disagg_data,
+            FormData.published_value,
+            FormData.published_disagg_data,
+            FormData.published_source,
+            FormData.published_at,
+        )
+        .select_from(FormData)
+        .join(AssignmentEntityStatus, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
+        .join(FormItem, FormData.form_item_id == FormItem.id)
+        .filter(AssignmentEntityStatus.assigned_form_id.in_(assignment_ids))
+        .filter(AssignmentEntityStatus.entity_type == "country")
+        .filter(form_item_privacy_is_public_expr())
+        .all()
+    )
+    for (
+        assigned_form_id,
+        aes_id,
+        value,
+        disagg,
+        imputed_value,
+        imputed_disagg,
+        published_value,
+        published_disagg,
+        published_source,
+        published_row_at,
+    ) in public_rows:
+        probe.value = value
+        probe.disagg_data = disagg
+        probe.imputed_value = imputed_value
+        probe.imputed_disagg_data = imputed_disagg
+        probe.published_value = published_value
+        probe.published_disagg_data = published_disagg
+        probe.published_source = published_source
+        kind = probe.publication_diff_kind()
+        counts = counts_by_assignment.get(assigned_form_id)
+        if counts is None:
+            continue
+        counts[kind] += 1
+        if kind in PENDING_DIFF_KINDS:
+            pending_countries[assigned_form_id].add(aes_id)
+        if kind in ("changed", "removed", "source", "unchanged"):
+            has_snapshot[assigned_form_id] = True
+        row_published_at[assigned_form_id] = _later_timestamp(
+            row_published_at.get(assigned_form_id), published_row_at
+        )
+
+    status_rank = {"republish": 0, "unpublished": 1, "current": 2}
+    years: List[Dict[str, Any]] = []
+    for assigned_form in assignments:
+        counts = counts_by_assignment[assigned_form.id]
+        country_count, aes_published_at = aes_stats.get(assigned_form.id, (0, None))
+        last_published = _later_timestamp(aes_published_at, row_published_at.get(assigned_form.id))
+        ever_published = bool(has_snapshot[assigned_form.id] or last_published is not None)
+        status = _year_publication_status(counts, ever_published=ever_published)
+        pending = sum(counts[kind] for kind in PENDING_DIFF_KINDS)
+        years.append({
+            "id": assigned_form.id,
+            "period_name": assigned_form.period_name,
+            "display_name": assigned_form.display_name,
+            "is_active": bool(assigned_form.is_active),
+            "is_closed": bool(assigned_form.is_closed),
+            "status": status,
+            "totals": counts,
+            "pending_total": pending,
+            "countries_with_pending_changes": len(pending_countries[assigned_form.id]),
+            "countries_total": country_count,
+            "last_published_at": last_published.isoformat() if last_published else None,
+            "_ordinal": _assignment_sort_ordinal(assigned_form),
+        })
+
+    years.sort(key=lambda row: (
+        status_rank[row["status"]],
+        -row["_ordinal"] if row["status"] == "current" else row["_ordinal"],
+        -row["id"] if row["status"] == "current" else row["id"],
+    ))
+    for row in years:
+        row.pop("_ordinal", None)
+
+    return {
+        "years": years,
+        "years_total": len(years),
+        "years_with_later_changes": sum(1 for row in years if row["status"] == "republish"),
+        "years_unpublished": sum(1 for row in years if row["status"] == "unpublished"),
+    }
 
 
 def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:

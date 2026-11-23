@@ -1,4 +1,5 @@
 {# In-page Manage Publication panel — injected by plugins.fdrs.routes.fdrs_tools. #}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes %}
 <style nonce="{{ csp_nonce() }}">
 .fdrs-pub-detail-row td { border-top: none; }
 #fdrs-pub-loading {
@@ -30,14 +31,83 @@
     <span id="fdrs-pub-progress-count"></span>
   </div>
 </div>
-{% endif %}
+
+{% call scroll_tab_bar(inner_id='fdrs-pub-subtabs', wrapper_class='mb-4', aria_label='Manage Publication') %}
+  <button type="button" role="tab" id="fdrs-pub-subtab-years"
+          class="fdrs-pub-subtab {{ admin_underline_tab_btn_classes(true, size='compact') }}"
+          data-pub-tab="years" aria-selected="true" aria-controls="fdrs-pub-panel-years">
+    Years
+    <span id="fdrs-pub-years-badge" class="hidden {{ admin_underline_tab_badge_classes(true) }}"
+          title="Years with changes after the last publish"></span>
+  </button>
+  <button type="button" role="tab" id="fdrs-pub-subtab-review"
+          class="fdrs-pub-subtab {{ admin_underline_tab_btn_classes(false, size='compact') }}"
+          data-pub-tab="review" aria-selected="false" aria-controls="fdrs-pub-panel-review">
+    Review &amp; publish
+  </button>
+{% endcall %}
+
+<div id="fdrs-pub-panel-years" role="tabpanel" aria-labelledby="fdrs-pub-subtab-years">
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-900">
+    <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>
+    Each reporting year is compared with its last published snapshot. A year that was already published and then edited stays in this list, so a change to an older year is visible while a later year is open.
+  </div>
+  <div id="fdrs-pub-years-alert" class="hidden mb-4 text-sm rounded-md px-3 py-2" role="status"></div>
+  <p id="fdrs-pub-years-unpublished" class="hidden mb-4 text-sm text-gray-600"></p>
+  <div id="fdrs-pub-years-confirm" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-md p-3">
+    <p id="fdrs-pub-years-confirm-text" class="text-sm text-amber-900 mb-3"></p>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" id="fdrs-pub-years-confirm-yes" class="btn btn-primary text-sm">Yes, publish all</button>
+      <button type="button" id="fdrs-pub-years-confirm-no" class="btn btn-secondary text-sm">Cancel</button>
+    </div>
+  </div>
+  <div class="bg-white rounded-lg border border-gray-200 mb-4 min-w-0">
+    <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h3 class="text-sm font-semibold text-gray-800">Reporting years</h3>
+        <p class="text-xs text-gray-500 mt-0.5">Years with later changes are listed first.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <label for="fdrs-pub-years-only-later" class="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" id="fdrs-pub-years-only-later" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          Only years that need republishing
+        </label>
+        <button type="button" id="fdrs-pub-years-publish-all" class="btn btn-primary text-sm" disabled>
+          Publish all
+        </button>
+        <button type="button" id="fdrs-pub-years-refresh" class="btn btn-secondary text-sm">
+          <i class="fas fa-sync-alt mr-1" aria-hidden="true"></i> Refresh
+        </button>
+      </div>
+    </div>
+    <div class="overflow-auto">
+      <table class="min-w-full divide-y divide-gray-200" aria-label="Reporting years and whether they need republishing">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Year</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Status</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Changes since last publish</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Countries with changes</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" scope="col">Last published</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" scope="col"><span class="sr-only">Open</span></th>
+          </tr>
+        </thead>
+        <tbody id="fdrs-pub-years-tbody" class="bg-white">
+          <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">Checking every reporting year…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div id="fdrs-pub-years-result"></div>
+</div>
+
+<div id="fdrs-pub-panel-review" class="hidden" role="tabpanel" aria-labelledby="fdrs-pub-subtab-review">
 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-900">
   <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>
   Compare public FDRS figures with the last published snapshot for the selected reporting period.
   Review flags are advisory — you can still publish.
 </div>
 
-{% if assignments %}
 <div class="flex flex-wrap items-end gap-4 mb-4">
   <div class="flex-1 min-w-[220px]">
     <label for="fdrs-assignment-select" class="block text-sm font-medium text-gray-700 mb-1">Reporting period</label>
@@ -46,8 +116,6 @@
       <option value="{{ af.id }}"
               {% if active_fdrs_publication_jobs and active_fdrs_publication_jobs[0].assigned_form_id == af.id %}selected{% endif %}>
         {{ af.period_name or af.display_name }}
-        {% if not af.is_active %} (inactive){% endif %}
-        {% if af.is_closed %} (closed){% endif %}
       </option>
       {% endfor %}
     </select>
@@ -94,12 +162,12 @@
         <button type="button" id="fdrs-pub-confirm-no" class="btn btn-secondary text-sm">Cancel</button>
       </div>
     </div>
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
+    <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div class="min-w-0">
         <p id="fdrs-pub-action-summary" class="text-sm font-medium text-gray-900">No countries selected</p>
         <p id="fdrs-pub-action-flags" class="text-xs text-gray-500">Select countries, then publish. Flags are advisory.</p>
       </div>
-      <button type="button" id="fdrs-pub-publish-btn" class="btn btn-primary text-sm" disabled>
+      <button type="button" id="fdrs-pub-publish-btn" class="btn btn-primary text-sm w-full sm:w-auto" disabled>
         Publish <span id="fdrs-pub-publish-count">0</span> selected
       </button>
     </div>
@@ -126,6 +194,7 @@
 </div>
 
 <div id="fdrs-pub-result"></div>
+</div>
 {% else %}
 <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
   <i class="fas fa-exclamation-triangle mr-2" aria-hidden="true"></i>

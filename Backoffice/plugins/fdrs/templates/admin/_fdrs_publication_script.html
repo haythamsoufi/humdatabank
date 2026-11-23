@@ -38,9 +38,22 @@ document.addEventListener('DOMContentLoaded', function () {
   var actionBar = document.getElementById('fdrs-pub-action-bar');
   var actionSummaryEl = document.getElementById('fdrs-pub-action-summary');
   var actionFlagsEl = document.getElementById('fdrs-pub-action-flags');
+  var yearsTbody = document.getElementById('fdrs-pub-years-tbody');
+  var yearsAlertEl = document.getElementById('fdrs-pub-years-alert');
+  var yearsUnpublishedEl = document.getElementById('fdrs-pub-years-unpublished');
+  var yearsOnlyLaterEl = document.getElementById('fdrs-pub-years-only-later');
+  var yearsRefreshBtn = document.getElementById('fdrs-pub-years-refresh');
+  var yearsBadgeEl = document.getElementById('fdrs-pub-years-badge');
+  var yearsPublishAllBtn = document.getElementById('fdrs-pub-years-publish-all');
+  var yearsConfirmEl = document.getElementById('fdrs-pub-years-confirm');
+  var yearsConfirmTextEl = document.getElementById('fdrs-pub-years-confirm-text');
+  var yearsConfirmYesBtn = document.getElementById('fdrs-pub-years-confirm-yes');
+  var yearsConfirmNoBtn = document.getElementById('fdrs-pub-years-confirm-no');
+  var yearsResultEl = document.getElementById('fdrs-pub-years-result');
 
   // Built with placeholder id 0, then string-swapped for the real id (avoids
   // relying on url_for accepting non-numeric placeholders for <int:> routes).
+  var yearsUrl = {{ url_for('fdrs.publication_years') | tojson }};
   var summaryUrlTpl = {{ url_for('fdrs.publication_summary', assigned_form_id=0) | tojson }};
   var detailUrlTpl  = {{ url_for('fdrs.publication_country_detail', assigned_form_id=0, assignment_entity_status_id=0) | tojson }};
   var publishUrlTpl = {{ url_for('fdrs.publication_publish', assigned_form_id=0) | tojson }};
@@ -82,6 +95,17 @@ document.addEventListener('DOMContentLoaded', function () {
   var openDetailAesId = null;
   var analysisPriorPeriodName = '';
   var summaryRequestId = 0;
+  var yearsPayload = null;
+  var yearsLoaded = false;
+  var yearsLoading = false;
+  var yearsRequestId = 0;
+  var yearPublishQueue = null;
+  var yearPublishIndex = 0;
+  var yearPublishTotal = 0;
+  var yearPublishCurrent = null;
+  var yearPublishStop = false;
+  var yearPublishAcc = null;
+  var yearPublishGen = 0;
   var activeJobId = null;
   var pollTimer = null;
   var pollDelayMs = 1000;
@@ -754,7 +778,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function isPublishing() {
-    return !!activeJobId;
+    return !!activeJobId || yearPublishTotal > 0;
   }
 
   function setPublishControlsDisabled(disabled) {
@@ -772,6 +796,10 @@ document.addEventListener('DOMContentLoaded', function () {
     tbody.querySelectorAll('.fdrs-pub-row-checkbox').forEach(function (cb) {
       cb.disabled = disabled;
     });
+    if (yearsRefreshBtn) yearsRefreshBtn.disabled = disabled;
+    if (yearsConfirmYesBtn) yearsConfirmYesBtn.disabled = disabled;
+    updatePublishAllButton();
+    if (disabled && yearsPublishAllBtn) yearsPublishAllBtn.disabled = true;
   }
 
   function updatePublishButton() {
@@ -809,7 +837,9 @@ document.addEventListener('DOMContentLoaded', function () {
       progressStageEl.textContent = (message && String(message).trim()) ? String(message).trim() : (stage || 'Publishing…');
     }
     if (progressTitleEl) {
-      progressTitleEl.textContent = cancelRequested ? 'Stopping…' : 'Publishing…';
+      if (cancelRequested) progressTitleEl.textContent = 'Stopping…';
+      else if (yearPublishTotal > 1) progressTitleEl.textContent = 'Publishing all years…';
+      else progressTitleEl.textContent = 'Publishing…';
     }
     if (progressCountEl) {
       if (total !== null && total !== undefined && total !== '' && Number(total) > 0) {
@@ -829,6 +859,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (cancelBtnText) cancelBtnText.textContent = 'Stop publishing';
     confirmBox.classList.add('hidden');
+    if (yearsConfirmEl) yearsConfirmEl.classList.add('hidden');
     setPublishControlsDisabled(true);
   }
 
@@ -868,32 +899,212 @@ document.addEventListener('DOMContentLoaded', function () {
     );
   }
 
+  function emptyPublishAcc() {
+    return { new: 0, changed: 0, removed: 0, source: 0, published_countries: 0, years: 0, ids: [] };
+  }
+
+  function yearsNeedingPublish() {
+    return ((yearsPayload && yearsPayload.years) || []).filter(function (year) {
+      return year.status === 'republish' || year.status === 'unpublished';
+    });
+  }
+
+  function updatePublishAllButton() {
+    if (!yearsPublishAllBtn) return;
+    var n = yearsNeedingPublish().length;
+    yearsPublishAllBtn.textContent = n ? ('Publish all (' + n + ')') : 'Publish all';
+    yearsPublishAllBtn.disabled = isPublishing() || yearsLoading || !yearsLoaded || n === 0;
+  }
+
+  function batchPercent(inner) {
+    if (!yearPublishTotal) return inner;
+    var clamped = Math.max(0, Math.min(100, Number(inner || 0)));
+    return ((yearPublishIndex + clamped / 100) / yearPublishTotal) * 100;
+  }
+
+  function activePublishAssignmentId() {
+    return (yearPublishCurrent && yearPublishCurrent.id) || currentAssignmentId;
+  }
+
+  function addPublishTotals(acc, job) {
+    var stats = (job && job.stats) || {};
+    var totals = stats.totals || {};
+    acc.new += totals.new || 0;
+    acc.changed += totals.changed || 0;
+    acc.removed += totals.removed || 0;
+    acc.source += totals.source || 0;
+    acc.published_countries += stats.published_countries || 0;
+    acc.years += 1;
+    if (yearPublishCurrent && yearPublishCurrent.id) acc.ids.push(yearPublishCurrent.id);
+  }
+
+  function renderBatchResult(acc, kind, job, yearName) {
+    var target = yearsResultEl || resultEl;
+    acc = acc || emptyPublishAcc();
+    if (kind === 'completed') {
+      setResultMessage(
+        target,
+        'text-green-700 text-sm py-3',
+        'Published ' + acc.years + ' year' + (acc.years === 1 ? '' : 's') + ': +' +
+          acc.new + ' new, ~' + acc.changed + ' changed, -' + acc.removed +
+          ' removed, ' + acc.source + ' source.',
+        'fas fa-check-circle mr-1'
+      );
+      return;
+    }
+    if (kind === 'cancelled') {
+      var stopped = acc.years
+        ? ('Stopped after ' + acc.years + ' year' + (acc.years === 1 ? '' : 's') + '. ')
+        : '';
+      setResultMessage(
+        target,
+        'text-amber-800 text-sm py-3',
+        stopped + 'Publishing stopped. Already-published countries stay published.'
+      );
+      return;
+    }
+    var where = yearName ? ('Stopped on ' + yearName + '. ') : '';
+    var earlier = acc.years
+      ? ('Published ' + acc.years + ' year' + (acc.years === 1 ? '' : 's') + ' before it stopped. ')
+      : '';
+    setResultMessage(
+      target,
+      'text-red-700 text-sm py-3',
+      where + earlier + ((job && (job.error || job.message)) || 'Publish failed')
+    );
+  }
+
+  function clearYearBatch() {
+    yearPublishGen += 1;
+    yearPublishQueue = null;
+    yearPublishIndex = 0;
+    yearPublishTotal = 0;
+    yearPublishCurrent = null;
+    yearPublishStop = false;
+    yearPublishAcc = null;
+  }
+
+  function startYearPublish(year) {
+    var gen = yearPublishGen;
+    if (yearPublishStop || !year) {
+      finishJob(null, 'cancelled');
+      return;
+    }
+    yearPublishCurrent = year;
+    var label = yearLabel(year) + ' · ' + (yearPublishIndex + 1) + ' of ' + yearPublishTotal;
+    setProgress(
+      batchPercent(0),
+      'queued',
+      label,
+      0,
+      null,
+      yearPublishIndex === 0 ? { reset: true } : undefined
+    );
+    fetch(publishUrl(year.id), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'Accept': 'application/json' },
+      body: JSON.stringify({})
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); })
+      .then(function (result) {
+        var data = result.data || {};
+        if (gen !== yearPublishGen || yearPublishStop) {
+          if (data.job_id) {
+            fetch(cancelUrl(year.id, data.job_id), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'Accept': 'application/json' }
+            });
+          }
+          return;
+        }
+        if ((result.status === 409 && data.job_id) || (result.ok && data.success && data.job_id)) {
+          activeJobId = data.job_id;
+          cancelRequested = false;
+          pollDelayMs = POLL_INITIAL_MS;
+          pollStatus();
+          return;
+        }
+        throw new Error(apiError(data, 'Publish failed'));
+      })
+      .catch(function (err) {
+        if (gen !== yearPublishGen) return;
+        finishJob({ error: err.message || 'Publish failed' }, 'failed');
+      });
+  }
+
+  function beginPublishAll(years) {
+    yearPublishQueue = years.slice(1);
+    yearPublishTotal = years.length;
+    yearPublishIndex = 0;
+    yearPublishStop = false;
+    yearPublishCurrent = years[0];
+    yearPublishAcc = emptyPublishAcc();
+    if (yearsResultEl) yearsResultEl.replaceChildren();
+    showProgress();
+    startYearPublish(years[0]);
+  }
+
   function finishJob(job, kind) {
+    var inBatch = yearPublishTotal > 0;
+    if (inBatch && kind === 'completed' && job && yearPublishAcc) {
+      addPublishTotals(yearPublishAcc, job);
+    }
+    if (inBatch && yearPublishStop && yearPublishQueue && yearPublishQueue.length && kind === 'completed') {
+      kind = 'cancelled';
+    }
+    if (kind === 'completed' && inBatch && !yearPublishStop && yearPublishQueue && yearPublishQueue.length) {
+      stopPolling();
+      yearPublishIndex += 1;
+      startYearPublish(yearPublishQueue.shift());
+      return;
+    }
+    var acc = yearPublishAcc;
+    var yearName = yearPublishCurrent ? yearLabel(yearPublishCurrent) : '';
+    var publishedIds = (acc && acc.ids) ? acc.ids.slice() : [];
     stopPolling();
+    if (inBatch) clearYearBatch();
     hideProgress();
+    if (inBatch) {
+      renderBatchResult(acc, kind, job, yearName);
+      loadYearsSummary();
+      if (summaryLoaded && currentAssignmentId && publishedIds.indexOf(currentAssignmentId) >= 0) {
+        loadSummary(currentAssignmentId, { keepResult: true });
+      }
+      return;
+    }
     if (kind === 'completed') {
       renderPublishResult(job);
       if (currentAssignmentId) loadSummary(currentAssignmentId, { keepResult: true });
+      loadYearsSummary();
       return;
     }
     if (kind === 'cancelled') {
       setResultMessage(resultEl, 'text-amber-800 text-sm py-3', 'Publishing stopped. Already-published countries stay published.');
       if (currentAssignmentId) loadSummary(currentAssignmentId, { keepResult: true });
+      loadYearsSummary();
       return;
     }
     setResultMessage(resultEl, 'text-red-700 text-sm py-3', (job && (job.error || job.message)) || 'Publish failed');
   }
 
   function pollStatus() {
-    if (!activeJobId || !currentAssignmentId) return;
-    fetch(statusUrl(currentAssignmentId, activeJobId), { headers: { 'Accept': 'application/json' } })
+    var assignmentId = activePublishAssignmentId();
+    if (!activeJobId || !assignmentId) return;
+    fetch(statusUrl(assignmentId, activeJobId), { headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
       .then(function (result) {
         var data = result.data || {};
         if (!result.ok || !data.success) {
           throw new Error(apiError(data, 'Failed to read publication status'));
         }
-        setProgress(data.percent, data.stage, data.message, data.current, data.total);
+        var message = data.message || '';
+        var percent = data.percent;
+        if (yearPublishTotal > 0 && yearPublishCurrent) {
+          var prefix = yearLabel(yearPublishCurrent) + ' · ' + (yearPublishIndex + 1) + ' of ' + yearPublishTotal;
+          message = message ? (prefix + ' · ' + message) : prefix;
+          percent = batchPercent(data.percent);
+        }
+        setProgress(percent, data.stage, message, data.current, data.total);
         if (data.status === 'completed') {
           finishJob(data, 'completed');
           return;
@@ -915,9 +1126,7 @@ document.addEventListener('DOMContentLoaded', function () {
         schedulePoll();
       })
       .catch(function (err) {
-        stopPolling();
-        hideProgress();
-        setResultMessage(resultEl, 'text-red-700 text-sm py-3', err.message || 'Failed to read publication status');
+        finishJob({ error: err.message || 'Failed to read publication status' }, 'failed');
       });
   }
 
@@ -1104,6 +1313,208 @@ document.addEventListener('DOMContentLoaded', function () {
     openDetail(aesId);
   }
 
+  var STATUS_PILL = {
+    republish: 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800',
+    unpublished: 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700',
+    current: 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800'
+  };
+  var STATUS_LABEL = {
+    republish: 'Needs republish',
+    unpublished: 'Not published',
+    current: 'Up to date'
+  };
+
+  function yearLabel(year) {
+    return year.period_name || year.display_name || ('Assignment ' + year.id);
+  }
+
+  function formatYearList(years) {
+    var names = years.map(yearLabel);
+    if (names.length <= 1) return names[0] || '';
+    if (names.length === 2) return names[0] + ' and ' + names[1];
+    return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
+  }
+
+  function pendingChangeLabel(totals) {
+    totals = totals || {};
+    var parts = [];
+    if (totals.changed) parts.push(totals.changed + ' changed');
+    if (totals.new) parts.push(totals.new + ' new');
+    if (totals.removed) parts.push(totals.removed + ' removed');
+    if (totals.source) parts.push(totals.source + ' source');
+    return parts.length ? parts.join(', ') : 'None';
+  }
+
+  function setYearsMessage(message, extraClass) {
+    if (!yearsTbody) return;
+    yearsTbody.replaceChildren();
+    var tr = document.createElement('tr');
+    var td = el('td', 'px-4 py-6 text-center text-sm ' + (extraClass || 'text-gray-500'), message);
+    td.colSpan = 6;
+    tr.appendChild(td);
+    yearsTbody.appendChild(tr);
+  }
+
+  function activatePubTab(tabId) {
+    var yearsOn = tabId !== 'review';
+    var yearsBtn = document.getElementById('fdrs-pub-subtab-years');
+    var reviewBtn = document.getElementById('fdrs-pub-subtab-review');
+    if (window.AdminUnderlineTabs) {
+      window.AdminUnderlineTabs.setOrgMainTabButton(yearsBtn, yearsOn);
+      window.AdminUnderlineTabs.setStripButtonActive(reviewBtn, !yearsOn);
+    }
+    if (yearsBtn) yearsBtn.setAttribute('aria-selected', yearsOn ? 'true' : 'false');
+    if (reviewBtn) reviewBtn.setAttribute('aria-selected', yearsOn ? 'false' : 'true');
+    var yearsPanel = document.getElementById('fdrs-pub-panel-years');
+    var reviewPanel = document.getElementById('fdrs-pub-panel-review');
+    if (yearsPanel) yearsPanel.classList.toggle('hidden', !yearsOn);
+    if (reviewPanel) reviewPanel.classList.toggle('hidden', yearsOn);
+  }
+
+  function reviewTabIsOpen() {
+    var reviewPanel = document.getElementById('fdrs-pub-panel-review');
+    return !!(reviewPanel && !reviewPanel.classList.contains('hidden'));
+  }
+
+  function updateYearsBadge(count) {
+    if (!yearsBadgeEl) return;
+    if (!count) {
+      yearsBadgeEl.classList.add('hidden');
+      yearsBadgeEl.textContent = '';
+      return;
+    }
+    yearsBadgeEl.classList.remove('hidden');
+    yearsBadgeEl.textContent = String(count);
+  }
+
+  function renderYearsAlert() {
+    updatePublishAllButton();
+    if (!yearsAlertEl || !yearsPayload) return;
+    var years = yearsPayload.years || [];
+    var later = years.filter(function (year) { return year.status === 'republish'; });
+    var unpublished = years.filter(function (year) { return year.status === 'unpublished'; });
+    yearsAlertEl.classList.remove('hidden', 'text-green-800', 'bg-green-50', 'border', 'border-green-200', 'text-amber-900', 'bg-amber-50', 'border-amber-200');
+    if (!later.length) {
+      yearsAlertEl.classList.add('text-green-800', 'bg-green-50', 'border', 'border-green-200');
+      yearsAlertEl.textContent = 'No published year has later changes. Each snapshot matches what a new publish would write.';
+    } else {
+      yearsAlertEl.classList.add('text-amber-900', 'bg-amber-50', 'border', 'border-amber-200');
+      var tail = later.length === 1
+        ? ' needs republishing. Public figures for that year are not all in the published snapshot.'
+        : ' need republishing. Public figures for those years are not all in the published snapshot.';
+      yearsAlertEl.textContent = formatYearList(later) + tail;
+    }
+    if (yearsUnpublishedEl) {
+      if (!unpublished.length) {
+        yearsUnpublishedEl.classList.add('hidden');
+        yearsUnpublishedEl.textContent = '';
+      } else {
+        yearsUnpublishedEl.classList.remove('hidden');
+        var unpublishedVerb = unpublished.length === 1 ? ' has not been published yet.' : ' have not been published yet.';
+        yearsUnpublishedEl.textContent = formatYearList(unpublished) + unpublishedVerb;
+      }
+    }
+    updateYearsBadge(later.length);
+  }
+
+  function renderYearsTable() {
+    if (!yearsTbody || !yearsPayload) return;
+    var onlyLater = !!(yearsOnlyLaterEl && yearsOnlyLaterEl.checked);
+    var years = (yearsPayload.years || []).filter(function (year) {
+      return !onlyLater || year.status === 'republish';
+    });
+    yearsTbody.replaceChildren();
+    if (!years.length) {
+      setYearsMessage(onlyLater
+        ? 'No year has changes after its last publish.'
+        : 'No FDRS reporting years found.');
+      return;
+    }
+    years.forEach(function (year) {
+      var tr = document.createElement('tr');
+      if (year.status === 'republish') tr.className = 'bg-amber-50';
+      var yearTd = el('td', 'px-3 py-2 text-sm');
+      var yearBtn = el('button', 'text-left font-medium text-blue-700 hover:underline', yearLabel(year));
+      yearBtn.type = 'button';
+      yearBtn.addEventListener('click', function () { openYearReview(year.id); });
+      yearTd.appendChild(yearBtn);
+      tr.appendChild(yearTd);
+
+      var statusTd = el('td', 'px-3 py-2');
+      statusTd.appendChild(el('span', STATUS_PILL[year.status] || STATUS_PILL.current, STATUS_LABEL[year.status] || year.status));
+      tr.appendChild(statusTd);
+
+      var changeClass = 'px-3 py-2 text-sm ' + (year.status === 'republish' ? 'font-medium text-amber-900' : 'text-gray-700');
+      tr.appendChild(el('td', changeClass, pendingChangeLabel(year.totals)));
+
+      var countryText = (year.countries_with_pending_changes || 0) + ' of ' + (year.countries_total || 0);
+      tr.appendChild(el('td', 'px-3 py-2 text-sm text-gray-700', countryText));
+      var lastPublishedText = year.last_published_at
+        ? formatDate(year.last_published_at)
+        : (year.status === 'republish' ? 'Date not recorded' : 'Never');
+      tr.appendChild(el('td', 'px-3 py-2 text-sm text-gray-600 whitespace-nowrap', lastPublishedText));
+
+      var actionTd = el('td', 'px-3 py-2 text-right');
+      var reviewBtn = el('button', 'btn btn-secondary text-sm', 'Review');
+      reviewBtn.type = 'button';
+      reviewBtn.addEventListener('click', function () { openYearReview(year.id); });
+      actionTd.appendChild(reviewBtn);
+      tr.appendChild(actionTd);
+      yearsTbody.appendChild(tr);
+    });
+  }
+
+  function openYearReview(assignmentId) {
+    if (!assignmentId) return;
+    if (isPublishing()) {
+      activatePubTab('review');
+      return;
+    }
+    if (select) select.value = String(assignmentId);
+    activatePubTab('review');
+    loadSummary(assignmentId);
+  }
+
+  function loadYearsSummary() {
+    if (!yearsTbody) return;
+    yearsLoading = true;
+    var requestId = ++yearsRequestId;
+    setYearsMessage('Checking every reporting year…');
+    fetch(yearsUrl, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (requestId !== yearsRequestId) return;
+        yearsLoading = false;
+        if (!data.success) {
+          yearsLoaded = false;
+          setYearsMessage(data.message || 'Failed to load the year summary', 'text-red-600');
+          updatePublishAllButton();
+          return;
+        }
+        yearsLoaded = true;
+        yearsPayload = data;
+        renderYearsAlert();
+        renderYearsTable();
+      })
+      .catch(function (err) {
+        if (requestId !== yearsRequestId) return;
+        yearsLoading = false;
+        yearsLoaded = false;
+        setYearsMessage(err.message || 'Failed to load the year summary', 'text-red-600');
+        updatePublishAllButton();
+      });
+  }
+
+  function ensureYearsLoaded() {
+    if (yearsLoaded || yearsLoading) return;
+    loadYearsSummary();
+  }
+
+  function onPublicationOpened() {
+    ensureYearsLoaded();
+    if (reviewTabIsOpen()) ensureSummaryLoaded();
+  }
+
   function loadSummary(assignedFormId, opts) {
     opts = opts || {};
     if (isPublishing() && assignedFormId !== currentAssignmentId) return;
@@ -1142,7 +1553,8 @@ document.addEventListener('DOMContentLoaded', function () {
         currentFlags = (data.analysis && data.analysis.flags) || [];
         analysisPriorPeriodName = (data.analysis && data.analysis.prior_period_name) || '';
         buildReviews();
-        queueFilter = currentFlags.length ? 'attention' : 'all';
+        var hasPending = currentCountries.some(function (c) { return c.has_pending_changes; });
+        queueFilter = hasPending ? 'all' : (currentFlags.length ? 'attention' : 'all');
         renderCards();
         renderAllClear();
         renderQueue();
@@ -1162,6 +1574,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
   select.addEventListener('change', function () { loadSummary(parseInt(select.value, 10)); });
   refreshBtn.addEventListener('click', function () { if (currentAssignmentId) loadSummary(currentAssignmentId); });
+  if (yearsRefreshBtn) {
+    yearsRefreshBtn.addEventListener('click', function () { loadYearsSummary(); });
+  }
+  if (yearsOnlyLaterEl) {
+    yearsOnlyLaterEl.addEventListener('change', function () { renderYearsTable(); });
+  }
+  if (yearsPublishAllBtn) {
+    yearsPublishAllBtn.addEventListener('click', function () {
+      var years = yearsNeedingPublish();
+      if (!years.length || isPublishing() || !yearsConfirmEl || !yearsConfirmTextEl) return;
+      var noun = years.length === 1 ? 'year' : 'years';
+      yearsConfirmTextEl.textContent =
+        'Publish every country in ' + years.length + ' ' + noun + ': ' + formatYearList(years) +
+        '. Years that already match their snapshot are skipped.';
+      yearsConfirmEl.classList.remove('hidden');
+      yearsConfirmEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+  if (yearsConfirmNoBtn && yearsConfirmEl) {
+    yearsConfirmNoBtn.addEventListener('click', function () { yearsConfirmEl.classList.add('hidden'); });
+  }
+  if (yearsConfirmYesBtn) {
+    yearsConfirmYesBtn.addEventListener('click', function () {
+      var years = yearsNeedingPublish();
+      if (!years.length || isPublishing()) return;
+      beginPublishAll(years);
+    });
+  }
+  document.querySelectorAll('.fdrs-pub-subtab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tabId = btn.getAttribute('data-pub-tab');
+      activatePubTab(tabId);
+      if (tabId === 'review') ensureSummaryLoaded();
+      else ensureYearsLoaded();
+    });
+  });
 
   if (selectVisibleBtn) {
     selectVisibleBtn.addEventListener('click', function () {
@@ -1284,12 +1732,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (cancelBtn) {
     cancelBtn.addEventListener('click', function () {
-      if (!activeJobId || cancelRequested) return;
+      if (yearPublishTotal > 0) {
+        yearPublishStop = true;
+        yearPublishQueue = [];
+      }
+      if (!activeJobId || cancelRequested) {
+        if (yearPublishTotal > 0 && !activeJobId) {
+          yearPublishGen += 1;
+          finishJob(null, 'cancelled');
+        }
+        return;
+      }
       cancelRequested = true;
       cancelBtn.disabled = true;
       if (cancelBtnText) cancelBtnText.textContent = 'Stopping…';
       if (progressTitleEl) progressTitleEl.textContent = 'Stopping…';
-      fetch(cancelUrl(currentAssignmentId, activeJobId), {
+      fetch(cancelUrl(activePublishAssignmentId(), activeJobId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'Accept': 'application/json' }
       })
@@ -1326,20 +1784,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if ((location.hash || '').replace('#', '') !== 'publication') {
       try { history.replaceState(null, '', '#publication'); } catch (e) { /* ignore */ }
     }
+    activatePubTab('review');
+    ensureYearsLoaded();
     ensureSummaryLoaded();
     attachToJob(match.job_id, assignmentId, { message: match.message || 'Resuming publication…' });
     return true;
   }
 
   // Deep-link #publication, or wait until the user opens the tab so we don't
-  // fire a summary request while the panel is hidden.
+  // scan every year while the panel is hidden.
   if (!resumeActiveJobIfNeeded()) {
     if ((location.hash || '').replace('#', '') === 'publication') {
-      ensureSummaryLoaded();
+      onPublicationOpened();
     }
   }
   document.querySelectorAll('#data-sync-tabs .settings-tab[data-tab="publication"]').forEach(function (btn) {
-    btn.addEventListener('click', function () { ensureSummaryLoaded(); });
+    btn.addEventListener('click', function () { onPublicationOpened(); });
   });
 });
 </script>

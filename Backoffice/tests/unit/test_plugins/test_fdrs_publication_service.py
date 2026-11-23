@@ -152,6 +152,58 @@ class TestListFdrsAssignments:
         assert other_aes.assigned_form_id not in ids
 
 
+class TestPublicationYearsSummary:
+    def test_older_year_with_later_changes_is_flagged_ahead_of_later_years(self, db_session, fdrs_scenario):
+        from datetime import datetime, timezone
+
+        template = fdrs_scenario["template"]
+        country = fdrs_scenario["country_a"]
+        item = fdrs_scenario["item_pub1"]
+        private_item = fdrs_scenario["item_private"]
+
+        aes_2019 = create_test_assignment_entity_status(
+            db_session, country=country, template=template, period_name="2019",
+        )
+        _set_form_data(db_session, aes_2019, item, value="12", published_value="10")
+        aes_2019.published_at = datetime(2024, 3, 1, tzinfo=timezone.utc)
+
+        aes_2026 = create_test_assignment_entity_status(
+            db_session, country=country, template=template, period_name="2026",
+        )
+        _set_form_data(db_session, aes_2026, item, value="7")
+
+        aes_2018 = create_test_assignment_entity_status(
+            db_session, country=country, template=template, period_name="2018",
+        )
+        row_2018 = _set_form_data(
+            db_session, aes_2018, item, value="5", published_value="5",
+            published_source=FormData.PUBLISHED_SOURCE_REPORTED,
+        )
+        row_2018.published_at = datetime(2020, 1, 15, tzinfo=timezone.utc)
+        # A private-item edit must not make an otherwise current year look stale.
+        _set_form_data(db_session, aes_2018, private_item, value="secret-later", published_value=None)
+        db_session.commit()
+
+        summary = svc.get_publication_years_summary()
+        by_name = {row["period_name"]: row for row in summary["years"]}
+
+        assert by_name["2019"]["status"] == "republish"
+        assert by_name["2019"]["totals"]["changed"] == 1
+        assert by_name["2019"]["countries_with_pending_changes"] == 1
+        assert by_name["2019"]["last_published_at"] is not None
+        # The fixture year already has published rows that no longer match.
+        assert by_name["2024"]["status"] == "republish"
+        assert by_name["2026"]["status"] == "unpublished"
+        assert by_name["2026"]["last_published_at"] is None
+        assert by_name["2018"]["status"] == "current"
+        assert by_name["2018"]["pending_total"] == 0
+        assert by_name["2018"]["last_published_at"].startswith("2020-01-15")
+
+        assert summary["years_with_later_changes"] == 2
+        assert summary["years_unpublished"] == 1
+        assert [row["period_name"] for row in summary["years"]] == ["2019", "2024", "2026", "2018"]
+
+
 class TestGetAssignmentPublicationSummary:
     def test_totals_and_country_counts(self, db_session, fdrs_scenario):
         summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])

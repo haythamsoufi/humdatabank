@@ -510,6 +510,7 @@ class TestUpdateNotificationPreferences:
             )
 
         assert 'admin_message' in result.notification_types_enabled
+        assert 'assignment_created' in result.notification_types_enabled
         assert 'deadline_reminder' not in result.notification_types_enabled
 
     def test_updates_notification_types_with_list(self, app, db_session):
@@ -528,7 +529,7 @@ class TestUpdateNotificationPreferences:
                 notification_types_enabled=['admin_message']
             )
 
-        assert result.notification_types_enabled == ['admin_message']
+        assert result.notification_types_enabled == ['admin_message', 'assignment_created']
 
     def test_updates_notification_types_with_invalid_type(self, app, db_session):
         from app.models import User

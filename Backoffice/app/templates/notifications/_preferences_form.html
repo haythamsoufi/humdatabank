@@ -1,4 +1,5 @@
 {# Notification preferences form — used on Account Settings #}
+{% set _locked_notification_types = locked_notification_types|default(['assignment_created'], true) %}
 <div id="notification-preferences-form">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="pref-group">
@@ -69,6 +70,7 @@
                 {{ _('Configure in-app and email delivery per notification type.') }}
                 {% endif %}
             </p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Assignment Created is always enabled and cannot be turned off.') }}</p>
             <p class="text-xs text-gray-500 mt-1">{{ _('System-only notifications (for example welcome emails and digest receipts) are not listed here and cannot be disabled.') }}</p>
         </div>
 
@@ -120,28 +122,34 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for notif_type in notification_types %}
+                    {% set is_locked = notif_type in _locked_notification_types %}
                     <tr class="hover:bg-gray-50 transition-colors duration-150">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="text-sm font-medium text-gray-900">{{ notification_type_labels.get(notif_type, notif_type.replace('_', ' ').title()) }}</span>
+                            {% if is_locked %}
+                            <span class="ml-2 inline-flex items-center text-xs text-gray-500" title="{{ _('This notification is always on.') }}">
+                                <i class="fas fa-lock mr-1" aria-hidden="true"></i>{{ _('Always on') }}
+                            </span>
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <input type="checkbox"
-                                   class="notification-type-in-app form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
+                                   class="notification-type-in-app form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded {% if is_locked %}cursor-not-allowed{% else %}cursor-pointer{% endif %}"
                                    data-type="{{ notif_type }}"
-                                   {% if not preferences.in_app_notification_types_enabled or notif_type in preferences.in_app_notification_types_enabled %}checked{% endif %}>
+                                   {% if is_locked %}data-locked="1" checked disabled aria-disabled="true" title="{{ _('Always enabled') }}"{% elif not preferences.in_app_notification_types_enabled or notif_type in preferences.in_app_notification_types_enabled %}checked{% endif %}>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <input type="checkbox"
-                                   class="notification-type-email form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
+                                   class="notification-type-email form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded {% if is_locked %}cursor-not-allowed{% else %}cursor-pointer{% endif %}"
                                    data-type="{{ notif_type }}"
-                                   {% if not preferences.notification_types_enabled or notif_type in preferences.notification_types_enabled %}checked{% endif %}>
+                                   {% if is_locked %}data-locked="1" checked disabled aria-disabled="true" title="{{ _('Always enabled') }}"{% elif not preferences.notification_types_enabled or notif_type in preferences.notification_types_enabled %}checked{% endif %}>
                         </td>
                         {% if notifications_push_enabled %}
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <input type="checkbox"
-                                   class="notification-type-push form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
+                                   class="notification-type-push form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded {% if is_locked %}cursor-not-allowed{% else %}cursor-pointer{% endif %}"
                                    data-type="{{ notif_type }}"
-                                   {% if not preferences.push_notification_types_enabled or notif_type in preferences.push_notification_types_enabled %}checked{% endif %}>
+                                   {% if is_locked %}data-locked="1" checked disabled aria-disabled="true" title="{{ _('Always enabled') }}"{% elif not preferences.push_notification_types_enabled or notif_type in preferences.push_notification_types_enabled %}checked{% endif %}>
                         </td>
                         {% endif %}
                     </tr>

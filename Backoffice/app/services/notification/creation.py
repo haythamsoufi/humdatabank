@@ -22,6 +22,7 @@ from app.services.notification.dedup import (
     calculate_notification_expiration,
     generate_group_id,
 )
+from app.utils.notifications.notification_registry import is_preference_locked_notification_type
 
 IN_APP_ONLY_NOTIFICATION_TYPES = frozenset({
     NotificationType.document_uploaded,
@@ -42,11 +43,58 @@ def _notification_type_value(notification_type) -> str:
 
 
 def _is_type_in_preference_list(notification_type_str: str, enabled_list) -> bool:
-    """Empty list means all types in that channel are enabled."""
+    """Empty list means all types in that channel are enabled.
+
+    Preference-locked types stay enabled even when a stored list omits them.
+    """
+    if is_preference_locked_notification_type(notification_type_str):
+        return True
     types = enabled_list or []
     if not types:
         return True
     return notification_type_str in types
+
+
+def notification_type_allowed_by_preferences(notification_type, enabled_list) -> bool:
+    """Whether a stored channel allow-list still permits this notification type."""
+    return _is_type_in_preference_list(_notification_type_value(notification_type), enabled_list)
+
+
+def is_instant_email_eligible(
+    preferences,
+    notification_type,
+    *,
+    priority: str = 'normal',
+    allow_urgent_bypass: bool = False,
+) -> bool:
+    """Whether this user should receive an instant email for ``notification_type``.
+
+    Locked types cannot be opted out. When the master email switch is off they
+    are still sent immediately, because no digest will be generated. Digest
+    users who still have email enabled receive locked types in the digest.
+    """
+    if preferences is None:
+        return False
+
+    notification_type_str = _notification_type_value(notification_type)
+    locked = is_preference_locked_notification_type(notification_type_str)
+    email_on = bool(getattr(preferences, 'email_notifications', False))
+    frequency = getattr(preferences, 'notification_frequency', None) or 'instant'
+    urgent = allow_urgent_bypass and (priority or 'normal').lower() in {'high', 'urgent'}
+
+    if locked:
+        if not email_on:
+            return True
+        return frequency == 'instant' or urgent
+
+    if not email_on:
+        return False
+    if frequency != 'instant' and not urgent:
+        return False
+    return _is_type_in_preference_list(
+        notification_type_str,
+        getattr(preferences, 'notification_types_enabled', None) or [],
+    )
 
 
 def _in_app_types_enabled_list(preferences) -> list:
@@ -908,21 +956,13 @@ def create_notification(
                                 f"[EMAIL_NOTIFICATION] Admin override enabled: sending email to {user.email} "
                                 f"(notification_id={notification.id})"
                             )
-                        elif preferences and preferences.email_notifications:
-                            # Check user preferences
-                            if preferences.notification_frequency == 'instant':
-                                should_send = True
-                            elif priority in ['high', 'urgent']:
-                                # Override: send instant email for high-priority notifications
-                                should_send = True
-
-                            if should_send:
-                                if not is_email_notification_type_enabled_for_user(
-                                    user.id,
-                                    notification.notification_type,
-                                    preferences_cache=preferences_map,
-                                ):
-                                    should_send = False
+                        elif is_instant_email_eligible(
+                            preferences,
+                            notification.notification_type,
+                            priority=priority,
+                            allow_urgent_bypass=True,
+                        ):
+                            should_send = True
 
                         if should_send:
                             try:
@@ -1193,21 +1233,13 @@ def create_notification(
                                 f"[EMAIL_NOTIFICATION] Admin override enabled: sending email to {user.email} "
                                 f"(notification_id={notification.id})"
                             )
-                        elif preferences and preferences.email_notifications:
-                            # Check user preferences
-                            if preferences.notification_frequency == 'instant':
-                                should_send = True
-                            elif priority in ['high', 'urgent']:
-                                # Override: send instant email for high-priority notifications
-                                should_send = True
-
-                            if should_send:
-                                if not is_email_notification_type_enabled_for_user(
-                                    user.id,
-                                    notification.notification_type,
-                                    preferences_cache=preferences_map,
-                                ):
-                                    should_send = False
+                        elif is_instant_email_eligible(
+                            preferences,
+                            notification.notification_type,
+                            priority=priority,
+                            allow_urgent_bypass=True,
+                        ):
+                            should_send = True
 
                         if should_send:
                             try:

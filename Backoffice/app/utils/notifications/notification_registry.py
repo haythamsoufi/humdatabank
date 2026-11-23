@@ -13,6 +13,9 @@ emitter runs (see ``build_notification_settings_delivery_rows`` for System Setti
 ``emitter_active``: if ``True``, the application creates in-app notifications for this type when the
 corresponding event occurs; if ``False``, the enum row exists for preferences / future use only
 (**hypothetical** — see System Configuration grid ordering and Status column).
+
+``preference_locked``: if ``True``, account and admin preference screens keep every channel
+(in-app, email, push) enabled. Users cannot turn the type off, and delivery ignores a stored opt-out.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         "group": "Assignments",
         "type_key": "assignment_created",
         "emitter_active": True,
+        "preference_locked": True,
         "audiences": ["focal_points", "admin_users", "system_managers"],
         "description": (
             "Created when the user gains a new form assignment requiring action."
@@ -268,6 +272,64 @@ def iter_registry_specs_display_order() -> Iterator[Dict[str, Any]]:
     indexed.sort(key=lambda item: (not item[1]["emitter_active"], item[0]))
     for _, spec in indexed:
         yield spec
+
+
+PREFERENCE_LOCKED_NOTIFICATION_TYPES = frozenset(
+    spec["type_key"]
+    for spec in NOTIFICATION_TYPE_REGISTRY_SPECS
+    if spec.get("preference_locked")
+)
+
+
+def is_preference_locked_notification_type(notification_type) -> bool:
+    """True when users cannot disable this notification type."""
+    if hasattr(notification_type, "value"):
+        notification_type = notification_type.value
+    return str(notification_type) in PREFERENCE_LOCKED_NOTIFICATION_TYPES
+
+
+def list_preference_locked_notification_types() -> List[str]:
+    """Preference types that stay enabled on every channel."""
+    return [
+        spec["type_key"]
+        for spec in NOTIFICATION_TYPE_REGISTRY_SPECS
+        if spec["type_key"] in PREFERENCE_LOCKED_NOTIFICATION_TYPES
+    ]
+
+
+def with_locked_notification_types(enabled_types) -> List[str]:
+    """Copy a channel allow-list and keep mandatory types in it.
+
+    An empty list means every type is enabled and is returned unchanged.
+    """
+    if not enabled_types:
+        return []
+    merged = [str(type_key) for type_key in enabled_types]
+    for type_key in list_preference_locked_notification_types():
+        if type_key not in merged:
+            merged.append(type_key)
+    return merged
+
+
+def normalize_submitted_preference_types(selected, known_types) -> List[str]:
+    """Normalize checkboxes posted from a preference form.
+
+    Disabled locked checkboxes are omitted from the post. An empty selection
+    therefore means "only the mandatory types", not "every type".
+    When every optional type is selected, return ``[]`` (all current and future types).
+    """
+    known = [str(type_key) for type_key in (known_types or [])]
+    locked_known = [type_key for type_key in known if type_key in PREFERENCE_LOCKED_NOTIFICATION_TYPES]
+    optional = [type_key for type_key in known if type_key not in PREFERENCE_LOCKED_NOTIFICATION_TYPES]
+    selected_set = {str(type_key) for type_key in (selected or [])}
+    selected_optional = [type_key for type_key in optional if type_key in selected_set]
+    if len(selected_optional) == len(optional):
+        return []
+    merged = list(selected_optional)
+    for type_key in locked_known:
+        if type_key not in merged:
+            merged.append(type_key)
+    return merged
 
 
 def list_preference_configurable_notification_types() -> List[str]:

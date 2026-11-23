@@ -62,6 +62,13 @@ def _get_current_user_id() -> int:
     raise RuntimeError("Could not resolve current user id")
 
 
+def get_locked_notification_types():
+    """Notification types that stay enabled. Users cannot turn these off."""
+    from app.utils.notifications.notification_registry import list_preference_locked_notification_types
+
+    return list_preference_locked_notification_types()
+
+
 def get_notification_type_labels():
     """Translated labels for notification type preference rows."""
     from flask_babel import gettext as _
@@ -570,7 +577,8 @@ def api_get_notification_preferences():
 
         return json_ok(
             success=True,
-            preferences=preferences_for_client(preferences)
+            preferences=preferences_for_client(preferences),
+            locked_notification_types=get_locked_notification_types(),
         )
 
     except Exception as e:
@@ -643,7 +651,8 @@ def api_update_notification_preferences():
 
             return json_ok(
                 success=True,
-                preferences=preferences_for_client(preferences)
+                preferences=preferences_for_client(preferences),
+                locked_notification_types=get_locked_notification_types(),
             )
         else:
             current_app.logger.error("Service returned None - preferences update failed")

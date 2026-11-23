@@ -1852,7 +1852,11 @@ def account_settings():
         all_access_requests = []
         pending_access_requests = []
 
-    from app.routes.notifications import get_notification_type_labels, get_notification_types_for_user
+    from app.routes.notifications import (
+        get_locked_notification_types,
+        get_notification_type_labels,
+        get_notification_types_for_user,
+    )
     from app.services.notification.service import NotificationService
 
     notification_types_info = get_notification_types_for_user(current_user)
@@ -1869,7 +1873,8 @@ def account_settings():
                          can_request_multiple_countries=is_organization_email(getattr(current_user, 'email', '')),
                          notification_preferences=notification_preferences,
                          notification_types=notification_types_info['for_user'],
-                         notification_type_labels=get_notification_type_labels())
+                         notification_type_labels=get_notification_type_labels(),
+                         locked_notification_types=get_locked_notification_types())
 
 
 @bp.route("/complete-profile", methods=["POST"])

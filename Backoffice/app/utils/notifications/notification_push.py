@@ -28,16 +28,20 @@ def push_disabled_service_result(*, devices_count: int = 0) -> Dict[str, Any]:
 
 def preferences_for_client(preferences) -> Dict[str, Any]:
     """Serialize notification preferences for API/template consumers."""
+    from app.utils.notifications.notification_registry import with_locked_notification_types
+
     payload = {
         'email_notifications': preferences.email_notifications,
-        'notification_types_enabled': preferences.notification_types_enabled,
-        'in_app_notification_types_enabled': getattr(
-            preferences, 'in_app_notification_types_enabled', []
+        'notification_types_enabled': with_locked_notification_types(
+            preferences.notification_types_enabled
+        ),
+        'in_app_notification_types_enabled': with_locked_notification_types(
+            getattr(preferences, 'in_app_notification_types_enabled', [])
         ),
         'notification_frequency': preferences.notification_frequency,
         'push_notifications': getattr(preferences, 'push_notifications', True),
-        'push_notification_types_enabled': getattr(
-            preferences, 'push_notification_types_enabled', []
+        'push_notification_types_enabled': with_locked_notification_types(
+            getattr(preferences, 'push_notification_types_enabled', [])
         ),
         'digest_day': getattr(preferences, 'digest_day', None),
         'digest_time': getattr(preferences, 'digest_time', None),

@@ -2134,9 +2134,10 @@ class TestAssignmentNotificationPreview:
         # The country does have a focal point — it's just not email-eligible.
         assert data["countries_without_focal_count"] == 0
 
-    def test_email_disabled_focal_point_excluded_from_email_counts(
+    def test_email_disabled_focal_point_still_receives_assignment_created(
         self, logged_in_client, db_session, app
     ):
+        """Assignment Created cannot be turned off, including via the master email switch."""
         from app.models import NotificationPreferences
 
         with app.app_context():
@@ -2155,8 +2156,8 @@ class TestAssignmentNotificationPreview:
         _assert_ok(resp)
         data = _get_json(resp)
         assert data["total_focal_users"] == 1
-        assert data["email_users"] == 0
-        assert data["email_batch_count"] == 0
+        assert data["email_users"] == 1
+        assert data["email_batch_count"] == 1
 
     def test_admin_only_country_promoted_into_email_batch_with_notify_admins(
         self, logged_in_client, db_session, app

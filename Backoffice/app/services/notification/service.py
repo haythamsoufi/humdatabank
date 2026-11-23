@@ -1880,20 +1880,27 @@ class NotificationService:
             if email_notifications is not None:
                 preferences.email_notifications = email_notifications
 
+            from app.utils.notifications.notification_registry import with_locked_notification_types
+
             if notification_types_enabled is not None:
-                # Accept dict or list; normalize to list of enabled types
+                # Accept dict or list; normalize to list of enabled types.
+                # A non-empty list always keeps preference-locked types.
                 if isinstance(notification_types_enabled, dict):
-                    preferences.notification_types_enabled = [k for k, v in notification_types_enabled.items() if v]
+                    enabled_email_types = [k for k, v in notification_types_enabled.items() if v]
                 elif isinstance(notification_types_enabled, list):
-                    preferences.notification_types_enabled = notification_types_enabled
+                    enabled_email_types = list(notification_types_enabled)
                 else:
-                    preferences.notification_types_enabled = []
+                    enabled_email_types = []
+                preferences.notification_types_enabled = with_locked_notification_types(enabled_email_types)
 
             if in_app_notification_types_enabled is not None:
                 if isinstance(in_app_notification_types_enabled, list):
-                    preferences.in_app_notification_types_enabled = in_app_notification_types_enabled
+                    enabled_in_app_types = list(in_app_notification_types_enabled)
                 else:
-                    preferences.in_app_notification_types_enabled = []
+                    enabled_in_app_types = []
+                preferences.in_app_notification_types_enabled = with_locked_notification_types(
+                    enabled_in_app_types
+                )
 
             if notification_frequency is not None:
                 preferences.notification_frequency = notification_frequency
@@ -1902,11 +1909,14 @@ class NotificationService:
                 preferences.push_notifications = push_notifications
 
             if push_notification_types_enabled is not None:
-                # Accept list of enabled types
+                # Accept list of enabled types. Locked types cannot be removed.
                 if isinstance(push_notification_types_enabled, list):
-                    preferences.push_notification_types_enabled = push_notification_types_enabled
+                    enabled_push_types = list(push_notification_types_enabled)
                 else:
-                    preferences.push_notification_types_enabled = []
+                    enabled_push_types = []
+                preferences.push_notification_types_enabled = with_locked_notification_types(
+                    enabled_push_types
+                )
 
             # Handle digest day and time
             # Update if provided (None means clear the field)

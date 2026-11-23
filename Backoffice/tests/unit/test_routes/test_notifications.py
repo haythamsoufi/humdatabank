@@ -1026,6 +1026,12 @@ class TestNotificationTypeLabels:
         assert "assignment_created" in labels
         assert "admin_message" in labels
 
+    def test_assignment_created_is_locked_on(self, app):
+        with app.app_context():
+            from app.routes.notifications import get_locked_notification_types
+            locked = get_locked_notification_types()
+        assert locked == ["assignment_created"]
+
 
 # ---------------------------------------------------------------------------
 # get_notification_types_for_user helper

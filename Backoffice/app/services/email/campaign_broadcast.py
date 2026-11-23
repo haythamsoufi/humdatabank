@@ -99,8 +99,12 @@ def _should_send_campaign_email(
             return False
 
     if preferences.notification_types_enabled:
-        ntype = notification.notification_type.value
-        if ntype not in preferences.notification_types_enabled:
+        from app.services.notification.creation import notification_type_allowed_by_preferences
+
+        if not notification_type_allowed_by_preferences(
+            notification.notification_type,
+            preferences.notification_types_enabled,
+        ):
             return False
     return True
 

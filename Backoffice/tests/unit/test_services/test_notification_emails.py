@@ -1176,11 +1176,19 @@ class TestFilterInstantEmailEligibleUserIds:
             )
         assert result == [1]
 
-    def test_excludes_user_with_email_notifications_disabled(self, app, db_session):
+    def test_assignment_created_stays_eligible_when_email_master_is_off(self, app, db_session):
         cache = {1: self._pref(email_notifications=False)}
         with app.app_context():
             result = filter_instant_email_eligible_user_ids(
                 [1], NotificationType.assignment_created, preferences_cache=cache
+            )
+        assert result == [1]
+
+    def test_optional_type_excludes_user_with_email_notifications_disabled(self, app, db_session):
+        cache = {1: self._pref(email_notifications=False)}
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1], NotificationType.assignment_submitted, preferences_cache=cache
             )
         assert result == []
 
@@ -1195,11 +1203,19 @@ class TestFilterInstantEmailEligibleUserIds:
             )
         assert result == []
 
-    def test_excludes_user_with_type_disabled(self, app, db_session):
+    def test_assignment_created_stays_eligible_when_omitted_from_type_list(self, app, db_session):
         cache = {1: self._pref(types_enabled=['deadline_reminder'])}
         with app.app_context():
             result = filter_instant_email_eligible_user_ids(
                 [1], NotificationType.assignment_created, preferences_cache=cache
+            )
+        assert result == [1]
+
+    def test_excludes_user_with_optional_type_disabled(self, app, db_session):
+        cache = {1: self._pref(types_enabled=['deadline_reminder'])}
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1], NotificationType.assignment_submitted, preferences_cache=cache
             )
         assert result == []
 
@@ -1221,7 +1237,7 @@ class TestFilterInstantEmailEligibleUserIds:
             result = filter_instant_email_eligible_user_ids(
                 [1, 2, 3, 4], NotificationType.assignment_created, preferences_cache=cache
             )
-        assert result == [1, 4]
+        assert result == [1, 3, 4]
 
     def test_backward_compatible_private_alias_is_same_function(self):
         """Internal callers within emails.py still use the private-named alias;

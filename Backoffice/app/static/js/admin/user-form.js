@@ -1791,9 +1791,19 @@
         const emailCheckboxesAdmin = document.querySelectorAll('.notification-type-email-admin');
         const pushCheckboxesAdmin = document.querySelectorAll('.notification-type-push-admin');
 
+        function setAdminChannelChecked(checkboxes, checked) {
+            checkboxes.forEach(cb => {
+                if (cb.disabled || cb.dataset.locked === '1') {
+                    cb.checked = true;
+                    return;
+                }
+                cb.checked = checked;
+            });
+        }
+
         if (selectAllInAppAdmin) {
             selectAllInAppAdmin.addEventListener('change', function() {
-                inAppCheckboxesAdmin.forEach(cb => cb.checked = this.checked);
+                setAdminChannelChecked(inAppCheckboxesAdmin, this.checked);
             });
 
             inAppCheckboxesAdmin.forEach(cb => {
@@ -1809,7 +1819,7 @@
 
         if (selectAllEmailAdmin) {
             selectAllEmailAdmin.addEventListener('change', function() {
-                emailCheckboxesAdmin.forEach(cb => cb.checked = this.checked);
+                setAdminChannelChecked(emailCheckboxesAdmin, this.checked);
             });
 
             // Update select all state when individual checkboxes change
@@ -1827,7 +1837,7 @@
 
         if (selectAllPushAdmin) {
             selectAllPushAdmin.addEventListener('change', function() {
-                pushCheckboxesAdmin.forEach(cb => cb.checked = this.checked);
+                setAdminChannelChecked(pushCheckboxesAdmin, this.checked);
             });
 
             // Update select all state when individual checkboxes change

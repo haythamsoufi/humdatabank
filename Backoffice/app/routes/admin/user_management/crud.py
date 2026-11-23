@@ -1226,30 +1226,28 @@ def edit_user(user_id):
             from app.services.notification.service import NotificationService
             from app.routes.notifications import get_preference_eligible_notification_types
             from app.utils.notifications.notification_push import is_notifications_push_enabled
+            from app.utils.notifications.notification_registry import normalize_submitted_preference_types
 
             # Get or create notification preferences for the user
             preferences = NotificationService.get_notification_preferences(user.id)
 
-            # Get enabled notification types from form
+            # Get enabled notification types from form. Locked types are disabled
+            # inputs, so they are absent from the post and added back here.
             in_app_types = request.form.getlist('notification_type_in_app')
             email_types = request.form.getlist('notification_type_email')
             push_types = request.form.getlist('notification_type_push') if is_notifications_push_enabled() else []
 
             # Match types shown in the admin preferences table (audience-configurable only)
             all_types = get_preference_eligible_notification_types()
+            in_app_saved = normalize_submitted_preference_types(in_app_types, all_types)
+            email_saved = normalize_submitted_preference_types(email_types, all_types)
 
-            # Determine if all types are selected
-            all_in_app_selected = len(in_app_types) == len(all_types)
-            all_email_selected = len(email_types) == len(all_types)
-            all_push_selected = is_notifications_push_enabled() and len(push_types) == len(all_types)
-
-            # Update notification preferences from form data
-            # email_notifications and push_notifications are determined by whether any types are selected
+            # Assignment Created stays enabled, so the email channel cannot be turned off.
             frequency = request.form.get('notification_frequency', 'instant')
-            preferences.email_notifications = all_email_selected or len(email_types) > 0
+            preferences.email_notifications = True
             preferences.notification_frequency = frequency
             if is_notifications_push_enabled():
-                preferences.push_notifications = all_push_selected or len(push_types) > 0
+                preferences.push_notifications = True
 
             # Handle digest day and time
             if frequency == 'daily' or frequency == 'weekly':
@@ -1262,11 +1260,13 @@ def edit_user(user_id):
                 preferences.digest_day = None
                 preferences.digest_time = None
 
-            # If all types are selected, send empty list (backend interprets as all enabled)
-            preferences.in_app_notification_types_enabled = [] if all_in_app_selected else in_app_types
-            preferences.notification_types_enabled = [] if all_email_selected else email_types
+            # Empty list means every type is enabled, including types added later.
+            preferences.in_app_notification_types_enabled = in_app_saved
+            preferences.notification_types_enabled = email_saved
             if is_notifications_push_enabled():
-                preferences.push_notification_types_enabled = [] if all_push_selected else push_types
+                preferences.push_notification_types_enabled = normalize_submitted_preference_types(
+                    push_types, all_types
+                )
 
             # Handle entity permissions from form (NS Structure and Secretariat).
             # Requires admin.users.grants.manage or system manager; self-editing is blocked.
@@ -1387,7 +1387,11 @@ def edit_user(user_id):
 
     # Load notification preferences for the user
     from app.services.notification.service import NotificationService
-    from app.routes.notifications import get_notification_type_labels, get_notification_types_for_user
+    from app.routes.notifications import (
+        get_locked_notification_types,
+        get_notification_type_labels,
+        get_notification_types_for_user,
+    )
 
     preferences = NotificationService.get_notification_preferences(user.id)
     notification_types_info = get_notification_types_for_user(user, for_admin_configuration=True)
@@ -1432,6 +1436,7 @@ def edit_user(user_id):
                            preferences=preferences,
                            notification_types_info=notification_types_info,
                            notification_type_labels=get_notification_type_labels(),
+                           locked_notification_types=get_locked_notification_types(),
                            registered_devices=registered_devices,
                            computed_role_type=computed_role_type,
                            selected_role_type=selected_role_type,

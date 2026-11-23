@@ -76,7 +76,7 @@ class AccountNotificationPreferences {
         const allInAppEnabled = inAppEnabledTypes.length === 0;
         this.root.querySelectorAll('.notification-type-in-app').forEach((checkbox) => {
             const type = checkbox.getAttribute('data-type');
-            checkbox.checked = allInAppEnabled || inAppEnabledTypes.includes(type);
+            checkbox.checked = this._isLockedCheckbox(checkbox) || allInAppEnabled || inAppEnabledTypes.includes(type);
         });
         this.updateSelectAllState('in-app');
 
@@ -84,7 +84,7 @@ class AccountNotificationPreferences {
         const allEmailEnabled = emailEnabledTypes.length === 0;
         this.root.querySelectorAll('.notification-type-email').forEach((checkbox) => {
             const type = checkbox.getAttribute('data-type');
-            checkbox.checked = allEmailEnabled || emailEnabledTypes.includes(type);
+            checkbox.checked = this._isLockedCheckbox(checkbox) || allEmailEnabled || emailEnabledTypes.includes(type);
         });
         this.updateSelectAllState('email');
 
@@ -92,7 +92,7 @@ class AccountNotificationPreferences {
         const allPushEnabled = pushEnabledTypes.length === 0;
         this.root.querySelectorAll('.notification-type-push').forEach((checkbox) => {
             const type = checkbox.getAttribute('data-type');
-            checkbox.checked = allPushEnabled || pushEnabledTypes.includes(type);
+            checkbox.checked = this._isLockedCheckbox(checkbox) || allPushEnabled || pushEnabledTypes.includes(type);
         });
         this.updateSelectAllState('push');
 
@@ -146,6 +146,10 @@ class AccountNotificationPreferences {
         });
     }
 
+    _isLockedCheckbox(checkbox) {
+        return checkbox.dataset.locked === '1' || checkbox.disabled;
+    }
+
     toggleSelectAll(type, checked) {
         const selectorMap = {
             'in-app': '.notification-type-in-app',
@@ -154,7 +158,7 @@ class AccountNotificationPreferences {
         };
         const selector = selectorMap[type] || '.notification-type-email';
         this.root.querySelectorAll(selector).forEach((checkbox) => {
-            checkbox.checked = checked;
+            checkbox.checked = this._isLockedCheckbox(checkbox) ? true : checked;
         });
     }
 

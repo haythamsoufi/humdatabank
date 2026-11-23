@@ -679,6 +679,24 @@ def send_notification_emails():
                 )
 
 
+def _notifications_allowed_by_email_type_preferences(notifications, preferences):
+    """Drop notifications whose email channel is turned off.
+
+    An empty allow-list means every type is enabled. Locked types stay included
+    when a partial list omits them.
+    """
+    enabled = getattr(preferences, 'notification_types_enabled', None)
+    if not enabled:
+        return notifications
+    from app.services.notification.creation import notification_type_allowed_by_preferences
+
+    return [
+        notification
+        for notification in notifications
+        if notification_type_allowed_by_preferences(notification.notification_type, enabled)
+    ]
+
+
 def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_log=None):
     """
     Send daily digest email to user with retry logic.
@@ -709,13 +727,7 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
     if not notifications:
         return False
 
-    # Filter by enabled notification types if specified
-    if preferences.notification_types_enabled:
-        notifications = [
-            n for n in notifications
-            if n.notification_type.value in preferences.notification_types_enabled
-        ]
-
+    notifications = _notifications_allowed_by_email_type_preferences(notifications, preferences)
     if not notifications:
         return False
 
@@ -817,13 +829,7 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
     if not notifications:
         return False
 
-    # Filter by enabled notification types if specified
-    if preferences.notification_types_enabled:
-        notifications = [
-            n for n in notifications
-            if n.notification_type.value in preferences.notification_types_enabled
-        ]
-
+    notifications = _notifications_allowed_by_email_type_preferences(notifications, preferences)
     if not notifications:
         return False
 
@@ -1139,26 +1145,16 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
 
     # If override is enabled, skip preference checks
     if not override_preferences:
-        # Check if user has email notifications enabled
+        from app.services.notification.creation import is_instant_email_eligible
+
         preferences = NotificationPreferences.query.filter_by(user_id=user.id).first()
-
-        if not preferences or not preferences.email_notifications:
+        if not is_instant_email_eligible(
+            preferences,
+            notification.notification_type,
+            priority=notification.priority,
+            allow_urgent_bypass=True,
+        ):
             return
-
-        if preferences.notification_frequency != 'instant':
-            # Allow high and urgent notifications to bypass digest preference
-            urgent_priorities = {'high', 'urgent'}
-            if (notification.priority or 'normal').lower() not in urgent_priorities:
-                return
-            current_app.logger.debug(
-                f"[EMAIL_NOTIFICATION] Urgent priority override: sending email to {user.email} "
-                f"despite digest preference ({preferences.notification_frequency})"
-            )
-
-        # Check if notification type is enabled
-        if preferences.notification_types_enabled:
-            if notification.notification_type.value not in preferences.notification_types_enabled:
-                return
 
     user_locale = _user_locale(user)
     from app.services.forms.assignment_email_snapshot import attachments_for_assignment_notification
@@ -1236,7 +1232,7 @@ def filter_instant_email_eligible_user_ids(
     """
     from app.services.notification.creation import (
         get_user_preferences_batch,
-        is_email_notification_type_enabled_for_user,
+        is_instant_email_eligible,
     )
 
     if not user_ids:
@@ -1247,16 +1243,8 @@ def filter_instant_email_eligible_user_ids(
 
     eligible: List[int] = []
     for uid in user_ids:
-        prefs = preferences_cache.get(uid)
-        if not prefs or not prefs.email_notifications:
-            continue
-        if prefs.notification_frequency != 'instant':
-            continue
-        if not is_email_notification_type_enabled_for_user(
-            uid, notification_type, preferences_cache=preferences_cache
-        ):
-            continue
-        eligible.append(uid)
+        if is_instant_email_eligible(preferences_cache.get(uid), notification_type):
+            eligible.append(uid)
     return eligible
 
 

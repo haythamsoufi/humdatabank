@@ -577,7 +577,7 @@ class TestIsNotificationTypeEnabledForUser:
             pref = NotificationPreferences(
                 user_id=user.id,
                 email_notifications=True,
-                notification_types_enabled=['assignment_created'],
+                notification_types_enabled=['assignment_approved'],
                 in_app_notification_types_enabled=['assignment_submitted'],
                 notification_frequency='instant',
             )
@@ -588,14 +588,21 @@ class TestIsNotificationTypeEnabledForUser:
                 user.id, NotificationType.assignment_submitted
             ) is True
             assert is_in_app_notification_type_enabled_for_user(
-                user.id, NotificationType.assignment_created
+                user.id, NotificationType.assignment_approved
             ) is False
             assert is_email_notification_type_enabled_for_user(
-                user.id, NotificationType.assignment_created
+                user.id, NotificationType.assignment_approved
             ) is True
             assert is_email_notification_type_enabled_for_user(
                 user.id, NotificationType.assignment_submitted
             ) is False
+            # Assignment Created cannot be turned off on either channel.
+            assert is_in_app_notification_type_enabled_for_user(
+                user.id, NotificationType.assignment_created
+            ) is True
+            assert is_email_notification_type_enabled_for_user(
+                user.id, NotificationType.assignment_created
+            ) is True
 
     def test_uses_cache_when_provided(self, app, db_session):
         from app.models import NotificationPreferences

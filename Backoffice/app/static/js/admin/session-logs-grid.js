@@ -81,6 +81,48 @@
         return out;
     }
 
+    /**
+     * Same-origin pathname safe to open in a new tab.
+     * Skips the overflow bucket, ``:id`` templates, and mobile analytics keys (``/m/...``).
+     */
+    function navigablePathHref(path) {
+        if (typeof path !== 'string' || path.length === 0 || path === PATH_COUNT_OTHER_KEY) {
+            return '';
+        }
+        if (path.charAt(0) !== '/' || path.charAt(1) === '/' || path.charAt(1) === '\\') {
+            return '';
+        }
+        if (path.indexOf('\\') !== -1 || path.indexOf('://') !== -1 || path.indexOf(':id') !== -1) {
+            return '';
+        }
+        if (/[\u0000-\u001F\u007F\s<>"']/.test(path)) {
+            return '';
+        }
+        if (path === '/m' || path.indexOf('/m/') === 0) {
+            return '';
+        }
+        try {
+            return encodeURI(path);
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function renderPathLabel(path, otherLabel, t) {
+        if (path === PATH_COUNT_OTHER_KEY) {
+            return esc(otherLabel);
+        }
+        var label = String(path);
+        var href = navigablePathHref(label);
+        if (!href) {
+            return esc(label);
+        }
+        var openLabel = (t && t.openPathInNewTab) || 'Open path in a new tab';
+        return '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" ' +
+            'class="text-blue-600 hover:text-blue-800 hover:underline" title="' + esc(openLabel) + '">' +
+            esc(label) + '</a>';
+    }
+
     function ensurePathBreakdownModal() {
         var id = 'session-logs-path-breakdown-modal';
         var el = document.getElementById(id);
@@ -156,8 +198,8 @@
                 '<th class="py-2 pl-2 font-semibold w-20 text-right">' + esc(t.viewCount || 'Count') + '</th></tr></thead><tbody>';
             for (var r = 0; r < rows.length; r++) {
                 var row = rows[r];
-                var pathLabel = row.path === PATH_COUNT_OTHER_KEY ? otherLabel : String(row.path);
-                buf += '<tr class="border-b border-gray-100"><td class="py-1.5 pr-2 font-mono break-all">' + esc(pathLabel) +
+                buf += '<tr class="border-b border-gray-100"><td class="py-1.5 pr-2 font-mono break-all">' +
+                    renderPathLabel(row.path, otherLabel, t) +
                     '</td><td class="py-1.5 pl-2 text-right tabular-nums">' + esc(String(row.count)) + '</td></tr>';
             }
             buf += '</tbody></table>';
@@ -321,8 +363,8 @@
             {
                 field: 'duration_minutes',
                 headerName: t.duration || 'Session length',
-                width: 120,
-                minWidth: 100,
+                width: 170,
+                minWidth: 160,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
                 comparator: durationSecondsComparator('duration_seconds'),
@@ -332,7 +374,7 @@
                     if (label === null || label === undefined) {
                         return '<span class="text-sm text-gray-400">-</span>';
                     }
-                    return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">' +
+                    return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">' +
                         esc(label) + '</span>';
                 }
             },

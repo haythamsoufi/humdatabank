@@ -440,6 +440,7 @@ Local drafts (`auth-drafts.js`) are captured through `matrixHandler.withAutoFill
 - `scripts/ai/seed_low_quality_review.py` – marks a trace as low-quality (`llm_needs_review=True`) and creates/resets a pending review row; use for deterministic end-to-end testing of review queue workflows.
 - `scripts/archive/` – completed one-offs (record-specific probes, incident scripts); not used in CI.
 - `scripts/codemods/` – template/JS bulk refactors; CI guardrails remain in `scripts/ci/`.
+- **Dead code and duplication (Backoffice CI, on pull requests and on pushes to `main` / `develop`):** `python scripts/ci/check_dead_code.py` fails when a production module under `app/` or `plugins/` is unreachable from an entry point, or a first-party JS/CSS file is never referenced (including relative `import`s and `/plugins/static/<id>/…` URLs). Modules that are unreachable today are listed in `scripts/ci/dead_code_allowlist.txt`; that list may only shrink. `python scripts/ci/check_duplicate_code.py` fails when duplicated Python/JS (normalized 40-line windows, outside tests, migrations, and vendor trees) exceeds `scripts/ci/duplicate_code_budget.txt`. The budget may only shrink.
 
 ### Website Testing  
 ```bash

@@ -3,7 +3,7 @@
 # (a direct push skips PR review, so this is the only safety net catching regressions
 # for that path — see the 2026-08-07 incident where a same-day push straight to main
 # shipped an UnboundLocalError that an existing test would have caught).
-# Jobs: fast code guards, Bandit, a cheap pytest-target selector, then pytest
+# Jobs: fast code guards (including dead code and duplication), Bandit, a cheap pytest-target selector, then pytest
 # only for files in the diff (full suite was timing out at GitHub's 6h cap).
 
 name: Backoffice CI
@@ -81,6 +81,36 @@ jobs:
             echo "::warning::No base SHA available (first push to branch?) — skipping gettext embed check"
           else
             python Backoffice/scripts/ci/check_unsafe_gettext_embedding.py --base-ref "$BASE"
+          fi
+
+      - name: No new dead Python modules or unreferenced JS/CSS
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::warning::No base SHA available (first push to branch?) — allowlist shrink check skipped"
+            python Backoffice/scripts/ci/check_dead_code.py
+          else
+            python Backoffice/scripts/ci/check_dead_code.py --base-ref "$BASE"
+          fi
+
+      - name: Duplicated Python/JS did not grow
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::warning::No base SHA available (first push to branch?) — budget shrink check skipped"
+            python Backoffice/scripts/ci/check_duplicate_code.py
+          else
+            python Backoffice/scripts/ci/check_duplicate_code.py --base-ref "$BASE"
           fi
 
   # ── Bandit static security analysis ────────────────────────────────────────

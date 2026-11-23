@@ -1,0 +1,11 @@
+# Unreachable production modules. Wire the module or delete it, then remove the line.
+# This list may only shrink. Do not add a path to silence a new finding.
+#
+# Optional prose translation memory. Nothing calls it; the env flag is unwired.
+app/services/translation/prose_memory.py
+# FDRS income-by-source preset kept for programmatic use. The agent calls the generic tool.
+plugins/fdrs/ai_data.py
+# INFORM / GO snapshot loader with no caller yet.
+plugins/ifrc/decisions/external.py
+# Delegation-city table for the Unified Plan footer. No caller yet.
+plugins/upr/geo/delegation_cities.py

@@ -1,0 +1,4 @@
+# Maximum normalized lines that sit inside a repeated 20-line window (names and
+# literals ignored). May only shrink. See scripts/ci/check_duplicate_code.py.
+window=20
+duplicated_lines=19082

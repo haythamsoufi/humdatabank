@@ -60,29 +60,29 @@
                             <i class="fas fa-chart-bar text-gray-600 mr-2"></i>{{ dref_tr('Overview') }}
                         </h3>
                         <dl class="space-y-2 text-sm">
-                            <div class="flex justify-between bg-gray-50 rounded p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-gray-50 rounded p-3">
                                 <dt class="text-gray-600">{{ dref_tr('Operations') }}</dt>
-                                <dd class="font-medium text-gray-900">{{ settings.operation_count }}</dd>
+                                <dd class="font-medium text-gray-900 break-words text-right min-w-0">{{ settings.operation_count }}</dd>
                             </div>
-                            <div class="flex justify-between bg-gray-50 rounded p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-gray-50 rounded p-3">
                                 <dt class="text-gray-600">{{ dref_tr('Monitoring plan') }}</dt>
-                                <dd class="font-medium text-gray-900">{{ settings.plan_count }}</dd>
+                                <dd class="font-medium text-gray-900 break-words text-right min-w-0">{{ settings.plan_count }}</dd>
                             </div>
-                            <div class="flex justify-between bg-gray-50 rounded p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-gray-50 rounded p-3">
                                 <dt class="text-gray-600">{{ dref_tr('Last sync') }}</dt>
-                                <dd class="font-medium text-gray-900">{{ settings.last_sync or dref_tr('Never') }} ({{ settings.last_sync_status or '-' }})</dd>
+                                <dd class="font-medium text-gray-900 break-words text-right min-w-0">{{ settings.last_sync or dref_tr('Never') }} ({{ settings.last_sync_status or '-' }})</dd>
                             </div>
-                            <div class="flex justify-between bg-gray-50 rounded p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-gray-50 rounded p-3">
                                 <dt class="text-gray-600">{{ dref_tr('AI draft reports') }}</dt>
-                                <dd class="font-medium text-gray-900">{{ dref_tr('Enabled') if settings.ai_enabled else dref_tr('Disabled') }}</dd>
+                                <dd class="font-medium text-gray-900 break-words text-right min-w-0">{{ dref_tr('Enabled') if settings.ai_enabled else dref_tr('Disabled') }}</dd>
                             </div>
-                            <div class="flex justify-between bg-gray-50 rounded p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-gray-50 rounded p-3">
                                 <dt class="text-gray-600">{{ dref_tr('AI engine') }}</dt>
-                                <dd class="font-medium text-gray-900">{{ dref_tr('AI engine ready') if settings.openai_configured else dref_tr('AI engine not configured') }}</dd>
+                                <dd class="font-medium text-gray-900 break-words text-right min-w-0">{{ dref_tr('AI engine ready') if settings.openai_configured else dref_tr('AI engine not configured') }}</dd>
                             </div>
-                            <div class="flex justify-between bg-gray-50 rounded p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-gray-50 rounded p-3">
                                 <dt class="text-gray-600">GO</dt>
-                                <dd class="font-medium text-gray-900">{{ dref_tr('GO token configured') if settings.go_token_configured else dref_tr('GO token missing') }}</dd>
+                                <dd class="font-medium text-gray-900 break-words text-right min-w-0">{{ dref_tr('GO token configured') if settings.go_token_configured else dref_tr('GO token missing') }}</dd>
                             </div>
                         </dl>
                         <div class="mt-4 space-y-3">

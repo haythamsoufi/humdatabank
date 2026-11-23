@@ -878,14 +878,14 @@
 
         <!-- Tab Content: Background jobs -->
         <div id="panel-jobs" class="communication-center-panel hidden">
-            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+            <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div class="min-w-0">
                     <h3 class="text-sm font-medium text-gray-900 m-0">{{ _('Background jobs') }}</h3>
                     <p class="text-xs text-gray-500 mt-1 mb-0">
                         {{ _('Notifications for new assignments are sent in the background. Follow progress here and see which entities could not be notified, and why. Jobs are kept for 30 days.') }}
                     </p>
                 </div>
-                <button type="button" id="background-jobs-refresh" class="btn btn-secondary btn-sm whitespace-nowrap">
+                <button type="button" id="background-jobs-refresh" class="btn btn-secondary btn-sm w-full sm:w-auto">
                     <i class="fas fa-sync-alt mr-2"></i>{{ _('Refresh') }}
                 </button>
             </div>
@@ -1187,20 +1187,20 @@
         </div>
 
         <!-- Footer Actions -->
-        <div class="flex justify-between items-center pt-4 border-t border-gray-200 mt-4 flex-shrink-0 bg-gray-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
-            <div class="flex items-center gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between pt-4 border-t border-gray-200 mt-4 flex-shrink-0 bg-gray-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
+            <div class="flex items-center gap-3 min-w-0">
                 <span id="bulk-selected-count" class="text-sm text-gray-700 font-medium hidden bg-white px-3 py-1.5 rounded border border-gray-300">
                     <span id="bulk-selected-number" class="text-blue-600 font-bold">0</span> {{ _('selected') }}
                 </span>
             </div>
-            <div class="flex space-x-3">
-                <button type="button" id="close-bulk-selection-btn" class="btn btn-secondary">
+            <div class="flex flex-col sm:flex-row flex-wrap gap-3">
+                <button type="button" id="close-bulk-selection-btn" class="btn btn-secondary w-full sm:w-auto">
                     {{ _('Close') }}
                 </button>
-                <button type="button" id="add-selected-users" class="btn btn-success hidden">
+                <button type="button" id="add-selected-users" class="btn btn-success hidden w-full sm:w-auto">
                     <i class="fas fa-user-plus mr-2"></i>{{ _('Add Selected') }}
                 </button>
-                <button type="button" id="add-all-filtered-users" class="btn btn-success">
+                <button type="button" id="add-all-filtered-users" class="btn btn-success w-full sm:w-auto">
                     <i class="fas fa-users mr-2"></i>{{ _('Add All') }}
                 </button>
             </div>
@@ -1270,11 +1270,11 @@
         </div>
 
         <!-- Footer -->
-        <div class="flex justify-between items-center pt-4 border-t border-gray-200 flex-shrink-0">
-            <div class="text-sm text-gray-600">
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between pt-4 border-t border-gray-200 flex-shrink-0">
+            <div class="text-sm text-gray-600 min-w-0">
                 <span id="recipients-total-count" class="font-medium">0</span> {{ _('recipients') }}
             </div>
-            <button type="button" id="close-campaign-recipients-modal-btn" class="btn btn-secondary">
+            <button type="button" id="close-campaign-recipients-modal-btn" class="btn btn-secondary w-full sm:w-auto">
                 {{ _('Close') }}
             </button>
         </div>

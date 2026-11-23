@@ -61,7 +61,7 @@
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{{ _('Quality Metrics') }}</h3>
             <dl class="space-y-2">
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Grounding Score') }}</dt>
                     <dd class="font-semibold">
                         {% if trace and trace.grounding_score is not none %}
@@ -69,11 +69,11 @@
                         {% else %}—{% endif %}
                     </dd>
                 </div>
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Confidence') }}</dt>
                     <dd class="font-semibold">{{ (trace.confidence_level or '—')|title if trace else '—' }}</dd>
                 </div>
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('User Rating') }}</dt>
                     <dd>
                         {% if trace and trace.user_rating == 'like' %}
@@ -83,11 +83,11 @@
                         {% else %}—{% endif %}
                     </dd>
                 </div>
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Execution Path') }}</dt>
-                    <dd class="text-xs font-mono">{{ (trace.execution_path or '—') if trace else '—' }}</dd>
+                    <dd class="text-xs font-mono break-all text-right min-w-0">{{ (trace.execution_path or '—') if trace else '—' }}</dd>
                 </div>
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Cost') }}</dt>
                     <dd>${{ '%.4f' % (trace.total_cost_usd or 0) if trace else '0.0000' }}</dd>
                 </div>
@@ -105,7 +105,7 @@
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{{ _('LLM Judge') }}</h3>
             <dl class="space-y-2">
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Score') }}</dt>
                     <dd class="font-semibold">
                         {% if trace.llm_quality_score is not none %}
@@ -113,11 +113,11 @@
                         {% else %}—{% endif %}
                     </dd>
                 </div>
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Verdict') }}</dt>
                     <dd class="font-semibold">{{ (trace.llm_quality_verdict or '—')|replace('_', ' ')|title }}</dd>
                 </div>
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Needs Review') }}</dt>
                     <dd class="font-semibold">
                         {% if trace.llm_needs_review is sameas true %}
@@ -127,9 +127,9 @@
                         {% else %}—{% endif %}
                     </dd>
                 </div>
-                <div class="flex justify-between text-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
                     <dt class="text-gray-600">{{ _('Judge Model') }}</dt>
-                    <dd class="text-xs font-mono">
+                    <dd class="text-xs font-mono break-all text-right min-w-0">
                         {% if trace.llm_provider or trace.llm_model %}
                         {{ (trace.llm_provider or '—') ~ ' / ' ~ (trace.llm_model or '—') }}
                         {% else %}—{% endif %}

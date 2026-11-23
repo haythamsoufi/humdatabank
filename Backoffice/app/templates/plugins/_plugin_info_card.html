@@ -4,24 +4,24 @@
 {% set plugin_display_name = info.display_name or info.name or '' %}
 {% set plugin_author = info.author or '' %}
 {% set plugin_homepage = info.homepage or '' %}
-<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+<div class="bg-white p-4 sm:p-6 rounded-lg shadow-md border border-gray-200 min-w-0">
     <h3 class="text-lg font-semibold text-gray-700 mb-4">
         <i class="fas fa-info-circle text-blue-600 mr-2"></i>
         Plugin Information
     </h3>
 
     <div class="space-y-3">
-        <div class="flex justify-between gap-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <span class="text-gray-600">Name:</span>
-            <span class="font-medium text-right">{{ plugin_display_name }}</span>
+            <span class="font-medium text-right break-words min-w-0">{{ plugin_display_name }}</span>
         </div>
-        <div class="flex justify-between gap-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <span class="text-gray-600">Version:</span>
-            <span class="font-medium">{{ info.version or '' }}</span>
+            <span class="font-medium break-words">{{ info.version or '' }}</span>
         </div>
-        <div class="flex justify-between gap-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <span class="text-gray-600">Author:</span>
-            <span class="font-medium text-right">
+            <span class="font-medium text-right break-words min-w-0">
                 {% if plugin_homepage and plugin_author %}
                     <a href="{{ plugin_homepage }}"
                        target="_blank"
@@ -33,7 +33,7 @@
             </span>
         </div>
         {% if plugin_homepage %}
-        <div class="flex justify-between gap-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <span class="text-gray-600">Homepage:</span>
             <span class="font-medium text-right">
                 <a href="{{ plugin_homepage }}"
@@ -43,11 +43,11 @@
             </span>
         </div>
         {% endif %}
-        <div class="flex justify-between gap-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <span class="text-gray-600">License:</span>
-            <span class="font-medium">{{ info.license or 'MIT' }}</span>
+            <span class="font-medium break-words">{{ info.license or 'MIT' }}</span>
         </div>
-        <div class="flex justify-between gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <span class="text-gray-600">Status:</span>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                 Active

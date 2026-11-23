@@ -156,24 +156,24 @@
 
     <!-- Bulk Actions Bar (hidden by default) -->
     <div id="bulk-actions-bar" class="bulk-actions-bar hidden bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
-        <div class="flex items-center justify-between">
-            <span class="text-gray-700 font-medium">
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <span class="text-gray-700 font-medium min-w-0">
                 <span id="selected-count">0</span> {{ _('selected') }}
             </span>
-            <div class="flex space-x-2">
-                <button id="bulk-mark-read" class="btn btn-sm btn-secondary">
+            <div class="flex flex-col sm:flex-row flex-wrap gap-2">
+                <button id="bulk-mark-read" class="btn btn-sm btn-secondary w-full sm:w-auto">
                     {{ svg_icon('check', 'w-4 h-4 inline-block mr-1') }}
                     {{ _('Mark Read') }}
                 </button>
-                <button id="bulk-mark-unread" class="btn btn-sm btn-secondary">
+                <button id="bulk-mark-unread" class="btn btn-sm btn-secondary w-full sm:w-auto">
                     <i class="fas fa-envelope w-4 h-4 inline-block mr-1"></i>
                     {{ _('Mark Unread') }}
                 </button>
-                <button id="bulk-archive" class="btn btn-sm btn-secondary">
+                <button id="bulk-archive" class="btn btn-sm btn-secondary w-full sm:w-auto">
                     {{ svg_icon('inbox', 'w-4 h-4 inline-block mr-1') }}
                     {{ _('Archive') }}
                 </button>
-                <button id="bulk-delete" class="btn-sm btn-danger">
+                <button id="bulk-delete" class="btn-sm btn-danger w-full sm:w-auto">
                     {{ svg_icon('trash', 'w-4 h-4 inline-block mr-1') }}
                     {{ _('Delete') }}
                 </button>

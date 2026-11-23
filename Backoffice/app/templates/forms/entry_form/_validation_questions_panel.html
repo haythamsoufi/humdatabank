@@ -1,11 +1,11 @@
 {% if open_validation_questions %}
 <div id="validation-questions-banner" class="bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-4 mb-6 rounded-r-lg" role="alert">
-    <div class="flex justify-between items-start gap-4">
-        <div>
+    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div class="min-w-0">
             <p class="font-semibold">{{ _('Validation questions require your attention') }} ({{ open_validation_questions|length }})</p>
             <p class="text-sm mt-1">{{ _('Please review and answer the questions below. Your responses affect your data quality score.') }}</p>
         </div>
-        <button type="button" id="validation-questions-toggle" class="text-sm underline">{{ _('Show / hide') }}</button>
+        <button type="button" id="validation-questions-toggle" class="text-sm underline shrink-0 self-start">{{ _('Show / hide') }}</button>
     </div>
     <div id="validation-questions-list" class="mt-4 space-y-4">
         {% for q in open_validation_questions %}

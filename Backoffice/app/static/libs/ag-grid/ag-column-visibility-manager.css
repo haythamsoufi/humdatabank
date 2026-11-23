@@ -12,8 +12,8 @@
 .ag-grid-header-toolbar {
     display: flex !important;
     flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
     justify-content: space-between !important;
     gap: 12px !important;
 }
@@ -51,11 +51,12 @@
     display: flex !important;
     align-items: center !important;
     justify-content: flex-end !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     gap: 8px !important;
-    flex: 0 0 auto !important;
+    flex: 0 1 auto !important;
     margin-inline-start: auto !important;
     min-width: 0;
+    max-width: 100%;
 }
 
 .ag-grid-header-actions [id*="column-visibility-button-placeholder"],
@@ -625,19 +626,23 @@ button.ag-clear-filters-button i {
     }
 
     .ag-grid-header-toolbar {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
+        flex-direction: column !important;
+        flex-wrap: wrap !important;
+        align-items: stretch !important;
         gap: 8px !important;
     }
 
     .ag-grid-header-meta {
         flex: 1 1 auto;
         min-width: 0;
+        width: 100%;
     }
 
     .ag-grid-header-actions {
-        flex-shrink: 0 !important;
+        flex-shrink: 1 !important;
+        width: 100%;
+        margin-inline-start: 0 !important;
+        justify-content: flex-start !important;
     }
 
     .ag-grid-toolbar-row,

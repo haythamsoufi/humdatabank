@@ -29,9 +29,9 @@
         <div class="lg:col-span-2 space-y-6">
             <!-- Suggestion Information -->
             <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 p-6">
-                <div class="flex justify-between items-start mb-4">
-                    <h2 class="text-xl font-semibold text-ifrc-navy">Suggestion Information</h2>
-                    <div class="flex gap-2">
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-ifrc-navy min-w-0">Suggestion Information</h2>
+                    <div class="flex flex-wrap gap-2">
                         {% if suggestion.suggestion_type == 'new_indicator' %}
                             {{ status_label(suggestion.suggestion_type_display, 'info') }}
                         {% elif suggestion.suggestion_type == 'correction' %}

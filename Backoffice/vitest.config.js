@@ -6,9 +6,14 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
     resolve: {
-        alias: {
-            '/static': path.resolve(rootDir, 'app/static'),
-        },
+        alias: [
+            // The server serves /plugins/static/<plugin_id>/... from plugins/<plugin_id>/static/...
+            {
+                find: /^\/plugins\/static\/([^/]+)/,
+                replacement: `${path.resolve(rootDir, 'plugins').replace(/\\/g, '/')}/$1/static`,
+            },
+            { find: '/static', replacement: path.resolve(rootDir, 'app/static') },
+        ],
     },
     test: {
         environment: 'jsdom',

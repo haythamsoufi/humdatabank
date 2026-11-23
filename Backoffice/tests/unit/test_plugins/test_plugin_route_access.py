@@ -41,8 +41,8 @@ INTENTIONALLY_UNGUARDED = {
     ("upr/routes.py", "support_overview_embed"),
     ("upr/routes.py", "support_flow_data"),
     ("upr/routes.py", "support_flow_tile"),
-    ("upr/documents_gallery.py", "upr_documents_gallery"),
-    ("upr/upr_data_routes.py", "get_ns_key_data"),
+    ("upr/documents/documents_gallery.py", "upr_documents_gallery"),
+    ("upr/extracts/upr_data_routes.py", "get_ns_key_data"),
     # Answers an empty object for anonymous users, link only for permitted users.
     ("nsd_projects/routes_pm.py", "links"),
 }

@@ -16,6 +16,8 @@ from app.plugins.base import (
 )
 from plugins.metadata import FirstPartyPluginMetadata
 
+VERSION = "2.0.0"  # keep equal to plugin.json
+
 _UPR_PDF_VIEWER_CSP = (
     "default-src 'self'; "
     "script-src 'self'; "
@@ -80,7 +82,7 @@ def support_flow_csp() -> str:
 
 _UPR_DOCUMENTS_GALLERY_CSP = (
     "default-src 'self'; "
-    "script-src 'unsafe-inline'; "
+    "script-src 'self'; "
     "style-src 'unsafe-inline'; "
     "img-src 'self'; "
     "font-src 'self'; "
@@ -107,7 +109,7 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     @property
     def version(self) -> str:
-        return "2.0.0"
+        return VERSION
 
     @property
     def description(self) -> str:
@@ -138,6 +140,38 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
         from plugins.upr.excel.import_routes import bp as excel_import_bp, legacy_bp as excel_import_legacy_bp
 
         return [excel_import_bp, excel_import_legacy_bp]
+
+    def get_matrix_detail_lines(self, **context):
+        from plugins.upr.ai.matrix_details import upr_matrix_detail_lines
+
+        return upr_matrix_detail_lines(
+            disagg_data=context.get("disagg_data"),
+            form_item=context.get("form_item"),
+            template_id=context.get("template_id"),
+            item_label=context.get("item_label") or "",
+            section_name=context.get("section_name") or "",
+            subsection_name=context.get("subsection_name") or "",
+        )
+
+    def build_matrix_line_verdicts(self, lines, **context):
+        from plugins.upr.ai.matrix_details import build_matrix_line_verdicts
+
+        return build_matrix_line_verdicts(
+            lines,
+            parent_verdict=context.get("parent_verdict"),
+            parent_opinion=context.get("parent_opinion"),
+            parent_confidence=context.get("parent_confidence"),
+            comparison=context.get("comparison"),
+            llm_json=context.get("llm_json"),
+        )
+
+    def get_mobile_handlers(self):
+        from plugins.upr.documents import mobile
+
+        return {
+            "unified_planning_config": mobile.unified_planning_config,
+            "unified_planning_thumbnail": mobile.unified_planning_thumbnail,
+        }
 
     def is_admin_feature(self) -> bool:
         return True

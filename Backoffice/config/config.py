@@ -411,11 +411,6 @@ class Config:
     REGISTRATION_EMAIL_CHECK_ENABLED = _parse_bool(os.environ.get("REGISTRATION_EMAIL_CHECK_ENABLED"), default=False)
     REGISTRATION_REVEAL_EXISTING_EMAIL = _parse_bool(os.environ.get("REGISTRATION_REVEAL_EXISTING_EMAIL"), default=False)
 
-    # Runtime plugin ZIP upload executes arbitrary Python in-process: off outside dev/test.
-    PLUGIN_UPLOAD_ENABLED = _parse_bool(
-        os.environ.get("PLUGIN_UPLOAD_ENABLED"), default=_flask_config in ("development", "testing")
-    )
-
     # Plugin runtime knobs (see plugins/README.md).
     # Seconds a worker may reuse the plugin activation state before re-reading it (0 = every request).
     try:

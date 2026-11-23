@@ -7,7 +7,7 @@ import importlib.util
 import inspect
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 from flask import Flask
 from markupsafe import Markup
 from .base import (
@@ -1670,6 +1670,43 @@ class PluginManager:
             if tool_set is not None:
                 sets.append(tool_set)
         return sets
+
+    def get_matrix_detail_lines(self, **context: Any) -> List[Dict[str, Any]]:
+        """Matrix cells described by the first active plugin that recognises the matrix."""
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                lines = plugin.get_matrix_detail_lines(**context)
+            except Exception as exc:
+                self.logger.debug("get_matrix_detail_lines failed for plugin %s: %s", plugin_id, exc)
+                continue
+            if lines:
+                return lines
+        return []
+
+    def build_matrix_line_verdicts(self, lines: Any, **context: Any) -> List[Dict[str, Any]]:
+        """Per-cell verdicts from the first active plugin that recognises the lines."""
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                verdicts = plugin.build_matrix_line_verdicts(lines, **context)
+            except Exception as exc:
+                self.logger.debug("build_matrix_line_verdicts failed for plugin %s: %s", plugin_id, exc)
+                continue
+            if verdicts:
+                return verdicts
+        return []
+
+    def get_mobile_handler(self, name: str) -> Optional[Callable[..., Any]]:
+        """Mobile API handler ``name`` from an active plugin, or None when no active plugin offers it."""
+        for plugin_id, plugin in self._integrating_plugins().items():
+            try:
+                handlers = plugin.get_mobile_handlers()
+            except Exception as exc:
+                self.logger.warning("get_mobile_handlers failed for plugin %s: %s", plugin_id, exc)
+                continue
+            handler = handlers.get(name) if handlers else None
+            if handler is not None:
+                return handler
+        return None
 
     def get_nav_items(self, section: Optional[str] = None) -> List[NavItem]:
         """Sidebar links contributed by active plugins, ordered by priority then label."""

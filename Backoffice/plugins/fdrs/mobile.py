@@ -1235,3 +1235,172 @@ def offline_countries():
     except Exception as e:
         current_app.logger.error('mobile_offline_countries: %s', e, exc_info=True)
         return mobile_server_error('Failed to prepare offline country data.')
+
+
+def disaggregation_overview():
+    """Pre-aggregated sex/age/regional/country disaggregation breakdown for mobile analytics.
+
+    Figures come from the published snapshot (never the live editable value) and only
+    from form items marked privacy=public. Anonymous callers receive global + regional
+    aggregates only. Authenticated organization users (IFRC staff, focal points with
+    country access, data-explore RBAC) may receive per-country breakdowns scoped to
+    their permitted countries.
+
+    Query params:
+      - indicator_bank_id (optional, default 729 — people reached)
+      - template_id (optional, default 21 — FDRS)
+      - period_name (optional): filter to one reporting period
+      - country_id (optional, org users only): filter to one country
+      - locale (optional, default 'en'): localized country names
+    """
+    from app.models import FormData, Country, AssignedForm, PublicSubmission
+    from app.models.assignments import AssignmentEntityStatus
+    from app.services.organization.authorization_service import AuthorizationService
+    from plugins.fdrs.published_facts import public_form_item_ids, published_snapshot_clause
+    from app.utils.mobile.mobile_disaggregation import (
+        aggregate_disaggregation_rows,
+        can_view_disaggregation_country_details,
+        get_disaggregation_country_scope,
+        resolve_optional_mobile_user,
+    )
+
+    indicator_bank_id = request.args.get('indicator_bank_id', 729, type=int)
+    template_id = request.args.get('template_id', 21, type=int)
+    period_name = request.args.get('period_name', type=str) or None
+    requested_country_id = request.args.get('country_id', type=int)
+    locale = request.args.get('locale', 'en')
+
+    user = resolve_optional_mobile_user()
+    include_country_breakdown = can_view_disaggregation_country_details(user)
+    country_scope = (
+        get_disaggregation_country_scope(user) if include_country_breakdown else set()
+    )
+
+    country_id = requested_country_id if include_country_breakdown else None
+    if (
+        country_id
+        and country_scope is not None
+        and country_id not in country_scope
+        and not AuthorizationService.has_country_access(user, country_id)
+    ):
+        country_id = None
+
+    empty_payload = {
+        'period_name': period_name,
+        'indicator_bank_id': indicator_bank_id,
+        'total': 0,
+        'record_count': 0,
+        'disaggregated_count': 0,
+        'disaggregation_rate': 0,
+        'by_sex': [],
+        'by_age': [],
+        'by_country': [],
+        'by_region': [],
+        'trends': [],
+        'country_details_available': include_country_breakdown,
+    }
+
+    try:
+        form_item_ids = public_form_item_ids(
+            indicator_bank_id=indicator_bank_id,
+            template_id=template_id,
+        )
+        if not form_item_ids:
+            return mobile_ok(data=empty_payload)
+
+        aes_q = (
+            db.session.query(
+                AssignmentEntityStatus.entity_id,
+                AssignedForm.period_name,
+                FormData.published_value,
+                FormData.published_disagg_data,
+            )
+            .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
+            .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
+            .filter(
+                FormData.form_item_id.in_(form_item_ids),
+                AssignmentEntityStatus.entity_type == 'country',
+                published_snapshot_clause(),
+            )
+        )
+        if template_id:
+            aes_q = aes_q.filter(AssignedForm.template_id == template_id)
+        if period_name:
+            aes_q = aes_q.filter(AssignedForm.period_name == period_name)
+        if country_id:
+            aes_q = aes_q.filter(AssignmentEntityStatus.entity_id == country_id)
+        elif include_country_breakdown and country_scope is not None and len(country_scope) > 0:
+            aes_q = aes_q.filter(AssignmentEntityStatus.entity_id.in_(list(country_scope)))
+
+        pub_q = (
+            db.session.query(
+                PublicSubmission.country_id,
+                AssignedForm.period_name,
+                FormData.published_value,
+                FormData.published_disagg_data,
+            )
+            .join(FormData, FormData.public_submission_id == PublicSubmission.id)
+            .join(AssignedForm, AssignedForm.id == PublicSubmission.assigned_form_id)
+            .filter(
+                FormData.form_item_id.in_(form_item_ids),
+                PublicSubmission.country_id.isnot(None),
+                published_snapshot_clause(),
+            )
+        )
+        if template_id:
+            pub_q = pub_q.filter(AssignedForm.template_id == template_id)
+        if period_name:
+            pub_q = pub_q.filter(AssignedForm.period_name == period_name)
+        if country_id:
+            pub_q = pub_q.filter(PublicSubmission.country_id == country_id)
+        elif include_country_breakdown and country_scope is not None and len(country_scope) > 0:
+            pub_q = pub_q.filter(PublicSubmission.country_id.in_(list(country_scope)))
+
+        rows = []
+        country_ids = set()
+        for cid, p_name, value, disagg in list(aes_q.all()) + list(pub_q.all()):
+            if not cid:
+                continue
+            cid_int = int(cid)
+            if (
+                include_country_breakdown
+                and country_scope is not None
+                and len(country_scope) > 0
+                and cid_int not in country_scope
+            ):
+                continue
+            country_ids.add(cid_int)
+            rows.append((cid_int, p_name or '', value, disagg, indicator_bank_id))
+
+        countries = (
+            Country.query.filter(Country.id.in_(list(country_ids))).all()
+            if country_ids
+            else []
+        )
+        country_names = {}
+        country_regions = {}
+        for c in countries:
+            name = c.name
+            if locale != 'en':
+                localized = getattr(c, f'name_{locale}', None)
+                if localized:
+                    name = localized
+            country_names[c.id] = name
+            country_regions[c.id] = c.region or 'Other'
+
+        payload = aggregate_disaggregation_rows(
+            rows,
+            country_names=country_names,
+            country_regions=country_regions,
+            include_country_breakdown=include_country_breakdown,
+        )
+        payload['period_name'] = period_name
+        payload['indicator_bank_id'] = indicator_bank_id
+        if country_id:
+            payload['country_id'] = country_id
+        payload['country_details_available'] = include_country_breakdown
+
+        return mobile_ok(data=payload)
+    except Exception as e:
+        current_app.logger.error('disaggregation_overview: %s', e, exc_info=True)
+        return mobile_server_error('Failed to load disaggregation overview data.')

@@ -496,6 +496,33 @@ class BasePlugin(ABC):
         """Sidebar links for the admin navigation (active plugins only)."""
         return []
 
+    def get_matrix_detail_lines(self, **context: Any) -> List[Dict[str, Any]]:
+        """Labeled cells of a matrix answer for the validation summary.
+
+        ``context`` has ``disagg_data``, ``form_item``, ``template_id``, ``item_label``,
+        ``section_name`` and ``subsection_name``. Return one dict per reported cell
+        (``key``, ``label``, ``value``, ``unit``), or ``[]`` when the matrix is not this plugin's.
+        """
+        return []
+
+    def build_matrix_line_verdicts(self, lines: Any, **context: Any) -> List[Dict[str, Any]]:
+        """Per-cell verdicts for matrix lines returned by :meth:`get_matrix_detail_lines`.
+
+        ``context`` has ``parent_verdict``, ``parent_opinion``, ``parent_confidence``,
+        ``comparison`` and ``llm_json``. Return ``[]`` when the lines are not this plugin's.
+        """
+        return []
+
+    def get_mobile_handlers(self) -> Dict[str, Callable[..., Any]]:
+        """View functions behind the public mobile API routes this plugin owns.
+
+        Core keeps the route, rate limit and app-version gate under ``/api/mobile/v1/`` and
+        looks the handler up by name (``PluginManager.get_mobile_handler``) while the plugin
+        is active. Each handler takes the route's URL arguments and returns a Flask response.
+        Core answers 404 when no active plugin provides the name.
+        """
+        return {}
+
     def get_scheduled_jobs(self) -> List[ScheduledJob]:
         """Periodic background jobs for the core scheduler (run only while the plugin is active)."""
         return []

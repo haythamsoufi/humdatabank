@@ -76,22 +76,6 @@
             btn.addEventListener('click', downloadStarterPlugin);
         });
 
-        // Install plugin button - trigger file picker
-        const installBtn = document.getElementById('install-plugin-btn');
-        const fileInput = document.getElementById('plugin-package-input');
-        if (installBtn && fileInput) {
-            installBtn.addEventListener('click', function() {
-                fileInput.click();
-            });
-
-            // When file is selected, automatically install
-            fileInput.addEventListener('change', function() {
-                if (this.files.length > 0) {
-                    installPlugin();
-                }
-            });
-        }
-
         // Modal close buttons
         document.getElementById('close-plugin-modal-btn')?.addEventListener('click', closePluginModal);
         document.getElementById('close-plugin-modal-btn-2')?.addEventListener('click', closePluginModal);
@@ -393,46 +377,6 @@
             showError(i18n.error_failed_start_download);
         } finally {
             // Keep spinner minimal to avoid blocking the download UX
-            showLoading(false);
-        }
-    }
-
-    async function installPlugin() {
-        const fileInput = document.getElementById('plugin-package-input');
-        const file = fileInput.files[0];
-
-        if (!file) {
-            showError(i18n.error_select_package);
-            return;
-        }
-
-        try {
-            showLoading(true);
-            const formData = new FormData();
-            formData.append('plugin_package', file);
-
-            const response = await ((window.getFetch && window.getFetch()) || fetch)('/admin/api/plugins/install', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: formData
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    showSuccess(data.message || i18n.success_installed);
-                    fileInput.value = '';
-                    await loadPlugins();
-                }
-            } else {
-                showError(await serverMessage(response, i18n.error_failed_install));
-            }
-        } catch (error) {
-            console.error('Error installing plugin:', error);
-            showError(i18n.error_failed_install);
-        } finally {
             showLoading(false);
         }
     }

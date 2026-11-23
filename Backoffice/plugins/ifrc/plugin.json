@@ -1,0 +1,9 @@
+{
+  "plugin_id": "ifrc",
+  "name": "ifrc",
+  "display_name": "IFRC",
+  "version": "1.0.0",
+  "description": "IFRC programme tools: Pilot Programmatic Partnership embeds, Plan & Budget visuals (Quarto/Playwright report pipeline), and Decision Maker (evidence, flags and methodology for Federation-wide decisions).",
+  "author": "Haytham Alsoufi",
+  "license": "MIT"
+}

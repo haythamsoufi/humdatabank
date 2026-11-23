@@ -452,9 +452,10 @@ class AIFormDataValidationService:
             evidence["suggestion"] = suggestion_obj
 
         try:
-            from plugins.upr.ai.matrix_details import build_matrix_line_verdicts
+            from flask import current_app
 
-            line_verdicts = build_matrix_line_verdicts(
+            manager = getattr(current_app, "plugin_manager", None)
+            line_verdicts = manager.build_matrix_line_verdicts(
                 context.get("matrix_lines"),
                 parent_verdict=str(verdict) if verdict is not None else None,
                 parent_opinion=opinion_text,

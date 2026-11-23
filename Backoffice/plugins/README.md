@@ -49,7 +49,7 @@ python -m pytest tests/unit/test_plugins/test_plugin_contract.py tests/unit/test
 
 ### Exemptions
 
-`EXEMPT` in `scripts/ci/check_plugin_contract.py` lists the older bundled plugins that predate a rule (each with a reason). It can only shrink: a stale entry fails CI, and the `Plugin contract` workflow rejects any added entry. New plugins comply; they do not get exemptions.
+`EXEMPT` in `scripts/ci/check_plugin_contract.py` lists exceptions (each with a reason). Every bundled plugin now meets the contract, so only the starter template's missing tests remain. It can only shrink: a stale entry fails CI, and the `Plugin contract` workflow rejects any added entry. New plugins comply; they do not get exemptions.
 
 ### Instructions for AI agents
 
@@ -141,7 +141,7 @@ See `interactive_map/` for a complete example plugin implementation.
 
 For **org-specific admin tools** (Data Explorer tabs, custom report pipelines, etc.) that should be removable without editing core app code, use a **plugin** with optional admin hooks on `BasePlugin` — same `plugin.py` entry point as form-field plugins.
 
-- Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`). Hooks consumed by core: `get_field_types()`, `get_blueprint()` / `get_additional_blueprints()`, `get_data_explorer_tabs()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`, `get_api_endpoints()` (Admin → API Management), `get_embed_visuals()`, `get_assignment_badges()`, `get_national_society_columns()`, `get_entry_form_assets()`, `get_documentation_source()`, `register_validation_packs()`, `get_required_plugins()` / `get_optional_plugins()`, and the ones added for decoupling: `get_nav_items()` (sidebar links, shown only while active), `get_scheduled_jobs()` (APScheduler jobs, skipped while inactive), `get_ai_tools()` (`AiToolSet` for the AI assistant), `get_list_option_count()` (size of a plugin-owned lookup list, for completion rates) and `materialize_document()` (fetch a missing document file). CLI commands live in `plugins/<id>/cli.py` as `register_cli(app)`; they are discovered from the file system (`app/plugins/cli_discovery.py`) so they exist even when plugins are not loaded. `get_admin_menu_items()`, `get_models()` and `get_migrations()` are informational and not consumed.
+- Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`). Hooks consumed by core: `get_field_types()`, `get_blueprint()` / `get_additional_blueprints()`, `get_data_explorer_tabs()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`, `get_api_endpoints()` (Admin → API Management), `get_embed_visuals()`, `get_assignment_badges()`, `get_national_society_columns()`, `get_entry_form_assets()`, `get_documentation_source()`, `register_validation_packs()`, `get_required_plugins()` / `get_optional_plugins()`, and the ones added for decoupling: `get_nav_items()` (sidebar links, shown only while active), `get_scheduled_jobs()` (APScheduler jobs, skipped while inactive), `get_ai_tools()` (`AiToolSet` for the AI assistant), `get_list_option_count()` (size of a plugin-owned lookup list, for completion rates) `materialize_document()` (fetch a missing document file), `get_mobile_handlers()` (view functions behind public `/api/mobile/v1/` routes; core keeps the route, rate limit and app-version gate and answers 404 while the plugin is inactive) and `get_matrix_detail_lines()` / `build_matrix_line_verdicts()` (labeled cells and per-cell verdicts for matrix validation). CLI commands live in `plugins/<id>/cli.py` as `register_cli(app)`; they are discovered from the file system (`app/plugins/cli_discovery.py`) so they exist even when plugins are not loaded. `get_admin_menu_items()`, `get_models()` and `get_migrations()` are informational and not consumed.
 - Field types may override `normalize_value()` (what is stored; return `None` for display-only fields) and `validate_value()` (return an error message to reject a submission).
 - Core must not import from `plugins.*`: `tests/unit/test_plugins/test_core_plugin_boundary.py` holds a ratchet baseline that can only shrink. Add an extension point instead of a new import.
 - Discovery: `Backoffice/app/plugins/manager.py` scans `plugins/*/plugin.py`
@@ -173,17 +173,17 @@ Admin-feature plugins (`is_admin_feature()`) register via the admin-feature blue
 - `get_optional_plugins()` declares soft dependencies: the plugin works without them, and the management page warns while they are inactive. Required-dependency cycles are logged at load.
 - Activation state is re-read from the database at most every `PLUGIN_ACTIVATION_SYNC_TTL_SECONDS` seconds per worker (default 2; `0` checks on every request). Static assets of inactive plugins answer 404 unless `PLUGIN_STATIC_REQUIRE_ACTIVE=false`.
 - Optional settings: `PLUGIN_FIELD_CONFIG_ENFORCE=true` rejects invalid plugin field config on save (default: log only); `PLUGIN_SECRETS_KEY` encrypts secret-looking plugin settings (`api_key`, `token`, `password`, ...) at rest as `enc:v1:...` (default: off; plaintext keeps reading, losing the key makes encrypted values unreadable); `PLUGIN_LOGGER_OWN_HANDLER_ONLY=true` stops plugin loggers propagating to root handlers.
-- Uploaded plugins are written to the local `plugins/` folder of one instance only; with several instances they must be deployed with the image instead.
-- Install, uninstall, activate, deactivate and upload are recorded in the admin audit trail (`plugin_<action>`).
+- Plugins are never installed at runtime: there is no ZIP upload. Plugin code is added to `plugins/` in the repository and ships in the core image, so every instance runs the same reviewed code.
+- Install, uninstall, activate and deactivate are recorded in the admin audit trail (`plugin_<action>`).
 - `update_settings()` returns `False` by default. Override it together with `supports_settings_update()` to expose a settings form.
 
 ### Secrets in plugin settings
 
 Pass `secret_paths` to `BasePluginRoutes` so API keys are replaced by a placeholder in responses and kept unchanged when the placeholder is posted back (`redact_secrets` / `restore_secrets` in `app/plugins/plugin_utils.py`). Keys whose name looks secret (`api_key`, `token`, `password`, ...) are masked even when not declared. Never log a request URL that carries a key; use `safe_request_error()`.
 
-### Uploading plugins
+### Deploying plugins
 
-`POST /admin/api/plugins/install` (field `plugin_package`) and `POST /admin/api/plugins/<id>/upload` (field `plugin_file`) accept a ZIP whose `plugin.json` declares `plugin_id`. The code is imported into the host process, so the endpoints require the System Manager role and `PLUGIN_UPLOAD_ENABLED=true`. The starter package is at `GET /admin/api/plugins/starter/download`.
+Plugins ship with the code. Add the folder under `Backoffice/plugins/`, register the id in `plugins/metadata.py::BUNDLED_PLUGIN_IDS`, pass the contract checks, and deploy the image. There is no upload endpoint. `GET /admin/api/plugins/starter/download` only returns a copy of the starter package to unpack into `plugins/`.
 
 ## Best Practices
 

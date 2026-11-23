@@ -64,16 +64,6 @@ MIN_README_CHARS = 200
 # (plugin_id, rule) -> reason. Plugins that predate the contract. New plugins must not
 # be added here; a stale entry (rule now passes) fails the check so the list shrinks.
 EXEMPT: dict[tuple[str, str], str] = {
-    ("emergency_operations", "manifest"): "predates the contract; plugin.json would change loader behaviour",
-    ("emergency_operations", "readme"): "predates the contract",
-    ("fdrs", "manifest"): "predates the contract; plugin.json would change loader behaviour",
-    ("fdrs", "readme"): "predates the contract",
-    ("ifrc", "manifest"): "predates the contract; plugin.json would change loader behaviour",
-    ("ifrc", "readme"): "predates the contract",
-    ("interactive_map", "manifest"): "predates the contract; plugin.json would change loader behaviour",
-    ("interactive_map", "readme"): "predates the contract",
-    ("upr", "manifest"): "predates the contract; plugin.json would change loader behaviour",
-    ("upr", "readme"): "predates the contract",
     # The starter is a template, not a shipped plugin.
     ("sample_plugin", "tests"): "starter package; copies must add tests",
 }

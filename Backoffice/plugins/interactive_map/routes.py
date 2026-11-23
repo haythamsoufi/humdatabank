@@ -67,18 +67,18 @@ def create_blueprint():
         """Get tile configuration for a map type."""
         # Validate map_type parameter
         if not map_type or not isinstance(map_type, str):
-            return json_bad_request('Invalid map type parameter', error='Invalid map type parameter')
+            return json_bad_request('Invalid map type parameter')
 
         # Sanitize map_type to prevent injection
         if map_type not in MAP_PROVIDERS:
             message = f'Map type must be one of: {", ".join(MAP_PROVIDERS)}'
-            return json_bad_request(message, error=message)
+            return json_bad_request(message)
 
         # Get base configurations from plugin config
         provider_config = plugin_config.get_provider_config(map_type)
 
         if not provider_config or not provider_config.get('enabled', False):
-            return json_bad_request('Map provider not enabled or not found', error='Map provider not enabled or not found')
+            return json_bad_request('Map provider not enabled or not found')
 
         # Return provider configuration (never expose raw API keys to the client)
         tile_url = provider_config.get('base_url')
@@ -103,20 +103,20 @@ def create_blueprint():
         public embeds warm the same cache.
         """
         if z < 0 or z > 22:
-            return json_bad_request('Invalid zoom level', error='Invalid zoom level')
+            return json_bad_request('Invalid zoom level')
         if x >= 2 ** z or y >= 2 ** z:
-            return json_bad_request('Invalid tile coordinates', error='Invalid tile coordinates')
+            return json_bad_request('Invalid tile coordinates')
 
         if hit_rate_limit(_viewer_key('interactive_map:tiles'), TILE_REQUESTS_PER_USER_PER_MINUTE):
-            return json_error('Too many tile requests', 429, success=False, error='Too many tile requests')
+            return json_error('Too many tile requests', 429, success=False)
 
         from plugins.upr.analysis.flow import mapbox_tile
 
         body, mimetype, error = mapbox_tile(z, x, y)
         if error == 'invalid':
-            return json_bad_request('Invalid tile coordinates', error='Invalid tile coordinates')
+            return json_bad_request('Invalid tile coordinates')
         if error == 'unconfigured':
-            return json_bad_request('Mapbox is not configured', error='Mapbox is not configured')
+            return json_bad_request('Mapbox is not configured')
         if body is None:
             return Response(status=502)
         return Response(
@@ -153,7 +153,7 @@ def create_blueprint():
             return json_ok(success=True, config=field_config)
 
         except Exception as e:
-            current_app.logger.error(f"Error getting field config: {e}")
+            current_app.logger.error("Error getting field config: %s", e)
             return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/geocode', methods=['POST'])
@@ -163,30 +163,30 @@ def create_blueprint():
         """Geocode an address to coordinates."""
         if requests is None:
             current_app.logger.error("Interactive Map Plugin: requests library is not installed")
-            return json_server_error('Server missing HTTP client support (requests).', success=False, error='Server missing HTTP client support (requests).')
+            return json_server_error('Server missing HTTP client support (requests).', success=False)
         data = get_json_safe()
         if not data:
-            return json_bad_request('Request body must be JSON', success=False, error='Request body must be JSON')
+            return json_bad_request('Request body must be JSON', success=False)
 
         address = data.get('address')
         if not address:
-            return json_bad_request('Address is required', success=False, error='Address is required')
+            return json_bad_request('Address is required', success=False)
 
         # Validate and sanitize address input
         if not isinstance(address, str):
-            return json_bad_request('Address must be a string', success=False, error='Address must be a string')
+            return json_bad_request('Address must be a string', success=False)
 
         # Sanitize address - remove potentially dangerous characters and limit length
         address = address.strip()[:500]  # Limit to 500 characters
         if not address:
-            return json_bad_request('Address cannot be empty', success=False, error='Address cannot be empty')
+            return json_bad_request('Address cannot be empty', success=False)
 
         if hit_rate_limit(_viewer_key('interactive_map:geocode'), GEOCODE_REQUESTS_PER_USER_PER_MINUTE):
             return json_error(
                 'Rate limit exceeded. Please wait before making another request.',
                 429,
                 success=False,
-                error='Rate limit exceeded. Please wait before making another request.'
+
             )
 
         # Get geocoding service from config
@@ -195,7 +195,7 @@ def create_blueprint():
         # Validate geocoding service
         allowed_services = ['nominatim', 'google']
         if geocoding_service not in allowed_services:
-            return json_bad_request(f'Unknown geocoding service: {geocoding_service}', success=False, error=f'Unknown geocoding service: {geocoding_service}')
+            return json_bad_request(f'Unknown geocoding service: {geocoding_service}', success=False)
 
         try:
             if geocoding_service == 'nominatim':
@@ -206,7 +206,7 @@ def create_blueprint():
                         'Rate limit exceeded. Please wait before making another request.',
                         429,
                         success=False,
-                        error='Rate limit exceeded. Please wait before making another request.'
+
                     )
 
                 # Make geocoding request
@@ -234,21 +234,21 @@ def create_blueprint():
                                 formatted_address=result.get('display_name', address)
                             )
                         except (ValueError, KeyError) as e:
-                            current_app.logger.error(f"Error parsing geocoding result: {e}")
-                            return json_server_error('Invalid response from geocoding service', success=False, error='Invalid response from geocoding service')
+                            current_app.logger.error("Error parsing geocoding result: %s", e)
+                            return json_server_error('Invalid response from geocoding service', success=False)
                     else:
-                        return json_not_found('No results found for the given address', success=False, error='No results found for the given address')
+                        return json_not_found('No results found for the given address', success=False)
                 elif response.status_code == 429:
-                    return json_error('Geocoding service rate limit exceeded. Please try again later.', 429, success=False, error='Geocoding service rate limit exceeded. Please try again later.')
+                    return json_error('Geocoding service rate limit exceeded. Please try again later.', 429, success=False)
                 else:
-                    current_app.logger.warning(f"Geocoding service returned status {response.status_code}")
-                    return json_error('Geocoding service unavailable', 502, success=False, error='Geocoding service unavailable')
+                    current_app.logger.warning("Geocoding service returned status %s", response.status_code)
+                    return json_error('Geocoding service unavailable', 502, success=False)
 
             elif geocoding_service == 'google':
                 # Use Google Geocoding API (requires API key)
                 api_key = plugin_config.get_global_setting('geocoding_api_key')
                 if not api_key:
-                    return json_bad_request('Google Geocoding API key not configured', success=False, error='Google Geocoding API key not configured')
+                    return json_bad_request('Google Geocoding API key not configured', success=False)
 
                 google_params = {
                     'address': address,
@@ -290,29 +290,29 @@ def create_blueprint():
                     )
 
                 if status in ('ZERO_RESULTS',):
-                    return json_not_found('No results found for the given address', success=False, error='No results found for the given address')
+                    return json_not_found('No results found for the given address', success=False)
 
                 if status in ('OVER_DAILY_LIMIT', 'OVER_QUERY_LIMIT'):
-                    return json_error('Google Geocoding API quota exceeded', 429, success=False, error='Google Geocoding API quota exceeded')
+                    return json_error('Google Geocoding API quota exceeded', 429, success=False)
 
                 if status in ('REQUEST_DENIED',):
                     message = payload.get('error_message', 'Google Geocoding request was denied')
-                    current_app.logger.error(f"Google Geocoding request denied: {message}")
-                    return json_error(message, 502, success=False, error=message)
+                    current_app.logger.error("Google Geocoding request denied: %s", message)
+                    return json_error(message, 502, success=False)
 
                 message = payload.get('error_message', f'Unexpected Google Geocoding status: {status}')
-                current_app.logger.warning(f"Google Geocoding error: {message}")
-                return json_error(message, 502, success=False, error=message)
+                current_app.logger.warning("Google Geocoding error: %s", message)
+                return json_error(message, 502, success=False)
 
         except requests.exceptions.Timeout:
             current_app.logger.error("Geocoding request timed out")
-            return json_error('Geocoding request timed out. Please try again.', 504, success=False, error='Geocoding request timed out. Please try again.')
+            return json_error('Geocoding request timed out. Please try again.', 504, success=False)
         except requests.exceptions.RequestException as e:
             current_app.logger.error("Geocoding request error: %s", safe_request_error(e))
-            return json_error('Failed to connect to geocoding service', 503, success=False, error='Failed to connect to geocoding service')
+            return json_error('Failed to connect to geocoding service', 503, success=False)
         except Exception as e:
-            current_app.logger.error(f"Geocoding error: {e}", exc_info=True)
-            return json_server_error('An unexpected error occurred during geocoding', success=False, error='An unexpected error occurred during geocoding')
+            current_app.logger.error("Geocoding error: %s", e, exc_info=True)
+            return json_server_error('An unexpected error occurred during geocoding', success=False)
 
     @bp.route('/api/settings', methods=['GET'])
     @plugin_admin_route_wrapper('Interactive Map Plugin')
@@ -322,7 +322,7 @@ def create_blueprint():
             config = redact_secrets(plugin_config.get_all_config(), SECRET_PATHS)
             return json_ok(success=True, settings=config)
         except Exception as e:
-            current_app.logger.error(f"Error getting settings: {e}")
+            current_app.logger.error("Error getting settings: %s", e)
             return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/settings', methods=['POST'])
@@ -332,10 +332,10 @@ def create_blueprint():
         try:
             data = get_json_safe()
             if not data:
-                return json_bad_request('No data provided', success=False, error='No data provided')
+                return json_bad_request('No data provided', success=False)
 
             if not isinstance(data, dict):
-                return json_bad_request('Invalid data format', success=False, error='Invalid data format')
+                return json_bad_request('Invalid data format', success=False)
 
             # Validate and sanitize input values
             default_map_provider = data.get('default_map_provider', 'mapbox')
@@ -393,21 +393,21 @@ def create_blueprint():
                     # Handle API keys separately
                     for key, value in section_data.items():
                         if not plugin_config.set_api_key(key, value):
-                            current_app.logger.error(f"Failed to set API key: {key}")
+                            current_app.logger.error("Failed to set API key: %s", key)
                 else:
                     for key, value in section_data.items():
                         if not plugin_config.set_global_setting(key, value):
-                            current_app.logger.warning(f"Failed to set global setting: {key}")
+                            current_app.logger.warning("Failed to set global setting: %s", key)
 
             # Clear plugin cache after settings change
             cleared_count = clear_plugin_cache('interactive_map')
-            current_app.logger.info(f"Interactive Map: Cleared {cleared_count} cached entries after settings update")
+            current_app.logger.info("Interactive Map: Cleared %s cached entries after settings update", cleared_count)
 
             return json_ok(success=True, message='Settings saved successfully', cache_cleared=cleared_count)
 
         except Exception as e:
-            current_app.logger.error(f"Error saving settings: {e}", exc_info=True)
-            return json_server_error('Failed to save settings. Please try again.', success=False, error='Failed to save settings. Please try again.')
+            current_app.logger.error("Error saving settings: %s", e, exc_info=True)
+            return json_server_error('Failed to save settings. Please try again.', success=False)
 
     @bp.route('/api/cache/clear', methods=['POST'])
     @plugin_admin_route_wrapper('Interactive Map Plugin')
@@ -415,10 +415,10 @@ def create_blueprint():
         """Clear plugin cache manually."""
         try:
             cleared_count = clear_plugin_cache('interactive_map')
-            current_app.logger.info(f"Interactive Map: Manually cleared {cleared_count} cached entries")
+            current_app.logger.info("Interactive Map: Manually cleared %s cached entries", cleared_count)
             return json_ok(success=True, cleared_count=cleared_count, message=f'Cleared {cleared_count} cached entries')
         except Exception as e:
-            current_app.logger.error(f"Error clearing cache: {e}")
+            current_app.logger.error("Error clearing cache: %s", e)
             return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/stats', methods=['GET'])
@@ -450,11 +450,7 @@ def create_blueprint():
             )
 
         except Exception as e:
-            current_app.logger.error(f"Error getting usage stats: {e}", exc_info=True)
-            return json_server_error(
-                'Failed to retrieve usage statistics',
-                success=False,
-                error='Failed to retrieve usage statistics',
-            )
+            current_app.logger.error("Error getting usage stats: %s", e, exc_info=True)
+            return json_server_error('Failed to retrieve usage statistics', success=False)
 
     return bp

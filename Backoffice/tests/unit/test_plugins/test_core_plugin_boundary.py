@@ -19,11 +19,16 @@ import pytest
 BACKOFFICE = Path(__file__).resolve().parents[3]
 APP_DIR = BACKOFFICE / "app"
 BASELINE = Path(__file__).with_name("core_plugin_import_baseline.json")
+# The starter package is a template that gets copied to ``plugins/<id>/``; its imports of
+# ``plugins.sample_plugin`` are what a real plugin looks like, not core depending on a plugin.
+TEMPLATE_DIRS = (APP_DIR / "sample_plugin_package",)
 
 
 def collect_core_plugin_imports() -> dict[str, dict[str, int]]:
     found: dict[str, Counter] = {}
     for path in sorted(APP_DIR.rglob("*.py")):
+        if any(template in path.parents for template in TEMPLATE_DIRS):
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         counter: Counter = Counter()
         for node in ast.walk(tree):

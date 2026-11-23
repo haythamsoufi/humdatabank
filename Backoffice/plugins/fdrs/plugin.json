@@ -1,0 +1,9 @@
+{
+  "plugin_id": "fdrs",
+  "name": "fdrs",
+  "display_name": "FDRS",
+  "version": "1.0.0",
+  "description": "Federation-wide Databank & Reporting System: data-api sync, document fetch, disaggregation analysis, service-income estimate, Everyone Counts report, document compliance, matrix validation, and quality methodology.",
+  "author": "Haytham Alsoufi",
+  "license": "MIT"
+}

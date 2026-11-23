@@ -25,10 +25,6 @@
   "app/routes/ai_documents/qa.py": {
     "upr": 1
   },
-  "app/routes/api/mobile/public_data.py": {
-    "fdrs": 5,
-    "upr": 2
-  },
   "app/routes/excel.py": {
     "fdrs": 1,
     "upr": 1
@@ -79,7 +75,7 @@
     "upr": 1
   },
   "app/services/ai/tools/registry.py": {
-    "upr": 5
+    "upr": 4
   },
   "app/services/ai/validation/assignment_review.py": {
     "upr": 2

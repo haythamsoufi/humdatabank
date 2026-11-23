@@ -37,7 +37,28 @@ from app.utils.database.transactions import request_transaction_rollback
 from app.utils.database.sql_utils import safe_ilike_pattern
 from app.utils.branding.sector_logo_urls import country_ns_logo_url, sector_logo_url
 from app.routes.api.mobile import mobile_bp
-# In-process JPEG cache lives in plugins.upr.documents.mobile.
+# Handlers for plugin-owned routes come from BasePlugin.get_mobile_handlers().
+
+
+def _plugin_mobile_call(name, *args, **kwargs):
+    """Call mobile handler ``name`` offered by an active plugin (``BasePlugin.get_mobile_handlers``).
+
+    Returns None when no active plugin provides it.
+    """
+    manager = getattr(current_app, 'plugin_manager', None)
+    handler = manager.get_mobile_handler(name) if manager is not None else None
+    if handler is None:
+        return None
+    return handler(*args, **kwargs)
+
+
+def _plugin_mobile_response(name, *args, **kwargs):
+    """Response of plugin mobile handler ``name``, or 404 while the owning plugin is inactive."""
+    manager = getattr(current_app, 'plugin_manager', None)
+    handler = manager.get_mobile_handler(name) if manager is not None else None
+    if handler is None:
+        return mobile_not_found('This data is not available.')
+    return handler(*args, **kwargs)
 
 
 @mobile_bp.route('/data/countrymap', methods=['GET'])
@@ -310,9 +331,8 @@ def mobile_periods():
     country_id = request.args.get('country_id', type=int)
 
     try:
-        from plugins.fdrs.mobile import campaign_period_names
-
-        return mobile_ok(data={'periods': campaign_period_names(template_id, country_id)})
+        names = _plugin_mobile_call('campaign_period_names', template_id, country_id)
+        return mobile_ok(data={'periods': names or []})
     except Exception as e:
         current_app.logger.error('mobile_periods: %s', e, exc_info=True)
         return mobile_ok(data={'periods': []})
@@ -322,108 +342,84 @@ def mobile_periods():
 @mobile_rate_limit(requests_per_minute=30)
 def mobile_fdrs_overview():
     """Pre-aggregated FDRS indicator totals per country (mobile-optimised)."""
-    from plugins.fdrs.mobile import fdrs_overview as _impl
-
-    return _impl()
+    return _plugin_mobile_response('fdrs_overview')
 
 
 @mobile_bp.route('/data/fdrs-reach-indicators', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_fdrs_reach_indicators():
     """People-reached indicators grouped by sector (home map chips)."""
-    from plugins.fdrs.mobile import reach_indicators as _impl
-
-    return _impl()
+    return _plugin_mobile_response('reach_indicators')
 
 
 @mobile_bp.route('/data/offline-home', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=6)
 def mobile_offline_home():
     """All home-map indicators and periods, for the offline cache."""
-    from plugins.fdrs.mobile import offline_home as _impl
-
-    return _impl()
+    return _plugin_mobile_response('offline_home')
 
 
 @mobile_bp.route('/data/offline-countries', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=4)
 def mobile_offline_countries():
     """Country list, every country profile, and active operations, for the offline cache."""
-    from plugins.fdrs.mobile import offline_countries as _impl
-
-    return _impl()
+    return _plugin_mobile_response('offline_countries')
 
 
 @mobile_bp.route('/data/country-profile/<iso3>', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_country_profile(iso3):
     """Public country profile (key figures, indicator series, cover images, documents)."""
-    from plugins.fdrs.mobile import country_profile as _impl
-
-    return _impl(iso3)
+    return _plugin_mobile_response('country_profile', iso3)
 
 
 @mobile_bp.route('/data/go-documents', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=4)
 def mobile_go_documents_all():
     """GO document lists for every country, one response."""
-    from plugins.fdrs.mobile import go_documents_all as _impl
-
-    return _impl()
+    return _plugin_mobile_response('go_documents_all')
 
 
 @mobile_bp.route('/data/country-profile/<iso3>/go-documents', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_country_go_documents(iso3):
     """Public GO emergency appeals, operations updates and situation reports for one country."""
-    from plugins.fdrs.mobile import country_go_documents as _impl
-
-    return _impl(iso3)
+    return _plugin_mobile_response('country_go_documents', iso3)
 
 
 @mobile_bp.route('/data/country-profile/<iso3>/operations', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_country_operations(iso3):
     """Active GO emergencies for one country (counts, funding, and operations)."""
-    from plugins.fdrs.mobile import country_operations as _impl
-
-    return _impl(iso3)
+    return _plugin_mobile_response('country_operations', iso3)
 
 
 @mobile_bp.route('/data/country-profile/<iso3>/international', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_country_international(iso3):
     """International bilateral support for one country (PNS outbound or host inbound)."""
-    from plugins.fdrs.mobile import country_international as _impl
-
-    return _impl(iso3)
+    return _plugin_mobile_response('country_international', iso3)
 
 
 @mobile_bp.route('/data/country-profile/<iso3>/projects', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_country_projects(iso3):
     """Active projects for one country (NSD and other portfolios). Public fields only."""
-    from plugins.fdrs.mobile import country_projects as _impl
-
-    return _impl(iso3)
+    return _plugin_mobile_response('country_projects', iso3)
 
 
 @mobile_bp.route('/data/region-profile/<slug>', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_region_profile(slug):
     """Public regional analysis (summed key indicators and top countries)."""
-    from plugins.fdrs.mobile import region_profile as _impl
-
-    return _impl(slug)
+    return _plugin_mobile_response('region_profile', slug)
 
 
 @mobile_bp.route('/data/region-profile/<slug>/operations', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def mobile_region_operations(slug):
     """Active GO operations for one region (counts, funding, and countries)."""
-    from plugins.fdrs.mobile import region_operations as _impl
-
-    return _impl(slug)
+    return _plugin_mobile_response('region_operations', slug)
 
 
 @mobile_bp.route('/data/disaggregation-overview', methods=['GET'])
@@ -444,157 +440,7 @@ def mobile_disaggregation_overview():
       - country_id (optional, org users only): filter to one country
       - locale (optional, default 'en'): localized country names
     """
-    from app.models import FormData, Country, AssignedForm, PublicSubmission
-    from app.models.assignments import AssignmentEntityStatus
-    from app.services.organization.authorization_service import AuthorizationService
-    from plugins.fdrs.published_facts import public_form_item_ids, published_snapshot_clause
-    from app.utils.mobile.mobile_disaggregation import (
-        aggregate_disaggregation_rows,
-        can_view_disaggregation_country_details,
-        get_disaggregation_country_scope,
-        resolve_optional_mobile_user,
-    )
-
-    indicator_bank_id = request.args.get('indicator_bank_id', 729, type=int)
-    template_id = request.args.get('template_id', 21, type=int)
-    period_name = request.args.get('period_name', type=str) or None
-    requested_country_id = request.args.get('country_id', type=int)
-    locale = request.args.get('locale', 'en')
-
-    user = resolve_optional_mobile_user()
-    include_country_breakdown = can_view_disaggregation_country_details(user)
-    country_scope = (
-        get_disaggregation_country_scope(user) if include_country_breakdown else set()
-    )
-
-    country_id = requested_country_id if include_country_breakdown else None
-    if (
-        country_id
-        and country_scope is not None
-        and country_id not in country_scope
-        and not AuthorizationService.has_country_access(user, country_id)
-    ):
-        country_id = None
-
-    empty_payload = {
-        'period_name': period_name,
-        'indicator_bank_id': indicator_bank_id,
-        'total': 0,
-        'record_count': 0,
-        'disaggregated_count': 0,
-        'disaggregation_rate': 0,
-        'by_sex': [],
-        'by_age': [],
-        'by_country': [],
-        'by_region': [],
-        'trends': [],
-        'country_details_available': include_country_breakdown,
-    }
-
-    try:
-        form_item_ids = public_form_item_ids(
-            indicator_bank_id=indicator_bank_id,
-            template_id=template_id,
-        )
-        if not form_item_ids:
-            return mobile_ok(data=empty_payload)
-
-        aes_q = (
-            db.session.query(
-                AssignmentEntityStatus.entity_id,
-                AssignedForm.period_name,
-                FormData.published_value,
-                FormData.published_disagg_data,
-            )
-            .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
-            .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
-            .filter(
-                FormData.form_item_id.in_(form_item_ids),
-                AssignmentEntityStatus.entity_type == 'country',
-                published_snapshot_clause(),
-            )
-        )
-        if template_id:
-            aes_q = aes_q.filter(AssignedForm.template_id == template_id)
-        if period_name:
-            aes_q = aes_q.filter(AssignedForm.period_name == period_name)
-        if country_id:
-            aes_q = aes_q.filter(AssignmentEntityStatus.entity_id == country_id)
-        elif include_country_breakdown and country_scope is not None and len(country_scope) > 0:
-            aes_q = aes_q.filter(AssignmentEntityStatus.entity_id.in_(list(country_scope)))
-
-        pub_q = (
-            db.session.query(
-                PublicSubmission.country_id,
-                AssignedForm.period_name,
-                FormData.published_value,
-                FormData.published_disagg_data,
-            )
-            .join(FormData, FormData.public_submission_id == PublicSubmission.id)
-            .join(AssignedForm, AssignedForm.id == PublicSubmission.assigned_form_id)
-            .filter(
-                FormData.form_item_id.in_(form_item_ids),
-                PublicSubmission.country_id.isnot(None),
-                published_snapshot_clause(),
-            )
-        )
-        if template_id:
-            pub_q = pub_q.filter(AssignedForm.template_id == template_id)
-        if period_name:
-            pub_q = pub_q.filter(AssignedForm.period_name == period_name)
-        if country_id:
-            pub_q = pub_q.filter(PublicSubmission.country_id == country_id)
-        elif include_country_breakdown and country_scope is not None and len(country_scope) > 0:
-            pub_q = pub_q.filter(PublicSubmission.country_id.in_(list(country_scope)))
-
-        rows = []
-        country_ids = set()
-        for cid, p_name, value, disagg in list(aes_q.all()) + list(pub_q.all()):
-            if not cid:
-                continue
-            cid_int = int(cid)
-            if (
-                include_country_breakdown
-                and country_scope is not None
-                and len(country_scope) > 0
-                and cid_int not in country_scope
-            ):
-                continue
-            country_ids.add(cid_int)
-            rows.append((cid_int, p_name or '', value, disagg, indicator_bank_id))
-
-        countries = (
-            Country.query.filter(Country.id.in_(list(country_ids))).all()
-            if country_ids
-            else []
-        )
-        country_names = {}
-        country_regions = {}
-        for c in countries:
-            name = c.name
-            if locale != 'en':
-                localized = getattr(c, f'name_{locale}', None)
-                if localized:
-                    name = localized
-            country_names[c.id] = name
-            country_regions[c.id] = c.region or 'Other'
-
-        payload = aggregate_disaggregation_rows(
-            rows,
-            country_names=country_names,
-            country_regions=country_regions,
-            include_country_breakdown=include_country_breakdown,
-        )
-        payload['period_name'] = period_name
-        payload['indicator_bank_id'] = indicator_bank_id
-        if country_id:
-            payload['country_id'] = country_id
-        payload['country_details_available'] = include_country_breakdown
-
-        return mobile_ok(data=payload)
-    except Exception as e:
-        current_app.logger.error('mobile_disaggregation_overview: %s', e, exc_info=True)
-        return mobile_server_error('Failed to load disaggregation overview data.')
+    return _plugin_mobile_response('disaggregation_overview')
 
 
 def _serialize_public_resource(r, *, locale: str, base_url: str, storage) -> dict:
@@ -790,18 +636,14 @@ def public_resources():
 @mobile_rate_limit(requests_per_minute=60)
 def unified_planning_config():
     """Public config for unified planning documents: appeals API URL and type IDs."""
-    from plugins.upr.documents.mobile import unified_planning_config as _impl
-
-    return _impl()
+    return _plugin_mobile_response('unified_planning_config')
 
 
 @mobile_bp.route('/data/unified-planning-thumbnail', methods=['GET', 'POST'])
 @mobile_rate_limit(requests_per_minute=120)
 def unified_planning_thumbnail():
     """Return a small JPEG of the PDF first page for unified-planning grid tiles."""
-    from plugins.upr.documents.mobile import unified_planning_thumbnail as _impl
-
-    return _impl()
+    return _plugin_mobile_response('unified_planning_thumbnail')
 
 
 @mobile_bp.route('/data/quiz/submit-score', methods=['POST'])

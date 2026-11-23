@@ -34,17 +34,16 @@ def _run_config(env_overrides, snippet, *, unset=()):
 class TestFlaskConfigResolution:
     SNIPPET = (
         "from config.config import Config, _RESOLVED_FLASK_CONFIG as r; "
-        "import os; print(r, Config.DEBUG, Config.TRUST_PROXY_HEADERS, Config.PLUGIN_UPLOAD_ENABLED, os.environ['FLASK_CONFIG'])"
+        "import os; print(r, Config.DEBUG, Config.TRUST_PROXY_HEADERS, os.environ['FLASK_CONFIG'])"
     )
 
     def test_unset_flask_config_fails_closed_to_production(self):
         proc = _run_config({}, self.SNIPPET)
         assert proc.returncode == 0, proc.stderr
-        resolved, debug, trust_proxy, plugin_upload, env_value = proc.stdout.split()
+        resolved, debug, trust_proxy, env_value = proc.stdout.split()
         assert resolved == "production"
         assert debug == "False"
         assert trust_proxy == "True"
-        assert plugin_upload == "False"
         assert env_value == "production"
         assert "defaulting to 'production'" in proc.stderr
 
@@ -56,13 +55,13 @@ class TestFlaskConfigResolution:
     def test_explicit_development_still_works(self):
         proc = _run_config({"FLASK_CONFIG": "development"}, self.SNIPPET)
         assert proc.returncode == 0, proc.stderr
-        resolved, debug, trust_proxy, plugin_upload, _ = proc.stdout.split()
-        assert (resolved, debug, trust_proxy, plugin_upload) == ("development", "True", "False", "True")
+        resolved, debug, trust_proxy, _ = proc.stdout.split()
+        assert (resolved, debug, trust_proxy) == ("development", "True", "False")
 
     def test_staging_trusts_proxy_by_default(self):
         proc = _run_config({"FLASK_CONFIG": "staging"}, self.SNIPPET)
         assert proc.returncode == 0, proc.stderr
-        assert proc.stdout.split()[:4] == ["staging", "False", "True", "False"]
+        assert proc.stdout.split()[:3] == ["staging", "False", "True"]
 
     def test_default_alias_is_deprecated_with_warning(self):
         proc = _run_config({"FLASK_CONFIG": "default"}, self.SNIPPET)
@@ -113,7 +112,6 @@ def _app(**config):
         "AI_JWT_SECRET": "a" * 48,
         "SESSION_COOKIE_SECURE": True,
         "TRUST_PROXY_HEADERS": True,
-        "PLUGIN_UPLOAD_ENABLED": False,
         "MOBILE_JWT_ACCEPT_LEGACY_SECRET_KEY": False,
         "AI_JWT_ACCEPT_LEGACY_SECRET_KEY": False,
         "MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK": False,
@@ -225,10 +223,6 @@ class TestSecurityFindings:
     def test_untrusted_proxy_headers_warn_in_production(self):
         _, warnings = collect_security_findings(_app(TRUST_PROXY_HEADERS=False))
         assert any("TRUST_PROXY_HEADERS" in w for w in warnings)
-
-    def test_plugin_upload_enabled_in_production_warns(self):
-        _, warnings = collect_security_findings(_app(PLUGIN_UPLOAD_ENABLED=True))
-        assert any("PLUGIN_UPLOAD_ENABLED" in w for w in warnings)
 
     def test_legacy_flags_warn(self):
         _, warnings = collect_security_findings(_app(

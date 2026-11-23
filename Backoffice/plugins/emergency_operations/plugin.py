@@ -3,6 +3,8 @@ from typing import List, Dict, Any, Optional
 from flask import current_app
 from plugins.metadata import FirstPartyPluginMetadata
 
+VERSION = "1.0.0"  # keep equal to plugin.json
+
 
 def _relevance_measures() -> List[Dict[str, Any]]:
     """Measures this plugin exposes for relevance conditions (used only by this plugin)."""
@@ -101,7 +103,7 @@ class EmergencyOperationsFieldType(BaseFieldType):
 
             return True
         except Exception as e:
-            current_app.logger.error(f"EmergencyOperations config validation failed: {e}")
+            current_app.logger.error("EmergencyOperations config validation failed: %s", e)
             return False
 
 
@@ -116,7 +118,7 @@ class EmergencyOperationsPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return VERSION
 
     @property
     def description(self) -> str:

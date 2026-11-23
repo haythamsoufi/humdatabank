@@ -5,6 +5,8 @@ from __future__ import annotations
 from app.plugins.base import BasePlugin, DataExplorerTabConfig, ScheduledJob, SeedPermission, SeedRole
 from plugins.metadata import FirstPartyPluginMetadata
 
+VERSION = "1.0.0"  # keep equal to plugin.json
+
 # Tabs that used to share admin.data_explore.analysis. Each one is its own
 # permission and its own "Admin: Data Explorer (...)" role on the user form.
 _SPLIT_ANALYSIS_TABS: tuple[tuple[str, str, str, str, int, str], ...] = (
@@ -79,7 +81,7 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return VERSION
 
     @property
     def description(self) -> str:
@@ -103,6 +105,29 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         load_routes()
         return bp
+
+    def get_mobile_handlers(self):
+        from plugins.fdrs import mobile
+
+        return {
+            name: getattr(mobile, name)
+            for name in (
+                "campaign_period_names",
+                "fdrs_overview",
+                "reach_indicators",
+                "offline_home",
+                "offline_countries",
+                "country_profile",
+                "go_documents_all",
+                "country_go_documents",
+                "country_operations",
+                "country_international",
+                "country_projects",
+                "region_profile",
+                "region_operations",
+                "disaggregation_overview",
+            )
+        }
 
     def get_api_endpoints(self):
         from plugins.fdrs import load_routes

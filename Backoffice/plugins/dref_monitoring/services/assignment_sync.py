@@ -68,7 +68,8 @@ def approver_completes_review(user) -> bool:
         if is_delegation_user(user):
             return True
     except Exception:
-        pass
+        # Fall through to the DREF permission check, which is the stricter answer.
+        logging.getLogger(__name__).warning("DREF delegation review check failed", exc_info=True)
     from plugins.dref_monitoring.access import actor_for_user
 
     actor = actor_for_user(user)

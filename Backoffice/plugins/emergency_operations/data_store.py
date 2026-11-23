@@ -152,7 +152,7 @@ class EmergencyOperationsDataStore:
                 return None
             return data
         except Exception as e:
-            logger.warning(f'[EmOps DataStore] Failed to load cache: {e}')
+            logger.warning("[EmOps DataStore] Failed to load cache: %s", e)
             return None
 
     def load_cached(self) -> Optional[Dict[str, Any]]:
@@ -206,7 +206,7 @@ class EmergencyOperationsDataStore:
             )
             return True
         except Exception as e:
-            logger.error(f'[EmOps DataStore] Failed to save cache: {e}')
+            logger.error("[EmOps DataStore] Failed to save cache: %s", e)
             return False
 
     # ── Status ─────────────────────────────────────────────────────────────────
@@ -311,7 +311,7 @@ class EmergencyOperationsDataStore:
             return str(exc) if exc else 'Unknown API error'
 
         try:
-            logger.info(f'[EmOps DataStore] Fetching appeals: {api_url}  params={query_params}')
+            logger.info("[EmOps DataStore] Fetching appeals: %s  params=%s", api_url, query_params)
             if 'appealgroupchild' in (api_url or ''):
                 from .appeal_group import CACHE_SOURCE, fetch_appeal_group_records
                 results = fetch_appeal_group_records(api_url, timeout=timeout)
@@ -326,7 +326,7 @@ class EmergencyOperationsDataStore:
                 return {'success': True,  'record_count': len(results), 'error': None}
             return {'success': False, 'record_count': 0, 'error': 'Failed to write cache file'}
         except Exception as e:
-            logger.error(f'[EmOps DataStore] Refresh failed: {e}', exc_info=True)
+            logger.error("[EmOps DataStore] Refresh failed: %s", e, exc_info=True)
             return {'success': False, 'record_count': 0, 'error': _fmt(e)}
 
 
@@ -364,10 +364,10 @@ def trigger_background_refresh(api_url: str, query_params: Dict, timeout: int = 
                     result = store.refresh_from_api(api_url, query_params, timeout)
                     if result['success']:
                         logger.info(
-                            f'[EmOps DataStore] Background refresh completed: {result["record_count"]} records'
+                            "[EmOps DataStore] Background refresh completed: %s records", result["record_count"]
                         )
                     else:
-                        logger.warning(f'[EmOps DataStore] Background refresh failed: {result["error"]}')
+                        logger.warning("[EmOps DataStore] Background refresh failed: %s", result["error"])
             finally:
                 _refresh_in_progress = False
 

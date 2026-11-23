@@ -1,0 +1,9 @@
+{
+  "plugin_id": "upr",
+  "name": "upr",
+  "display_name": "UPR",
+  "version": "2.0.0",
+  "description": "Unified Plan and Report: live dashboards, Excel import/export, GO-API documents, and AI/RAG document intelligence.",
+  "author": "Haytham Alsoufi",
+  "license": "MIT"
+}

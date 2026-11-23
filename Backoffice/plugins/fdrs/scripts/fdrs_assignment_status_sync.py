@@ -410,7 +410,8 @@ def run_fdrs_assignment_status_sync(
         except FdrsSyncCancelled:
             raise
         except Exception:
-            pass
+            # Progress reporting must never abort the sync.
+            logger.debug("FDRS assignment status sync: progress callback failed", exc_info=True)
 
     _progress(
         stage="assignment_status",

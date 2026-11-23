@@ -459,16 +459,15 @@ def register_validation_summary_routes(bp) -> None:
         if not isinstance(disagg, dict) or not disagg:
             return []
         try:
-            from plugins.upr.ai.matrix_details import upr_matrix_detail_lines
-
-            lines = upr_matrix_detail_lines(
+            manager = getattr(current_app, "plugin_manager", None)
+            lines = manager.get_matrix_detail_lines(
                 disagg_data=disagg,
                 form_item=fi,
                 template_id=template_id,
                 item_label=item_label or str(getattr(fi, "label", "") or ""),
                 section_name=section_name or "",
                 subsection_name=subsection_name or "",
-            )
+            ) if manager is not None else []
         except Exception as e:
             logger.debug("matrix detail lines failed: %s", e)
             lines = []

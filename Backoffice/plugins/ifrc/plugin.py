@@ -15,6 +15,8 @@ from app.plugins.base import (
     SeedRole,
 )
 from plugins.metadata import FirstPartyPluginMetadata
+
+VERSION = "1.0.0"  # keep equal to plugin.json
 from plugins.ifrc.pb_progress.versions import (
     DEFAULT_VERSION,
     REPORT_VERSIONS,
@@ -97,7 +99,7 @@ class IfrcPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return VERSION
 
     @property
     def description(self) -> str:

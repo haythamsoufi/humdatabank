@@ -484,7 +484,7 @@ def t_batch(
         if not language_has_machine_translation(lang, source_language=source):
             return originals
     except Exception:
-        pass
+        logger.debug("UPR: machine translation availability check failed", exc_info=True)
     indexes = [i for i, text in enumerate(originals) if text.strip()]
     if not indexes:
         return originals

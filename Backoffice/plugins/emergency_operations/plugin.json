@@ -1,0 +1,9 @@
+{
+  "plugin_id": "emergency_operations",
+  "name": "emergency_operations",
+  "display_name": "Emergency Operations Plugin",
+  "version": "1.0.0",
+  "description": "Provides a field type that lists active IFRC operations for a country using GO API",
+  "author": "Haytham Alsoufi",
+  "license": "MIT"
+}

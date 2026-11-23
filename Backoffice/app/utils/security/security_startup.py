@@ -142,10 +142,6 @@ def collect_security_findings(app) -> Tuple[List[str], List[str]]:
                 "for rate limits, lockouts and audit logs. Set it to true and PROXY_FIX_X_FOR to the number "
                 "of trusted proxy hops."
             )
-        if cfg.get("PLUGIN_UPLOAD_ENABLED"):
-            warnings.append(
-                "PLUGIN_UPLOAD_ENABLED is true: uploaded plugin ZIPs execute arbitrary Python in the web process."
-            )
         if cfg.get("MOBILE_JWT_ACCEPT_LEGACY_SECRET_KEY"):
             warnings.append(
                 "MOBILE_JWT_ACCEPT_LEGACY_SECRET_KEY is true: mobile tokens signed with SECRET_KEY are still "

@@ -16,13 +16,12 @@ from __future__ import annotations
 
 ADMIN_PERMISSION_PREFIX = "admin."
 
-# Endpoints that must be System Manager only. Plugin install/upload/uninstall load or remove Python
-# code (remote-code-execution equivalent); the error-notification test emails every System Manager.
+# Endpoints that must be System Manager only. Plugin install/uninstall run plugin hooks and remove
+# plugin files; the error-notification test emails every System Manager.
 SYSTEM_MANAGER_ONLY_ENDPOINTS = frozenset(
     {
         "plugin_management.install_plugin",
         "plugin_management.uninstall_plugin",
-        "plugin_management.upload_plugin",
         "monitoring.test_error_notification",
     }
 )
@@ -34,7 +33,6 @@ POST_ONLY_ENDPOINTS = frozenset(
         "monitoring.clear_monitoring_logs",
         "plugin_management.install_plugin",
         "plugin_management.uninstall_plugin",
-        "plugin_management.upload_plugin",
     }
 )
 

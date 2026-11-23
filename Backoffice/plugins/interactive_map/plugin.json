@@ -1,0 +1,9 @@
+{
+  "plugin_id": "interactive_map",
+  "name": "interactive_map",
+  "display_name": "Interactive Map Plugin",
+  "version": "1.0.0",
+  "description": "Provides interactive map field type for location selection in forms",
+  "author": "Haytham Alsoufi",
+  "license": "MIT"
+}

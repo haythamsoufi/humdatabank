@@ -20,13 +20,6 @@
     actions=[
         {
             'type': 'button',
-            'text': _('Install Plugin'),
-            'icon': 'fas fa-upload',
-            'classes': 'professional-action-btn professional-action-btn-green',
-            'attributes': {'id': 'install-plugin-btn', 'title': _('Install a new plugin from a package file')}
-        } if can_manage_plugins else None,
-        {
-            'type': 'button',
             'text': _('Download Starter Plugin'),
             'icon': 'fas fa-download',
             'classes': 'professional-action-btn professional-action-btn-purple',
@@ -143,12 +136,6 @@
             </table>
         </div>
     </div>
-
-    <!-- Hidden file input for plugin installation -->
-    <input type="file"
-           id="plugin-package-input"
-           accept=".zip,.tar.gz,.py"
-           class="hidden">
 </div>
 
 {% call modal_shell('plugin-details-modal', _('Plugin Details'), max_width='max-w-4xl', close_id='close-plugin-modal-btn') %}
@@ -228,9 +215,6 @@
   "error_failed_scan_plugins": {{ _('Failed to scan for plugins') | tojson }},
   "success_scan_completed": {{ _('Plugin scan completed') | tojson }},
   "error_failed_start_download": {{ _('Failed to start download') | tojson }},
-  "error_select_package": {{ _('Please select a plugin package to install') | tojson }},
-  "success_installed": {{ _('Plugin installed successfully') | tojson }},
-  "error_failed_install": {{ _('Failed to install plugin') | tojson }},
   "error_no_plugin_for_uninstall": {{ _('No plugin specified for uninstall') | tojson }},
   "error_failed_uninstall": {{ _('Failed to uninstall plugin') | tojson }},
   "details_description": {{ _('Description') | tojson }},

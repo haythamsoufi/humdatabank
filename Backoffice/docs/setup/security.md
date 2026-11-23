@@ -46,7 +46,7 @@ client -> reverse proxy -> ProxyFix (PROXY_FIX_X_*) -> request hooks -> site loc
 
 ### Startup validation (`app/utils/security/security_startup.py`)
 
-In production/staging (or with `STRICT_ENV_VALIDATION=true`) the app refuses to start when: `DEBUG` is on; `AI_JWT_SECRET` is set but short or equal to another secret; `AUTH_STATE_BACKEND` is invalid or `redis` without a Redis URL; multiple workers run with `RATE_LIMIT_REQUIRE_SHARED_STORAGE=true` and no shared store. `DEBUG_SKIP_LOGIN=true` outside development + DEBUG is fatal in every environment. A missing, short, or `SECRET_KEY`-equal `MOBILE_JWT_SECRET`, and `ENABLE_SSH` left unset, are warnings: they are logged and shown on System Configuration, and they do not block startup. Other warnings (logged, not fatal): `AI_JWT_SECRET` falling back to `SECRET_KEY`, `TRUST_PROXY_HEADERS` off, `PLUGIN_UPLOAD_ENABLED` on, legacy compatibility flags still on, per-process rate limits with several workers. Worker count is read from `GUNICORN_WORKERS` / `WEB_CONCURRENCY` (`auto` = 2 x CPU + 1), else 3 under gunicorn, else 1.
+In production/staging (or with `STRICT_ENV_VALIDATION=true`) the app refuses to start when: `DEBUG` is on; `AI_JWT_SECRET` is set but short or equal to another secret; `AUTH_STATE_BACKEND` is invalid or `redis` without a Redis URL; multiple workers run with `RATE_LIMIT_REQUIRE_SHARED_STORAGE=true` and no shared store. `DEBUG_SKIP_LOGIN=true` outside development + DEBUG is fatal in every environment. A missing, short, or `SECRET_KEY`-equal `MOBILE_JWT_SECRET`, and `ENABLE_SSH` left unset, are warnings: they are logged and shown on System Configuration, and they do not block startup. Other warnings (logged, not fatal): `AI_JWT_SECRET` falling back to `SECRET_KEY`, `TRUST_PROXY_HEADERS` off, legacy compatibility flags still on, per-process rate limits with several workers. Worker count is read from `GUNICORN_WORKERS` / `WEB_CONCURRENCY` (`auto` = 2 x CPU + 1), else 3 under gunicorn, else 1.
 
 ### Signing secrets
 
@@ -87,7 +87,7 @@ App builds that predate the code flow send no challenge; while `MOBILE_OAUTH_ALL
 
 ### Development-only shortcuts
 
-Dev "Act as" needs `FLASK_CONFIG=development`, `DEBUG`, and a true loopback connection (no forwarding headers). The picker lists every active user; preset buttons still resolve only to the seeded `test_sys@`, `test_admin@`, and `test_focal@` accounts. Dev act-as itself is logged as `dev_act_as_login`, so using the picker does not count as registration. `DEBUG_SKIP_LOGIN` is now defined in `Config` (default false) and is fatal outside development + DEBUG. Plugin ZIP upload is controlled by `PLUGIN_UPLOAD_ENABLED` (default off in production/staging, on in development/testing).
+Dev "Act as" needs `FLASK_CONFIG=development`, `DEBUG`, and a true loopback connection (no forwarding headers). The picker lists every active user; preset buttons still resolve only to the seeded `test_sys@`, `test_admin@`, and `test_focal@` accounts. Dev act-as itself is logged as `dev_act_as_login`, so using the picker does not count as registration. `DEBUG_SKIP_LOGIN` is now defined in `Config` (default false) and is fatal outside development + DEBUG. Runtime plugin upload no longer exists (the `PLUGIN_UPLOAD_ENABLED` setting was removed): plugins are repository code shipped in the image.
 
 ### Deployment and upgrade notes
 
@@ -191,7 +191,7 @@ sshd in the image is opt-in (`ENABLE_SSH=true`) and hardened; see [Container SSH
 - [ ] `MOBILE_JWT_SECRET` and `AI_JWT_SECRET` are set, distinct from `SECRET_KEY` and from each other
 - [ ] `PROXY_FIX_X_FOR` matches the real number of proxies; `TRUST_PROXY_HEADERS=true` behind a proxy
 - [ ] Migration `add_auth_state_entry` applied (or Redis configured) so refresh/lockout state is shared across workers
-- [ ] `PLUGIN_UPLOAD_ENABLED` unset/false unless plugin installs are intended
+- [ ] Plugins come only from the image build (no runtime upload); the `plugins/` folder is not writable in the container if your host allows it
 - [ ] Legacy flags (`MOBILE_JWT_ACCEPT_LEGACY_SECRET_KEY`, `AI_JWT_ACCEPT_LEGACY_SECRET_KEY`, `MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK`) turned off once clients have migrated
 
 ## Pre–penetration test checklist (Backoffice)

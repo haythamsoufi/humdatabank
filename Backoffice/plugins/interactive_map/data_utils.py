@@ -3,11 +3,12 @@
 import json
 import logging
 import uuid
-from datetime import datetime
+from typing import Dict, Any, List, Tuple
+import re
+
+from app.utils.common.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
-from typing import Dict, Any, List, Optional, Tuple
-import re
 
 # Optional imports for geometry validation
 try:
@@ -181,11 +182,8 @@ def normalize_marker_data(marker: Dict[str, Any], config: Dict[str, Any]) -> Dic
 
                 # Type validation
                 if prop_schema.get('type') == 'string':
-                    if isinstance(value, str):
-                        max_length = prop_schema.get('maxLength', 1000)
-                        value = value[:max_length]
-                    else:
-                        value = str(value)[:max_length]
+                    max_length = prop_schema.get('maxLength', 1000)
+                    value = (value if isinstance(value, str) else str(value))[:max_length]
 
                 # Enum validation
                 if 'enum' in prop_schema:
@@ -195,7 +193,7 @@ def normalize_marker_data(marker: Dict[str, Any], config: Dict[str, Any]) -> Dic
                 normalized[prop_name] = value
 
     # Timestamps
-    now = datetime.utcnow().isoformat()
+    now = utcnow().isoformat()
     normalized['created_at'] = marker.get('created_at') or now
     normalized['updated_at'] = now
 
@@ -249,7 +247,7 @@ def normalize_shape_data(shape_data: Dict[str, Any], config: Dict[str, Any]) -> 
                 normalized['properties'][key] = value
 
     # Timestamps
-    now = datetime.utcnow().isoformat()
+    now = utcnow().isoformat()
     normalized['created_at'] = shape_data.get('created_at') or now
     normalized['updated_at'] = now
 
@@ -368,7 +366,7 @@ def normalize_map_data(data: Dict[str, Any], config: Dict[str, Any]) -> Dict[str
     normalized['metadata'] = {
         'total_markers': len(normalized.get('markers', [])),
         'total_shapes': len(normalized.get('shapes', [])),
-        'last_modified': datetime.utcnow().isoformat(),
+        'last_modified': utcnow().isoformat(),
         'user_id': data.get('metadata', {}).get('user_id'),
         'session_id': data.get('metadata', {}).get('session_id')
     }

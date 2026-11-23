@@ -233,7 +233,7 @@ def _filter_by_country_iso(results, iso):
             if matched:
                 filtered.append(item)
         except Exception as parse_err:
-            current_app.logger.debug(f"Skipping item idx={idx} due to parse error: {parse_err}")
+            current_app.logger.debug("Skipping item idx=%s due to parse error: %s", idx, parse_err)
             continue
 
     return filtered
@@ -257,10 +257,10 @@ def _validate_query_params(limit_str, end_date_str, max_limit=MAX_LIMIT):
     try:
         limit = int(limit_str)
         if limit < 1 or limit > max_limit:
-            current_app.logger.warning(f"Invalid limit value: {limit}, must be between 1 and {max_limit}")
+            current_app.logger.warning("Invalid limit value: %s, must be between 1 and %s", limit, max_limit)
             return None, None
     except (ValueError, TypeError):
-        current_app.logger.warning(f"Invalid limit format: {limit_str}")
+        current_app.logger.warning("Invalid limit format: %s", limit_str)
         return None, None
 
     # Validate date format (YYYY-MM-DD)
@@ -268,7 +268,7 @@ def _validate_query_params(limit_str, end_date_str, max_limit=MAX_LIMIT):
         try:
             datetime.strptime(end_date_str, '%Y-%m-%d')
         except (ValueError, TypeError):
-            current_app.logger.warning(f"Invalid date format: {end_date_str}, expected YYYY-MM-DD")
+            current_app.logger.warning("Invalid date format: %s, expected YYYY-MM-DD", end_date_str)
             return None, None
 
     return limit, end_date_str
@@ -322,7 +322,7 @@ def create_blueprint():
 
         # Clear plugin cache after settings change
         cleared_count = clear_plugin_cache('emergency_operations')
-        current_app.logger.info(f"Emergency Operations: Cleared {cleared_count} cached entries after settings update")
+        current_app.logger.info("Emergency Operations: Cleared %s cached entries after settings update", cleared_count)
 
         return json_ok(success=True, cache_cleared=cleared_count)
 
@@ -332,10 +332,10 @@ def create_blueprint():
         """Clear plugin cache manually."""
         try:
             cleared_count = clear_plugin_cache('emergency_operations')
-            current_app.logger.info(f"Emergency Operations: Manually cleared {cleared_count} cached entries")
+            current_app.logger.info("Emergency Operations: Manually cleared %s cached entries", cleared_count)
             return json_ok(success=True, cleared_count=cleared_count, message=f'Cleared {cleared_count} cached entries')
         except Exception as e:
-            current_app.logger.error(f"Error clearing cache: {e}")
+            current_app.logger.error("Error clearing cache: %s", e)
             return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/stats', methods=['GET'])
@@ -366,7 +366,7 @@ def create_blueprint():
             return json_ok(success=True, stats=stats)
 
         except Exception as e:
-            current_app.logger.error(f"Error getting emergency operations stats: {e}", exc_info=True)
+            current_app.logger.error("Error getting emergency operations stats: %s", e, exc_info=True)
             return json_server_error('Failed to load statistics', success=False)
 
     @bp.route('/api/list-data', methods=['GET'])
@@ -394,15 +394,15 @@ def create_blueprint():
         # Validate query parameters
         limit, end_date_gt = _validate_query_params(limit_str, end_date_gt, MAX_LIMIT)
         if limit is None:
-            return json_bad_request('Invalid query parameters', success=False, error='Invalid query parameters')
+            return json_bad_request('Invalid query parameters', success=False)
 
         # Parse filters from request (plain filters param or WAF-safe query_b64)
         filters = _emops_filters_from_request()
         if filters:
-            current_app.logger.debug(f"[EmOps List] Parsed filters: {filters}")
+            current_app.logger.debug("[EmOps List] Parsed filters: %s", filters)
 
         try:
-            current_app.logger.debug(f"[EmOps List] Incoming /api/list-data iso={iso} end_date__gte={end_date_gt} limit={limit}")
+            current_app.logger.debug("[EmOps List] Incoming /api/list-data iso=%s end_date__gte=%s limit=%s", iso, end_date_gt, limit)
             timeout_sec = cfg.get('api', {}).get('timeout', 10)
             use_file_cache = cfg.get('data_cache', {}).get('use_file_cache', True)
 
@@ -421,16 +421,16 @@ def create_blueprint():
                     fetch_params=fetch_params,
                 )
             except Exception as fetch_err:
-                current_app.logger.error(f"[EmOps List] appeals fetch failed: {fetch_err}", exc_info=True)
-                return json_error(_format_api_error(fetch_err), 502, success=False, error=_format_api_error(fetch_err))
+                current_app.logger.error("[EmOps List] appeals fetch failed: %s", fetch_err, exc_info=True)
+                return json_error(_format_api_error(fetch_err), 502, success=False)
             if from_cache:
-                current_app.logger.debug(f"[EmOps List] Serving from file cache ({len(results)} records)")
+                current_app.logger.debug("[EmOps List] Serving from file cache (%s records)", len(results))
                 schedule = cfg.get('data_cache', {}).get('schedule', 'off')
                 cached = store.load_cached()
                 if cached and store.is_refresh_due(schedule, cached.get('fetched_at')):
                     current_app.logger.info('[EmOps List] Scheduled refresh due — triggering background update')
                     trigger_background_refresh(_appeals_feed_url(), fetch_params, timeout=timeout_sec)
-            current_app.logger.debug(f"[EmOps List] appeals results total: {len(results)}")
+            current_app.logger.debug("[EmOps List] appeals results total: %s", len(results))
 
             # Tentative end-date overrides (before filters so extended appeals stay visible).
             results = apply_end_date_overrides(results)
@@ -500,7 +500,7 @@ def create_blueprint():
 
             # Apply filters if any
             if filters:
-                current_app.logger.debug(f"[EmOps List] Applying {len(filters)} filters to {len(list_data)} operations")
+                current_app.logger.debug("[EmOps List] Applying %s filters to %s operations", len(filters), len(list_data))
                 current_app.logger.info(
                     "[EmOps List] Filter payload: %s | types before filter: %s",
                     filters,
@@ -555,7 +555,7 @@ def create_blueprint():
                         filtered_data.append(operation)
 
                 list_data = filtered_data
-                current_app.logger.debug(f"[EmOps List] After filtering: {len(list_data)} operations remain")
+                current_app.logger.debug("[EmOps List] After filtering: %s operations remain", len(list_data))
                 current_app.logger.info(
                     "[EmOps List] Types after filter: %s",
                     sorted({op.get('type', '?') for op in list_data}),
@@ -574,8 +574,8 @@ def create_blueprint():
             resp.headers['Cache-Control'] = 'private, max-age=300'
             return resp
         except Exception as e:
-            current_app.logger.error(f"[EmOps List] error fetching GO data: {e}", exc_info=True)
-            return json_error(_format_api_error(e), 502, success=False, error=_format_api_error(e))
+            current_app.logger.error("[EmOps List] error fetching GO data: %s", e, exc_info=True)
+            return json_error(_format_api_error(e), 502, success=False)
 
     @bp.route('/api/operations', methods=['GET'])
     @plugin_route_wrapper('Emergency Operations Plugin')
@@ -625,7 +625,7 @@ def create_blueprint():
 
         limit, end_date_gt = _validate_query_params(limit_str, end_date_gt, MAX_LIMIT)
         if limit is None:
-            return json_bad_request('Invalid query parameters', success=False, error='Invalid query parameters')
+            return json_bad_request('Invalid query parameters', success=False)
 
         display_config = cfg.get('display_defaults', {})
         timeout_sec = cfg.get('api', {}).get('timeout', 10)
@@ -643,8 +643,8 @@ def create_blueprint():
                 fetch_params=fetch_params,
             )
         except Exception as e:
-            current_app.logger.error(f'[EmOps] Live fetch failed: {e}', exc_info=True)
-            return json_error(_format_api_error(e), 502, success=False, error=_format_api_error(e))
+            current_app.logger.error("[EmOps] Live fetch failed: %s", e, exc_info=True)
+            return json_error(_format_api_error(e), 502, success=False)
         if from_cache:
             cached = store.load_cached() or {}
             if store.is_refresh_due(schedule, cached.get('fetched_at')):
@@ -655,7 +655,7 @@ def create_blueprint():
 
         # ── Apply all filters from request params ──────────────────────────────
         results = _apply_filters(results, iso=iso, end_date_gt=end_date_gt, start_date_gte=start_date_gte)
-        current_app.logger.debug(f'[EmOps] After filters: {len(results)} results (iso={iso})')
+        current_app.logger.debug("[EmOps] After filters: %s results (iso=%s)", len(results), iso)
 
         return json_ok(
             success=True,
@@ -706,7 +706,7 @@ def create_blueprint():
                 record_count=result['record_count'],
                 fetched_at_display=status.get('fetched_at_display', ''),
             )
-        return json_error(result.get('error', 'Unknown error'), 502, success=False, error=result.get('error', 'Unknown error'))
+        return json_error(result.get('error', 'Unknown error'), 502, success=False)
 
     @bp.route('/api/data-cache/schedule', methods=['POST'])
     @plugin_admin_route_wrapper('Emergency Operations Plugin')
@@ -716,11 +716,11 @@ def create_blueprint():
         schedule = payload.get('schedule', 'off')
         valid = ('off', 'daily', 'weekly', 'monthly')
         if schedule not in valid:
-            return json_bad_request(f'Invalid schedule; must be one of {valid}', success=False, error=f'Invalid schedule; must be one of {valid}')
+            return json_bad_request(f'Invalid schedule; must be one of {valid}', success=False)
         ok = plugin_config.update_section('data_cache', {'schedule': schedule})
         if ok:
             return json_ok(success=True, schedule=schedule)
-        return json_server_error('Failed to save schedule', success=False, error='Failed to save schedule')
+        return json_server_error('Failed to save schedule', success=False)
 
     @bp.route('/api/data-cache/source', methods=['POST'])
     @plugin_admin_route_wrapper('Emergency Operations Plugin')
@@ -734,7 +734,7 @@ def create_blueprint():
         if ok:
             clear_plugin_cache('emergency_operations')
             return json_ok(success=True, use_file_cache=use_file_cache)
-        return json_server_error('Failed to save data source setting', success=False, error='Failed to save data source setting')
+        return json_server_error('Failed to save data source setting', success=False)
 
     @bp.route('/api/data-cache/preview', methods=['GET'])
     @plugin_admin_route_wrapper('Emergency Operations Plugin')
@@ -879,7 +879,7 @@ def create_blueprint():
             note=payload.get('note') or '',
         )
         if err:
-            return json_bad_request(err, success=False, error=err)
+            return json_bad_request(err, success=False)
         cleared = clear_plugin_cache('emergency_operations')
         store = get_data_store()
         cached = store.load_cached() or {}
@@ -1411,7 +1411,7 @@ def get_emergency_operations_options_handler(country_iso=None, config=None, **kw
                 datetime.strptime(start_date, '%Y-%m-%d')
                 normalized_config['start_date'] = start_date
             except (ValueError, TypeError):
-                current_app.logger.warning(f"[EmOps Handler] Invalid start_date format: {start_date}, ignoring")
+                current_app.logger.warning("[EmOps Handler] Invalid start_date format: %s, ignoring", start_date)
                 normalized_config['start_date'] = None
         else:
             normalized_config['start_date'] = None
@@ -1444,17 +1444,17 @@ def get_emergency_operations_options_handler(country_iso=None, config=None, **kw
                 datetime.strptime(end_date_gt, '%Y-%m-%d')
                 normalized_config['end_date_gt'] = end_date_gt
             except (ValueError, TypeError):
-                current_app.logger.warning(f"[EmOps Handler] Invalid end_date_gt format: {end_date_gt}, using default")
+                current_app.logger.warning("[EmOps Handler] Invalid end_date_gt format: %s, using default", end_date_gt)
                 cfg = plugin_config.get_all_config()
                 query_defaults = cfg.get('query_defaults', {})
                 normalized_config['end_date_gt'] = query_defaults.get('end_date_gt', '2022-12-31')
 
-        current_app.logger.debug(f"[EmOps Handler] Normalized config: {normalized_config}")
+        current_app.logger.debug("[EmOps Handler] Normalized config: %s", normalized_config)
 
         # Get emergency operations data (filtered by country if provided)
         operations_data = get_emergency_operations_data(country_iso=country_iso, config=normalized_config)
 
-        current_app.logger.debug(f"[EmOps Handler] Returning {len(operations_data)} operations after filtering")
+        current_app.logger.debug("[EmOps Handler] Returning %s operations after filtering", len(operations_data))
 
         # Convert to the format expected by the frontend
         rows_data = []
@@ -1483,13 +1483,15 @@ def get_emergency_operations_options_handler(country_iso=None, config=None, **kw
             }
             rows_data.append(row_dict)
 
-        current_app.logger.debug(f"Returning {len(rows_data)} emergency operations" + (f" (filtered by country: {country_iso})" if country_iso else ""))
+        current_app.logger.debug(
+            "Returning %s emergency operations (filtered by country: %s)", len(rows_data), country_iso or "none"
+        )
 
         return json_ok(success=True, rows=rows_data)
 
     except Exception as e:
-        current_app.logger.error(f"Error getting emergency operations options: {e}", exc_info=True)
-        return json_server_error('Failed to fetch emergency operations data', success=False, error='Failed to fetch emergency operations data')
+        current_app.logger.error("Error getting emergency operations options: %s", e, exc_info=True)
+        return json_server_error('Failed to fetch emergency operations data', success=False)
 
 
 def get_emergency_operations_data(country_iso=None, config=None):
@@ -1575,7 +1577,7 @@ def get_emergency_operations_data(country_iso=None, config=None):
             end_date_gt,
         )
 
-        current_app.logger.debug(f"[EmOps Direct] GO results total: {len(results)}")
+        current_app.logger.debug("[EmOps Direct] GO results total: %s", len(results))
 
         # Filter by country ISO if provided
         if country_iso:
@@ -1587,13 +1589,13 @@ def get_emergency_operations_data(country_iso=None, config=None):
                 results = by_iso.get(str(country_iso).upper(), [])
             else:
                 results = _filter_by_country_iso(results, country_iso)
-            current_app.logger.debug(f"[EmOps Direct] Filtered by iso={country_iso}: {len(results)} results")
+            current_app.logger.debug("[EmOps Direct] Filtered by iso=%s: %s results", country_iso, len(results))
 
         if end_date_gt:
             before_end = len(results)
             results = _apply_filters(results, end_date_gt=end_date_gt)
             current_app.logger.debug(
-                f"[EmOps Direct] Filtered by end_date_gt {end_date_gt}: {len(results)} of {before_end} remaining"
+                "[EmOps Direct] Filtered by end_date_gt %s: %s of %s remaining", end_date_gt, len(results), before_end
             )
 
         # Filter by start_date if provided (client-side filtering as backup)
@@ -1620,7 +1622,7 @@ def get_emergency_operations_data(country_iso=None, config=None):
                             try:
                                 item_start_date_obj = datetime.strptime(item_start_date[:10], '%Y-%m-%d')
                             except (ValueError, TypeError):
-                                current_app.logger.debug(f"[EmOps Direct] Could not parse start_date: {item_start_date}")
+                                current_app.logger.debug("[EmOps Direct] Could not parse start_date: %s", item_start_date)
                         elif isinstance(item_start_date, datetime):
                             item_start_date_obj = item_start_date
 
@@ -1632,15 +1634,15 @@ def get_emergency_operations_data(country_iso=None, config=None):
                         filtered_results.append(item)
 
                 results = filtered_results
-                current_app.logger.debug(f"[EmOps Direct] Filtered by start_date {start_date}: {len(results)} of {original_count} remaining")
+                current_app.logger.debug("[EmOps Direct] Filtered by start_date %s: %s of %s remaining", start_date, len(results), original_count)
             except (ValueError, TypeError) as e:
-                current_app.logger.warning(f"[EmOps Direct] Error filtering by start_date {start_date}: {e}")
+                current_app.logger.warning("[EmOps Direct] Error filtering by start_date %s: %s", start_date, e)
 
         # Filter by closed operations status
         if not show_closed_operations:
             original_count = len(results)
             results = [item for item in results if item.get('status') != 'Closed']
-            current_app.logger.debug(f"[EmOps Direct] Filtered out closed operations: {len(results)} of {original_count} remaining")
+            current_app.logger.debug("[EmOps Direct] Filtered out closed operations: %s of %s remaining", len(results), original_count)
 
         # Filter by operation types
         # Only filter if 'All' is not in the list and we have specific types to filter by
@@ -1677,14 +1679,14 @@ def get_emergency_operations_data(country_iso=None, config=None):
                     filtered_results.append(item)
 
             results = filtered_results
-            current_app.logger.debug(f"[EmOps Direct] Filtered by operation types {operation_types}: {len(results)} of {original_count} remaining")
+            current_app.logger.debug("[EmOps Direct] Filtered by operation types %s: %s of %s remaining", operation_types, len(results), original_count)
         elif operation_types and 'All' in operation_types:
-            current_app.logger.debug(f"[EmOps Direct] 'All' selected in operation_types, showing all types")
+            current_app.logger.debug("[EmOps Direct] 'All' selected in operation_types, showing all types")
 
         if direct_cache is not None and cache_key is not None:
             direct_cache[cache_key] = results
         return results
 
     except Exception as e:
-        current_app.logger.error(f"[EmOps Direct] error fetching GO data: {e}", exc_info=True)
+        current_app.logger.error("[EmOps Direct] error fetching GO data: %s", e, exc_info=True)
         raise Exception(_format_api_error(e))

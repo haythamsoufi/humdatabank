@@ -1,6 +1,22 @@
 // Backoffice/plugins/interactive_map/static/js/map_field.js
 import { debugPluginLog, debugPluginError, debugPluginWarn } from '/static/js/forms/modules/debug.js';
 
+// Marker titles/descriptions are user-entered and geocoder results come from third parties, so
+// every value that reaches an HTML string (innerHTML, Leaflet tooltip/popup) goes through this.
+function escapeHtml(value) {
+    const text = String(value == null ? '' : value);
+    if (window.SafeDom && typeof window.SafeDom.escapeHtml === 'function') {
+        return window.SafeDom.escapeHtml(text);
+    }
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
+
 // --- Optional generic host integration hook ---------------------------------
 // The host app's generic plugin loader will call `registerActions(ActionRouter)`
 // if this function is exported. This lets the plugin register its own
@@ -1235,10 +1251,10 @@ export class InteractiveMapField {
         if (shapeData.properties && (shapeData.properties.title || shapeData.properties.description)) {
             let popupContent = '';
             if (shapeData.properties.title) {
-                popupContent += `<h4 class="font-medium">${shapeData.properties.title}</h4>`;
+                popupContent += `<h4 class="font-medium">${escapeHtml(shapeData.properties.title)}</h4>`;
             }
             if (shapeData.properties.description) {
-                popupContent += `<p class="text-sm text-gray-600">${shapeData.properties.description}</p>`;
+                popupContent += `<p class="text-sm text-gray-600">${escapeHtml(shapeData.properties.description)}</p>`;
             }
 
             shape.bindPopup(popupContent).openPopup();
@@ -1655,8 +1671,9 @@ export class InteractiveMapField {
 
     // Helper function to build tooltip content for a marker (used for both hover and click)
     buildMarkerTooltipContent(markerData) {
-        const title = markerData.title || `Marker at ${markerData.lat.toFixed(6)}, ${markerData.lng.toFixed(6)}`;
-        const description = markerData.description ? `<div class="text-gray-600 text-xs mt-1">${markerData.description}</div>` : '';
+        const title = escapeHtml(markerData.title || `Marker at ${markerData.lat.toFixed(6)}, ${markerData.lng.toFixed(6)}`);
+        const description = markerData.description ? `<div class="text-gray-600 text-xs mt-1">${escapeHtml(markerData.description)}</div>` : '';
+        const markerId = escapeHtml(markerData.id);
 
         const actionButtons = this.canEdit ? `
             <div class="flex gap-2 mt-2 pt-2 border-t border-gray-200">
@@ -1664,7 +1681,7 @@ export class InteractiveMapField {
                         class="tooltip-edit-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                         data-action="map:edit-marker"
                         data-field-id="${this.fieldId}"
-                        data-marker-id="${markerData.id}"
+                        data-marker-id="${markerId}"
                         title="Edit marker">
                     <i class="fas fa-pen"></i> Edit
                 </button>
@@ -1672,7 +1689,7 @@ export class InteractiveMapField {
                         class="tooltip-delete-btn px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
                         data-action="map:remove-marker"
                         data-field-id="${this.fieldId}"
-                        data-marker-id="${markerData.id}"
+                        data-marker-id="${markerId}"
                         title="Remove marker">
                     <i class="fas fa-trash"></i> Delete
                 </button>
@@ -1906,12 +1923,12 @@ export class InteractiveMapField {
             <div class="marker-item d-flex justify-content-between align-items-start p-2 border-bottom">
                 <div class="flex-grow-1">
                     <div class="mb-1">
-                        <strong>${marker.title || `Marker ${index + 1}`}</strong>
+                        <strong>${escapeHtml(marker.title || `Marker ${index + 1}`)}</strong>
                     </div>
                     <div class="text-muted small mb-1">
                         <i class="fas fa-map-marker-alt"></i> Lat: ${marker.lat.toFixed(6)}, Lng: ${marker.lng.toFixed(6)}
                     </div>
-                    ${marker.description ? `<div class="text-sm text-muted"><em>${marker.description}</em></div>` : '<div class="text-sm text-muted"><em>No description</em></div>'}
+                    ${marker.description ? `<div class="text-sm text-muted"><em>${escapeHtml(marker.description)}</em></div>` : '<div class="text-sm text-muted"><em>No description</em></div>'}
                 </div>
                 ${this.canEdit ? `
                     <div class="btn-group btn-group-sm ml-2">
@@ -1919,7 +1936,7 @@ export class InteractiveMapField {
                                 class="btn btn-outline-primary btn-sm"
                                 data-action="map:edit-marker"
                                 data-field-id="${this.fieldId}"
-                                data-marker-id="${marker.id}"
+                                data-marker-id="${escapeHtml(marker.id)}"
                                 title="Edit marker">
                             <i class="fas fa-pen"></i>
                         </button>
@@ -1927,7 +1944,7 @@ export class InteractiveMapField {
                                 class="btn btn-outline-danger btn-sm"
                                 data-action="map:remove-marker"
                                 data-field-id="${this.fieldId}"
-                                data-marker-id="${marker.id}"
+                                data-marker-id="${escapeHtml(marker.id)}"
                                 title="Remove marker">
                             <i class="fas fa-times"></i>
                         </button>
@@ -2104,9 +2121,9 @@ export class InteractiveMapField {
             html += `
                 <li class="map-autocomplete-item ${isSelected}"
                     data-index="${index}"
-                    data-lat="${suggestion.lat}"
-                    data-lng="${suggestion.lon}"
-                    data-display-name="${displayName.replace(/"/g, '&quot;')}">
+                    data-lat="${escapeHtml(suggestion.lat)}"
+                    data-lng="${escapeHtml(suggestion.lon)}"
+                    data-display-name="${escapeHtml(displayName)}">
                     <div class="map-autocomplete-item-name">${this.highlightMatch(displayName, searchInput.value)}</div>
                     ${suggestion.address ? `<div class="map-autocomplete-item-details">${this.formatAddress(suggestion.address)}</div>` : ''}
                 </li>
@@ -2168,9 +2185,12 @@ export class InteractiveMapField {
 
     // Method to highlight matching text in suggestions
     highlightMatch(text, query) {
-        if (!query) return text;
-        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-        return text.replace(regex, '<strong>$1</strong>');
+        // Escape first, then wrap matches, so neither the result text nor the query can add markup.
+        const safeText = escapeHtml(text);
+        if (!query) return safeText;
+        const safeQuery = escapeHtml(query);
+        const regex = new RegExp(`(${safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return safeText.replace(regex, '<strong>$1</strong>');
     }
 
     // Method to format address for display
@@ -2186,7 +2206,7 @@ export class InteractiveMapField {
         if (address.country) {
             parts.push(address.country);
         }
-        return parts.join(', ');
+        return escapeHtml(parts.join(', '));
     }
 
     // Method to show autocomplete dropdown

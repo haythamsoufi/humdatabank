@@ -2,7 +2,7 @@
 Comprehensive pytest tests for app/routes/admin/plugin_management.py
 
 Covers plugin listing, info, install/uninstall, activate/deactivate,
-settings management, ZIP upload, static file serving, and settings pages.
+settings management, static file serving, and settings pages.
 """
 import io
 import json
@@ -47,16 +47,6 @@ def _make_plugin_manager(**kwargs):
     pm.get_dependents.return_value = kwargs.get("dependents", [])
     pm.lifecycle_block_reason.return_value = kwargs.get("block_reason", None)
     return pm
-
-
-def _make_valid_zip(plugin_name="test_plugin"):
-    """Create a minimal valid plugin ZIP archive in memory."""
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        zf.writestr("plugin.py", "# plugin")
-        zf.writestr("plugin.json", json.dumps({"name": plugin_name, "version": "1.0.0"}))
-    buf.seek(0)
-    return buf.read()
 
 
 # ---------------------------------------------------------------------------
@@ -537,195 +527,6 @@ class TestPluginSettings:
         _assert_status(resp, 200, 302, 500)
 
 
-# ---------------------------------------------------------------------------
-# upload_plugin  POST /admin/api/plugins/<plugin_name>/upload
-# ---------------------------------------------------------------------------
-
-class TestUploadPlugin:
-    @pytest.fixture(autouse=True)
-    def _upload_enabled(self, app):
-        app.config["PLUGIN_UPLOAD_ENABLED"] = True
-        yield
-        app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
-
-    def test_no_file(self, logged_in_sm_client, db_session, app):
-        pm = _make_plugin_manager()
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post("/admin/api/plugins/test_plugin/upload")
-        _assert_status(resp, 200, 302, 400)
-        if resp.status_code == 200:
-            data = _get_json(resp)
-            assert not data.get("success")
-
-    def test_empty_filename(self, logged_in_sm_client, db_session, app):
-        pm = _make_plugin_manager()
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(b""), "")},
-                content_type="multipart/form-data",
-            )
-        _assert_status(resp, 200, 302, 400)
-
-    def test_non_zip_file(self, logged_in_sm_client, db_session, app):
-        pm = _make_plugin_manager()
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(b"hello"), "plugin.txt")},
-                content_type="multipart/form-data",
-            )
-        _assert_status(resp, 200, 302, 400)
-
-    def test_invalid_zip_magic_bytes(self, logged_in_sm_client, db_session, app):
-        pm = _make_plugin_manager()
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(b"not-a-zip-file"), "plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        _assert_status(resp, 200, 302, 400)
-
-    def test_valid_zip_wrong_plugin_name(self, logged_in_sm_client, db_session, app, tmp_path):
-        zip_data = _make_valid_zip("wrong_plugin")
-        pm = _make_plugin_manager(install_result=True)
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(zip_data), "plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        _assert_status(resp, 200, 302, 400)
-
-    def test_valid_zip_name_match_install_success(self, logged_in_sm_client, db_session, app, tmp_path):
-        zip_data = _make_valid_zip("test_plugin")
-        pm = _make_plugin_manager(install_result=True, plugin_directories=[tmp_path])
-        pm.scan_for_new_plugins.return_value = ["test_plugin"]
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(zip_data), "test_plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        assert resp.status_code == 200, resp.data
-        assert _get_json(resp)["plugin_id"] == "test_plugin"
-        assert (tmp_path / "test_plugin" / "plugin.py").exists()
-        assert (tmp_path / "test_plugin" / "__init__.py").exists()
-        pm.install_plugin.assert_called_once_with("test_plugin")
-
-    def test_archive_that_does_not_load_is_removed(self, logged_in_sm_client, db_session, app, tmp_path):
-        pm = _make_plugin_manager(plugin_directories=[tmp_path])
-        pm.scan_for_new_plugins.return_value = []
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(_make_valid_zip("test_plugin")), "p.zip")},
-                content_type="multipart/form-data",
-            )
-        assert resp.status_code == 400
-        assert not (tmp_path / "test_plugin").exists()
-        pm.install_plugin.assert_not_called()
-
-    def test_already_installed_plugin_is_rejected(self, logged_in_sm_client, db_session, app, tmp_path):
-        pm = _make_plugin_manager(plugins_by_id={"test_plugin": object()}, plugin_directories=[tmp_path])
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(_make_valid_zip("test_plugin")), "p.zip")},
-                content_type="multipart/form-data",
-            )
-        assert resp.status_code == 400
-        assert not (tmp_path / "test_plugin").exists()
-
-    def test_generic_install_endpoint_uses_manifest_plugin_id(self, logged_in_sm_client, db_session, app, tmp_path):
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as zf:
-            zf.writestr("bundle/plugin.py", "# plugin")
-            zf.writestr("bundle/plugin.json", json.dumps({"plugin_id": "from_manifest"}))
-        pm = _make_plugin_manager(plugin_directories=[tmp_path])
-        pm.scan_for_new_plugins.return_value = ["from_manifest"]
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/install",
-                data={"plugin_package": (io.BytesIO(buf.getvalue()), "bundle.zip")},
-                content_type="multipart/form-data",
-            )
-        assert resp.status_code == 200, resp.data
-        assert (tmp_path / "from_manifest" / "plugin.py").exists()
-
-    def test_install_endpoint_requires_package_field(self, logged_in_sm_client, db_session, app):
-        pm = _make_plugin_manager()
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post("/admin/api/plugins/install")
-        assert resp.status_code == 400
-
-    def test_file_too_large(self, logged_in_sm_client, db_session, app):
-        pm = _make_plugin_manager()
-        # Create a zip that reports a large size via seek
-        large_buf = MagicMock()
-        large_buf.filename = "plugin.zip"
-        large_buf.tell.return_value = 200 * 1024 * 1024  # 200MB - over limit
-        large_buf.seek.return_value = None
-        large_buf.read.return_value = b""
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(b"PK\x03\x04" + b"x" * 100), "plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        # File size check happens after reading - just ensure no crash
-        _assert_status(resp, 200, 302, 400)
-
-    def test_missing_required_files_in_zip(self, logged_in_sm_client, db_session, app, tmp_path):
-        # Create a zip without plugin.py
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as zf:
-            zf.writestr("README.md", "# Plugin")
-        buf.seek(0)
-        zip_data = buf.read()
-        pm = _make_plugin_manager()
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(zip_data), "plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        _assert_status(resp, 200, 302, 400)
-
-    def test_invalid_plugin_json(self, logged_in_sm_client, db_session, app, tmp_path):
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as zf:
-            zf.writestr("plugin.py", "# plugin")
-            zf.writestr("plugin.json", "not valid json {{{")
-        buf.seek(0)
-        zip_data = buf.read()
-        pm = _make_plugin_manager()
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(zip_data), "plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        _assert_status(resp, 200, 302, 400)
-
-    def test_valid_zip_install_failure_rolls_back(self, logged_in_sm_client, db_session, app, tmp_path):
-        pm = _make_plugin_manager(install_result=False, plugin_directories=[tmp_path])
-        pm.scan_for_new_plugins.return_value = ["test_plugin"]
-        with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(_make_valid_zip("test_plugin")), "test_plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        assert resp.status_code == 400
-        pm.uninstall_plugin.assert_called_once_with("test_plugin")
-
-
-# ---------------------------------------------------------------------------
-# plugin_management_page  GET /admin/plugins/
-# ---------------------------------------------------------------------------
-
 class TestPluginManagementPage:
     def test_get(self, logged_in_client, db_session, app):
         plugins = [{"name": "p1", "version": "1.0"}]
@@ -875,18 +676,14 @@ class TestServePluginStatic:
 # ---------------------------------------------------------------------------
 
 class TestPluginCodeChangesAreSystemManagerOnly:
-    @pytest.mark.parametrize("action", ["install", "uninstall", "upload"])
+    @pytest.mark.parametrize("action", ["install", "uninstall"])
     def test_plugin_manager_admin_is_denied(self, logged_in_client, db_session, app, action):
         pm = _make_plugin_manager()
-        app.config["PLUGIN_UPLOAD_ENABLED"] = True
-        try:
-            with patch.object(app, "plugin_manager", pm):
-                resp = logged_in_client.post(
-                    f"/admin/api/plugins/my_plugin/{action}",
-                    headers={"Accept": "application/json"},
-                )
-        finally:
-            app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.post(
+                f"/admin/api/plugins/my_plugin/{action}",
+                headers={"Accept": "application/json"},
+            )
         assert resp.status_code == 403
         pm.install_plugin.assert_not_called()
         pm.uninstall_plugin.assert_not_called()
@@ -897,59 +694,15 @@ class TestPluginCodeChangesAreSystemManagerOnly:
             assert logged_in_client.get("/admin/api/plugins/").status_code == 200
             assert logged_in_client.post("/admin/api/plugins/my_plugin/activate").status_code == 200
 
-    def test_upload_kill_switch_defaults_to_disabled(self, logged_in_sm_client, db_session, app):
+    @pytest.mark.parametrize(
+        "path", ["/admin/api/plugins/install", "/admin/api/plugins/test_plugin/upload"]
+    )
+    def test_runtime_plugin_upload_routes_do_not_exist(self, logged_in_sm_client, db_session, app, path):
+        """Plugins ship with the core image; there is no ZIP install/upload endpoint."""
         pm = _make_plugin_manager()
-        app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
-        with patch.object(app, "plugin_manager", pm), patch.dict("os.environ", {}, clear=False):
-            import os
-            os.environ.pop("PLUGIN_UPLOAD_ENABLED", None)
-            resp = logged_in_sm_client.post(
-                "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(_make_valid_zip()), "plugin.zip")},
-                content_type="multipart/form-data",
-            )
-        assert resp.status_code == 403
-        pm.install_plugin.assert_not_called()
-
-    @pytest.mark.parametrize("bad_name", ["..", "Bad-Name", "a" * 80])
-    def test_upload_rejects_invalid_plugin_names(self, logged_in_sm_client, db_session, app, bad_name):
-        pm = _make_plugin_manager()
-        app.config["PLUGIN_UPLOAD_ENABLED"] = True
-        try:
-            with patch.object(app, "plugin_manager", pm):
-                resp = logged_in_sm_client.post(
-                    f"/admin/api/plugins/{bad_name}/upload",
-                    data={"plugin_file": (io.BytesIO(_make_valid_zip(bad_name)), "plugin.zip")},
-                    content_type="multipart/form-data",
-                )
-        finally:
-            app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
-        assert resp.status_code in (400, 404)
-        pm.install_plugin.assert_not_called()
-
-    def test_upload_rejects_symlink_entries(self, logged_in_sm_client, db_session, app, tmp_path):
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as zf:
-            zf.writestr("plugin.py", "# plugin")
-            zf.writestr("plugin.json", json.dumps({"name": "test_plugin"}))
-            link = zipfile.ZipInfo("static/link")
-            link.external_attr = 0o120777 << 16
-            zf.writestr(link, "/etc/passwd")
-        pm = _make_plugin_manager(plugin_directories=[tmp_path])
-        app.config["PLUGIN_UPLOAD_ENABLED"] = True
-        app.config["PLUGINS_DIR"] = str(tmp_path)
-        try:
-            with patch.object(app, "plugin_manager", pm):
-                resp = logged_in_sm_client.post(
-                    "/admin/api/plugins/test_plugin/upload",
-                    data={"plugin_file": (io.BytesIO(buf.getvalue()), "plugin.zip")},
-                    content_type="multipart/form-data",
-                )
-        finally:
-            app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
-            app.config.pop("PLUGINS_DIR", None)
-        assert resp.status_code == 400
-        assert not (tmp_path / "test_plugin" / "static" / "link").exists()
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post(path, data={"plugin_file": "x"})
+        assert resp.status_code in (404, 405)
         pm.install_plugin.assert_not_called()
 
 
@@ -1150,3 +903,5 @@ class TestManagementPageMarkup:
         assert "custom-fields-count" not in html
         assert '"details_homepage": "Homepage"' in html  # no translation in the default locale
         assert '"error_failed_activate"' in html and '"error_failed_deactivate"' in html
+        assert 'id="install-plugin-btn"' not in html
+        assert 'id="plugin-package-input"' not in html

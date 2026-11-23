@@ -131,7 +131,7 @@ def fdrs_settings_status() -> Dict[str, Any]:
     try:
         years_start, years_end = fdrs_default_years_bounds()
     except Exception:
-        pass
+        current_app.logger.warning("FDRS default year bounds unavailable", exc_info=True)
     return {
         "template_id": FDRS_TEMPLATE_ID,
         "sync_script_available": fdrs_sync_script_available(),
@@ -478,7 +478,7 @@ def run_data_sync(template_id: int):
     except HTTPException:
         raise
     except (ValueError, RuntimeError) as e:
-        current_app.logger.error(f"Data sync error: {e}", exc_info=True)
+        current_app.logger.error("Data sync error: %s", e, exc_info=True)
         msg = str(e).strip() or "Sync failed."
         return json_bad_request(msg[:2000] if len(msg) > 2000 else msg)
     except Exception as e:

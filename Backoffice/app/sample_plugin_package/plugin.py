@@ -1,8 +1,7 @@
 """Minimal sample plugin for the Humanitarian Databank.
 
-Starter template. Upload the ZIP from the admin plugin management page (needs
-PLUGIN_UPLOAD_ENABLED and the System Manager role), or extract it to
-Backoffice/plugins/sample_plugin/ and restart the application.
+Starter template. Copy this folder to Backoffice/plugins/<plugin_id>/ and restart
+the application. Plugins ship with the core image; there is no runtime upload.
 """
 from typing import Any, Dict, List
 

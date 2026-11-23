@@ -7,14 +7,12 @@ Minimal starter plugin for the Humanitarian Databank.
 - **plugin.py** - Minimal `BasePlugin` subclass (no custom field types).
 - **routes.py** - Blueprint with the mandatory settings page, `GET /admin/plugins/sample_plugin/settings`, guarded by `plugin_admin_route_wrapper`.
 - **templates/settings.html** - Settings page (core layout, page header, plugin info card).
-- **plugin.json** - Manifest read when the ZIP is uploaded. `plugin_id` must match `plugin_id` in `plugin.py`.
+- **plugin.json** - Plugin manifest. `plugin_id` must match `plugin_id` in `plugin.py`.
 - **__init__.py** - Makes the folder an importable Python package.
 
 ## How to use
 
-1. Install it, either:
-   - Upload the ZIP on **Admin > Plugins** (requires `PLUGIN_UPLOAD_ENABLED=true` and the System Manager role; the archive is imported as Python code, so only upload plugins you trust), or
-   - Extract it to `Backoffice/plugins/sample_plugin/` and restart the application, then use **Install**.
+1. Copy this folder to `Backoffice/plugins/<plugin_id>/` (plugins are never uploaded at runtime; they ship in the image), rename it, and restart the application, then use **Install**.
 2. Activate the plugin from the plugin management page.
 3. Use it as a template: add field types, blueprints or settings by following the plugins under `Backoffice/plugins/` (for example `emergency_operations`, `interactive_map`).
 

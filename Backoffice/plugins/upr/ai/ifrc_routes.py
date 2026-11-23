@@ -537,13 +537,13 @@ def list_ifrc_api_documents():
             data = response.json()
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
-                logger.error(f"IFRC API authentication failed: {e}", exc_info=True)
+                logger.error("IFRC API authentication failed: %s", e, exc_info=True)
                 return json_auth_required('External document API authentication failed. Please check credentials.')
             else:
-                logger.error(f"IFRC API HTTP error: {e}", exc_info=True)
+                logger.error("IFRC API HTTP error: %s", e, exc_info=True)
                 return json_error(f'External document API error: {e.response.status_code} - {e.response.text[:200]}', e.response.status_code)
         except requests.exceptions.RequestException as e:
-            logger.error(f"IFRC API request failed: {e}", exc_info=True)
+            logger.error("IFRC API request failed: %s", e, exc_info=True)
             return json_server_error(GENERIC_ERROR_MESSAGE)
 
         if not isinstance(data, list):
@@ -662,7 +662,7 @@ def list_ifrc_api_documents():
         )
 
     except Exception as e:
-        logger.error(f"IFRC API list error: {e}", exc_info=True)
+        logger.error("IFRC API list error: %s", e, exc_info=True)
         return json_server_error(GENERIC_ERROR_MESSAGE)
 
 
@@ -845,7 +845,7 @@ def import_ifrc_api_document():
             )
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to download from IFRC API: {e}", exc_info=True)
+            logger.error("Failed to download from IFRC API: %s", e, exc_info=True)
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
@@ -862,7 +862,7 @@ def import_ifrc_api_document():
             raise
 
     except Exception as e:
-        logger.error(f"IFRC API import error: {e}", exc_info=True)
+        logger.error("IFRC API import error: %s", e, exc_info=True)
         return json_server_error(GENERIC_ERROR_MESSAGE)
 
 

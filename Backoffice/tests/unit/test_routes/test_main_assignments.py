@@ -219,6 +219,91 @@ class TestReopenAssignmentPage:
 
 
 # ===========================================================================
+# POST /approve_assignment_page/<aes_id>/<page_id>
+# ===========================================================================
+
+class TestApproveAssignmentPage:
+    def test_unauthenticated_redirects_to_login(self, client, db_session, app):
+        resp = client.post("/approve_assignment_page/1/2")
+        assert_redirect(resp)
+        assert "login" in (resp.headers.get("Location") or "").lower()
+
+    def test_no_permission_redirects_to_assignment(self, client, db_session, app, admin_user):
+        aes = create_test_assignment_entity_status(db_session, status="submitted")
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_approve_assignment_page", return_value=False):
+            resp = client.post(
+                f"/approve_assignment_page/{aes.id}/1", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+    def test_one_page_stays_submitted_until_every_page_is_validated(self, client, db_session, app, admin_user):
+        from app.models import FormPage, FormSection
+        from app.models.assignments import AssignmentPageStatus
+        from app.models.enums import AssignmentEntityStatusValue, AssignmentSectionStatusValue
+
+        aes = create_test_assignment_entity_status(db_session, status="submitted")
+        aes.assigned_form.enable_page_submission = True
+        template = aes.assigned_form.template
+        version_id = template.published_version_id
+        p1 = FormPage(template_id=template.id, version_id=version_id, name="Page A", order=1)
+        p2 = FormPage(template_id=template.id, version_id=version_id, name="Page B", order=2)
+        db_session.add_all([p1, p2])
+        db_session.commit()
+        db_session.add_all([
+            FormSection(
+                template_id=template.id, version_id=version_id, name="A", order=1,
+                page_id=p1.id, section_type="standard", archived=False,
+            ),
+            FormSection(
+                template_id=template.id, version_id=version_id, name="B", order=2,
+                page_id=p2.id, section_type="standard", archived=False,
+            ),
+            AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p1.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ),
+            AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p2.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ),
+        ])
+        db_session.commit()
+
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_approve_assignment_page", return_value=True), \
+             patch(f"{_NOTIF_CORE}.notify_assignment_approved") as notify:
+            resp = client.post(
+                f"/approve_assignment_page/{aes.id}/{p1.id}", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+        notify.assert_not_called()
+
+        db_session.refresh(aes)
+        row1 = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_page_id=p1.id
+        ).one()
+        row2 = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_page_id=p2.id
+        ).one()
+        assert row1.status == AssignmentSectionStatusValue.approved.value
+        assert row2.status == AssignmentSectionStatusValue.submitted.value
+        assert aes.status == AssignmentEntityStatusValue.submitted
+
+        with patch(f"{_AUTH_SVC}.can_approve_assignment_page", return_value=True), \
+             patch(f"{_NOTIF_CORE}.notify_assignment_approved") as notify_all:
+            resp = client.post(
+                f"/approve_assignment_page/{aes.id}/{p2.id}", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+        notify_all.assert_called_once()
+        db_session.refresh(aes)
+        assert aes.status == AssignmentEntityStatusValue.approved
+
+
+# ===========================================================================
 # POST /return_assignment_page/<aes_id>/<page_id>
 # ===========================================================================
 

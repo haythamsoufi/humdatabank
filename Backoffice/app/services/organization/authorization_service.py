@@ -1392,6 +1392,18 @@ class AuthorizationService:
         return AuthorizationService.has_rbac_permission(user, "assignment.approve", scope=scope)
 
     @staticmethod
+    def can_approve_assignment_page(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
+        """True when the user may validate one submitted page."""
+        if not user or not user.is_authenticated:
+            return False
+        if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
+            return False
+        from app.services.assignments.page_submission_service import is_page_submission_enabled
+        if not is_page_submission_enabled(assignment_entity_status):
+            return False
+        return AuthorizationService.can_approve_assignment(assignment_entity_status, user)
+
+    @staticmethod
     def can_reopen_assignment(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
         """
         Check if user can reopen an assignment.

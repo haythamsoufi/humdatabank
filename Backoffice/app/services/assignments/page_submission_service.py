@@ -313,6 +313,34 @@ def reset_page_status(
     return _set_status(row, AssignmentSectionStatusValue.in_progress, user_id)
 
 
+def mark_page_approved(
+    assignment_entity_status_id: int,
+    form_page_id: int,
+    user_id: int | None = None,
+) -> AssignmentPageStatus | None:
+    """Approve one submitted page. Other pages are left as they are."""
+    row = AssignmentPageStatus.query.filter_by(
+        assignment_entity_status_id=assignment_entity_status_id,
+        form_page_id=form_page_id,
+    ).first()
+    if not row or status_value(row.status) != AssignmentSectionStatusValue.submitted.value:
+        return None
+    return _set_status(row, AssignmentSectionStatusValue.approved, user_id)
+
+
+def all_participating_pages_approved(assignment_entity_status, all_sections: Iterable) -> bool:
+    pages = participating_page_ids(all_sections)
+    if not pages:
+        return False
+    rows = AssignmentPageStatus.query.filter(
+        AssignmentPageStatus.assignment_entity_status_id == assignment_entity_status.id,
+        AssignmentPageStatus.form_page_id.in_(pages),
+        AssignmentPageStatus.status == AssignmentSectionStatusValue.approved.value,
+    ).all()
+    approved_ids = {int(row.form_page_id) for row in rows}
+    return all(page_id in approved_ids for page_id in pages)
+
+
 def mark_page_requires_revision(
     assignment_entity_status_id: int,
     form_page_id: int,

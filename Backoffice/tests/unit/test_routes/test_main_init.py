@@ -54,6 +54,7 @@ class TestInjectRbacHelpersReturnValue:
         expected_keys = {
             "has_permission",
             "can_approve_assignment",
+            "can_approve_assignment_page",
             "can_reopen_assignment",
             "can_reopen_assignment_page",
             "can_reopen_closed_assignment",

@@ -26,6 +26,18 @@
         {% endif %}
     </div>
     <div class="sidebar-scope-actions__locked{% if not _locked %} hidden{% endif %}">
+        {% if can_approve_assignment_page(assignment_status) and _wf == 'submitted' %}
+        <button type="submit"
+                form="approve-page-form-{{ assignment_status.id }}-{{ _scope_id }}"
+                class="btn btn-success btn-sm approve-page-btn"
+                title="{{ _('Validate this page')|forceescape }}"
+                data-confirm-title="{{ _('Validate Page?')|forceescape }}"
+                data-confirm-label="{{ _('Validate')|forceescape }}"
+                data-confirm-message="{{ _('Validate this page? Other pages stay as they are. The assignment is approved only when every page is validated.')|forceescape }}">
+            <i class="fas fa-check-double" aria-hidden="true"></i>
+            <span>{{ _('Validate') }}</span>
+        </button>
+        {% endif %}
         {% if can_return_assignment_page(assignment_status) and _wf in scoped_revision_statuses %}
         <button type="submit"
                 form="return-page-form-{{ assignment_status.id }}-{{ _scope_id }}"

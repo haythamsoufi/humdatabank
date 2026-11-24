@@ -331,6 +331,92 @@ def return_assignment_page_for_revision(aes_id, page_id):
     return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
 
+@bp.route("/approve_assignment_page/<int:aes_id>/<int:page_id>", methods=["POST"])
+@login_required
+def approve_assignment_page(aes_id, page_id):
+    """Validate one submitted page. The assignment is approved only when every page is."""
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.assignments.page_submission_service import (
+        all_participating_pages_approved,
+        is_page_submission_enabled,
+        load_published_sections,
+        mark_page_approved,
+    )
+
+    assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
+    if not AuthorizationService.can_approve_assignment_page(assignment_entity_status, current_user):
+        flash(_("You do not have permission to validate this page."), "danger")
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
+
+    form = ApproveAssignmentForm()
+    if not form.validate_on_submit():
+        flash(_("Invalid request. Please try again."), "danger")
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
+
+    if not is_page_submission_enabled(assignment_entity_status):
+        flash(_("Per-page submission is not enabled for this assignment."), "warning")
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
+
+    current_status = assignment_entity_status.status
+    if hasattr(current_status, "value"):
+        current_status = current_status.value
+    if current_status == AssignmentEntityStatusValue.cancelled.value:
+        flash(_("This assignment is cancelled and cannot be validated."), "warning")
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
+
+    try:
+        transition = begin_aes_transition(
+            assignment_entity_status,
+            current_user,
+            permission=AuthorizationService.can_approve_assignment_page,
+        )
+        if not transition.ok:
+            return _reject_transition(
+                transition,
+                _("You do not have permission to validate this page."),
+                endpoint="assignments.view_assignment",
+                aes_id=aes_id,
+            )
+        row = mark_page_approved(aes_id, page_id, current_user.id)
+        if row is None:
+            flash(_("That page has not been submitted."), "warning")
+            return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
+
+        sections = load_published_sections(assignment_entity_status.assigned_form)
+        assignment_approved = False
+        rolled_status = assignment_entity_status.status
+        if hasattr(rolled_status, "value"):
+            rolled_status = rolled_status.value
+        if all_participating_pages_approved(assignment_entity_status, sections):
+            if rolled_status != AssignmentEntityStatusValue.approved.value:
+                apply_entity_status_change(
+                    assignment_entity_status,
+                    AssignmentEntityStatusValue.approved,
+                    current_user.id,
+                    sync_scoped=False,
+                )
+                assignment_approved = True
+        db.session.flush()
+        if assignment_approved:
+            try:
+                from app.services.notification.core import notify_assignment_approved
+                notify_assignment_approved(assignment_entity_status)
+            except Exception as e:
+                current_app.logger.error(
+                    "Error sending assignment approved notification: %s", e, exc_info=True
+                )
+            flash(_("All pages are validated. The assignment has been approved."), "success")
+        else:
+            flash(_("Page validated. Other pages stay as they are."), "success")
+    except Exception as e:
+        request_transaction_rollback()
+        flash(_("Error validating page."), "danger")
+        current_app.logger.error(
+            "Error validating page %s on assignment %s: %s", page_id, aes_id, e, exc_info=True
+        )
+    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
+
+
 # NEW: Route to handle approving an assignment
 @bp.route("/approve_assignment/<int:aes_id>", methods=["POST"])
 @login_required

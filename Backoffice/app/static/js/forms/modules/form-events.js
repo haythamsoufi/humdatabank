@@ -382,7 +382,7 @@ export function initFormEvents() {
   });
 
   document.querySelectorAll(
-    '.sidebar-scope-actions .reopen-section-btn, .sidebar-scope-actions .reopen-page-btn, .sidebar-scope-actions .return-section-btn, .sidebar-scope-actions .return-page-btn'
+    '.sidebar-scope-actions .approve-page-btn, .sidebar-scope-actions .reopen-section-btn, .sidebar-scope-actions .reopen-page-btn, .sidebar-scope-actions .return-section-btn, .sidebar-scope-actions .return-page-btn'
   ).forEach((button) => {
     if (button.dataset.confirmHandlerBound === 'true') return;
     button.dataset.confirmHandlerBound = 'true';

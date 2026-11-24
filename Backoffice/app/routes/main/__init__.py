@@ -26,6 +26,14 @@ def inject_rbac_helpers():
             current_app.logger.debug("can_approve_assignment failed: %s", e)
             return False
 
+    def can_approve_assignment_page(aes):
+        """Check if current user can validate one submitted page."""
+        try:
+            return AuthorizationService.can_approve_assignment_page(aes, current_user)
+        except Exception as e:
+            current_app.logger.debug("can_approve_assignment_page failed: %s", e)
+            return False
+
     def can_reopen_assignment(aes):
         """Check if current user can reopen an assignment"""
         try:
@@ -85,6 +93,7 @@ def inject_rbac_helpers():
     return dict(
         has_permission=has_permission,
         can_approve_assignment=can_approve_assignment,
+        can_approve_assignment_page=can_approve_assignment_page,
         can_reopen_assignment=can_reopen_assignment,
         can_reopen_assignment_page=can_reopen_assignment_page,
         can_reopen_closed_assignment=can_reopen_closed_assignment,

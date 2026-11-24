@@ -156,6 +156,7 @@ PUBLIC_SUBMISSION_ACTION_AUDIT_ENDPOINTS: dict[str, str] = {
 # Dedicated assignment POSTs keep a main.* Flask name; show the assignments.* action.
 DEDICATED_ASSIGNMENT_AUDIT_ENDPOINTS: dict[str, str] = {
     "main.approve_assignment": "assignments.approve_assignment",
+    "main.approve_assignment_page": "assignments.approve_assignment",
     "main.reopen_assignment": "assignments.reopen_assignment",
     "main.reopen_assignment_page": "assignments.reopen_assignment",
     "main.return_assignment_for_revision": "assignments.return_assignment_for_revision",

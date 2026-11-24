@@ -367,8 +367,14 @@ class FormDataService(
 
             # Availability flags are handled during field processing; skip redundant pass
 
-            # Update assignment status if needed
-            if assignment_entity_status.status == AssignmentEntityStatusValue.pending:
+            # Update assignment status if needed. Public submissions keep their own
+            # review status (pending/approved/rejected): both enums are ``str`` enums, so
+            # ``PublicSubmissionStatus.pending == AssignmentEntityStatusValue.pending`` is
+            # true, and ``in_progress`` is not a valid public submission status.
+            if (
+                not is_public_submission
+                and assignment_entity_status.status == AssignmentEntityStatusValue.pending
+            ):
                 assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
                 try:
                     from flask_login import current_user as _progress_user

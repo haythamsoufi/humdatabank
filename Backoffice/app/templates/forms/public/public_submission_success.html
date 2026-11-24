@@ -4,6 +4,30 @@
 {% from "components/_page_header.html" import page_header %}
 {% block content %}
 
+{% if public_form_theme is defined and public_form_theme %}
+{# Themed public link: the theme's banner replaces the back-office page header (see app/services/public/form_themes.py). #}
+{% set assignment = submission.assigned_form %}
+{% if public_form_theme.hero_template %}{% include public_form_theme.hero_template %}{% endif %}
+<div class="theme-message">
+    <div class="theme-message__icon theme-message__icon--success">
+        <i class="fas fa-check-circle fa-5x" aria-hidden="true"></i>
+    </div>
+    <h2 class="text-2xl font-semibold mb-4">{{ _('Submission Successful!') }}</h2>
+    <p class="mb-6">{{ _('Thank you for submitting the form. Your data has been received.') }}</p>
+    <div class="flex flex-col items-center space-y-4">
+        <a href="{{ url_for('main.download_submission_pdf', submission_id=submission.id) }}"
+           class="btn btn-primary">
+            <i class="fas fa-file-pdf mr-2"></i>
+            {{ _('Download PDF Copy') }}
+        </a>
+        <p class="text-sm">
+            <i class="fas fa-info-circle mr-1"></i>
+            {{ _('You can download a PDF copy of your submission for your records') }}
+        </p>
+    </div>
+</div>
+{% else %}
+
 {{ page_header(
     title=title,
     icon='fas fa-check-circle',
@@ -34,4 +58,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

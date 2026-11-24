@@ -1,0 +1,25 @@
+{# Banner for the "16 Days of Activism against Gender-based Violence" public form theme.
+   Included by entry_form.html when the assignment uses this theme. The stylesheet is
+   css/public-form-themes/16-days-of-activism.css (it also owns the entrance animations). #}
+{% set _hero_title = assignment.display_name if (assignment is defined and assignment) else title %}
+<div class="theme-progress" aria-hidden="true"><span></span></div>
+<header class="theme-hero" role="banner">
+    {# Decorative awareness ribbon, drawn in on load. #}
+    <svg class="theme-hero__ribbon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <path pathLength="1" d="M18 60C26 46 42 34 44 18C45 8 38 4 32 4C26 4 19 8 20 18C22 34 38 46 46 60"/>
+    </svg>
+    <div class="theme-hero__inner">
+        <div class="theme-hero__top">
+            <p class="theme-hero__campaign">
+                <i class="fas fa-ribbon" aria-hidden="true"></i>
+                <span>{{ _('16 Days of Activism against Gender-based Violence') }}</span>
+            </p>
+            {% include "forms/public/themes/_language_switcher.html" %}
+        </div>
+        <p class="theme-hero__dates">{{ _('25 November – 10 December') }}</p>
+        <h1 class="theme-hero__title">{{ _hero_title }}</h1>
+        <div class="theme-hero__days" aria-hidden="true">
+            {% for _day in range(16) %}<span style="--i: {{ loop.index0 }}"></span>{% endfor %}
+        </div>
+    </div>
+</header>

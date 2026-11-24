@@ -373,6 +373,12 @@
                 {% endif %}
             </div>
             {{ form.period_name(class="hidden") }}
+            <div id="template-period-duplicate-warning"
+                 class="hidden mt-3 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                 role="alert" aria-live="polite">
+                <i class="fas fa-exclamation-triangle mt-0.5 text-amber-500"></i>
+                <span data-role="message"></span>
+            </div>
             {% for error in form.period_name.errors %}
                 <p class="mt-2 text-red-500 text-xs italic">{{ error }}</p>
             {% endfor %}
@@ -618,7 +624,11 @@
                 {% set public_count = assignment.country_statuses.filter_by(is_public_available=True).count() %}
                 <p class="text-xs text-gray-600">
                     <i class="fas fa-flag mr-1 text-gray-400"></i>
-                    <span class="font-medium">{{ public_count }}</span> / {{ total_countries }} {{ _('countries enabled for public submission') }}
+                    {% if total_countries == 0 %}
+                        {{ _('Not country-specific: the public form accepts submissions without a country.') }}
+                    {% else %}
+                        <span class="font-medium">{{ public_count }}</span> / {{ total_countries }} {{ _('countries enabled for public submission') }}
+                    {% endif %}
                 </p>
             {% else %}
                 <p class="text-sm text-gray-400 italic py-2">{{ _('Not generated') }}</p>
@@ -628,6 +638,29 @@
                         data-next="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) }}">
                     <i class="fas fa-link mr-1"></i>{{ _('Generate Public URL') }}
                 </button>
+            {% endif %}
+
+            {% if form.public_collect_submitter_info is defined %}
+            <div class="flex items-start gap-3 mt-4" id="assignment-public-collect-submitter-info-row">
+                <div class="pt-0.5">
+                    {{ form.public_collect_submitter_info(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="public_collect_submitter_info") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.public_collect_submitter_info.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Submitter Information section on the public form and require a name and email. Turn this off for anonymous submissions. The country choice is still shown when the form is country-specific.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.public_form_theme is defined %}
+            <div class="mt-4 max-w-xl" id="assignment-public-form-theme-row">
+                {{ form.public_form_theme.label(class="block text-sm font-medium text-gray-800 mb-1", for="public_form_theme") }}
+                {{ form.public_form_theme(id="public_form_theme", class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
+                <p class="mt-1 text-xs text-gray-500">{{ _('Give the public link a look that matches an occasion or campaign. A theme replaces the back-office navigation on the public page with its own banner. The form fields and answers are not affected.') }}</p>
+                {% for error in form.public_form_theme.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
             {% endif %}
         </div>
         {% endif %}
@@ -1305,7 +1338,7 @@ window.manageAssignmentConfig = {
         nsHierarchyBase: {{ url_for('user_management.get_ns_hierarchy')|tojson }},
         secretariatHierarchy: {{ url_for('user_management.get_secretariat_hierarchy')|tojson }},
         secretariatRegionsHierarchy: {{ url_for('user_management.get_secretariat_regions_hierarchy')|tojson }},
-        templateOwnedByBase: {{ url_for('form_builder.get_template_owned_by', template_id=99999)|replace('/99999', '')|tojson }},
+        templateOwnedByBase: {{ url_for('form_builder.get_template_owned_by', template_id=99999)|replace('/99999/owned-by', '')|tojson }},
         copyConfig: {{ url_for('assignment_management.assignment_copy_config', assignment_id=99999)|tojson }},
         {% if assignment %}
         assignmentBulkRemove: {{ url_for('assignment_management.bulk_remove_entities_from_assignment', assignment_id=assignment.id)|tojson }},
@@ -1326,6 +1359,8 @@ window.manageAssignmentConfig = {
         publicReporting: {{ _('Public reporting')|tojson }},
         createAnyway: {{ _('Create anyway')|tojson }},
         duplicateAssignment: {{ _('Duplicate assignment')|tojson }},
+        templatePeriodTaken: {{ _('An assignment already exists for this template and period (ID {id}). Pick a different period or template.')|tojson }},
+        templatePeriodTakenRestricted: {{ _('An assignment already exists for this template and period. Pick a different period or template.')|tojson }},
         createAssignment: {{ _('Create assignment')|tojson }},
         continueBtn: {{ _('Continue')|tojson }},
         confirmNoNotifyTitle: {{ _('Create without notifications?')|tojson }},

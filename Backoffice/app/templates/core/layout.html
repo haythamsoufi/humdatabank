@@ -2,6 +2,8 @@
 {% from "components/_profile_icon.html" import profile_icon, profile_icon_button, profile_icon_tooltip %}
 {% from "components/_mobile_language_menu.html" import mobile_language_nav_button, mobile_language_modal %}
 {% set _ui_language = current_ui_language() %}
+{# Public form pages pass public_form_theme (see app/services/public/form_themes.py); None for every other page. #}
+{% set _public_form_theme = public_form_theme|default(none) %}
 <!DOCTYPE html>
 <html lang="{{ _ui_language }}" dir="{{ 'rtl' if (_ui_language or '')[:2] == 'ar' else 'ltr' }}"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
 <head>
@@ -244,6 +246,12 @@
     <script type="module" src="{{ static_url('js/chatbot/main.js') }}"></script>
     {% endif %}
     {% block extra_css %}{% endblock %}
+    {# Last, so the theme can restyle the form CSS loaded above. #}
+    {% if _public_form_theme %}
+    {% if _public_form_theme.theme_color %}<meta name="theme-color" content="{{ _public_form_theme.theme_color }}">{% endif %}
+    <link rel="stylesheet" href="{{ static_url(_public_form_theme.base_stylesheet) }}">
+    <link rel="stylesheet" href="{{ static_url(_public_form_theme.stylesheet) }}">
+    {% endif %}
 </head>
 {% set is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set is_focal_point = current_user.is_authenticated and current_user_has_role('assignment_editor_submitter') %}
@@ -255,7 +263,7 @@
 {# Use centralized is_admin_user helper from AuthorizationService #}
 {% set is_admin_user = is_admin_user() %}
 {% set can_manage_users = is_system_manager or has_permission('admin.users.edit') %}
-<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}{% if can_manage_users %} user-hover-details-enabled{% endif %}" data-language="{{ _ui_language }}" data-chat-websocket-enabled="{{ 'true' if chat_websocket_enabled|default(false) else 'false' }}">
+<body class="bg-gray-100 font-sans {% if _public_form_theme %}public-form-themed public-form-theme-{{ _public_form_theme.key|replace('_', '-') }} {% endif %}{% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}{% if can_manage_users %} user-hover-details-enabled{% endif %}" data-language="{{ _ui_language }}" data-chat-websocket-enabled="{{ 'true' if chat_websocket_enabled|default(false) else 'false' }}">
     {% include 'components/_staging_environment_banner.html' %}
     {% block outer_body %}
     <div class="flex h-screen staging-app-shell">

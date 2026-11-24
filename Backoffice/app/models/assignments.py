@@ -12,7 +12,7 @@ SUBMISSION_REVIEW_RECIPIENT_MODES = frozenset({
     SUBMISSION_REVIEW_RECIPIENT_FDS,
     SUBMISSION_REVIEW_RECIPIENT_SPECIFIC,
 })
-from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, JSON, and_, or_, Table
+from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, JSON, and_, or_, Table, true
 from sqlalchemy.orm import relationship, backref, foreign
 from sqlalchemy import and_
 from ..extensions import db
@@ -172,6 +172,16 @@ class AssignedForm(db.Model):
     # Off until an admin opts in, including assignments that already exist.
     enable_offline_download = Column(Boolean, default=False, nullable=False)
 
+    # Public form: ask the submitter for their name and email. On by default so
+    # existing public links keep behaving as before.
+    public_collect_submitter_info = Column(
+        Boolean, default=True, nullable=False, server_default=true()
+    )
+
+    # Public form: key of a visual theme from app/services/public/form_themes.py
+    # (e.g. a campaign look). None means the standard form.
+    public_form_theme = Column(String(50), nullable=True)
+
     # Optional override for the assignment's display name.
     # When None the UI falls back to "<template name> – <period>".
     custom_name = Column(String(200), nullable=True)
@@ -319,6 +329,16 @@ class AssignedForm(db.Model):
             if country:
                 result.append(country)
         return result
+
+    @property
+    def is_public_country_scoped(self) -> bool:
+        """True when this assignment is rolled out to countries.
+
+        Country-scoped public links make the submitter pick one of the countries
+        enabled for public submission. An assignment with no country rows at all
+        (a survey or other general form) takes public submissions without a country.
+        """
+        return self.country_statuses.first() is not None
 
     def add_country(self, country):
         """Add a country to this assignment by creating an AssignmentEntityStatus entry."""
@@ -669,7 +689,8 @@ class PublicSubmission(db.Model):
     __tablename__ = 'public_submission'
     id = db.Column(db.Integer, primary_key=True)
     assigned_form_id = db.Column(db.Integer, db.ForeignKey('assigned_form.id'), nullable=True)
-    country_id = db.Column(db.Integer, db.ForeignKey('country.id'), nullable=False)
+    # NULL for public links that are not country-specific (surveys, general forms).
+    country_id = db.Column(db.Integer, db.ForeignKey('country.id'), nullable=True)
     submitted_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     status = db.Column(
         Enum(

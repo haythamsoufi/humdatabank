@@ -217,6 +217,18 @@ class TestLanguageDisplayName:
             assert result is not None
         language_display_name.cache_clear()
 
+    def test_implicit_locale_follows_a_later_language_switch(self, app):
+        """A name resolved for English must not stick after the UI language changes."""
+        from app.utils.i18n.language_names import language_display_name
+        language_display_name.cache_clear()
+        with app.test_request_context("/"):
+            from flask import session
+            session["language"] = "en"
+            assert language_display_name("fa") == "Persian"
+            session["language"] = "ar"
+            assert language_display_name("fa") == "الفارسية"
+        language_display_name.cache_clear()
+
 
 @pytest.mark.unit
 class TestCurrentUiLocale:

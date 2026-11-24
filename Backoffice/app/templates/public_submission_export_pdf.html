@@ -13,10 +13,12 @@
         <div class="form-section">
             <div class="form-section-title">{{ _('Submitter Information') }}</div>
             <div class="space-y-4">
+                {% if (country_form and country_form.country_id and country_form.country_id.data) or (submission and submission.country) %}
                 <div class="form-group">
                     <span class="form-item-label">{{ _('Country') }}</span>
-                    <div class="form-item-input">{{ country_form.country_id.data.name if country_form and country_form.country_id and country_form.country_id.data else (submission.country.name if submission and submission.country else '') }}</div>
+                    <div class="form-item-input">{{ country_form.country_id.data.name if country_form and country_form.country_id and country_form.country_id.data else submission.country.name }}</div>
                 </div>
+                {% endif %}
                 <div class="form-group">
                     <span class="form-item-label">{{ _('Name') }}</span>
                     <div class="form-item-input">{{ form.name.data if form and form.name else '' }}</div>

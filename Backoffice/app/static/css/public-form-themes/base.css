@@ -1,0 +1,58 @@
+/*
+ * Shared rules for every themed public form (body.public-form-themed).
+ *
+ * A theme replaces the back-office shell: no top navigation, no admin sidebar, no
+ * assistant or floating menus. The shell elements stay in the DOM (page scripts
+ * look them up), they are only hidden. Each theme stylesheet loads after this
+ * file and owns the colours, banner and form styling.
+ *
+ * See app/services/public/form_themes.py for how a theme is registered.
+ */
+
+body.public-form-themed #appTopNav,
+body.public-form-themed #adminSidebar,
+body.public-form-themed #mobileMenuFAB,
+body.public-form-themed #mobileMenuScrim,
+body.public-form-themed #mobileFloatingMenu,
+body.public-form-themed #aiChatbotFAB,
+body.public-form-themed #aiChatWidget,
+body.public-form-themed #translationReviewFAB {
+  display: none !important;
+}
+
+/* No admin sidebar, so no offset for it (left in LTR, right in RTL). */
+body.public-form-themed #mainContent,
+body.public-form-themed #mainContent.content-with-sidebar,
+body.public-form-themed #mainContent.content-with-collapsed-sidebar,
+html[dir="rtl"] body.public-form-themed #mainContent,
+html[dir="rtl"] body.public-form-themed #mainContent.content-with-sidebar,
+html[dir="rtl"] body.public-form-themed #mainContent.content-with-collapsed-sidebar {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
+}
+
+/* The scroll area no longer sits under a 3.5rem navigation bar. */
+body.public-form-themed .admin-scroll-main {
+  max-height: 100vh;
+  max-height: 100dvh;
+}
+
+/*
+ * The page container and the form root are full width, with no padding, so a
+ * theme can run its banner edge to edge and set its own reading width.
+ * !important: layout.css / forms.css set padding on these ids per sidebar state
+ * and per breakpoint.
+ */
+body.public-form-themed #pageContentContainer,
+body.public-form-themed #mainContent.content-with-sidebar #pageContentContainer,
+body.public-form-themed #mainContent.content-with-collapsed-sidebar #pageContentContainer,
+body.public-form-themed #pageContentContainer:has(.entry-form-root) {
+  max-width: 100% !important;
+  padding: 0 0 2rem !important;
+}
+
+body.public-form-themed #entry-form-root {
+  padding-left: 0;
+  padding-right: 0;
+}

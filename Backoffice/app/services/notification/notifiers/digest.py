@@ -186,15 +186,23 @@ def notify_public_submission_received(public_submission):
     """Notify org admins and/or system managers when a public submission is received."""
     try:
         country_eid = public_submission.country_id
-        if not country_eid:
-            current_app.logger.debug("Public submission has no country — skipping admin notifications")
-            return []
+        if country_eid:
+            admin_user_ids = collect_entity_admin_audience_recipient_ids(
+                NotificationType.public_submission_received,
+                "country",
+                int(country_eid),
+            )
+        else:
+            # Not tied to a country (survey / general form): there is no entity admin scope,
+            # so only system managers can be told, and only if that audience toggle is on.
+            from app.services.notification.audience import get_system_manager_user_ids
+            from app.services.platform.app_settings_service import audience_bucket_enabled
 
-        admin_user_ids = collect_entity_admin_audience_recipient_ids(
-            NotificationType.public_submission_received,
-            "country",
-            int(country_eid),
-        )
+            admin_user_ids = (
+                get_system_manager_user_ids()
+                if audience_bucket_enabled(NotificationType.public_submission_received, "system_managers")
+                else []
+            )
         if not admin_user_ids:
             current_app.logger.debug("No recipients for public submission admin notification")
             return []
@@ -203,7 +211,7 @@ def notify_public_submission_received(public_submission):
 
         template_name = 'Unknown Template'
         assignment_title = template_name
-        country_name = 'Unknown Country'
+        country_name = None
         if public_submission.assigned_form and public_submission.assigned_form.template_id:
             template = FormTemplate.query.get(public_submission.assigned_form.template_id)
             if template:
@@ -215,19 +223,25 @@ def notify_public_submission_received(public_submission):
         if public_submission.country:
             country_name = public_submission.country.name
 
+        message_params = {
+            'template': template_name,
+            'assignment_title': assignment_title,
+            'submitter': public_submission.submitter_name or public_submission.submitter_email or 'Unknown'
+        }
+        if country_name:
+            message_key = 'notification.public_submission_received.message'
+            message_params['country'] = country_name
+        else:
+            message_key = 'notification.public_submission_received.message_no_country'
+
         # Create notifications for all admins
         return create_notification(
             user_ids=admin_user_ids,
             notification_type=NotificationType.public_submission_received,
             title_key='notification.public_submission_received.title',
             title_params=None,
-            message_key='notification.public_submission_received.message',
-            message_params={
-                'template': template_name,
-                'assignment_title': assignment_title,
-                'country': country_name,
-                'submitter': public_submission.submitter_name or public_submission.submitter_email or 'Unknown'
-            },
+            message_key=message_key,
+            message_params=message_params,
         entity_type='country' if public_submission.country_id else None,
         entity_id=public_submission.country_id if public_submission.country_id else None,
             related_object_type='public_submission',

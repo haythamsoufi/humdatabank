@@ -167,6 +167,16 @@ def secure_join_filename(folder_rel: str | None, filename: str) -> str:
     return name
 
 
+def public_submission_storage_entity(country_id: int | None) -> tuple[str, int]:
+    """``(entity_type, entity_id)`` storage prefix for a public submission's documents.
+
+    Public submissions are filed under their country. One with no country (a survey or
+    other general form) uses ``country/0``: the entity-repo layout only recognises
+    ``EntityType`` prefixes, and id ``0`` never matches a real country.
+    """
+    return "country", int(country_id or 0)
+
+
 def save_submission_document(
     file_storage,
     assignment_id: int,

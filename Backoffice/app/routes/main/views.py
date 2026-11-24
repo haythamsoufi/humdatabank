@@ -246,7 +246,7 @@ def download_submission_pdf(submission_id):
     # Generate HTML using the exact template
     html_content = render_template(
         'public_submission_export_pdf.html',
-        title=f"Submission Details - {submission.country.name}",
+        title=f"Submission Details - {submission.country.name if submission.country else (submission.submitter_name or submission.submitter_email or submission.id)}",
         form=form,
         country_form=country_form,
         sections=organized_sections,

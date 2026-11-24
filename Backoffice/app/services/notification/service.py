@@ -385,6 +385,7 @@ class NotificationService:
         'notification.deadline_reminder.message',
         'notification.validation_questions.title',
         'notification.public_submission_received.message',
+        'notification.public_submission_received.message_no_country',
     })
 
     _ACTOR_NAME_KEYS = frozenset({

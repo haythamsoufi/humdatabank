@@ -22,17 +22,21 @@
             max-width: 500px; /* Limit the width of the message container */
         }
     </style>
+    {% if public_form_theme is defined and public_form_theme %}
+    {# Themed public link (see app/services/public/form_themes.py): same colours as the form. #}
+    <link rel="stylesheet" href="{{ static_url(public_form_theme.stylesheet) }}">
+    {% endif %}
 </head>
-<body{% if show_staging_banner %} class="has-staging-banner"{% endif %}>
+<body class="{% if public_form_theme is defined and public_form_theme %}public-form-themed public-form-theme-{{ public_form_theme.key|replace('_', '-') }} {% endif %}{% if show_staging_banner %}has-staging-banner{% endif %}">
     {% include 'components/_staging_environment_banner.html' %}
     <div class="container mx-auto px-4 py-6">
-        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 text-center">
-            <div class="text-red-500 mb-4">
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 text-center{% if public_form_theme is defined and public_form_theme %} theme-message{% endif %}">
+            <div class="text-red-500 mb-4{% if public_form_theme is defined and public_form_theme %} theme-message__icon{% endif %}">
                 <i class="fas fa-exclamation-circle fa-5x"></i> {# Large warning icon #}
             </div>
-            <h2 class="text-2xl font-semibold mb-4 text-gray-700">Form Expired</h2>
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">{{ title or _('Form Unavailable') }}</h2>
             <p class="text-gray-700">
-                This form is no longer available.
+                {{ message or _('This form is no longer available.') }}
             </p>
             <p class="text-gray-700 mt-2">
                 {{ _('Please contact your') }} {{ ORG_NAME }} {{ _('focal point for assistance.') }}

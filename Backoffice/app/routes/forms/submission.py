@@ -21,6 +21,7 @@ from app.services.organization.authorization_service import AuthorizationService
 from app.services.organization.entity_service import EntityService
 from app.services.forms.data_service import FormDataService
 from app.services.forms.processing_service import get_form_items_for_section, slugify_age_group
+from app.services.public.form_themes import public_form_theme_for_assignment
 from app.utils.api.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.common.constants import SELF_REPORT_PERIOD_NAME
@@ -57,6 +58,20 @@ def _stale_form_message():
         "This form was updated while you were working on it. Reload the page to get the "
         "latest version; your unsaved changes on this page could not be saved."
     )
+
+
+def _submission_country_suffix(submission) -> str:
+    """`` for <country>`` for flash messages, or an empty string for country-less submissions."""
+    country = getattr(submission, "country", None)
+    return f" for {country.name}" if country else ""
+
+
+def _submission_title_label(submission) -> str:
+    """Country name, or the submitter, when a public submission has no country."""
+    country = getattr(submission, "country", None)
+    if country:
+        return country.name
+    return submission.submitter_name or submission.submitter_email or f"#{submission.id}"
 
 
 def _authorize_public_submission(submission, action, *, as_json=False):
@@ -103,7 +118,7 @@ def register_submission_routes(bp):
             try:
                 submission.status = PublicSubmissionStatus.approved
                 db.session.flush()
-                flash(f"Public Submission for {submission.country.name} approved.", "success")
+                flash(f"Public Submission{_submission_country_suffix(submission)} approved.", "success")
             except Exception as e:
                 request_transaction_rollback()
                 flash("An error occurred. Please try again.", "danger")
@@ -125,7 +140,7 @@ def register_submission_routes(bp):
             try:
                 submission.status = PublicSubmissionStatus.rejected
                 db.session.flush()
-                flash(f"Public Submission for {submission.country.name} rejected.", "success")
+                flash(f"Public Submission{_submission_country_suffix(submission)} rejected.", "success")
             except Exception as e:
                 request_transaction_rollback()
                 flash("An error occurred. Please try again.", "danger")
@@ -145,7 +160,7 @@ def register_submission_routes(bp):
 
         if csrf_form.validate_on_submit():
             try:
-                country_name = submission.country.name if submission.country else 'N/A'
+                country_suffix = _submission_country_suffix(submission)
 
                 from app.services.platform import storage_service as _ss
                 for doc in submission.submitted_documents:
@@ -174,7 +189,7 @@ def register_submission_routes(bp):
 
                 db.session.delete(submission)
                 db.session.flush()
-                flash(f"Public Submission for {country_name} deleted successfully.", "success")
+                flash(f"Public Submission{country_suffix} deleted successfully.", "success")
 
                 return redirect(url_for("main.dashboard"))
 
@@ -207,7 +222,7 @@ def register_submission_routes(bp):
                 if new_status in ['pending', 'approved', 'rejected']:
                     submission.status = getattr(PublicSubmissionStatus, new_status)
                     db.session.flush()
-                    flash(f"Public Submission for {submission.country.name} status updated to {new_status}.", "success")
+                    flash(f"Public Submission{_submission_country_suffix(submission)} status updated to {new_status}.", "success")
                     return {"success": True, "message": "Status updated successfully"}
                 else:
                     return json_bad_request("Invalid status value", success=False)
@@ -268,7 +283,8 @@ def register_submission_routes(bp):
             abort(404)
         return render_template("forms/public/public_submission_success.html",
                                title="Submission Successful",
-                               submission=submission)
+                               submission=submission,
+                               public_form_theme=public_form_theme_for_assignment(submission.assigned_form))
 
     @bp.route("/public-submission/<int:submission_id>/success", methods=["GET"])
     def public_submission_success_legacy(submission_id):
@@ -368,9 +384,9 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
             self.assigned_form = assigned_form
             self.country = country
             self.status = "Public Submission"
-            self.country_id = country.id
-            self.entity_type = "country"
-            self.entity_id = country.id
+            self.country_id = country.id if country else None
+            self.entity_type = "country" if country else None
+            self.entity_id = country.id if country else None
 
     dummy_acs = DummyACS(submission.id, submission.assigned_form, submission.country)
 
@@ -480,7 +496,15 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
     sorted_countries = sorted(submission.assigned_form.public_countries, key=lambda c: c.name)
     country_choices = [(c.id, c.name) for c in sorted_countries]
     country_select_form.country_id.choices = country_choices
-    country_select_form.country_id.data = submission.country.id
+    country_select_form.country_id.data = submission.country.id if submission.country else None
+
+    # Keep showing name/email for stored submissions that have them, even if the
+    # assignment stopped asking later.
+    collect_submitter_info = bool(
+        submission.assigned_form.public_collect_submitter_info
+        or submission.submitter_name
+        or submission.submitter_email
+    )
 
     submission_details_form = DummySubmissionDetailsForm()
     submission_details_form.submitter_name.data = submission.submitter_name
@@ -494,7 +518,10 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
         else:
             available_indicators_by_section[section.id] = []
 
-    for page in FormPage.query.filter_by(template_id=form_template.id, version_id=form_template.published_version_id).order_by(FormPage.order).all():
+    published_pages = FormPage.query.filter_by(
+        template_id=form_template.id, version_id=form_template.published_version_id
+    ).order_by(FormPage.order).all()
+    for page in published_pages:
         page.display_name = get_localized_page_name(page)
 
     page_ids_processed = set()
@@ -516,9 +543,9 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
     template_structure.sections = all_sections
 
     if can_edit:
-        title = f"Edit Submission: {submission.country.name} - {submission.submitted_at.strftime('%Y-%m-%d %H:%M')}"
+        title = f"Edit Submission: {_submission_title_label(submission)} - {submission.submitted_at.strftime('%Y-%m-%d %H:%M')}"
     else:
-        title = f"View Submission: {submission.country.name} - {submission.submitted_at.strftime('%Y-%m-%d %H:%M')}"
+        title = f"View Submission: {_submission_title_label(submission)} - {submission.submitted_at.strftime('%Y-%m-%d %H:%M')}"
 
     form_features = build_entry_form_features(all_sections, form_template)
 
@@ -527,6 +554,9 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
                          assignment=submission.assigned_form,
                          assignment_status=dummy_acs,
                          template_structure=template_structure,
+                         sections=[s for s in all_sections if s.parent_section_id is None],
+                         all_sections=all_sections,
+                         published_pages=published_pages,
                          form=csrf_form,
                          csrf_form=csrf_form,
                          existing_data=existing_data_processed,
@@ -552,8 +582,12 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
                          is_public_submission=True,
                          form_version_id=form_template.published_version_id,
                          can_return_for_revision=False,
+                         can_send_for_review=False,
+                         can_finalize_submit=bool(can_edit),
                          country_select_form=country_select_form,
                          submission_details_form=submission_details_form,
+                         collect_submitter_info=collect_submitter_info,
+                         show_submitter_section=bool(collect_submitter_info or country_choices),
                          form_features=form_features,
                          plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
                          form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None)
@@ -581,7 +615,8 @@ def _fill_public_form_impl(public_token):
     if not assigned_form.is_public_active:
         return render_template("forms/public/public_form_unavailable.html",
                                title="Form Unavailable",
-                               message="This form is currently not active.")
+                               message="This form is currently not active.",
+                               public_form_theme=public_form_theme_for_assignment(assigned_form))
 
     if not assigned_form.is_public_submission_allowed:
         if not assigned_form.is_active:
@@ -590,20 +625,29 @@ def _fill_public_form_impl(public_token):
             message = _("This form is closed.")
         return render_template("forms/public/public_form_unavailable.html",
                                title=_("Form Unavailable"),
-                               message=message)
+                               message=message,
+                               public_form_theme=public_form_theme_for_assignment(assigned_form))
 
     form_template = assigned_form.template
     sections = FormSection.query.filter_by(template_id=form_template.id, version_id=form_template.published_version_id).order_by(FormSection.order).all()
 
     from wtforms import SelectField, StringField, EmailField, SubmitField
-    from wtforms.validators import DataRequired, Email
+    from wtforms.validators import DataRequired, Email, Optional
+
+    # Admins can turn off the Submitter Information (name and email) on the assignment.
+    collect_submitter_info = bool(assigned_form.public_collect_submitter_info)
 
     class PublicCountrySelectForm(FlaskForm):
         country_id = SelectField("Select Your Country", coerce=int, validators=[DataRequired()])
 
     class PublicSubmissionDetailsForm(FlaskForm):
-        submitter_name = StringField("Your Name", validators=[DataRequired()])
-        submitter_email = EmailField("Your Email", validators=[DataRequired(), Email()])
+        submitter_name = StringField(
+            "Your Name", validators=[DataRequired()] if collect_submitter_info else [Optional()]
+        )
+        submitter_email = EmailField(
+            "Your Email",
+            validators=[DataRequired(), Email()] if collect_submitter_info else [Optional()],
+        )
         submit = SubmitField("Submit Form")
 
     class DummyACS:
@@ -644,11 +688,17 @@ def _fill_public_form_impl(public_token):
 
     country_choices = [(c.id, c.name) for c in sorted_countries]
 
-    if not country_choices:
-        current_app.logger.warning(f"Public form link {public_token} has no countries assigned.")
+    # Assignments rolled out to countries make the submitter pick one of the countries
+    # enabled for public submission. Assignments with no country rows (surveys, general
+    # forms) take submissions without a country.
+    country_required = assigned_form.is_public_country_scoped
+
+    if country_required and not country_choices:
+        current_app.logger.warning(f"Public form link {public_token} has no countries enabled for public submission.")
         return render_template("forms/public/public_form_unavailable.html",
                                title="Form Unavailable",
-                               message="This form is not configured for any countries.")
+                               message="This form is not open for submissions in any country yet.",
+                               public_form_theme=public_form_theme_for_assignment(assigned_form))
 
     country_select_form = PublicCountrySelectForm()
     country_select_form.country_id.choices = country_choices
@@ -672,7 +722,9 @@ def _fill_public_form_impl(public_token):
         current_app.logger.debug(f"Submission form valid: {submission_valid}")
         current_app.logger.debug(f"Submission form errors: {submission_details_form.errors}")
 
-        country_valid = country_select_form.country_id.validate(country_select_form)
+        country_valid = (
+            country_select_form.country_id.validate(country_select_form) if country_required else True
+        )
         current_app.logger.debug(f"Country form valid: {country_valid}")
         current_app.logger.debug(f"Country form errors: {country_select_form.errors}")
 
@@ -688,20 +740,27 @@ def _fill_public_form_impl(public_token):
             return redirect(url_for("forms.fill_public_form", public_token=public_token))
 
         if csrf_valid and submission_valid and country_valid:
-            selected_country_id = country_select_form.country_id.data
-            selected_country = Country.query.get(selected_country_id)
+            selected_country = None
+            country_selection_ok = True
+            if country_required:
+                selected_country = Country.query.get(country_select_form.country_id.data)
+                country_selection_ok = bool(
+                    selected_country and selected_country in assigned_form.public_countries
+                )
 
-            valid_countries = assigned_form.public_countries
-
-            if not selected_country or selected_country not in valid_countries:
+            if not country_selection_ok:
                 flash("Invalid country selection during submission.", "danger")
             else:
                 try:
                     submission = PublicSubmission(
                         assigned_form_id=assigned_form.id,
-                        country_id=selected_country.id,
-                        submitter_name=submission_details_form.submitter_name.data,
-                        submitter_email=submission_details_form.submitter_email.data,
+                        country_id=selected_country.id if selected_country else None,
+                        submitter_name=(
+                            submission_details_form.submitter_name.data if collect_submitter_info else None
+                        ),
+                        submitter_email=(
+                            submission_details_form.submitter_email.data if collect_submitter_info else None
+                        ),
                         status=PublicSubmissionStatus.pending
                     )
                     db.session.add(submission)
@@ -796,7 +855,10 @@ def _fill_public_form_impl(public_token):
 
     section_statuses = {section.name: 'Not Started' for section in sections}
 
-    for page in FormPage.query.filter_by(template_id=form_template.id, version_id=form_template.published_version_id).order_by(FormPage.order).all():
+    published_pages = FormPage.query.filter_by(
+        template_id=form_template.id, version_id=form_template.published_version_id
+    ).order_by(FormPage.order).all()
+    for page in published_pages:
         page.display_name = get_localized_page_name(page)
 
     page_ids_processed = set()
@@ -826,6 +888,9 @@ def _fill_public_form_impl(public_token):
                            assignment=assigned_form,
                            assignment_status=assignment_status,
                            template_structure=form_template,
+                           sections=[s for s in sections if s.parent_section_id is None],
+                           all_sections=sections,
+                           published_pages=published_pages,
                            form=submission_details_form,
                            csrf_form=csrf_form,
                            existing_data={},
@@ -847,11 +912,16 @@ def _fill_public_form_impl(public_token):
                            get_localized_indicator_unit=get_localized_indicator_unit,
                            get_localized_template_name=get_localized_template_name,
                            is_public_submission=True,
+                           public_form_theme=public_form_theme_for_assignment(assigned_form),
                            is_preview_mode=False,
                            form_version_id=form_template.published_version_id,
                            can_return_for_revision=False,
+                           can_send_for_review=False,
+                           can_finalize_submit=True,
                            country_select_form=country_select_form,
                            submission_details_form=submission_details_form,
+                           collect_submitter_info=collect_submitter_info,
+                           show_submitter_section=bool(collect_submitter_info or country_choices),
                            public_token=public_token,
                            form_action=url_for('forms.fill_public_form', public_token=public_token),
                            form_features=form_features,

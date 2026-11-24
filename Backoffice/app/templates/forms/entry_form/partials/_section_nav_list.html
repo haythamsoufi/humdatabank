@@ -1,13 +1,13 @@
 {# Side navigation section list (included inside #sidebar-nav-scroll) #}
 {% set _page_mode = enable_page_submission|default(false) %}
 <ul class="sidebar-nav-list space-y-2 px-6">
-    {% if is_public_submission %}
+    {% if is_public_submission and show_submitter_section|default(true) %}
         <li>
             <a href="#submitter-information-section"
                class="section-link group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150 ease-in-out"
                data-section-id="submitter-information-section" data-page-number="{{ 1 }}">
                 <i class="far fa-circle section-status-icon flex-shrink-0 w-4 h-4 text-gray-400" aria-hidden="true"></i>
-                <span class="truncate min-w-0 flex-1">{{ _('Submitter Information') }}</span>
+                <span class="truncate min-w-0 flex-1">{{ _('Submitter Information') if collect_submitter_info|default(true) else _('Country') }}</span>
             </a>
         </li>
     {% endif %}

@@ -207,7 +207,7 @@ def replace_submitted_document_file(document, file_storage) -> tuple[bool, list[
     from app.routes.admin.content_management import _standalone_entity_for_library_paths
     from app.services.platform import storage_service as storage
     from app.utils.common.datetime_helpers import utcnow
-    from app.utils.files.file_paths import save_submission_document
+    from app.utils.files.file_paths import public_submission_storage_entity, save_submission_document
 
     new_filename = secure_filename(file_storage.filename or "")
     file_ext = os.path.splitext(new_filename)[1].lower()
@@ -286,6 +286,7 @@ def replace_submitted_document_file(document, file_storage) -> tuple[bool, list[
             entity_id=replace_aes.entity_id,
         )
     elif document.public_submission_id and document.form_item_id:
+        public_et, public_eid = public_submission_storage_entity(ps_for_replace.country_id)
         new_rel_path = save_submission_document(
             file_storage,
             0,
@@ -293,8 +294,8 @@ def replace_submitted_document_file(document, file_storage) -> tuple[bool, list[
             is_public=True,
             form_id=ps_for_replace.assigned_form_id,
             submission_id=ps_for_replace.id,
-            entity_type="country",
-            entity_id=ps_for_replace.country_id,
+            entity_type=public_et,
+            entity_id=public_eid,
         )
     else:
         et_slug, eid = library_entity

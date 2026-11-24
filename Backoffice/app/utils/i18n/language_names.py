@@ -93,20 +93,35 @@ def language_endonym(code: Optional[str]) -> Optional[str]:
     return None
 
 
-@lru_cache(maxsize=4096)
 def language_display_name(code: Optional[str], viewer_locale: Optional[str] = None) -> Optional[str]:
     """Return the language name as seen by the current viewer.
 
     When *viewer_locale* is ``'en'`` (default / most common), this gives
     English names: ``'fr'`` → ``'French'``, ``'ar'`` → ``'Arabic'``.
 
+    The viewer locale is part of the cache key. Resolving it inside the
+    cache would keep the first request's language for every later one.
+
     Falls back to :func:`language_endonym` if Babel cannot resolve the
     combination.
     """
+    viewer = _normalize_lang_code(viewer_locale) or _current_ui_locale()
+    return _language_display_name_for_viewer(code, viewer)
+
+
+def _clear_language_display_name_cache() -> None:
+    _language_display_name_for_viewer.cache_clear()
+
+
+language_display_name.cache_clear = _clear_language_display_name_cache  # type: ignore[attr-defined]
+
+
+@lru_cache(maxsize=4096)
+def _language_display_name_for_viewer(code: Optional[str], viewer: str) -> Optional[str]:
     base = _normalize_lang_code(code)
     if not base:
         return None
-    viewer = _normalize_lang_code(viewer_locale) or _current_ui_locale()
+    viewer = _normalize_lang_code(viewer) or "en"
     unknown_to_babel = False
     try:
         from babel import Locale

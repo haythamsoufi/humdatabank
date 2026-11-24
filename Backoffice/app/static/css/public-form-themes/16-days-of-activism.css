@@ -1,0 +1,704 @@
+/*
+ * Public form theme: 16 Days of Activism against Gender-based Violence.
+ * Orange campaign look (25 November - 10 December).
+ *
+ * Loaded after forms.css and public-form-themes/base.css, only on pages whose
+ * assignment uses this theme (body.public-form-theme-16-days-of-activism).
+ * Registered in app/services/public/form_themes.py.
+ */
+
+body.public-form-theme-16-days-of-activism {
+  /* Palette (Tailwind orange scale). */
+  --theme-50: #fff7ed;
+  --theme-100: #ffedd5;
+  --theme-200: #fed7aa;
+  --theme-300: #fdba74;
+  --theme-500: #f97316;
+  --theme-600: #ea580c;
+  --theme-700: #c2410c;
+  --theme-800: #9a3412;
+  --theme-900: #7c2d12;
+
+  /* Global button colours (theme.css): every .btn-primary / .btn-success follows. */
+  --btn-primary: var(--theme-700);
+  --btn-primary-hover: var(--theme-800);
+  --btn-primary-active: var(--theme-900);
+  --btn-primary-focus: rgba(234, 88, 12, 0.3);
+  --btn-success: var(--theme-700);
+  --btn-success-hover: var(--theme-800);
+  --btn-success-active: var(--theme-900);
+  --btn-success-focus: rgba(234, 88, 12, 0.3);
+
+  background: var(--theme-50);
+  color: #431407;
+}
+
+body.public-form-theme-16-days-of-activism main.admin-scroll-main {
+  background:
+    radial-gradient(circle at 100% 0, rgba(253, 186, 116, 0.35), transparent 28rem),
+    var(--theme-50);
+}
+
+/* ------------------------------------------------------------------ */
+/* Banner                                                              */
+/* ------------------------------------------------------------------ */
+
+.public-form-theme-16-days-of-activism .theme-hero {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.22), transparent 18rem),
+    linear-gradient(135deg, var(--theme-500) 0%, var(--theme-700) 62%, var(--theme-800) 100%);
+  border-radius: 0 0 2rem 2rem;
+  box-shadow: 0 10px 30px -12px rgba(154, 52, 18, 0.55);
+  margin-bottom: 1.75rem;
+}
+
+.public-form-theme-16-days-of-activism .theme-hero__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  /* Side padding matches the form below so the text lines up with the cards. */
+  padding: 1.25rem 1rem 1.75rem;
+}
+
+@media (min-width: 640px) {
+  .public-form-theme-16-days-of-activism .theme-hero__inner {
+    padding-top: 1.75rem;
+    padding-bottom: 2.25rem;
+  }
+}
+
+.public-form-theme-16-days-of-activism .theme-hero__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.public-form-theme-16-days-of-activism .theme-hero__campaign {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.public-form-theme-16-days-of-activism .theme-hero__dates {
+  margin: 1.5rem 0 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--theme-100);
+}
+
+.public-form-theme-16-days-of-activism .theme-hero__title {
+  margin: 0;
+  max-width: 52rem;
+  font-size: clamp(1.6rem, 4.2vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: #fff;
+  text-wrap: balance;
+}
+
+/* One dot per day of the campaign. */
+.public-form-theme-16-days-of-activism .theme-hero__days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+}
+
+.public-form-theme-16-days-of-activism .theme-hero__days span {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.public-form-theme-16-days-of-activism .theme-hero__days span:last-child {
+  background: #fff;
+}
+
+/* Language links. */
+.public-form-theme-16-days-of-activism .theme-lang {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.public-form-theme-16-days-of-activism .theme-lang__link {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.public-form-theme-16-days-of-activism .theme-lang__link:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.public-form-theme-16-days-of-activism .theme-lang__link.is-active {
+  background: #fff;
+  color: var(--theme-800);
+  border-color: #fff;
+}
+
+.public-form-theme-16-days-of-activism .theme-lang__link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Form                                                                */
+/* ------------------------------------------------------------------ */
+
+/* The banner is full width; everything below it reads at a comfortable width. */
+.public-form-theme-16-days-of-activism #entry-form-root > :not(.theme-hero):not(.theme-progress) {
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* The back-office title strip repeats what the banner says (and shows a status that means nothing here). */
+.public-form-theme-16-days-of-activism .executive-page-header {
+  display: none;
+}
+
+/* Section cards. */
+.public-form-theme-16-days-of-activism #sections-container > div {
+  background: #fff;
+  border: 1px solid var(--theme-200);
+  border-top: 4px solid var(--theme-600);
+  box-shadow: 0 6px 18px -10px rgba(154, 52, 18, 0.3);
+}
+
+.public-form-theme-16-days-of-activism #sections-container > div h3,
+.public-form-theme-16-days-of-activism #sections-container > div h3 i {
+  color: var(--theme-800);
+}
+
+/* Question cards. */
+.public-form-theme-16-days-of-activism .form-item-block {
+  background: #fffaf5;
+  border-color: var(--theme-200);
+}
+
+.public-form-theme-16-days-of-activism .form-item-block label {
+  color: #431407;
+}
+
+/* Fields: orange focus instead of blue/green. */
+.public-form-theme-16-days-of-activism input:not([type="checkbox"]):not([type="radio"]):focus,
+.public-form-theme-16-days-of-activism textarea:focus,
+.public-form-theme-16-days-of-activism select:focus {
+  --tw-ring-color: rgba(234, 88, 12, 0.35);
+  border-color: var(--theme-600);
+  outline: none;
+}
+
+.public-form-theme-16-days-of-activism input[type="checkbox"],
+.public-form-theme-16-days-of-activism input[type="radio"] {
+  accent-color: var(--theme-700);
+}
+
+/*
+ * No side navigation pane. The form runs full width and the pane's Submit
+ * button moves to a card under the questions. The pane stays in the
+ * DOM (form scripts use it); !important beats the per-breakpoint pane rules in
+ * forms.css.
+ */
+body.public-form-theme-16-days-of-activism #entry-form-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important;
+}
+
+body.public-form-theme-16-days-of-activism #main-form-area {
+  order: 1;
+  width: 100%;
+}
+
+body.public-form-theme-16-days-of-activism #section-navigation-sidebar {
+  order: 2;
+  position: static !important;
+  inset: auto !important;
+  z-index: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  transform: none !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Section list, headings and discussion belong to the pane we are not showing. */
+body.public-form-theme-16-days-of-activism #section-navigation-sidebar .entry-form-sections-pane__header,
+body.public-form-theme-16-days-of-activism #sidebar-shared-pane,
+body.public-form-theme-16-days-of-activism #entry-form-sidebar-resizer,
+body.public-form-theme-16-days-of-activism #sidebar-expand-button,
+body.public-form-theme-16-days-of-activism #mobile-nav-toggle-button,
+body.public-form-theme-16-days-of-activism #mobile-nav-overlay,
+body.public-form-theme-16-days-of-activism #fab-menu {
+  display: none !important;
+}
+
+/* Saving drafts is not offered on this form. The button stays in the DOM for the form scripts. */
+body.public-form-theme-16-days-of-activism #public-save-draft-btn {
+  display: none !important;
+}
+
+/* Submit sits in a card at the end of the form (not pinned to the screen). */
+body.public-form-theme-16-days-of-activism #sidebar-bottom-dock {
+  width: 100%;
+  margin: 0;
+  padding: 0 0 2.5rem;
+  background: transparent;
+}
+
+body.public-form-theme-16-days-of-activism #sidebar-action-buttons {
+  padding: 1.25rem 1.5rem;
+  background: #fff;
+  border: 1px solid var(--theme-200);
+  border-top: 4px solid var(--theme-600);
+  border-radius: 0.75rem;
+  box-shadow: 0 6px 18px -10px rgba(154, 52, 18, 0.3);
+}
+
+body.public-form-theme-16-days-of-activism #sidebar-action-buttons > div {
+  justify-content: center;
+}
+
+body.public-form-theme-16-days-of-activism #sidebar-action-buttons .btn {
+  flex: 0 1 auto;
+  min-width: 14rem;
+  padding-block: 0.75rem;
+  font-size: 1.0625rem;
+}
+
+@media (max-width: 480px) {
+  body.public-form-theme-16-days-of-activism #sidebar-action-buttons .btn {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
+/* The bottom bar replaces the pane, so the questions no longer need clearance for the floating menu. */
+body.public-form-theme-16-days-of-activism .entry-form-root #sections-container {
+  padding-bottom: 0;
+}
+
+/* Keyboard focus. */
+.public-form-theme-16-days-of-activism a:focus-visible,
+.public-form-theme-16-days-of-activism button:focus-visible {
+  outline: 2px solid var(--theme-600);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Confirmation and unavailable pages                                  */
+/* ------------------------------------------------------------------ */
+
+.public-form-theme-16-days-of-activism .theme-message {
+  max-width: 40rem;
+  margin: 0 auto 2rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--theme-200);
+  border-top: 4px solid var(--theme-600);
+  border-radius: 0.75rem;
+  box-shadow: 0 6px 18px -10px rgba(154, 52, 18, 0.3);
+}
+
+.public-form-theme-16-days-of-activism .theme-message__icon {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  color: var(--theme-600);
+  margin-bottom: 1rem;
+}
+
+.public-form-theme-16-days-of-activism .theme-message h2 {
+  color: var(--theme-800);
+}
+
+/* ------------------------------------------------------------------ */
+/* Banner decoration (static; the motion below only adds movement)     */
+/* ------------------------------------------------------------------ */
+
+/* Two soft glows behind the banner text. */
+.public-form-theme-16-days-of-activism .theme-hero::before,
+.public-form-theme-16-days-of-activism .theme-hero::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.public-form-theme-16-days-of-activism .theme-hero::before {
+  width: 22rem;
+  height: 22rem;
+  inset-block-start: -9rem;
+  inset-inline-start: -6rem;
+  background: radial-gradient(circle, rgba(253, 186, 116, 0.55), transparent 68%);
+}
+
+.public-form-theme-16-days-of-activism .theme-hero::after {
+  width: 16rem;
+  height: 16rem;
+  inset-block-end: -7rem;
+  inset-inline-end: 22%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2), transparent 68%);
+}
+
+/* Awareness ribbon outline. */
+.public-form-theme-16-days-of-activism .theme-hero__ribbon {
+  position: absolute;
+  inset-inline-end: 4%;
+  top: 50%;
+  translate: 0 -50%;
+  height: 88%;
+  max-height: 15rem;
+  width: auto;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .public-form-theme-16-days-of-activism .theme-hero__ribbon {
+    opacity: 0.55;
+  }
+}
+
+/* Reading progress bar: only shown where scroll-driven animation works (see below). */
+.public-form-theme-16-days-of-activism .theme-progress {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion                                                              */
+/* Everything below is skipped for visitors who ask for reduced motion. */
+/* Keyframes only describe the starting state, so the page as styled    */
+/* above is always the end state.                                       */
+/* ------------------------------------------------------------------ */
+
+@keyframes tp-hero-in {
+  from { opacity: 0; translate: 0 -1.5rem; }
+}
+
+@keyframes tp-fade-up {
+  from { opacity: 0; translate: 0 1.25rem; }
+}
+
+@keyframes tp-fade-down {
+  from { opacity: 0; translate: 0 -0.75rem; }
+}
+
+@keyframes tp-pop {
+  from { opacity: 0; scale: 0.4; }
+}
+
+@keyframes tp-dates-in {
+  from { opacity: 0; letter-spacing: 0.32em; translate: 0 0.5rem; }
+}
+
+@keyframes tp-title-in {
+  from { opacity: 0; translate: 0 1rem; filter: blur(8px); }
+}
+
+@keyframes tp-gradient {
+  from { background-position: 0 0, 0% 50%; }
+  to { background-position: 0 0, 100% 50%; }
+}
+
+@keyframes tp-drift {
+  from { translate: 0 0; scale: 1; }
+  to { translate: 2.5rem 1.5rem; scale: 1.2; }
+}
+
+@keyframes tp-ribbon-draw {
+  from { stroke-dashoffset: 1; }
+}
+
+@keyframes tp-sway {
+  from { rotate: -4deg; }
+  to { rotate: 4deg; }
+}
+
+@keyframes tp-wiggle {
+  0%, 100% { rotate: 0deg; }
+  20% { rotate: -18deg; }
+  40% { rotate: 14deg; }
+  60% { rotate: -10deg; }
+  80% { rotate: 6deg; }
+}
+
+@keyframes tp-wave {
+  0%, 22%, 100% { scale: 1; }
+  11% { scale: 1.6; }
+}
+
+@keyframes tp-ring-pulse {
+  from { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.85); }
+  to { box-shadow: 0 0 0 0.7rem rgba(255, 255, 255, 0); }
+}
+
+@keyframes tp-btn-pulse {
+  from { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.55); }
+  to { box-shadow: 0 0 0 0.8rem rgba(234, 88, 12, 0); }
+}
+
+@keyframes tp-icon-pop {
+  0% { opacity: 0; scale: 0; rotate: -40deg; }
+  60% { opacity: 1; scale: 1.18; rotate: 8deg; }
+  100% { scale: 1; rotate: 0deg; }
+}
+
+@keyframes tp-ripple {
+  from { opacity: 0.8; scale: 0.6; }
+  to { opacity: 0; scale: 1.9; }
+}
+
+@keyframes tp-confetti {
+  from { opacity: 1; scale: 0; }
+  70% { opacity: 1; }
+  to { opacity: 0; scale: 1.5; }
+}
+
+@keyframes tp-rise {
+  from { opacity: 0; translate: 0 1.75rem; scale: 0.98; }
+}
+
+@keyframes tp-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Banner: slides in, colour slowly shifts, glows drift. */
+  .public-form-theme-16-days-of-activism .theme-hero {
+    background-size: auto, 170% 170%;
+    animation:
+      tp-hero-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both,
+      tp-gradient 16s ease-in-out 0.8s infinite alternate;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-hero::before {
+    animation: tp-drift 13s ease-in-out infinite alternate;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-hero::after {
+    animation: tp-drift 17s ease-in-out -6s infinite alternate-reverse;
+  }
+
+  /* Ribbon draws itself, then sways gently. */
+  .public-form-theme-16-days-of-activism .theme-hero__ribbon {
+    transform-origin: 50% 80%;
+    stroke-dasharray: 1;
+    animation:
+      tp-ribbon-draw 2.4s cubic-bezier(0.65, 0, 0.35, 1) 0.5s both,
+      tp-sway 8s ease-in-out 2.9s infinite alternate;
+  }
+
+  /* Banner text arrives in sequence. */
+  .public-form-theme-16-days-of-activism .theme-hero__campaign {
+    animation: tp-fade-down 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-hero__campaign i {
+    display: inline-block;
+    transform-origin: 50% 90%;
+    animation: tp-wiggle 1.1s ease-in-out 1.1s both;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-lang__link {
+    animation: tp-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-lang__link:nth-child(1) { animation-delay: 0.4s; }
+  .public-form-theme-16-days-of-activism .theme-lang__link:nth-child(2) { animation-delay: 0.5s; }
+  .public-form-theme-16-days-of-activism .theme-lang__link:nth-child(3) { animation-delay: 0.6s; }
+  .public-form-theme-16-days-of-activism .theme-lang__link:nth-child(4) { animation-delay: 0.7s; }
+  .public-form-theme-16-days-of-activism .theme-lang__link:nth-child(5) { animation-delay: 0.8s; }
+  .public-form-theme-16-days-of-activism .theme-lang__link:nth-child(6) { animation-delay: 0.9s; }
+
+  .public-form-theme-16-days-of-activism .theme-hero__dates {
+    animation: tp-dates-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.55s both;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-hero__title {
+    animation: tp-title-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.75s both;
+  }
+
+  /* 16 dots pop in one by one, then a wave runs through them every few seconds. */
+  .public-form-theme-16-days-of-activism .theme-hero__days span {
+    animation:
+      tp-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) calc(1.1s + var(--i, 0) * 70ms) both,
+      tp-wave 5s ease-in-out calc(3.2s + var(--i, 0) * 90ms) infinite;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-hero__days span:last-child {
+    animation:
+      tp-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) calc(1.1s + var(--i, 0) * 70ms) both,
+      tp-wave 5s ease-in-out calc(3.2s + var(--i, 0) * 90ms) infinite,
+      tp-ring-pulse 2.2s ease-out 3s infinite;
+  }
+
+  /* Cards and questions. */
+  .public-form-theme-16-days-of-activism #sections-container > div {
+    animation: tp-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.45s both;
+    transition: box-shadow 0.25s ease;
+  }
+
+  .public-form-theme-16-days-of-activism #sections-container > div:hover {
+    box-shadow: 0 12px 28px -12px rgba(154, 52, 18, 0.4);
+  }
+
+  .public-form-theme-16-days-of-activism .form-item-block {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+
+  .public-form-theme-16-days-of-activism .form-item-block:focus-within {
+    border-color: var(--theme-500);
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16), 0 8px 18px -12px rgba(154, 52, 18, 0.45);
+  }
+
+  /* Submit gives a soft pulse until the visitor engages with it. */
+  .public-form-theme-16-days-of-activism #sidebar-action-buttons .btn-success {
+    animation: tp-btn-pulse 2.8s ease-out 1s infinite;
+  }
+
+  .public-form-theme-16-days-of-activism #sidebar-action-buttons .btn-success:hover,
+  .public-form-theme-16-days-of-activism #sidebar-action-buttons .btn-success:focus-visible,
+  .public-form-theme-16-days-of-activism #sidebar-action-buttons .btn-success:disabled {
+    animation: none;
+  }
+
+  .public-form-theme-16-days-of-activism .btn-primary,
+  .public-form-theme-16-days-of-activism .btn-success {
+    transition: translate 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  }
+
+  .public-form-theme-16-days-of-activism .btn-primary:hover,
+  .public-form-theme-16-days-of-activism .btn-success:hover {
+    translate: 0 -2px;
+    box-shadow: 0 8px 16px -8px rgba(154, 52, 18, 0.7);
+  }
+
+  /* Confirmation / unavailable pages. */
+  .public-form-theme-16-days-of-activism .theme-message {
+    animation: tp-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-message__icon i {
+    animation: tp-icon-pop 0.8s cubic-bezier(0.34, 1.3, 0.64, 1) 0.9s both;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-message__icon--success::before,
+  .public-form-theme-16-days-of-activism .theme-message__icon--success::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-message__icon--success::before {
+    inset: 0;
+    border: 3px solid var(--theme-500);
+    border-radius: 50%;
+    animation: tp-ripple 1.6s ease-out 1.2s 2 both;
+  }
+
+  .public-form-theme-16-days-of-activism .theme-message__icon--success::after {
+    left: 50%;
+    top: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin: -0.25rem 0 0 -0.25rem;
+    border-radius: 50%;
+    box-shadow:
+      4.5rem 0 #f97316, -4.5rem 0 #fbbf24, 0 4.5rem #ea580c, 0 -4.5rem #fdba74,
+      3.2rem 3.2rem #c2410c, -3.2rem 3.2rem #f97316, 3.2rem -3.2rem #fbbf24, -3.2rem -3.2rem #ea580c;
+    animation: tp-confetti 1.3s cubic-bezier(0.2, 0.8, 0.3, 1) 1.1s both;
+  }
+}
+
+/* Scroll-driven extras (Chromium 115+, Safari 26, Firefox 159+); other browsers just skip them. */
+@supports ((animation-timeline: view()) and (animation-range: entry)) {
+  @media (prefers-reduced-motion: no-preference) {
+    /*
+     * A view() timeline follows the nearest scroll container. These two wrappers
+     * are as tall as their content (they never scroll themselves), so they would
+     * freeze every reveal in its finished state. main.admin-scroll-main does the
+     * real scrolling and clips the sides.
+     */
+    body.public-form-theme-16-days-of-activism #pageContentContainer,
+    body.public-form-theme-16-days-of-activism #mainContent {
+      overflow: visible !important;
+    }
+
+    /* Each question (and the Submit card) rises into place as it scrolls into view. */
+    .public-form-theme-16-days-of-activism #sidebar-action-buttons,
+    .public-form-theme-16-days-of-activism .form-item-block {
+      animation: tp-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 100%;
+    }
+
+    /* Thin orange reading-progress line along the top edge. */
+    .public-form-theme-16-days-of-activism .theme-progress {
+      display: block;
+      position: sticky;
+      top: 0;
+      height: 0;
+      z-index: 60;
+    }
+
+    .public-form-theme-16-days-of-activism .theme-progress span {
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 4px;
+      background: linear-gradient(90deg, #fbbf24, #fff 140%);
+      box-shadow: 0 1px 6px rgba(154, 52, 18, 0.5);
+      transform-origin: 0 50%;
+      animation: tp-progress linear both;
+      animation-timeline: scroll(nearest block);
+    }
+
+    [dir="rtl"] .public-form-theme-16-days-of-activism .theme-progress span {
+      transform-origin: 100% 50%;
+    }
+  }
+}

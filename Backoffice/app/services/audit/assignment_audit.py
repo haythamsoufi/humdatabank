@@ -56,6 +56,8 @@ _ASSIGNMENT_FIELD_LABELS: Dict[str, str] = {
     "email_attach_excel": "Email Excel snapshot",
     "enable_page_submission": "Per-page submit",
     "enable_offline_download": "Mobile offline download",
+    "public_collect_submitter_info": "Public form asks for name and email",
+    "public_form_theme": "Public form theme",
     "submission_review_mode": "Submission review notification",
     "submission_review_recipients": "Submission review recipients",
     "allowed_roles": "Restricted to roles",
@@ -109,6 +111,13 @@ def _submission_review_mode_label(mode: Optional[str]) -> str:
     if mode == SUBMISSION_REVIEW_RECIPIENT_SPECIFIC:
         return "Specific IFRC admin(s)"
     return "Designated FDS member for the submitting country"
+
+
+def _public_form_theme_label(assignment: Any) -> str:
+    from app.services.public.form_themes import public_form_theme_for_assignment
+
+    theme = public_form_theme_for_assignment(assignment)
+    return theme.label if theme else "Default"
 
 
 def assignment_audit_label(assignment: Any) -> Optional[str]:
@@ -232,6 +241,8 @@ def assignment_settings_snapshot(assignment: Any) -> Dict[str, Any]:
         "email_attach_excel": bool(getattr(assignment, "email_attach_excel", False)),
         "enable_page_submission": bool(getattr(assignment, "enable_page_submission", False)),
         "enable_offline_download": bool(getattr(assignment, "enable_offline_download", False)),
+        "public_collect_submitter_info": bool(getattr(assignment, "public_collect_submitter_info", True)),
+        "public_form_theme": _public_form_theme_label(assignment),
         "submission_review_mode": _submission_review_mode_label(
             getattr(assignment, "submission_review_recipient_mode", None)
         ),

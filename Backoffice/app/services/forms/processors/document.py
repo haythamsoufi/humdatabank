@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from app.utils.common.datetime_helpers import utcnow
 from app.models import db, FormItem, SubmittedDocument
 from app.services.notification.core import notify_document_uploaded
-from app.utils.files.file_paths import save_submission_document
+from app.utils.files.file_paths import public_submission_storage_entity, save_submission_document
 from app.utils.documents.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
 from app.utils.files.file_scanning import scan_file_for_viruses, FileScanError
 from app.utils.database.transactions import register_post_commit
@@ -18,6 +18,13 @@ from app.services.forms.processors._common import get_english_field_name
 from app.services.monitoring.debug import debug_manager
 
 logger = debug_manager.get_logger(__name__)
+
+
+def storage_entity_for_submission(submission_obj, is_public_submission: bool) -> tuple:
+    """``(entity_type, entity_id)`` used as the storage prefix for an uploaded document."""
+    if is_public_submission:
+        return public_submission_storage_entity(getattr(submission_obj, "country_id", None))
+    return submission_obj.entity_type, submission_obj.entity_id
 
 
 class DocumentProcessorMixin:
@@ -204,11 +211,7 @@ class DocumentProcessorMixin:
                 form_id = assignment_entity_status.assigned_form_id if is_public_sub else None
                 submission_id = assignment_entity_status.id if is_public_sub else None
 
-                if is_public_sub:
-                    st_ent_type, st_ent_id = "country", assignment_entity_status.entity_id
-                else:
-                    st_ent_type = assignment_entity_status.entity_type
-                    st_ent_id = assignment_entity_status.entity_id
+                st_ent_type, st_ent_id = storage_entity_for_submission(assignment_entity_status, is_public_sub)
 
                 # Save file and get relative path from submissions root
                 storage_rel_path = save_submission_document(
@@ -270,15 +273,18 @@ class DocumentProcessorMixin:
                     # create_notification uses commit/rollback on the global session; doing that here
                     # can roll back the SubmittedDocument row while the file remains on disk. Defer until
                     # after the request transaction commits (see transaction_middleware + register_post_commit).
-                    register_post_commit(notify_document_uploaded, assignment_entity_status, secured_filename)
-                    logger.info(
-                        "Queued post-commit focal-point notification for document upload "
-                        "(aes_id=%s, form_item_id=%s, submitted_document_id=%s, filename=%s)",
-                        assignment_entity_status.id,
-                        document.id,
-                        getattr(new_doc, "id", None),
-                        secured_filename,
-                    )
+                    # Public submissions have no entity focal points; they raise their own
+                    # "public submission received" notification when the form is submitted.
+                    if not is_public_sub:
+                        register_post_commit(notify_document_uploaded, assignment_entity_status, secured_filename)
+                        logger.info(
+                            "Queued post-commit focal-point notification for document upload "
+                            "(aes_id=%s, form_item_id=%s, submitted_document_id=%s, filename=%s)",
+                            assignment_entity_status.id,
+                            document.id,
+                            getattr(new_doc, "id", None),
+                            secured_filename,
+                        )
                 except Exception as e:
                     logger.error(
                         "Error flushing document or scheduling upload notification: %s", str(e), exc_info=True
@@ -441,11 +447,7 @@ class DocumentProcessorMixin:
                     form_id = assignment_entity_status.assigned_form_id if is_public_sub else None
                     submission_id = assignment_entity_status.id if is_public_sub else None
 
-                    if is_public_sub:
-                        st_ent_type, st_ent_id = "country", assignment_entity_status.entity_id
-                    else:
-                        st_ent_type = assignment_entity_status.entity_type
-                        st_ent_id = assignment_entity_status.entity_id
+                    st_ent_type, st_ent_id = storage_entity_for_submission(assignment_entity_status, is_public_sub)
 
                     storage_rel_path = save_submission_document(
                         file_storage=file,

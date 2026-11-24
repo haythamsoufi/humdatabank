@@ -9,7 +9,6 @@
     {% set is_repo = doc.id in entity_repo_document_ids %}
     {% set doc_lang_base = (doc.language or '').split('_')[0].split('-')[0] %}
     {% set doc_lang_label = language_endonym(doc_lang_base) or LANGUAGE_DISPLAY_NAMES.get(doc_lang_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(doc_lang_base) or (doc.language or _('N/A')) %}
-    {% set doc_lang_code = doc_lang_base|upper if doc_lang_base else _('N/A') %}
     {% set _doc_fname = doc.filename or '' %}
     {% set doc_ext = (_doc_fname.rsplit('.', 1)[-1]|lower) if '.' in _doc_fname else '' %}
     {% set _doc_icon_map = {
@@ -77,7 +76,7 @@
                   title="{{ doc_lang_label }}"
                   aria-label="{{ doc_lang_label }}">
                 <i class="fas fa-language" aria-hidden="true"></i>
-                {{ doc_lang_code }}
+                {{ doc_lang_label }}
             </span>
             {% if can_edit and not is_repo %}
             <div class="entry-form-doc-card__action-btns">

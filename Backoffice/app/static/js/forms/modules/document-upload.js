@@ -170,7 +170,7 @@ export function initDocumentUpload() {
     if (icon) icon.className = `fas ${spec.icon}`;
   }
 
-  /** Visible language pill uses the code (EN); title/aria keep the full name. */
+  /** Uppercase ISO code, used only when a full language name is unavailable. */
   function languageCodeLabel(code) {
     const raw = (code || '').toString().trim();
     if (!raw) return '';
@@ -184,7 +184,7 @@ export function initDocumentUpload() {
     const v = variant || 'submitted';
     tag.className = `entry-form-doc-language-tag entry-form-doc-language-tag--${v}`;
     const name = (displayName || '').toString().trim();
-    const visible = languageCodeLabel(code) || name;
+    const visible = name || languageCodeLabel(code);
     if (name) {
       tag.setAttribute('title', name);
       tag.setAttribute('aria-label', name);
@@ -2297,7 +2297,7 @@ export function initDocumentUpload() {
         languageBadge.setAttribute('title', display);
         languageBadge.setAttribute('aria-label', display);
       }
-      languageBadge.appendChild(document.createTextNode(languageCodeLabel(code) || display));
+      languageBadge.appendChild(document.createTextNode(display || languageCodeLabel(code)));
     }
   }
 

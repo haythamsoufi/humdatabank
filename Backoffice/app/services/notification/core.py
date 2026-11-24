@@ -207,6 +207,9 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         'notification.public_submission_received.message': _notification_msgid(
             "From %(submitter)s (%(country)s) for %(assignment_title)s."
         ),
+        'notification.public_submission_received.message_no_country': _notification_msgid(
+            "From %(submitter)s for %(assignment_title)s."
+        ),
 
         # Admin message notifications (these use custom messages, so we handle them specially)
         'notification.admin_message.title': _notification_msgid('Admin Message'),

@@ -4308,6 +4308,121 @@
     }
 })();
 
+// Live warning when the chosen template + period already has an assignment.
+(function initTemplatePeriodDuplicateWarning() {
+    var warningEl = document.getElementById('template-period-duplicate-warning');
+    var templateSelect = document.querySelector('select[name="template_id"]');
+    var periodField = document.querySelector('input[name="period_name"]');
+    if (!warningEl || !templateSelect || !periodField || !(cfg.urls && cfg.urls.checkDuplicate)) return;
+
+    var messageEl = warningEl.querySelector('[data-role="message"]');
+    var timer = null;
+    var requestSeq = 0;
+    var lastKey = null;
+
+    var blocked = false;
+    var blockedTitle = '';
+
+    // The Create/Update button lives in the page header (linked to the form via `form=`).
+    function submitButtons() {
+        var btn = document.getElementById('manageAssignmentSubmitBtn');
+        return btn ? [btn] : [];
+    }
+
+    function setBlocked(isBlocked) {
+        blocked = isBlocked;
+        submitButtons().forEach(function (btn) {
+            btn.disabled = isBlocked;
+            btn.setAttribute('aria-disabled', isBlocked ? 'true' : 'false');
+            btn.classList.toggle('opacity-50', isBlocked);
+            btn.classList.toggle('cursor-not-allowed', isBlocked);
+            if (isBlocked) {
+                if (btn.dataset.dupOrigTitle === undefined) btn.dataset.dupOrigTitle = btn.getAttribute('title') || '';
+                btn.setAttribute('title', blockedTitle);
+            } else if (btn.dataset.dupOrigTitle !== undefined) {
+                if (btn.dataset.dupOrigTitle) btn.setAttribute('title', btn.dataset.dupOrigTitle);
+                else btn.removeAttribute('title');
+                delete btn.dataset.dupOrigTitle;
+            }
+        });
+    }
+
+    // Enter-key submits bypass the disabled button; stop them before other handlers run.
+    document.addEventListener('submit', function (e) {
+        if (!blocked || e.target !== document.getElementById('manageAssignmentForm')) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        warningEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, true);
+
+    function hideWarning() {
+        warningEl.classList.add('hidden');
+        setBlocked(false);
+    }
+
+    function showWarning(assignment) {
+        var tpl = assignment && assignment.id != null
+            ? (cfg.t.templatePeriodTaken || '').replace('{id}', assignment.id)
+            : (cfg.t.templatePeriodTakenRestricted || '');
+        if (messageEl) messageEl.textContent = tpl;
+        warningEl.classList.remove('hidden');
+        blockedTitle = tpl;
+        setBlocked(true);
+    }
+
+    async function runCheck() {
+        var templateId = parseInt(templateSelect.value, 10);
+        var periodName = (periodField.value || '').trim();
+        if (!templateId || !periodName) {
+            lastKey = null;
+            hideWarning();
+            return;
+        }
+        var key = templateId + '|' + periodName;
+        if (key === lastKey) return;
+        lastKey = key;
+        var seq = ++requestSeq;
+        var url = cfg.urls.checkDuplicate +
+            '?template_id=' + encodeURIComponent(templateId) +
+            '&period_name=' + encodeURIComponent(periodName);
+        if (cfg.assignmentId) {
+            url += '&exclude_assignment_id=' + encodeURIComponent(cfg.assignmentId);
+        }
+        try {
+            var resp = await fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!resp.ok) { hideWarning(); return; }
+            var data = await resp.json();
+            if (seq !== requestSeq) return; // a newer selection superseded this response
+            if (data && data.success && data.exists) {
+                showWarning(data.assignment || {});
+            } else {
+                hideWarning();
+            }
+        } catch (e) {
+            // Non-critical: the server still guards on submit.
+            lastKey = null;
+        }
+    }
+
+    function scheduleCheck() {
+        // Defer so the period generator has refreshed the hidden period_name field.
+        clearTimeout(timer);
+        timer = setTimeout(runCheck, 300);
+    }
+
+    templateSelect.addEventListener('change', scheduleCheck);
+    // Capture phase: year pickers may dispatch non-bubbling events.
+    ['input', 'change'].forEach(function (evt) {
+        document.addEventListener(evt, function (e) {
+            var t = e.target;
+            if (t && t.closest && t.closest('#period-type, .period-fields')) scheduleCheck();
+        }, true);
+    });
+    scheduleCheck();
+})();
+
 (function initSubmissionReviewRecipientPicker() {
     var reviewCfg = cfg.submissionReviewRecipient || {};
     var searchInput = document.getElementById('submission-review-user-search');

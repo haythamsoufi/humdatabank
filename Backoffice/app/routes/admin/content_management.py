@@ -443,7 +443,8 @@ def _public_admin_documents_query():
             PublicSubmission,
             SubmittedDocument.public_submission_id == PublicSubmission.id,
         )
-        .join(Country, PublicSubmission.country_id == Country.id)
+        # Outer join: public submissions without a country (surveys) keep their documents listed.
+        .outerjoin(Country, PublicSubmission.country_id == Country.id)
     )
 
 

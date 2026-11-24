@@ -1723,9 +1723,19 @@ body.entry-form-sidebar-resizing #main-form-area {
   gap: 0.375rem;
 }
 
+/* forms.css loads after Tailwind, so this must beat .hidden { display: none }. */
+.sidebar-scope-actions__edit.hidden,
+.sidebar-scope-actions__locked.hidden {
+  display: none;
+}
+
 .sidebar-scope-actions .btn {
   flex: 1 1 auto;
   min-width: 4.5rem;
+}
+
+.sidebar-scope-actions__locked .btn {
+  flex: 1 1 100%;
 }
 
 .sidebar-scope-actions .btn i {
@@ -2529,6 +2539,7 @@ a.btn.entry-form-doc-library-btn {
   line-height: 1.25;
   border-radius: 9999px;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .entry-form-doc-language-tag i {

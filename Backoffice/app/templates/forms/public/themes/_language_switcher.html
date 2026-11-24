@@ -1,0 +1,12 @@
+{# Compact language links for themed public pages, which hide the back-office navigation
+   (and with it the language menu). Same route as the navigation menu. #}
+{% set _switcher_lang = current_ui_language() %}
+<nav class="theme-lang" aria-label="{{ _('Language')|forceescape }}">
+    {% for code in SUPPORTED_LANGUAGES %}
+        {% set code_base = (code|string|lower|replace('-', '_')).split('_')[0] %}
+        <a href="{{ url_for('main.set_language', language=code_base) }}"
+           class="theme-lang__link{% if code_base == _switcher_lang %} is-active{% endif %}"
+           {% if code_base == _switcher_lang %}aria-current="true"{% endif %}
+           lang="{{ code_base }}">{{ language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or code_base.upper() }}</a>
+    {% endfor %}
+</nav>

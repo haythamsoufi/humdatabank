@@ -95,6 +95,11 @@
 {% set ui_style_root_id = 'entry-form-root' %}
 {% include "components/_ui_style_boot.html" %}
 
+    {# Occasion banner for themed public links (see app/services/public/form_themes.py). #}
+    {% if is_public_submission and public_form_theme is defined and public_form_theme and public_form_theme.hero_template %}
+        {% include public_form_theme.hero_template %}
+    {% endif %}
+
     {# Template Preview Mode banner (with "view as" + period builder controls) #}
     {% if is_preview_mode %}
         {% include "forms/entry_form/partials/_preview_banner.html" %}
@@ -862,14 +867,19 @@
                     {% endif %}
 
                     <div id="sections-container" class="space-y-4 sm:space-y-8 mb-6 sm:mb-8 min-w-0" data-is-paginated="{{ template_structure.is_paginated|lower }}">
-                        {% if is_public_submission %}
+                        {% if is_public_submission and show_submitter_section|default(true) %}
                             <!-- Submitter Information Section -->
                             <div id="submitter-information-section" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20" data-page-number="1">
                                 <h3 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
                                     <i class="fas fa-user w-5 h-5 mr-2 text-gray-500"></i>
-                                    {{ _('Submitter Information') }}
+                                    {# Assignments can turn off the name and email fields (anonymous submissions). #}
+                                    {% set show_submitter_fields = collect_submitter_info|default(true) %}
+                                    {{ _('Submitter Information') if show_submitter_fields else _('Country') }}
                                 </h3>
-                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                {# Public links that are not country-specific (surveys, general forms) have no country choices. #}
+                                {% set show_public_country_select = country_select_form and country_select_form.country_id.choices %}
+                                <div class="grid grid-cols-1 {{ 'lg:grid-cols-3' if (show_public_country_select and show_submitter_fields) else 'lg:grid-cols-2' if (show_public_country_select or show_submitter_fields) else '' }} gap-4">
+                                    {% if show_public_country_select %}
                                     <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white">
                                         {{ country_select_form.country_id.label(class="block text-md font-semibold text-gray-800 mb-1") }}
                                         {{ country_select_form.country_id(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
@@ -881,7 +891,9 @@
                                             </div>
                                         {% endif %}
                                     </div>
+                                    {% endif %}
 
+                                    {% if show_submitter_fields %}
                                     <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white">
                                         {{ submission_details_form.submitter_name.label(class="block text-md font-semibold text-gray-800 mb-1") }}
                                         {{ submission_details_form.submitter_name(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
@@ -905,6 +917,7 @@
                                             </div>
                                         {% endif %}
                                     </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endif %}
@@ -1557,14 +1570,14 @@
                                                             {% set indicator_is_imputed = existing_data.get('field_value[' ~ field.id ~ ']_is_imputed', false) %}
 
                                                             {# Define classes for indicator number fields #}
-                                                            {% set indicator_number_classes = "w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right" %}
+                                                            {% set indicator_number_classes = "w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-right" %}
 
                                                             {% if field.field_type_for_js|lower == 'number' or field.field_type_for_js|lower == 'currency' %}
                                                                 {% if indicator_entry == 'target' %}
                                                                     <div class="mt-3">
                                                                         <div class="flex flex-wrap items-center gap-3">
                                                                             <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Target:') }}</label>
-                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                         </div>
                                                                     </div>
                                                                 {% elif allowed_modes and allowed_modes|length > 1 %}
@@ -1582,7 +1595,7 @@
                                                                         <div class="flex items-center gap-6">
                                                                             <div class="flex items-center gap-3 flex-wrap sm:flex-nowrap">
                                                                                 <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1629,7 +1642,7 @@
                                                                     <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                         <div class="flex flex-wrap items-center gap-3">
                                                                             <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                         </div>
                                                                         {% if field.indirect_reach %}
                                                                         <div class="flex flex-wrap items-center gap-3">
@@ -1720,14 +1733,14 @@
                                                             {% set indicator_is_imputed = existing_data.get('field_value[' ~ field.id ~ ']_is_imputed', false) %}
 
                                                             {# Define classes for indicator number fields #}
-                                                            {% set indicator_number_classes = "w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right" %}
+                                                            {% set indicator_number_classes = "w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-right" %}
 
                                                             {% if field.field_type_for_js|lower == 'number' or field.field_type_for_js|lower == 'currency' %}
                                                                 {% if indicator_entry == 'target' %}
                                                                     <div class="mt-3">
                                                                         <div class="flex flex-wrap items-center gap-3">
                                                                             <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Target:') }}</label>
-                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                         </div>
                                                                     </div>
                                                                 {% elif allowed_modes and allowed_modes|length > 1 %}
@@ -1745,7 +1758,7 @@
                                                                         <div class="flex items-center gap-6">
                                                                             <div class="flex items-center gap-3 flex-wrap sm:flex-nowrap">
                                                                                 <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1792,7 +1805,7 @@
                                                                     <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                         <div class="flex flex-wrap items-center gap-3">
                                                                             <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                         </div>
                                                                         {% if field.indirect_reach %}
                                                                         <div class="flex flex-wrap items-center gap-3">
@@ -1827,9 +1840,9 @@
                                                             {% elif field.field_type_for_js == 'datetime' %}
                                                                 <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (raw_value_indicator is none or raw_value_indicator|string|lower == 'none') else raw_value_indicator }}" class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
                                                             {% elif field.field_type_for_js|lower == 'percentage' %}
-                                                                {% set indicator_percentage_classes = "w-20 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white text-right" %}
+                                                                {% set indicator_percentage_classes = "w-20 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-right" %}
                                                                 <div class="inline-flex items-center gap-1">
-                                                                    <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="{{ indicator_percentage_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} step="any" inputmode="decimal" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}>
+                                                                    <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="{{ indicator_percentage_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} step="any" inputmode="decimal" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}>
                                                                     <span class="text-gray-700 font-medium text-sm">%</span>
                                                                 </div>
 
@@ -2429,7 +2442,7 @@
                                                                         <div class="flex items-center gap-6">
                                                                                                                                                         <div class="flex items-center gap-3">
                                                                                 <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                      <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                      <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -2526,7 +2539,7 @@
                                                                     {# Simple input for single mode (total only) without disaggregation #}
                                                                     <div class="flex flex-wrap items-center gap-3">
                                                                         <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Total:') }}</label>
-                                                                        <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                        <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                                     </div>
                                                                     {% if field.indirect_reach %}
                                                                     {# Indirect reach with calculated total displayed adjacent #}
@@ -2549,7 +2562,7 @@
                                                             {% elif field.field_type_for_js|lower == 'yesno' %} {% set current_yesno_val = (existing_entry_data.get('values').get('value') | lower) if (existing_entry_data is mapping and existing_entry_data.get('values') and existing_entry_data.get('values').get('value')) else (raw_value_indicator | lower if raw_value_indicator is not none else '') %} <div class="flex items-center gap-4"> <div class="flex items-center gap-3"> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="indicator_{{ field.id }}_standard_value" value="yes" class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500" {% if current_yesno_val == 'yes' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-green-700">Yes</span> </label> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="indicator_{{ field.id }}_standard_value" value="no" class="form-checkbox h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500" {% if current_yesno_val == 'no' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-red-700">No</span> </label> </div> </div>
                                                                             {% elif field.field_type_for_js == 'date' %} <input type="date" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (raw_value_indicator is none or raw_value_indicator|string|lower == 'none') else raw_value_indicator }}" class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
                                                                             {% elif field.field_type_for_js == 'datetime' %} <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (raw_value_indicator is none or raw_value_indicator|string|lower == 'none') else raw_value_indicator }}" class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
-                                                                            {% elif field.field_type_for_js|lower == 'percentage' %} <div class="inline-flex items-center gap-1"> <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="mt-1 w-20 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} step="any" inputmode="decimal" {% if not can_edit %}disabled{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}> <span class="mt-1 text-gray-700 font-medium text-sm">%</span> </div>
+                                                                            {% elif field.field_type_for_js|lower == 'percentage' %} <div class="inline-flex items-center gap-1"> <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="mt-1 w-20 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% else %} bg-white{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} step="any" inputmode="decimal" {% if not can_edit %}disabled{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}> <span class="mt-1 text-gray-700 font-medium text-sm">%</span> </div>
 
                                                                             {% else %}
                                                                                 <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ raw_value_indicator if raw_value_indicator is not none else '' }}" class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
@@ -2922,6 +2935,14 @@
         {% if enable_page_submission and assignment_status and page_workflow_statuses %}
         {% for _page_id, _page_status in page_workflow_statuses.items() %}
             {% if _page_status in scoped_reopenable_statuses %}
+        {% if can_approve_assignment_page(assignment_status) and _page_status == 'submitted' %}
+        <form id="approve-page-form-{{ assignment_status.id }}-{{ _page_id }}"
+              action="{{ url_for('main.approve_assignment_page', aes_id=assignment_status.id, page_id=_page_id) }}"
+              method="POST"
+              class="hidden approve-page-form">
+            {{ csrf_form.csrf_token }}
+        </form>
+        {% endif %}
         {% if can_reopen_assignment_page(assignment_status) %}
         <form id="reopen-page-form-{{ assignment_status.id }}-{{ _page_id }}"
               action="{{ url_for('main.reopen_assignment_page', aes_id=assignment_status.id, page_id=_page_id) }}"

@@ -45,6 +45,10 @@ from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionConte
 from app.utils.forms.form_localization import get_localized_country_name, build_template_select_choices
 from app.utils.organization.country_utils import get_countries_by_region_with_part_of
 from app.services.assignments.service import AssignmentService
+from app.services.public.form_themes import (
+    normalize_theme_key,
+    public_form_theme_choices,
+)
 from app.services.assignments.workflow_service import apply_entity_status_change
 from app.utils.forms.form_authorization import begin_aes_transition, lock_aes_rows_for_update
 from app.services.organization.entity_service import EntityService
@@ -635,6 +639,16 @@ class EditAssignmentDetailsForm(AssignmentSharedSettingsMixin, FlaskForm):
     period_name = StringField("Period Name", validators=[DataRequired()])
     due_date = DateField("Due Date", validators=[Optional()])
     expiry_date = DateField("Expiry Date (assignment will be treated as Closed after this date)", format='%Y-%m-%d', validators=[Optional()])
+    public_collect_submitter_info = BooleanField(
+        "Ask public submitters for their name and email",
+        default=True,
+    )
+    public_form_theme = SelectField(
+        "Public form theme",
+        choices=[],
+        validators=[Optional()],
+        default="",
+    )
     submit = SubmitField("Update Assignment")
 
     def validate(self, extra_validators=None):
@@ -649,11 +663,37 @@ class EditAssignmentDetailsForm(AssignmentSharedSettingsMixin, FlaskForm):
             FormTemplate.published_version_id.isnot(None)
         ).all()
         self.template_id.choices = build_template_select_choices(templates)
+        self.public_form_theme.choices = public_form_theme_choices()
         # Populate data owner choices
         active_users = User.query.filter_by(active=True).order_by(User.name).all()
         self.data_owner_id.choices = [("", "— Select data owner —")] + [
             (u.id, f"{u.name} ({u.email})") for u in active_users
         ]
+
+def _edit_template_period_is_free(form, assignment) -> bool:
+    """False (with a form error) when another assignment already uses the
+    submitted template + period; avoids a unique-constraint violation on save."""
+    period_name = (form.period_name.data or "").strip()
+    clash = (
+        AssignedForm.query.filter(
+            AssignedForm.template_id == form.template_id.data,
+            AssignedForm.period_name == period_name,
+            AssignedForm.id != assignment.id,
+        )
+        .with_entities(AssignedForm.id)
+        .first()
+    )
+    if clash is None:
+        return True
+    message = _(
+        "Another assignment already uses this form template with the period '%(period)s'. "
+        "Choose a different period name or template.",
+        period=period_name,
+    )
+    form.period_name.errors = list(form.period_name.errors) + [message]
+    flash(message, "danger")
+    return False
+
 
 # === Assignment Management Routes ===
 @bp.route("/assignments", methods=["GET"])
@@ -1099,16 +1139,23 @@ def assignment_copy_config(assignment_id):
 
 
 @bp.route("/assignments/check_duplicate", methods=["GET"])
-@permission_required('admin.assignments.create')
+@permission_required_any('admin.assignments.create', ASSIGNMENT_DETAILS_PERMISSION)
 def check_assignment_duplicate():
-    """Duplicate checker for the create-assignment UI preflight."""
+    """Duplicate checker for the create/edit-assignment UI (live warning and submit preflight).
+
+    ``exclude_assignment_id`` skips the assignment being edited.
+    """
     template_id = request.args.get("template_id", type=int)
     period_name = (request.args.get("period_name") or "").strip()
+    exclude_assignment_id = request.args.get("exclude_assignment_id", type=int)
 
     if not template_id or not period_name:
         return json_ok(exists=False)
 
-    existing = AssignedForm.query.filter_by(template_id=template_id, period_name=period_name).first()
+    query = AssignedForm.query.filter_by(template_id=template_id, period_name=period_name)
+    if exclude_assignment_id:
+        query = query.filter(AssignedForm.id != exclude_assignment_id)
+    existing = query.first()
     if not existing:
         return json_ok(exists=False)
 
@@ -1406,6 +1453,7 @@ def edit_assignment(assignment_id):
         form.submission_review_recipient_user_ids.data = (
             assignment.submission_review_recipient_user_ids_csv
         )
+        form.public_form_theme.data = normalize_theme_key(assignment.public_form_theme)
         populate_standard_excel_flags_from_legacy(assignment, form)
     enabled_entity_groups = get_enabled_entity_groups()
 
@@ -1415,7 +1463,7 @@ def edit_assignment(assignment_id):
         flash(_("You do not have permission to update assignment details."), "warning")
         return redirect(url_for("assignment_management.edit_assignment", assignment_id=assignment_id))
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _edit_template_period_is_free(form, assignment):
         # Snapshot for the audit trail before any mutation; never let audit
         # bookkeeping fail the edit itself.
         audit_before = {}
@@ -1438,6 +1486,9 @@ def edit_assignment(assignment_id):
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)
             assignment.enable_page_submission = next_page_mode
             assignment.enable_offline_download = bool(form.enable_offline_download.data)
+            assignment.public_collect_submitter_info = bool(form.public_collect_submitter_info.data)
+            if "public_form_theme" in request.form:
+                assignment.public_form_theme = normalize_theme_key(form.public_form_theme.data) or None
             assignment.enable_export_excel = bool(form.enable_export_excel.data)
             assignment.enable_import_excel = bool(form.enable_import_excel.data)
             assignment.enable_export_pdf = bool(form.enable_export_pdf.data)

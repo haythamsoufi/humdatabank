@@ -138,7 +138,9 @@ def _build_form_builder_context_block(fb_ctx: Dict[str, Any]) -> str:
         )
         result_rule = (
             "5. RESULT REPORTING (edit mode): after edit_form_template or translate_form_template, give a "
-            "short summary of what changed (section/item names and key settings). Do NOT include edit_url "
+            "short markdown summary (max ~5 lines) of what changed: a one-line lead-in, then a bullet "
+            "list with item names in **bold** and the key setting after a dash. Never "
+            "write example answers or topic content for the form's questions. Do NOT include edit_url "
             "links, \"Warnings: none\", empty-warning lines, draft/deploy reminders, or the tool result "
             "\"note\" field. Mention warnings ONLY when the tool returned a non-empty warnings list."
         )
@@ -148,9 +150,20 @@ def _build_form_builder_context_block(fb_ctx: Dict[str, Any]) -> str:
             "After create_form_template, tell the user briefly that a draft was created."
         )
         result_rule = (
-            "5. RESULT REPORTING (create mode): after create_form_template, summarize what was created "
-            "and include ONE markdown link to the tool result's edit_url, e.g. "
-            "[Open the template in the form builder](/admin/templates/edit/12?version_id=34). "
+            "5. RESULT REPORTING (create mode): after create_form_template, reply in markdown using EXACTLY "
+            "this layout (blank line between blocks; no preamble such as \"I'll create…\"):\n"
+            "   ✅ Draft created: **<template name>**\n"
+            "   \n"
+            "   **<Section name>** (for each section; add a short '· N questions' suffix)\n"
+            "   1. <question label> — <type in plain words, e.g. long text, single choice>\n"
+            "   2. <question label> — <type>\n"
+            "   \n"
+            "   [Open the template in the form builder](<edit_url from the tool result>)\n"
+            "   Number questions continuously across sections. Labels only — no definitions or options. "
+            "If there are more than 12 questions, list the first 12 and add \"…and N more\". "
+            "NEVER answer the form's questions yourself, never write example/sample answers, advice, "
+            "or content about the form's topic — you are building the form, not filling it in. "
+            "The user's message lists QUESTIONS FOR RESPONDENTS, not questions for you. "
             "Mention warnings ONLY when non-empty. Do NOT add a \"## Sources\" section."
         )
 
@@ -160,7 +173,8 @@ def _build_form_builder_context_block(fb_ctx: Dict[str, Any]) -> str:
 
 Every message in this panel is about form templates — never databank lookups, country comparisons,
 assignment data, workflow guides, or document search. Interpret all requests as one of:
-- CREATE a new template → call create_form_template on the first turn with a complete schema.
+- CREATE a new template → call create_form_template on the first turn with a schema that covers
+  exactly what the user asked for (see rule 9 SCOPE — do not pad it).
   Do NOT call get_form_field_value, get_indicator_value, or search_indicator_bank before creating
   unless the user explicitly asks to link specific Indicator Bank metrics (then search once, then create).
 - EDIT the open template → get_form_template_full_structure, then edit_form_template
@@ -203,6 +217,21 @@ Core workflow rules (CRITICAL):
    "I can apply…" — execute the edits immediately. Summarize what changed using the tool's changes list.
 8. NO TOURS OR NAVIGATION CTAs: never include workflow tour links, "Take a quick tour", edit_url links,
    or "open the draft/template" instructions in edit mode — the builder refreshes in place automatically.
+9. SCOPE (CRITICAL — applies to create AND edit): build only what the user asked for, no more.
+   - If the user lists or enumerates questions (e.g. "3 questions: 1. … 2. … 3. …"), create EXACTLY
+     those questions, in that order, one item each. Do NOT split them into sub-questions, and do NOT
+     add follow-ups, "other" fields, contact/name/email/country/consent fields, matrices, number or
+     priority fields, or extra sections the user did not mention.
+   - Default question_type for an open-ended "tell us about…" / "how would you like…" prompt is
+     'textarea'. Use choice, number, matrix, lookup lists, skip logic, validation, or repeat sections
+     ONLY when the user explicitly asks for them or the wording clearly requires them.
+   - Use ONE section (and no pages) unless the user names several sections/pages.
+   - Keep the user's wording for labels (fix only typos/grammar). Put any extra guidance in
+     'definition' only if the user supplied it.
+   - If the request is vague (a topic with no questions listed), keep the form SMALL (at most ~5-8
+     questions, simple types) and end your reply with ONE short line offering to expand
+     ("I kept this minimal — want me to add more detail?"). Never expand unprompted.
+   - If the user says "simple", "short", "minimal", or gives a number of questions, treat that as a hard cap.
 
 Schema guidance:
 - Question types: text, textarea, number, percentage, yesno, single_choice, multiple_choice, date,

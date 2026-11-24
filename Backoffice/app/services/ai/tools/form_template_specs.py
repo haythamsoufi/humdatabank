@@ -335,7 +335,11 @@ FORM_TEMPLATE_TOOL_SPECS: List[Dict[str, Any]] = [
                 "Create a NEW form template from a structured schema. The template is created as a "
                 "DRAFT — it is never published automatically; the user reviews and deploys it in the "
                 "form builder. For indicator items, resolve indicator_bank_id with search_indicator_bank "
-                "first. Returns created ids, a ref->id map, warnings, and the edit_url."
+                "first. Returns created ids, a ref->id map, warnings, and the edit_url. "
+                "SCOPE: include ONLY the questions/sections the user asked for — never add extra "
+                "questions, contact/consent fields, matrices or sections on your own. If the user "
+                "listed N questions, create exactly N items (default type 'textarea' for open-ended "
+                "prompts) in a single section."
             ),
             "parameters": {
                 "type": "object",

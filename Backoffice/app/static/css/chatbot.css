@@ -841,6 +841,20 @@ body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
 
 .chat-ai-notice-center .chat-ai-notice-block { max-width: 560px; }
 
+/* Form builder AI: instructions live in the message list, so the notice is stacked below
+   (not centered over) them. */
+.chat-messages-shell--stacked-notice {
+    flex-direction: column;
+}
+
+.chat-messages-shell--stacked-notice .chat-ai-notice-center {
+    position: relative;
+    inset: auto;
+    flex: 0 0 auto;
+    padding: 12px 24px 16px;
+    pointer-events: auto;
+}
+
 @keyframes chat-ai-notice-attention-flash {
     0%, 100% { background-color: transparent; box-shadow: none; }
     25% { background-color: rgba(251, 191, 36, 0.35); box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.5); }

@@ -280,6 +280,10 @@ export const DlpPolicyMixin = {
         const show = isImmersive ? (isEmptyChat || notAcked) : (isEmptyChat || notAcked);
         el.style.display = show ? '' : 'none';
         try { el.setAttribute('aria-hidden', show ? 'false' : 'true'); } catch (_) {}
+        // Form builder AI shows instructions in the message list; stack the notice below
+        // them instead of centering it over the top of the chat.
+        const shell = el.closest('.chat-messages-shell');
+        if (shell) shell.classList.toggle('chat-messages-shell--stacked-notice', !!this._fbAiConfig);
         const acked = this._hasAcknowledgedAiPolicy();
         if (isImmersive) this._updateImmersiveChatControls(acked);
         else this._updateFloatingChatControls(acked);

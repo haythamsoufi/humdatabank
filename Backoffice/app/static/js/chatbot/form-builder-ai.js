@@ -763,6 +763,12 @@ export const FormBuilderAiMixin = {
         // (bubbling would attach the same screenshot twice).
         widget?.addEventListener('paste', onPaste, true);
 
+        // Ctrl/Cmd+Z removes the most recently added attachment. The paste is cancelled
+        // (preventDefault), so the textarea's native undo stack has no entry for it.
+        // Typing disarms this so Ctrl+Z still undoes text edits first.
+        widget?.addEventListener('keydown', (e) => this._handleFormBuilderAttachmentUndoKey(e), true);
+        this.elements?.input?.addEventListener('input', () => { this._fbAiAttachUndoArmed = false; });
+
         if (widget) {
             widget.addEventListener('dragover', (e) => {
                 if (!this._fbAiConfig || this._fbAiAttachmentBusy) return;
@@ -782,6 +788,36 @@ export const FormBuilderAiMixin = {
                 files.forEach((f) => { void this._uploadFormBuilderAttachment(f); });
             });
         }
+    },
+
+    _pushFormBuilderAttachmentUndo(id) {
+        this._fbAiAttachUndoStack = [...(this._fbAiAttachUndoStack || []), id];
+        this._fbAiAttachUndoArmed = true;
+    },
+
+    _handleFormBuilderAttachmentUndoKey(e) {
+        if (!this._fbAiConfig || !this._fbAiAttachUndoArmed) return;
+        if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+        if (String(e.key || '').toLowerCase() !== 'z') return;
+
+        const stack = [...(this._fbAiAttachUndoStack || [])];
+        let id = null;
+        while (stack.length) {
+            const candidate = stack.pop();
+            if ((this._fbAiAttachments || []).some((a) => a.id === candidate && a.status !== 'extracting')) {
+                id = candidate;
+                break;
+            }
+        }
+        this._fbAiAttachUndoStack = stack;
+        if (id === null) {
+            this._fbAiAttachUndoArmed = false;
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        this._removeFormBuilderAttachment(id);
+        if (!stack.length) this._fbAiAttachUndoArmed = false;
     },
 
     _handleFormBuilderPaste(e) {
@@ -838,6 +874,7 @@ export const FormBuilderAiMixin = {
             status: 'ready',
         };
         this._fbAiAttachments = [...(this._fbAiAttachments || []), attachment];
+        this._pushFormBuilderAttachmentUndo(attachment.id);
         this._renderFormBuilderAttachmentGrid();
         this.elements?.input?.focus();
     },
@@ -889,6 +926,7 @@ export const FormBuilderAiMixin = {
             } else {
                 this._fbAiAttachments = [...(this._fbAiAttachments || []), readyDoc];
             }
+            this._pushFormBuilderAttachmentUndo(pendingId);
             this._renderFormBuilderAttachmentGrid();
         } catch (e) {
             console.warn('[chatbot] form builder document extraction failed', e);
@@ -1038,6 +1076,8 @@ export const FormBuilderAiMixin = {
             }
         });
         this._fbAiAttachments = [];
+        this._fbAiAttachUndoStack = [];
+        this._fbAiAttachUndoArmed = false;
         if (!opts.keepPanel) {
             this._renderFormBuilderAttachmentGrid();
         } else if (this._fbAiAttachmentEls?.grid) {

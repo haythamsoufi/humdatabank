@@ -64,7 +64,7 @@ Constants: `Backoffice/plugins/fdrs/scripts/fdrs_sync_constants.py` → `FDRS_QU
   - all 3 submitted → `submitted`
   - any section submitted/validated → `submitted` (partial)
   - any section started only → `in_progress`
-- Sets `status_timestamp` / `submitted_at` from FDRS dates when available.
+- Sets `status_timestamp` / `submitted_at` from FDRS dates when available (`SubmitDate`, then `ValidationDate` / `PublishDate`; `StartDate` counts toward the status timestamp).
 - Does **not** set `submitted_by_user_id` / `approved_by_user_id` (FDRS has no user identity).
 - FDRS workflow KPIs **always** overwrite databank assignment status during sync (no downgrade protection).
 - CLI opt-out: `--no-sync-assignment-status`.
@@ -83,7 +83,7 @@ KPI and document import join FDRS rows to `assignment_entity_status` by `(period
 
 Every FDRS assignment, including inactive years, needs **Allow save and submit per page** (`enable_page_submission`). New years created by sync get this flag automatically; for older assignments see [FDRS page-level submission](fdrs-page-submission.md).
 
-Once that flag is on, the same workflow KPIs should be imported as `assignment_page_status` for the matching published page:
+The same workflow KPIs are imported as `assignment_page_status` for the matching published page (matched by page name):
 
 | Prefix | Page |
 |---|---|
@@ -91,7 +91,7 @@ Once that flag is on, the same workflow KPIs should be imported as `assignment_p
 | `KPI_NSFP` | NS Finance & Partnerships |
 | `KPI_NSR` | NS Reach |
 
-Per page: validated/published → `approved`, submitted → `submitted`, started only → `in_progress`. The whole-assignment status stays the rollup of those three pages. That page import is **not built yet**; sync still writes only `assignment_entity_status`. Page names are on `FDRS_SECTION_WORKFLOW_SPECS`.
+Per page: validated/published → `approved`, submitted → `submitted`, started only → `in_progress`. A section with no flags leaves that page row unchanged. The whole-assignment status stays the rollup of those three pages. Page names are on `FDRS_SECTION_WORKFLOW_SPECS`.
 
 ### Documents (metadata and file bytes)
 

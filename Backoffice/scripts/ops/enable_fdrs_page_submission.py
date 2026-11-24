@@ -15,9 +15,8 @@ Write on the database this process is connected to:
 
 Turning the flag on seeds one page-status row per participating page, copied from
 each entity's current assignment status. That is the same path as the assignment
-editor. It is not the FDRS section workflow (KPI_NSGS / KPI_NSFP / KPI_NSR).
-Those KPIs still roll up to the whole assignment until the page-status import
-described in docs/runbooks/fdrs-page-submission.md is built.
+editor. The FDRS sync then replaces those rows from KPI_NSGS / KPI_NSFP / KPI_NSR.
+See docs/runbooks/fdrs-page-submission.md.
 """
 from __future__ import annotations
 

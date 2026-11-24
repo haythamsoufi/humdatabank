@@ -227,6 +227,31 @@ class TestUpsertFormDataRowsUnchangedDetection:
             assert row.published_numeric_value is None
             assert row.published_source is None
 
+    def test_imputed_published_snapshot_is_not_stamped_reported(self, db_session, app):
+        with app.app_context():
+            aes, item = _make_aes_and_item(db_session)
+            stats = upsert_form_data_rows([
+                _row(
+                    aes.id,
+                    item.id,
+                    "",
+                    imputed_value="5506200",
+                    published_value="5506200",
+                    published_disagg_data="",
+                    published_source="imputed",
+                )
+            ], batch_size=100)
+            assert stats["inserted"] == 1
+            row = (
+                db_session.query(FormData)
+                .filter_by(assignment_entity_status_id=aes.id, form_item_id=item.id)
+                .one()
+            )
+            assert row.value is None
+            assert row.imputed_value == "5506200"
+            assert row.published_value == "5506200"
+            assert row.published_source == FormData.PUBLISHED_SOURCE_IMPUTED
+
     def test_dry_run_distinguishes_updated_from_unchanged_without_writing(self, db_session, app):
         with app.app_context():
             aes1, item1 = _make_aes_and_item(db_session)

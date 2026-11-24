@@ -1027,12 +1027,24 @@ def build_ready_to_import_from_new_pipeline(
                 if len(group_rows) > 20:
                     logger.info("  ... and %d more rows", len(group_rows) - 20)
 
+        published_source = ""
         if data_not_available_flag or not_applicable_flag:
             published_value = ""
             published_disagg = ""
         else:
             scalar_text = (str(value) if value is not None else "").strip()
-            published_value = scalar_text if scalar_text and _row_is_fdrs_published(r or {}) else ""
+            imputed_text = (str(imputed_value) if imputed_value is not None else "").strip()
+            row_published = _row_is_fdrs_published(r or {})
+            if scalar_text and row_published:
+                published_value = scalar_text
+                published_source = "reported"
+            elif imputed_text and row_published:
+                # State 500 on the *_IP sibling: publish the imputed figure, not a
+                # submitted copy that the combiner already removed from value.
+                published_value = imputed_text
+                published_source = "imputed"
+            else:
+                published_value = ""
             if is_question_kpi:
                 published_disagg = ""
             else:
@@ -1056,6 +1068,7 @@ def build_ready_to_import_from_new_pipeline(
             COL_PREFILLED: "",
             COL_IMPUTED: imputed_value or "",
             COL_SUBMITTED: sub_at,
+            "published_source": published_source,
             **_published_columns(published_value, published_disagg),
         }))
     if rti_excl is not None and isinstance(rti_excl, dict):

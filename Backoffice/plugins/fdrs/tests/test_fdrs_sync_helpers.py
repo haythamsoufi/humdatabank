@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 backoffice_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_dir)))
@@ -21,6 +22,8 @@ from fdrs_assignment_status_sync import (  # noqa: E402
     build_assignment_status_plan,
     derive_assignment_status_from_sections,
     derive_assignment_timestamps,
+    derive_page_timestamps,
+    derive_page_workflow_status,
 )
 from fdrs_documents_sync import (  # noqa: E402
     build_document_import_plan,
@@ -831,6 +834,55 @@ def test_network_support_keeps_partner_names_when_amount_is_blank():
     assert published == {"Costa Rican Red Cross_Funding provided": None}
 
 
+def test_page_status_uses_section_flags_and_submit_date():
+    assert derive_page_workflow_status(
+        {"started": True, "submitted": False, "validated": False, "published": False}
+    ) == "in_progress"
+    assert derive_page_workflow_status(
+        {"started": True, "submitted": True, "validated": False, "published": False}
+    ) == "submitted"
+    assert derive_page_workflow_status(
+        {"started": True, "submitted": True, "validated": False, "published": True}
+    ) == "approved"
+    assert derive_page_workflow_status(
+        {"started": False, "submitted": False, "validated": False, "published": False}
+    ) is None
+
+    submit = datetime(2026, 11, 18, 12, 5, 33)
+    start = datetime(2026, 10, 12, 10, 38, 37)
+    status_ts, submitted_at = derive_page_timestamps(
+        "submitted",
+        {
+            "started": True,
+            "submitted": True,
+            "validated": False,
+            "published": False,
+            "start_date": start,
+            "submit_date": submit,
+            "validation_date": None,
+            "publish_date": None,
+        },
+    )
+    assert status_ts == submit
+    assert submitted_at == submit
+
+    assignment_ts, assignment_submitted = derive_assignment_timestamps(
+        "submitted",
+        [
+            {
+                "started": True,
+                "submitted": True,
+                "start_date": start,
+                "submit_date": submit,
+                "validation_date": None,
+                "publish_date": None,
+            }
+        ],
+    )
+    assert assignment_ts == submit
+    assert assignment_submitted == submit
+
+
 def test_derive_assignment_status_all_validated():
     sections = [
         {"started": True, "submitted": True, "validated": True, "published": False,
@@ -890,6 +942,12 @@ def test_build_assignment_status_plan_maps_workflow_kpis():
     assert summary["planned"] == 1
     assert plan[0]["status"] == "approved"
     assert plan[0]["assignment_entity_status_id"] == 77
+    by_page = {section["page_name"]: section["page_status"] for section in plan[0]["sections"]}
+    assert by_page == {
+        "NS Governance & Structure": "approved",
+        "NS Finance & Partnerships": "approved",
+        "NS Reach": "approved",
+    }
     status_ts, submitted_at = derive_assignment_timestamps(plan[0]["status"], plan[0]["sections"])
     assert submitted_at is not None
     assert status_ts is not None
@@ -1193,6 +1251,79 @@ def test_build_fdrs_combined_keeps_reported_and_imputed_separate():
     assert base["ImputedValue"] == "1574"
 
 
+def test_build_fdrs_combined_source_i_drops_the_reported_copy():
+    """A submitted fdrsdata row that mirrors an imputed figure must not stay reported.
+
+    Iran 2025 volunteers: KPI_PeopleVol_Tot is State 300 with the same number
+    KpiImputedValue marks source I, and the published row is KPI_PeopleVol_Tot_IP
+    at State 500.
+    """
+    reported = [
+        {
+            "KPI_code": "KPI_PeopleVol_Tot",
+            "DonCode": "DIR001",
+            "year": 2025,
+            "value": "5506200",
+            "State": 300,
+        },
+        {
+            "KPI_code": "KPI_PeopleVol_Tot_IP",
+            "DonCode": "DIR001",
+            "year": 2025,
+            "value": "5506200",
+            "State": 500,
+        },
+    ]
+    imputed = [{
+        "KPI_code": "KPI_PeopleVol_Tot",
+        "DonCode": "DIR001",
+        "year": 2025,
+        "value": "5506200",
+        "source": "I",
+    }]
+    combined = build_fdrs_combined(
+        reported,
+        imputed,
+        {"DIR001": "IRN"},
+        import_state_allowlist=frozenset({100, 200, 300, 400, 500}),
+    )
+    by_kpi = {(r["KPI_code"], r["DonCode"]): r for r in combined}
+    tot = by_kpi[("KPI_PeopleVol_Tot", "DIR001")]
+    assert tot["Value"] is None
+    assert tot["ReportedValue"] is None
+    assert tot["ImputedValue"] == "5506200"
+    assert tot["ValueStatus"] == "Imputed"
+    assert tot["State"] == 500
+
+
+def test_build_fdrs_combined_source_r_is_not_stored_as_imputed():
+    reported = [{
+        "KPI_code": "KPI_PeopleVol_Tot",
+        "DonCode": "DAD001",
+        "year": 2025,
+        "value": "395",
+        "State": 500,
+    }]
+    imputed = [{
+        "KPI_code": "KPI_PeopleVol_Tot",
+        "DonCode": "DAD001",
+        "year": 2025,
+        "value": "395",
+        "source": "R",
+    }]
+    combined = build_fdrs_combined(
+        reported,
+        imputed,
+        {"DAD001": "AND"},
+        import_state_allowlist=frozenset({100, 200, 300, 400, 500}),
+    )
+    tot = {(r["KPI_code"], r["DonCode"]): r for r in combined}[("KPI_PeopleVol_Tot", "DAD001")]
+    assert tot["Value"] == "395"
+    assert tot["ReportedValue"] == "395"
+    assert tot["ImputedValue"] is None
+    assert tot["State"] == 500
+
+
 def test_build_ready_to_import_splits_reported_value_and_imputed_value():
     fdrs_data = [
         {
@@ -1320,9 +1451,45 @@ def test_build_ready_to_import_copies_value_into_published_only_for_state_500():
     submitted = one(300)
     assert published["value"] == "15"
     assert published["published_value"] == "15"
+    assert published["published_source"] == "reported"
     assert submitted["value"] == "15"
     assert submitted["published_value"] == ""
     assert submitted["published_disagg_data"] == ""
+    assert submitted["published_source"] == ""
+
+
+def test_build_ready_to_import_publishes_imputed_only_value_for_state_500():
+    assignment_rows = [{"period_name": "2025", "iso3": "IRN", "assignment_entity_status_id": 3037}]
+    form_item_rows = [{"bank_id": 7, "item_id": 916}]
+    indicator_bank_rows = [{"id": 7, "fdrs_kpi_code": "KPI_PeopleVol"}]
+
+    def one(state):
+        return build_ready_to_import_from_new_pipeline(
+            [{
+                "ISO3": "IRN",
+                "year": "2025",
+                "BaseKPI": "KPI_PeopleVol",
+                "KPI_code": "KPI_PeopleVol_Tot",
+                "Value": "",
+                "ImputedValue": "5506200",
+                "State": state,
+            }],
+            {},
+            assignment_rows,
+            form_item_rows,
+            indicator_bank_rows,
+        )[0]
+
+    published = one(500)
+    submitted = one(300)
+    assert published["value"] == ""
+    assert published["imputed_value"] == "5506200"
+    assert published["published_value"] == "5506200"
+    assert published["published_source"] == "imputed"
+    assert submitted["value"] == ""
+    assert submitted["imputed_value"] == "5506200"
+    assert submitted["published_value"] == ""
+    assert submitted["published_source"] == ""
 
 
 def test_build_ready_to_import_sets_not_applicable_from_is_data_not_collected():

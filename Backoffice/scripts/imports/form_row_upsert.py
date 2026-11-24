@@ -37,6 +37,7 @@ COL_IMPUTED = "imputed_value"
 COL_SUBMITTED = "submitted_at"
 COL_PUBLISHED_VALUE = "published_value"
 COL_PUBLISHED_DISAGG = "published_disagg_data"
+COL_PUBLISHED_SOURCE = "published_source"
 
 ALL_COLUMNS = (
     COL_ASSIGNMENT,
@@ -349,6 +350,7 @@ def row_to_payload(row: Dict[str, str]) -> Tuple[Optional[int], Optional[int], O
         payload["set_published"] = True
         payload["published_value"] = _coerce_value(row.get(COL_PUBLISHED_VALUE))
         payload["published_disagg_data"] = _normalize_json_numbers_to_ints(published_disagg)
+        payload["published_source"] = (row.get(COL_PUBLISHED_SOURCE) or "").strip().lower()
     else:
         payload["set_published"] = False
     return assignment_entity_status_id, public_submission_id, form_item_id, payload
@@ -373,6 +375,8 @@ def _published_snapshot_fields(payload: Dict[str, Any]) -> Tuple[Optional[str], 
         return None, None, None
     from app.models.forms import FormData
 
+    if (payload.get("published_source") or "") == FormData.PUBLISHED_SOURCE_IMPUTED:
+        return published_value, published_disagg, FormData.PUBLISHED_SOURCE_IMPUTED
     return published_value, published_disagg, FormData.PUBLISHED_SOURCE_REPORTED
 
 

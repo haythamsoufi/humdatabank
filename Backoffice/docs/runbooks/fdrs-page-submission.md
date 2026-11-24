@@ -18,17 +18,16 @@ Published FDRS template pages, and the workflow KPI prefix that belongs on each 
 
 Match pages by **name** on the published template version. Page ids differ between databases (local published version 21 uses 76, 77, and 78).
 
-Intended import, once page mode is on everywhere:
+`fdrs_assignment_status_sync.py` writes each prefix to `assignment_page_status` for that page and keeps `assignment_entity_status` as the rollup:
 
-- Each prefix is written to `assignment_page_status` for that page, not only folded into `assignment_entity_status`.
 - `WasValidated` or `WasPublished` → page `approved`
 - `WasSubmitted` → page `submitted`
 - `WasStarted` only → page `in_progress`
 - No flags for that section → leave the page row unchanged
-- `ValidationDate` / `PublishDate` → that page's `status_timestamp` and `submitted_at`
+- `SubmitDate`, else `ValidationDate` / `PublishDate`, sets that page's `submitted_at`. `StartDate` is included in `status_timestamp`.
 - The whole-assignment status stays the rollup of the three pages (all approved → `approved`, all submitted → `submitted`, any submitted → `submitted`, any started → `in_progress`)
 
-The sync does **not** do this yet. `fdrs_assignment_status_sync.py` still writes only `assignment_entity_status`. The page names live on `FDRS_SECTION_WORKFLOW_SPECS` in `plugins/fdrs/scripts/fdrs_sync_constants.py` so that import can use them.
+Page names live on `FDRS_SECTION_WORKFLOW_SPECS` in `plugins/fdrs/scripts/fdrs_sync_constants.py`. Pages are matched by name on the assignment's published template version.
 
 ## What the script changes
 

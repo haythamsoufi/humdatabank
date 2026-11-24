@@ -623,6 +623,7 @@ def fetch_imputed_from_kpi_api(
     """
     FDRS - ImputedValue API: GET /api/KpiImputedValue?kpicode=X&year=Y&apikey=KEY
     per (KPI, year) for KPIs that contain "_IP". Response: list of {doncode, value, source}.
+    Only source ``I`` is kept. Source ``R`` is the reported figure and is ignored.
     KPI_code in output has "_IP" removed for joining with reported data.
     """
     if years is None:
@@ -656,6 +657,10 @@ def fetch_imputed_from_kpi_api(
             for r in rows:
                 if not isinstance(r, dict):
                     continue
+                # source R is the reported figure echoed by this endpoint. Keeping it
+                # would copy a real reported number into imputed_value.
+                if _imputed_api_source(r) != "I":
+                    continue
                 don = (r.get("doncode") or r.get("DonCode") or "").strip()
                 if not don:
                     continue
@@ -667,6 +672,7 @@ def fetch_imputed_from_kpi_api(
                     "value": str(val) if val is not None else None,
                     "State": None,
                     "SourceType": "Imputed",
+                    "source": "I",
                 })
     return out
 
@@ -701,6 +707,10 @@ def load_imputed_cache(
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, list):
+            return None
+        # Caches written before source was stored treated every KpiImputedValue
+        # row as imputed, including source R. Refetch those.
+        if any(isinstance(row, dict) and "source" not in row and "Source" not in row for row in data):
             return None
         return data
     except Exception as e:
@@ -752,6 +762,28 @@ def fetch_country_map(
 # ---------- FDRS (combined) ----------
 
 
+def _imputed_api_source(row: Dict[str, Any]) -> Optional[str]:
+    """``I`` or ``R`` from a KpiImputedValue row. None when that feed did not say."""
+    if "source" in row:
+        raw = row.get("source")
+    elif "Source" in row:
+        raw = row.get("Source")
+    else:
+        return None
+    text = str(raw or "").strip().upper()
+    if text in ("I", "R"):
+        return text
+    return None
+
+
+def _value_present(val: Any) -> bool:
+    if val is None:
+        return False
+    if isinstance(val, str) and not val.strip():
+        return False
+    return True
+
+
 def build_fdrs_combined(
     reported_rows: List[Dict],
     imputed_rows: List[Dict],
@@ -764,13 +796,20 @@ def build_fdrs_combined(
     ReportedValue = reported value when State is in import_state_allowlist (else None).
     ImputedValue = imputed value when present.
     Value = ReportedValue only (imputed is kept separate for import into imputed_value).
+    A KpiImputedValue row with source ``I`` is imputed-only: the matching reported
+    figure is dropped, because FDRS often copies that imputed number onto a
+    non-published ``fdrsdata`` row. Source ``R`` is not an imputed value.
+    When the ``*_IP`` sibling is State 500, that state is kept on the imputed row
+    so the import publishes the imputed figure.
     ValueStatus: reported workflow state when reported is importable; else Imputed when imputed-only.
     Merge Country Map: DonCode -> ISO3.
     """
     import_states = import_state_allowlist
     key_to_reported = {}
     key_to_imputed = {}
+    key_to_imputed_source = {}
     key_to_state = {}
+    key_to_ip_state = {}
 
     def _key_year(y_raw: Any) -> Any:
         yk = _fdrs_reporting_year_key(y_raw)
@@ -778,13 +817,22 @@ def build_fdrs_combined(
 
     for r in reported_rows:
         y = _key_year(r.get("year"))
-        key = (r.get("KPI_code") or "", r.get("DonCode") or "", y)
+        kpi = r.get("KPI_code") or ""
+        don = r.get("DonCode") or ""
+        key = (kpi, don, y)
         key_to_reported[key] = r.get("value")
         key_to_state[key] = r.get("State")
+        if kpi.endswith("_IP") and len(kpi) > 3:
+            key_to_ip_state[(kpi[:-3], don, y)] = r.get("State")
     for r in imputed_rows:
+        source = _imputed_api_source(r)
+        if source == "R":
+            continue
         y = _key_year(r.get("year"))
         key = (r.get("KPI_code") or "", r.get("DonCode") or "", y)
         key_to_imputed[key] = r.get("value")
+        if source == "I":
+            key_to_imputed_source[key] = "I"
 
     all_keys = set(key_to_reported) | set(key_to_imputed)
     out = []
@@ -793,24 +841,34 @@ def build_fdrs_combined(
         reported_val = key_to_reported.get(key)
         imputed_val = key_to_imputed.get(key)
         state = key_to_state.get(key)
-        state_i = _fdrs_state_as_int(state)
-        if reported_val is not None and state_i is not None and state_i in import_states:
-            reported_out = reported_val
-            value_status = _value_status_for_reported_state(state_i)
-        elif reported_val is not None:
+        confirmed_imputed = key_to_imputed_source.get(key) == "I" and _value_present(imputed_val)
+        if confirmed_imputed:
             reported_out = None
-            value_status = "Unpublished Reported"
-        else:
-            reported_out = None
-            value_status = "Missing"
-        imputed_out = imputed_val
-        if reported_out is not None:
-            value = reported_out
-        elif imputed_out is not None:
+            imputed_out = imputed_val
             value = None
             value_status = "Imputed"
+            ip_state = key_to_ip_state.get(key)
+            if fdrs_state_is_published(ip_state):
+                state = ip_state
         else:
-            value = None
+            state_i = _fdrs_state_as_int(state)
+            if reported_val is not None and state_i is not None and state_i in import_states:
+                reported_out = reported_val
+                value_status = _value_status_for_reported_state(state_i)
+            elif reported_val is not None:
+                reported_out = None
+                value_status = "Unpublished Reported"
+            else:
+                reported_out = None
+                value_status = "Missing"
+            imputed_out = imputed_val
+            if reported_out is not None:
+                value = reported_out
+            elif imputed_out is not None:
+                value = None
+                value_status = "Imputed"
+            else:
+                value = None
         iso3 = country_map.get(don, "")
         out.append({
             "ISO3": iso3,
@@ -1248,14 +1306,20 @@ def build_fdrs_table(
                 don = (r.get("DonCode") or r.get("id.1") or r.get("id") or "").strip()
                 yr = r.get("year") or r.get("Year")
                 val = r.get("value")
-                imputed.append({
+                source = _imputed_api_source(r)
+                if source == "R":
+                    continue
+                imputed_row = {
                     "DonCode": don,
                     "year": yr,
                     "KPI_code": kpi,
                     "value": str(val) if val is not None else None,
                     "State": None,
                     "SourceType": "Imputed",
-                })
+                }
+                if source:
+                    imputed_row["source"] = source
+                imputed.append(imputed_row)
         except Exception as e:
             logger.debug("Imputed row append failed: %s", e)
     else:

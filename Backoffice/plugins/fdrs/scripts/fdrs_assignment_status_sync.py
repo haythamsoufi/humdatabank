@@ -1,8 +1,10 @@
 """
-FDRS section workflow KPIs → assignment_entity_status sync.
+FDRS section workflow KPIs → assignment and page status sync.
 
-Reads per-section WasStarted / WasSubmitted / WasValidated flags and ValidationDate /
-PublishDate from data-api.ifrc.org fdrsdata, then maps to databank assignment workflow.
+Reads per-section WasStarted / WasSubmitted / WasValidated / WasPublished flags and
+StartDate / SubmitDate / ValidationDate / PublishDate from data-api.ifrc.org fdrsdata.
+Each section is written to assignment_page_status on the matching form page. The
+assignment status stays the rollup of those three sections.
 """
 
 from __future__ import annotations
@@ -116,23 +118,39 @@ def fetch_section_workflow_rows(
     return out
 
 
+def derive_page_workflow_status(section: Dict[str, Any]) -> Optional[str]:
+    """Map one FDRS section's flags to a page status.
+
+    No flags means the page row is left unchanged (returns None).
+    Validated or published wins over submitted; submitted wins over started.
+    """
+    if section.get("validated") or section.get("published"):
+        return "approved"
+    if section.get("submitted"):
+        return "submitted"
+    if section.get("started"):
+        return "in_progress"
+    return None
+
+
 def _section_states_from_kpi_values(kpi_values: Dict[str, Any]) -> List[Dict[str, Any]]:
     sections: List[Dict[str, Any]] = []
     for spec in FDRS_SECTION_WORKFLOW_SPECS:
         prefix = spec["prefix"]
-        validation_date = _parse_fdrs_datetime(kpi_values.get(f"{prefix}_ValidationDate"))
-        publish_date = _parse_fdrs_datetime(kpi_values.get(f"{prefix}_PublishDate"))
-        sections.append(
-            {
-                "label": spec["label"],
-                "started": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasStarted")),
-                "submitted": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasSubmitted")),
-                "validated": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasValidated")),
-                "published": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasPublished")),
-                "validation_date": validation_date,
-                "publish_date": publish_date,
-            }
-        )
+        section = {
+            "label": spec["label"],
+            "page_name": spec["page_name"],
+            "started": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasStarted")),
+            "submitted": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasSubmitted")),
+            "validated": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasValidated")),
+            "published": _parse_fdrs_bool(kpi_values.get(f"{prefix}_WasPublished")),
+            "start_date": _parse_fdrs_datetime(kpi_values.get(f"{prefix}_StartDate")),
+            "submit_date": _parse_fdrs_datetime(kpi_values.get(f"{prefix}_SubmitDate")),
+            "validation_date": _parse_fdrs_datetime(kpi_values.get(f"{prefix}_ValidationDate")),
+            "publish_date": _parse_fdrs_datetime(kpi_values.get(f"{prefix}_PublishDate")),
+        }
+        section["page_status"] = derive_page_workflow_status(section)
+        sections.append(section)
     return sections
 
 
@@ -173,14 +191,58 @@ def _section_event_datetimes(sections: List[Dict[str, Any]]) -> Tuple[List[datet
     submitted_dates: List[datetime] = []
     all_dates: List[datetime] = []
     for section in sections:
-        for dt in (section.get("publish_date"), section.get("validation_date")):
+        for dt in (
+            section.get("start_date"),
+            section.get("submit_date"),
+            section.get("publish_date"),
+            section.get("validation_date"),
+        ):
             if dt is not None:
                 all_dates.append(dt)
         if section.get("submitted") or section.get("validated") or section.get("published"):
-            for dt in (section.get("publish_date"), section.get("validation_date")):
+            for dt in (
+                section.get("submit_date"),
+                section.get("publish_date"),
+                section.get("validation_date"),
+            ):
                 if dt is not None:
                     submitted_dates.append(dt)
     return submitted_dates, all_dates
+
+
+def derive_page_timestamps(
+    status: Optional[str],
+    section: Dict[str, Any],
+) -> Tuple[Optional[datetime], Optional[datetime]]:
+    """Return (status_timestamp, submitted_at) for one page.
+
+    submitted_at prefers SubmitDate, then ValidationDate / PublishDate.
+    An in-progress page has no submitted_at.
+    """
+    if not status:
+        return None, None
+    _submitted, all_dates = _section_event_datetimes([section])
+    if not all_dates:
+        return None, None
+    status_timestamp = max(all_dates)
+    if status == "in_progress":
+        return status_timestamp, None
+    submitted_at = min(_submitted) if _submitted else None
+    return status_timestamp, submitted_at
+
+
+def _normalize_page_name(value: Any) -> str:
+    return " ".join(str(value or "").split()).casefold()
+
+
+def _same_timestamp(left: Any, right: Any) -> bool:
+    if left is None or right is None:
+        return left is right
+    if getattr(left, "tzinfo", None) is not None:
+        left = left.replace(tzinfo=None)
+    if getattr(right, "tzinfo", None) is not None:
+        right = right.replace(tzinfo=None)
+    return left == right
 
 
 def derive_assignment_timestamps(
@@ -274,6 +336,109 @@ def build_assignment_status_plan(
     return plan, summary
 
 
+def _published_page_ids_by_aes(aes_rows: List[Any]) -> Dict[int, Dict[str, int]]:
+    """Map each assignment to published form-page ids keyed by normalized page name."""
+    from app.models.forms import FormPage
+
+    aes_version: Dict[int, int] = {}
+    version_ids = set()
+    for aes in aes_rows:
+        form = getattr(aes, "assigned_form", None)
+        template = getattr(form, "template", None) if form is not None else None
+        version_id = getattr(template, "published_version_id", None) if template is not None else None
+        if not version_id:
+            continue
+        version_ids.add(int(version_id))
+        aes_version[int(aes.id)] = int(version_id)
+    if not version_ids:
+        return {}
+
+    pages = (
+        FormPage.query.filter(FormPage.version_id.in_(list(version_ids)))
+        .order_by(FormPage.order, FormPage.id)
+        .all()
+    )
+    by_version: Dict[int, Dict[str, int]] = {}
+    for page in pages:
+        bucket = by_version.setdefault(int(page.version_id), {})
+        name_key = _normalize_page_name(page.name)
+        if name_key:
+            bucket.setdefault(name_key, int(page.id))
+        translations = page.name_translations if isinstance(page.name_translations, dict) else {}
+        for value in translations.values():
+            key = _normalize_page_name(value)
+            if key:
+                bucket.setdefault(key, int(page.id))
+    return {aes_id: by_version.get(version_id, {}) for aes_id, version_id in aes_version.items()}
+
+
+def _apply_page_statuses(
+    aes_id: int,
+    sections: List[Dict[str, Any]],
+    pages_by_name: Dict[str, int],
+    *,
+    dry_run: bool,
+    missing_pages: set,
+) -> int:
+    """Write FDRS section status onto matching page rows. Returns rows changed."""
+    from app.extensions import db
+    from app.models.assignments import AssignmentPageStatus
+
+    changed = 0
+    for section in sections or []:
+        status = section.get("page_status")
+        if not status:
+            continue
+        page_name = section.get("page_name") or ""
+        page_key = _normalize_page_name(page_name)
+        page_id = pages_by_name.get(page_key)
+        if page_id is None:
+            marker = (aes_id, page_key)
+            if page_key and marker not in missing_pages:
+                missing_pages.add(marker)
+                logger.warning(
+                    "FDRS page status: no published page named %r for assignment %s",
+                    page_name,
+                    aes_id,
+                )
+            continue
+
+        status_timestamp, submitted_at = derive_page_timestamps(status, section)
+        row = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes_id,
+            form_page_id=page_id,
+        ).first()
+        row_changed = row is None or row.status != status
+        if row is not None and status_timestamp is not None and not _same_timestamp(row.status_timestamp, status_timestamp):
+            row_changed = True
+        if status in {"submitted", "approved"}:
+            if submitted_at is not None and (row is None or not _same_timestamp(row.submitted_at, submitted_at)):
+                row_changed = True
+        elif row is not None and row.submitted_at is not None:
+            row_changed = True
+        if not row_changed:
+            continue
+        changed += 1
+        if dry_run:
+            continue
+        if row is None:
+            row = AssignmentPageStatus(
+                assignment_entity_status_id=aes_id,
+                form_page_id=page_id,
+                status=status,
+            )
+            db.session.add(row)
+        row.status = status
+        if status_timestamp is not None:
+            row.status_timestamp = status_timestamp
+        if status in {"submitted", "approved"}:
+            if submitted_at is not None:
+                row.submitted_at = submitted_at
+        else:
+            row.submitted_at = None
+    return changed
+
+
 def upsert_assignment_status_from_plan(
     plan_rows: List[Dict[str, Any]],
     *,
@@ -283,12 +448,12 @@ def upsert_assignment_status_from_plan(
     progress_start_pct: float = 94.0,
     progress_end_pct: float = 99.0,
 ) -> Dict[str, int]:
-    """Apply assignment status updates. Does not set submitted_by / approved_by (unknown in FDRS)."""
+    """Apply assignment and page status updates. Does not set submitted_by / approved_by (unknown in FDRS)."""
     from app.extensions import db
     from app.models.assignments import AssignmentEntityStatus
     from app.models.enums import AssignmentEntityStatusValue
 
-    stats = {"updated": 0, "skipped": 0, "errors": 0}
+    stats = {"updated": 0, "skipped": 0, "errors": 0, "pages_updated": 0}
     if not plan_rows:
         return stats
 
@@ -328,6 +493,8 @@ def upsert_assignment_status_from_plan(
 
         aes_rows = lock_aes_rows_for_update(aes_ids)
     aes_by_id = {int(row.id): row for row in aes_rows}
+    pages_by_aes = _published_page_ids_by_aes(aes_rows)
+    missing_pages: set = set()
 
     for i, row in enumerate(plan_rows, start=1):
         _check_cancel()
@@ -347,15 +514,24 @@ def upsert_assignment_status_from_plan(
             new_ts = row.get("status_timestamp")
             new_submitted_at = row.get("submitted_at")
 
-            changed = current_status != new_status.value
-            if new_ts is not None and aes.status_timestamp != new_ts:
-                changed = True
-            if new_submitted_at != aes.submitted_at:
-                changed = True
+            aes_changed = current_status != new_status.value
+            if new_ts is not None and not _same_timestamp(aes.status_timestamp, new_ts):
+                aes_changed = True
+            if new_submitted_at is not None and not _same_timestamp(aes.submitted_at, new_submitted_at):
+                aes_changed = True
             if new_status.value == "in_progress" and aes.submitted_at is not None:
-                changed = True
+                aes_changed = True
 
-            if not changed:
+            pages_changed = _apply_page_statuses(
+                aes_id,
+                row.get("sections") or [],
+                pages_by_aes.get(aes_id, {}),
+                dry_run=dry_run,
+                missing_pages=missing_pages,
+            )
+            stats["pages_updated"] += pages_changed
+
+            if not aes_changed and pages_changed == 0:
                 stats["skipped"] += 1
                 continue
 
@@ -363,15 +539,16 @@ def upsert_assignment_status_from_plan(
                 stats["updated"] += 1
                 continue
 
-            aes.status = new_status
-            if new_ts is not None:
-                aes.status_timestamp = new_ts
-            if new_status.value in {"submitted", "approved"}:
-                if new_submitted_at is not None:
-                    aes.submitted_at = new_submitted_at
-            else:
-                aes.submitted_at = None
-            db.session.add(aes)
+            if aes_changed:
+                aes.status = new_status
+                if new_ts is not None:
+                    aes.status_timestamp = new_ts
+                if new_status.value in {"submitted", "approved"}:
+                    if new_submitted_at is not None:
+                        aes.submitted_at = new_submitted_at
+                else:
+                    aes.submitted_at = None
+                db.session.add(aes)
             stats["updated"] += 1
 
             if i == 1 or i % 50 == 0 or i == total_rows:
@@ -399,7 +576,7 @@ def run_fdrs_assignment_status_sync(
     progress_start_pct: float = 94.0,
     progress_end_pct: float = 99.0,
 ) -> Dict[str, Any]:
-    """Fetch workflow KPIs, build plan, upsert assignment_entity_status."""
+    """Fetch workflow KPIs, build plan, upsert assignment and page status."""
     def _progress(**kwargs: Any) -> None:
         if cancel_check and cancel_check():
             raise FdrsSyncCancelled()
@@ -448,6 +625,7 @@ def run_fdrs_assignment_status_sync(
         stage="assignment_status_done",
         message=(
             f"Assignment status: updated={upsert_stats.get('updated', 0)} "
+            f"pages={upsert_stats.get('pages_updated', 0)} "
             f"skipped={upsert_stats.get('skipped', 0)} "
             f"errors={upsert_stats.get('errors', 0)}"
         ),
@@ -457,9 +635,10 @@ def run_fdrs_assignment_status_sync(
     )
 
     logger.info(
-        "FDRS assignment status: planned=%s updated=%s skipped=%s errors=%s by_status=%s",
+        "FDRS assignment status: planned=%s updated=%s pages=%s skipped=%s errors=%s by_status=%s",
         summary.get("planned"),
         upsert_stats.get("updated"),
+        upsert_stats.get("pages_updated"),
         upsert_stats.get("skipped"),
         upsert_stats.get("errors"),
         summary.get("by_status"),

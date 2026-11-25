@@ -93,14 +93,14 @@ class TestProjectDashboardFields:
 class TestDashboardProjectCardHeading:
     def test_dref_card_puts_fund_code_and_name_in_the_title(self):
         title, subtitle = dashboard_project_card_heading(
-            "DREF", "DREF", "MDRZZ001", "Zedland Flood"
+            "Emergency Operations", "DREF", "MDRZZ001", "Zedland Flood"
         )
         assert title == "DREF MDRZZ001 — Zedland Flood"
         assert subtitle == ""
 
     def test_imminent_dref_uses_its_fund_label(self):
         title, subtitle = dashboard_project_card_heading(
-            "DREF", "i-DREF", "MDRIM009", "Imminent flood"
+            "Emergency Operations", "i-DREF", "MDRIM009", "Imminent flood"
         )
         assert title == "i-DREF MDRIM009 — Imminent flood"
         assert subtitle == ""

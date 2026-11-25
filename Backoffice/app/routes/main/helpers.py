@@ -2123,14 +2123,16 @@ def dashboard_cycle_label(period_name: str, reference: str = "") -> str:
 def dashboard_project_card_heading(portfolio, fund, reference, title) -> tuple[str, str]:
     """Title and subtitle for one project assignment card.
 
-    A DREF card title is the fund, the appeal code, and the disaster name.
-    Every project card uses the project name as the title and leaves the
-    subtitle empty, so the project code is not repeated under the title.
+    An Emergency Operations card title is the fund, the appeal code, and the disaster name.
+    A portfolio still stored as DREF uses the same layout. Every other project card uses
+    the project name as the title and leaves the subtitle empty.
     """
     ref = (reference or "").strip()
     name = (title or "").strip()
-    if (portfolio or "").strip() == "DREF":
-        label = (fund or "").strip() or "DREF"
+    portfolio_name = (portfolio or "").strip()
+    if portfolio_name in {"DREF", "Emergency Operations"}:
+        fallback = "DREF" if portfolio_name == "DREF" else "Emergency Operations"
+        label = (fund or "").strip() or fallback
         heading = f"{label} {ref}".strip()
         if name and name != ref:
             heading = f"{heading} — {name}"

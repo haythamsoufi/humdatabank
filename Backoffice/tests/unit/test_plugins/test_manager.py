@@ -1588,12 +1588,12 @@ class TestGetDocumentationSources:
         pm, _ = _make_manager(tmp_path)
         plugin = MagicMock()
         plugin.get_documentation_source.return_value = PluginDocsSource(
-            category="dref-monitoring",
+            category="emergency-operations",
             root_dir=tmp_path / "dref-docs",
-            display_name="DREF monitoring",
+            display_name="Emergency Operations",
             include_in_help=True,
         )
-        pm.plugins = {"dref_monitoring": plugin}
+        pm.plugins = {"emergency_operations_monitoring": plugin}
         pm.active_plugins = set()
 
         assert pm.get_documentation_sources() == []

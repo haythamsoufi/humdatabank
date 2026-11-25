@@ -12,7 +12,7 @@ PLUGIN_LICENSE = "MIT"
 
 # Plugins whose author metadata is stamped by FirstPartyPluginMetadata.
 FIRST_PARTY_PLUGIN_IDS = (
-    "dref_monitoring",
+    "emergency_operations_monitoring",
     "global_award",
     "interactive_map",
 )
@@ -23,7 +23,7 @@ FIRST_PARTY_PLUGIN_IDS = (
 # never uninstalled. tests/unit/test_plugins/test_first_party_plugins.py fails if
 # a plugin folder under Backoffice/plugins/ is missing from this tuple.
 BUNDLED_PLUGIN_IDS = (
-    "dref_monitoring",
+    "emergency_operations_monitoring",
     "emergency_operations",
     "fdrs",
     "global_award",

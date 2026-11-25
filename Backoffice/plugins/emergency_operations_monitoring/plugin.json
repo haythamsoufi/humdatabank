@@ -1,0 +1,10 @@
+{
+  "plugin_id": "emergency_operations_monitoring",
+  "name": "emergency_operations_monitoring",
+  "display_name": "Emergency Operations",
+  "version": "0.14.0",
+  "description": "Tracks emergency operations from GO approval through monitoring to closure, including routine reports, escalation, and draft operational updates and final reports.",
+  "author": "Haytham Alsoufi",
+  "homepage": "https://github.com/haythamsoufi",
+  "license": "MIT"
+}

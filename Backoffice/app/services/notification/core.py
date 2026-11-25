@@ -235,10 +235,10 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
             '%(count)s data validation question(s) for %(entity)s require your response.'
         ),
 
-        'notification.dref_monitoring.reminder.title': _notification_msgid(
-            'DREF monitoring reminder: %(appeal)s'
+        'notification.emergency_operations_monitoring.reminder.title': _notification_msgid(
+            'Emergency Operations reminder: %(appeal)s'
         ),
-        'notification.dref_monitoring.reminder.message': _notification_msgid(
+        'notification.emergency_operations_monitoring.reminder.message': _notification_msgid(
             '%(detail)s'
         ),
     }

@@ -119,6 +119,17 @@
   box-shadow: 0 16px 40px rgba(5, 28, 44, 0.5);
 }
 
+.dev-tools.is-dragging-over-hide {
+  opacity: 0.55;
+}
+
+.dev-tools.is-session-hidden,
+.dev-tools[hidden].is-session-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 .dev-tools__bar {
   touch-action: none;
 }
@@ -187,6 +198,40 @@
   text-transform: uppercase;
   color: #94a3b8;
   font-size: 0.625rem;
+}
+
+.dev-tools__tabs {
+  display: flex;
+  gap: 0.125rem;
+  border-bottom: 1px solid #1e3a4c;
+  padding: 0 0.25rem;
+}
+
+.dev-tools__tab {
+  margin: 0;
+  padding: 0.4rem 0.45rem 0.35rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dev-tools__tab:hover {
+  color: #e2e8f0;
+}
+
+.dev-tools__tab.is-active {
+  color: #f8fafc;
+  border-bottom-color: #5eead4;
+}
+
+.dev-tools__tab:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: -2px;
 }
 
 .dev-tools__panel {

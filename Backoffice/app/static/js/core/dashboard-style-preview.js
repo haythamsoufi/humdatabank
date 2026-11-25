@@ -4,6 +4,7 @@
  * Requires .ui-style-root and optional #dev-tools (DEBUG + loopback).
  * The pane starts collapsed. Drag the header to move it; position,
  * open/closed state, and the active tool are saved in this browser.
+ * Dropping it on the hide target dismisses it until the next page load.
  */
 (function () {
     'use strict';
@@ -277,10 +278,97 @@
         var dragging = false;
         var moved = false;
         var suppressClick = false;
+        var sessionHidden = false;
         var startX = 0;
         var startY = 0;
         var originLeft = 0;
         var originTop = 0;
+        var lastPointerX = 0;
+        var lastPointerY = 0;
+        var hideZone = null;
+        var hideZoneHot = false;
+        var hideZoneShown = false;
+
+        function ensureHideZone() {
+            if (hideZone && hideZone.isConnected) {
+                return hideZone;
+            }
+            hideZone = document.getElementById('aiChatbotFabHideZone')
+                || document.getElementById('devToolsHideZone');
+            if (hideZone) {
+                return hideZone;
+            }
+            hideZone = document.createElement('div');
+            hideZone.id = 'devToolsHideZone';
+            hideZone.className = 'fab-hide-zone';
+            hideZone.setAttribute('role', 'status');
+            hideZone.setAttribute('aria-hidden', 'true');
+            hideZone.innerHTML =
+                '<div class="fab-hide-zone-inner">' +
+                '<i class="fas fa-eye-slash" aria-hidden="true"></i>' +
+                '<span class="fab-hide-zone-label">Drop to hide</span>' +
+                '</div>';
+            document.body.appendChild(hideZone);
+            return hideZone;
+        }
+
+        function showHideZone() {
+            var zone = ensureHideZone();
+            hideZoneShown = true;
+            zone.setAttribute('aria-hidden', 'false');
+            window.requestAnimationFrame(function () {
+                if (hideZoneShown) {
+                    zone.classList.add('fab-hide-zone--visible');
+                }
+            });
+        }
+
+        function hideHideZone() {
+            hideZoneShown = false;
+            if (!hideZone) {
+                return;
+            }
+            hideZone.classList.remove('fab-hide-zone--visible', 'fab-hide-zone--hot');
+            hideZone.setAttribute('aria-hidden', 'true');
+        }
+
+        function pointInHideZone(clientX, clientY) {
+            if (!hideZone || !hideZoneShown) {
+                return false;
+            }
+            var rect = hideZone.getBoundingClientRect();
+            var pad = 12;
+            return clientX >= rect.left - pad && clientX <= rect.right + pad
+                && clientY >= rect.top - pad && clientY <= rect.bottom + pad;
+        }
+
+        function paneOverlapsHideZone() {
+            if (!hideZone || !hideZoneShown) {
+                return false;
+            }
+            var pane = switcher.getBoundingClientRect();
+            var zone = hideZone.getBoundingClientRect();
+            return pane.left < zone.right && pane.right > zone.left
+                && pane.top < zone.bottom && pane.bottom > zone.top;
+        }
+
+        function setHideZoneHot(hot) {
+            hideZoneHot = !!hot;
+            if (hideZone) {
+                hideZone.classList.toggle('fab-hide-zone--hot', hideZoneHot);
+            }
+            switcher.classList.toggle('is-dragging-over-hide', hideZoneHot);
+        }
+
+        function dismissForSession() {
+            sessionHidden = true;
+            hideHideZone();
+            setHideZoneHot(false);
+            switcher.classList.remove('is-dragging');
+            switcher.classList.add('is-session-hidden');
+            switcher.hidden = true;
+            switcher.setAttribute('aria-hidden', 'true');
+        }
 
         function place(left, top) {
             switcher.classList.add('is-positioned');
@@ -333,7 +421,7 @@
             state.tool = next;
             switcher.querySelectorAll('[data-dev-tool]').forEach(function (tab) {
                 var on = tab.getAttribute('data-dev-tool') === next;
-                if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(tab, on);
+                tab.classList.toggle('is-active', on);
                 tab.setAttribute('aria-selected', on ? 'true' : 'false');
             });
             switcher.querySelectorAll('[data-dev-tool-panel]').forEach(function (panel) {
@@ -376,6 +464,9 @@
         });
 
         dragHandle.addEventListener('pointerdown', function (event) {
+            if (sessionHidden) {
+                return;
+            }
             if (event.pointerType === 'mouse' && event.button !== 0) {
                 return;
             }
@@ -404,6 +495,7 @@
             if (!moved) {
                 moved = true;
                 switcher.classList.add('is-dragging');
+                showHideZone();
             }
             var width = switcher.offsetWidth;
             var height = switcher.offsetHeight;
@@ -412,6 +504,9 @@
             var left = Math.min(Math.max(originLeft + dx, VIEWPORT_PAD), maxLeft);
             var top = Math.min(Math.max(originTop + dy, VIEWPORT_PAD), maxTop);
             place(left, top);
+            lastPointerX = event.clientX;
+            lastPointerY = event.clientY;
+            setHideZoneHot(pointInHideZone(event.clientX, event.clientY) || paneOverlapsHideZone());
         });
 
         function endDrag(event) {
@@ -419,10 +514,25 @@
                 return;
             }
             dragging = false;
-            switcher.classList.remove('is-dragging');
             if (moved) {
                 suppressClick = true;
-                writePane(state);
+                var releaseX = isFinite(event.clientX) ? event.clientX : lastPointerX;
+                var releaseY = isFinite(event.clientY) ? event.clientY : lastPointerY;
+                var overHide = hideZoneHot
+                    || pointInHideZone(releaseX, releaseY)
+                    || paneOverlapsHideZone();
+                if (overHide) {
+                    dismissForSession();
+                } else {
+                    setHideZoneHot(false);
+                    hideHideZone();
+                    switcher.classList.remove('is-dragging');
+                    writePane(state);
+                }
+            } else {
+                setHideZoneHot(false);
+                hideHideZone();
+                switcher.classList.remove('is-dragging');
             }
             try {
                 dragHandle.releasePointerCapture(event.pointerId);
@@ -435,7 +545,7 @@
         dragHandle.addEventListener('pointercancel', endDrag);
 
         window.addEventListener('resize', function () {
-            if (!positioned) {
+            if (sessionHidden || !positioned) {
                 return;
             }
             clampIntoView(true);

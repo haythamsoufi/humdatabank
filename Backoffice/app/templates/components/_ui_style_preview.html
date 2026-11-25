@@ -1,5 +1,4 @@
 {% if show_ui_style_preview|default(false) %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {# Add a tool: a [data-dev-tool] tab and a matching [data-dev-tool-panel]. #}
 <aside id="dev-tools"
        class="dev-tools is-collapsed"
@@ -17,9 +16,9 @@
         </button>
     </div>
     <div id="dev-tools-body" class="dev-tools__body" data-dev-tools-body hidden>
-        {% call scroll_tab_bar(inner_id='dev-tools-tabs', aria_label=_('Dev tools'), wrapper_class='bg-white') %}
+        <nav id="dev-tools-tabs" class="dev-tools__tabs" role="tablist" aria-label="{{ _('Dev tools')|forceescape }}">
             <button type="button"
-                    class="{{ admin_underline_tab_btn_classes(true, size='compact') }}"
+                    class="dev-tools__tab is-active"
                     role="tab"
                     id="dev-tools-tab-style"
                     data-dev-tool="style"
@@ -27,14 +26,14 @@
                     aria-controls="dev-tools-panel-style">{{ _('Style preview') }}</button>
             {% if show_section_nav_preview|default(false) %}
             <button type="button"
-                    class="{{ admin_underline_tab_btn_classes(false, size='compact') }}"
+                    class="dev-tools__tab"
                     role="tab"
                     id="dev-tools-tab-section-nav"
                     data-dev-tool="section-nav"
                     aria-selected="false"
                     aria-controls="dev-tools-panel-section-nav">{{ _('Section nav') }}</button>
             {% endif %}
-        {% endcall %}
+        </nav>
         <div id="dev-tools-panel-style"
              class="dev-tools__panel"
              role="tabpanel"
@@ -97,7 +96,7 @@
         if (savedToolExists) {
             el.querySelectorAll('[data-dev-tool]').forEach(function (tab) {
                 var on = tab.getAttribute('data-dev-tool') === savedTool;
-                if (window.AdminUnderlineTabs) window.AdminUnderlineTabs.setStripButtonActive(tab, on);
+                tab.classList.toggle('is-active', on);
                 tab.setAttribute('aria-selected', on ? 'true' : 'false');
             });
             el.querySelectorAll('[data-dev-tool-panel]').forEach(function (panel) {

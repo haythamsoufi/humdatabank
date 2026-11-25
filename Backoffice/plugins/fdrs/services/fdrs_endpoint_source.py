@@ -91,7 +91,7 @@ PUBLIC_ENDPOINTS: tuple[PublicEndpoint, ...] = (
         "/api/globalvalidationdata",
         ("GET",),
         "Volunteer headline",
-        "Three-year rolling mean of reported volunteers, per zone and worldwide.",
+        "Three-year rolling mean of published volunteers, including imputed years, per zone and worldwide.",
     ),
     PublicEndpoint(
         "kpi_value",

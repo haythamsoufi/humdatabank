@@ -14,7 +14,8 @@ Legacy semantics this module reproduces:
 - ``KpiImputedValue`` returns every society with a value and flags imputed rows
   with ``source = "I"``.
 - ``globalvalidationdata`` is the volunteer headline: a 3-year rolling mean of
-  reported values, not the single-year total.
+  published values (reported, or imputed when that year has no reported figure),
+  not the single-year total.
 - A society series with no ``year`` (the NS page line chart) includes only the
   latest published year and the five years before it. 2025 starts at 2020.
 - Sex and age series (``X_M``, ``X_F``, ``X_M_age_6_12`` ...) come from the
@@ -703,7 +704,7 @@ def three_year_rolling_mean(values_by_year: Mapping[int, float], end_year: int) 
     """Mean of ``end_year-2`` .. ``end_year``.
 
     A missing year uses the latest earlier value above zero. The society is left
-    out when nothing positive was reported at or before the first year of the
+    out when nothing positive was published at or before the first year of the
     window. This is the figure the public site shows for volunteers.
     """
     filled: list[float] = []
@@ -718,11 +719,12 @@ def three_year_rolling_mean(values_by_year: Mapping[int, float], end_year: int) 
 def build_global_validation(year: int) -> list[dict[str, Any]]:
     """Volunteer headline per zone, plus a world row with an empty ``ZoneCode``.
 
-    Each society contributes :func:`three_year_rolling_mean` of reported
-    ``KPI_PeopleVol``. Imputed cells are not included. The single-year total
-    stays on ``/api/data``.
+    Each society contributes :func:`three_year_rolling_mean` of published
+    ``KPI_PeopleVol``. A year published as imputed is included; a reported figure
+    wins when both exist, because that is what the snapshot stores. The
+    single-year total stays on ``/api/data``.
     """
-    spec = SeriesSpec(VOLUNTEER_BANK_CODE, KIND_TOTAL, candidates=(VOLUNTEER_BANK_CODE,), reported_only=True)
+    spec = SeriesSpec(VOLUNTEER_BANK_CODE, KIND_TOTAL, candidates=(VOLUNTEER_BANK_CODE,), reported_only=False)
     by_don = compute_series([spec], year=None).get(spec.code, {})
     zone_by_don = {
         don: zone

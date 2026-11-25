@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models import EmbedContent, FormData, FormItem, IndicatorBank, NationalSociety
+from app.models import AssignedForm, EmbedContent, FormData, FormItem, IndicatorBank, NationalSociety
 from app.models.organization import NS_STATUS_INACTIVE
 from app.models.assignments import AssignmentEntityStatus
 from app.services.security.api_key_permissions import CONTENT_READ, build_permissions_document
@@ -500,15 +500,41 @@ class TestMapAndSummaries:
             db_session, country=scenario.country_a, template=scenario.template, period_name="2022",
         )
         _publish(db_session, aes_2022, item, value=900)
+        aes_a_2023 = (
+            db_session.query(AssignmentEntityStatus)
+            .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+            .filter(
+                AssignmentEntityStatus.entity_id == scenario.country_a.id,
+                AssignedForm.template_id == scenario.template.id,
+                AssignedForm.period_name == "2023",
+            )
+            .one()
+        )
+        aes_b_2022 = AssignmentEntityStatus(
+            assigned_form_id=aes_2022.assigned_form_id,
+            entity_type="country",
+            entity_id=scenario.country_b.id,
+            status="in_progress",
+        )
+        aes_b_2023 = AssignmentEntityStatus(
+            assigned_form_id=aes_a_2023.assigned_form_id,
+            entity_type="country",
+            entity_id=scenario.country_b.id,
+            status="in_progress",
+        )
+        db_session.add_all([aes_b_2022, aes_b_2023])
+        db_session.commit()
+        _publish(db_session, aes_b_2022, item, value=200)
+        _publish(db_session, aes_b_2023, item, value=500)
         db_session.commit()
 
         rows = _get(client, key, "/api/globalvalidationdata", year=2024).get_json()
         by_zone = {r["ZoneCode"]: r["IntValue"] for r in rows}
-        # Society A reported 900, 1000, 1500. Society B's 700 is imputed and stays out.
-        assert by_zone["S1"] == 1133
-        assert by_zone["S2"] == 0
+        # A reported 900, 1000, 1500. B reported 200 and 500, then 700 imputed in 2024.
+        assert by_zone["S1"] == round((900 + 1000 + 1500) / 3)
+        assert by_zone["S2"] == round((200 + 500 + 700) / 3)
         assert by_zone["S3"] == 0
-        assert by_zone[""] == 1133
+        assert by_zone[""] == round((900 + 1000 + 1500 + 200 + 500 + 700) / 3)
 
     def test_kpivalue_without_kpicode_is_empty(self, client, scenario, key):
         assert _get(client, key, "/api/kpivalue", year=2024, showunpublished="true").get_json() == []

@@ -208,7 +208,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Volunteer headline per zone S1-S5 plus a world row (empty ZoneCode): 3-year rolling mean of reported volunteers.",
+        "description": "Volunteer headline per zone S1-S5 plus a world row (empty ZoneCode): 3-year rolling mean of published volunteers, including imputed years.",
         "consumers": "data.ifrc.org",
     },
     {

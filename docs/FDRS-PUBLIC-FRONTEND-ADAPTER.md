@@ -260,7 +260,7 @@ When a code is unknown, private, or has no published value for the filters, its 
 
 `/api/lastpublishedyear` is the greatest year that has any published public FDRS value.
 
-`/api/globalvalidationdata` is the number the site shows when the selected indicator is `KPI_PeopleVol_Tot`. Other indicators sum `/api/data` in the browser; volunteers do not. The figure is a three-year rolling mean of **reported** `KPI_PeopleVol`, not that year's total and not the imputed value. For year Y, each society contributes the mean of Y−2, Y−1 and Y. A missing year uses the latest earlier reported value above zero. A society with nothing to carry into Y−2 is left out. Those means are summed into one row per `S1`–`S5` (0 when a zone has no data) plus a world row with an empty `ZoneCode`.
+`/api/globalvalidationdata` is the number the site shows when the selected indicator is `KPI_PeopleVol_Tot`. Other indicators sum `/api/data` in the browser; volunteers do not. The figure is a three-year rolling mean of published `KPI_PeopleVol`: the reported figure, or the imputed figure when that year was published as imputed. It is not that year's total. For year Y, each society contributes the mean of Y−2, Y−1 and Y. A missing year uses the latest earlier published value above zero. A society with nothing to carry into Y−2 is left out. Those means are summed into one row per `S1`–`S5` (0 when a zone has no data) plus a world row with an empty `ZoneCode`.
 
 ## Society reference the adapter needs
 

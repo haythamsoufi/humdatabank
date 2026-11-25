@@ -231,7 +231,8 @@ def _rename_plugin_id(conn, old_id: str, new_id: str) -> None:
         text(
             """
             UPDATE plugin_data
-            SET data = replace(data::text, :old_token, :new_token)::jsonb
+            SET data = replace(data::text, :old_token, :new_token)::jsonb,
+                updated_at = CURRENT_TIMESTAMP
             WHERE data::text LIKE :like
             """
         ),

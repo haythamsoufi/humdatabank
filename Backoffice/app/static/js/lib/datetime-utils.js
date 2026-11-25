@@ -386,8 +386,8 @@
             return '<span class="text-gray-400">' + emptyValue + '</span>';
         }
 
-        // Build the HTML with proper styling
-        var html = '<div class="datetime-cell">';
+        // Build the HTML with proper styling. Title keeps the full value available when the cell ellipsizes.
+        var html = '<div class="datetime-cell" title="' + escapeHtml(formatted) + '">';
         html += '<span class="text-sm text-gray-900">' + escapeHtml(formatted) + '</span>';
 
         // Optionally show timezone separately

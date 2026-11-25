@@ -340,6 +340,38 @@
     line-height: 1.4 !important;
 }
 
+/* Nowrap text must stay inside its column. A flex .ag-cell-value grows with
+   the text and paints over the next cell. Block layout plus a max-width lets
+   the line ellipsize instead. Actions menus are allowed to overflow. */
+.ag-cell[style*="white-space: nowrap"]:not([col-id="actions"]),
+.ag-cell[style*="white-space:nowrap"]:not([col-id="actions"]),
+.ag-cell:not(.ag-cell-wrap-text):not([col-id="actions"]):not([col-id="ag-Grid-SelectionColumn"]):not(.ag-selection-column-cell),
+.ag-cell[style*="white-space: nowrap"]:not([col-id="actions"]) .ag-cell-wrapper,
+.ag-cell[style*="white-space:nowrap"]:not([col-id="actions"]) .ag-cell-wrapper,
+.ag-cell:not(.ag-cell-wrap-text):not([col-id="actions"]):not([col-id="ag-Grid-SelectionColumn"]):not(.ag-selection-column-cell) .ag-cell-wrapper,
+.ag-cell[style*="white-space: nowrap"]:not([col-id="actions"]) .ag-cell-value,
+.ag-cell[style*="white-space:nowrap"]:not([col-id="actions"]) .ag-cell-value,
+.ag-cell:not(.ag-cell-wrap-text):not([col-id="actions"]):not([col-id="ag-Grid-SelectionColumn"]):not(.ag-selection-column-cell) .ag-cell-value {
+    overflow: hidden;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.ag-cell[style*="white-space: nowrap"]:not([col-id="actions"]) .ag-cell-value,
+.ag-cell[style*="white-space:nowrap"]:not([col-id="actions"]) .ag-cell-value,
+.ag-cell:not(.ag-cell-wrap-text):not([col-id="actions"]):not([col-id="ag-Grid-SelectionColumn"]):not(.ag-selection-column-cell) .ag-cell-value {
+    display: block !important;
+}
+
+.ag-cell[style*="white-space: nowrap"]:not([col-id="actions"]) .ag-cell-value > *,
+.ag-cell[style*="white-space:nowrap"]:not([col-id="actions"]) .ag-cell-value > *,
+.ag-cell:not(.ag-cell-wrap-text):not([col-id="actions"]):not([col-id="ag-Grid-SelectionColumn"]):not(.ag-selection-column-cell) .ag-cell-value > * {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Header labels use the same line spacing as body cells */
 .ag-theme-alpine .ag-header-cell-label,
 .ag-theme-balham .ag-header-cell-label,

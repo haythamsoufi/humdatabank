@@ -13,7 +13,7 @@ pytestmark = pytest.mark.db
 def test_plugin_class_loads():
     plugin = EmergencyOperationsMonitoringPlugin()
     assert plugin.plugin_id == "emergency_operations_monitoring"
-    assert plugin.version == "0.13.0"
+    assert plugin.version == "0.15.0"
     assert plugin.get_blueprint().name == "emergency_operations_monitoring"
     assert plugin.get_seed_permissions()
     assert plugin.get_scheduled_jobs()

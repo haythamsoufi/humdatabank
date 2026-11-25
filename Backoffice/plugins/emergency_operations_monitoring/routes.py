@@ -100,6 +100,7 @@ from plugins.emergency_operations_monitoring.services.go_sync_job import (
     request_go_sync_cancel,
     status_payload,
 )
+from plugins.emergency_operations_monitoring.services.ops_strategy import draft_plan_from_strategy, public_strategy
 from plugins.emergency_operations_monitoring.services.plans import (
     add_appeal_indicators,
     decide_change,
@@ -107,6 +108,7 @@ from plugins.emergency_operations_monitoring.services.plans import (
     go_source_notices,
     latest_baseline,
     latest_plan,
+    plan_can_take_strategy,
     plan_matches_sync,
     plan_sections,
     plan_source_label,
@@ -575,6 +577,7 @@ def operation_page(operation_id: int):
     drafts.sort(key=lambda row: row.id, reverse=True)
     previewed = valid_frequency(request.args.get("frequency"))
     is_appeal = is_emergency_appeal(operation.appeal_type or "")
+    strategy_link = public_strategy(baseline)
     return render_template(
         f"plugins/{PLUGIN_ID}/operation.html",
         operation=operation,
@@ -599,6 +602,8 @@ def operation_page(operation_id: int):
         current_plan_matches_go=current_plan_matches_go,
         can_reset_plan=can_reset_plan,
         baseline=baseline,
+        operational_strategy=strategy_link,
+        strategy_can_draft=strategy_link is not None and plan_can_take_strategy(plan) and not plan_history,
         go_source_notices=go_source_notices(baseline),
         sections=sections,
         snapshot=monitoring_snapshot(operation, plan, current_sections),
@@ -628,6 +633,17 @@ def operation_page(operation_id: int):
 def validate_plan_route(operation_id: int):
     operation = _operation(operation_id, "validate")
     _flash_error(validate_plan(operation, _actor(), date.today())) or flash(_("Plan validated."), "success")
+    return _operation_redirect(operation.id)
+
+
+@bp.route("/emergency-operations/operations/<int:operation_id>/plan/strategy", methods=["POST"])
+@permission_required_any(*_ANY)
+def draft_strategy_route(operation_id: int):
+    """Read the appeal's operational strategy and replace the draft monitoring plan."""
+    operation = _operation(operation_id, "enter")
+    result = draft_plan_from_strategy(operation, force=True)
+    if not _flash_error(None if result.get("ok") else result.get("error")):
+        flash(translate("The monitoring plan was drafted from the operational strategy."), "success")
     return _operation_redirect(operation.id)
 
 

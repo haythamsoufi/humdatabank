@@ -35,20 +35,20 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "El botón y la tarea de las 05:10 UTC leen las operaciones de respuesta y operaciones inminentes del flujo público dref3, de 200 en 200, y los llamamientos de emergencia de la API pública de llamamientos. Sin clave de API. Cuando GO marca una operación como cerrada, el estado guardado pasa a cerrado y el flujo pasa a cierre.",
         "يقرأ الزر والمهمة اليومية عند 05:10 بالتوقيت العالمي عمليات الاستجابة والعمليات الاستباقية في التغذية العامة dref3، بمعدل 200 في كل مرة، ونداءات الطوارئ من واجهة النداءات العامة. بلا مفتاح. عندما تصنّف GO عملية على أنها مغلقة، يصبح الوضع المحفوظ مغلقاً وتنتقل مرحلة العمل إلى الإغلاق.",
     ),
-    "Applications still in draft or in review on GO are not on the feed. The feed has no activity list, so lines finer than a sector come from the Excel import on the operation. GO publishes no sectors, indicators, or activities for an Emergency Appeal, so its plan starts as one group with the appeal budget, plus the emergency indicators of the indicator bank. The team switches them on or off before confirming the plan. Activities from its Emergency Plan of Action are added on the operation.": (
-        "Les demandes encore en brouillon ou en examen dans GO ne figurent pas dans le flux. Le flux n'a pas de liste d'activités : les lignes plus fines qu'un secteur viennent de l'import Excel de l'opération. GO ne publie ni secteurs, ni indicateurs, ni activités pour un appel d'urgence : son plan commence donc par un groupe avec le budget de l'appel, plus les indicateurs d'urgence de la banque d'indicateurs. L'équipe les active ou les désactive avant de confirmer le plan. Les activités de son plan d'action d'urgence sont ajoutées sur l'opération.",
-        "Las solicitudes que siguen en borrador o en revisión en GO no están en el flujo. El flujo no tiene lista de actividades: las líneas más finas que un sector vienen de la importación Excel de la operación. GO no publica sectores, indicadores ni actividades de un llamamiento de emergencia, por lo que su plan empieza con un grupo con el presupuesto del llamamiento, más los indicadores de emergencia del banco de indicadores. El equipo los activa o desactiva antes de confirmar el plan. Las actividades de su plan de acción de emergencia se añaden en la operación.",
-        "الطلبات التي ما زالت مسودة أو قيد المراجعة في GO ليست في التغذية. التغذية بلا قائمة أنشطة، لذا البنود الأدق من القطاع تأتي من استيراد إكسل في العملية. لا تنشر GO قطاعات ولا مؤشرات ولا أنشطة لنداء الطوارئ، لذلك تبدأ خطته بمجموعة بميزانية النداء، إضافة إلى مؤشرات الطوارئ من بنك المؤشرات. يفعّلها الفريق أو يعطّلها قبل تأكيد الخطة. وتُضاف أنشطة خطة عمل الطوارئ الخاصة به في العملية.",
+    "Applications still in draft or in review on GO are not on the feed. The feed has no activity list, so lines finer than a sector come from the Excel import on the operation. GO publishes no approved plan for an Emergency Appeal. When it has published an operational strategy, the monitoring plan is drafted from that document. Otherwise the plan lists the emergency indicators of the indicator bank, and the team switches off the ones the operation will not report on.": (
+        "Les demandes encore en brouillon ou en examen dans GO ne figurent pas dans le flux. Le flux n'a pas de liste d'activités : les lignes plus fines qu'un secteur viennent de l'import Excel de l'opération. GO ne publie pas de plan approuvé pour un appel d'urgence. Quand une stratégie opérationnelle est publiée, le plan de suivi est rédigé à partir de ce document. Sinon, le plan liste les indicateurs d'urgence de la banque d'indicateurs, et l'équipe désactive ceux sur lesquels l'opération ne fera pas de rapport.",
+        "Las solicitudes que siguen en borrador o en revisión en GO no están en el flujo. El flujo no tiene lista de actividades: las líneas más finas que un sector vienen de la importación Excel de la operación. GO no publica un plan aprobado para un llamamiento de emergencia. Cuando ha publicado una estrategia operativa, el plan de seguimiento se redacta a partir de ese documento. Si no, el plan enumera los indicadores de emergencia del banco de indicadores y el equipo desactiva los que la operación no reportará.",
+        "الطلبات التي ما زالت مسودة أو قيد المراجعة في GO ليست في التغذية. التغذية بلا قائمة أنشطة، لذا البنود الأدق من القطاع تأتي من استيراد إكسل في العملية. لا تنشر GO خطة معتمدة لنداء الطوارئ. عندما تنشر استراتيجية تشغيلية، تُصاغ خطة المتابعة من ذلك المستند. وإلا تعرض الخطة مؤشرات الطوارئ من بنك المؤشرات، ويعطّل الفريق ما لن تُبلّغ عنه العملية.",
     ),
     "Active approved emergency operations from GO.": (
         "Opérations d'urgence approuvées et actives issues de GO.",
         "Operaciones de emergencia aprobadas y activas de GO.",
         "عمليات الطوارئ المعتمدة والنشطة من GO.",
     ),
-    "This operation is an Emergency Appeal read from the public GO appeal API. The plan starts from the amount requested and the people targeted. GO publishes no sectors, indicators, or activities for an appeal, so the plan lists the emergency indicators of the indicator bank. Switch off the ones this operation will not report on, then confirm the plan. Add activities from the Emergency Plan of Action here, or import them from Excel.": (
-        "Cette opération est un appel d'urgence lu depuis l'API publique des appels de GO. Le plan part du montant demandé et des personnes ciblées. GO ne publie ni secteurs, ni indicateurs, ni activités pour un appel : le plan liste donc les indicateurs d'urgence de la banque d'indicateurs. Désactivez ceux sur lesquels cette opération ne fera pas de rapport, puis confirmez le plan. Ajoutez ici les activités du plan d'action d'urgence, ou importez-les depuis Excel.",
-        "Esta operación es un llamamiento de emergencia leído de la API pública de llamamientos de GO. El plan parte del monto solicitado y de las personas objetivo. GO no publica sectores, indicadores ni actividades de un llamamiento, por lo que el plan enumera los indicadores de emergencia del banco de indicadores. Desactive los que esta operación no reportará y luego confirme el plan. Añada aquí las actividades del plan de acción de emergencia, o impórtelas desde Excel.",
-        "هذه العملية نداء طوارئ قُرئ من واجهة النداءات العامة في GO. تبدأ الخطة من المبلغ المطلوب والأشخاص المستهدفين. لا تنشر GO قطاعات أو مؤشرات أو أنشطة للنداء، لذا تعرض الخطة مؤشرات الطوارئ من بنك المؤشرات. عطّل ما لن تُبلّغ عنه هذه العملية ثم أكّد الخطة. أضف هنا أنشطة خطة عمل الطوارئ أو استوردها من إكسل.",
+    "This operation is an Emergency Appeal read from the public GO appeal API. The plan starts from the amount requested and the people targeted. GO publishes no approved plan. When an operational strategy is available, draft the monitoring plan from it. Otherwise the plan lists the emergency indicators of the indicator bank: switch off the ones this operation will not report on, then confirm. Activities can still be added here or imported from Excel.": (
+        "Cette opération est un appel d'urgence lu depuis l'API publique des appels de GO. Le plan part du montant demandé et des personnes ciblées. GO ne publie pas de plan approuvé. Quand une stratégie opérationnelle est disponible, rédigez le plan de suivi à partir d'elle. Sinon, le plan liste les indicateurs d'urgence de la banque d'indicateurs : désactivez ceux sur lesquels cette opération ne fera pas de rapport, puis confirmez. Des activités peuvent encore être ajoutées ici ou importées depuis Excel.",
+        "Esta operación es un llamamiento de emergencia leído de la API pública de llamamientos de GO. El plan parte del monto solicitado y de las personas objetivo. GO no publica un plan aprobado. Cuando hay una estrategia operativa, redacte el plan de seguimiento a partir de ella. Si no, el plan enumera los indicadores de emergencia del banco de indicadores: desactive los que esta operación no reportará y luego confirme. Las actividades se pueden añadir aquí o importar desde Excel.",
+        "هذه العملية نداء طوارئ قُرئ من واجهة النداءات العامة في GO. تبدأ الخطة من المبلغ المطلوب والأشخاص المستهدفين. لا تنشر GO خطة معتمدة. عندما تتوفر استراتيجية تشغيلية، صيغوا خطة المتابعة منها. وإلا تعرض الخطة مؤشرات الطوارئ من بنك المؤشرات: عطّلوا ما لن تُبلّغ عنه هذه العملية ثم أكّدوا. يمكن إضافة الأنشطة هنا أو استيرادها من إكسل.",
     ),
     "GO publishes the budget and the people targeted of an Emergency Appeal, but not its sectors, indicators, or activities. The plan lists the emergency indicators of the indicator bank. Switch off the ones this operation will not report on, then confirm the plan. Add activities from the Emergency Plan of Action here, or import them from Excel.": (
         "GO publie le budget et les personnes ciblées d'un appel d'urgence, mais pas ses secteurs, indicateurs ni activités. Le plan liste les indicateurs d'urgence de la banque d'indicateurs. Désactivez ceux sur lesquels cette opération ne fera pas de rapport, puis confirmez le plan. Ajoutez ici les activités du plan d'action d'urgence, ou importez-les depuis Excel.",
@@ -168,5 +168,75 @@ ROWS: dict[str, tuple[str, str, str]] = {
         "La fréquence de rapport a été enregistrée.",
         "Se guardó la frecuencia de informe.",
         "تم حفظ وتيرة التقارير.",
+    ),
+    "Drafted from the operational strategy": (
+        "Rédigé à partir de la stratégie opérationnelle",
+        "Redactado a partir de la estrategia operativa",
+        "صيغ من الاستراتيجية التشغيلية",
+    ),
+    "Draft plan from the operational strategy": (
+        "Rédiger le plan à partir de la stratégie opérationnelle",
+        "Redactar el plan a partir de la estrategia operativa",
+        "صياغة الخطة من الاستراتيجية التشغيلية",
+    ),
+    "Operational strategy": (
+        "Stratégie opérationnelle",
+        "Estrategia operativa",
+        "الاستراتيجية التشغيلية",
+    ),
+    "This monitoring plan was drafted from the operational strategy. Review the sectors, indicators, and activities, then confirm it.": (
+        "Ce plan de suivi a été rédigé à partir de la stratégie opérationnelle. Vérifiez les secteurs, les indicateurs et les activités, puis confirmez-le.",
+        "Este plan de seguimiento se redactó a partir de la estrategia operativa. Revise los sectores, los indicadores y las actividades, y después confírmelo.",
+        "صيغت خطة المتابعة هذه من الاستراتيجية التشغيلية. راجعوا القطاعات والمؤشرات والأنشطة ثم أكّدوها.",
+    ),
+    "GO has no approved plan for this appeal. An operational strategy is available: draft the monitoring plan from it.": (
+        "GO n'a pas de plan approuvé pour cet appel. Une stratégie opérationnelle est disponible : rédigez le plan de suivi à partir d'elle.",
+        "GO no tiene un plan aprobado para este llamamiento. Hay una estrategia operativa: redacte el plan de seguimiento a partir de ella.",
+        "ليس لدى GO خطة معتمدة لهذا النداء. تتوفر استراتيجية تشغيلية: صيغوا خطة المتابعة منها.",
+    ),
+    "The monitoring plan was drafted from the operational strategy.": (
+        "Le plan de suivi a été rédigé à partir de la stratégie opérationnelle.",
+        "El plan de seguimiento se redactó a partir de la estrategia operativa.",
+        "صيغت خطة المتابعة من الاستراتيجية التشغيلية.",
+    ),
+    "Only an Emergency Appeal is drafted from an operational strategy.": (
+        "Seul un appel d'urgence est rédigé à partir d'une stratégie opérationnelle.",
+        "Solo un llamamiento de emergencia se redacta a partir de una estrategia operativa.",
+        "لا تُصاغ من الاستراتيجية التشغيلية إلا خطة نداء طوارئ.",
+    ),
+    "GO has not published an operational strategy for this appeal.": (
+        "GO n'a pas publié de stratégie opérationnelle pour cet appel.",
+        "GO no ha publicado una estrategia operativa para este llamamiento.",
+        "لم تنشر GO استراتيجية تشغيلية لهذا النداء.",
+    ),
+    "This plan was edited or confirmed, so it was left as it is.": (
+        "Ce plan a été modifié ou confirmé, il est donc laissé tel quel.",
+        "Este plan fue editado o confirmado, así que se dejó como estaba.",
+        "عُدّلت هذه الخطة أو أُكّدت، فتُركت كما هي.",
+    ),
+    "Turn on AI draft reports before drafting a plan from the operational strategy.": (
+        "Activez les brouillons de rapport par IA avant de rédiger un plan à partir de la stratégie opérationnelle.",
+        "Active los borradores de informe con IA antes de redactar un plan a partir de la estrategia operativa.",
+        "فعّلوا مسودات التقارير بالذكاء الاصطناعي قبل صياغة خطة من الاستراتيجية التشغيلية.",
+    ),
+    "The operational strategy could not be read.": (
+        "La stratégie opérationnelle n'a pas pu être lue.",
+        "No se pudo leer la estrategia operativa.",
+        "تعذّر قراءة الاستراتيجية التشغيلية.",
+    ),
+    "The operational strategy did not yield a monitoring plan.": (
+        "La stratégie opérationnelle n'a pas donné de plan de suivi.",
+        "La estrategia operativa no produjo un plan de seguimiento.",
+        "لم تُنتج الاستراتيجية التشغيلية خطة متابعة.",
+    ),
+    "The monitoring plan could not be drafted from the operational strategy.": (
+        "Le plan de suivi n'a pas pu être rédigé à partir de la stratégie opérationnelle.",
+        "No se pudo redactar el plan de seguimiento a partir de la estrategia operativa.",
+        "تعذّر صياغة خطة المتابعة من الاستراتيجية التشغيلية.",
+    ),
+    "Drafting monitoring plans from operational strategies (%(current)s of %(total)s).": (
+        "Rédaction des plans de suivi à partir des stratégies opérationnelles (%(current)s sur %(total)s).",
+        "Redactando planes de seguimiento a partir de las estrategias operativas (%(current)s de %(total)s).",
+        "جارٍ صياغة خطط المتابعة من الاستراتيجيات التشغيلية (%(current)s من %(total)s).",
     ),
 }

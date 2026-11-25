@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 PLUGIN_ID = "emergency_operations_monitoring"
-VERSION = "0.14.0"
+VERSION = "0.15.0"
 DISPLAY_NAME = "Emergency Operations"
 
 TEMPLATE_NAME = "Emergency Operations"

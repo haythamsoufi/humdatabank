@@ -1,6 +1,6 @@
 {# The reporting frequency the plan commits to, and the periods it would open. Needs: operation, schedule, schedule_editable, schedule_previewing. #}
 {% from "plugins/emergency_operations_monitoring/_status.html" import dref_enum %}
-{% set _plan_version = request.args.get('plan_version', type=int) %}
+{% set _plan_version = request.args.get('plan_version')|int(0) or none %}
 <section class="border border-gray-200 rounded-lg overflow-hidden" id="dref-plan-schedule" data-dref-plan-schedule
          data-dref-schedule-url="{{ url_for('emergency_operations_monitoring.plan_schedule_preview_route', operation_id=operation.id, plan_version=_plan_version if _plan_version else none) }}"
          data-dref-saved-frequency="{{ operation.reporting_frequency }}"

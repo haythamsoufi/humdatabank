@@ -3,10 +3,10 @@
 The ``dref3`` feed is a DREF dataset. Its ``EA`` rows are DREFs allocated as a loan
 against an appeal, so they carry sector budgets for the loan and not for the appeal.
 The appeal itself (code, country, hazard, amount requested, people targeted, dates,
-status) is on ``/api/v2/appeal/`` with ``atype`` 1. GO publishes no sector budget,
-indicator, or activity list for an Emergency Appeal. Those sit in the Emergency Plan
-of Action document. The plan therefore starts as one group for the whole appeal, and
-the National Society adds sectors and activities, or imports them from Excel.
+status) is on ``/api/v2/appeal/`` with ``atype`` 1. GO publishes no approved plan of
+sector budgets, indicators, or activities. Those are in the operational strategy
+document. Until that document is drafted into a plan, the plan starts as one group
+for the whole appeal, plus the indicator bank's emergency indicators.
 
 Each appeal becomes a dref3-shaped row, so it goes through the same parser, baseline,
 plan, and project code as a DREF stage. ``appeal_feed`` marks it, and it outranks the

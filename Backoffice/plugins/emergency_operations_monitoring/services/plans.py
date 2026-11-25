@@ -87,6 +87,7 @@ PLAN_SOURCES = {
     "structure": "Opened by a plan edit",
     "excel": "Excel import",
     "restored": "Restored from an earlier version",
+    "strategy": "Drafted from the operational strategy",
 }
 
 
@@ -750,6 +751,33 @@ def drop_generated_indicators(plan_id: int) -> bool:
     return changed
 
 
+def _appeal_strategy(baseline: DrefBaseline | None) -> dict | None:
+    """The operational strategy GO published for an Emergency Appeal, when this pull stored one."""
+    if baseline is None or (baseline.stage or "") != APPEAL_STAGE:
+        return None
+    application = baseline.application if isinstance(baseline.application, dict) else None
+    raw = application.get("operational_strategy") if isinstance(application, dict) else None
+    if not isinstance(raw, dict) or not str(raw.get("url") or "").strip():
+        return None
+    return raw
+
+
+def _strategy_ids_match(strategy: dict) -> bool:
+    try:
+        return int(strategy.get("extracted_document_id")) == int(strategy.get("id"))
+    except (TypeError, ValueError):
+        return False
+
+
+def plan_can_take_strategy(plan: DrefPlan | None) -> bool:
+    """A draft that sync or a strategy draft created can be replaced. An edited or confirmed plan cannot."""
+    if plan is None:
+        return True
+    if plan.status != PLAN_DRAFT:
+        return False
+    return (plan.source or "generated") in {"generated", "strategy"}
+
+
 def go_source_notices(baseline: DrefBaseline | None) -> list[str]:
     """Gaps in what GO published, apart from an indicator title that missed the bank."""
     from plugins.emergency_operations_monitoring.i18n import translate
@@ -757,6 +785,28 @@ def go_source_notices(baseline: DrefBaseline | None) -> list[str]:
     if baseline is None:
         return [translate("No approved GO stage is stored for this operation.")]
     if (baseline.stage or "") == APPEAL_STAGE:
+        strategy = _appeal_strategy(baseline)
+        application = baseline.application if isinstance(baseline.application, dict) else {}
+        drafted = (
+            strategy is not None
+            and application.get("source") == "operational_strategy"
+            and bool(_interventions(baseline))
+            and _strategy_ids_match(strategy)
+        )
+        if drafted:
+            return [
+                translate(
+                    "This monitoring plan was drafted from the operational strategy. "
+                    "Review the sectors, indicators, and activities, then confirm it."
+                )
+            ]
+        if strategy is not None:
+            return [
+                translate(
+                    "GO has no approved plan for this appeal. "
+                    "An operational strategy is available: draft the monitoring plan from it."
+                )
+            ]
         return [
             translate(
                 "GO publishes the budget and the people targeted of an Emergency Appeal, but not its sectors, "
@@ -948,10 +998,44 @@ def generate_plan(operation: DrefOperation, baseline: DrefBaseline, today) -> Dr
     return plan
 
 
+def _wipe_plan_groups(plan_id: int) -> None:
+    """Drop every group on a draft. Database cascades remove its indicators and activities."""
+    for group in groups_for(plan_id):
+        db.session.delete(group)
+    db.session.flush()
+
+
+def replace_plan_with_interventions(operation: DrefOperation, baseline: DrefBaseline, today) -> str:
+    """Write the baseline interventions onto a draft that has not been edited by hand.
+
+    Returns ``drafted``, ``created``, ``kept``, or ``empty``.
+    """
+    interventions = _interventions(baseline)
+    if not interventions:
+        return "empty"
+    plan = latest_plan(operation.id)
+    if plan is None:
+        generate_plan(operation, baseline, today)
+        created = latest_plan(operation.id)
+        if created is not None:
+            created.source = "strategy"
+        return "created"
+    if not plan_can_take_strategy(plan):
+        return "kept"
+    _wipe_plan_groups(plan.id)
+    plan.source = "strategy"
+    _apply_application(plan, operation, interventions)
+    return "drafted"
+
+
 def _refresh_caps(plan: DrefPlan, operation: DrefOperation, baseline: DrefBaseline) -> None:
     interventions = _interventions(baseline)
     if interventions:
         _apply_application(plan, operation, interventions)
+        return
+    # A plan already drafted from a strategy stays until a new draft replaces it.
+    # An empty intervention list here means the document changed and has not been read again.
+    if (plan.source or "") == "strategy" and _appeal_strategy(baseline):
         return
     existing = {group.key: group for group in groups_for(plan.id)}
     for spec in _desired_groups(operation, list(baseline.sectors or [])):

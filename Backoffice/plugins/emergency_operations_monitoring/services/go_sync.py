@@ -563,6 +563,11 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
             stored = baselines.get(latest["go_stage_id"])
             if stored is not None and isinstance(stored.application, dict):
                 latest["application"] = stored.application
+        elif latest.get("from_appeal_feed"):
+            from plugins.emergency_operations_monitoring.services.ops_strategy import carry_strategy_plan
+
+            stored = baselines.get(latest["go_stage_id"])
+            carry_strategy_plan(latest, stored.application if stored is not None else None)
         if _appeal_is_current(operation, stages, latest, baselines, country_ids.get((latest.get("country_iso3") or "").upper())):
             unchanged += 1
         else:
@@ -885,6 +890,8 @@ def _success_text(summary: dict, applications: dict) -> str:
         message += f" {summary['failed']} appeal(s) could not be saved and were skipped: {codes}."
     if summary.get("truncated"):
         message += " The GO feed is longer than one sync reads, so some appeals were not read."
+    if summary.get("strategies_drafted"):
+        message += f" Drafted {summary['strategies_drafted']} monitoring plan(s) from operational strategies."
     return message
 
 
@@ -930,9 +937,26 @@ def _run_sync(http_get, operation_status, progress, should_stop, log_id: int) ->
     reused = stamp_stored_applications(rows)
     applications = attach_applications(rows, http_get, progress=report, should_stop=should_stop)
     applications["reused"] = reused
+    if not appeals_unavailable and settings["enabled"]:
+        from plugins.emergency_operations_monitoring.services.ops_strategy import attach_strategies
+
+        try:
+            applications["strategies"] = attach_strategies(rows, getter)["found"]
+        except Exception:
+            logger.warning("Emergency Operations GO sync could not read operational strategies", exc_info=True)
     if applications.get("cancelled"):
         raise GoSyncCancelled()
     summary = apply_rows(rows, progress=report, should_stop=should_stop)
+    summary["strategies_drafted"] = 0
+    if not appeals_unavailable and settings["enabled"]:
+        from plugins.emergency_operations_monitoring.services.ops_strategy import draft_pending_strategies
+
+        try:
+            summary["strategies_drafted"] = draft_pending_strategies(should_stop=should_stop, progress=report)
+        except GoSyncCancelled:
+            raise
+        except Exception:
+            logger.warning("Emergency Operations GO sync could not draft plans from operational strategies", exc_info=True)
     summary["truncated"] = bool(getattr(rows, "truncated", False))
     summary["appeals_unavailable"] = appeals_unavailable
     summary["loans_held"] = loans_held

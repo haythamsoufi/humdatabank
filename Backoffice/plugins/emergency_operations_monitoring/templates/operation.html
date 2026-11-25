@@ -317,6 +317,21 @@
             </div>
             {% endif %}
 
+            {% if operational_strategy %}
+            <div class="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 flex flex-wrap items-center justify-between gap-3">
+                <p>
+                    <a class="text-blue-700 underline" href="{{ operational_strategy.url }}" target="_blank" rel="noopener noreferrer">{{ operational_strategy.name or dref_tr('Operational strategy') }}</a>
+                </p>
+                {% if strategy_can_draft and plan_editable %}
+                <form action="{{ url_for('emergency_operations_monitoring.draft_strategy_route', operation_id=operation.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="tab" value="plan">
+                    <button type="submit" class="btn btn-secondary btn-sm">{{ dref_tr('Draft plan from the operational strategy') }}</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% if plan_history and current_plan %}
             <div class="border border-gray-200 bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-700 flex flex-wrap items-center justify-between gap-3">
                 <p>{{ dref_tr('You are viewing version {version}. Reporting uses version {current}.').format(version=plan.version, current=current_plan.version) }}</p>
@@ -1197,7 +1212,7 @@
 {% call modal_shell('dref-plan-source-modal', dref_tr('Where this plan comes from'), max_width='max-w-xl') %}
     <div class="text-sm text-gray-600 space-y-2">
         {% if dref_is_appeal(operation.appeal_type) and baseline and baseline.stage == 'Emergency Appeal' %}
-        <p>{{ dref_tr('This operation is an Emergency Appeal read from the public GO appeal API. The plan starts from the amount requested and the people targeted. GO publishes no sectors, indicators, or activities for an appeal, so the plan lists the emergency indicators of the indicator bank. Switch off the ones this operation will not report on, then confirm the plan. Add activities from the Emergency Plan of Action here, or import them from Excel.') }}</p>
+        <p>{{ dref_tr('This operation is an Emergency Appeal read from the public GO appeal API. The plan starts from the amount requested and the people targeted. GO publishes no approved plan. When an operational strategy is available, draft the monitoring plan from it. Otherwise the plan lists the emergency indicators of the indicator bank: switch off the ones this operation will not report on, then confirm. Activities can still be added here or imported from Excel.') }}</p>
         {% else %}
         <p>{{ dref_tr('This draft is built from the latest approved stage on the public GO feed. That stage is the approved application, or a later operational update or final report when one is the latest. An application still in draft or in review on GO is not used.') }}</p>
         {% endif %}

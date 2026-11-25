@@ -143,7 +143,23 @@ def narrative_signature(application) -> str:
         "context": application.get("context"),
         "contacts": application.get("contacts"),
     }
-    if not material["narrative"] and not material["context"] and not material["contacts"]:
+    strategy = application.get("operational_strategy")
+    if isinstance(strategy, dict) and strategy.get("id") not in (None, ""):
+        try:
+            strategy_id = int(strategy.get("id"))
+        except (TypeError, ValueError):
+            strategy_id = str(strategy.get("id"))
+        # A new or replaced operational strategy must be saved. It is not a plan rebase by itself.
+        material["operational_strategy"] = {
+            "id": strategy_id,
+            "created_at": str(strategy.get("created_at") or "")[:40],
+        }
+    if (
+        not material["narrative"]
+        and not material["context"]
+        and not material["contacts"]
+        and "operational_strategy" not in material
+    ):
         return ""
     raw = json.dumps(material, sort_keys=True, default=str, ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()

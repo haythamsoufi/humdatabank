@@ -204,6 +204,7 @@
             tools_used: {{ (trace.tools_used or [])|tojson|safe }},
             status: {{ (trace.status or '')|tojson|safe }},
             user_rating: {{ (trace.user_rating or '')|tojson|safe }},
+            user_feedback: {{ (trace.user_feedback or '')|tojson|safe }},
             llm_quality_score: {{ trace.llm_quality_score if trace.llm_quality_score is not none else 'null' }},
             llm_quality_verdict: {{ (trace.llm_quality_verdict or '')|tojson|safe }},
             llm_needs_review: {{ (trace.llm_needs_review if trace.llm_needs_review is not none else None)|tojson|safe }},
@@ -379,8 +380,30 @@
                 if (!r || r === '') return '<span class="text-gray-400">—</span>';
                 const safe = String(r).replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 if (r === 'like') return '<span class="inline-flex items-center text-green-700" title="' + {{ _("Like")|tojson|safe }} + '"><i class="fas fa-thumbs-up mr-1"></i> ' + {{ _("Like")|tojson|safe }} + '</span>';
-                if (r === 'dislike') return '<span class="inline-flex items-center text-red-700" title="' + {{ _("Dislike")|tojson|safe }} + '"><i class="fas fa-thumbs-down mr-1"></i> ' + {{ _("Dislike")|tojson|safe }} + '</span>';
+                if (r === 'dislike') {
+                    const note = params.data && params.data.user_feedback;
+                    const title = note ? escapeHtml(note) : {{ _("Dislike")|tojson|safe }};
+                    return '<span class="inline-flex items-center text-red-700" title="' + title + '"><i class="fas fa-thumbs-down mr-1"></i> ' + {{ _("Dislike")|tojson|safe }} + '</span>';
+                }
                 return '<span class="text-gray-600">' + safe + '</span>';
+            }
+        },
+        {
+            field: 'user_feedback',
+            headerName: {{ _("Feedback")|tojson|safe }},
+            width: 240,
+            minWidth: 160,
+            flex: 1,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            tooltipField: 'user_feedback',
+            wrapText: true,
+            autoHeight: true,
+            cellStyle: { wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', alignItems: 'flex-start', lineHeight: '1.4' },
+            cellRenderer: function(params) {
+                const text = (params.value || '').trim();
+                if (!text) return '<span class="text-gray-400">—</span>';
+                return '<span class="text-sm text-gray-800">' + escapeHtml(truncateText(text, 180)) + '</span>';
             }
         },
         {

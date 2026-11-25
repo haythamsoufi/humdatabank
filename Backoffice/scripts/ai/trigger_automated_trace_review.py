@@ -105,6 +105,8 @@ def _build_text_packet(review: AITraceReview, max_obs_lines: int) -> str:
         lines.append(f"Tools used: {', '.join(str(t) for t in (trace.tools_used or []))}")
     if trace.user_rating:
         lines.append(f"User rating: {trace.user_rating}")
+    if getattr(trace, "user_feedback", None):
+        lines.append(f"User feedback: {trace.user_feedback}")
     lines.append("")
 
     steps = trace.steps if isinstance(trace.steps, list) else []

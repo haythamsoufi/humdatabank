@@ -441,6 +441,7 @@ class TestAIReasoningTrace:
             assert d['query'] == 'What is the volunteer count in Kenya?'
             assert d['agent_mode'] == 'react'
             assert d['final_answer'] == 'Final answer'
+            assert d['user_feedback'] is None
             assert 'steps' in d
 
     def test_to_dict_without_steps(self, db_session, app):

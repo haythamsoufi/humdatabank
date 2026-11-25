@@ -6,6 +6,7 @@ import uuid
 import pytest
 
 from app.models.ai_chat import AIConversation, AIMessage
+from app.models.embeddings import AIReasoningTrace
 from app.utils.ai.ai_tokens import issue_ai_token
 from app.services.ai.chat.retention import archive_conversation
 from app.utils.common.datetime_helpers import utcnow
@@ -641,3 +642,93 @@ def test_ai_chat_anonymous_history_is_masked(app, monkeypatch):
         {"isUser": True, "message": "password: [REDACTED_PASSWORD]"},
         {"isUser": False, "message": "I can't use that."},
     ]
+
+
+@pytest.mark.api
+@pytest.mark.db
+def test_ai_feedback_stores_optional_dislike_comment(client, app, db_session):
+    """A dislike can carry an optional note; a like clears it. Other users cannot rate the trace."""
+    owner = create_test_user(db_session, email="ai_feedback_owner@test.local", name="Feedback Owner", role="user")
+    other = create_test_user(db_session, email="ai_feedback_other@test.local", name="Feedback Other", role="user")
+    with app.app_context():
+        owner_token = issue_ai_token(user_id=int(owner.id), role="user")
+        other_token = issue_ai_token(user_id=int(other.id), role="user")
+        trace = AIReasoningTrace(query="How many volunteers?", steps=[], user_id=int(owner.id))
+        db_session.add(trace)
+        db_session.commit()
+        trace_id = int(trace.id)
+
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+
+    disliked = client.post(
+        "/api/ai/v1/feedback",
+        json={"trace_id": trace_id, "rating": "dislike"},
+        headers=owner_headers,
+    )
+    assert disliked.status_code == 200, disliked.get_data(as_text=True)
+    assert disliked.get_json()["comment_saved"] is False
+    db_session.expire_all()
+    stored = db_session.get(AIReasoningTrace, trace_id)
+    assert stored.user_rating == "dislike"
+    assert stored.user_feedback is None
+
+    blank = client.post(
+        "/api/ai/v1/feedback",
+        json={"trace_id": trace_id, "rating": "dislike", "comment": "   "},
+        headers=owner_headers,
+    )
+    assert blank.status_code == 200
+    db_session.expire_all()
+    stored = db_session.get(AIReasoningTrace, trace_id)
+    assert stored.user_feedback is None
+
+    noted = client.post(
+        "/api/ai/v1/feedback",
+        json={
+            "trace_id": trace_id,
+            "rating": "dislike",
+            "comment": "  The figure is for 2022, not 2024.  ",
+        },
+        headers=owner_headers,
+    )
+    assert noted.status_code == 200, noted.get_data(as_text=True)
+    assert noted.get_json()["comment_saved"] is True
+    db_session.expire_all()
+    stored = db_session.get(AIReasoningTrace, trace_id)
+    assert stored.user_feedback == "The figure is for 2022, not 2024."
+    assert stored.to_dict()["user_feedback"] == "The figure is for 2022, not 2024."
+
+    liked = client.post(
+        "/api/ai/v1/feedback",
+        json={"trace_id": trace_id, "rating": "like"},
+        headers=owner_headers,
+    )
+    assert liked.status_code == 200
+    db_session.expire_all()
+    stored = db_session.get(AIReasoningTrace, trace_id)
+    assert stored.user_rating == "like"
+    assert stored.user_feedback is None
+
+    too_long = client.post(
+        "/api/ai/v1/feedback",
+        json={"trace_id": trace_id, "rating": "dislike", "comment": "x" * 2001},
+        headers=owner_headers,
+    )
+    assert too_long.status_code == 400
+    db_session.expire_all()
+    stored = db_session.get(AIReasoningTrace, trace_id)
+    assert stored.user_rating == "like"
+
+    not_a_string = client.post(
+        "/api/ai/v1/feedback",
+        json={"trace_id": trace_id, "rating": "dislike", "comment": ["nope"]},
+        headers=owner_headers,
+    )
+    assert not_a_string.status_code == 400
+
+    forbidden = client.post(
+        "/api/ai/v1/feedback",
+        json={"trace_id": trace_id, "rating": "dislike", "comment": "stolen"},
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+    assert forbidden.status_code == 403

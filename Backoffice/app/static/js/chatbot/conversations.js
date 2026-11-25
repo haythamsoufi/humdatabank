@@ -1262,7 +1262,93 @@ export const ConversationsMixin = {
                     setTimeout(() => toast.remove(), 300);
                 }, 2200);
             };
-            const submitFeedback = (rating) => {
+            const closeDislikeFeedback = (wrapper) => {
+                const panel = wrapper && wrapper.querySelector('.chat-dislike-feedback');
+                if (panel) panel.remove();
+            };
+            const openDislikeFeedback = (traceId) => {
+                const wrapper = messageDiv.closest('.chat-message-wrapper');
+                if (!wrapper) return;
+                const existing = wrapper.querySelector('.chat-dislike-feedback');
+                if (existing) {
+                    const area = existing.querySelector('textarea');
+                    if (area) area.focus();
+                    return;
+                }
+                const prompt = this._uiString('feedbackPrompt') || 'What should we improve or correct?';
+                const optional = this._uiString('feedbackOptional') || 'Optional';
+                const placeholder = this._uiString('feedbackPlaceholder') || 'Tell us what was wrong or what to change';
+                const skipLabel = this._uiString('feedbackSkip') || 'Skip';
+                const sendLabel = this._uiString('feedbackSend') || 'Send feedback';
+                const panel = document.createElement('div');
+                panel.className = 'chat-dislike-feedback';
+                panel.setAttribute('role', 'group');
+                panel.setAttribute('aria-label', prompt);
+
+                const label = document.createElement('label');
+                label.className = 'chat-dislike-feedback-label';
+                const fieldId = 'chat-dislike-feedback-' + String(traceId);
+                label.setAttribute('for', fieldId);
+                label.appendChild(document.createTextNode(prompt + ' '));
+                const optionalSpan = document.createElement('span');
+                optionalSpan.className = 'chat-dislike-feedback-optional';
+                optionalSpan.textContent = '(' + optional + ')';
+                label.appendChild(optionalSpan);
+
+                const textarea = document.createElement('textarea');
+                textarea.id = fieldId;
+                textarea.rows = 3;
+                textarea.maxLength = 2000;
+                textarea.placeholder = placeholder;
+                const prior = wrapper.getAttribute('data-user-feedback') || '';
+                if (prior) textarea.value = prior;
+
+                const actions = document.createElement('div');
+                actions.className = 'chat-dislike-feedback-actions';
+                const skipBtn = document.createElement('button');
+                skipBtn.type = 'button';
+                skipBtn.className = 'chat-dislike-feedback-skip';
+                skipBtn.textContent = skipLabel;
+                const sendBtn = document.createElement('button');
+                sendBtn.type = 'button';
+                sendBtn.className = 'chat-dislike-feedback-send';
+                sendBtn.textContent = sendLabel;
+                sendBtn.disabled = !textarea.value.trim();
+
+                skipBtn.addEventListener('click', () => {
+                    panel.remove();
+                    showFeedbackToast(this._uiString('feedbackReceived') || 'Thanks, feedback received.');
+                });
+                textarea.addEventListener('input', () => {
+                    sendBtn.disabled = !textarea.value.trim();
+                });
+                textarea.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        skipBtn.click();
+                    }
+                });
+                sendBtn.addEventListener('click', () => {
+                    const text = textarea.value.trim();
+                    if (!text) return;
+                    textarea.disabled = true;
+                    skipBtn.disabled = true;
+                    sendBtn.disabled = true;
+                    submitFeedback('dislike', text);
+                });
+
+                actions.appendChild(skipBtn);
+                actions.appendChild(sendBtn);
+                panel.appendChild(label);
+                panel.appendChild(textarea);
+                panel.appendChild(actions);
+                wrapper.appendChild(panel);
+                textarea.focus();
+                if (typeof panel.scrollIntoView === 'function') {
+                    panel.scrollIntoView({ block: 'nearest' });
+                }
+            };
+            const submitFeedback = (rating, comment) => {
                 const wrapper = messageDiv.closest('.chat-message-wrapper');
                 if (!wrapper) return;
                 const traceId = wrapper.getAttribute('data-trace-id');
@@ -1271,15 +1357,19 @@ export const ConversationsMixin = {
                     return;
                 }
                 const current = wrapper.getAttribute('data-user-rating');
-                if (current === rating) return;
+                if (current === rating && comment == null) return;
                 likeBtn.disabled = true;
                 dislikeBtn.disabled = true;
+                const body = { trace_id: parseInt(traceId, 10), rating };
+                if (typeof comment === 'string') body.comment = comment;
+                let accepted = false;
                 this._apiFetch('/api/ai/v1/feedback', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trace_id: parseInt(traceId, 10), rating }),
+                    body: JSON.stringify(body),
                 }).then((res) => {
                     if (res.ok) {
+                        accepted = true;
                         wrapper.setAttribute('data-user-rating', rating);
                         likeBtn.classList.toggle('active', rating === 'like');
                         dislikeBtn.classList.toggle('active', rating === 'dislike');
@@ -1287,7 +1377,17 @@ export const ConversationsMixin = {
                         const dislikeIcon = dislikeBtn.querySelector('i');
                         if (likeIcon) likeIcon.className = rating === 'like' ? 'fas fa-thumbs-up' : 'far fa-thumbs-up';
                         if (dislikeIcon) dislikeIcon.className = rating === 'dislike' ? 'fas fa-thumbs-down' : 'far fa-thumbs-down';
-                        showFeedbackToast(this._uiString('feedbackReceived') || 'Thanks, feedback received.');
+                        if (rating === 'like') {
+                            wrapper.removeAttribute('data-user-feedback');
+                            closeDislikeFeedback(wrapper);
+                            showFeedbackToast(this._uiString('feedbackReceived') || 'Thanks, feedback received.');
+                        } else if (comment == null) {
+                            openDislikeFeedback(traceId);
+                        } else {
+                            wrapper.setAttribute('data-user-feedback', comment);
+                            closeDislikeFeedback(wrapper);
+                            showFeedbackToast(this._uiString('feedbackReceived') || 'Thanks, feedback received.');
+                        }
                     } else {
                         showFeedbackToast(this._uiString('feedbackSendFailed') || "Couldn't send feedback.");
                     }
@@ -1296,10 +1396,28 @@ export const ConversationsMixin = {
                 }).finally(() => {
                     likeBtn.disabled = false;
                     dislikeBtn.disabled = false;
+                    if (comment != null && !accepted) {
+                        const panel = wrapper.querySelector('.chat-dislike-feedback');
+                        if (!panel) return;
+                        const area = panel.querySelector('textarea');
+                        const skip = panel.querySelector('.chat-dislike-feedback-skip');
+                        const send = panel.querySelector('.chat-dislike-feedback-send');
+                        if (area) area.disabled = false;
+                        if (skip) skip.disabled = false;
+                        if (send) send.disabled = !(area && area.value.trim());
+                    }
                 });
             };
             likeBtn.addEventListener('click', () => submitFeedback('like'));
-            dislikeBtn.addEventListener('click', () => submitFeedback('dislike'));
+            dislikeBtn.addEventListener('click', () => {
+                const wrapper = messageDiv.closest('.chat-message-wrapper');
+                const traceId = wrapper && wrapper.getAttribute('data-trace-id');
+                if (wrapper && wrapper.getAttribute('data-user-rating') === 'dislike' && traceId) {
+                    openDislikeFeedback(traceId);
+                    return;
+                }
+                submitFeedback('dislike');
+            });
             bar.appendChild(likeBtn);
             bar.appendChild(dislikeBtn);
         }

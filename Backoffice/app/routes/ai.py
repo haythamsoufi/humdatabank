@@ -2799,13 +2799,19 @@ def chat_stream():
     return resp
 
 
+# Optional dislike note. The chat textarea uses the same limit.
+_USER_FEEDBACK_MAX_CHARS = 2000
+
+
 @ai_bp.route("/feedback", methods=["POST"])
 @limiter.limit(_ai_feedback_limit)
 def submit_feedback():
     """
     Record like/dislike for an AI response. Used in traces to improve quality.
-    Body: { "trace_id": int, "rating": "like" | "dislike" }.
-    Trace must belong to the current user (user_id match).
+    Body: { "trace_id": int, "rating": "like" | "dislike", "comment"?: str }.
+    ``comment`` is optional and stored only for a dislike (what to improve or
+    correct). A like clears any previous comment. Trace must belong to the
+    current user (user_id match).
     """
     identity = resolve_ai_identity()
     beta_denied = _ai_beta_denied_response(identity)
@@ -2827,6 +2833,21 @@ def submit_feedback():
     if rating not in ("like", "dislike"):
         return json_bad_request("rating must be 'like' or 'dislike'")
 
+    has_comment = "comment" in data
+    comment_text = None
+    if has_comment:
+        raw_comment = data.get("comment")
+        if raw_comment is None:
+            comment_text = None
+        elif not isinstance(raw_comment, str):
+            return json_bad_request("comment must be a string")
+        else:
+            comment_text = raw_comment.replace("\x00", "").strip()
+            if len(comment_text) > _USER_FEEDBACK_MAX_CHARS:
+                return json_bad_request("comment is too long")
+            if not comment_text:
+                comment_text = None
+
     trace = db.session.get(AIReasoningTrace, trace_id)
     if not trace:
         return json_not_found("Trace not found")
@@ -2834,6 +2855,13 @@ def submit_feedback():
         return json_forbidden("Not allowed")
 
     trace.user_rating = rating
+    # A like means the earlier dislike note no longer applies. A dislike keeps
+    # the existing note unless this request includes a comment (including a
+    # blank one, which clears it).
+    if rating == "like":
+        trace.user_feedback = None
+    elif has_comment:
+        trace.user_feedback = comment_text
     try:
         db.session.commit()
     except Exception as e:
@@ -2841,7 +2869,11 @@ def submit_feedback():
         db.session.rollback()
         return json_server_error("Failed to save")
 
-    return json_ok(trace_id=trace_id, rating=rating)
+    return json_ok(
+        trace_id=trace_id,
+        rating=rating,
+        comment_saved=bool(rating == "dislike" and comment_text),
+    )
 
 
 @ai_bp.route("/conversations", methods=["GET"])

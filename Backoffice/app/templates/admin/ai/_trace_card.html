@@ -183,6 +183,12 @@
                 </dd>
             </div>
             {% endif %}
+            {% if trace.user_feedback %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('User feedback') }}</dt>
+                <dd class="text-sm text-gray-900 mt-1 break-words whitespace-pre-wrap">{{ trace.user_feedback }}</dd>
+            </div>
+            {% endif %}
             {% if trace.grounding_score is not none or trace.confidence_level %}
             <div class="border-t pt-3">
                 <dt class="text-sm text-gray-500">{{ _('Grounding / Confidence') }}</dt>
@@ -334,6 +340,7 @@
         'final_answer': (trace.display_answer or trace.final_answer or ''),
         'output_payloads': trace.output_payloads or {},
         'user_rating': trace.user_rating or '',
+        'user_feedback': trace.user_feedback or '',
         'progress_steps': trace.progress_steps or [],
         'trace_diagnostics': trace.trace_diagnostics if trace.trace_diagnostics is not none else none
     } | tojson }}</script>

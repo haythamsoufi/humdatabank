@@ -795,6 +795,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
                 if (meta.user_rating) { lines.push('User rating: ' + meta.user_rating); }
+                if (meta.user_feedback) { lines.push('User feedback: ' + meta.user_feedback); }
                 if (meta.error_message) { lines.push('Error: ' + meta.error_message); }
                 if (meta.tools_used && meta.tools_used.length) { lines.push('Tools used: ' + meta.tools_used.join(', ')); }
                 lines.push('');

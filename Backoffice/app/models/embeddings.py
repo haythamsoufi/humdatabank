@@ -422,6 +422,8 @@ class AIReasoningTrace(db.Model):
 
     # User feedback for quality improvement (recorded from chat UI)
     user_rating = Column(String(20), nullable=True, index=True)  # 'like' | 'dislike'
+    # Optional note written after a dislike: what to improve or correct.
+    user_feedback = Column(Text, nullable=True)
 
     # Quality metrics (computed post-answer)
     grounding_score = Column(Float, nullable=True)   # 0.0–1.0: fraction of answer claims supported by retrieved sources
@@ -513,6 +515,7 @@ class AIReasoningTrace(db.Model):
             'execution_path': self.execution_path,
             'output_payloads': self.output_payloads,
             'user_rating': self.user_rating,
+            'user_feedback': self.user_feedback,
             'grounding_score': self.grounding_score,
             'confidence_level': self.confidence_level,
             'llm_quality_score': self.llm_quality_score,

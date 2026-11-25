@@ -396,7 +396,7 @@ AI_API_REGISTRY = [
      'consumers': 'Backoffice, Mobile'},
     {'group': 'Chat', 'path': '/api/ai/v1/feedback', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
-     'description': 'Submit like/dislike feedback on a reasoning trace'},
+     'description': 'Submit like/dislike on a reasoning trace; dislike may include an optional comment'},
 
     # ── Conversations ──────────────────────────────────────────────────────────
     {'group': 'Conversations', 'path': '/api/ai/v1/conversations', 'methods': ['GET', 'DELETE'],

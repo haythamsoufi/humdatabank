@@ -1228,6 +1228,92 @@ body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
 .chat-feedback-toast.chat-feedback-toast-visible {
     opacity: 1;
 }
+
+/* Optional note offered after a dislike. */
+.chat-dislike-feedback {
+    width: 100%;
+    max-width: 28rem;
+    margin-top: 0.35rem;
+    padding: 0.65rem 0.75rem 0.7rem;
+    border: 1px solid var(--ci-border, #e2e8f0);
+    border-radius: 10px;
+    background: var(--ci-bg-elevated, #ffffff);
+    color: var(--ci-text, #1e293b);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.chat-dislike-feedback-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.chat-dislike-feedback-optional {
+    font-weight: 500;
+    color: var(--ci-text-muted, #64748b);
+}
+
+.chat-dislike-feedback textarea {
+    display: block;
+    width: 100%;
+    min-height: 4.25rem;
+    margin: 0;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--ci-border, #e2e8f0);
+    border-radius: 8px;
+    background: var(--ci-bg, #ffffff);
+    color: inherit;
+    font: inherit;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    resize: vertical;
+}
+
+.chat-dislike-feedback textarea:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 1px;
+}
+
+.chat-dislike-feedback-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+}
+
+.chat-dislike-feedback-skip,
+.chat-dislike-feedback-send {
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+}
+
+.chat-dislike-feedback-skip {
+    background: transparent;
+    border: none;
+    color: var(--ci-text-muted, #64748b);
+}
+
+.chat-dislike-feedback-skip:hover {
+    color: var(--ci-text, #1e293b);
+}
+
+.chat-dislike-feedback-send {
+    background: #2563eb;
+    border: none;
+    color: #ffffff;
+}
+
+.chat-dislike-feedback-send:disabled,
+.chat-dislike-feedback-skip:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
 .chat-message-actions {
     flex-wrap: wrap;
     align-items: center;

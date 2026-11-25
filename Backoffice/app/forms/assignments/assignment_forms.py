@@ -5,8 +5,9 @@ Assignment management forms for the platform.
 
 from flask_wtf import FlaskForm
 from flask_login import current_user
-from wtforms import StringField, SubmitField, SelectField, SelectMultipleField, DateField, BooleanField, HiddenField
-from wtforms.validators import DataRequired, Optional
+from wtforms import StringField, SubmitField, SelectField, SelectMultipleField, DateField, BooleanField, HiddenField, TextAreaField
+from wtforms.validators import DataRequired, Length, Optional
+from app.services.assignments.status_notes import STATUS_NOTE_MAX_LENGTH
 from wtforms.widgets import ListWidget, CheckboxInput
 from app.models import FormTemplate, Country, User
 from app.utils.forms.form_localization import build_template_select_choices
@@ -268,6 +269,10 @@ class AssignmentEntityStatusForm(BaseForm):
 
     status = SelectField("Status", choices=AssignmentEntityStatusValue.choices(), validators=[DataRequired()])
     due_date = DateField("Due Date", format='%Y-%m-%d', validators=[Optional()])
+    status_note = TextAreaField(
+        "Note",
+        validators=[Optional(), Length(max=STATUS_NOTE_MAX_LENGTH)],
+    )
     submit = SubmitField("Save Status")
 
 

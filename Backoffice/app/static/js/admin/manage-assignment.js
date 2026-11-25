@@ -368,6 +368,8 @@
                 if(editStatusModalEntityTypeInput) editStatusModalEntityTypeInput.value = entityType || '';
                 if(editStatusModalStatusSelect) editStatusModalStatusSelect.value = currentStatus;
                 if(editStatusModalDueDateInput) editStatusModalDueDateInput.value = currentDueDate;
+                const editStatusNote = document.getElementById('status_note');
+                if (editStatusNote) editStatusNote.value = '';
 
                 // Set the form action URL dynamically - use entity status update endpoint
                 if(editStatusActualForm) {
@@ -401,6 +403,8 @@
                 if(editStatusModalEntityTypeInput) editStatusModalEntityTypeInput.value = 'country';
                 if(editStatusModalStatusSelect) editStatusModalStatusSelect.value = currentStatus;
                 if(editStatusModalDueDateInput) editStatusModalDueDateInput.value = currentDueDate;
+                const editStatusNoteLegacy = document.getElementById('status_note');
+                if (editStatusNoteLegacy) editStatusNoteLegacy.value = '';
 
                 // Set the form action URL dynamically
                 if(editStatusActualForm) {
@@ -667,6 +671,56 @@
                 });
         }
 
+        var openStatusNotesModal = function () {};
+
+        function StatusNotesCellRenderer() {}
+        StatusNotesCellRenderer.prototype.init = function(params) {
+            this.params = params;
+            this.button = document.createElement('button');
+            this.button.type = 'button';
+            var self = this;
+            var stopGrid = function(e) { e.stopPropagation(); };
+            this.button.addEventListener('mousedown', stopGrid);
+            this.button.addEventListener('click', function(e) {
+                stopGrid(e);
+                if (self.button.disabled) return;
+                openStatusNotesModal(self.params && self.params.data);
+            });
+            this.eGui = this.button;
+            this.paint();
+        };
+        StatusNotesCellRenderer.prototype.paint = function() {
+            var data = (this.params && this.params.data) || {};
+            var count = Number(data.status_note_count) || 0;
+            var preview = data.status_note_preview || '';
+            this.button.replaceChildren();
+            if (!count && !canUpdateEntityStatus) {
+                this.button.disabled = true;
+                this.button.className = 'w-full text-left text-sm text-gray-400';
+                this.button.textContent = '—';
+                return;
+            }
+            this.button.disabled = false;
+            this.button.className = 'inline-flex items-center gap-1 w-full text-left text-sm ' +
+                (preview ? 'text-gray-800' : 'text-blue-700');
+            var label = document.createElement('span');
+            label.className = 'truncate';
+            label.textContent = preview || ((cfg.t && cfg.t.addStatusNote) || 'Add note');
+            this.button.appendChild(label);
+            if (count > 1) {
+                var badge = document.createElement('span');
+                badge.className = 'text-xs text-gray-500 shrink-0';
+                badge.textContent = '(' + count + ')';
+                this.button.appendChild(badge);
+            }
+        };
+        StatusNotesCellRenderer.prototype.getGui = function() { return this.eGui; };
+        StatusNotesCellRenderer.prototype.refresh = function(params) {
+            this.params = params;
+            this.paint();
+            return true;
+        };
+
         function StatusDropdownCellRenderer() {}
         StatusDropdownCellRenderer.prototype.init = function(params) {
             const self = this;
@@ -796,6 +850,19 @@
                     const match = statusChoices.find(function(c) { return c.value === params.data.status; });
                     return match ? match.label : params.data.status;
                 }
+            },
+            {
+                field: 'status_note_preview',
+                headerName: (cfg.t && cfg.t.statusNotes) || 'Notes',
+                width: 240,
+                minWidth: 160,
+                maxWidth: 360,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                valueGetter: function(params) {
+                    return (params.data && params.data.status_note_preview) || '';
+                },
+                cellRenderer: StatusNotesCellRenderer
             },
             {
                 field: 'status_changed_by_name',
@@ -1112,6 +1179,8 @@
             if (ids.length === 0) return;
             const select = document.getElementById('bulk-status-select');
             if (select) select.value = '';
+            const bulkNote = document.getElementById('bulk-status-note');
+            if (bulkNote) bulkNote.value = '';
             openModal(bulkStatusModal);
         });
 
@@ -1122,6 +1191,7 @@
             if (form && form.dataset.submitting === '1') return;
             const ids = getEntityGridSelectedIds();
             const status = document.getElementById('bulk-status-select')?.value;
+            const note = document.getElementById('bulk-status-note')?.value || '';
             if (ids.length === 0 || !status) {
                 if (!status) {
                     if (window.showAlert) window.showAlert('Please select a status.', 'warning');
@@ -1135,7 +1205,7 @@
             fetch(cfg.urls.assignmentBulkUpdateStatus, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
-                body: JSON.stringify({ status_ids: ids, status: status })
+                body: JSON.stringify({ status_ids: ids, status: status, note: note })
             }).then(function(res) {
                 return window.responseAsResult(res);
             })
@@ -1153,6 +1223,208 @@
                 if (submitBtn) submitBtn.disabled = false;
                 if (window.showAlert) window.showAlert('Request failed.', 'error'); else window.__clientWarn && window.__clientWarn('Request failed.');
               });
+        });
+
+        var statusNotesAesId = null;
+
+        function statusNotesUrl(aesId) {
+            var base = cfg.urls && cfg.urls.statusNotesBase;
+            if (!base || !aesId) return '';
+            return String(base).replace('/99999/status-notes', '/' + aesId + '/status-notes');
+        }
+
+        function formatStatusNoteTime(iso) {
+            if (!iso) return '';
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleString(undefined, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function appendMultiline(el, text) {
+            String(text || '').split('\n').forEach(function(line, index) {
+                if (index) el.appendChild(document.createElement('br'));
+                el.appendChild(document.createTextNode(line));
+            });
+        }
+
+        function renderStatusNoteItem(note) {
+            var item = document.createElement('div');
+            item.className = 'rounded-md border border-gray-200 bg-gray-50 p-3';
+            var head = document.createElement('div');
+            head.className = 'flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-1';
+            var statusEl = document.createElement('span');
+            statusEl.className = 'font-semibold text-gray-700';
+            statusEl.textContent = getStatusDisplayLabel(note && note.status);
+            var author = document.createElement('span');
+            author.textContent = (note && note.author_name) || ((cfg.t && cfg.t.unknownUser) || 'Unknown user');
+            head.appendChild(statusEl);
+            head.appendChild(author);
+            if (note && note.created_at) {
+                var time = document.createElement('span');
+                time.textContent = formatStatusNoteTime(note.created_at);
+                head.appendChild(time);
+            }
+            var body = document.createElement('p');
+            body.className = 'text-sm text-gray-800';
+            appendMultiline(body, note && note.body);
+            item.appendChild(head);
+            item.appendChild(body);
+            return item;
+        }
+
+        function setStatusNotesMessage(el, text) {
+            if (!el) return;
+            if (text) {
+                el.textContent = text;
+                el.classList.remove('hidden');
+            } else {
+                el.textContent = '';
+                el.classList.add('hidden');
+            }
+        }
+
+        function paintStatusNotesList(notes) {
+            var list = document.getElementById('status-notes-list');
+            var empty = document.getElementById('status-notes-empty');
+            if (list) {
+                list.replaceChildren();
+                (notes || []).forEach(function(note) {
+                    list.appendChild(renderStatusNoteItem(note));
+                });
+            }
+            if (empty) empty.classList.toggle('hidden', (notes || []).length > 0);
+        }
+
+        function applyStatusNoteSummary(aesId, summary) {
+            var api = window.entityGridApi || entityGridApi;
+            if (!api || !summary || typeof api.forEachNode !== 'function') return;
+            api.forEachNode(function(node) {
+                if (!node.data || Number(node.data.id) !== Number(aesId)) return;
+                node.data.status_note_count = summary.count || 0;
+                node.data.status_note_preview = summary.preview || '';
+                node.data.status_note_status = summary.status || '';
+                if (typeof api.refreshCells === 'function') {
+                    api.refreshCells({
+                        rowNodes: [node],
+                        columns: ['status_note_preview'],
+                        force: true
+                    });
+                }
+            });
+        }
+
+        openStatusNotesModal = function (row) {
+            if (!row || !row.id) return;
+            statusNotesAesId = row.id;
+            var entity = document.getElementById('status-notes-entity');
+            var linked = document.getElementById('status-notes-linked');
+            var body = document.getElementById('status-notes-body');
+            var error = document.getElementById('status-notes-error');
+            var empty = document.getElementById('status-notes-empty');
+            if (entity) entity.textContent = row.entity_name || '';
+            if (linked) {
+                var template = (cfg.t && cfg.t.statusNoteLinked) ||
+                    'A new note is saved against the current status: {status}.';
+                linked.textContent = template.replace('{status}', getStatusDisplayLabel(row.status));
+            }
+            if (body) body.value = '';
+            if (empty) empty.textContent = (cfg.t && cfg.t.statusNotesEmpty) || 'No notes yet.';
+            setStatusNotesMessage(error, '');
+            paintStatusNotesList([]);
+            if (empty) empty.classList.add('hidden');
+            openModal(document.getElementById('status-notes-modal'));
+            var url = statusNotesUrl(row.id);
+            if (!url) return;
+            fetch(url, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).then(function(res) {
+                return window.responseAsResult(res);
+            }).then(function(result) {
+                if (Number(statusNotesAesId) !== Number(row.id)) return;
+                if (result.ok && result.data && result.data.success) {
+                    paintStatusNotesList(result.data.notes || []);
+                } else {
+                    setStatusNotesMessage(
+                        error,
+                        (result.data && result.data.error) ||
+                            ((cfg.t && cfg.t.statusNotesLoadFailed) || 'Could not load notes.')
+                    );
+                }
+            }).catch(function() {
+                if (Number(statusNotesAesId) !== Number(row.id)) return;
+                setStatusNotesMessage(
+                    document.getElementById('status-notes-error'),
+                    (cfg.t && cfg.t.statusNotesLoadFailed) || 'Could not load notes.'
+                );
+            });
+        }
+
+        document.getElementById('status-notes-form')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var form = e.currentTarget;
+            if (!form || form.dataset.submitting === '1') return;
+            var bodyEl = document.getElementById('status-notes-body');
+            var text = (bodyEl && bodyEl.value ? bodyEl.value : '').trim();
+            var error = document.getElementById('status-notes-error');
+            if (!text) {
+                setStatusNotesMessage(
+                    error,
+                    (cfg.t && cfg.t.statusNoteRequired) || 'Write a note before adding it.'
+                );
+                return;
+            }
+            var aesId = statusNotesAesId;
+            var url = statusNotesUrl(aesId);
+            if (!url) return;
+            var submitBtn = form.querySelector('[type="submit"]');
+            form.dataset.submitting = '1';
+            if (submitBtn) submitBtn.disabled = true;
+            setStatusNotesMessage(error, '');
+            var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRFToken': csrfToken || '',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ body: text })
+            }).then(function(res) {
+                return window.responseAsResult(res);
+            }).then(function(result) {
+                if (!(result.ok && result.data && result.data.success && result.data.note)) {
+                    setStatusNotesMessage(
+                        error,
+                        (result.data && result.data.error) ||
+                            ((cfg.t && cfg.t.statusNotesSaveFailed) || 'Could not save the note.')
+                    );
+                    return;
+                }
+                if (bodyEl) bodyEl.value = '';
+                var list = document.getElementById('status-notes-list');
+                if (list) list.insertBefore(renderStatusNoteItem(result.data.note), list.firstChild);
+                var empty = document.getElementById('status-notes-empty');
+                if (empty) empty.classList.add('hidden');
+                if (result.data.summary) applyStatusNoteSummary(aesId, result.data.summary);
+            }).catch(function() {
+                setStatusNotesMessage(
+                    document.getElementById('status-notes-error'),
+                    (cfg.t && cfg.t.statusNotesSaveFailed) || 'Could not save the note.'
+                );
+            }).finally(function() {
+                form.dataset.submitting = '0';
+                if (submitBtn) submitBtn.disabled = false;
+            });
         });
 
         // "Change due date" opens the bulk-duedate-selected-modal

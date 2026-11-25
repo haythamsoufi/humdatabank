@@ -545,6 +545,12 @@ class AssignmentEntityStatus(db.Model):
         cascade="all, delete-orphan",
         back_populates='assignment_entity_status',
     )
+    status_notes = relationship(
+        'AssignmentEntityStatusNote',
+        lazy='dynamic',
+        cascade="all, delete-orphan",
+        back_populates='assignment_entity_status',
+    )
 
     # Relationship to SubmittedDocuments
     submitted_documents = relationship('SubmittedDocument', lazy='dynamic', cascade="all, delete-orphan", foreign_keys='SubmittedDocument.assignment_entity_status_id')
@@ -682,6 +688,45 @@ class AssignmentPageStatus(db.Model):
         return (
             f'<AssignmentPageStatus AES:{self.assignment_entity_status_id} '
             f'Page:{self.form_page_id} Status:{self.status}>'
+        )
+
+
+class AssignmentEntityStatusNote(db.Model):
+    """A comment kept with the assignment status it was written against.
+
+    The status is a snapshot: later status changes do not rewrite older notes.
+    """
+
+    __tablename__ = 'assignment_entity_status_note'
+
+    id = db.Column(db.Integer, primary_key=True)
+    assignment_entity_status_id = db.Column(
+        db.Integer,
+        db.ForeignKey('assignment_entity_status.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    status = db.Column(db.String(32), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    created_by_user_id = db.Column(
+        db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True
+    )
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    assignment_entity_status = relationship(
+        'AssignmentEntityStatus',
+        back_populates='status_notes',
+    )
+    created_by_user = db.relationship('User', foreign_keys=[created_by_user_id])
+
+    __table_args__ = (
+        db.Index('ix_aesn_aes', 'assignment_entity_status_id'),
+        db.Index('ix_aesn_aes_created', 'assignment_entity_status_id', 'created_at'),
+    )
+
+    def __repr__(self):
+        return (
+            f'<AssignmentEntityStatusNote {self.id} '
+            f'AES:{self.assignment_entity_status_id} Status:{self.status}>'
         )
 
 

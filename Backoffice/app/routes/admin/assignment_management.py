@@ -18,6 +18,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from app.models import (
     FormTemplate, AssignedForm, Country, User, AssignmentEntityStatus,
+    AssignmentEntityStatusNote,
     PublicSubmission, PublicSubmissionStatus,
     SubmittedDocument, NSBranch, NSSubBranch, NSLocalUnit, SecretariatDivision, SecretariatDepartment
 )
@@ -50,6 +51,15 @@ from app.services.public.form_themes import (
     public_form_theme_choices,
 )
 from app.services.assignments.workflow_service import apply_entity_status_change
+from app.services.assignments.status_notes import (
+    StatusNoteError,
+    add_status_note,
+    list_status_notes,
+    normalize_status_note,
+    note_summaries_by_aes,
+    serialize_status_note,
+    status_value as assignment_status_value,
+)
 from app.utils.forms.form_authorization import begin_aes_transition, lock_aes_rows_for_update
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
@@ -467,10 +477,14 @@ def _delete_assignment_entity_status_with_children(aes):
       - RepeatGroupData for RepeatGroupInstances linked via assignment_entity_status_id
       - RepeatGroupInstances linked via assignment_entity_status_id
       - SubmittedDocument linked via assignment_entity_status_id
+      - AssignmentEntityStatusNote linked via assignment_entity_status_id
     Then deletes the AES itself.
     """
     # Delete simple children that directly FK the AES
     FormData.query.filter_by(assignment_entity_status_id=aes.id).delete(synchronize_session=False)
+    AssignmentEntityStatusNote.query.filter_by(
+        assignment_entity_status_id=aes.id
+    ).delete(synchronize_session=False)
     DynamicIndicatorData.query.filter_by(assignment_entity_status_id=aes.id).delete(synchronize_session=False)
     DynamicSectionContext.query.filter_by(assignment_entity_status_id=aes.id).delete(synchronize_session=False)
 
@@ -1611,6 +1625,9 @@ def edit_assignment(assignment_id):
         aes.id: setters_by_id.get(aes.status_changed_by_user_id)
         for aes in assignment_entities
     }
+    assignment_entity_status_notes = note_summaries_by_aes(
+        [aes.id for aes in assignment_entities]
+    )
 
     country_ids = [
         aes.entity_id for aes in assignment_entities if aes.entity_type == 'country'
@@ -1684,6 +1701,7 @@ def edit_assignment(assignment_id):
                          assignment_entity_display=assignment_entity_display,
                          assignment_entity_fds_members=assignment_entity_fds_members,
                          assignment_entity_status_setters=assignment_entity_status_setters,
+                         assignment_entity_status_notes=assignment_entity_status_notes,
                          assignment_overview=assignment_overview,
                          edit_aes_form=edit_aes_form,
                          assignment_entity_status_choices=assignment_entity_status_choices,
@@ -1990,6 +2008,41 @@ def bulk_remove_entities_from_assignment(assignment_id):
     return json_ok(removed=removed)
 
 
+@bp.route(
+    "/assignments/<int:assignment_id>/entities/<int:aes_id>/status-notes",
+    methods=["GET", "POST"],
+)
+@permission_required_any(
+    ASSIGNMENT_DETAILS_PERMISSION,
+    ASSIGNMENT_ENTITIES_MANAGE_PERMISSION,
+    ASSIGNMENT_ENTITY_STATUS_PERMISSION,
+)
+def assignment_entity_status_notes(assignment_id, aes_id):
+    """List or add notes linked to one entity's assignment status."""
+    aes = AssignmentEntityStatus.query.get_or_404(aes_id)
+    if aes.assigned_form_id != assignment_id or not _assignment_entity_in_actor_scope(aes):
+        abort(404)
+    if request.method == "GET":
+        notes = list_status_notes(aes.id)
+        return json_ok(
+            notes=[serialize_status_note(note) for note in notes],
+            status=assignment_status_value(aes.status),
+        )
+    if not _can_update_assignment_entity_status():
+        return json_forbidden("You cannot add a note for this assignment.")
+    data = get_json_safe()
+    try:
+        note = add_status_note(aes, data.get("body"), current_user.id)
+    except StatusNoteError as exc:
+        return json_bad_request(str(exc))
+    if note is None:
+        return json_bad_request("Note is required.")
+    db.session.flush()
+    db.session.refresh(note)
+    summary = note_summaries_by_aes([aes.id]).get(aes.id, {})
+    return json_ok(note=serialize_status_note(note), summary=summary)
+
+
 @bp.route("/assignments/<int:assignment_id>/entities/bulk-update-status", methods=["POST"])
 @permission_required_any(ASSIGNMENT_ENTITY_STATUS_PERMISSION, ASSIGNMENT_ENTITIES_MANAGE_PERMISSION)
 def bulk_update_entity_status(assignment_id):
@@ -2002,6 +2055,10 @@ def bulk_update_entity_status(assignment_id):
         return json_bad_request('status_ids array required')
     if not new_status:
         return json_bad_request('status required')
+    try:
+        status_note = normalize_status_note(data.get('note'))
+    except StatusNoteError as exc:
+        return json_bad_request(str(exc))
     normalized_status = AssignmentEntityStatusValue.normalize(new_status)
     due_date_obj = None
     if due_date_str:
@@ -2042,6 +2099,8 @@ def bulk_update_entity_status(assignment_id):
             apply_entity_status_change(aes, normalized_status, current_user.id, now=_now)
             if due_date_obj is not None:
                 aes.due_date = due_date_obj
+            if status_note:
+                add_status_note(aes, status_note, current_user.id)
             updated += 1
             audit_changes.append(audit_change)
     db.session.flush()
@@ -2072,12 +2131,19 @@ def edit_assignment_entity_status(aes_id):
                 return redirect(url_for("assignment_management.manage_assignments"))
             apply_entity_status_change(aes, form.status.data, current_user.id)
             aes.due_date = form.due_date.data
+            add_status_note(aes, form.status_note.data, current_user.id)
             db.session.flush()
             flash(f"Status updated for {EntityService.get_entity_name(aes.entity_type, aes.entity_id)}.", "success")
+        except StatusNoteError as exc:
+            request_transaction_rollback()
+            flash(str(exc), "danger")
         except Exception as e:
             request_transaction_rollback()
             flash("Error updating status.", "danger")
             current_app.logger.error(f"Error updating assignment entity status {aes_id}: {e}", exc_info=True)
+    else:
+        for error in form.status_note.errors:
+            flash(error, "danger")
 
     return redirect(url_for("assignment_management.edit_assignment", assignment_id=aes.assigned_form_id))
 

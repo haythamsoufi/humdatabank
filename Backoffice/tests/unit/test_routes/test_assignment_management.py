@@ -575,6 +575,30 @@ class TestEditAssignment:
         assert payload[0]['completion_rate'] == 67.5
         assert payload[0]['assignment_url'] == f'/assignment/{aes_id}'
 
+    def test_entity_grid_includes_status_notes(self, logged_in_client, db_session, app):
+        from app.services.assignments.status_notes import add_status_note
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country, status="submitted")
+            add_status_note(aes, "Ready for approval", None)
+            db_session.commit()
+            assignment_id = aes.assigned_form_id
+        resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="status-notes-modal"' in html
+        assert 'id="bulk-status-note"' in html
+        marker = '<script type="application/json" id="entity-management-data">'
+        start = html.find(marker)
+        assert start != -1
+        json_start = start + len(marker)
+        json_end = html.find('</script>', json_start)
+        payload = json.loads(html[json_start:json_end].strip())
+        assert payload[0]['status_note_count'] == 1
+        assert payload[0]['status_note_preview'] == 'Ready for approval'
+        assert payload[0]['status_note_status'] == 'submitted'
+
     def test_entity_grid_includes_status_changed_by_user(
         self, logged_in_client, db_session, app, admin_user
     ):
@@ -1454,6 +1478,100 @@ class TestBulkUpdateEntityStatus:
         )
         assert resp.status_code in (200, 302)
 
+    def test_bulk_update_saves_note_against_new_status(self, logged_in_client, db_session, app, admin_user):
+        from app.models.assignments import AssignmentEntityStatusNote
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+        resp = logged_in_client.post(
+            f"/admin/assignments/{assignment_id}/entities/bulk-update-status",
+            json={
+                "status_ids": [aes_id],
+                "status": "approved",
+                "note": "  Approved after the desk review.  ",
+            },
+        )
+        assert resp.status_code in (200, 302)
+        with app.app_context():
+            notes = AssignmentEntityStatusNote.query.filter_by(
+                assignment_entity_status_id=aes_id
+            ).all()
+            assert len(notes) == 1
+            assert notes[0].status == "approved"
+            assert notes[0].body == "Approved after the desk review."
+            assert notes[0].created_by_user_id == admin_user.id
+
+    def test_bulk_update_rejects_oversized_note_without_changing_status(
+        self, logged_in_client, db_session, app
+    ):
+        from app.models.assignments import AssignmentEntityStatus, AssignmentEntityStatusNote
+        from app.models.enums import AssignmentEntityStatusValue
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+        resp = logged_in_client.post(
+            f"/admin/assignments/{assignment_id}/entities/bulk-update-status",
+            json={"status_ids": [aes_id], "status": "approved", "note": "x" * 2001},
+        )
+        assert resp.status_code == 400
+        with app.app_context():
+            refreshed = AssignmentEntityStatus.query.get(aes_id)
+            assert refreshed.status == AssignmentEntityStatusValue.in_progress
+            assert AssignmentEntityStatusNote.query.filter_by(
+                assignment_entity_status_id=aes_id
+            ).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# assignment_entity_status_notes
+# ---------------------------------------------------------------------------
+
+class TestAssignmentEntityStatusNotes:
+    def test_add_and_list_note_for_current_status(self, logged_in_client, db_session, app, admin_user):
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country, status="in_progress")
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+        resp = logged_in_client.post(
+            f"/admin/assignments/{assignment_id}/entities/{aes_id}/status-notes",
+            json={"body": "Focal point asked for another week."},
+        )
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["note"]["status"] == "in_progress"
+        assert payload["note"]["body"] == "Focal point asked for another week."
+        assert payload["note"]["created_by_user_id"] == admin_user.id
+        assert payload["summary"]["count"] == 1
+
+        listed = logged_in_client.get(
+            f"/admin/assignments/{assignment_id}/entities/{aes_id}/status-notes",
+        )
+        assert listed.status_code == 200
+        notes = listed.get_json()["notes"]
+        assert len(notes) == 1
+        assert notes[0]["status"] == "in_progress"
+        assert notes[0]["body"] == "Focal point asked for another week."
+
+    def test_blank_note_is_rejected(self, logged_in_client, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+        resp = logged_in_client.post(
+            f"/admin/assignments/{assignment_id}/entities/{aes_id}/status-notes",
+            json={"body": "   "},
+        )
+        assert resp.status_code == 400
+
 
 # ---------------------------------------------------------------------------
 # edit_assignment_entity_status
@@ -1511,6 +1629,29 @@ class TestEditAssignmentEntityStatus:
                 follow_redirects=False,
             )
         assert resp.status_code in (302, 200)
+
+    def test_edit_aes_saves_note_against_selected_status(self, logged_in_client, db_session, app, admin_user):
+        from app.models.assignments import AssignmentEntityStatusNote
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            aes_id = aes.id
+        with patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
+            resp = logged_in_client.post(
+                f"/admin/assignment_entity_status/edit/{aes_id}",
+                data={"status": "submitted", "status_note": "Waiting on the regional review."},
+                follow_redirects=False,
+            )
+        assert resp.status_code in (302, 200)
+        with app.app_context():
+            notes = AssignmentEntityStatusNote.query.filter_by(
+                assignment_entity_status_id=aes_id
+            ).all()
+            assert len(notes) == 1
+            assert notes[0].status == "submitted"
+            assert notes[0].body == "Waiting on the regional review."
+            assert notes[0].created_by_user_id == admin_user.id
 
     def test_edit_aes_not_found(self, logged_in_client, db_session):
         resp = logged_in_client.post(

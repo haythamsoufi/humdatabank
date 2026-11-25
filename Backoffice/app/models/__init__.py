@@ -50,6 +50,7 @@ from .assignments import (
     AssignedForm,
     AssignmentEntityStatus,
     AssignmentPageStatus,
+    AssignmentEntityStatusNote,
     PublicSubmission,
     ReportingPeriod
 )
@@ -261,6 +262,7 @@ __all__ = [
     'AssignedForm',
     'AssignmentEntityStatus',
     'AssignmentPageStatus',
+    'AssignmentEntityStatusNote',
     'PublicSubmission',
     'ReportingPeriod',
 

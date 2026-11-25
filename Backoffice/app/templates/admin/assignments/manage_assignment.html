@@ -1052,10 +1052,19 @@
                  {% endfor %}
             </div>
 
-            <div class="mb-6">
+            <div class="mb-4">
                  {{ edit_aes_form.due_date.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
                  {{ edit_aes_form.due_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
                  {% for error in edit_aes_form.due_date.errors %}
+                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                 {% endfor %}
+            </div>
+
+            <div class="mb-6">
+                 <label for="status_note" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Note') }}</label>
+                 {{ edit_aes_form.status_note(id="status_note", rows="3", class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md", placeholder=_('Optional. Saved against the status you select.')) }}
+                 <p class="mt-1 text-xs text-gray-500">{{ _('Leave blank to change the status without a note.') }}</p>
+                 {% for error in edit_aes_form.status_note.errors %}
                      <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                  {% endfor %}
             </div>
@@ -1080,6 +1089,13 @@
             {% endfor %}
         </select>
     </div>
+    <div class="mb-4">
+        <label for="bulk-status-note" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Note') }}</label>
+        <textarea id="bulk-status-note" name="note" rows="3" maxlength="2000"
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  placeholder="{{ _('Optional. Saved against the new status.') }}"></textarea>
+        <p class="mt-1 text-xs text-gray-500">{{ _('Applied to every selected entity and linked to the new status. Leave blank to change the status without a note.') }}</p>
+    </div>
     <div class="flex justify-end space-x-3">
         <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
         <button type="submit" class="btn btn-primary">{{ _('Apply') }}</button>
@@ -1102,6 +1118,33 @@
 </form>
 {% endcall %}
 {% endif %}
+{% endif %}
+
+{% if assignment %}
+{% call modal_shell('status-notes-modal', _('Status notes'), max_width='max-w-lg') %}
+    <p id="status-notes-entity" class="text-sm font-semibold text-gray-800"></p>
+    <p id="status-notes-linked" class="mt-1 text-xs text-gray-500"></p>
+    <div id="status-notes-list" class="mt-4 space-y-2"></div>
+    <p id="status-notes-empty" class="mt-4 text-sm text-gray-500 hidden">{{ _('No notes yet.') }}</p>
+    <p id="status-notes-error" class="mt-3 text-sm text-red-600 hidden" role="alert"></p>
+    {% if can_update_assignment_entity_status %}
+    <form id="status-notes-form" class="mt-4">
+        <label for="status-notes-body" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Add a note') }}</label>
+        <textarea id="status-notes-body" name="body" rows="3" maxlength="2000" required
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  placeholder="{{ _('Write a note for the current status') }}"></textarea>
+        <p class="mt-1 text-xs text-gray-500">{{ _('The note is saved against the entity\'s current assignment status.') }}</p>
+        <div class="flex justify-end space-x-3 mt-4">
+            <button type="button" class="btn btn-secondary close-modal">{{ _('Close') }}</button>
+            <button type="submit" class="btn btn-primary">{{ _('Add note') }}</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="flex justify-end mt-4">
+        <button type="button" class="btn btn-secondary close-modal">{{ _('Close') }}</button>
+    </div>
+    {% endif %}
+{% endcall %}
 {% endif %}
 
 
@@ -1256,6 +1299,7 @@ window.manageAssignmentConfig = {
 {% set aes_display_name = assignment_entity_display.get(aes.id, '') if assignment_entity_display is defined else EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) %}
 {% set fds_info = (assignment_entity_fds_members.get(aes.entity_id) if assignment_entity_fds_members is defined and aes.entity_type in ('country', 'project') else none) %}
 {% set setter_info = (assignment_entity_status_setters.get(aes.id) if assignment_entity_status_setters is defined else none) %}
+{% set note_info = (assignment_entity_status_notes.get(aes.id) if assignment_entity_status_notes is defined else none) %}
 {
     "id": {{ aes.id }},
     "entity_type": {{ (aes.entity_type or '')|tojson }},
@@ -1279,6 +1323,9 @@ window.manageAssignmentConfig = {
     "fds_member_active": {{ (fds_info.fds_member_active if fds_info else true)|tojson }},
     "fds_member_profile_color": {{ ((fds_info.fds_member_profile_color if fds_info else '') or '')|tojson }},
     "status": {{ (aes.status or '')|tojson }},
+    "status_note_count": {{ (note_info.count if note_info else 0)|tojson }},
+    "status_note_preview": {{ ((note_info.preview if note_info else '') or '')|tojson }},
+    "status_note_status": {{ ((note_info.status if note_info else '') or '')|tojson }},
     "status_changed_by_user_id": {{ (setter_info.status_changed_by_user_id if setter_info else none)|tojson }},
     "status_changed_by_name": {{ ((setter_info.status_changed_by_name if setter_info else '') or '')|tojson }},
     "status_changed_by_email": {{ ((setter_info.status_changed_by_email if setter_info else '') or '')|tojson }},
@@ -1343,6 +1390,7 @@ window.manageAssignmentConfig = {
         {% if assignment %}
         assignmentBulkRemove: {{ url_for('assignment_management.bulk_remove_entities_from_assignment', assignment_id=assignment.id)|tojson }},
         assignmentBulkUpdateStatus: {{ url_for('assignment_management.bulk_update_entity_status', assignment_id=assignment.id)|tojson }},
+        statusNotesBase: {{ url_for('assignment_management.assignment_entity_status_notes', assignment_id=assignment.id, aes_id=99999)|tojson }},
         assignmentBulkUpdatePublic: {{ url_for('assignment_management.bulk_update_public_availability', assignment_id=assignment.id)|tojson }},
         assignmentBulkUpdateDueDate: {{ url_for('assignment_management.bulk_update_due_date_selected', assignment_id=assignment.id)|tojson }},
         assignmentTogglePublicAccess: {{ url_for('assignment_management.toggle_public_access', assignment_id=assignment.id)|tojson }},
@@ -1398,6 +1446,14 @@ window.manageAssignmentConfig = {
         noUsersFound: {{ _('No users found.')|tojson }},
         completionRate: {{ _('Completion Rate')|tojson }},
         statusSetBy: {{ _('Status set by')|tojson }},
+        statusNotes: {{ _('Notes')|tojson }},
+        addStatusNote: {{ _('Add note')|tojson }},
+        statusNoteLinked: {{ _('A new note is saved against the current status: {status}.')|tojson }},
+        statusNotesEmpty: {{ _('No notes yet.')|tojson }},
+        statusNotesLoadFailed: {{ _('Could not load notes.')|tojson }},
+        statusNotesSaveFailed: {{ _('Could not save the note.')|tojson }},
+        statusNoteRequired: {{ _('Write a note before adding it.')|tojson }},
+        unknownUser: {{ _('Unknown user')|tojson }},
         entities: {{ _('Entities')|tojson }},
         copyConfigLoading: {{ _('Loading configuration…')|tojson }},
         copyConfigFailed: {{ _('Could not load that assignment. Try again.')|tojson }},

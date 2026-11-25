@@ -2,7 +2,8 @@
 
 Operational updates go to ``dref-op-update``. Final reports go to
 ``dref-final-report``. The record is created as a GO draft so GO can process it.
-Contact names and addresses are not sent.
+Contact names and addresses are not sent. An Emergency Appeal is never posted:
+GO has no write endpoint for one (see ``posts_to_go``).
 """
 
 from __future__ import annotations
@@ -20,12 +21,21 @@ from app.utils.common.datetime_helpers import ensure_utc, utcnow
 from plugins.dref_monitoring.constants import GO_API_ROOT
 from plugins.dref_monitoring.models import DrefDraft
 from plugins.dref_monitoring.services.drafts import narrative_map
+from plugins.dref_monitoring.services.go_parse import is_emergency_appeal
 from plugins.dref_monitoring.services.narrative_format import to_plain
 
 logger = logging.getLogger(__name__)
 
 _TOKEN_MISSING = "GO API token is not configured."
 _REJECTED = "GO did not accept the report."
+NOT_POSTED = "Emergency Appeal reports are not sent to GO from here. Download the Word file or the PDF."
+
+
+def posts_to_go(operation) -> bool:
+    """GO takes operational updates and final reports for a DREF, through ``dref-op-update`` and
+    ``dref-final-report``. It has no such endpoint for an Emergency Appeal, whose reports are filed
+    as documents, so a validated Emergency Appeal draft stays here and is exported."""
+    return not is_emergency_appeal(getattr(operation, "appeal_type", "") or "")
 
 
 def go_payload(operation, draft) -> dict:
@@ -128,6 +138,8 @@ def _claim(draft) -> dict | None:
 def submit_draft(operation, draft, post=None) -> dict:
     if draft.operation_id != operation.id:
         return {"ok": False, "error": "Draft not found."}
+    if not posts_to_go(operation):
+        return {"ok": False, "error": NOT_POSTED, "not_posted": True}
     claimed = _claim(draft)
     if claimed is not None:
         return claimed

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from pathlib import Path
 
 from app.plugins.db_config import DbPluginConfig
-from plugins.dref_monitoring.constants import DEFAULT_CONFIG, PLUGIN_ID, PROMPT_VERSION
+from plugins.dref_monitoring.constants import DEFAULT_CONFIG, EA_DEFAULT_SINCE_YEAR, PLUGIN_ID, PROMPT_VERSION
 
 _store = DbPluginConfig(PLUGIN_ID, DEFAULT_CONFIG, plugin_root=Path(__file__).resolve().parent)
 
@@ -57,6 +58,29 @@ def ai_model(kind: str | None = None) -> str:
 
 def go_base_url() -> str:
     return str((get_config().get("go") or {}).get("base_url") or DEFAULT_CONFIG["go"]["base_url"])
+
+
+def go_appeal_url() -> str:
+    return str((get_config().get("go") or {}).get("appeal_url") or DEFAULT_CONFIG["go"]["appeal_url"])
+
+
+def _since_year(value, default: int = EA_DEFAULT_SINCE_YEAR) -> int:
+    """A saved start year. Anything outside a sensible range uses the default."""
+    try:
+        year = int(value)
+    except (TypeError, ValueError):
+        return default
+    return year if 2000 <= year <= date.today().year + 1 else default
+
+
+def emergency_appeal_settings() -> dict:
+    """Whether Emergency Appeals are synced, and from which year closed ones are read."""
+    saved = get_config().get("emergency_appeals") or {}
+    enabled = saved.get("enabled")
+    return {
+        "enabled": True if enabled is None else _flag(enabled),
+        "closed_since_year": _since_year(saved.get("closed_since_year")),
+    }
 
 
 def _flag(value) -> bool:
@@ -117,4 +141,23 @@ def save_posted_settings(form, *, partial: bool = False) -> bool:
     if ai:
         ai["prompt_version"] = PROMPT_VERSION
         _store.update_section("ai", ai)
+
+    # The section changes only when its fields are posted. An unchecked box is absent from the HTML form,
+    # so the year field marks a form post; a caller that never mentions Emergency Appeals leaves them alone.
+    nested_ea = form.get("emergency_appeals") if isinstance(form.get("emergency_appeals"), dict) else {}
+    if "ea_closed_since_year" in form or "ea_enabled" in form or nested_ea:
+        ea = {}
+        if "ea_enabled" in form:
+            ea["enabled"] = _flag(form.get("ea_enabled"))
+        elif "enabled" in nested_ea:
+            ea["enabled"] = _flag(nested_ea.get("enabled"))
+        elif not partial:
+            ea["enabled"] = False
+        year = form.get("ea_closed_since_year") if "ea_closed_since_year" in form else nested_ea.get("closed_since_year")
+        if year not in (None, ""):
+            ea["closed_since_year"] = _since_year(year)
+        elif not partial:
+            ea["closed_since_year"] = EA_DEFAULT_SINCE_YEAR
+        if ea:
+            _store.update_section("emergency_appeals", ea)
     return True

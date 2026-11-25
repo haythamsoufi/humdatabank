@@ -1,6 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_subtab_btn_classes %}
 {% from "components/_status_label.html" import status_label %}
 {% from "plugins/dref_monitoring/_status.html" import dref_enum, dref_status %}
 {% from "macros/modal_shell.html" import modal_shell %}
@@ -55,7 +55,7 @@
 
 {% block extra_css %}
 {% include "components/_ui_style_stylesheets.html" %}
-<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/plan_inline.css') }}?v=21">
+<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/plan_inline.css') }}?v=23">
 <link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='css/ai_writing.css') }}?v=2">
 {% endblock %}
 
@@ -70,13 +70,13 @@
     subtitle=operation.appeal_code ~ ' · ' ~ operation.country_name,
     icon='fas fa-clipboard-list',
     breadcrumbs=[
-        {'name': dref_tr('DREF monitoring'), 'url': url_for('dref_monitoring.operations_page')},
+        {'name': dref_tr('DREF and Emergency Appeal monitoring'), 'url': url_for('dref_monitoring.operations_page')},
         {'name': operation.appeal_code}
     ]
 ) }}
 
 <div class="bg-white rounded-lg shadow-md border border-gray-200">
-    {% call scroll_tab_bar(inner_id='dref-operation-tabs', aria_label=dref_tr('DREF monitoring')) %}
+    {% call scroll_tab_bar(inner_id='dref-operation-tabs', aria_label=dref_tr('DREF and Emergency Appeal monitoring')) %}
         <button type="button" role="tab" id="dref-tab-overview" data-tab="overview"
                 aria-controls="panel-overview" aria-selected="{{ 'true' if active_tab == 'overview' else 'false' }}"
                 class="{{ admin_underline_tab_btn_classes(active_tab == 'overview') }}">
@@ -113,12 +113,7 @@
         <div id="panel-overview" class="settings-panel space-y-6{% if active_tab != 'overview' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-tab-overview">
             {% if snapshot %}
             <section class="space-y-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-sm font-semibold text-gray-800">{{ dref_tr('Reporting timeline') }}</h2>
-                    {% if snapshot.update_href %}
-                    <a class="btn btn-primary btn-sm" href="{{ snapshot.update_href }}">{{ dref_tr('Report updates') }}</a>
-                    {% endif %}
-                </div>
+                <h2 class="text-sm font-semibold text-gray-800">{{ dref_tr('Reporting timeline') }}</h2>
                 {% if snapshot.events %}
                 <ol class="dref-timeline" style="grid-template-columns: repeat({{ snapshot.events|length }}, minmax(0, 1fr));">
                     {% for event in snapshot.events %}
@@ -217,7 +212,7 @@
                         {{ fact(dref_tr('Country'), operation.country_name ~ ((' (' ~ operation.country_iso3 ~ ')') if operation.country_iso3 else '')) }}
                         {{ fact(dref_tr('Region'), operation.region) }}
                         {{ fact(dref_tr('Hazard'), operation.hazard) }}
-                        {{ fact(dref_tr('Appeal type'), operation.appeal_type) }}
+                        {{ fact(dref_tr('Appeal type'), dref_appeal_label(operation.appeal_type)) }}
                         {{ fact(dref_tr('Pillar'), operation.pillar) }}
                         {{ fact(dref_tr('Allocation'), operation.allocation_type) }}
                         {{ fact(dref_tr('Onset'), operation.onset) }}
@@ -330,11 +325,29 @@
             {% endif %}
 
             {% if plan %}
+            {% set plan_subtab = plan_subtab|default('indicators') %}
+            {% call scroll_tab_bar(inner_id='dref-plan-subtabs', aria_label=dref_tr('Monitoring plan')) %}
+                <button type="button" role="tab" id="dref-plan-subtab-schedule" data-tab="schedule"
+                        aria-controls="dref-plan-panel-schedule" aria-selected="{{ 'true' if plan_subtab == 'schedule' else 'false' }}"
+                        class="{{ admin_underline_subtab_btn_classes(plan_subtab == 'schedule') }}">
+                    <i class="fas fa-calendar-alt mr-1.5" aria-hidden="true"></i>{{ dref_tr('Reporting schedule') }}
+                </button>
+                <button type="button" role="tab" id="dref-plan-subtab-indicators" data-tab="indicators"
+                        aria-controls="dref-plan-panel-indicators" aria-selected="{{ 'true' if plan_subtab == 'indicators' else 'false' }}"
+                        class="{{ admin_underline_subtab_btn_classes(plan_subtab == 'indicators') }}">
+                    <i class="fas fa-list-check mr-1.5" aria-hidden="true"></i>{{ dref_tr('Indicators') }}
+                </button>
+            {% endcall %}
+            <div id="dref-plan-panel-schedule" class="dref-plan-subpanel pt-4{% if plan_subtab != 'schedule' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-plan-subtab-schedule">
+            {% include "plugins/dref_monitoring/_plan_schedule.html" %}
+            </div>
+            <div id="dref-plan-panel-indicators" class="dref-plan-subpanel space-y-4 pt-4{% if plan_subtab != 'indicators' %} hidden{% endif %}" role="tabpanel" aria-labelledby="dref-plan-subtab-indicators">
             {% set field_class = "dref-plan-write dref-plan-field form-input w-full px-2 py-1 text-sm text-gray-900 bg-white" %}
             {% if actor_can_enter %}
             <form method="post" action="{{ url_for('dref_monitoring.save_plan_route', operation_id=operation.id) }}" data-dref-plan-form data-dref-operation="{{ operation.id }}" data-dref-date-order="{{ dref_tr('The end date must be on or after the start date.') }}" data-dref-amount="{{ dref_tr('Amounts cannot be negative.') }}" data-dref-plan-draft="{{ '1' if request.args.get('plan_draft') == '1' else '' }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="tab" value="plan">
+                <input type="hidden" name="plan_tab" value="indicators">
                 <template data-dref-activity-template>
                     <table><tbody>
                     <tr class="dref-plan-activity border-t border-gray-200" data-dref-new-activity="__KEY__" data-dref-activity data-dref-sector="__GROUP__" data-dref-indicator="__INDICATOR_KEY__">
@@ -369,6 +382,12 @@
                     </tr>
                     </tbody></table>
                 </template>
+            {% if plan_is_appeal %}
+                <div class="dref-plan-write mb-3">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dref-indicators-set="on">{{ dref_tr('Switch all on') }}</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-dref-indicators-set="off">{{ dref_tr('Switch all off') }}</button>
+                </div>
+            {% endif %}
             {% endif %}
             <div class="border border-gray-200 rounded-lg overflow-hidden">
                 <div class="dref-plan-scroll">
@@ -393,6 +412,15 @@
                                         {{ fold_button('sector', dref_label(section.group.label)) }}
                                         <div class="dref-plan-fold-body">
                                             <p class="font-medium text-gray-900">{{ dref_tr('Sector') }}: {{ dref_label(section.group.label) }}</p>
+                                            {% if plan_is_appeal and section.indicators_total %}
+                                            <p class="mt-1 text-xs text-gray-500" data-dref-indicator-count>{{ dref_tr('{on} of {all} on').format(on=section.indicators_on, all=section.indicators_total) }}</p>
+                                            {% if actor_can_enter %}
+                                            <span class="dref-plan-write mt-2">
+                                                <button type="button" class="btn btn-secondary btn-sm" data-dref-indicators-set="on" data-dref-indicators-scope="{{ section.group.id }}">{{ dref_tr('Switch all on') }}</button>
+                                                <button type="button" class="btn btn-secondary btn-sm" data-dref-indicators-set="off" data-dref-indicators-scope="{{ section.group.id }}">{{ dref_tr('Switch all off') }}</button>
+                                            </span>
+                                            {% endif %}
+                                            {% endif %}
                                             {% if section.group.unmatched %}
                                             <p class="mt-1 text-xs font-medium text-amber-700">{{ dref_tr('No match in the indicator bank') }}</p>
                                             {% endif %}
@@ -410,14 +438,29 @@
                             {% for block in section.blocks %}
                             {% set indicator = block.indicator %}
                             {% set indicator_key = indicator.id if indicator else 'other-' ~ section.group.id %}
+                            {% set flat = plan_is_appeal and not block.activities %}
                             {% if not block.bare %}
-                            <tr class="dref-plan-indicator border-t border-gray-200" data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}" data-dref-indicator-row>
-                                <td class="px-4 py-3" colspan="4" data-dref-indicator-cell="{{ indicator_key }}">
+                            <tr class="dref-plan-indicator border-t border-gray-200{% if flat %} dref-plan-flat{% endif %}{% if not block.enabled %} dref-plan-off{% endif %}" data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}" data-dref-indicator-row>
+                                <td class="{% if flat %}dref-plan-wrap dref-plan-name{% else %}px-4{% endif %} py-3" {% if not flat %}colspan="4"{% endif %} data-dref-indicator-cell="{{ indicator_key }}">
                                     <div class="dref-plan-fold-head">
+                                        {% if not flat %}
                                         {{ fold_button('indicator', dref_label(indicator.title) if indicator else dref_tr('Other activities')) }}
+                                        {% endif %}
                                         <div class="dref-plan-fold-body">
                                             {% if indicator %}
-                                            <p class="font-medium text-gray-900">{{ dref_tr('Indicator') }}: {{ dref_label(indicator.title) }}</p>
+                                            <p class="dref-plan-name font-medium text-gray-900">{{ dref_tr('Indicator') }}: {{ dref_label(indicator.title) }}</p>
+                                            {% if plan_is_appeal and indicator.indicator_bank_id %}
+                                            {% if not block.enabled %}
+                                            <p class="dref-plan-read mt-1 text-xs font-medium text-gray-500">{{ dref_tr('Not monitored') }}</p>
+                                            {% endif %}
+                                            {% if actor_can_enter %}
+                                            <label class="dref-plan-write mt-2 inline-flex items-center gap-2 text-xs text-gray-700">
+                                                <input type="hidden" class="dref-plan-field" name="indicator_listed" value="{{ indicator.id }}" disabled>
+                                                <input type="checkbox" class="dref-plan-field" name="indicator_on" value="{{ indicator.id }}" data-dref-indicator-group="{{ section.group.id }}" {% if block.enabled %}checked{% endif %} disabled>
+                                                {{ dref_tr('Report on this indicator') }}
+                                            </label>
+                                            {% endif %}
+                                            {% endif %}
                                             {% if indicator.unit %}
                                             <p class="mt-1 text-xs text-gray-500">{{ dref_label(indicator.unit) }}</p>
                                             {% endif %}
@@ -440,6 +483,11 @@
                                         </div>
                                     </div>
                                 </td>
+                                {% if flat %}
+                                <td class="dref-plan-col dref-plan-col--status px-4 py-3 text-gray-500">-</td>
+                                <td class="dref-plan-col dref-plan-col--choice px-4 py-3 text-gray-500">-</td>
+                                <td class="dref-plan-col dref-plan-col--choice px-4 py-3 text-gray-500">-</td>
+                                {% endif %}
                                 <td class="dref-plan-col dref-plan-col--budget px-4 py-3 text-gray-500">-</td>
                                 <td class="dref-plan-col dref-plan-col--target px-4 py-3" data-dref-indicator-target="{{ indicator_key }}">
                                     {% if indicator %}
@@ -456,7 +504,7 @@
                             </tr>
                             {% endif %}
                             {% for row in block.activities %}
-                            <tr class="dref-plan-activity border-t border-gray-200" data-dref-activity data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}">
+                            <tr class="dref-plan-activity border-t border-gray-200{% if not block.enabled %} dref-plan-off{% endif %}" data-dref-activity data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}">
                                 <td class="dref-plan-wrap px-4 py-3">
                                     <span class="dref-plan-read font-medium text-gray-900">{{ dref_label(row.title) }}</span>
                                     {% if actor_can_enter %}
@@ -515,9 +563,11 @@
                                 </td>
                             </tr>
                             {% else %}
+                            {% if not (plan_is_appeal and indicator and indicator.indicator_bank_id) %}
                             <tr class="dref-plan-activity border-t border-gray-200" data-dref-indicator-empty data-dref-sector="{{ section.group.id }}" data-dref-indicator="{{ indicator_key }}">
                                 <td class="px-4 py-3 text-gray-500" colspan="8">{{ dref_tr('No activities on this plan yet') }}</td>
                             </tr>
+                            {% endif %}
                             {% endfor %}
                             {% else %}
                             <tr class="border-t border-gray-200" data-dref-sector="{{ section.group.id }}">
@@ -590,6 +640,7 @@
             </div>
             </form>
             {% endif %}
+            </div>
             {% else %}
             <p class="text-sm text-gray-500 text-center py-8 border border-gray-200 rounded-lg">{{ dref_tr('No monitoring plan yet') }}</p>
             {% endif %}
@@ -1145,7 +1196,11 @@
 {% endif %}
 {% call modal_shell('dref-plan-source-modal', dref_tr('Where this plan comes from'), max_width='max-w-xl') %}
     <div class="text-sm text-gray-600 space-y-2">
+        {% if dref_is_appeal(operation.appeal_type) and baseline and baseline.stage == 'Emergency Appeal' %}
+        <p>{{ dref_tr('This operation is an Emergency Appeal read from the public GO appeal API. The plan starts from the amount requested and the people targeted. GO publishes no sectors, indicators, or activities for an appeal, so the plan lists the emergency indicators of the indicator bank. Switch off the ones this operation will not report on, then confirm the plan. Add activities from the Emergency Plan of Action here, or import them from Excel.') }}</p>
+        {% else %}
         <p>{{ dref_tr('This draft is built from the latest approved stage on the public GO feed. That stage is the approved DREF application, or a later operational update or final report when one is the latest. An application still in draft or in review on GO is not used.') }}</p>
+        {% endif %}
         {% if baseline and baseline.stage %}
         <p>{{ dref_tr('The latest approved stage stored for this operation is {stage}.').format(stage=baseline.stage) }}</p>
         {% endif %}
@@ -1170,7 +1225,7 @@
         <button type="button" class="btn btn-secondary close-modal">{{ dref_tr('Close') }}</button>
     </div>
 {% endcall %}
-<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/operation_tabs.js') }}?v=2" nonce="{{ csp_nonce() }}" defer></script>
+<script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/operation_tabs.js') }}?v=5" nonce="{{ csp_nonce() }}" defer></script>
 <script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/report_actions.js') }}?v=3" nonce="{{ csp_nonce() }}" defer></script>
 <script src="{{ url_for('plugin_static.serve_plugin_static', plugin_name='dref_monitoring', filename='js/plan_inline.js') }}?v=13" nonce="{{ csp_nonce() }}" defer></script>
 {% include "components/_ui_style_root_end.html" %}

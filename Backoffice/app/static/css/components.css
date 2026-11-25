@@ -1401,3 +1401,11 @@ textarea:focus,
   border-color: #14b8a6;
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
 }
+
+/* @tailwindcss/forms draws a chevron on the end of a closed <select> and
+   reserves 2.5rem for it. Padding utilities (px-*, pr-*, form-input) replace
+   that reserve, so the chevron sits on the label. Keep the reserve on every
+   dropdown. RTL (rtl.css) moves the chevron to the other side. */
+html:not([dir="rtl"]) select:not([multiple]):not([size]) {
+  padding-inline-end: 2.5rem !important;
+}

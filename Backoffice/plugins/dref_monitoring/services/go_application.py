@@ -381,6 +381,28 @@ def application_from_emergency(payload: Any, stage: str = "", event_id: int | No
     return application
 
 
+def appeal_application_from_emergency(payload: Any, event_id: int | None = None) -> dict | None:
+    """The written side of an Emergency Appeal: the event summary and its context.
+
+    An appeal has no planned interventions on GO, so ``interventions`` stays empty and the plan
+    starts as one group. An emergency page can also carry the DREF that came first. That DREF's
+    sectors belong to the DREF stage, so they are never read here.
+    """
+    if not isinstance(payload, dict) or not payload:
+        return None
+    summary = _text(payload.get("summary"), NARRATIVE_LIMIT)
+    narrative = {"source": "emergency_appeal"}
+    if summary:
+        narrative["event_description"] = summary
+    return {
+        "source": "emergency_appeal",
+        "interventions": [],
+        "narrative": narrative,
+        "context": context_from_emergency(payload, {}, event_id),
+        "narrative_version": NARRATIVE_VERSION,
+    }
+
+
 def _fast_get(url, params):
     """Emergency pages are large. A short timeout keeps one missing page from stalling the sync."""
     import requests
@@ -482,6 +504,12 @@ def attach_applications(rows: list[dict], http_get=None, *, progress=None, shoul
             continue
         event_id = event_id_from_link(row.get("link_to_emergency_page") or "")
         if event_id is None:
+            continue
+        if row.get("appeal_feed"):
+            from plugins.dref_monitoring.services.go_appeals import enrich_from_emergency
+
+            enrich_from_emergency(row, cache.get(event_id))
+            row["application"] = appeal_application_from_emergency(cache.get(event_id), event_id)
             continue
         parsed = application_from_emergency(cache.get(event_id), str(row.get("stage") or ""), event_id)
         if parsed:

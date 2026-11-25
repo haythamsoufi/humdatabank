@@ -7,10 +7,10 @@
 
   import_activity(last, runs): last is the highlighted run; runs is the full list.
 #}
-{% macro disk_files(files, empty_message='No workbook is on disk.') %}
-<section class="rounded-lg border border-gray-200 bg-white p-5 space-y-3" aria-labelledby="import-disk-heading">
-  <h3 id="import-disk-heading" class="text-base font-semibold text-gray-900">
-    <i class="fas fa-folder-open text-gray-500 mr-2" aria-hidden="true"></i>Files on disk
+{% macro disk_files(files, empty_message='No workbook is on disk.', heading='Files on disk', id_prefix='import') %}
+<section class="rounded-lg border border-gray-200 bg-white p-5 space-y-3" aria-labelledby="{{ id_prefix }}-disk-heading">
+  <h3 id="{{ id_prefix }}-disk-heading" class="text-base font-semibold text-gray-900">
+    <i class="fas fa-folder-open text-gray-500 mr-2" aria-hidden="true"></i>{{ heading }}
   </h3>
   {% if not files %}
   <p class="text-sm text-gray-600">{{ empty_message }}</p>
@@ -57,9 +57,9 @@
 </section>
 {% endmacro %}
 
-{% macro import_activity(last, runs) %}
-<section class="rounded-lg border border-gray-200 bg-white p-5 space-y-3" aria-labelledby="import-last-heading">
-  <h3 id="import-last-heading" class="text-base font-semibold text-gray-900">
+{% macro import_activity(last, runs, id_prefix='import') %}
+<section class="rounded-lg border border-gray-200 bg-white p-5 space-y-3" aria-labelledby="{{ id_prefix }}-last-heading">
+  <h3 id="{{ id_prefix }}-last-heading" class="text-base font-semibold text-gray-900">
     <i class="fas fa-history text-gray-500 mr-2" aria-hidden="true"></i>Last import
   </h3>
   {% if not last %}
@@ -92,8 +92,8 @@
   {% endif %}
 </section>
 
-<section class="rounded-lg border border-gray-200 bg-white p-5 space-y-3" aria-labelledby="import-logs-heading">
-  <h3 id="import-logs-heading" class="text-base font-semibold text-gray-900">
+<section class="rounded-lg border border-gray-200 bg-white p-5 space-y-3" aria-labelledby="{{ id_prefix }}-logs-heading">
+  <h3 id="{{ id_prefix }}-logs-heading" class="text-base font-semibold text-gray-900">
     <i class="fas fa-list-alt text-gray-500 mr-2" aria-hidden="true"></i>Change logs
   </h3>
   {% if not runs %}

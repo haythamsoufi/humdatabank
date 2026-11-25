@@ -1,140 +1,302 @@
-{# Logframe import tab. Expects disk_files, last_import, import_runs, report, settings. #}
+{# Import tab: one sub-tab per workbook, the logframe and the sectoral interventions. #}
+{# Expects disk_files, sectoral_files, last_import, import_runs, last_sectoral, sectoral_runs, report, sectoral_report, settings. #}
+{# "Import this file" buttons carry the file in name/value, so they opt out of the submit guard: it disables the clicked button, and a disabled button sends nothing. #}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_subtab_btn_classes %}
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 {% from "macros/import_source_files.html" import disk_files as disk_file_table, import_activity as import_activity_panel %}
 
-<div class="space-y-6">
-  <p class="text-sm text-gray-600">
-    Re-importing updates the published template in place. Lines that match the indicator bank
-    stay indicators; the others are questions. Portfolio
-    <strong>{{ settings.portfolio }}</strong>, fund <strong>{{ settings.fund }}</strong>.
-  </p>
+{% set import_subtab = request.args.get('subtab', 'logframe') %}
+{% if sectoral_report %}{% set import_subtab = 'sectoral' %}{% endif %}
+{% if report %}{% set import_subtab = 'logframe' %}{% endif %}
+{% if import_subtab not in ('logframe', 'sectoral') %}{% set import_subtab = 'logframe' %}{% endif %}
 
-  {% call(file) disk_file_table(disk_files, empty_message='No workbook is on disk yet. Upload one below.') %}
-    {% if file.found and file.ref %}
-    <button type="submit" form="ga-import-form" name="file_ref" value="{{ file.ref }}"
-            class="bg-red-600 hover:bg-red-700 text-white font-medium py-1.5 px-3 rounded-lg text-sm">
-      Import this file
-    </button>
-    {% endif %}
-  {% endcall %}
-
-  <form id="ga-import-form" method="post" enctype="multipart/form-data"
-        action="{{ url_for('global_award.settings_page', tab='import') }}"
+{# Upload form of one slot. Each slot posts its own `slot` value, so the server runs the matching importer. #}
+{% macro upload_form(slot, heading, intro, dry_run_checked) %}
+  <form id="ga-{{ slot }}-form" method="post" enctype="multipart/form-data"
+        action="{{ url_for('global_award.settings_page', tab='import', subtab=slot) }}"
         class="rounded-lg border border-gray-200 bg-white p-5 space-y-4">
-    <h3 class="text-base font-semibold text-gray-900">Upload a replacement workbook</h3>
-    <p class="text-sm text-gray-600">
-      Drop an Excel file to import it. The file is kept under Files on disk so it can be imported
-      again. Tick Preview to see the changes without saving, for this form and for the files above.
-    </p>
+    <h4 class="text-base font-semibold text-gray-900">{{ heading }}</h4>
+    <p class="text-sm text-gray-600">{{ intro }}</p>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="slot" value="{{ slot }}">
     <label class="flex items-center text-sm text-gray-700">
-      <input type="checkbox" name="dry_run" value="1" class="mr-2"
-             {% if report and report.dry_run %}checked{% endif %}>
+      <input type="checkbox" name="dry_run" value="1" class="mr-2" {% if dry_run_checked %}checked{% endif %}>
       Preview only (do not save)
     </label>
     {% call excel_import_dropzone(
-        'ga-import-dropzone',
-        input_id='ga-import-file',
+        'ga-' ~ slot ~ '-dropzone',
+        input_id='ga-' ~ slot ~ '-file',
         input_name='file',
         required=false,
         accept='.xlsx,.xls',
-        title='Drop a replacement workbook here or click to browse',
+        title='Drop a workbook here or click to browse',
         hint='Supported formats: .xlsx, .xls'
     ) %}{% endcall %}
     <div class="flex flex-wrap gap-3">
-      <button type="submit" id="ga-import-upload"
+      <button type="submit" id="ga-{{ slot }}-upload"
               class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
         Upload and import
       </button>
     </div>
   </form>
+{% endmacro %}
 
-  {% if report %}
-  <div class="rounded-lg border border-gray-200 bg-white p-5 text-sm">
-    <p class="font-medium text-gray-900 mb-2">
-      {% if report.dry_run %}Preview{% else %}Imported{% endif %}:
-      {{ report.sections }} sections,
-      {{ report.linked }} linked to the bank,
-      {{ report.questions }} questions,
-      {{ report.projects_upserted }} country projects
-      {% if report.cycles_per_project %},
-      {{ report.cycles_per_project }} quarterly cycles
-      ({{ report.award_start }} to {{ report.award_end }})
-      {% endif %}.
-    </p>
-    {% if report.unmatched_countries %}
-    <p class="text-gray-700 mb-3">No country match: {{ report.unmatched_countries | join(', ') }}</p>
-    {% endif %}
-    {% if report.links %}
-    <h4 class="font-semibold text-gray-700 mb-2">Linked to the indicator bank</h4>
-    <div class="overflow-x-auto mb-4">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-left text-gray-600">
-            <th class="py-1 pr-3">Code</th>
-            <th class="py-1 pr-3">Bank</th>
-            <th class="py-1 pr-3">How</th>
-            <th class="py-1">Indicator</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in report.links %}
-          <tr class="border-t border-gray-200">
-            <td class="py-1 pr-3">{{ row.code }}</td>
-            <td class="py-1 pr-3">#{{ row.bank_id }}</td>
-            <td class="py-1 pr-3">{{ row.method }}</td>
-            <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+{% call scroll_tab_bar(inner_id='ga-import-subtabs', aria_label='Import workbooks', wrapper_class='mb-6') %}
+  <button type="button" role="tab" id="ga-import-subtab-logframe" data-tab="logframe"
+          aria-controls="ga-import-panel-logframe"
+          aria-selected="{{ 'true' if import_subtab == 'logframe' else 'false' }}"
+          class="{{ admin_underline_subtab_btn_classes(import_subtab == 'logframe') }}">
+    <i class="fas fa-sitemap mr-1.5" aria-hidden="true"></i>Logframe
+  </button>
+  <button type="button" role="tab" id="ga-import-subtab-sectoral" data-tab="sectoral"
+          aria-controls="ga-import-panel-sectoral"
+          aria-selected="{{ 'true' if import_subtab == 'sectoral' else 'false' }}"
+          class="{{ admin_underline_subtab_btn_classes(import_subtab == 'sectoral') }}">
+    <i class="fas fa-users mr-1.5" aria-hidden="true"></i>Sectoral interventions
+  </button>
+{% endcall %}
+
+<div>
+  <section id="ga-import-panel-logframe" role="tabpanel" aria-labelledby="ga-import-subtab-logframe"
+           class="ga-import-subpanel space-y-6{% if import_subtab != 'logframe' %} hidden{% endif %}">
+    <div>
+      <h3 id="ga-logframe-title" class="text-lg font-semibold text-gray-900">
+        <i class="fas fa-sitemap text-gray-500 mr-2" aria-hidden="true"></i>Logframe workbook
+      </h3>
+      <p class="text-sm text-gray-600 mt-1">
+        Re-importing updates the published template in place. Lines that match the indicator bank
+        stay indicators; the others are questions. Portfolio
+        <strong>{{ settings.portfolio }}</strong>, fund <strong>{{ settings.fund }}</strong>.
+        Import this first: it creates the country projects the sectoral workbook fills in.
+      </p>
+    </div>
+
+    {% call(file) disk_file_table(disk_files, empty_message='No logframe workbook is on disk yet. Upload one below.', id_prefix='ga-logframe') %}
+      {% if file.found and file.ref %}
+      <button type="submit" form="ga-logframe-form" name="file_ref" value="{{ file.ref }}"
+              class="no-submit-guard bg-red-600 hover:bg-red-700 text-white font-medium py-1.5 px-3 rounded-lg text-sm">
+        Import this file
+      </button>
+      {% endif %}
+    {% endcall %}
+
+    {{ upload_form(
+        'logframe',
+        'Upload a replacement logframe workbook',
+        'Drop an Excel file to import it. The file is kept under Files on disk so it can be imported again. Tick Preview to see the changes without saving, for this form and for the files above.',
+        report and report.dry_run
+    ) }}
+
+    {% if report %}
+    <div class="rounded-lg border border-gray-200 bg-white p-5 text-sm">
+      <p class="font-medium text-gray-900 mb-2">
+        {% if report.dry_run %}Preview{% else %}Imported{% endif %}:
+        {{ report.sections }} sections,
+        {{ report.linked }} linked to the bank,
+        {{ report.questions }} questions,
+        {{ report.projects_upserted }} country projects
+        {% if report.cycles_per_project %},
+        {{ report.cycles_per_project }} quarterly cycles
+        ({{ report.award_start }} to {{ report.award_end }})
+        {% endif %}.
+      </p>
+      {% if report.unmatched_countries %}
+      <p class="text-gray-700 mb-3">No country match: {{ report.unmatched_countries | join(', ') }}</p>
+      {% endif %}
+      {% if report.links %}
+      <h4 class="font-semibold text-gray-700 mb-2">Linked to the indicator bank</h4>
+      <div class="overflow-x-auto mb-4">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-gray-600">
+              <th class="py-1 pr-3">Code</th>
+              <th class="py-1 pr-3">Bank</th>
+              <th class="py-1 pr-3">How</th>
+              <th class="py-1">Indicator</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in report.links %}
+            <tr class="border-t border-gray-200">
+              <td class="py-1 pr-3">{{ row.code }}</td>
+              <td class="py-1 pr-3">#{{ row.bank_id }}</td>
+              <td class="py-1 pr-3">{{ row.method }}</td>
+              <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      {% if report.created_questions %}
+      <h4 class="font-semibold text-gray-700 mb-2">Questions (no bank match)</h4>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-gray-600">
+              <th class="py-1 pr-3">Code</th>
+              <th class="py-1 pr-3">Type</th>
+              <th class="py-1 pr-3">Section</th>
+              <th class="py-1">Question</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in report.created_questions %}
+            <tr class="border-t border-gray-200">
+              <td class="py-1 pr-3">{{ row.code or '—' }}</td>
+              <td class="py-1 pr-3">{{ row.question_type }}</td>
+              <td class="py-1 pr-3">{{ row.section }}</td>
+              <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
     {% endif %}
-    {% if report.created_questions %}
-    <h4 class="font-semibold text-gray-700 mb-2">Questions (no bank match)</h4>
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-left text-gray-600">
-            <th class="py-1 pr-3">Code</th>
-            <th class="py-1 pr-3">Type</th>
-            <th class="py-1 pr-3">Section</th>
-            <th class="py-1">Question</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in report.created_questions %}
-          <tr class="border-t border-gray-200">
-            <td class="py-1 pr-3">{{ row.code or '—' }}</td>
-            <td class="py-1 pr-3">{{ row.question_type }}</td>
-            <td class="py-1 pr-3">{{ row.section }}</td>
-            <td class="py-1">{{ row.label }}{% if row.note %} <span class="text-gray-500">— {{ row.note }}</span>{% endif %}</td>
-          </tr>
+
+    {{ import_activity_panel(last_import, import_runs, id_prefix='ga-logframe') }}
+  </section>
+
+  <section id="ga-import-panel-sectoral" role="tabpanel" aria-labelledby="ga-import-subtab-sectoral"
+           class="ga-import-subpanel space-y-6{% if import_subtab != 'sectoral' %} hidden{% endif %}">
+    <div>
+      <h3 id="ga-sectoral-title" class="text-lg font-semibold text-gray-900">
+        <i class="fas fa-users text-gray-500 mr-2" aria-hidden="true"></i>Sectoral interventions workbook
+      </h3>
+      <p class="text-sm text-gray-600 mt-1">
+        Adds each country's sectors and pillar to its project, and reads the PMER focal points and
+        project managers. A country with nobody listed uses the people of its region office.
+        Everyone named is created as a user and added to the
+        <strong>Global Award</strong> access group; users that already exist are not changed and
+        are listed after the run.
+      </p>
+    </div>
+
+    {% call(file) disk_file_table(sectoral_files, empty_message='No sectoral interventions workbook is on disk yet. Upload one below.', id_prefix='ga-sectoral') %}
+      {% if file.found and file.ref %}
+      <button type="submit" form="ga-sectoral-form" name="file_ref" value="{{ file.ref }}"
+              class="no-submit-guard bg-red-600 hover:bg-red-700 text-white font-medium py-1.5 px-3 rounded-lg text-sm">
+        Import this file
+      </button>
+      {% endif %}
+    {% endcall %}
+
+    {{ upload_form(
+        'sectoral',
+        'Upload a sectoral interventions workbook',
+        'Needs the sheets Sectoral interventions, PMER Focal Points and Project Managers. The file is kept under Files on disk so it can be imported again. Tick Preview to see what would change, including which users already exist.',
+        sectoral_report and sectoral_report.dry_run
+    ) }}
+
+    {% if sectoral_report %}
+    {% set users = sectoral_report.users %}
+    <div class="rounded-lg border border-gray-200 bg-white p-5 text-sm space-y-4">
+      <p class="font-medium text-gray-900">
+        {% if sectoral_report.dry_run %}Preview{% else %}Imported{% endif %}:
+        {{ sectoral_report.projects_updated }} of {{ sectoral_report.countries }} country projects,
+        {{ sectoral_report.users_created | length }} users created,
+        {{ sectoral_report.users_existing | length }} already existed,
+        {{ users.group_added }} added to {{ sectoral_report.group_name }},
+        {{ users.country_access_added }} country access grants.
+      </p>
+
+      {% if sectoral_report.users_existing %}
+      <div class="rounded-md border border-amber-200 bg-amber-50 p-4">
+        <p class="font-semibold text-amber-900 mb-2">
+          {{ sectoral_report.users_existing | length }} users already existed
+        </p>
+        <p class="text-amber-900 mb-2">
+          These accounts were not created again and keep their roles. They were only added to
+          {{ sectoral_report.group_name }} and to the countries they are a focal point for.
+        </p>
+        <ul class="space-y-0.5 text-amber-900">
+          {% for row in sectoral_report.users_existing %}
+          <li>
+            {{ row.email }}{% if row.name %} ({{ row.name }}){% endif %}
+            — {{ 'added to the group' if row.joined_group else 'already in the group' }}{% if row.countries_added %}, {{ row.countries_added }} countries added{% endif %}{% if not row.active %}, <strong>inactive account</strong>{% endif %}
+          </li>
           {% endfor %}
-        </tbody>
-      </table>
+        </ul>
+      </div>
+      {% else %}
+      <p class="text-gray-700">None of these users existed before this import.</p>
+      {% endif %}
+
+      {% if sectoral_report.users_created %}
+      <div>
+        <h4 class="font-semibold text-gray-700 mb-1">New users</h4>
+        <ul class="space-y-0.5 text-gray-700">
+          {% for row in sectoral_report.users_created %}
+          <li>{{ row.email }} ({{ row.name }}) — {{ row.roles | join(', ') }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if sectoral_report.pmer_regional %}
+      <p class="text-gray-700">
+        <span class="font-semibold">PMER focal point from the region office:</span>
+        {{ sectoral_report.pmer_regional | join(', ') }}
+      </p>
+      {% endif %}
+      {% if sectoral_report.managers_regional %}
+      <p class="text-gray-700">
+        <span class="font-semibold">Project manager from the region office:</span>
+        {{ sectoral_report.managers_regional | join(', ') }}
+      </p>
+      {% endif %}
+      {% for warning in sectoral_report.warnings %}
+      <p class="text-amber-800"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>{{ warning }}</p>
+      {% endfor %}
     </div>
     {% endif %}
-  </div>
-  {% endif %}
 
-  {{ import_activity_panel(last_import, import_runs) }}
+    {{ import_activity_panel(last_sectoral, sectoral_runs, id_prefix='ga-sectoral') }}
+  </section>
 </div>
 
 <script nonce="{{ csp_nonce() }}">
 (function () {
-  var uploadBtn = document.getElementById('ga-import-upload');
+  var tabs = document.getElementById('ga-import-subtabs');
+  if (!tabs || !window.AdminUnderlineTabs || !window.AdminUnderlineTabs.setSubTabButton) return;
+  tabs.querySelectorAll('[data-tab]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tabId = btn.getAttribute('data-tab');
+      if (!tabId) return;
+      tabs.querySelectorAll('[data-tab]').forEach(function (other) {
+        var on = other === btn;
+        window.AdminUnderlineTabs.setSubTabButton(other, on);
+        other.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      document.querySelectorAll('.ga-import-subpanel').forEach(function (panel) {
+        panel.classList.toggle('hidden', panel.id !== 'ga-import-panel-' + tabId);
+      });
+      try {
+        var url = new URL(window.location.href);
+        url.searchParams.set('tab', 'import');
+        url.searchParams.set('subtab', tabId);
+        window.history.replaceState({}, '', url);
+      } catch (e) { /* ignore */ }
+    });
+  });
+})();
+(function () {
   import({{ static_url('js/components/excel-import-dropzone.js')|tojson }})
     .then(function (mod) {
-      mod.initExcelImportDropzone('#ga-import-dropzone', {
-        submitBtn: uploadBtn,
-        acceptExtensions: ['.xlsx', '.xls'],
-        onReset: function () {
-          if (uploadBtn) uploadBtn.disabled = true;
-        }
+      ['logframe', 'sectoral'].forEach(function (slot) {
+        var uploadBtn = document.getElementById('ga-' + slot + '-upload');
+        mod.initExcelImportDropzone('#ga-' + slot + '-dropzone', {
+          submitBtn: uploadBtn,
+          acceptExtensions: ['.xlsx', '.xls'],
+          onReset: function () {
+            if (uploadBtn) uploadBtn.disabled = true;
+          }
+        });
+        var input = document.getElementById('ga-' + slot + '-file');
+        if (uploadBtn && !(input && input.files && input.files.length)) uploadBtn.disabled = true;
       });
-      var input = document.getElementById('ga-import-file');
-      if (uploadBtn && !(input && input.files && input.files.length)) uploadBtn.disabled = true;
     });
 })();
 </script>

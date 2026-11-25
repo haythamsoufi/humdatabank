@@ -11,12 +11,33 @@ from plugins.dref_monitoring.services.parsing import as_bool, as_date, as_int, a
 
 
 def appeal_kind(appeal_type: str) -> str:
-    return (appeal_type or "").strip().lower().replace("_", "-")
+    return (appeal_type or "").strip().lower().replace("_", "-").replace(" ", "-")
 
 
 def is_dref_appeal(appeal_type: str) -> bool:
-    """Response DREF and Imminent DREF. Emergency Appeals (EA) are not included."""
+    """Response DREF and Imminent DREF."""
     return appeal_kind(appeal_type) in {"dref", "i-dref", "idref"}
+
+
+def is_emergency_appeal(appeal_type: str) -> bool:
+    """An Emergency Appeal (``EA`` on the dref3 feed, ``Emergency Appeal`` on the appeal API)."""
+    return appeal_kind(appeal_type) in {"ea", "emergency-appeal"}
+
+
+def is_monitored_appeal(appeal_type: str) -> bool:
+    """The appeal types this plugin monitors: DREF, Imminent DREF, and Emergency Appeal."""
+    return is_dref_appeal(appeal_type) or is_emergency_appeal(appeal_type)
+
+
+def appeal_type_label(appeal_type: str) -> str:
+    """English name for an appeal type. Other values are shown as GO sent them."""
+    if is_emergency_appeal(appeal_type):
+        return "Emergency Appeal"
+    if is_imminent(appeal_type, ""):
+        return "Imminent DREF"
+    if is_dref_appeal(appeal_type):
+        return "DREF"
+    return (appeal_type or "").strip()
 
 
 def is_imminent(appeal_type: str, pillar: str) -> bool:
@@ -82,6 +103,8 @@ def parse_stage(row: dict[str, Any]) -> dict[str, Any] | None:
         "operation_timeframe_months": as_int(row.get("operation_timeframe")),
         "operation_status": str(row.get("operation_status") or "").strip().lower(),
         "is_latest_stage": as_bool(row.get("is_latest_stage")),
+        # Set on a row built from the GO appeal API. It outranks the dref3 stages of the same appeal code.
+        "from_appeal_feed": as_bool(row.get("appeal_feed")),
         "sectors": sectors_from_row(row),
         "application": row.get("application") if isinstance(row.get("application"), dict) else None,
     }

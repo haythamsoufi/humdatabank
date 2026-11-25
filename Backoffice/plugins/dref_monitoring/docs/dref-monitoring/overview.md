@@ -1,10 +1,10 @@
-# DREF operational monitoring
+# DREF and Emergency Appeal operational monitoring
 
-DREF monitoring tracks an operation after GO has approved it, from the monitoring plan through routine reports to an operational update or final report. It lives in the Backoffice as the `dref_monitoring` plugin.
+This plugin tracks an operation after GO has approved it, from the monitoring plan through routine reports to an operational update or final report. It lives in the Backoffice as the `dref_monitoring` plugin.
 
 Open it from **Analytics & Monitoring → DREF monitoring**, or go to `/dref-monitoring/operations`. Portfolio staff also see a **DREF monitoring** tab in **Explore Data**. Settings are at `/admin/plugins/dref_monitoring/settings`.
 
-The plugin does not replace GO. It reads approved stages from GO and keeps the monitoring record in the Databank. A validated Draft 0 is posted to the GO write API when `GO_API_TOKEN` is set. The nightly sync itself only reads the public feed.
+The plugin does not replace GO. It reads approved stages from GO and keeps the monitoring record in the Databank. A validated Draft 0 of a DREF is posted to the GO write API when `GO_API_TOKEN` is set. Emergency Appeal reports are not posted, because GO has no endpoint for them. The nightly sync itself only reads the public feed.
 
 ## What starts monitoring
 
@@ -18,8 +18,11 @@ These approved appeal types are included:
 |---|---|
 | DREF | Response DREF. The plan is one activity group per sector that GO marked as active. |
 | i-DREF, or a pillar that starts with “Anticip” | Imminent / anticipatory DREF. The plan uses Early actions and Early response instead of a single sector activity. Reporting defaults to every two weeks. |
+| Emergency Appeal | Read from the GO `appeal` API, not from `dref3`. GO publishes the amount requested and the people it targets, but not sectors, indicators, or activities. The starting plan has an "Operation" group sized to the appeal budget, plus every indicator the indicator bank marks as Emergency, grouped by sector and all switched on. Before confirming, the team switches off the indicators the operation will not report on (in **Edit plan**, untick **Report on this indicator**) and may still add activities or import them from Excel. Only the switched-on indicators appear in the reports. Reporting starts when the plan is confirmed, because an appeal is usually already running by then. A validated report is downloaded as Word or PDF and is not posted to GO. |
 
-Emergency Appeals (`EA`) appear on the same feed. The sync does not store them, and a later sync removes any that were stored earlier.
+Rows on `dref3` tagged `EA` are DREFs allocated as loans against an appeal. They share the appeal's code. When the appeal is also read, the appeal is the latest stage, so a loan never overrides the appeal budget, and the loan stages stay in the history.
+
+Emergency Appeals are read for active appeals and for appeals started since a year set under **Emergency Appeals** in settings (2025 by default). The same setting switches Emergency Appeals off. A Frozen, Closed, or Archived appeal closes the operation. The project keeps portfolio `DREF` and fund `EA`. When the appeal API cannot be read, the DREF pull still runs and stored appeals stay as they are.
 
 A new appeal code creates four things:
 
@@ -106,6 +109,18 @@ Each planned intervention becomes a sector. Its indicators become the plan indic
 Further activities can be added under the same indicator. Each activity has a type, who carries it out, its own target, a budget, dates, and a status (planned, ongoing, completed, blocked, or delayed).
 
 The National Society can edit the sector figures, the indicator, and the activities, and can replace the activity list with an Excel file. Adding or removing a sector, an indicator, or an activity after the plan is confirmed opens a new draft. Adding, removing, or renaming an activity keeps the justification on that plan version. Number changes inside the approved budget, targets, and dates still apply on the confirmed plan.
+
+### Reporting schedule
+
+Under **Monitoring plan**, **Reporting schedule** shows the reporting frequency, biweekly or monthly, and a table of the periods the plan would open: period start, period end, and the day the report is due (the last day of the period). Choosing a frequency updates the table without saving it. **Use this frequency** keeps the choice.
+
+The frequency does not come from the DREF application. It is set once when the operation is created: an Imminent DREF, or an operation of 60 days or less, reports every two weeks; a longer one reports monthly. It can be changed on the plan tab while the plan is a draft and no cycle has been opened. Afterwards portfolio staff change it under Governance. At most 36 periods are opened.
+
+A DREF counts its periods from its start date. An Emergency Appeal may have started long before it is monitored, so its first period begins when the plan is confirmed (the first of that month for a monthly schedule). The schedule says so, and that day does not move afterwards.
+
+### Indicators of an Emergency Appeal
+
+An Emergency Appeal plan lists every Emergency indicator of the indicator bank under its sector, on the **Indicators** part of the monitoring plan. The rows do not expand, because an appeal plan has no activities under them yet. Press **Edit plan** and untick **Report on this indicator** for the ones the operation will not report on, one by one, per sector or for the whole plan (**Switch all on** and **Switch all off**), then save with the justification as usual. A switched-off indicator stays in the table, dimmed and marked "Not monitored", and is left out of the reporting form. At least one must stay on to confirm the plan. Changing the switches on a confirmed plan opens a new draft, as adding a sector or activity does. DREF plans do not use this list.
 
 ### Validating the plan
 
@@ -242,7 +257,7 @@ The National Society edits the chapters on the draft page, either directly in th
 
 People who prefer Word can export the draft, edit it, and use **Import Word file**. The import matches chapters by heading in English, French, Spanish, or Arabic, shows each chapter's words before and after, and stores nothing until the person confirms. Tables and sentences Databank writes from the figures are skipped. Text under headings it does not recognise is listed as ignored, and a file exported from another report gets a warning.
 
-Validation sends the report to GO (`dref-op-update` or `dref-final-report`) as a GO draft for formal processing. That post needs `GO_API_TOKEN`. A failed post stays validated so it can be sent again. Word and PDF stay available either way.
+Validation of a DREF report sends it to GO (`dref-op-update` or `dref-final-report`) as a GO draft for formal processing. That post needs `GO_API_TOKEN`. Validating an Emergency Appeal report keeps it in the Databank only. A failed post stays validated so it can be sent again. Word and PDF stay available either way.
 
 The draft page shows that document. The same document downloads as:
 

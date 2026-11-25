@@ -2,7 +2,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
-{% block title %}{{ dref_tr('DREF monitoring') }}{% endblock %}
+{% block title %}{{ dref_tr('DREF and Emergency Appeal monitoring') }}{% endblock %}
 
 {% block extra_css %}
 {% include "components/_ui_style_stylesheets.html" %}
@@ -18,17 +18,17 @@
 {% include "components/_ui_style_root_start.html" %}
 <div class="container mx-auto px-4 py-6">
     {{ page_header(
-        title=dref_tr('DREF monitoring'),
+        title=dref_tr('DREF and Emergency Appeal monitoring'),
         icon='fas fa-clipboard-list',
         breadcrumbs=[
             {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
             {'name': 'Plugins', 'url': url_for('admin.plugin_management')},
-            {'name': dref_tr('DREF monitoring')}
+            {'name': dref_tr('DREF and Emergency Appeal monitoring')}
         ]
     ) }}
 
     <div class="bg-white rounded-lg shadow-md border border-gray-200 mt-6">
-        {% call scroll_tab_bar(inner_id='dref-settings-tabs', aria_label=dref_tr('DREF monitoring')) %}
+        {% call scroll_tab_bar(inner_id='dref-settings-tabs', aria_label=dref_tr('DREF and Emergency Appeal monitoring')) %}
             <button type="button" role="tab" id="dref-settings-tab-overview" data-tab="overview"
                     aria-controls="panel-overview"
                     aria-selected="{{ 'true' if initial_tab == 'overview' else 'false' }}"
@@ -126,6 +126,15 @@
                     <label class="block text-sm text-gray-700">{{ dref_tr('Escalate to portfolio after (days)') }}
                         <input class="mt-1 w-full border border-gray-300 rounded px-3 py-2" type="number" min="0" max="365" name="escalation_portfolio_days" value="{{ schedule.get('escalation_portfolio_days', 14) }}">
                     </label>
+                    {% set ea = settings.emergency_appeals or {} %}
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="ea_enabled" value="1" {% if ea.get('enabled', True) %}checked{% endif %}>
+                        {{ dref_tr('Sync Emergency Appeals') }}
+                    </label>
+                    <label class="block text-sm text-gray-700">{{ dref_tr('Closed Emergency Appeals started since (year)') }}
+                        <input class="mt-1 w-full border border-gray-300 rounded px-3 py-2" type="number" min="2000" max="2100" name="ea_closed_since_year" value="{{ ea.get('closed_since_year', 2025) }}">
+                    </label>
+                    <p class="text-sm text-gray-600">{{ dref_tr('Active Emergency Appeals are always read. Closed ones are read when they started in this year or later.') }}</p>
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input type="checkbox" name="ai_enabled" value="1" {% if settings.ai_enabled %}checked{% endif %}>
                         {{ dref_tr('AI draft reports') }}
@@ -161,9 +170,12 @@
                     <dl class="space-y-2 text-sm">
                         <div class="bg-gray-50 rounded p-3">
                             <dt class="font-medium text-gray-800">{{ dref_tr('Source') }}</dt>
-                            <dd class="mt-1 text-gray-600">{{ dref_tr('The button and the job at 05:10 UTC read DREF and Imminent DREF operations on the public dref3 feed, 200 at a time. Emergency Appeals are left out. No API key. When GO marks an operation closed, the stored status becomes closed and the workflow moves to closure.') }}</dd>
+                            <dd class="mt-1 text-gray-600">{{ dref_tr('The button and the job at 05:10 UTC read DREF and Imminent DREF operations on the public dref3 feed, 200 at a time, and Emergency Appeals on the public appeal API. No API key. When GO marks an operation closed, the stored status becomes closed and the workflow moves to closure.') }}</dd>
                             {% if settings.go_url %}
                             <dd class="mt-1 text-gray-600 break-all">{{ settings.go_url }}</dd>
+                            {% endif %}
+                            {% if settings.go_appeal_url %}
+                            <dd class="mt-1 text-gray-600 break-all">{{ settings.go_appeal_url }}</dd>
                             {% endif %}
                         </div>
                         <div class="bg-gray-50 rounded p-3">
@@ -176,7 +188,7 @@
                         </div>
                         <div class="bg-gray-50 rounded p-3">
                             <dt class="font-medium text-gray-800">{{ dref_tr('Left out') }}</dt>
-                            <dd class="mt-1 text-gray-600">{{ dref_tr('Emergency Appeals on this feed are not stored. Applications still in draft or in review on GO are not on this feed. The feed has no activity list, so lines finer than a sector come from the Excel import on the operation.') }}</dd>
+                            <dd class="mt-1 text-gray-600">{{ dref_tr('Applications still in draft or in review on GO are not on the feed. The feed has no activity list, so lines finer than a sector come from the Excel import on the operation. GO publishes no sectors, indicators, or activities for an Emergency Appeal, so its plan starts as one group with the appeal budget, plus the emergency indicators of the indicator bank. The team switches them on or off before confirming the plan. Activities from its Emergency Plan of Action are added on the operation.') }}</dd>
                         </div>
                     </dl>
                     <p class="text-sm text-gray-600">{{ dref_tr('The sync runs in the background. This page shows its status and progress. You can leave and come back.') }}</p>

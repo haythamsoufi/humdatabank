@@ -29,6 +29,11 @@
     flex: 1 1 auto;
     min-height: 0;
 }
+/* Keep the status pill clear of the reporting-cycle control. margin-top: auto
+   below collapses to 0 on short cards, so this floor always applies. */
+.dashboard-project-group-card .dashboard-project-card-body {
+    padding-top: 0.75rem;
+}
 /* Split spare card height so status, due date, and completion sit midway between the cycle button and Enter Data. */
 .dashboard-project-group-card .dashboard-project-card-body > div:not(.dashboard-assignment-contributors):not(.dashboard-card-actions),
 .dashboard-project-group-card .dashboard-card-actions {

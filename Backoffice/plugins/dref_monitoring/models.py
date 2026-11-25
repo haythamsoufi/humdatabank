@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import JSON
+from sqlalchemy import JSON, true
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.extensions import db
@@ -43,6 +43,9 @@ class DrefOperation(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey("project.id", ondelete="SET NULL"), nullable=True)
     sign_off_authority = db.Column(db.String(16), nullable=False, default="ns")
     reporting_frequency = db.Column(db.String(16), nullable=False, default="monthly")
+    # First day the reporting periods count from. Empty means the operation start date, as for a DREF.
+    # An Emergency Appeal that began years ago starts reporting when its plan is confirmed.
+    reporting_start = db.Column(db.Date, nullable=True)
     funds_received = db.Column(db.Boolean, nullable=False, default=False)
     funds_received_on = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
@@ -176,6 +179,9 @@ class DrefIndicator(db.Model):
     unmatched = db.Column(db.Boolean, nullable=False, default=False)
     # True when the temporary GO-title adapter supplied indicator_bank_id.
     bank_adapted = db.Column(db.Boolean, nullable=False, default=False)
+    # An Emergency Appeal plan lists every emergency indicator of the bank. The team switches off the
+    # ones it will not report on before confirming. A switched-off row stays on the plan, out of the form.
+    enabled = db.Column(db.Boolean, nullable=False, default=True, server_default=true())
 
 
 class DrefStandardIndicator(db.Model):

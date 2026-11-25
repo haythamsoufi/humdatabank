@@ -30,8 +30,8 @@
     {% if can_validate %}
         {% set __ = header_actions.items.append({
             'type': 'form',
-            'text': dref_tr('Validate and send to GO'),
-            'icon': 'fas fa-paper-plane',
+            'text': dref_tr('Validate and send to GO') if posts_to_go else dref_tr('Validate report'),
+            'icon': 'fas fa-paper-plane' if posts_to_go else 'fas fa-check',
             'url': url_for('dref_monitoring.draft_validate_route', operation_id=operation.id, draft_id=draft.id),
             'classes': 'professional-action-btn professional-action-btn-green',
             'csrf': True,
@@ -47,13 +47,17 @@
             'csrf': True
         }) %}
     {% endif %}
+    {% if not posts_to_go %}
+        {% set header_subtitle = dref_tr('This report is figures only. Add the chapters on the Narrative tab, or validate it and export it.') if narrative_mode == 'none' and can_add_narrative else dref_tr('This report is figures only. It has no narrative chapters. Validate it, then export the Word file or the PDF.') if narrative_mode == 'none' else dref_tr('Review the chapters, then validate. GO does not take Emergency Appeal reports from here, so export the Word file or the PDF to file it.') %}
+    {% else %}
     {% set header_subtitle = dref_tr('This report is figures only. Add the chapters on the Narrative tab, or validate it to send the figures to GO.') if narrative_mode == 'none' and can_add_narrative else dref_tr('This report is figures only. It has no narrative chapters. Validation sends it to GO for formal processing.') if narrative_mode == 'none' else dref_tr('Review the chapters, then validate. Validation sends the report to GO for formal processing.') %}
+    {% endif %}
     {% call page_header(
         title=dref_tr('Draft 0'),
         subtitle=header_subtitle,
         icon='fas fa-clipboard-list',
         breadcrumbs=[
-            {'name': dref_tr('DREF monitoring'), 'url': url_for('dref_monitoring.operations_page')},
+            {'name': dref_tr('DREF and Emergency Appeal monitoring'), 'url': url_for('dref_monitoring.operations_page')},
             {'name': operation.appeal_code, 'url': url_for('dref_monitoring.operation_page', operation_id=operation.id, tab='drafts')},
             {'name': dref_tr('Draft 0')}
         ],
@@ -119,10 +123,12 @@
                 <dt class="text-xs font-medium text-gray-500">{{ dref_tr('Narrative') }}</dt>
                 <dd class="mt-1 text-sm font-medium text-gray-900">{{ narrative_label }}</dd>
             </div>
+            {% if posts_to_go %}
             <div>
                 <dt class="text-xs font-medium text-gray-500">{{ dref_tr('GO reference') }}</dt>
                 <dd class="mt-1 text-sm font-medium text-gray-900 break-words">{{ draft.go_reference or dref_tr('Not sent') }}</dd>
             </div>
+            {% endif %}
         </dl>
         {% if draft.go_error %}
         <p class="px-4 pb-3 text-sm text-amber-800">{{ dref_tr(draft.go_error) }}</p>

@@ -19,8 +19,15 @@ UPLOAD_FOLDER = "global_award_uploads"
 # Workbooks saved before the plugin id was singular.
 _PREVIOUS_UPLOAD_FOLDER = "global_awards_uploads"
 STORED_LIMIT = 12
-# A repository workbook is offered when its name looks like the award logframe.
-_REPO_NAME_HINTS = ("global award", "marc", "log frame", "logframe")
+# The two workbooks the importer takes, each with its own upload slot.
+SLOT_LOGFRAME = "logframe"
+SLOT_SECTORAL = "sectoral"
+SLOTS = (SLOT_LOGFRAME, SLOT_SECTORAL)
+# A repository workbook is offered for a slot when its name looks like that workbook.
+_REPO_NAME_HINTS = {
+    SLOT_LOGFRAME: ("global award", "marc", "log frame", "logframe"),
+    SLOT_SECTORAL: ("sectoral",),
+}
 
 REF_REPO = "repo"
 REF_STORED = "stored"
@@ -57,17 +64,26 @@ def _read_meta(path: Path) -> Dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def store_upload(data: bytes, filename: str) -> str:
+def _slot_of(meta: Dict[str, Any]) -> str:
+    """Uploads kept before there were two slots have no slot and are logframes."""
+    slot = str(meta.get("slot") or SLOT_LOGFRAME)
+    return slot if slot in SLOTS else SLOT_LOGFRAME
+
+
+def store_upload(data: bytes, filename: str, slot: str = SLOT_LOGFRAME) -> str:
     """Keep an uploaded workbook and return its file id.
 
-    The same bytes are stored once; uploading them again only refreshes the name and time,
-    so the list does not fill with copies of one file.
+    The same bytes are stored once per slot; uploading them again only refreshes the name
+    and time, so the list does not fill with copies of one file.
     """
     digest = hashlib.sha256(data).hexdigest()
     folder = upload_dir()
     file_id = None
     for path in folder.glob("*.xlsx"):
-        if FILE_ID.match(path.stem) and _read_meta(path).get("sha256") == digest:
+        if not FILE_ID.match(path.stem):
+            continue
+        meta = _read_meta(path)
+        if meta.get("sha256") == digest and _slot_of(meta) == slot:
             file_id = path.stem
             break
     if file_id is None:
@@ -77,6 +93,7 @@ def store_upload(data: bytes, filename: str) -> str:
         "filename": filename,
         "size": len(data),
         "sha256": digest,
+        "slot": slot,
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
     _meta_path(folder / f"{file_id}.xlsx").write_text(json.dumps(meta), encoding="utf-8")
@@ -95,24 +112,25 @@ def stored_name(file_id: str) -> str:
     return str(_read_meta(path).get("filename") or "Uploaded workbook") if path else "Uploaded workbook"
 
 
-def repo_workbooks() -> List[Path]:
-    """Logframe workbooks in the repository root, newest first."""
+def repo_workbooks(slot: str = SLOT_LOGFRAME) -> List[Path]:
+    """Workbooks for ``slot`` in the repository root, newest first."""
+    hints = _REPO_NAME_HINTS.get(slot, ())
     try:
         candidates = [
             path
             for path in REPO_ROOT.glob("*.xlsx")
             if path.is_file()
             and not path.name.startswith("~$")
-            and any(hint in path.name.casefold() for hint in _REPO_NAME_HINTS)
+            and any(hint in path.name.casefold() for hint in hints)
         ]
     except OSError:
         return []
     return sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True)
 
 
-def repo_workbook(name: str) -> Optional[Path]:
-    """The repository workbook called ``name``, only when it is one that is offered."""
-    for path in repo_workbooks():
+def repo_workbook(name: str, slot: str = SLOT_LOGFRAME) -> Optional[Path]:
+    """The repository workbook called ``name``, only when it is one that is offered for ``slot``."""
+    for path in repo_workbooks(slot):
         if path.name == name:
             return path
     return None
@@ -136,14 +154,16 @@ def _when(value: Any) -> str:
     return text or "—"
 
 
-def list_disk_files() -> List[Dict[str, Any]]:
-    """Uploads kept by the plugin, then repository workbooks. Each row carries a ``ref``."""
+def list_disk_files(slot: str = SLOT_LOGFRAME) -> List[Dict[str, Any]]:
+    """Uploads kept for ``slot``, then its repository workbooks. Each row carries a ``ref``."""
     rows: List[Dict[str, Any]] = []
     stored = []
     try:
         for path in upload_dir().glob("*.xlsx"):
             if path.is_file() and FILE_ID.match(path.stem):
                 meta = _read_meta(path)
+                if _slot_of(meta) != slot:
+                    continue
                 stored.append((str(meta.get("uploaded_at") or ""), path, meta))
     except OSError:
         stored = []
@@ -158,7 +178,7 @@ def list_disk_files() -> List[Dict[str, Any]]:
             "kind": REF_STORED,
             "ref": f"{REF_STORED}:{path.stem}",
         })
-    for path in repo_workbooks():
+    for path in repo_workbooks(slot):
         stat = path.stat()
         rows.append({
             "name": path.name,
@@ -172,13 +192,19 @@ def list_disk_files() -> List[Dict[str, Any]]:
     return rows
 
 
-def resolve_ref(ref: str) -> Optional[tuple[Path, str]]:
-    """``(path, display name)`` for a ref from :func:`list_disk_files`, or ``None``."""
+def resolve_ref(ref: str, slot: str = SLOT_LOGFRAME) -> Optional[tuple[Path, str]]:
+    """``(path, display name)`` for a ref from :func:`list_disk_files` of ``slot``, or ``None``.
+
+    A file kept for the other slot does not resolve, so a logframe cannot be imported as the
+    sectoral workbook or the other way round.
+    """
     kind, _sep, value = (ref or "").partition(":")
     if kind == REF_STORED:
         path = stored_path(value)
-        return (path, stored_name(value)) if path else None
+        if path is None or _slot_of(_read_meta(path)) != slot:
+            return None
+        return path, stored_name(value)
     if kind == REF_REPO:
-        path = repo_workbook(value)
+        path = repo_workbook(value, slot)
         return (path, path.name) if path else None
     return None

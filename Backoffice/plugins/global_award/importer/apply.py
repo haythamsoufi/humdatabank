@@ -756,6 +756,9 @@ def _upsert_projects(parsed: ParsedLogframe, countries: CountryIndex, changes: _
             "indicators": lines,
         }
         project = Project.query.filter_by(reference=reference).first()
+        if project is not None and isinstance(project.plan_data, dict):
+            # Keep what other imports put in the plan (sectors, contacts).
+            plan = {**project.plan_data, **plan}
         before = None
         old_plan = None
         if project is None:

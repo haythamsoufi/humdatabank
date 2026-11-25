@@ -908,7 +908,9 @@ CODE_LABELS = {
 }
 
 
+from plugins.dref_monitoring.phrases_appeal import ROWS as _APPEAL_ROWS  # noqa: E402
 from plugins.dref_monitoring.phrases_narrative import ROWS as _NARRATIVE_ROWS  # noqa: E402
 
 ROWS.update(_NARRATIVE_ROWS)
+ROWS.update(_APPEAL_ROWS)
 

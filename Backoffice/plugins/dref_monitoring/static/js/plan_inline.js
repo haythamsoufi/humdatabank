@@ -254,6 +254,10 @@
         }
         setEditing(true);
         restoreNewActivities(rows);
+        if (rows.some(function (item) { return item.name === 'indicator_listed'; })) {
+            // An unticked box is not in the snapshot, so start from all off and tick what was saved.
+            namedAll('indicator_on').forEach(function (box) { box.checked = false; });
+        }
         rows.forEach(function (item) {
             if (!item.check) return;
             namedAll(item.name).forEach(function (field) {
@@ -439,6 +443,18 @@
         }
         var discard = target.closest('[data-dref-discard-activity]');
         if (discard) discardActivity(discard.closest('tr'));
+        var bulk = target.closest('[data-dref-indicators-set]');
+        if (bulk) {
+            event.preventDefault();
+            var on = bulk.getAttribute('data-dref-indicators-set') === 'on';
+            var scope = bulk.getAttribute('data-dref-indicators-scope');
+            var boxes = scope
+                ? form.querySelectorAll('input[name="indicator_on"][data-dref-indicator-group="' + attrValue(scope) + '"]')
+                : form.querySelectorAll('input[name="indicator_on"]');
+            boxes.forEach(function (box) {
+                if (!box.disabled) box.checked = on;
+            });
+        }
     });
 
     form.addEventListener('input', function (event) {

@@ -73,8 +73,8 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def description(self) -> str:
         return (
-            "Tracks DREF and Imminent DREF operations from GO approval through "
-            "monitoring to closure: generated plans, routine reports, escalation, "
+            "Tracks DREF, Imminent DREF and Emergency Appeal operations from GO approval "
+            "through monitoring to closure: generated plans, routine reports, escalation, "
             "and draft operational updates and final reports."
         )
 
@@ -203,7 +203,7 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
         return PluginDocsSource(
             category="dref-monitoring",
             root_dir=Path(__file__).resolve().parent / "docs",
-            display_name="DREF monitoring",
+            display_name="DREF and Emergency Appeal monitoring",
             icon="fas fa-clipboard-list",
             include_in_help=True,
         )
@@ -211,7 +211,7 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
     def get_nav_items(self) -> List[NavItem]:
         return [
             NavItem(
-                label="DREF monitoring",
+                label="DREF and Emergency Appeal monitoring",
                 endpoint="dref_monitoring.operations_page",
                 section="form-data-management",
                 icon="fas fa-clipboard-list",
@@ -224,7 +224,7 @@ class DrefMonitoringPlugin(FirstPartyPluginMetadata, BasePlugin):
         return [
             DataExplorerTabConfig(
                 tab_id=EXPLORE_TAB_ID,
-                label="DREF monitoring",
+                label="DREF and Emergency Appeal monitoring",
                 permission=EXPLORE_PERMISSION,
                 priority=58,
                 panel_template="plugins/dref_monitoring/explorer/tab_panel.html",

@@ -9,6 +9,7 @@ from app.extensions import db
 from app.utils.common.datetime_helpers import utcnow
 from plugins.dref_monitoring.constants import (
     ACTIVITY_BLOCKED,
+    APPEAL_STAGE,
     ACTIVITY_COMPLETED,
     ACTIVITY_DELAYED,
     ACTIVITY_ONGOING,
@@ -45,7 +46,7 @@ from plugins.dref_monitoring.services.bounds import (
     people_over_cap,
     same_amount,
 )
-from plugins.dref_monitoring.services.go_parse import is_imminent, stage_signature
+from plugins.dref_monitoring.services.go_parse import is_emergency_appeal, is_imminent, stage_signature
 from plugins.dref_monitoring.services.parsing import as_date, as_int, as_money, date_text
 
 ACTIVITY_STATUSES = {
@@ -181,6 +182,18 @@ def sync_plan_shape(operation: DrefOperation, baseline: DrefBaseline) -> tuple:
                 _sync_activities([spec["activity_title"]], spec["budget_chf"]),
             )
         )
+    if uses_bank_indicators(baseline):
+        for spec in appeal_indicator_specs():
+            rows.append(
+                (
+                    spec["key"][:80],
+                    _shape_text(spec["label"][:180]),
+                    _shape_number(None),
+                    _shape_number(None),
+                    tuple(sorted((_shape_text((bank.name or "")[:255]), _shape_number(None)) for bank in spec["indicators"])),
+                    (),
+                )
+            )
     return tuple(rows)
 
 
@@ -367,19 +380,26 @@ def realign_plan_activities(plan_id: int) -> bool:
     return changed
 
 
-def plan_sections(plan_id: int) -> list[dict]:
-    """Sector, then its indicators, then the activities under each indicator."""
+def plan_sections(plan_id: int, include_disabled: bool = False) -> list[dict]:
+    """Sector, then its indicators, then the activities under each indicator.
+
+    A switched-off indicator stays on the plan but is left out of the monitoring figures and the
+    reporting form. The plan screen asks for it (``include_disabled``) so it can be switched back on.
+    """
     sections = []
     adapted_ids: set[int] = set()
     for group in groups_for(plan_id):
         activities = activities_for(group.id)
         linked: set[int] = set()
         blocks = []
-        real_indicators = [
+        listed = [
             indicator
             for indicator in indicators_for_group(group.id)
             if indicator.standard_code not in _SYNTHETIC_CODES
         ]
+        real_indicators = listed if include_disabled else [i for i in listed if i.enabled is not False]
+        if listed and not real_indicators and not activities:
+            continue
         for indicator in real_indicators:
             rows = [activity for activity in activities if activity.indicator_id == indicator.id]
             if not rows:
@@ -387,11 +407,26 @@ def plan_sections(plan_id: int) -> list[dict]:
             linked.update(activity.id for activity in rows)
             if indicator.bank_adapted and indicator.indicator_bank_id:
                 adapted_ids.add(int(indicator.indicator_bank_id))
-            blocks.append({"indicator": indicator, "activities": rows, "bare": False})
+            blocks.append(
+                {
+                    "indicator": indicator,
+                    "activities": rows,
+                    "bare": False,
+                    "enabled": indicator.enabled is not False,
+                }
+            )
         orphans = [activity for activity in activities if activity.id not in linked]
         if orphans:
-            blocks.append({"indicator": None, "activities": orphans, "bare": not real_indicators})
-        sections.append({"group": group, "blocks": blocks, "activities": activities})
+            blocks.append({"indicator": None, "activities": orphans, "bare": not real_indicators, "enabled": True})
+        sections.append(
+            {
+                "group": group,
+                "blocks": blocks,
+                "activities": activities,
+                "indicators_total": len(listed),
+                "indicators_on": sum(1 for item in listed if item.enabled is not False),
+            }
+        )
     names = _bank_names(adapted_ids)
     for section in sections:
         for block in section["blocks"]:
@@ -545,6 +580,97 @@ def _interventions(baseline: DrefBaseline) -> list[dict]:
     return [row for row in rows if isinstance(row, dict)]
 
 
+def uses_bank_indicators(baseline: DrefBaseline | None) -> bool:
+    """True for an Emergency Appeal stage. GO publishes no indicators for it, so the plan lists the bank's."""
+    return baseline is not None and (baseline.stage or "") == APPEAL_STAGE and not _interventions(baseline)
+
+
+def appeal_indicator_specs() -> list[dict]:
+    """Every emergency indicator of the bank, placed on the sector the reporting template files it under."""
+    from plugins.dref_monitoring.services import report_template as template
+
+    by_fold, by_go_key = template._sector_index()
+    specs = []
+    for section in template._section_plan(None):
+        key = section["key"]
+        rows = [row for row in section.get("indicators") or [] if row.emergency]
+        if key == template._REPORT_KEY or not rows:
+            continue
+        sector = None
+        if key != template._OTHER_KEY:
+            sector = template._resolve_bank_sector(key, section["name"], by_fold, by_go_key)
+        specs.append(
+            {
+                "key": key,
+                "label": section["name"],
+                "bank_sector_id": None if sector is None else int(sector.id),
+                "indicators": rows,
+            }
+        )
+    return specs
+
+
+def add_appeal_indicators(plan: DrefPlan, specs: list[dict] | None = None) -> int:
+    """Add the bank's emergency indicators to the plan, each switched on. Rows already there are kept as they are."""
+    existing = {group.key: group for group in groups_for(plan.id)}
+    added = 0
+    for index, spec in enumerate(appeal_indicator_specs() if specs is None else specs):
+        group = existing.get(spec["key"][:80])
+        if group is None:
+            group = DrefGroup(
+                plan_id=plan.id,
+                key=spec["key"][:80],
+                label=spec["label"][:180],
+                group_kind="sector",
+                budget_chf=None,
+                people_targeted=None,
+                bank_sector_id=spec["bank_sector_id"],
+                unmatched=False,
+                sort_order=100 + index,
+            )
+            db.session.add(group)
+            db.session.flush()
+            existing[group.key] = group
+        have = {int(row.indicator_bank_id) for row in indicators_for_group(group.id) if row.indicator_bank_id}
+        for bank in spec["indicators"]:
+            if int(bank.id) in have:
+                continue
+            db.session.add(
+                DrefIndicator(
+                    group_id=group.id,
+                    title=(bank.name or "")[:255],
+                    kind="outcome",
+                    unit=str(getattr(bank, "unit", "") or "")[:32],
+                    indicator_bank_id=int(bank.id),
+                    unmatched=False,
+                    enabled=True,
+                )
+            )
+            added += 1
+    db.session.flush()
+    return added
+
+
+def backfill_appeal_indicators() -> int:
+    """Give a draft Emergency Appeal plan the bank's indicators it was built without.
+
+    A plan made before appeals used the bank, or before the bank had emergency indicators, has none.
+    A confirmed plan is never changed. Rows already on a draft keep their switch.
+    """
+    specs = None
+    added = 0
+    for operation in DrefOperation.query.all():
+        if not is_emergency_appeal(operation.appeal_type or ""):
+            continue
+        plan = latest_plan(operation.id)
+        if plan is None or plan.status != PLAN_DRAFT or not uses_bank_indicators(latest_baseline(operation.id)):
+            continue
+        if specs is None:
+            specs = appeal_indicator_specs()
+        added += add_appeal_indicators(plan, specs)
+    return added
+
+
 def _match_indicator(title: str, sector_id: int | None, indicators) -> object | None:
     """An emergency indicator in this sector with the same name, or one unique contained name."""
     from plugins.dref_monitoring.services.report_template import _fold
@@ -630,6 +756,15 @@ def go_source_notices(baseline: DrefBaseline | None) -> list[str]:
 
     if baseline is None:
         return [translate("No approved GO stage is stored for this operation.")]
+    if (baseline.stage or "") == APPEAL_STAGE:
+        return [
+            translate(
+                "GO publishes the budget and the people targeted of an Emergency Appeal, but not its sectors, "
+                "indicators, or activities. The plan lists the emergency indicators of the indicator bank. "
+                "Switch off the ones this operation will not report on, then confirm the plan. Add activities "
+                "from the Emergency Plan of Action here, or import them from Excel."
+            )
+        ]
     if not _interventions(baseline):
         return [
             translate(
@@ -807,6 +942,8 @@ def generate_plan(operation: DrefOperation, baseline: DrefBaseline, today) -> Dr
     else:
         for spec in _desired_groups(operation, list(baseline.sectors or [])):
             _add_group(plan, operation, spec)
+        if uses_bank_indicators(baseline):
+            add_appeal_indicators(plan)
     operation.workflow_status = WORKFLOW_PLAN_DRAFT
     return plan
 
@@ -825,6 +962,8 @@ def _refresh_caps(plan: DrefPlan, operation: DrefOperation, baseline: DrefBaseli
         group.budget_chf = spec["budget_chf"]
         group.people_targeted = spec["people_targeted"]
         group.label = spec["label"]
+    if uses_bank_indicators(baseline):
+        add_appeal_indicators(plan)
 
 
 def _clone(operation: DrefOperation, source: DrefPlan, today, plan_source: str = "rebased"):
@@ -860,6 +999,7 @@ def _clone(operation: DrefOperation, source: DrefPlan, today, plan_source: str =
                 indicator_bank_id=indicator.indicator_bank_id,
                 unmatched=bool(indicator.unmatched),
                 bank_adapted=bool(indicator.bank_adapted),
+                enabled=indicator.enabled is not False,
             )
             db.session.add(copied_indicator)
             db.session.flush()
@@ -902,6 +1042,7 @@ def _clone(operation: DrefOperation, source: DrefPlan, today, plan_source: str =
                         indicator_bank_id=indicator.indicator_bank_id,
                         unmatched=bool(indicator.unmatched),
                         bank_adapted=bool(indicator.bank_adapted),
+                        enabled=indicator.enabled is not False,
                     )
                     db.session.add(copied_indicator)
                     db.session.flush()
@@ -945,6 +1086,8 @@ def validate_plan(operation: DrefOperation, actor, today) -> str | None:
         return "The plan is already validated."
     if not actor.allows(operation, "validate"):
         return "You cannot validate this plan."
+    if _has_indicator_rows(plan.id) and not _has_enabled_indicator(plan.id):
+        return "Switch on at least one indicator before confirming the plan."
     plan.status = PLAN_VALIDATED
     plan.validated_at = utcnow()
     plan.validated_by_user_id = actor.user_id
@@ -953,10 +1096,59 @@ def validate_plan(operation: DrefOperation, actor, today) -> str | None:
     else:
         operation.workflow_status = WORKFLOW_MONITORING
     from plugins.dref_monitoring.services.project_link import open_cycles
+    from plugins.dref_monitoring.services.schedule import lock_schedule_start
+
+    lock_schedule_start(operation, today)
 
     open_cycles(operation)
     db.session.commit()
     return None
+
+
+def _plan_indicators(plan_id: int) -> list[DrefIndicator]:
+    found = []
+    for group in groups_for(plan_id):
+        found.extend(row for row in indicators_for_group(group.id) if row.standard_code not in _SYNTHETIC_CODES)
+    return found
+
+
+def _has_indicator_rows(plan_id: int) -> bool:
+    return bool(_plan_indicators(plan_id))
+
+
+def _has_enabled_indicator(plan_id: int) -> bool:
+    return any(row.enabled is not False for row in _plan_indicators(plan_id))
+
+
+def indicator_switches_posted(operation, form) -> dict[int, bool]:
+    """The indicators of the current plan whose on/off state the posted plan form changes.
+
+    The form lists every indicator it showed (``indicator_listed``) and ticks the ones that stay on
+    (``indicator_on``). Only rows that exist on this plan and differ from the stored state count.
+    """
+    listed = {item for item in (as_int(raw) for raw in _posted_ids(form, "indicator_listed")) if item}
+    if not listed:
+        return {}
+    plan = latest_plan(operation.id)
+    if plan is None:
+        return {}
+    ticked = {item for item in (as_int(raw) for raw in _posted_ids(form, "indicator_on")) if item}
+    changes = {}
+    for row in _plan_indicators(plan.id):
+        if row.id in listed and (row.enabled is not False) != (row.id in ticked):
+            changes[row.id] = row.id in ticked
+    return changes
+
+
+def apply_indicator_switches(changes: dict[int, bool], indicator_map: dict[int, int]) -> int:
+    """Switch indicators on or off. ``indicator_map`` carries ids across a new draft of the plan."""
+    count = 0
+    for original, enabled in changes.items():
+        row = db.session.get(DrefIndicator, indicator_map.get(original, original))
+        if row is not None and (row.enabled is not False) != enabled:
+            row.enabled = enabled
+            count += 1
+    return count
 
 
 def restore_plan_version(operation: DrefOperation, version: int, actor, today) -> str | None:
@@ -1477,7 +1669,8 @@ def save_plan_activities(operation, form, actor) -> dict:
     add_tokens = [str(raw).strip() for raw in _posted_ids(form, "add_activity") if str(raw).strip()]
     remove_ids = [item for item in (as_int(raw) for raw in _posted_ids(form, "remove_activity")) if item]
     group_ids = [item for item in (as_int(raw) for raw in _posted_ids(form, "group_id")) if item]
-    if not activity_ids and not add_keys and not add_tokens and not remove_ids and not group_ids:
+    switches = indicator_switches_posted(operation, form)
+    if not activity_ids and not add_keys and not add_tokens and not remove_ids and not group_ids and not switches:
         return {"ok": False, "error": "There is nothing to save.", "errors": [], "pending": False, "saved": 0}
 
     justification = str(form.get("justification") or "").strip()
@@ -1494,7 +1687,7 @@ def save_plan_activities(operation, form, actor) -> dict:
     indicator_map: dict[int, int] = {}
     activity_map: dict[int, int] = {}
     plan = latest_plan(operation.id)
-    if plan is not None and plan.status != PLAN_DRAFT and _structure_posted(form):
+    if plan is not None and plan.status != PLAN_DRAFT and (_structure_posted(form) or switches):
         plan, group_map, indicator_map, activity_map = _clone(operation, plan, date.today(), "structure")
         if operation.workflow_status != WORKFLOW_CLOSURE:
             operation.workflow_status = WORKFLOW_PLAN_DRAFT
@@ -1563,6 +1756,7 @@ def save_plan_activities(operation, form, actor) -> dict:
         db.session.rollback()
         return {"ok": False, "error": errors[0], "errors": errors, "pending": False, "saved": 0}
 
+    saved += apply_indicator_switches(switches, indicator_map)
     saved += remove_plan_activities(operation, plan, remove_ids, justification, actor.user_id)
     add_errors, added = add_plan_activities(
         operation, plan, form, indicator_map, justification, actor.user_id, group_map=group_map

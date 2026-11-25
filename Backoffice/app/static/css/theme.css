@@ -297,6 +297,21 @@ a.modal-action-btn {
 }
 
 /*
+ * A second strip inside a padded tab panel (the card is primary strip + .p-6).
+ * .p-6 leaves 1.5rem above the strip. -mx-6, used to span the card, cancels
+ * only the side padding, so the labels sit on the card edge and the gap above
+ * stays. Keep the body's side inset, and when the strip is the first thing in
+ * the panel sit it on the parent rule.
+ */
+.scroll-tab-bar + .p-6 > .settings-panel .scroll-tab-bar {
+  margin-inline: 0;
+}
+
+.scroll-tab-bar + .p-6 > .settings-panel > .scroll-tab-bar:first-of-type {
+  margin-top: -1.5rem;
+}
+
+/*
  * Feature-flag / config identifiers (System Settings → Notifications, etc.).
  * Prefer system UI monospace before legacy Courier-style generic monospace.
  */

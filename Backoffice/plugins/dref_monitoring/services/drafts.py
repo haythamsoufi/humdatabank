@@ -1126,7 +1126,10 @@ def llm_messages(payload: dict, kind: str, language: str = "en", only: str | Non
 
     language = report_language(language or payload.get("language"))
     return [
-        {"role": "system", "content": system_prompt(kind, language, only=only)},
+        {
+            "role": "system",
+            "content": system_prompt(kind, language, only=only, appeal_type=str(payload.get("appeal_type") or "")),
+        },
         {"role": "user", "content": user_prompt(payload)},
     ]
 

@@ -15,14 +15,21 @@ from app.models import AIJob
 from app.plugins.plugin_utils import PLUGIN_MANAGE_PERMISSION, settings_plugin_info
 from app.routes.admin.shared import admin_permission_required_any, permission_required_any
 from plugins.dref_monitoring.access import current_actor, operations_for
-from plugins.dref_monitoring.config_store import ai_enabled, get_config, save_posted_settings
+from plugins.dref_monitoring.config_store import (
+    ai_enabled,
+    emergency_appeal_settings,
+    get_config,
+    save_posted_settings,
+)
 from plugins.dref_monitoring.constants import (
     ACTIVITY_TYPES,
     CARRIED_OUT_BY,
+    EA_DEFAULT_SINCE_YEAR,
     ENTER_PERMISSION,
     MANAGE_PERMISSION,
     NARRATIVE_AI,
     NARRATIVE_NONE,
+    PLAN_DRAFT,
     PLAN_VALIDATED,
     PLUGIN_ID,
     PORTFOLIO_PERMISSION,
@@ -71,7 +78,7 @@ from plugins.dref_monitoring.services.draft_job import (
     request_draft_cancel,
     status_payload as draft_status_payload,
 )
-from plugins.dref_monitoring.services.go_submit import submit_draft
+from plugins.dref_monitoring.services.go_submit import posts_to_go, submit_draft
 from plugins.dref_monitoring.services.context import load_context
 from plugins.dref_monitoring.services.llm import complete_with_engine, configured_model
 from plugins.dref_monitoring.services import narrative_format as fmt
@@ -85,7 +92,7 @@ from plugins.dref_monitoring.services.report_document import (
     source_for,
 )
 from plugins.dref_monitoring.services.excel_import import export_workbook, import_activities
-from plugins.dref_monitoring.services.go_parse import is_imminent
+from plugins.dref_monitoring.services.go_parse import appeal_type_label, is_emergency_appeal, is_imminent
 from plugins.dref_monitoring.services.go_sync_job import (
     current_sync_payload,
     prepare_settings_sync,
@@ -94,6 +101,7 @@ from plugins.dref_monitoring.services.go_sync_job import (
     status_payload,
 )
 from plugins.dref_monitoring.services.plans import (
+    add_appeal_indicators,
     decide_change,
     edit_activity,
     go_source_notices,
@@ -112,7 +120,14 @@ from plugins.dref_monitoring.services.plans import (
     save_plan_activities,
     set_member,
     update_governance,
+    uses_bank_indicators,
     validate_plan,
+)
+from plugins.dref_monitoring.services.schedule import (
+    frequency_editable,
+    schedule_preview,
+    set_plan_frequency,
+    valid_frequency,
 )
 from plugins.dref_monitoring.services.reporting import (
     add_delay,
@@ -172,6 +187,17 @@ def dref_label(value) -> str:
     return localize_text(value)
 
 
+@bp.app_template_global("dref_appeal_label")
+def dref_appeal_label(appeal_type) -> str:
+    """DREF, Imminent DREF, or Emergency Appeal, in the signed-in user's language."""
+    return translate(appeal_type_label(appeal_type or ""))
+
+
+@bp.app_template_global("dref_is_appeal")
+def dref_is_appeal(appeal_type) -> bool:
+    return is_emergency_appeal(appeal_type or "")
+
+
 @bp.app_template_global("dref_nodes")
 def dref_nodes(text):
     """A stored chapter as paragraphs and lists, so a template draws it without trusting its markup."""
@@ -221,9 +247,13 @@ def settings_status() -> dict:
         "go_token_configured": bool(current_app.config.get("GO_API_TOKEN")),
         "schedule": {},
         "go_url": "",
+        "go_appeal_url": "",
+        "emergency_appeals": {"enabled": True, "closed_since_year": EA_DEFAULT_SINCE_YEAR},
     }
     try:
         config = get_config()
+        payload["emergency_appeals"] = emergency_appeal_settings()
+        payload["go_appeal_url"] = (config.get("go") or {}).get("appeal_url") or ""
         payload["ai_enabled"] = bool((config.get("ai") or {}).get("enabled"))
         payload["ai_language"] = report_language((config.get("ai") or {}).get("language"))
         payload["ai_model"] = str((config.get("ai") or {}).get("model") or "")
@@ -310,6 +340,9 @@ def _operation_redirect(operation_id: int, *, plan_draft: bool = False):
         kwargs["tab"] = tab
     if plan_draft:
         kwargs["plan_draft"] = 1
+    plan_tab = (request.values.get("plan_tab") or "").strip()
+    if plan_tab in {"schedule", "indicators"}:
+        kwargs["plan_tab"] = plan_tab
     return redirect(url_for(f"{PLUGIN_ID}.operation_page", **kwargs))
 
 
@@ -451,6 +484,13 @@ def operation_page(operation_id: int):
         try:
             changed = realign_plan_activities(plan.id)
             changed = refresh_indicator_matches(plan.id) or changed
+            if (
+                plan.status == PLAN_DRAFT
+                and is_emergency_appeal(operation.appeal_type or "")
+                and uses_bank_indicators(latest_baseline(operation.id))
+            ):
+                # A draft appeal plan made before it listed the bank indicators gets them on the first visit.
+                changed = bool(add_appeal_indicators(plan)) or changed
             if changed:
                 db.session.commit()
         except Exception:
@@ -467,8 +507,8 @@ def operation_page(operation_id: int):
         else:
             view_plan = chosen
             plan_history = True
-    current_sections = plan_sections(plan.id) if plan is not None else []
-    sections = current_sections if view_plan is plan else plan_sections(view_plan.id)
+    current_sections = plan_sections(plan.id, include_disabled=True) if plan is not None else []
+    sections = current_sections if view_plan is plan else plan_sections(view_plan.id, include_disabled=True)
     periods = []
     for period in periods_for(operation.id):
         href = assignment_url(operation.id, period)
@@ -521,9 +561,18 @@ def operation_page(operation_id: int):
         .all()
     ]
     drafts.sort(key=lambda row: row.id, reverse=True)
+    previewed = valid_frequency(request.args.get("frequency"))
+    is_appeal = is_emergency_appeal(operation.appeal_type or "")
     return render_template(
         f"plugins/{PLUGIN_ID}/operation.html",
         operation=operation,
+        **_schedule_context(operation, request.args.get("frequency"), plan_history=plan_history),
+        plan_is_appeal=is_appeal,
+        plan_subtab=(
+            request.args.get("plan_tab")
+            if request.args.get("plan_tab") in {"schedule", "indicators"}
+            else ("schedule" if previewed else "indicators")
+        ),
         active_job=draft_job_for_page(operation.id, ACTION_GENERATE) if can_enter else None,
         actor_can_enter=can_enter,
         can_enter=can_enter,
@@ -567,6 +616,51 @@ def operation_page(operation_id: int):
 def validate_plan_route(operation_id: int):
     operation = _operation(operation_id, "validate")
     _flash_error(validate_plan(operation, _actor(), date.today())) or flash(_("Plan validated."), "success")
+    return _operation_redirect(operation.id)
+
+
+def _schedule_context(operation, frequency, *, plan_history: bool) -> dict:
+    """The schedule card: a saved frequency, or a preview that has not been saved."""
+    previewed = valid_frequency(frequency)
+    can_enter = _actor().allows(operation, "enter")
+    return {
+        "schedule": schedule_preview(operation, previewed),
+        "schedule_previewing": bool(previewed) and previewed != operation.reporting_frequency,
+        "schedule_editable": can_enter and not plan_history and frequency_editable(operation),
+    }
+
+
+def _viewing_older_plan(operation) -> bool:
+    requested = request.args.get("plan_version", type=int)
+    if not requested:
+        return False
+    plan = latest_plan(operation.id)
+    if plan is not None and requested == plan.version:
+        return False
+    return any(item.version == requested for item in plans_for(operation.id))
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/plan/schedule/preview", methods=["GET"])
+@permission_required_any(*_ANY)
+def plan_schedule_preview_route(operation_id: int):
+    """The schedule card for a frequency that is not saved yet. The plan page swaps this in."""
+    operation = _operation(operation_id)
+    return render_template(
+        f"plugins/{PLUGIN_ID}/_plan_schedule.html",
+        operation=operation,
+        **_schedule_context(operation, request.args.get("frequency"), plan_history=_viewing_older_plan(operation)),
+    )
+
+
+@bp.route("/dref-monitoring/operations/<int:operation_id>/plan/schedule", methods=["POST"])
+@permission_required_any(*_ANY)
+def plan_schedule_route(operation_id: int):
+    """Choose the reporting frequency while the plan is a draft."""
+    operation = _operation(operation_id, "enter")
+    if _flash_error(set_plan_frequency(operation, request.form.get("frequency"), _actor())):
+        db.session.rollback()
+    else:
+        flash(_("The reporting frequency was saved."), "success")
     return _operation_redirect(operation.id)
 
 
@@ -1027,7 +1121,11 @@ def draft_page(operation_id: int, draft_id: int):
         if actor.allows(operation, "enter") and status == "draft"
         else None,
         can_validate=actor.allows(operation, "validate") and status == "draft",
-        can_send=actor.allows(operation, "validate") and status == "validated" and draft.go_status != "sent",
+        can_send=actor.allows(operation, "validate")
+        and status == "validated"
+        and draft.go_status != "sent"
+        and posts_to_go(operation),
+        posts_to_go=posts_to_go(operation),
         can_delete=draft_deletable(draft, operation, actor),
     )
 
@@ -1172,6 +1270,9 @@ def draft_validate_route(operation_id: int, draft_id: int):
     error = validate_draft(draft, operation, _actor())
     if error:
         flash(translate(error), "warning")
+        return redirect(url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=draft.id))
+    if not posts_to_go(operation):
+        flash(translate("The report is validated. Download the Word file or the PDF to file it."), "success")
         return redirect(url_for(f"{PLUGIN_ID}.draft_page", operation_id=operation.id, draft_id=draft.id))
     result = submit_draft(operation, draft)
     if result.get("ok"):

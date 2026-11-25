@@ -154,8 +154,13 @@ def plan_indicator_filter(operation: DrefOperation) -> dict:
     sector_keys = []
     bank_ids = []
     for group in groups_for(plan.id):
+        indicators = indicators_for_group(group.id)
+        live = [indicator for indicator in indicators if indicator.enabled is not False]
+        if indicators and not live and not activities_for(group.id):
+            # Every indicator of this sector is switched off, so the form leaves the sector out.
+            continue
         sector_keys.append(form_section_key(group.key))
-        for indicator in indicators_for_group(group.id):
+        for indicator in live:
             if indicator.indicator_bank_id and not indicator.unmatched:
                 bank_ids.append(int(indicator.indicator_bank_id))
     return {
@@ -225,7 +230,7 @@ def indicators_missing_from_template(operation: DrefOperation, template_bank_ids
     for group in groups_for(plan.id):
         section_key = form_section_key(group.key)
         for indicator in indicators_for_group(group.id):
-            if indicator.standard_code in _SYNTHETIC_CODES:
+            if indicator.standard_code in _SYNTHETIC_CODES or indicator.enabled is False:
                 continue
             if not _absent_from_template(indicator, template_bank_ids):
                 continue
@@ -344,7 +349,7 @@ def _plan_indicators_by_bank(operation):
     found = {}
     for group in groups_for(plan.id):
         for indicator in indicators_for_group(group.id):
-            if not indicator.indicator_bank_id:
+            if not indicator.indicator_bank_id or indicator.enabled is False:
                 continue
             found.setdefault(int(indicator.indicator_bank_id), []).append((indicator, group))
     return found

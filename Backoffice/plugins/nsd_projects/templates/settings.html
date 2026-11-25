@@ -54,18 +54,6 @@
                             Tools
                         </h3>
                         <div class="space-y-3">
-                            {% if can_import %}
-                            <button type="button" data-nsd-tab="import"
-                                    class="flex items-center w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg text-left">
-                                <i class="fas fa-file-import mr-2"></i>
-                                Master import
-                            </button>
-                            {% endif %}
-                            <a href="{{ url_for('assignment_management.manage_assignments', type='project') }}"
-                               class="flex items-center w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg">
-                                <i class="fas fa-folder-open mr-2"></i>
-                                Admin → Projects
-                            </a>
                             <a href="{{ url_for('data_exploration.explore_data', tab='nsd_funds') }}"
                                class="flex items-center w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300">
                                 <i class="fas fa-chart-pie mr-2"></i>
@@ -176,11 +164,6 @@
     document.querySelectorAll('#nsd-settings-tabs [role="tab"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         activateNsdSettingsTab(btn.getAttribute('data-tab'));
-      });
-    });
-    document.querySelectorAll('[data-nsd-tab]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        activateNsdSettingsTab(el.getAttribute('data-nsd-tab'));
       });
     });
     var initial = {{ initial_tab|tojson }};

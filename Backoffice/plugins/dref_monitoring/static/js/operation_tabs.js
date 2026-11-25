@@ -174,6 +174,103 @@
     });
 
     var A = window.AdminUnderlineTabs;
+    var planSubtabs = document.getElementById('dref-plan-subtabs');
+    if (planSubtabs && A && A.setSubTabButton) {
+        planSubtabs.querySelectorAll('[data-tab]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tabId = btn.getAttribute('data-tab');
+                if (!tabId) {
+                    return;
+                }
+                planSubtabs.querySelectorAll('[data-tab]').forEach(function (other) {
+                    var on = other === btn;
+                    A.setSubTabButton(other, on);
+                    other.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                document.querySelectorAll('#panel-plan .dref-plan-subpanel').forEach(function (panel) {
+                    panel.classList.toggle('hidden', panel.id !== 'dref-plan-panel-' + tabId);
+                });
+                var url = new URL(window.location.href);
+                url.searchParams.set('plan_tab', tabId);
+                window.history.replaceState(null, '', url.pathname + url.search);
+            });
+        });
+    }
+
+    var scheduleHost = document.getElementById('dref-plan-panel-schedule');
+    if (scheduleHost && window.fetch) {
+        var scheduleRequest = 0;
+        scheduleHost.addEventListener('change', function (event) {
+            var field = event.target;
+            if (!field || !field.hasAttribute('data-dref-schedule-frequency') || !scheduleHost.contains(field)) {
+                return;
+            }
+            var section = field.closest('[data-dref-plan-schedule]');
+            var endpoint = section && section.getAttribute('data-dref-schedule-url');
+            if (!section || !endpoint) {
+                return;
+            }
+            var frequency = field.value || '';
+            var id = ++scheduleRequest;
+            section.setAttribute('aria-busy', 'true');
+            var target = new URL(endpoint, window.location.origin);
+            if (frequency) {
+                target.searchParams.set('frequency', frequency);
+            }
+            fetch(target.toString(), {
+                credentials: 'same-origin',
+                headers: { Accept: 'text/html' }
+            }).then(function (response) {
+                if (!response.ok || response.redirected) {
+                    throw new Error('schedule');
+                }
+                return response.text();
+            }).then(function (html) {
+                if (id !== scheduleRequest || html.indexOf('data-dref-plan-schedule') === -1) {
+                    if (id === scheduleRequest) {
+                        throw new Error('schedule');
+                    }
+                    return;
+                }
+                section.outerHTML = html;
+                var pageUrl = new URL(window.location.href);
+                var refreshed = document.getElementById('dref-plan-schedule');
+                var saved = refreshed ? (refreshed.getAttribute('data-dref-saved-frequency') || '') : '';
+                pageUrl.searchParams.set('tab', 'plan');
+                pageUrl.searchParams.set('plan_tab', 'schedule');
+                if (frequency && frequency !== saved) {
+                    pageUrl.searchParams.set('frequency', frequency);
+                } else {
+                    pageUrl.searchParams.delete('frequency');
+                }
+                window.history.replaceState(null, '', pageUrl.pathname + pageUrl.search);
+            }).catch(function () {
+                if (id !== scheduleRequest) {
+                    return;
+                }
+                var live = document.getElementById('dref-plan-schedule');
+                if (!live) {
+                    return;
+                }
+                live.removeAttribute('aria-busy');
+                var message = live.getAttribute('data-dref-schedule-error') || '';
+                var note = live.querySelector('[data-dref-schedule-error]');
+                if (!note) {
+                    note = document.createElement('p');
+                    note.setAttribute('role', 'alert');
+                    note.setAttribute('data-dref-schedule-error', '');
+                    var body = live.querySelector('[data-dref-schedule-body]');
+                    if (body) {
+                        body.prepend(note);
+                    }
+                }
+                if (note) {
+                    note.textContent = message;
+                }
+            });
+        });
+    }
+
     var tabs = document.querySelectorAll('#dref-operation-tabs .settings-tab');
     if (!tabs.length || !A) {
         return;

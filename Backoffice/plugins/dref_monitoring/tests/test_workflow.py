@@ -533,25 +533,28 @@ def test_plan_edit_adds_a_sector_that_was_not_on_the_plan(seeded):
     assert "livelihoods" not in {key for key, _label in sectors_not_on_plan(plan.id)}
 
 
-def test_sync_keeps_dref_appeals_and_drops_emergency_appeals(seeded):
+def test_sync_keeps_dref_and_emergency_appeals_and_drops_other_types(seeded):
     summary = apply_rows(
         [
             _row(),
             _row(id="Dref-ea", appeal_code="MDREA001", appeal_type="EA", disaster_name="Emergency appeal"),
             _row(id="Dref-imminent", appeal_code="MDRIM001", appeal_type="i-DREF", pillar="Anticipatory"),
+            _row(id="Dref-intl", appeal_code="MDRIN001", appeal_type="International Appeal"),
         ]
     )
-    assert summary["created"] == 2
-    assert summary["appeals"] == 2
+    assert summary["created"] == 3
+    assert summary["appeals"] == 3
     assert DrefOperation.query.filter_by(appeal_code="MDRZZ001").count() == 1
     assert DrefOperation.query.filter_by(appeal_code="MDRIM001").count() == 1
-    assert DrefOperation.query.filter_by(appeal_code="MDREA001").count() == 0
+    assert DrefOperation.query.filter_by(appeal_code="MDREA001").one().appeal_type == "EA"
+    assert DrefOperation.query.filter_by(appeal_code="MDRIN001").count() == 0
 
-    db.session.add(DrefOperation(appeal_code="MDREA002", disaster_name="Stored appeal", appeal_type="EA"))
+    db.session.add(DrefOperation(appeal_code="MDRIN002", disaster_name="Stored international", appeal_type="INTL"))
     db.session.commit()
     again = apply_rows([_row()])
     assert again["removed"] == 1
-    assert DrefOperation.query.filter_by(appeal_code="MDREA002").count() == 0
+    assert DrefOperation.query.filter_by(appeal_code="MDRIN002").count() == 0
+    assert DrefOperation.query.filter_by(appeal_code="MDREA001").count() == 1
 
 
 def test_fetch_rows_reads_the_feed_without_a_status_filter():

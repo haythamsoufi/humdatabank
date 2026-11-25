@@ -14,10 +14,15 @@ from decimal import Decimal
 
 from plugins.dref_monitoring.i18n import code_label, localize_text, override_locale, translate
 from plugins.dref_monitoring.services import narrative_format as fmt
+from plugins.dref_monitoring.services.go_parse import appeal_type_label, is_emergency_appeal
 
 TITLE = {
     "operational_update": "DREF Operational Update",
     "final_report": "DREF Final Report",
+}
+TITLE_APPEAL = {
+    "operational_update": "Emergency Appeal Operational Update",
+    "final_report": "Emergency Appeal Final Report",
 }
 INTERVENTION = {
     "operational_update": "Planned intervention",
@@ -289,8 +294,9 @@ def build_report(source: dict) -> list[Block]:
 
 def _compose_report(source: dict) -> list[Block]:
     kind = source.get("kind") if source.get("kind") in TITLE else "operational_update"
+    titles = TITLE_APPEAL if is_emergency_appeal(source.get("appeal_type") or "") else TITLE
     blocks: list[Block] = [
-        Block("title", TITLE[kind]),
+        Block("title", titles[kind]),
         Block("subtitle", (source.get("disaster_name") or source.get("appeal_code") or "").strip()),
         Block("note", DATA_COVER_NOTE if source.get("narrative_mode") == NARRATIVE_NONE else COVER_NOTE),
         Block("kv", rows=tuple(_cover_rows(source, kind))),
@@ -641,7 +647,7 @@ def _cover_rows(source: dict, kind: str) -> list[tuple[str, str]]:
         ("Country", source.get("country_name") or ""),
         ("Hazard", source.get("hazard") or ""),
         ("Crisis category", source.get("crisis_category") or ""),
-        ("Appeal type", source.get("appeal_type") or ""),
+        ("Appeal type", translate(appeal_type_label(source.get("appeal_type") or ""))),
         ("Pillar", source.get("pillar") or ""),
         ("Event onset", source.get("onset") or ""),
         ("Date of event", _show_date(source.get("date_of_disaster"))),
@@ -649,7 +655,12 @@ def _cover_rows(source: dict, kind: str) -> list[tuple[str, str]]:
         ("Operational end date", _show_date(source.get("end_date"))),
         ("Total operating timeframe", _timeframe(source.get("timeframe_months"))),
         ("Reporting timeframe", _range(source.get("reporting_start"), source.get("reporting_end"))),
-        ("Total DREF allocation (CHF)", _money(source.get("total_approved"))),
+        (
+            "Total appeal budget (CHF)"
+            if is_emergency_appeal(source.get("appeal_type") or "")
+            else "Total DREF allocation (CHF)",
+            _money(source.get("total_approved")),
+        ),
         ("People affected", _count(source.get("people_affected"))),
         ("People targeted", _count(source.get("people_targeted"))),
         ("Targeted areas", source.get("districts") or ""),

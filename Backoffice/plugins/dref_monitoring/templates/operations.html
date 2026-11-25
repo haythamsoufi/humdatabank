@@ -2,7 +2,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "plugins/dref_monitoring/_status.html" import dref_status %}
 
-{% block title %}{{ dref_tr('Operations') }}{% endblock %}
+{% block title %}{{ dref_tr('DREF and Emergency Appeal monitoring') }}{% endblock %}
 
 {% block extra_css %}
 {% include "components/_ui_style_stylesheets.html" %}
@@ -32,11 +32,11 @@
     {% endif %}
 
     {{ page_header(
-        title=dref_tr('DREF monitoring'),
+        title=dref_tr('DREF and Emergency Appeal monitoring'),
         icon='fas fa-clipboard-list',
-        subtitle=none if include_closed else dref_tr('Active approved DREF applications from GO.'),
+        subtitle=none if include_closed else dref_tr('Active approved DREF and Emergency Appeal operations from GO.'),
         breadcrumbs=[
-            {'name': dref_tr('DREF monitoring'), 'url': url_for('dref_monitoring.operations_page')},
+            {'name': dref_tr('DREF and Emergency Appeal monitoring'), 'url': url_for('dref_monitoring.operations_page')},
             {'name': dref_tr('Operations')}
         ],
         actions=header_actions.items
@@ -47,6 +47,7 @@
             <thead class="bg-gray-50 text-gray-600">
                 <tr>
                     <th class="px-3 py-2">{{ dref_tr('Appeal') }}</th>
+                    <th class="px-3 py-2">{{ dref_tr('Type') }}</th>
                     <th class="px-3 py-2">{{ dref_tr('Country') }}</th>
                     <th class="px-3 py-2">{{ dref_tr('Hazard') }}</th>
                     <th class="px-3 py-2">{{ dref_tr('Workflow') }}</th>
@@ -59,6 +60,7 @@
                 {% set is_closed = (operation.operation_status or '')|string|lower in ['closed', 'unspecified'] %}
                 <tr class="border-t {% if is_closed %}bg-slate-100 border-l-4 border-slate-300 text-gray-600{% else %}border-gray-200{% endif %}"{% if is_closed %} data-closed="1"{% endif %}>
                     <td class="px-3 py-2 font-medium {% if is_closed %}text-gray-600{% else %}text-gray-900{% endif %}">{{ operation.appeal_code }}</td>
+                    <td class="px-3 py-2">{{ dref_appeal_label(operation.appeal_type) }}</td>
                     <td class="px-3 py-2">{{ operation.country_name }}</td>
                     <td class="px-3 py-2">{{ operation.hazard }}</td>
                     <td class="px-3 py-2">{% if (operation.workflow_status or '')|string|lower == 'monitoring' %}{{ dref_status(operation.workflow_status, variant='success') }}{% else %}{{ dref_status(operation.workflow_status) }}{% endif %}</td>
@@ -66,7 +68,7 @@
                     <td class="px-3 py-2"><a class="text-blue-700 underline" href="{{ url_for('dref_monitoring.operation_page', operation_id=operation.id) }}">{{ dref_tr('Open') }}</a></td>
                 </tr>
                 {% else %}
-                <tr><td class="px-3 py-6 text-gray-600" colspan="{{ 6 if include_closed else 5 }}">{{ dref_tr('No open operations' if not include_closed else 'No operations yet') }}</td></tr>
+                <tr><td class="px-3 py-6 text-gray-600" colspan="{{ 7 if include_closed else 6 }}">{{ dref_tr('No open operations' if not include_closed else 'No operations yet') }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

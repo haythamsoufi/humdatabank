@@ -34,6 +34,7 @@ from plugins.dref_monitoring.models import (
 )
 from plugins.dref_monitoring.services.parsing import as_bool, as_date, as_int, as_money
 from plugins.dref_monitoring.services.periods import build_periods
+from plugins.dref_monitoring.services.schedule import schedule_start
 from plugins.dref_monitoring.services.plans import (
     ACTIVITY_TYPE_CODES,
     CARRIED_OUT_CODES,
@@ -103,7 +104,9 @@ def ensure_periods(operation) -> None:
         row.sequence
         for row in DrefPeriod.query.filter_by(operation_id=operation.id).all()
     }
-    for sequence, start, end, due in build_periods(operation.start_date, operation.end_date, operation.reporting_frequency):
+    for sequence, start, end, due in build_periods(
+        schedule_start(operation), operation.end_date, operation.reporting_frequency
+    ):
         if sequence in existing:
             continue
         db.session.add(
@@ -525,8 +528,6 @@ def monitoring_snapshot(operation, plan=None, sections=None) -> dict:
     The operation page already holds the latest plan and its sections, so it
     passes them in rather than reading them again.
     """
-    from plugins.dref_monitoring.services.assignment_sync import assignment_url
-
     if plan is None:
         plan = latest_plan(operation.id)
     confirmed = plan.validated_at.date() if plan is not None and plan.validated_at else None
@@ -542,7 +543,6 @@ def monitoring_snapshot(operation, plan=None, sections=None) -> dict:
             "state": "done" if confirmed else "upcoming",
         },
     ]
-    update_href = None
     filed_count = 0
     period_count = 0
     next_update = None
@@ -556,9 +556,6 @@ def monitoring_snapshot(operation, plan=None, sections=None) -> dict:
         elif next_update is None:
             next_overdue = period.status == "overdue" or (period.due_date is not None and period.due_date < date.today())
             next_update = {"date": period.due_date, "label": "Next update", "state": "current"}
-        href = assignment_url(operation.id, period)
-        if update_href is None and not filed and href.startswith("/assignment/"):
-            update_href = href
     if next_update is not None:
         events.append(next_update)
     elif period_count:
@@ -588,7 +585,6 @@ def monitoring_snapshot(operation, plan=None, sections=None) -> dict:
         "by_sector": by_sector,
         "status_chart": _chart_background(by_status),
         "sector_chart": _chart_background(by_sector),
-        "update_href": update_href,
         "period_count": period_count,
         "filed_count": filed_count,
         "next_overdue": next_overdue,

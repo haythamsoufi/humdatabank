@@ -20,6 +20,12 @@ EXPLORE_PERMISSION = "admin.data_explore.global_award"
 EXPLORE_ROLE = "admin_data_explorer_global_award"
 
 PROJECT_REFERENCE_PREFIX = "GA-"
+
+# Access Group (``rbac_role.kind = 'group'``) that every imported focal point joins.
+ACCESS_GROUP_NAME = "Global Award"
+ACCESS_GROUP_CODE = "group_global_award"
+# Role given to a user the sectoral import creates; existing users keep their roles.
+DEFAULT_USER_ROLE_CODE = "assignment_viewer"
 SHEET_NAME = "Logframe_Mastersheet"
 
 PLUGIN_DIR = Path(__file__).resolve().parent

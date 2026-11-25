@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 PLUGIN_ID = "dref_monitoring"
-VERSION = "0.11.0"
+VERSION = "0.13.0"
 DISPLAY_NAME = "DREF Monitoring"
 
 TEMPLATE_NAME = "DREF operational monitoring"
@@ -26,7 +26,14 @@ PORTFOLIO_ROLE = "dref_monitoring_portfolio"
 EXPLORE_TAB_ID = "dref-monitoring"
 
 GO_DREF3_URL = "https://goadmin.ifrc.org/api/v2/dref3/"
-PROMPT_VERSION = "5"
+# Emergency Appeals are not in dref3 as operations. GO keeps them as appeals (``atype`` 1).
+GO_APPEAL_URL = "https://goadmin.ifrc.org/api/v2/appeal/"
+GO_APPEAL_TYPE_EA = 1
+# Stage name and id prefix of an Emergency Appeal read from the appeal API (dref3 stage ids start with ``Dref``).
+APPEAL_STAGE = "Emergency Appeal"
+APPEAL_STAGE_PREFIX = "Appeal-"
+EA_DEFAULT_SINCE_YEAR = 2025
+PROMPT_VERSION = "6"
 REPORT_LANGUAGES = ("en", "fr", "es", "ar")
 # How a generated report treats narrative: figures only, chapters the National Society writes, or chapters the model drafts.
 NARRATIVE_NONE = "none"
@@ -143,7 +150,9 @@ RISK_LEVELS = ("low", "medium", "high")
 RISK_STATUSES = ("open", "mitigated", "closed")
 
 DEFAULT_CONFIG = {
-    "go": {"base_url": GO_DREF3_URL},
+    "go": {"base_url": GO_DREF3_URL, "appeal_url": GO_APPEAL_URL},
+    # Active Emergency Appeals are always read. Closed ones from this year on are read too.
+    "emergency_appeals": {"enabled": True, "closed_since_year": EA_DEFAULT_SINCE_YEAR},
     "schedule": {
         "plan_validation_days": 14,
         "reminder_days_before": 3,

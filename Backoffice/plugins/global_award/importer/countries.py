@@ -12,8 +12,9 @@ from typing import Iterable, Optional, Sequence
 _ALIAS_GROUPS = (
     {"viet nam", "vietnam"},
     {"turkiye", "turkey"},
-    {"democratic republic of the congo", "congo democratic republic of the", "congo the democratic republic of the", "dr congo", "democratic republic of congo"},
-    {"federated states of micronesia", "micronesia federated states of"},
+    {"democratic republic of the congo", "congo democratic republic of the", "congo the democratic republic of the", "dr congo", "drc", "democratic republic of congo", "democratic republic congo"},
+    {"central african republic", "car"},
+    {"federated states of micronesia", "micronesia federated states of", "micronesia"},
     {"syrian arab republic", "syria"},
     {"kyrgyz republic", "kyrgyzstan"},
     {"eswatini", "swaziland", "eswatini the kingdom of"},

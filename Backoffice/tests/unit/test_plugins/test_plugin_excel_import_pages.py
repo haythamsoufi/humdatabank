@@ -14,7 +14,13 @@ def _page(client, path):
 def test_global_award_import_tab_uses_the_standard_dropzone(logged_in_sm_client):
     html = _page(logged_in_sm_client, "/admin/plugins/global_award/settings?tab=import")
     assert 'data-tab="import"' in html
-    assert 'id="ga-import-dropzone"' in html
+    # One upload slot per workbook: the logframe and the sectoral interventions.
+    assert 'id="ga-import-subtabs"' in html
+    assert 'id="ga-import-panel-logframe"' in html
+    assert 'id="ga-import-panel-sectoral"' in html
+    assert 'id="ga-logframe-dropzone"' in html
+    assert 'id="ga-sectoral-dropzone"' in html
+    assert html.count('name="slot"') == 2
     assert "Files on disk" in html
     assert "Last import" in html
     assert "Change logs" in html

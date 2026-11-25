@@ -28,7 +28,7 @@ class GlobalAwardPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     @property
     def version(self) -> str:
-        return "0.8.1"
+        return "0.9.0"
 
     @property
     def description(self) -> str:
@@ -36,6 +36,9 @@ class GlobalAwardPlugin(FirstPartyPluginMetadata, BasePlugin):
             "Global Award (IFRC MARC) logframe. Imports the mastersheet into a "
             "form template, linking indicator-bank rows where they match and "
             "creating questions for the rest, plus one project per country. "
+            "A second workbook (Sectoral Interventions) adds each country's "
+            "sectors, PMER focal points and project managers, and creates "
+            "their users in the Global Award access group. "
             "Data Explorer shows coverage, targets vs reported values, a "
             "presentation, and an A4 report."
         )

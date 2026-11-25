@@ -1,4 +1,5 @@
-"""Pull approved DREF stages from the public GO ``dref3`` API into operations and baselines."""
+"""Pull approved DREF stages from the public GO ``dref3`` API, and Emergency Appeals from the ``appeal`` API,
+into operations and baselines."""
 
 from __future__ import annotations
 
@@ -15,8 +16,9 @@ from sqlalchemy.orm import sessionmaker
 from app.extensions import db
 from app.models.core import Country
 from app.utils.common.datetime_helpers import utcnow
-from plugins.dref_monitoring.config_store import go_base_url
+from plugins.dref_monitoring.config_store import emergency_appeal_settings, go_appeal_url, go_base_url
 from plugins.dref_monitoring.constants import (
+    APPEAL_STAGE_PREFIX,
     PLAN_VALIDATED,
     WORKFLOW_CLOSURE,
     WORKFLOW_MONITORING,
@@ -24,19 +26,22 @@ from plugins.dref_monitoring.constants import (
 )
 from plugins.dref_monitoring.models import DrefBaseline, DrefOperation, DrefSyncLog
 from plugins.dref_monitoring.services.go_application import NARRATIVE_VERSION
+from plugins.dref_monitoring.services.go_appeals import appeal_queries, appeal_row
 from plugins.dref_monitoring.services.go_parse import (
-    is_dref_appeal,
+    is_emergency_appeal,
+    is_monitored_appeal,
     narrative_signature,
     parse_stage,
     stage_signature,
 )
 from plugins.dref_monitoring.services.periods import default_frequency
-from plugins.dref_monitoring.services.plans import latest_plan, sync_plan
+from plugins.dref_monitoring.services.plans import backfill_appeal_indicators, latest_plan, sync_plan
 
 logger = logging.getLogger(__name__)
 
 _PAGE_LIMIT = 200
 _MAX_PAGES = 100
+_MAX_APPEAL_PAGES = 10
 
 
 class FeedRows(list):
@@ -140,6 +145,91 @@ def fetch_rows(
         rows.truncated = True
         logger.warning("DREF GO sync stopped after %s rows; more pages may remain.", len(rows))
     return rows
+
+
+def fetch_appeal_rows(
+    http_get,
+    url: str,
+    *,
+    closed_since_year: int,
+    progress=None,
+    should_stop=None,
+) -> list[dict]:
+    """Read Emergency Appeals from the public appeal API as dref3-shaped rows.
+
+    Every active appeal is read, and every appeal that started since ``closed_since_year``.
+    An appeal found by both reads is kept once.
+    """
+    found: dict[str, dict] = {}
+    pages = 0
+    for query in appeal_queries(closed_since_year):
+        for page in range(_MAX_APPEAL_PAGES):
+            if should_stop and should_stop():
+                raise GoSyncCancelled()
+            pages += 1
+            if progress:
+                progress(
+                    {
+                        "stage": "fetching",
+                        "message": "Reading Emergency Appeals, page %(current)s.",
+                        "message_vars": {"current": pages},
+                        "current": pages,
+                        "total": None,
+                        "percent": min(19.5, 16.0 + pages),
+                    }
+                )
+            payload = http_get(url, {**query, "limit": _PAGE_LIMIT, "offset": page * _PAGE_LIMIT})
+            batch = payload.get("results") if isinstance(payload, dict) else payload
+            if not isinstance(batch, list) or not batch:
+                break
+            for item in batch:
+                row = appeal_row(item)
+                if row is not None:
+                    found.setdefault(row["appeal_code"], row)
+            if len(batch) < _PAGE_LIMIT:
+                break
+    return list(found.values())
+
+
+def _hold_stored_appeals(rows: list[dict]) -> int:
+    """Drop dref3 loan rows of an appeal this pull did not return, when the appeal is already stored.
+
+    The loan DREF of an Emergency Appeal shares its code. Without the appeal row, those rows would
+    become the latest stage and replace the appeal's budget with the loan. Returns how many were held.
+    """
+    present = {
+        str(row.get("appeal_code") or "").strip().upper() for row in rows if row.get("appeal_feed")
+    }
+    loans = {
+        str(row.get("appeal_code") or "").strip().upper()
+        for row in rows
+        if not row.get("appeal_feed") and is_emergency_appeal(row.get("appeal_type") or "")
+    } - present
+    if not loans:
+        return 0
+    stored = {
+        code
+        for (code,) in db.session.query(DrefOperation.appeal_code)
+        .join(DrefBaseline, DrefBaseline.operation_id == DrefOperation.id)
+        .filter(
+            DrefOperation.appeal_code.in_(sorted(loans)),
+            DrefBaseline.go_stage_id.like(f"{APPEAL_STAGE_PREFIX}%"),
+        )
+        .distinct()
+        .all()
+    }
+    if not stored:
+        return 0
+    kept = [
+        row
+        for row in rows
+        if row.get("appeal_feed")
+        or not is_emergency_appeal(row.get("appeal_type") or "")
+        or str(row.get("appeal_code") or "").strip().upper() not in stored
+    ]
+    held = len(rows) - len(kept)
+    rows[:] = kept
+    return held
 
 
 def _country_id(iso3: str) -> int | None:
@@ -433,7 +523,7 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
             parsed_rows.append(parsed)
     grouped: dict[str, list[dict]] = defaultdict(list)
     for parsed in parsed_rows:
-        if not is_dref_appeal(parsed.get("appeal_type") or ""):
+        if not is_monitored_appeal(parsed.get("appeal_type") or ""):
             continue
         grouped[parsed["appeal_code"]].append(parsed)
 
@@ -460,14 +550,19 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
     for index, (appeal_code, stages) in enumerate(grouped.items()):
         if should_stop and should_stop():
             raise GoSyncCancelled()
-        latest = next((item for item in stages if item.get("is_latest_stage")), None)
-        if latest is None:
-            latest = max(stages, key=lambda item: (item.get("date_of_approval") or date.min, item["go_stage_id"]))
-        if not is_dref_appeal(latest.get("appeal_type") or ""):
+        latest = _latest_stage(stages)
+        if not is_monitored_appeal(latest.get("appeal_type") or ""):
             continue
         latest["operation_status"] = operation_status_for(stages, latest)
         operation = operations.get(appeal_code)
+        if latest.get("from_appeal_feed"):
+            _carry_event_details(latest, operation)
         baselines = baselines_by_op.get(operation.id, {}) if operation is not None else {}
+        if latest.get("from_appeal_feed") and not isinstance(latest.get("application"), dict):
+            # The emergency page could not be read this time. Keep the text stored from an earlier pull.
+            stored = baselines.get(latest["go_stage_id"])
+            if stored is not None and isinstance(stored.application, dict):
+                latest["application"] = stored.application
         if _appeal_is_current(operation, stages, latest, baselines, country_ids.get((latest.get("country_iso3") or "").upper())):
             unchanged += 1
         else:
@@ -494,7 +589,12 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
             )
     if should_stop and should_stop():
         raise GoSyncCancelled()
-    removed = _drop_non_dref_operations()
+    removed = _drop_unsupported_operations()
+    try:
+        with db.session.begin_nested():
+            backfill_appeal_indicators()
+    except Exception:
+        logger.warning("DREF GO sync could not add the bank indicators to appeal plans", exc_info=True)
     db.session.commit()
     return {
         "created": created,
@@ -504,18 +604,54 @@ def apply_rows(rows: list[dict], today: date | None = None, *, progress=None, sh
         "failed": len(failed),
         "failed_codes": failed[:20],
         "appeals": len(grouped),
+        "emergency_appeals": sum(
+            1 for stages in grouped.values() if any(item.get("from_appeal_feed") for item in stages)
+        ),
     }
 
 
-def _drop_non_dref_operations() -> int:
-    """Remove Emergency Appeals and any other non-DREF rows a previous sync stored."""
-    stale = [row for row in DrefOperation.query.all() if not is_dref_appeal(row.appeal_type)]
+def _latest_stage(stages: list[dict]) -> dict:
+    """The stage the operation follows. An Emergency Appeal read from the appeal API always wins.
+
+    The dref3 rows that share its code are the loan DREF. They stay as earlier stages, so their
+    application text is still available, but their sector budgets are not the appeal's.
+    """
+    appeal = next((item for item in stages if item.get("from_appeal_feed")), None)
+    if appeal is not None:
+        for item in stages:
+            item["is_latest_stage"] = item is appeal
+        return appeal
+    latest = next((item for item in stages if item.get("is_latest_stage")), None)
+    if latest is None:
+        latest = max(stages, key=lambda item: (item.get("date_of_approval") or date.min, item["go_stage_id"]))
+    return latest
+
+
+def _carry_event_details(latest: dict, operation: DrefOperation | None) -> None:
+    """Keep the areas, event date, and people affected already stored when this pull could not read them.
+
+    They come from the emergency page, which can be slow or missing. Without this, one failed page
+    would blank the header and the next sync would write it back.
+    """
+    if operation is None:
+        return
+    if not latest.get("districts") and operation.districts:
+        latest["districts"] = operation.districts
+    if latest.get("date_of_disaster") is None and operation.date_of_disaster is not None:
+        latest["date_of_disaster"] = operation.date_of_disaster
+    if latest.get("people_affected") is None and operation.people_affected is not None:
+        latest["people_affected"] = operation.people_affected
+
+
+def _drop_unsupported_operations() -> int:
+    """Remove operations of a type this plugin does not monitor, such as an International Appeal."""
+    stale = [row for row in DrefOperation.query.all() if not is_monitored_appeal(row.appeal_type)]
     if not stale:
         return 0
     ids = [row.id for row in stale]
     # This cascades to plans, reports, and drafts, so name what is removed.
     logger.warning(
-        "DREF GO sync is removing non-DREF operations with their monitoring data: %s",
+        "DREF GO sync is removing unsupported operations with their monitoring data: %s",
         ", ".join(f"{row.appeal_code} ({row.appeal_type or 'no type'})" for row in stale),
     )
     for row in stale:
@@ -681,7 +817,8 @@ def stamp_stored_applications(rows: list[dict]) -> int:
     """
     pending = []
     for row in rows:
-        if not isinstance(row, dict) or isinstance(row.get("application"), dict):
+        # An appeal has no interventions to reuse, and its event summary changes, so it is read every time.
+        if not isinstance(row, dict) or isinstance(row.get("application"), dict) or row.get("appeal_feed"):
             continue
         stage_id = str(row.get("id") or "").strip()
         if stage_id:
@@ -725,7 +862,14 @@ def completion_progress(summary: dict) -> dict:
 
 
 def _success_text(summary: dict, applications: dict) -> str:
-    message = f"Synced {summary['appeals']} DREF appeal(s)."
+    message = f"Synced {summary['appeals']} appeal(s)"
+    if summary.get("emergency_appeals"):
+        message += f", {summary['emergency_appeals']} of them Emergency Appeals"
+    message += "."
+    if summary.get("appeals_unavailable"):
+        message += " The Emergency Appeals could not be read from GO, so stored ones were left as they are."
+    if summary.get("loans_held"):
+        message += f" Kept {summary['loans_held']} loan stage(s) of stored Emergency Appeals out of this pull."
     if summary.get("unchanged"):
         message += f" {summary['unchanged']} were already up to date."
     if applications.get("reused"):
@@ -735,7 +879,7 @@ def _success_text(summary: dict, applications: dict) -> str:
     if applications.get("missing"):
         message += f" {applications['missing']} emergency page(s) are not published."
     if summary.get("removed"):
-        message += f" Removed {summary['removed']} non-DREF operation(s)."
+        message += f" Removed {summary['removed']} unsupported operation(s)."
     if summary.get("failed"):
         codes = ", ".join(summary.get("failed_codes") or [])
         message += f" {summary['failed']} appeal(s) could not be saved and were skipped: {codes}."
@@ -758,6 +902,31 @@ def _run_sync(http_get, operation_status, progress, should_stop, log_id: int) ->
     )
     from plugins.dref_monitoring.services.go_application import attach_applications
 
+    appeals_unavailable = False
+    settings = emergency_appeal_settings()
+    if not settings["enabled"]:
+        # Switched off: Emergency Appeals are neither read nor changed. Stored ones stay as they are.
+        rows[:] = [row for row in rows if not is_emergency_appeal(row.get("appeal_type") or "")]
+    else:
+        try:
+            rows.extend(
+                fetch_appeal_rows(
+                    getter,
+                    go_appeal_url(),
+                    closed_since_year=settings["closed_since_year"],
+                    progress=report,
+                    should_stop=should_stop,
+                )
+            )
+        except GoSyncCancelled:
+            raise
+        except Exception as exc:
+            # The DREF pull still stands. Stored appeals are left alone rather than rebuilt from a partial read.
+            logger.warning("DREF GO sync could not read Emergency Appeals: %s", exc)
+            appeals_unavailable = True
+    # With the appeal feed off or unreachable, the loan stages of a stored appeal must not take over.
+    loans_held = _hold_stored_appeals(rows)
+
     reused = stamp_stored_applications(rows)
     applications = attach_applications(rows, http_get, progress=report, should_stop=should_stop)
     applications["reused"] = reused
@@ -765,6 +934,8 @@ def _run_sync(http_get, operation_status, progress, should_stop, log_id: int) ->
         raise GoSyncCancelled()
     summary = apply_rows(rows, progress=report, should_stop=should_stop)
     summary["truncated"] = bool(getattr(rows, "truncated", False))
+    summary["appeals_unavailable"] = appeals_unavailable
+    summary["loans_held"] = loans_held
     if summary["failed"] and not (summary["created"] or summary["updated"] or summary["unchanged"]):
         raise RuntimeError(f"Every appeal failed to save: {', '.join(summary['failed_codes'])}")
     message = _success_text(summary, applications)

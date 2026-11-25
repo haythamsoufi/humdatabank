@@ -133,7 +133,7 @@
 }
 
 .dref-plan-sector:not(.dref-plan-extra) td:first-child,
-tr[data-dref-indicator-row] td:first-child {
+tr[data-dref-indicator-row]:not(.dref-plan-flat) td:first-child {
     cursor: pointer;
 }
 
@@ -146,6 +146,8 @@ tr[data-dref-indicator-row] td:first-child {
 .dref-plan-fold-body {
     min-width: 0;
     flex: 1 1 auto;
+    max-width: 22rem;
+    overflow-wrap: anywhere;
 }
 
 .dref-plan-toggle {
@@ -196,10 +198,21 @@ html[dir="rtl"] .dref-plan-toggle[aria-expanded="false"] .fa-chevron-down {
     background: #f3f4f6;
 }
 
-.dref-plan-wrap {
+.dref-plan-off {
+    opacity: 0.55;
+}
+
+.is-editing .dref-plan-off {
+    opacity: 1;
+}
+
+.dref-plan-wrap,
+.dref-plan-name {
+    width: 18rem;
     min-width: 11rem;
     max-width: 18rem;
     white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .dref-plan-write,
@@ -340,4 +353,13 @@ html[dir="rtl"] .dref-plan-toggle[aria-expanded="false"] .fa-chevron-down {
 .select2-container.dref-invalid .select2-selection--single {
     border-color: #dc2626;
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+#dref-plan-schedule[aria-busy="true"] [data-dref-schedule-body] {
+    opacity: 0.55;
+}
+
+[data-dref-schedule-error] {
+    color: #b91c1c;
+    font-size: 0.875rem;
 }

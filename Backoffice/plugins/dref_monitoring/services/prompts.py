@@ -158,15 +158,40 @@ def _rewrite_rules(key: str) -> str:
     )
 
 
-def system_prompt(kind: str, language: str, today: date | None = None, only: str | None = None) -> str:
+_APPEAL_NOTE = (
+    "This operation is an IFRC Emergency Appeal, not a DREF. `operation` figures are the appeal's budget "
+    "(the amount requested) and the people it aims to reach, over a longer period than a DREF. "
+    "`approved_application` is the situation summary GO publishes for the emergency, not a DREF application, "
+    "so it has no sector plan, and `original_application` may be the DREF loan that started the response. "
+    "Describe the operation as an Emergency Appeal and never call it a DREF.\n\n"
+)
+
+
+def system_prompt(
+    kind: str,
+    language: str,
+    today: date | None = None,
+    only: str | None = None,
+    appeal_type: str = "",
+) -> str:
     """The instructions for a whole report, or for one chapter when ``only`` names it."""
+    from plugins.dref_monitoring.services.go_parse import is_emergency_appeal
+
+    appeal = is_emergency_appeal(appeal_type)
+    name = "Emergency Appeal" if appeal else "DREF"
     title = "operational update" if kind == "operational_update" else "final report"
     today = today or date.today()
     names = (only,) if only else chapter_keys(kind)
     keys = ", ".join(f'"{key}"' for key in names)
-    scope = f"the chapter \"{only}\" of a DREF {title}" if only else f"the narrative chapters of a DREF {title}"
+    article = "an" if appeal else "a"
+    scope = (
+        f"the chapter \"{only}\" of {article} {name} {title}"
+        if only
+        else f"the narrative chapters of {article} {name} {title}"
+    )
+    own_documents = "its Emergency Plan of Action, operations updates" if appeal else "its DREF, operations updates"
     return (
-        f"You are a senior IFRC DREF reporting officer. Draft {scope} "
+        f"You are a senior IFRC {'emergency operations' if appeal else 'DREF'} reporting officer. Draft {scope} "
         "that the National Society will review, edit and file in GO. Today is "
         f"{today.isoformat()}.\n\n"
         "INPUT\n"
@@ -180,7 +205,8 @@ def system_prompt(kind: str, language: str, today: date | None = None, only: str
         "`source_catalog` lists every source you may name in the reply, each with a stable id. "
         "The id `operation` is the approved allocation, the operation dates and the people targeted. "
         "An id starting with `mon-` is one reporting period. Any of these may be missing.\n\n"
-        "SOURCE RULES\n"
+        + (_APPEAL_NOTE if appeal else "")
+        + "SOURCE RULES\n"
         "1. Progress, activities, people reached, expenditure and indicator values come only from the "
         "monitoring records. Never estimate them. Cite the `mon-` id of the reporting period that recorded "
         "the figure. Cite `operation` for the approved allocation, the operation dates and the people "
@@ -190,8 +216,8 @@ def system_prompt(kind: str, language: str, today: date | None = None, only: str
         "3. `field_reports` are newer than the application. Use them to update the situation, the "
         "figures and who is acting. Prefer the most recent report. When figures differ, give both with "
         "source and date.\n"
-        "4. `databank_documents` are excerpts from documents filed for this operation: its DREF, "
-        "operations updates and situation reports. Use one only when it describes this event, and name "
+        f"4. `databank_documents` are excerpts from documents filed for this operation: {own_documents} "
+        "and situation reports. Use one only when it describes this event, and name "
         "it in the text (for example: according to OCHA Flash Update 3, 26 April 2026).\n"
         "5. `previous_report` is the last approved report. Keep what is still true, and write what is "
         "new or different. Do not repeat it unchanged. Never treat the draft being written as a previous "
